@@ -10,8 +10,13 @@ namespace Slang
 namespace PackageTool
 {
 
-/// A parsed manifest together with the directory used to resolve its path dependencies and the
-/// app-relative directory that will contain the package after fetch.
+/// A parsed manifest together with the identity that contributed it and the directories used to
+/// resolve its path dependencies.
+///
+/// `ownerKey` is an opaque identity for this selected representation. Git requirements record
+/// that key as their owner so that, if this representation is later replaced (for example a Git
+/// pin shadowed by a path package), those requirements can be dropped. Do not parse the string;
+/// compare it only for equality with keys produced by the resolver.
 struct ResolvedManifest
 {
     Manifest manifest;
@@ -53,7 +58,7 @@ SlangResult resolveDependenciesWithSource(
     LockFile& outLock,
     String& outError);
 
-/// Resolve dependencies using an explicit source and app root.
+/// Resolve dependencies using an explicit source and workspace root.
 SlangResult resolveDependenciesWithSource(
     const String& projectRoot,
     const Manifest& manifest,
@@ -62,7 +67,7 @@ SlangResult resolveDependenciesWithSource(
     String& outError,
     List<String>* outWarnings = nullptr);
 
-/// Resolve dependencies from Git repositories, using a cache under `projectRoot`.
+/// Resolve dependencies from Git repositories, using a cache under the workspace root.
 SlangResult resolveDependencies(
     const String& projectRoot,
     const Manifest& manifest,

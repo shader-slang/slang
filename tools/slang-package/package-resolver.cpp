@@ -6,6 +6,7 @@
 #include "package-git.h"
 #include "package-json.h"
 #include "package-local.h"
+#include "package-path.h"
 
 namespace Slang
 {
@@ -31,21 +32,29 @@ struct ResolutionPackage
     ResolvedManifest resolvedManifest;
 };
 
-static bool _isPathWithin(const String& root, const String& path)
+static String _rootOwnerKey()
 {
-    String relative = Path::getRelativePath(root, path);
-    if (Path::isAbsolute(relative))
-        return false;
-    List<UnownedStringSlice> components;
-    Path::split(relative.getUnownedSlice(), components);
-    return components.getCount() == 0 || components[0] != "..";
+    return "<root>";
 }
 
-static bool _pathStartsWithParent(const String& path)
+static String _gitOwnerKey(const String& packageName, const String& commit)
 {
-    List<UnownedStringSlice> components;
-    Path::split(path.getUnownedSlice(), components);
-    return components.getCount() != 0 && components[0] == "..";
+    return String("git:") + packageName + "@" + commit;
+}
+
+static String _pathOwnerKey(const String& canonicalPath)
+{
+    return String("path:") + canonicalPath;
+}
+
+static String _localOwnerKey(const String& packageName, const String& path)
+{
+    return String("local:") + packageName + ":" + path;
+}
+
+static String _candidateOwnerKey(const String& packageName, const String& tag)
+{
+    return String("candidate:") + packageName + "@" + tag;
 }
 
 class GitPackageResolverSource : public IPackageResolverSource
@@ -93,7 +102,7 @@ public:
         String sourceName = git + "@" + candidate.tag + ":slang-package.json";
         SLANG_RETURN_ON_FAIL(
             readManifestText(sourceName, manifestText, outManifest.manifest, outError));
-        outManifest.ownerKey = String("git:") + packageName + "@" + candidate.commit;
+        outManifest.ownerKey = _gitOwnerKey(packageName, candidate.commit);
         outManifest.lockRoot = Path::combine(".slang", "packages", packageName);
         outManifest.gitRepositoryPath = repositoryPath;
         outManifest.gitRevision = candidate.commit;
@@ -158,12 +167,20 @@ public:
             (*localPackages)[localIndex],
             outManifest.sourceRoot,
             outError));
-        outManifest.ownerKey = String("local:") + packageName + ":" + candidate.path;
+        outManifest.ownerKey = _localOwnerKey(packageName, candidate.path);
         outManifest.lockRoot = (*localPackages)[localIndex].path;
         return SLANG_OK;
     }
 };
 
+/// Resolve the workspace package's dependency graph to one lock entry per package name.
+///
+/// Consider this example: the workspace package depends on `b` from Git (`>=1.0.0`) and on `a` by
+/// relative path, and `a` also depends on `b` by path. Name identity is unique, so there is one `b`.
+/// The path edge wins, Git constraints that only the Git pin contributed must disappear, and
+/// transitives that existed only because of that pin must be pruned. Path packages are selected
+/// immediately; Git packages are searched by release tag. `ownerKey` records which selected
+/// representation added each Git requirement so a later path selection can retract it.
 class Resolver
 {
 public:
@@ -182,7 +199,7 @@ public:
         this->rootManifest = &rootManifest;
         ResolvedManifest root;
         root.manifest = rootManifest;
-        root.ownerKey = "<root>";
+        root.ownerKey = _rootOwnerKey();
         root.sourceRoot = projectRoot;
         root.lockRoot = ".";
         for (const auto& dependency : rootManifest.dependencies)
@@ -191,41 +208,13 @@ public:
         SLANG_RETURN_ON_FAIL(search(outError));
         outLock = LockFile();
         List<bool> reachable;
-        reachable.setCount(packages.getCount());
-        for (auto& value : reachable)
-            value = false;
-        List<Index> pending;
-        for (const auto& dependency : rootManifest.dependencies)
-        {
-            Index index = findPackage(dependency.name);
-            SLANG_RELEASE_ASSERT(index >= 0);
-            if (!reachable[index])
-            {
-                reachable[index] = true;
-                pending.add(index);
-            }
-        }
-        for (Index pendingIndex = 0; pendingIndex < pending.getCount(); ++pendingIndex)
-        {
-            const auto& package = packages[pending[pendingIndex]];
-            SLANG_RELEASE_ASSERT(package.selected);
-            for (const auto& dependency : package.locked.dependencies)
-            {
-                Index index = findPackage(dependency.name);
-                SLANG_RELEASE_ASSERT(index >= 0);
-                if (!reachable[index])
-                {
-                    reachable[index] = true;
-                    pending.add(index);
-                }
-            }
-        }
+        getReachablePackages(reachable);
         for (Index i = 0; i < packages.getCount(); ++i)
         {
             if (!reachable[i])
                 continue;
-            const auto& package = packages[i];
-            outLock.packages.add(package.locked);
+            SLANG_RELEASE_ASSERT(packages[i].selected);
+            outLock.packages.add(packages[i].locked);
         }
         outLock.packages.sort([](const LockedPackage& left, const LockedPackage& right)
                               { return left.name < right.name; });
@@ -255,6 +244,8 @@ private:
 
     void removeGitRequirementsFromOwner(const String& owner)
     {
+        // Path selection of `owner`'s package retracts every Git constraint that representation
+        // added, including constraints on other package names.
         for (auto& package : packages)
         {
             String oldGit = package.git;
@@ -276,7 +267,7 @@ private:
 
     bool isOwnerActive(const String& owner, const List<bool>& reachable) const
     {
-        if (owner == "<root>")
+        if (owner == _rootOwnerKey())
             return true;
         for (Index i = 0; i < packages.getCount(); ++i)
         {
@@ -287,6 +278,9 @@ private:
         return false;
     }
 
+    /// Drop Git constraints whose contributing representation is no longer reachable, and unselect
+    /// path packages whose declaring owner disappeared. Repeat until the reachable set is stable;
+    /// each iteration only removes requirements or selections, so it cannot cycle.
     void pruneUnreachableGitRequirements()
     {
         for (;;)
@@ -383,7 +377,7 @@ private:
         {
             String gitRelativeRoot =
                 Path::simplify(Path::combine(declaringManifest.gitRelativeRoot, dependency.path));
-            if (Path::isAbsolute(gitRelativeRoot) || _pathStartsWithParent(gitRelativeRoot))
+            if (Path::isAbsolute(gitRelativeRoot) || pathStartsWithParentComponent(gitRelativeRoot))
             {
                 outError = String("Path dependency '") + dependency.name +
                            "' escapes its Git package checkout: " + dependency.path;
@@ -423,26 +417,26 @@ private:
                            " (" + dependency.path + ")";
                 return SLANG_FAIL;
             }
-            String canonicalStateRoot;
             String canonicalDeclaringRoot;
-            if (SLANG_SUCCEEDED(
-                    Path::getCanonical(Path::combine(projectRoot, ".slang"), canonicalStateRoot)) &&
-                SLANG_SUCCEEDED(
-                    Path::getCanonical(declaringManifest.sourceRoot, canonicalDeclaringRoot)) &&
-                _isPathWithin(canonicalStateRoot, outCanonicalPath) &&
-                !(_isPathWithin(canonicalStateRoot, canonicalDeclaringRoot) &&
-                  _isPathWithin(canonicalDeclaringRoot, outCanonicalPath)))
+            if (SLANG_FAILED(
+                    Path::getCanonical(declaringManifest.sourceRoot, canonicalDeclaringRoot)))
             {
-                outError = String("Path dependency cannot use package-tool state under .slang: ") +
-                           dependency.name;
+                outError =
+                    String("Cannot canonicalize package root: ") + declaringManifest.sourceRoot;
                 return SLANG_FAIL;
             }
+            SLANG_RETURN_ON_FAIL(validatePathDoesNotEscapeIntoToolState(
+                projectRoot,
+                canonicalDeclaringRoot,
+                outCanonicalPath,
+                dependency.name,
+                outError));
             SLANG_RETURN_ON_FAIL(readManifest(
                 Path::combine(outCanonicalPath, "slang-package.json"),
                 outManifest.manifest,
                 outError));
             outManifest.sourceRoot = outCanonicalPath;
-            if (_isPathWithin(declaringManifest.sourceRoot, outCanonicalPath))
+            if (isCanonicalPathWithin(canonicalDeclaringRoot, outCanonicalPath))
             {
                 String relative =
                     Path::getRelativePath(declaringManifest.sourceRoot, outCanonicalPath);
@@ -458,8 +452,9 @@ private:
             }
             if (Path::isAbsolute(outManifest.lockRoot))
             {
-                outError = String("Path dependency must be on the same filesystem as the app: ") +
-                           dependency.name;
+                outError =
+                    String("Path dependency must be on the same filesystem as the workspace: ") +
+                    dependency.name;
                 return SLANG_FAIL;
             }
         }
@@ -469,7 +464,7 @@ private:
                        "' does not match dependency name '" + dependency.name + "'.";
             return SLANG_FAIL;
         }
-        outManifest.ownerKey = String("path:") + outCanonicalPath;
+        outManifest.ownerKey = _pathOwnerKey(outCanonicalPath);
         return SLANG_OK;
     }
 
@@ -618,7 +613,7 @@ private:
             return SLANG_FAIL;
         }
         if (!outManifest.ownerKey.getLength())
-            outManifest.ownerKey = String("candidate:") + package.name + "@" + candidate.tag;
+            outManifest.ownerKey = _candidateOwnerKey(package.name, candidate.tag);
         return SLANG_OK;
     }
 

@@ -14,7 +14,7 @@ namespace PackageTool
 /// Return the placeholder text written by `slang package init`.
 const char* getLicensePlaceholderText();
 
-/// Validate the current package and its materialized, locked dependency closure.
+/// Validate the workspace package and its materialized, locked dependency closure.
 SlangResult validateProject(
     const String& projectRoot,
     String& outError,

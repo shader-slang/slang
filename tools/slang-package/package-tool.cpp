@@ -8,6 +8,7 @@
 #include "package-json.h"
 #include "package-local.h"
 #include "package-lock.h"
+#include "package-path.h"
 #include "package-resolver.h"
 #include "package-validate.h"
 
@@ -20,16 +21,6 @@ namespace PackageTool
 
 static const char* const kManifestName = "slang-package.json";
 static const char* const kLockName = "slang-package-lock.json";
-
-static bool _isPathWithin(const String& canonicalRoot, const String& canonicalPath)
-{
-    if (canonicalPath == canonicalRoot)
-        return true;
-    UnownedStringSlice root = canonicalRoot.getUnownedSlice();
-    UnownedStringSlice path = canonicalPath.getUnownedSlice();
-    return path.startsWith(root) && path.getLength() > root.getLength() &&
-           Path::isDelimiter(path[root.getLength()]);
-}
 
 static void _printHelp()
 {
@@ -89,17 +80,17 @@ static SlangResult _writeSearchPaths(
                 searchPaths << Path::combine(localPackages[localIndex].path, exportPath) << "\n";
             continue;
         }
-        if (package.path.getLength())
+        if (isPathOnlyLockedPackage(package))
         {
-            if (package.git.getLength())
-            {
-                outError = String("Locked local override '") + package.name +
-                           "' is not registered in .slang/overrides.json.";
-                return SLANG_FAIL;
-            }
             for (const auto& exportPath : package.exports)
                 searchPaths << Path::combine(package.path, exportPath) << "\n";
             continue;
+        }
+        if (isLocalOverrideLockedPackage(package))
+        {
+            outError = String("Locked local override '") + package.name +
+                       "' is not registered in .slang/overrides.json.";
+            return SLANG_FAIL;
         }
 
         String packageRoot = Path::combine(".slang", "packages", package.name);
@@ -147,15 +138,13 @@ static SlangResult _materialize(
     {
         if (findLocalPackageIndex(localPackages, package.name) >= 0)
             continue;
-        if (package.path.getLength())
-        {
-            if (package.git.getLength())
-            {
-                outError = String("Locked local override '") + package.name +
-                           "' is not registered in .slang/overrides.json.";
-                return SLANG_FAIL;
-            }
+        if (isPathOnlyLockedPackage(package))
             continue;
+        if (isLocalOverrideLockedPackage(package))
+        {
+            outError = String("Locked local override '") + package.name +
+                       "' is not registered in .slang/overrides.json.";
+            return SLANG_FAIL;
         }
 
         List<TagCandidate> candidates;
@@ -287,7 +276,7 @@ static SlangResult _validateLocalPackages(
     }
     for (const auto& package : lock.packages)
     {
-        if (package.path.getLength() && package.git.getLength() &&
+        if (isLocalOverrideLockedPackage(package) &&
             findLocalPackageIndex(localPackages, package.name) < 0)
         {
             outError = String("Locked local package '") + package.name +
@@ -299,45 +288,6 @@ static SlangResult _validateLocalPackages(
     return SLANG_OK;
 }
 
-static SlangResult _validateLockedPath(
-    const String& projectRoot,
-    const String& declaringRoot,
-    const Dependency& dependency,
-    const LockedPackage& lockedPackage,
-    String& outError)
-{
-    if (!dependency.path.getLength())
-        return SLANG_OK;
-    String canonicalExpectedPath;
-    String canonicalLockedPath;
-    if (SLANG_FAILED(Path::getCanonical(
-            Path::combine(declaringRoot, dependency.path),
-            canonicalExpectedPath)) ||
-        SLANG_FAILED(Path::getCanonical(
-            Path::combine(projectRoot, lockedPackage.path),
-            canonicalLockedPath)) ||
-        canonicalExpectedPath != canonicalLockedPath)
-    {
-        outError = String("Locked path does not match dependency '") + dependency.name +
-                   "'. Run 'slang package update'.";
-        return SLANG_FAIL;
-    }
-    String canonicalStateRoot;
-    String canonicalDeclaringRoot;
-    if (SLANG_SUCCEEDED(
-            Path::getCanonical(Path::combine(projectRoot, ".slang"), canonicalStateRoot)) &&
-        SLANG_SUCCEEDED(Path::getCanonical(declaringRoot, canonicalDeclaringRoot)) &&
-        _isPathWithin(canonicalStateRoot, canonicalExpectedPath) &&
-        !_isPathWithin(canonicalDeclaringRoot, canonicalExpectedPath))
-    {
-        outError = String("Path dependency cannot use package-tool state under .slang: ") +
-                   dependency.name;
-        return SLANG_FAIL;
-    }
-    return SLANG_OK;
-}
-
-/// Verify the materialized manifest and path identity for every package in the lock.
 static SlangResult _validateMaterializedManifests(
     const String& projectRoot,
     const Manifest& rootManifest,
@@ -347,28 +297,24 @@ static SlangResult _validateMaterializedManifests(
     bool allowLocalManifestChanges = false)
 {
     List<bool> trusted;
-    List<bool> processed;
     trusted.setCount(lock.packages.getCount());
-    processed.setCount(lock.packages.getCount());
     for (Index i = 0; i < lock.packages.getCount(); ++i)
-    {
         trusted[i] = false;
-        processed[i] = false;
-    }
     List<Index> pending;
 
     for (const auto& dependency : rootManifest.dependencies)
     {
         Index packageIndex = findLockedPackageIndex(lock, dependency.name);
         SLANG_RELEASE_ASSERT(packageIndex >= 0);
-        SLANG_RETURN_ON_FAIL(_validateLockedPath(
+        SLANG_RETURN_ON_FAIL(validateLockedPathDependency(
             projectRoot,
             projectRoot,
+            rootManifest.name,
             dependency,
             lock.packages[packageIndex],
             outError));
-        const LockedPackage& package = lock.packages[packageIndex];
-        if (dependency.path.getLength() || package.git.getLength())
+        if (isTrustedLockSelection(dependency, lock.packages[packageIndex]) &&
+            !trusted[packageIndex])
         {
             trusted[packageIndex] = true;
             pending.add(packageIndex);
@@ -378,26 +324,11 @@ static SlangResult _validateMaterializedManifests(
     for (Index pendingIndex = 0; pendingIndex < pending.getCount(); ++pendingIndex)
     {
         Index packageIndex = pending[pendingIndex];
-        if (processed[packageIndex])
-            continue;
-        processed[packageIndex] = true;
         const LockedPackage& package = lock.packages[packageIndex];
         String packageRoot;
+        SLANG_RETURN_ON_FAIL(
+            getLockedPackageRoot(projectRoot, package, localPackages, packageRoot, outError));
         Index localIndex = findLocalPackageIndex(localPackages, package.name);
-        if (localIndex >= 0)
-        {
-            SLANG_RETURN_ON_FAIL(
-                getLocalPackageRoot(projectRoot, localPackages[localIndex], packageRoot, outError));
-        }
-        else if (package.path.getLength())
-        {
-            packageRoot = Path::combine(projectRoot, package.path);
-        }
-        else
-        {
-            packageRoot =
-                Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
-        }
 
         Manifest manifest;
         if (SLANG_FAILED(
@@ -416,33 +347,22 @@ static SlangResult _validateMaterializedManifests(
         {
             Index dependencyIndex = findLockedPackageIndex(lock, dependency.name);
             SLANG_RELEASE_ASSERT(dependencyIndex >= 0);
-            SLANG_RETURN_ON_FAIL(_validateLockedPath(
+            SLANG_RETURN_ON_FAIL(validateLockedPathDependency(
                 projectRoot,
                 packageRoot,
+                manifest.name,
                 dependency,
                 lock.packages[dependencyIndex],
                 outError));
-            const LockedPackage& dependencyPackage = lock.packages[dependencyIndex];
-            if (dependency.path.getLength() || dependencyPackage.git.getLength())
+            if (isTrustedLockSelection(dependency, lock.packages[dependencyIndex]) &&
+                !trusted[dependencyIndex])
             {
-                if (!trusted[dependencyIndex])
-                {
-                    trusted[dependencyIndex] = true;
-                    pending.add(dependencyIndex);
-                }
+                trusted[dependencyIndex] = true;
+                pending.add(dependencyIndex);
             }
         }
     }
-    for (Index i = 0; i < lock.packages.getCount(); ++i)
-    {
-        if (!processed[i])
-        {
-            outError = String("Locked path package '") + lock.packages[i].name +
-                       "' is not selected by a trusted path dependency.";
-            return SLANG_FAIL;
-        }
-    }
-    return SLANG_OK;
+    return requireAllLockPackagesTrusted(lock, trusted, outError);
 }
 
 static SlangResult _writeValidatedSearchPathsAfterLocalChange(
@@ -781,7 +701,7 @@ static SlangResult _override(
     LockFile lock;
     SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
     LockedPackage* lockedPackage = _findLockedPackage(lock, name);
-    if (lockedPackage && lockedPackage->path.getLength() && !lockedPackage->git.getLength())
+    if (lockedPackage && isPathOnlyLockedPackage(*lockedPackage))
     {
         outError = String("Manifest path dependency cannot be overridden: ") + name;
         return SLANG_FAIL;

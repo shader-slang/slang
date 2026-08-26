@@ -10,6 +10,15 @@ The `slang package` command manages source dependencies stored in Git repositori
 `slang pkg` accepts the same commands. Package management does not change Slang's `import` syntax
 and does not build or distribute `.slang-module` files.
 
+A **package** is a directory with `slang-package.json`. Its name, exports, license files, and
+dependencies apply wherever that package appears in a graph, including as a Git pin or a path
+dependency.
+
+A **workspace** is the directory where you run `slang package` for a given solve. It is also a
+package: the one whose manifest starts resolution. The workspace owns `slang-package-lock.json` and
+generated state under `.slang/`. Nested packages' lockfiles are not used for that solve. A module
+is a Slang language unit (`module NAME;`), not a package-manager concept.
+
 ## Package layout
 
 A package uses these conventional paths:
@@ -85,7 +94,7 @@ For example, a package can check in another package under `vendor/noise`:
 ```
 
 The resolver reads every reachable path package manifest and includes all of its transitive
-dependencies in the app's lock. Path packages are used in place and are not copied under
+dependencies in the workspace lock. Path packages are used in place and are not copied under
 `.slang/packages/`; Git packages are fetched there.
 
 One package name identifies one node in the graph. Git requirements from multiple dependents must
@@ -95,21 +104,22 @@ resolution fails. A path requirement wins over a Git requirement for the same na
 checking the Git version range, and the tool warns that the Git requirement was shadowed. The path
 package's transitive dependencies are still resolved normally.
 
-A path in the app or another local package may use `..` to leave the package that declares it,
-which supports sibling packages in a larger checkout. `slang package update` and
+A path in the workspace package or another local package may use `..` to leave the package that
+declares it, which supports sibling packages in a larger checkout. `slang package update` and
 `slang package validate` warn because fetching the declaring package alone may not reproduce that
 layout. A path inside a Git release must remain in that release's checkout. A missing target is
 always an error.
 
 ## Locking and fetching
 
-`slang package update` resolves all manifests reachable from the app, materializes the resulting
-dependency set, and writes one `slang-package-lock.json` in the app root. The lockfile is the
-definitive dependency graph and records both Git and path packages. Nested packages' lockfiles are
-not used for that build. `slang package fetch` requires the app lockfile, checks that it still
-satisfies every recorded manifest, and checks out every direct and transitive Git dependency under
-`.slang/packages/`. Path dependencies remain at their locked relative locations. Fetch never
-changes dependency resolution, so it is the appropriate command for normal builds and CI.
+`slang package update` resolves all manifests reachable from the workspace package, materializes
+the resulting dependency set, and writes one `slang-package-lock.json` in the workspace root. The
+lockfile is the definitive dependency graph and records both Git and path packages. Nested
+packages' lockfiles are not used for that solve. `slang package fetch` requires the workspace
+lockfile, checks that it still satisfies every recorded manifest, and checks out every direct and
+transitive Git dependency under `.slang/packages/`. Path dependencies remain at their locked
+relative locations. Fetch never changes dependency resolution, so it is the appropriate command
+for normal builds and CI.
 
 Run `slang package update` deliberately when manifest constraints or upstream releases change.
 Normal CI and developer builds use `slang package fetch`; a missing or inconsistent lock is an
@@ -121,7 +131,7 @@ cannot begin with `-`, use Git's command-executing `ext::` transport, or contain
 control characters.
 
 After fetching, `.slang/search-paths` lists the source roots to pass to `slangc` with `-I`. Paths in
-this file are relative to the package root and are not added to compiler sessions automatically.
+this file are relative to the workspace root and are not added to compiler sessions automatically.
 
 ## Validating packages
 
@@ -141,10 +151,10 @@ relative to the primary (for example `__include "noise/hash";`), as shown in
 ## Creating and editing packages
 
 `slang package init` creates `slang-package.json` and the conventional directories in the current
-directory. It also adds `.slang/` to `.gitignore`; that directory contains generated checkouts,
-search paths, and developer-local registrations.
+directory. It also adds `.slang/` to `.gitignore`; that workspace directory contains generated
+checkouts, search paths, and developer-local registrations.
 
-`slang package edit NAME` creates a project-local working copy under `.slang/edit/NAME`. Search
+`slang package edit NAME` creates a workspace-local working copy under `.slang/edit/NAME`. Search
 paths prefer that copy, while the lockfile initially retains the original resolved commit. Use
 `slang package unedit NAME` to return to the locked checkout. `unedit` refuses to remove a checkout
 that has local changes, local commits, or stashes. It also refuses while the lock has a local-path
@@ -160,7 +170,7 @@ the supplied directory. `slang package unoverride NAME` removes an override regi
 A registered local manifest must agree with the lock. If its exports or dependencies change,
 `fetch` and `validate` report the drift. Run `slang package update --from-local` to resolve the
 changed local manifests and their transitive requirements into the definitive lock. Unlike a
-manifest path dependency, this is a project-local replacement for a package selected through Git:
+manifest path dependency, this is a workspace-local replacement for a package selected through Git:
 the lock records both its original Git location and its effective path and requires the matching
 registration in `.slang/overrides.json`. It therefore fails explicitly on another machine or in
 CI. The local tree does not need to satisfy the shadowed Git version range, but all of its

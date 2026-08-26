@@ -2,6 +2,9 @@
 
 #include "package-lock.h"
 
+#include "core/slang-io.h"
+#include "package-local.h"
+
 namespace Slang
 {
 namespace PackageTool
@@ -34,7 +37,7 @@ SlangResult validateLockedDependency(
     const LockedPackage& lockedPackage = lock.packages[outPackageIndex];
     if (dependency.path.getLength())
     {
-        if (!lockedPackage.path.getLength() || lockedPackage.git.getLength())
+        if (!isPathOnlyLockedPackage(lockedPackage))
         {
             outError = String("Lock file does not use a path for dependency '") + dependency.name +
                        "'. Run 'slang package update'.";
@@ -44,7 +47,7 @@ SlangResult validateLockedDependency(
     }
     if (lockedPackage.path.getLength())
     {
-        if (lockedPackage.git.getLength() && lockedPackage.git != dependency.git)
+        if (isLocalOverrideLockedPackage(lockedPackage) && lockedPackage.git != dependency.git)
         {
             outError = String("Lock file path for Git dependency '") + dependency.name +
                        "' uses a different Git location. Run 'slang package update'.";
@@ -131,6 +134,51 @@ SlangResult validateLockedPackageManifest(
                 String("Package manifest dependencies do not match its lock: ") + package.name;
             return SLANG_FAIL;
         }
+    }
+    return SLANG_OK;
+}
+
+SlangResult getLockedPackageRoot(
+    const String& projectRoot,
+    const LockedPackage& package,
+    const List<LocalPackage>& localPackages,
+    String& outRoot,
+    String& outError)
+{
+    Index localIndex = findLocalPackageIndex(localPackages, package.name);
+    if (localIndex >= 0)
+        return getLocalPackageRoot(projectRoot, localPackages[localIndex], outRoot, outError);
+    if (isLocalOverrideLockedPackage(package))
+    {
+        outError = String("Locked local override '") + package.name +
+                   "' is not registered in .slang/overrides.json.";
+        return SLANG_FAIL;
+    }
+    if (isPathOnlyLockedPackage(package))
+    {
+        outRoot = Path::combine(projectRoot, package.path);
+        return SLANG_OK;
+    }
+    outRoot = Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
+    return SLANG_OK;
+}
+
+SlangResult requireAllLockPackagesTrusted(
+    const LockFile& lock,
+    const List<bool>& trusted,
+    String& outError)
+{
+    SLANG_RELEASE_ASSERT(trusted.getCount() == lock.packages.getCount());
+    for (Index i = 0; i < lock.packages.getCount(); ++i)
+    {
+        if (trusted[i])
+            continue;
+        outError =
+            isPathOnlyLockedPackage(lock.packages[i])
+                ? String("Locked path package '") + lock.packages[i].name +
+                      "' is not selected by a trusted path dependency."
+                : String("Lock file contains unreachable package '") + lock.packages[i].name + "'.";
+        return SLANG_FAIL;
     }
     return SLANG_OK;
 }

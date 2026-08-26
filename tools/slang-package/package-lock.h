@@ -25,6 +25,21 @@ SlangResult validateLockedPackageManifest(
     const Manifest& manifest,
     String& outError);
 
+/// Resolve the on-disk root for a lock entry: a registered override, a path-only directory, or
+/// the Git checkout under `.slang/packages`.
+SlangResult getLockedPackageRoot(
+    const String& projectRoot,
+    const LockedPackage& package,
+    const List<LocalPackage>& localPackages,
+    String& outRoot,
+    String& outError);
+
+/// Fail if any lock entry was never selected by a trusted edge.
+SlangResult requireAllLockPackagesTrusted(
+    const LockFile& lock,
+    const List<bool>& trusted,
+    String& outError);
+
 } // namespace PackageTool
 } // namespace Slang
 

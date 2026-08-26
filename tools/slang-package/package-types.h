@@ -17,6 +17,8 @@ struct Dependency
     String name;
     String git;
     String path;
+    /// Range constraint for a Git dependency, written without a `v` prefix (for example `>=1.2.0`).
+    /// This is not a package self-version; a package's published identity is its Git release tag.
     String version;
     String tag;
 };
@@ -29,6 +31,14 @@ struct Manifest
     List<Dependency> dependencies;
 };
 
+/// One package in `slang-package-lock.json`. Exactly one of these shapes is legal:
+///
+/// - Git pin: `git`, `tag`, and `commit` are set; `path` is empty. Fetch materializes
+///   `.slang/packages/<name>` at that commit.
+/// - Path-only: `path` is set; `git` is empty. The package is used in place and is trusted only
+///   when a manifest `path` edge selected it.
+/// - Local override: `git` and `path` are both set. The Git identity is retained, but the tree at
+///   `path` is used instead; `.slang/overrides.json` must register the same path.
 struct LockedPackage
 {
     String name;
@@ -39,6 +49,29 @@ struct LockedPackage
     List<String> exports;
     List<Dependency> dependencies;
 };
+
+inline bool isGitBackedLockedPackage(const LockedPackage& package)
+{
+    return package.git.getLength() != 0;
+}
+
+inline bool isPathOnlyLockedPackage(const LockedPackage& package)
+{
+    return package.path.getLength() != 0 && package.git.getLength() == 0;
+}
+
+inline bool isLocalOverrideLockedPackage(const LockedPackage& package)
+{
+    return package.path.getLength() != 0 && package.git.getLength() != 0;
+}
+
+/// A lock row may be used only if a declaring package selected it with a `path` edge, or if the
+/// row is Git-backed. A path-only row in the lock is not enough: otherwise a Git dependency could
+/// be redirected to an arbitrary directory by editing the lock.
+inline bool isTrustedLockSelection(const Dependency& dependency, const LockedPackage& locked)
+{
+    return dependency.path.getLength() != 0 || isGitBackedLockedPackage(locked);
+}
 
 struct LockFile
 {

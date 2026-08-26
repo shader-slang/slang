@@ -331,6 +331,67 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsPathLockForGitDependency)
         error.getUnownedSlice().indexOf(UnownedStringSlice("trusted path dependency")) >= 0);
 }
 
+SLANG_UNIT_TEST(PackageToolRejectsPathIntoSlangState)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    String evilRoot = Path::combine(temp.path, ".slang/evil");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(evilRoot));
+    Manifest evil;
+    evil.name = "evil";
+    evil.exports.add("src");
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(writeManifest(Path::combine(evilRoot, "slang-package.json"), evil, error)));
+
+    Manifest root;
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency pathDep;
+    pathDep.name = "evil";
+    pathDep.path = ".slang/evil";
+    root.dependencies.add(pathDep);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* updateArguments[] = {"slang-package", "update"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("package-tool state under .slang")) >=
+        0);
+
+    LockedPackage locked;
+    locked.name = "evil";
+    locked.path = ".slang/evil";
+    locked.exports.add("src");
+    PackageTool::LockFile lock;
+    lock.packages.add(locked);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
+
+    const char* fetchArguments[] = {"slang-package", "fetch"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("package-tool state under .slang")) >=
+        0);
+    const char* validateArguments[] = {"slang-package", "validate"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(validateArguments),
+        validateArguments,
+        error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("package-tool state under .slang")) >=
+        0);
+}
+
 SLANG_UNIT_TEST(PackageToolPathDependencies)
 {
     TemporaryDirectory temp;
