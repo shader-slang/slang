@@ -2031,10 +2031,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto valueType = getSpvPointerValueType(ptrType);
         auto rule = getPointerArrayStrideLayoutRule(ptrType, valueType);
 
-        if (auto arrayType = as<IRUnsizedArrayType>(valueType))
-            return getArrayElementStrideValue(arrayType, rule);
-
-        if (auto arrayType = as<IRArrayType>(valueType))
+        if (auto arrayType = as<IRArrayTypeBase>(valueType))
             return getArrayElementStrideValue(arrayType, rule);
 
         IRSizeAndAlignment sizeAndAlignment;
