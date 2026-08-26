@@ -66,6 +66,13 @@ static bool _supportsScalarPointerArithmetic(const SlangNVVMBuilderAPI_V2& api)
            api.emitPointerOffset;
 }
 
+// Treats the appended Slice 11 fields as one coherent scalar-array-addressing capability.
+static bool _supportsScalarArrayAddressing(const SlangNVVMBuilderAPI_V2& api)
+{
+    return api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_ARRAY_MIN_SIZE &&
+           api.getArrayType && api.emitArrayElementPointer;
+}
+
 // Rejects success without a required handle and never exposes a handle from a failed provider call.
 template<typename T>
 static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
@@ -157,11 +164,14 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     const bool hasPartialScalarPointerArithmeticPrefix =
         api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_FUNCTION_MIN_SIZE &&
         api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_POINTER_ARITHMETIC_MIN_SIZE;
+    const bool hasPartialScalarArrayPrefix =
+        api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_POINTER_ARITHMETIC_MIN_SIZE &&
+        api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_ARRAY_MIN_SIZE;
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE || hasPartialScalarPrefix ||
         hasPartialScalarControlFlowPrefix || hasPartialScalarSSAPrefix ||
         hasPartialScalarFunctionPrefix || hasPartialScalarPointerArithmeticPrefix ||
-        api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
-        !api.serializeModuleWithDiagnostics ||
+        hasPartialScalarArrayPrefix || api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 ||
+        !_isCompatibleV1(api.baseAPI) || !api.serializeModuleWithDiagnostics ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
          !_supportsScalarOperations(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE &&
@@ -171,7 +181,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_FUNCTION_MIN_SIZE &&
          !_supportsScalarFunctions(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_POINTER_ARITHMETIC_MIN_SIZE &&
-         !_supportsScalarPointerArithmetic(api)))
+         !_supportsScalarPointerArithmetic(api)) ||
+        (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_ARRAY_MIN_SIZE &&
+         !_supportsScalarArrayAddressing(api)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -216,6 +228,11 @@ bool NVVMIRBuilder::supportsScalarPointerArithmetic() const
     return _supportsScalarPointerArithmetic(m_apiV2);
 }
 
+bool NVVMIRBuilder::supportsScalarArrayAddressing() const
+{
+    return _supportsScalarArrayAddressing(m_apiV2);
+}
+
 String NVVMIRBuilder::getVersionString() const
 {
     if (!isInitialized())
@@ -235,6 +252,7 @@ String NVVMIRBuilder::getVersionString() const
             << ";scalar-ssa=" << (supportsScalarSSA() ? 1 : 0)
             << ";scalar-functions=" << (supportsScalarFunctions() ? 1 : 0)
             << ";scalar-pointer-arithmetic=" << (supportsScalarPointerArithmetic() ? 1 : 0)
+            << ";scalar-array-addressing=" << (supportsScalarArrayAddressing() ? 1 : 0)
             << ";timestamp="
             << SharedLibraryUtils::getSharedLibraryTimestamp(
                    reinterpret_cast<void*>(m_api.createModule));
@@ -539,6 +557,38 @@ SlangResult NVVMIRBuilder::emitPointerOffset(
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result =
         m_apiV2.emitPointerOffset(module, basePointer, elementOffset, &outPointer);
+    return _validateHandleResult(result, outPointer);
+}
+
+SlangResult NVVMIRBuilder::getArrayType(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1 elementType,
+    uint32_t elementCount,
+    SlangNVVMTypeHandle_1& outType) const
+{
+    outType = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarArrayAddressing())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV2.getArrayType(module, elementType, elementCount, &outType);
+    return _validateHandleResult(result, outType);
+}
+
+SlangResult NVVMIRBuilder::emitArrayElementPointer(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 baseArrayPointer,
+    SlangNVVMValueHandle_1 elementIndex,
+    SlangNVVMValueHandle_1& outPointer) const
+{
+    outPointer = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarArrayAddressing())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV2.emitArrayElementPointer(module, baseArrayPointer, elementIndex, &outPointer);
     return _validateHandleResult(result, outPointer);
 }
 

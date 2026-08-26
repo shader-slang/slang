@@ -310,6 +310,30 @@ static SlangResult SLANG_NVVM_CALL _getPointerType(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _getArrayType(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1 elementType,
+    uint32_t elementCount,
+    SlangNVVMTypeHandle_1* outType)
+{
+    if (outType)
+        *outType = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Type* llvmElementType = _getType(elementType);
+    if (!state || !llvmElementType || &llvmElementType->getContext() != &state->context ||
+        !llvm::ArrayType::isValidElementType(llvmElementType) ||
+        !llvm::PointerType::isLoadableOrStorableType(llvmElementType) ||
+        !llvmElementType->isSized() || !elementCount || !outType)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(
+        llvm::ArrayType::get(llvmElementType, elementCount));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _getFunctionType(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMTypeHandle_1 resultType,
@@ -756,6 +780,46 @@ static SlangResult SLANG_NVVM_CALL _emitPointerOffset(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 baseArrayPointer,
+    SlangNVVMValueHandle_1 elementIndex,
+    SlangNVVMValueHandle_1* outPointer)
+{
+    if (outPointer)
+        *outPointer = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmBaseArrayPointer = _getValue(baseArrayPointer);
+    llvm::Value* llvmElementIndex = _getValue(elementIndex);
+    llvm::PointerType* pointerType =
+        llvmBaseArrayPointer ? llvm::dyn_cast<llvm::PointerType>(llvmBaseArrayPointer->getType())
+                             : nullptr;
+    llvm::Type* pointeeType = pointerType && !pointerType->isOpaque()
+                                  ? pointerType->getNonOpaquePointerElementType()
+                                  : nullptr;
+    llvm::ArrayType* arrayType = llvm::dyn_cast_or_null<llvm::ArrayType>(pointeeType);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !outPointer || !insertionBlock || !pointerType || pointerType->isOpaque() ||
+        !_isNVVMAddressSpace(
+            static_cast<SlangNVVMAddressSpace_2>(pointerType->getAddressSpace())) ||
+        !arrayType || !arrayType->getNumElements() || !arrayType->isSized() || !llvmElementIndex ||
+        !llvm::isa<llvm::IntegerType>(llvmElementIndex->getType()) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmBaseArrayPointer) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmElementIndex))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* indices[] = {
+        llvm::ConstantInt::get(llvm::Type::getInt32Ty(state->context), 0),
+        llvmElementIndex};
+    // A Slang subscript does not establish LLVM's stronger inbounds provenance contract.
+    llvm::Value* result = state->builder.CreateGEP(arrayType, llvmBaseArrayPointer, indices);
+    *outPointer = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitReturnVoid(SlangNVVMModuleHandle_1 module)
 {
     ModuleState* state = _getModule(module);
@@ -1011,6 +1075,8 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitIntegerCall = _emitIntegerCall;
     api.emitIntegerReturn = _emitIntegerReturn;
     api.emitPointerOffset = _emitPointerOffset;
+    api.getArrayType = _getArrayType;
+    api.emitArrayElementPointer = _emitArrayElementPointer;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

@@ -80,6 +80,28 @@ bool _isBoolType(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Bool;
 }
 
+// Returns the accepted nonempty fixed i32 array and its exact provider-representable count.
+IRArrayType* _asSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount = nullptr)
+{
+    if (outElementCount)
+        *outElementCount = 0;
+
+    auto arrayType = as<IRArrayType>(type);
+    if (!arrayType || arrayType->getOp() != kIROp_ArrayType || arrayType->getOperandCount() != 2 ||
+        !_isI32Type(arrayType->getElementType()))
+    {
+        return nullptr;
+    }
+
+    auto elementCount = as<IRIntLit>(arrayType->getElementCount());
+    if (!elementCount || elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX)
+        return nullptr;
+
+    if (outElementCount)
+        *outElementCount = uint32_t(elementCount->getValue());
+    return arrayType;
+}
+
 // Returns the accepted CUDA device-pointer type, or null for every other pointer spelling.
 IRPtrTypeBase* _asSupportedDevicePointerType(IRInst* type)
 {
@@ -95,10 +117,43 @@ IRPtrTypeBase* _asSupportedDevicePointerType(IRInst* type)
                                                                                    : nullptr;
 }
 
-// Returns whether `type` has a direct scalar CUDA launch-parameter representation.
+// Returns a device pointer to an accepted fixed i32 array, preserving its canonical array type.
+IRPtrTypeBase* _asSupportedDeviceArrayPointerType(
+    IRInst* type,
+    IRArrayType** outArrayType = nullptr,
+    uint32_t* outElementCount = nullptr)
+{
+    if (outArrayType)
+        *outArrayType = nullptr;
+    if (outElementCount)
+        *outElementCount = 0;
+
+    auto ptrType = as<IRPtrTypeBase>(type);
+    IRArrayType* arrayType = nullptr;
+    uint32_t elementCount = 0;
+    if (!ptrType || ptrType->getOp() != kIROp_PtrType ||
+        !(arrayType = _asSupportedI32ArrayType(ptrType->getValueType(), &elementCount)) ||
+        ptrType->getAddressSpace() != AddressSpace::UserPointer)
+    {
+        return nullptr;
+    }
+
+    const AccessQualifier access = ptrType->getAccessQualifier();
+    if (access != AccessQualifier::Read && access != AccessQualifier::ReadWrite)
+        return nullptr;
+
+    if (outArrayType)
+        *outArrayType = arrayType;
+    if (outElementCount)
+        *outElementCount = elementCount;
+    return ptrType;
+}
+
+// Returns whether `type` has a direct CUDA launch-parameter representation.
 bool _isSupportedParameterType(IRInst* type)
 {
-    return _isI32Type(type) || _asSupportedDevicePointerType(type);
+    return _isI32Type(type) || _asSupportedDevicePointerType(type) ||
+           _asSupportedDeviceArrayPointerType(type);
 }
 
 // Raises the required builder prefix without weakening an already stronger requirement.
@@ -422,6 +477,8 @@ SlangResult _validateNVVMFunction(
     UInt actualParamCount = 0;
     for (auto param : function->getParams())
     {
+        auto arrayPointerType =
+            isEntryPoint ? _asSupportedDeviceArrayPointerType(param->getDataType()) : nullptr;
         const bool isSupportedType = isEntryPoint ? _isSupportedParameterType(param->getDataType())
                                                   : _isI32Type(param->getDataType());
         if (actualParamCount >= function->getParamCount() || !isSupportedType ||
@@ -432,6 +489,8 @@ SlangResult _validateNVVMFunction(
                 isEntryPoint ? toSlice("entry-point parameter")
                              : toSlice("helper function parameter"));
         }
+        if (arrayPointerType)
+            _requireCapability(capability, NVVMIRCapability::ScalarArrayAddressing);
         availableValues.add(param);
         ++actualParamCount;
     }
@@ -507,6 +566,17 @@ SlangResult _validateNVVMFunction(
                         toSlice("device i32 pointer offset"));
                 }
                 _requireCapability(capability, NVVMIRCapability::ScalarPointerArithmetic);
+                break;
+
+            case kIROp_GetElementPtr:
+                if (inst->getOperandCount() != 2 ||
+                    !_asSupportedDevicePointerType(inst->getDataType()))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("device i32 array element pointer"));
+                }
+                _requireCapability(capability, NVVMIRCapability::ScalarArrayAddressing);
                 break;
 
             case kIROp_Return:
@@ -648,6 +718,46 @@ SlangResult _validateNVVMFunction(
                     SLANG_RETURN_ON_FAIL(_validateI32Value(
                         codeGenContext,
                         elementOffset,
+                        inst,
+                        availableValues,
+                        dominatorTree,
+                        capability));
+                    availableValues.add(inst);
+                }
+                break;
+
+            case kIROp_GetElementPtr:
+                {
+                    IRInst* basePointer = inst->getOperand(0);
+                    IRInst* elementIndex = inst->getOperand(1);
+                    IRArrayType* arrayType = nullptr;
+                    auto basePointerType = basePointer ? _asSupportedDeviceArrayPointerType(
+                                                             basePointer->getDataType(),
+                                                             &arrayType)
+                                                       : nullptr;
+                    auto resultPointerType = _asSupportedDevicePointerType(inst->getDataType());
+                    if (!basePointerType || !resultPointerType || !arrayType ||
+                        basePointerType->getAddressSpace() !=
+                            resultPointerType->getAddressSpace() ||
+                        basePointerType->getAccessQualifier() !=
+                            resultPointerType->getAccessQualifier() ||
+                        !isTypeEqual(
+                            arrayType->getElementType(),
+                            resultPointerType->getValueType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("array element pointer relation"));
+                    }
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        basePointer,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    SLANG_RETURN_ON_FAIL(_validateI32Value(
+                        codeGenContext,
+                        elementIndex,
                         inst,
                         availableValues,
                         dominatorTree,
@@ -822,6 +932,50 @@ SlangResult _getNVVMI32Type(
         builder.getIntegerType(module, 32, ioType));
 }
 
+// Gets the provider array and AS1 pointer types for one canonical fixed-i32-array type.
+SlangResult _getNVVMDeviceArrayPointerType(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module,
+    IRArrayType* irArrayType,
+    SlangNVVMTypeHandle_1& ioI32Type,
+    Dictionary<IRArrayType*, SlangNVVMTypeHandle_1>& arrayTypeMap,
+    Dictionary<IRArrayType*, SlangNVVMTypeHandle_1>& arrayPointerTypeMap,
+    SlangNVVMTypeHandle_1& outPointerType)
+{
+    outPointerType = nullptr;
+    uint32_t elementCount = 0;
+    SLANG_RELEASE_ASSERT(_asSupportedI32ArrayType(irArrayType, &elementCount));
+    SLANG_RETURN_ON_FAIL(_getNVVMI32Type(codeGenContext, builder, module, ioI32Type));
+
+    SlangNVVMTypeHandle_1 arrayType = nullptr;
+    if (auto mappedType = arrayTypeMap.tryGetValue(irArrayType))
+    {
+        arrayType = *mappedType;
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "fixed i32 array type",
+            builder.getArrayType(module, ioI32Type, elementCount, arrayType)));
+        arrayTypeMap[irArrayType] = arrayType;
+    }
+
+    if (auto mappedType = arrayPointerTypeMap.tryGetValue(irArrayType))
+    {
+        outPointerType = *mappedType;
+        return SLANG_OK;
+    }
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "device fixed i32 array pointer type",
+        builder
+            .getPointerType(module, arrayType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL, outPointerType)));
+    arrayPointerTypeMap[irArrayType] = outPointerType;
+    return SLANG_OK;
+}
+
 // Returns an already-lowered SSA value or materializes the exact preflighted i32 literal.
 SlangResult _getLoweredNVVMValue(
     CodeGenContext* codeGenContext,
@@ -966,6 +1120,8 @@ SlangResult emitNVVMIRFromLinkedIR(
 
     SlangNVVMTypeHandle_1 i32Type = nullptr;
     SlangNVVMTypeHandle_1 deviceI32PointerType = nullptr;
+    Dictionary<IRArrayType*, SlangNVVMTypeHandle_1> arrayTypeMap;
+    Dictionary<IRArrayType*, SlangNVVMTypeHandle_1> arrayPointerTypeMap;
     Dictionary<IRFunc*, SlangNVVMValueHandle_1> functionMap;
     NVVMValueMap valueMap;
     Dictionary<IRBlock*, SlangNVVMBlockHandle_1> blockMap;
@@ -993,22 +1149,40 @@ SlangResult emitNVVMIRFromLinkedIR(
                 continue;
             }
 
-            SLANG_RELEASE_ASSERT(
-                function == entryPoint && _asSupportedDevicePointerType(param->getDataType()));
+            SLANG_RELEASE_ASSERT(function == entryPoint);
             SLANG_RETURN_ON_FAIL(
                 _getNVVMI32Type(codeGenContext, builder, moduleScope.module, i32Type));
-            if (!deviceI32PointerType)
+            if (_asSupportedDevicePointerType(param->getDataType()))
             {
-                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                    codeGenContext,
-                    "device i32 pointer type",
-                    builder.getPointerType(
-                        moduleScope.module,
-                        i32Type,
-                        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-                        deviceI32PointerType)));
+                if (!deviceI32PointerType)
+                {
+                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                        codeGenContext,
+                        "device i32 pointer type",
+                        builder.getPointerType(
+                            moduleScope.module,
+                            i32Type,
+                            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+                            deviceI32PointerType)));
+                }
+                parameterTypes.add(deviceI32PointerType);
+                continue;
             }
-            parameterTypes.add(deviceI32PointerType);
+
+            IRArrayType* irArrayType = nullptr;
+            SLANG_RELEASE_ASSERT(
+                _asSupportedDeviceArrayPointerType(param->getDataType(), &irArrayType));
+            SlangNVVMTypeHandle_1 arrayPointerType = nullptr;
+            SLANG_RETURN_ON_FAIL(_getNVVMDeviceArrayPointerType(
+                codeGenContext,
+                builder,
+                moduleScope.module,
+                irArrayType,
+                i32Type,
+                arrayTypeMap,
+                arrayPointerTypeMap,
+                arrayPointerType));
+            parameterTypes.add(arrayPointerType);
         }
 
         SlangNVVMTypeHandle_1 functionType = nullptr;
@@ -1311,6 +1485,39 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 loweredBasePointer,
                                 loweredElementOffset,
+                                loweredPointer)));
+                        valueMap[inst] = loweredPointer;
+                    }
+                    break;
+
+                case kIROp_GetElementPtr:
+                    {
+                        SlangNVVMValueHandle_1 loweredBasePointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(0),
+                            valueMap,
+                            i32Type,
+                            loweredBasePointer));
+                        SlangNVVMValueHandle_1 loweredElementIndex = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(1),
+                            valueMap,
+                            i32Type,
+                            loweredElementIndex));
+                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "device i32 array element pointer",
+                            builder.emitArrayElementPointer(
+                                moduleScope.module,
+                                loweredBasePointer,
+                                loweredElementIndex,
                                 loweredPointer)));
                         valueMap[inst] = loweredPointer;
                     }

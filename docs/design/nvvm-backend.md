@@ -784,6 +784,76 @@ aggregates, globals, shared/local/constant/generic address spaces, pointer helpe
 results, pointer casts/comparisons/subtraction, byte addressing, bounds checks, or `inbounds`
 provenance. Those remain separate producer and ABI decisions.
 
+### Slice 11 fixed device-array element addressing
+
+Consider this example:
+
+```slang
+typealias RWIntArray4 = Ptr<int[4], Access::ReadWrite, AddressSpace::Device>;
+typealias RIntArray4 = Ptr<int[4], Access::Read, AddressSpace::Device>;
+
+[CUDAKernel]
+void computeMain(
+    uniform RWIntArray4 destination,
+    uniform RIntArray4 source,
+    uniform int index)
+{
+    (*destination)[index] = (*source)[index];
+}
+```
+
+After the established CUDA passes and `simplifyIR`, the final entry signature is exactly
+`Func(Void, Ptr(Array(Int,4),RW,UserPointer), Ptr(Array(Int,4),Read,UserPointer), Int)`. The body
+contains two canonical, two-operand `IRGetElementPtr` instructions. Each consumes its array-pointer
+parameter and the same signed-i32 `index` parameter. The source result feeds the existing scalar
+load, and that load feeds the existing scalar store through the destination result. The emitter
+does not turn this representation into `IRGetOffsetPtr`, byte arithmetic, or reconstructed source
+syntax.
+
+The pointer-type relation is intentionally semantic rather than whole-type equality. Both bases
+point to the same `Array(Int,4)` with `DefaultLayout`; the destination result is a read-write device
+`Ptr(Int, ScalarLayout)`, while the source result is a read-only device
+`Ptr(Int, ScalarLayout)`. Preflight therefore requires the same address space and access on each
+base/result pair, and requires the result pointee to equal the array element type, while allowing
+the canonical layout spelling to change. CUDA's canonical buffer-element lowering selects the
+`Natural` layout rule for pointer pointees regardless of a source pointer's layout annotation.
+Consequently, the storage-shape invariant is the exact `IRArrayType`:
+signed-i32 elements, a nonzero `IRIntLit` count that fits `uint32_t`, and exactly its element and
+count operands with no custom stride.
+
+The private V2 provider table appends one coherent two-operation array-addressing prefix:
+
+```text
+getArrayType(module, elementType, nonzeroCount, outType)
+emitArrayElementPointer(module, baseArrayPointer, elementIndex, outPointer)
+```
+
+The complete V2 table is 264 bytes on the 64-bit build, while the exact 248-byte Slice 10 prefix and
+all older minima remain frozen and compatible for their established programs. A byte count between
+those two coherent prefixes, or a complete prefix with either operation null, is malformed; larger
+tables remain compatible. An array-shaped program presented to an exact Slice 10 provider reaches
+E52016 after discovery but before module creation. The host reports
+`scalar-array-addressing=0|1` in the builder identity and clears output handles both before dispatch
+and after any failed provider call.
+
+The provider keeps the ABI mechanism more general than the Slang-side policy. `getArrayType`
+requires a live module, a non-null output, a same-context element type accepted by
+`ArrayType::isValidElementType` and `PointerType::isLoadableOrStorableType`, a sized element, and a
+nonzero count. `emitArrayElementPointer` requires a live module, a non-null output, a current
+unterminated insertion block, a typed non-opaque pointer in a declared NVVM address space whose
+pointee is a nonempty sized array, a scalar integer index, and base/index values owned by and
+available in the current function. All validation precedes the only mutation. The operation then
+emits ordinary non-`inbounds`
+`CreateGEP(arrayType, base, {i32 0, index})`; a Slang subscript does not establish LLVM's stronger
+object/provenance promise.
+
+This boundary is only nonempty fixed signed-i32 arrays behind read or read-write device entry-point
+pointers, indexed by signed `i32`. It does not add unsized, empty, nested, vector, matrix, struct,
+tuple, or non-i32 arrays; array SSA values or aggregate load/store/copy; local allocation, globals,
+constant or shared storage; other address spaces; pointer-to-array helper ABI; unsigned or wider
+indices; bounds checks; `inbounds` provenance; thread builtins; barriers; atomics; resources; or
+libdevice. Those shapes have different canonical producers and remain separate slices.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -871,7 +941,7 @@ The program advances through bounded slices:
 8. complete scalar program structure with executable constants, phis, and loops;
 9. direct calls and the non-void helper ABI;
 10. signed device-pointer element offsets;
-11. address spaces, aggregates, and shared memory;
+11. fixed device-array element addressing;
 12. libdevice and floating-point policy;
 13. atomics and wave operations;
 14. resources and optimization-quality work; and
@@ -892,8 +962,10 @@ Slice 7 completes the first raw CUDA scalar parameter ABI and a deliberately phi
 constants, block parameters/branch arguments, phis, loops, calls, and richer types as the next
 program-structure boundary. Slice 8 completes constants, phis, and finite loops. Slice 9 completes
 the separately demonstrable direct-call/non-void-helper ABI. Slice 10 then proves signed-i32 element
-offsetting on the existing device pointer ABI without claiming the arrays, aggregates, shared
-memory, or additional address spaces beginning with Slice 11.
+offsetting on the existing device pointer ABI. Slice 11 takes the next bounded part of the aggregate
+roadmap: exact fixed signed-i32 arrays behind device entry-point pointers and their canonical
+`IRGetElementPtr`, without claiming array values, other aggregates, shared memory, or additional
+address spaces.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -1028,6 +1100,24 @@ preserving neighboring sentinels. The preservation runs passed CUDA-option parsi
 and hashing (2/2), the unsupported-IR file (1/1), default/explicit NVRTC sampler coverage (3/3),
 true NVRTC pass-through (2/2), and CUDA runtime dispatch (1/1).
 
+Later on 2026-08-27, Slice 11 built the Release LLVM 14.0.6 provider and Debug host, and the final
+`slang-unit-test-tool/nvvm` prefix passed 76/76. The exact fake graph proved one shared provider
+`[4 x i32]` type, two address-space-1 array-pointer parameters, one signed-i32 index parameter, and
+the exact base/index/result/load/store topology. The verified provider fixture emitted the two
+ordinary, non-`inbounds` array element GEPs. Negotiation retained the exact Slice 10 prefix for its
+published programs, rejected partial or incomplete two-operation array prefixes, and sanitized
+failed outputs. Invalid provider operations were rejected before mutation.
+
+Direct NVVM and NVRTC exposed matching `[64, 64, 32]` parameter widths and each showed the expected
+entry-scoped global i32 load/store behavior; this is a semantic comparison, not a PTX-text equality
+claim. CUDA 12.9 `ptxas` accepted both outputs. On the RTX 5090, both runtime lanes copied array
+indices `0` and `3` while preserving every neighboring sentinel. Post-format preservation passed
+CUDA-option parsing (1/1), routing and hashing (2/2), the unsupported-IR file (1/1),
+default/explicit NVRTC sampler coverage (3/3), true NVRTC pass-through (2/2), and CUDA runtime
+dispatch (1/1). Binary inspection found only the frozen V1 and V2 provider getters in the export
+table, a normal `KERNEL32.dll` dependency plus delay-loaded `SHELL32.dll` and `ole32.dll`, and no
+LLVM DLL dependency.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -1061,6 +1151,17 @@ sized-pointee validation at the provider boundary. These claims do not include `
 unsigned or wider offsets, other pointees or address spaces, arrays, aggregates, globals, or shared
 memory.
 
+Slice 11 settles canonical two-operand `IRGetElementPtr` lowering for nonempty fixed signed-i32
+arrays behind read or read-write device entry-point pointers. It settles the canonical relation
+between an array-pointer base and its scalar-pointer result: the address space and access remain
+equal, the result pointee is the array element, and the CUDA natural-layout producer may give the
+base and result different layout spellings. It also settles the coherent append-only
+`getArrayType`/`emitArrayElementPointer` provider prefix, the frozen exact Slice 10 compatibility
+boundary, and ordinary non-`inbounds` `{i32 0, index}` LLVM GEP construction after complete
+pre-mutation validation. These claims do not include other element types or array shapes, array
+values, other aggregates, local or global storage, helper array pointers, unsigned or wider
+indices, additional address spaces, or shared memory.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
@@ -1069,8 +1170,9 @@ The following remain open until their named slice supplies evidence:
 - conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
   pointers;
 - external/indirect calls, richer helper ABI, and richer scalar/control-flow types;
-- pointer addressing beyond signed-i32 element offsets, including `IRGetElementPtr`, arrays,
-  aggregates, globals, shared memory, and additional address spaces;
+- pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
+  array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
+  memory, and additional address spaces;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

@@ -290,6 +290,24 @@ extern "C"
         SlangNVVMValueHandle_1 elementOffset,
         SlangNVVMValueHandle_1* outPointer);
 
+    /// Gets a fixed, nonempty LLVM array type with a same-module sized element type.
+    /// On failure, the output type is null.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMGetArrayType_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 elementType,
+        uint32_t elementCount,
+        SlangNVVMTypeHandle_1* outType);
+
+    /// Emits a non-inbounds element address from a same-module typed pointer to an LLVM array.
+    /// The scalar integer index and base pointer must both be available at the current
+    /// unterminated insertion point. On failure, the output pointer is null and no instruction is
+    /// inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitArrayElementPointer_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 baseArrayPointer,
+        SlangNVVMValueHandle_1 elementIndex,
+        SlangNVVMValueHandle_1* outPointer);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -325,6 +343,9 @@ extern "C"
         SlangNVVMEmitIntegerReturn_2 emitIntegerReturn;
 
         SlangNVVMEmitPointerOffset_2 emitPointerOffset;
+
+        SlangNVVMGetArrayType_2 getArrayType;
+        SlangNVVMEmitArrayElementPointer_2 emitArrayElementPointer;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -355,6 +376,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_POINTER_ARITHMETIC_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitPointerOffset) +           \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitPointerOffset))
+
+    // This Slice 11 prefix is one coherent scalar-array-addressing capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_ARRAY_MIN_SIZE          \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitArrayElementPointer) + \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitArrayElementPointer))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

@@ -49,6 +49,8 @@ public:
     bool supportsScalarFunctions() const;
     /// Returns whether the provider advertised the complete Slice 10 pointer-arithmetic prefix.
     bool supportsScalarPointerArithmetic() const;
+    /// Returns whether the provider advertised the complete Slice 11 array-addressing prefix.
+    bool supportsScalarArrayAddressing() const;
     /// Returns the provider identity that affects generated bitcode and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -192,6 +194,20 @@ public:
         SlangNVVMModuleHandle_1 module,
         SlangNVVMValueHandle_1 basePointer,
         SlangNVVMValueHandle_1 elementOffset,
+        SlangNVVMValueHandle_1& outPointer) const;
+
+    /// Gets a fixed, nonempty array type with the requested element type.
+    SlangResult getArrayType(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 elementType,
+        uint32_t elementCount,
+        SlangNVVMTypeHandle_1& outType) const;
+
+    /// Emits a non-inbounds address of one element of a typed array pointer.
+    SlangResult emitArrayElementPointer(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 baseArrayPointer,
+        SlangNVVMValueHandle_1 elementIndex,
         SlangNVVMValueHandle_1& outPointer) const;
 
     /// Terminates the current void-returning insertion block.
