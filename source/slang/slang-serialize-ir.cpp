@@ -588,6 +588,85 @@ static const Int64 kModuleInstDepth = 0;
 static const Int64 kGlobalValueDepth = 1;
 static const Int64 kBodyChildDepth = 2;
 
+/// Marks, for every instruction in `flat`'s preorder table, whether it belongs to the
+/// eager *skeleton* -- the set that is materialized at load time.
+///
+/// The skeleton is the module inst, its globals, and the run of decorations at the head of
+/// each global's child list, including anything nested under those decorations. Everything
+/// from a global's first non-decoration child onward is that global's deferrable body.
+///
+/// This is the single place that cut is decided. The allocation pass reads the result to
+/// decide which instructions to allocate at all, and `decodeInst` reads the same result
+/// back through `FlatModuleDecoder::isEagerSkeletonInst` to find where a body starts, so
+/// the two cannot disagree. They must not: an instruction the allocation pass skips but
+/// the decoder does not defer would be wired against an empty slot, and an instruction
+/// allocated but deferred anyway would be decoded twice, once by the load walk and once by
+/// the replay.
+///
+/// The rule is deliberately suffix-shaped. A deferred body is recorded as "the last `n`
+/// children of this global" and replayed that way, so the deferred set has to be a
+/// contiguous tail of the child list. A decoration appearing *after* a body instruction is
+/// therefore part of the body rather than an eager exception to it. `IRBuilder` only ever
+/// inserts decorations at the head (`addDecoration` calls `insertAtStart`), so the
+/// serializer does not emit that shape today -- stating the rule this way means nothing
+/// here depends on it continuing not to.
+///
+/// A decoration is kept eager because the symbol index reads it without materializing.
+/// Its children have to be kept for the same reason: they are reachable only through the
+/// decoration, and nothing on that path would ever trigger a materialization to supply
+/// them, so keeping just the decoration inst would silently give a decoration that has
+/// children no children at all.
+static void _computeEagerSkeleton(
+    const FlatInstTable& flat,
+    Int64 numInsts,
+    List<uint8_t>& outInstIsEager)
+{
+    outInstIsEager.setCount(numInsts);
+    ::memset(outInstIsEager.getBuffer(), 0, size_t(numInsts));
+
+    // Preorder scan tracking depth, allocating nothing beyond the depth stack.
+    // `childCounts` is in the same preorder as the instructions, so a stack of
+    // remaining-child counts is enough to recover each instruction's depth.
+    List<Int64> remainingChildren;
+    Int64 depth = 0;
+    // True while the scan is inside one of a global's leading decorations, including
+    // anything nested under it.
+    bool inEagerDecoration = false;
+    // True once the current global's body has started, so that every later child of that
+    // global belongs to the body whatever its opcode.
+    bool inBody = false;
+    for (Int64 i = 0; i < numInsts; ++i)
+    {
+        const IROp op = flat.instAllocInfo[i].op;
+        const bool isDecoration = op >= kIROp_FirstDecoration && op <= kIROp_LastDecoration;
+        // Depth 0 is the module inst and depth 1 its globals; a global's decorations and
+        // its body instructions both sit at depth 2. Deeper instructions carry whatever
+        // the depth-2 ancestor decided, which is what keeps a decoration's subtree eager
+        // and a body's subtree deferred.
+        if (depth <= kGlobalValueDepth)
+        {
+            inEagerDecoration = false;
+            inBody = false;
+        }
+        else if (depth == kBodyChildDepth)
+        {
+            inEagerDecoration = !inBody && isDecoration;
+            inBody = !inEagerDecoration;
+        }
+        outInstIsEager[i] = uint8_t(depth <= kGlobalValueDepth || inEagerDecoration);
+
+        remainingChildren.add(flat.childCounts[i]);
+        depth++;
+        while (remainingChildren.getCount() && remainingChildren.getLast() == 0)
+        {
+            remainingChildren.removeLast();
+            depth--;
+        }
+        if (remainingChildren.getCount())
+            remainingChildren.getLast()--;
+    }
+}
+
 struct FlatModuleDecoder : IRDeferredBodyLoader
 {
     FlatInstTable flat;
@@ -645,6 +724,24 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// otherwise one decode's restore will overwrite another's mode mid-walk and
     /// bodies will be deferred, or not, at the wrong depth.
     bool deferBodies = false;
+
+    /// The eager-skeleton predicate, borrowed for the duration of the initial load walk.
+    ///
+    /// Points at the `_computeEagerSkeleton` result, which lives on the stack of the
+    /// function that runs the walk and is cleared from here when that walk returns. A
+    /// later deferred materialization runs with `deferBodies == false` and so never reads
+    /// it, which is what makes borrowing rather than copying safe -- and copying would
+    /// cost a byte per instruction retained for the module's life, which is the opposite
+    /// of what this whole path is for.
+    const uint8_t* instIsEagerDuringLoadWalk = nullptr;
+
+    /// True if instruction `index` is part of the eager skeleton, as decided by
+    /// `_computeEagerSkeleton`. Only meaningful while the load walk is deferring.
+    bool isEagerSkeletonInst(Int64 index) const
+    {
+        SLANG_ASSERT(instIsEagerDuringLoadWalk);
+        return instIsEagerDuringLoadWalk[index] != 0;
+    }
 
     /// Serialises deferred decoding.
     ///
@@ -1027,20 +1124,18 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
     SLANG_RELEASE_ASSERT(childCount >= 0);
     for (Int64 i = 0; i < childCount; ++i)
     {
-        // A global value's decorations come first and stay eager; everything
-        // after them is its body. Note where that body's encoding starts, then
-        // let the remaining children be walked without being materialized --
-        // the walk still has to run, to consume their operand and payload
-        // entries and keep the cursors aligned.
+        // Where a global's body starts is not decided here: `_computeEagerSkeleton`
+        // decided it for the whole module, and the first child it left out of the eager
+        // skeleton is the first instruction of the body. Note where that body's encoding
+        // starts, then let the remaining children be walked without being materialized --
+        // the walk still has to run, to consume their operand and payload entries and
+        // keep the cursors aligned.
         if (deferBodies && depth == kGlobalValueDepth && inst && !inst->m_hasDeferredBody)
         {
             // Looked at before the recursive call validates it, so bound it here; a
             // corrupt `childCounts` is what would put this out of range.
             SLANG_RELEASE_ASSERT(instIndex < getInstCount());
-            const IROp nextOp = flat.instAllocInfo[instIndex].op;
-            const bool nextIsDecoration =
-                nextOp >= kIROp_FirstDecoration && nextOp <= kIROp_LastDecoration;
-            if (!nextIsDecoration)
+            if (!isEagerSkeletonInst(instIndex))
             {
                 DeferredBody body;
                 body.firstChildInstIndex = instIndex;
@@ -1224,67 +1319,12 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             onDemandIRLoad = false;
         }
     }
-    /// Per-instruction predicate: is instruction `i` part of the eager *skeleton*?
-    ///
-    /// The skeleton is the set of instructions materialized at load time -- the module
-    /// inst, its globals, and each global's decorations including anything nested under
-    /// them. Everything else is a deferrable body. This is the one name for that set;
-    /// "on-demand load" names the mode that produces it.
-    ///
-    /// A predicate rather than a command, so `!instIsEager[i]` reads as "instruction `i`
-    /// was deferred" at the use site below.
+    // Which instructions are eager skeleton and which are deferrable body, decided once
+    // for the whole module. Both readers below -- the allocation pass and, through
+    // `isEagerSkeletonInst`, the decode walk -- work off this one answer.
     List<uint8_t> instIsEager;
     if (onDemandIRLoad)
-    {
-        instIsEager.setCount(numInsts);
-        ::memset(instIsEager.getBuffer(), 0, size_t(numInsts));
-
-        // Preorder scan tracking depth, allocating nothing. `childCounts` is in the
-        // same preorder as the instructions, so a stack of remaining-child counts
-        // is enough to recover each instruction's depth.
-        //
-        // This decides the same cut that `decodeInst` decides again while walking:
-        // what is eager skeleton and what is a deferrable body. The two must agree
-        // exactly -- an instruction this scan leaves unallocated but the decoder does
-        // not defer would be wired against an empty slot, and the reverse would defer
-        // a body whose slots were never filled. They agree because both derive from
-        // one rule, that a global's decorations are eager and everything after them is
-        // body, but they express it differently and there is no single predicate
-        // enforcing it. Sharing one is the obvious follow-up; `readInstRef` asserting
-        // that no live operand resolves to an empty slot is what would catch a
-        // disagreement today.
-        List<Int64> remainingChildren;
-        Int64 depth = 0;
-        // True while the scan is inside a global's decoration, including anything
-        // nested under it. A decoration is kept eager because the symbol index reads
-        // it without materializing, so its children have to be kept too: they are
-        // reachable only through the decoration, and nothing on that path would ever
-        // trigger a materialization to supply them. Keeping just the decoration inst
-        // would silently give a decoration-with-children no children under on-demand load.
-        bool inDecorationSubtree = false;
-        for (Int64 i = 0; i < numInsts; ++i)
-        {
-            const IROp op = flat.instAllocInfo[i].op;
-            const bool isDecoration = op >= kIROp_FirstDecoration && op <= kIROp_LastDecoration;
-            // Depth 0 is the module inst and depth 1 its globals; a global's
-            // decorations sit at depth 2 and carry the linkage names.
-            if (depth <= kBodyChildDepth)
-                inDecorationSubtree = false;
-            if (depth == kBodyChildDepth && isDecoration)
-                inDecorationSubtree = true;
-            instIsEager[i] = uint8_t(depth <= kGlobalValueDepth || inDecorationSubtree);
-
-            remainingChildren.add(flat.childCounts[i]);
-            depth++;
-            while (remainingChildren.getCount() && remainingChildren.getLast() == 0)
-            {
-                remainingChildren.removeLast();
-                depth--;
-            }
-            if (remainingChildren.getCount())
-                remainingChildren.getLast()--;
-        }
-    }
+        _computeEagerSkeleton(flat, numInsts, instIsEager);
 
     for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
     {
@@ -1305,7 +1345,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     }
 
     decoder->deferBodies = onDemandIRLoad;
+    decoder->instIsEagerDuringLoadWalk = onDemandIRLoad ? instIsEager.getBuffer() : nullptr;
     const auto moduleInst = decoder->decodeInst(nullptr, kModuleInstDepth);
+    // The borrow ends with the walk. `instIsEager` is a local of this function, and the
+    // decoder outlives it whenever any body was deferred.
+    decoder->instIsEagerDuringLoadWalk = nullptr;
 
     // Keep the decoder alive so the bodies it skipped can still be decoded. It
     // holds the flat table and the instruction array, which a body needs: its
