@@ -19,6 +19,7 @@
 #include "slang-emit-hlsl.h"
 #include "slang-emit-llvm.h"
 #include "slang-emit-metal.h"
+#include "slang-emit-nvvm.h"
 #include "slang-emit-slang.h"
 #include "slang-emit-source-writer.h"
 #include "slang-emit-torch.h"
@@ -3572,6 +3573,52 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     outArtifact.swap(artifact);
 
     return SLANG_OK;
+}
+
+SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifact)
+{
+    outArtifact.setNull();
+
+    // Consider this example:
+    //
+    //     [numthreads(1, 1, 1)]
+    //     void computeMain() {}
+    //
+    // The direct backend must consume the same linked, target-specialized Slang IR that other
+    // direct emitters receive. A CUDA-source subcontext would instead apply C++ representation
+    // choices before we can establish an NVVM ABI. This slice therefore keeps resources and
+    // existentials in their canonical linked form and accepts only the exact empty-compute shape.
+    LinkedIR linkedIR;
+    LinkingAndOptimizationOptions linkingAndOptimizationOptions;
+    linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
+    SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(this, linkingAndOptimizationOptions, linkedIR));
+    SLANG_RETURN_ON_FAIL(validateNVVMMinimalComputeIR(this, linkedIR));
+
+    NVVMIRBuilder* builder = nullptr;
+    String explicitBuilderPath;
+    SlangResult loadResult = getSession()->getOrLoadNVVMIRBuilder(builder, &explicitBuilderPath);
+    if (SLANG_FAILED(loadResult) || !builder || !builder->supportsSerializationDiagnostics())
+    {
+        StringBuilder location;
+        if (explicitBuilderPath.getLength())
+            location << "'" << explicitBuilderPath << "'";
+        else
+            location << "the default library search path";
+        getSink()->diagnose(Diagnostics::NvvmIrBuilderUnavailable{
+            .location = location.produceString(),
+        });
+        return SLANG_FAILED(loadResult) ? loadResult : SLANG_E_NO_INTERFACE;
+    }
+
+    ComPtr<IArtifact> sourceArtifact;
+    SLANG_RETURN_ON_FAIL(emitNVVMIRFromLinkedIR(this, linkedIR, *builder, sourceArtifact));
+    maybeDumpIntermediate(sourceArtifact);
+
+    return emitWithDownstreamForEntryPoints(
+        outArtifact,
+        PassThroughMode::NVVM,
+        sourceArtifact,
+        SourceLanguage::LLVM);
 }
 
 SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)

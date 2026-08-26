@@ -3461,7 +3461,7 @@ size_t getPointerSize(TargetRequest* targetReq)
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
-    if (targetProgram->shouldEmitSPIRVDirectly() ||
+    if (targetProgram->shouldEmitSPIRVDirectly() || targetProgram->shouldEmitNVVMDirectly() ||
         isCPUTargetViaLLVM(targetProgram->getTargetReq()))
     {
         return SourceLanguage::Unknown;

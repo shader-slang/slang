@@ -47,7 +47,8 @@ static PassThroughMode resolvePTXDownstreamCompiler(
 static ComPtr<slang::IComponentType> createMinimalPTXProgram(
     slang::IGlobalSession* globalSession,
     ComPtr<slang::ISession>& outSession,
-    slang::CompilerOptionEntry* targetOption = nullptr)
+    slang::CompilerOptionEntry* targetOption = nullptr,
+    const char* source = "[shader(\"compute\")] [numthreads(1, 1, 1)] void computeMain() {}")
 {
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_PTX;
@@ -64,7 +65,7 @@ static ComPtr<slang::IComponentType> createMinimalPTXProgram(
     ComPtr<slang::IModule> module(outSession->loadModuleFromSourceString(
         "nvvmRouting",
         "nvvm-routing.slang",
-        "[shader(\"compute\")] [numthreads(1, 1, 1)] void computeMain() {}",
+        source,
         diagnostics.writeRef()));
     SLANG_CHECK_ABORT(module != nullptr);
 
@@ -131,8 +132,13 @@ SLANG_UNIT_TEST(cudaEmissionMethodLinkOptionsAffectRoutingAndHash)
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     ComPtr<slang::ISession> nvrtcSession;
     ComPtr<slang::ISession> nvvmSession;
-    ComPtr<slang::IComponentType> nvrtcInput = createMinimalPTXProgram(globalSession, nvrtcSession);
-    ComPtr<slang::IComponentType> nvvmInput = createMinimalPTXProgram(globalSession, nvvmSession);
+    static const char kUnsupportedSource[] =
+        "[shader(\"compute\")] [numthreads(1, 1, 1)] void computeMain() { "
+        "GroupMemoryBarrierWithGroupSync(); }";
+    ComPtr<slang::IComponentType> nvrtcInput =
+        createMinimalPTXProgram(globalSession, nvrtcSession, nullptr, kUnsupportedSource);
+    ComPtr<slang::IComponentType> nvvmInput =
+        createMinimalPTXProgram(globalSession, nvvmSession, nullptr, kUnsupportedSource);
 
     slang::CompilerOptionEntry nvrtcOption =
         makeCUDAEmissionMethodOption(SLANG_EMIT_CUDA_VIA_NVRTC);
@@ -157,14 +163,16 @@ SLANG_UNIT_TEST(cudaEmissionMethodLinkOptionsAffectRoutingAndHash)
             nvrtcHash->getBufferSize()) != 0);
 
     // The link-time option is part of the TargetProgram's effective option set. If dispatch read
-    // only TargetRequest, this would silently take the default NVRTC route instead of E52014.
+    // only TargetRequest, this would silently take the default NVRTC route instead of reaching the
+    // direct emitter's provider-independent unsupported-IR boundary.
     ComPtr<slang::IBlob> code;
     ComPtr<slang::IBlob> diagnostics;
     SlangResult result =
         nvvmProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(code == nullptr);
-    SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("E52014")) != -1);
+    SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("E52017")) != -1);
+    SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("'call'")) != -1);
 }
 
 SLANG_UNIT_TEST(invalidCUDAEmissionMethodIsDiagnosed)

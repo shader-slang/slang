@@ -5526,6 +5526,7 @@ err(
     "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
 )
 
+-- Retain E52014 as the historical Slice 5 boundary; Slice 6 no longer emits it.
 err(
     "nvvm-lowering-not-implemented",
     52014,
@@ -5536,6 +5537,24 @@ err(
     "invalid-cuda-emission-method",
     52015,
     "invalid CUDA emission method value '~method:Int'"
+)
+
+err(
+    "nvvm-ir-builder-unavailable",
+    52016,
+    "unable to load a compatible LLVM 14 NVVM IR builder from ~location; set SLANG_NVVM_BUILDER_PATH to the provider directory"
+)
+
+err(
+    "nvvm-unsupported-ir",
+    52017,
+    "direct NVVM lowering does not support Slang IR instruction or shape '~construct'"
+)
+
+err(
+    "nvvm-ir-builder-operation-failed",
+    52018,
+    "LLVM 14 NVVM IR builder operation '~operation' failed with result ~resultCode:Int"
 )
 
 warning(

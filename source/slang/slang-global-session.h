@@ -15,6 +15,7 @@
 #include "compiler-core/slang-downstream-compiler-set.h"
 #include "compiler-core/slang-downstream-compiler-util.h"
 #include "compiler-core/slang-downstream-compiler.h"
+#include "compiler-core/slang-nvvm-ir-builder.h"
 #include "compiler-core/slang-spirv-core-grammar.h"
 #include "core/slang-command-options.h"
 #include "slang-pass-through.h"
@@ -291,6 +292,10 @@ public:
     /// Will try to load the library by specified name (using the set loader), if not one already
     /// available.
     IDownstreamCompiler* getOrLoadDownstreamCompiler(PassThroughMode type, DiagnosticSink* sink);
+    /// Loads and retains the optional LLVM 14 NVVM builder used by direct PTX emission.
+    SlangResult getOrLoadNVVMIRBuilder(
+        NVVMIRBuilder*& outBuilder,
+        String* outExplicitPath = nullptr);
     /// Will unload the specified shared library if it's currently loaded
     void resetDownstreamCompiler(PassThroughMode type);
 
@@ -341,6 +346,10 @@ public:
     ComPtr<IDownstreamCompiler> m_downstreamCompilers[int(
         PassThroughMode::CountOf)]; ///< A downstream compiler for a pass through
     DownstreamCompilerLocatorFunc m_downstreamCompilerLocators[int(PassThroughMode::CountOf)];
+    bool m_nvvmIRBuilderLoadAttempted = false;
+    SlangResult m_nvvmIRBuilderLoadResult = SLANG_E_UNINITIALIZED;
+    String m_nvvmIRBuilderExplicitPath;
+    NVVMIRBuilder m_nvvmIRBuilder;
     Name* m_completionTokenName = nullptr; ///< The name of a completion request token.
 
     ComPtr<ISlangSharedLibrary> m_slangLLVM = nullptr; ///< slang-llvm, loaded on-demand.

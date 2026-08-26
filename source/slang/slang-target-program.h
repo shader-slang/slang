@@ -115,6 +115,13 @@ public:
         return isSPIRV(m_targetReq->getTarget()) && getOptionSet().shouldEmitSPIRVDirectly();
     }
 
+    /// Returns whether this PTX program selected the direct LLVM/NVVM representation.
+    bool shouldEmitNVVMDirectly()
+    {
+        return m_targetReq->getTarget() == CodeGenTarget::PTX &&
+               getOptionSet().getEmitCUDAMethod() == SLANG_EMIT_CUDA_VIA_NVVM;
+    }
+
 private:
     RefPtr<IRModule> createIRModuleForLayout(DiagnosticSink* sink);
 

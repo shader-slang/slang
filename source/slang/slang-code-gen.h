@@ -252,7 +252,9 @@ protected:
 
     SlangResult emitWithDownstreamForEntryPoints(
         ComPtr<IArtifact>& outArtifact,
-        PassThroughMode compilerOverride = PassThroughMode::None);
+        PassThroughMode compilerOverride = PassThroughMode::None,
+        IArtifact* sourceArtifactOverride = nullptr,
+        SourceLanguage sourceLanguageOverride = SourceLanguage::Unknown);
 
     /// Emits PTX through the direct NVVM route.
     ///

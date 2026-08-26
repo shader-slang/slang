@@ -62,6 +62,8 @@ protected:
 
 void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_downstreamCompilerMutex);
+
     if (m_sharedLibraryLoader != loader)
     {
         // Need to clear all of the libraries
@@ -73,9 +75,48 @@ void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
             m_downstreamCompilers[i].setNull();
         }
 
+        m_nvvmIRBuilderLoadAttempted = false;
+        m_nvvmIRBuilderLoadResult = SLANG_E_UNINITIALIZED;
+        m_nvvmIRBuilderExplicitPath = String();
+        m_nvvmIRBuilder = NVVMIRBuilder();
+
         // Set the loader
         m_sharedLibraryLoader = loader;
     }
+}
+
+SlangResult Session::getOrLoadNVVMIRBuilder(NVVMIRBuilder*& outBuilder, String* outExplicitPath)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_downstreamCompilerMutex);
+
+    outBuilder = nullptr;
+    if (!m_nvvmIRBuilderLoadAttempted)
+    {
+        StringBuilder pathBuilder;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                toSlice("SLANG_NVVM_BUILDER_PATH"),
+                pathBuilder)) &&
+            pathBuilder.getLength())
+        {
+            m_nvvmIRBuilderExplicitPath = pathBuilder.produceString();
+        }
+        else
+        {
+            m_nvvmIRBuilderExplicitPath = String();
+        }
+
+        m_nvvmIRBuilderLoadAttempted = true;
+        m_nvvmIRBuilderLoadResult = NVVMIRBuilder::load(
+            m_nvvmIRBuilderExplicitPath,
+            m_sharedLibraryLoader,
+            m_nvvmIRBuilder);
+    }
+
+    if (outExplicitPath)
+        *outExplicitPath = m_nvvmIRBuilderExplicitPath;
+    if (SLANG_SUCCEEDED(m_nvvmIRBuilderLoadResult))
+        outBuilder = &m_nvvmIRBuilder;
+    return m_nvvmIRBuilderLoadResult;
 }
 
 void Session::resetDownstreamCompiler(PassThroughMode type)

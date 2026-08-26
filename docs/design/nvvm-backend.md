@@ -325,6 +325,12 @@ is wrapped as `ObjectCode + LLVMIR + Kernel` and passed to the existing
 in the directory named by `SLANG_NVVM_BUILDER_PATH`; an explicit but broken directory is a failure,
 not a skip.
 
+Slice 6 makes the builder session-owned and lazily loaded so shader hashing and code generation use
+the same retained provider. Changing the session's shared-library loader clears that cached
+instance. The direct Slang route requires the V2 verified-serialization prefix so malformed
+generated IR always carries LLVM verifier text. A V1-only provider still supports the standalone
+builder proof, but is incompatible with direct Slang lowering and reaches E52016.
+
 The local Windows proof uses upstream tag `llvmorg-14.0.6` at commit
 `f28c006a5895fc0e329fe15fead81e37457cb1d1`. The Slice 3a Release module has only the V1 getter in
 its PE export table and no LLVM DLL dependency. In one test process, the normal LLVM 21.1 module is
@@ -465,18 +471,52 @@ True `-pass-through` selection remains state on the legacy `EndToEndCompileReque
 pass-through/method regression proves dispatch precedence; the component hash describes the
 ordinary non-pass-through target-program route.
 
-The direct route intentionally stops at E52014 in this slice: ordinary checked Slang IR has no
-canonical NVVM representation yet. The code-generation boundary neither fabricates a kernel nor
-discovers a compiler as a substitute for lowering. A separate positive test starts with the exact
-LLVM 14 typed-pointer bitcode produced by the Slice 4 builder, asks the public global-session API to
-discover/register NVVM, and compiles through that registered compiler. This proves the downstream
-handoff while leaving the missing producer visible for Slice 6.
+At the Slice 5 boundary the direct route intentionally stopped at E52014. Slice 6 replaces that
+historical stop with the first canonical Slang-IR-to-NVVM producer.
+
+### Slice 6 minimal linked-IR compute boundary
+
+Consider this program:
+
+```slang
+[numthreads(1, 1, 1)]
+void computeMain()
+{}
+```
+
+The direct PTX route now runs the ordinary link-and-optimize pipeline without entering a
+CUDA-source subcontext. The resulting selected entry point must be a defined compute function
+returning `void`, with no parameters, exactly one parameterless block, and only
+`IRReturn(IRVoidLit)`. Its `IREntryPointDecoration` remains the source of truth for the emitted
+kernel name. Any other reachable instruction or semantic global is rejected with E52017; the
+emitter neither repairs the IR nor substitutes an empty kernel.
+
+After legality succeeds, the session-owned LLVM 14 builder creates an NVPTX64/NVVM 2.0 module,
+declares the selected `void()` function, emits one `ret void`, marks it as a kernel, and verifies
+and serializes LLVM bitcode through the V2 API. Builder discovery or ABI incompatibility reaches
+E52016. A failed builder operation or verifier rejection reaches E52018, with verifier text
+preserved, and no libNVVM program is created.
+
+The resulting `ObjectCode + LLVMIR + Kernel` artifact enters the existing downstream continuation
+with `SourceLanguage::LLVM` and `PassThroughMode::NVVM`. That continuation remains the single owner
+of architecture and compilation options, diagnostics, timing, and artifact associations.
+`cuda_sm_7_0` becomes `-arch=compute_70`, and successful compilation returns
+`ObjectCode + PTX + Kernel`.
+
+The shader hash includes both the registered libNVVM identity and the separately loaded builder
+identity. Hash construction can discover the optional builder before code-generation legality is
+checked, so the provider-independent unsupported-IR guarantee is specifically that no builder
+module or libNVVM program is created, not that no library-load attempt occurs.
+
+This slice deliberately excludes parameters, values, memory operations, calls, branches, loops,
+builtins, resources, multiple entry points, and every non-compute stage. Those boundaries begin in
+Slice 7.
 
 ## CUDA Pass Ownership Audit
 
-Before the first Slang-to-NVVM emitter lands, each current CUDA-specific behavior must be placed in
-one of four groups: shared CUDA semantics, CUDA-C++ representation, NVVM representation, or obsolete
-after the split. Important initial audit items include:
+As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
+behavior must be placed in one of four groups: shared CUDA semantics, CUDA-C++ representation,
+NVVM representation, or obsolete after the split. Important initial audit items include:
 
 | Current behavior | Audit question |
 | --- | --- |
@@ -569,6 +609,9 @@ Slang IR traversal or experimental routing from item 5.
 Slice 5 completes item 5 by freezing the target option, preserving the NVRTC and pass-through
 routes, reserving an honest NVVM dispatch boundary, and proving builder bitcode can reach the
 session-registered compiler. It deliberately leaves the Slang-IR-to-NVVM producer to item 6.
+Slice 6 completes item 6 for an empty, zero-parameter compute entry point. It establishes canonical
+linked-IR legality, verified builder bitcode, the internal LLVM-kernel artifact, and real
+libNVVM/`ptxas` handoff while leaving the kernel ABI and scalar control flow to Slice 7.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -625,23 +668,34 @@ parser, method resolver, `linkWithOptions` routing/hash, invalid-method, explici
 default/explicit-NVRTC, and raw-pass-through precedence tests. The affected component-hash and
 session-digest regressions also passed. With the LLVM 14 provider selected, the new
 registered-compiler handoff passed and the complete NVVM unit prefix passed 33/33. Default PTX
-remains transition-driven NVRTC, explicit NVRTC bypasses a mutable transition override, and
-explicit NVVM now reaches E52014 without fallback. No ordinary Slang program is claimed as
-NVVM-lowered yet.
+remained transition-driven NVRTC, explicit NVRTC bypassed a mutable transition override, and
+explicit NVVM reached E52014 without fallback. No ordinary Slang program was claimed as
+NVVM-lowered at that boundary.
+
+Later on 2026-08-26, Slice 6 built the Debug host and the Release LLVM 14.0.6 provider. The complete
+NVVM unit prefix passed 40/40, including ordinary-Slang fake and real direct-route compilation,
+builder-aware cache hashing, unsupported-IR rejection, builder-verifier diagnostic propagation,
+unavailable-provider behavior, and the established provider/compiler regressions. The real route
+emitted `computeMain` for `cuda_sm_7_0`, and CUDA 12.9 `ptxas` accepted the resulting PTX. The
+provider-independent file test reached E52017 on the retained barrier `call`. Default and explicit
+NVRTC behavior and true NVRTC pass-through remained unchanged.
 
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
 shape, the continued NVRTC default, the binary artifact shape, the separate pinned LLVM 14 builder,
 the frozen-V1/append-only-V2 diagnostic ABI, the coherent AS1 scalar-memory capability and
-differential contract, and the Slice 5 target-option/routing boundary described above.
+differential contract, the Slice 5 target-option/routing boundary, and the Slice 6 exact
+empty-compute subset. The direct route uses one session-owned builder for hashing and code
+generation, requires the V2 verifier boundary, and enters the established downstream continuation
+as an internal LLVM-bitcode kernel artifact.
 
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
-- the exact entry-point/global-parameter ABI beyond the first pointer/scalar kernels;
+- the entry-point/global-parameter ABI beyond the empty kernel;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

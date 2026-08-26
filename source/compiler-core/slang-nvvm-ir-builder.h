@@ -41,6 +41,8 @@ public:
     }
     /// Returns whether the provider advertised the complete Slice 4 scalar-memory prefix.
     bool supportsScalarOperations() const;
+    /// Returns the provider identity that affects generated bitcode and shader-cache keys.
+    String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
     /// Returns the locally supported V2 prefix, with `structureSize` clamped to that prefix.
     const SlangNVVMBuilderAPI_V2* getAPIV2() const

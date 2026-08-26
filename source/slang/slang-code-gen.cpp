@@ -359,9 +359,16 @@ static bool _isCPUHostTarget(CodeGenTarget target)
 
 SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
     ComPtr<IArtifact>& outArtifact,
-    PassThroughMode compilerOverride)
+    PassThroughMode compilerOverride,
+    IArtifact* sourceArtifactOverride,
+    SourceLanguage sourceLanguageOverride)
 {
     outArtifact.setNull();
+
+    SLANG_RELEASE_ASSERT(
+        !sourceArtifactOverride ||
+        (!isPassThroughEnabled() && compilerOverride != PassThroughMode::None &&
+         sourceLanguageOverride != SourceLanguage::Unknown));
 
     auto sink = getSink();
     auto session = getSession();
@@ -381,17 +388,19 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
     }
     else
     {
-        // Get the default source codegen type for a given target
-        sourceTarget = _getDefaultSourceForTarget(target);
-
         // An explicit emission method belongs to this target program and must not mutate the
         // session's global transition table. With no override, retain the established lookup.
         compilerType = compilerOverride;
-        if (compilerType == PassThroughMode::None)
+        if (!sourceArtifactOverride)
         {
-            compilerType = (PassThroughMode)session->getDownstreamCompilerForTransition(
-                (SlangCompileTarget)sourceTarget,
-                (SlangCompileTarget)target);
+            // Get the default source codegen type for a given target.
+            sourceTarget = _getDefaultSourceForTarget(target);
+            if (compilerType == PassThroughMode::None)
+            {
+                compilerType = (PassThroughMode)session->getDownstreamCompilerForTransition(
+                    (SlangCompileTarget)sourceTarget,
+                    (SlangCompileTarget)target);
+            }
         }
         // We should have a downstream compiler set at this point
         if (compilerType == PassThroughMode::None)
@@ -447,13 +456,20 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
         }
     }
 
-    ComPtr<IArtifact> sourceArtifact;
+    ComPtr<IArtifact> sourceArtifact(sourceArtifactOverride);
 
     /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we
     would ideally like to use the original file. We want to do this because we want includes
     relative to the source file to work, and for that to work most easily we want to use the
     original file, if there is one */
-    if (auto endToEndReq = isPassThroughEnabled())
+    if (sourceArtifactOverride)
+    {
+        // A direct backend already produced the exact intermediate representation expected by the
+        // selected compiler. Keep that representation and reuse only the shared downstream option,
+        // diagnostic, association, and timing continuation below.
+        sourceLanguage = sourceLanguageOverride;
+    }
+    else if (auto endToEndReq = isPassThroughEnabled())
     {
         // If we are pass through, we may need to set extension tracker state.
         if (ShaderExtensionTracker* glslTracker = as<ShaderExtensionTracker>(extensionTracker))
@@ -1080,23 +1096,6 @@ SlangResult emitSPIRVForEntryPointsDirectly(
 SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
 
 SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
-
-SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifact)
-{
-    outArtifact.setNull();
-
-    // Consider this example:
-    //
-    //     slangc kernel.slang -target ptx -emit-cuda-via-nvvm
-    //
-    // The checked program is ready for backend code generation, but no producer currently runs the
-    // canonical link-and-optimize path and turns its result into the exact LLVM-bitcode kernel
-    // artifact accepted by NVVMDownstreamCompiler. Sending CUDA source or CPU LLVM IR would violate
-    // the downstream artifact contract, and falling back to NVRTC would ignore the explicit
-    // selection. Slice 6 will replace this diagnostic with that producer.
-    getSink()->diagnose(Diagnostics::NvvmLoweringNotImplemented{});
-    return SLANG_E_NOT_AVAILABLE;
-}
 
 static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
 {

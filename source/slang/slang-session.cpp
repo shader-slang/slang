@@ -949,6 +949,20 @@ void Linkage::buildHash(
                 builder.append(versionString);
             }
         }
+
+        // Direct NVVM output depends on both libNVVM and the separately loaded LLVM 14 producer.
+        // Include the producer identity from the same session-owned instance used by codegen so a
+        // provider replacement cannot reuse PTX cached for different generated bitcode.
+        if (targetReq->getTarget() == CodeGenTarget::PTX &&
+            targetOptions.getEmitCUDAMethod() == SLANG_EMIT_CUDA_VIA_NVVM)
+        {
+            NVVMIRBuilder* nvvmIRBuilder = nullptr;
+            if (SLANG_SUCCEEDED(getSessionImpl()->getOrLoadNVVMIRBuilder(nvvmIRBuilder, nullptr)) &&
+                nvvmIRBuilder)
+            {
+                builder.append(nvvmIRBuilder->getVersionString());
+            }
+        }
     };
 
     // Add the target specified by targetIndex

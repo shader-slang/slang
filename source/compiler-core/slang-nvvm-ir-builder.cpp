@@ -59,13 +59,12 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         loader = DefaultSharedLibraryLoader::getSingleton();
 
     ComPtr<ISlangSharedLibrary> library;
-    SLANG_RETURN_ON_FAIL(
-        DownstreamCompilerUtil::loadSharedLibrary(
-            path,
-            loader,
-            nullptr,
-            "slang-llvm-nvvm",
-            library));
+    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(
+        path,
+        loader,
+        nullptr,
+        "slang-llvm-nvvm",
+        library));
     if (!library)
         return SLANG_FAIL;
 
@@ -144,6 +143,26 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
 bool NVVMIRBuilder::supportsScalarOperations() const
 {
     return _supportsScalarOperations(m_apiV2);
+}
+
+String NVVMIRBuilder::getVersionString() const
+{
+    if (!isInitialized())
+        return String();
+
+    StringBuilder builder;
+    builder << "slang-llvm-nvvm;builder-abi="
+            << (supportsSerializationDiagnostics() ? SLANG_NVVM_BUILDER_ABI_VERSION_2
+                                                   : SLANG_NVVM_BUILDER_ABI_VERSION_1)
+            << ";builder-api-size="
+            << (supportsSerializationDiagnostics() ? m_apiV2.structureSize : m_api.structureSize)
+            << ";llvm=" << m_api.llvmVersionMajor << "." << m_api.llvmVersionMinor << "."
+            << m_api.llvmVersionPatch << ";nvvm-ir=" << m_api.nvvmIRVersionMajor << "."
+            << m_api.nvvmIRVersionMinor << ";pointer-model=" << uint32_t(m_api.pointerModel)
+            << ";scalar-operations=" << (supportsScalarOperations() ? 1 : 0) << ";timestamp="
+            << SharedLibraryUtils::getSharedLibraryTimestamp(
+                   reinterpret_cast<void*>(m_api.createModule));
+    return builder.produceString();
 }
 
 SlangResult NVVMIRBuilder::createModule(
