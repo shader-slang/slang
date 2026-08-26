@@ -949,6 +949,13 @@ err(
 )
 
 err(
+    "operator-subscript-should-use-subscript",
+    20021,
+    "'operator[]' is not supported; use '__subscript'",
+    span { loc = "location", message = "'operator[]' is not supported in Slang; declare an indexing operator using the '__subscript' syntax instead" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -1603,6 +1610,14 @@ err(
     30202,
     "function return type mismatch",
     span { loc = "decl:Decl", message = "function '~decl' declared to return '~newReturnType:Type' was previously declared to return '~prevReturnType:Type'" }
+)
+
+err(
+    "redundant-struct-forward-declaration",
+    30203,
+    "redundant struct forward declaration",
+    span { loc = "decl:Decl", message = "Slang does not require or support this struct forward declaration; remove it and use the complete declaration below" },
+    note { message = "the complete declaration of '~decl' is here", span { loc = "definition:Decl" } }
 )
 
 err(
@@ -4048,6 +4063,13 @@ standalone_note(
     "overload-candidate-argument-type-mismatch",
     40018,
     "argument ~argIndex:Int does not match: expected '~expectedType:Type', got '~actualType:Type'",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "array-argument-extent-is-generic-value-parameter",
+    40021,
+    "the array argument's extent is a generic value parameter, so this call is checked before the extent is specialized and cannot select a fixed-extent overload; make the callee value-generic over the extent, or dispatch through a type whose conformance is specialized for each supported extent",
     span { loc = "location" }
 )
 

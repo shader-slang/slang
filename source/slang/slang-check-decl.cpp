@@ -13829,6 +13829,36 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
         return SLANG_OK;
     }
 
+    // A C/HLSL-style struct forward declaration (`struct Item;`) followed by a
+    // complete definition (`struct Item { ... }`) is redundant in Slang, which
+    // has order-independent lookup. Detect that specific pair so we can report a
+    // single migration-focused diagnostic instead of the generic "conflicting
+    // declaration" error, and hide the redundant forward declaration from lookup
+    // so that later references to the type are not additionally diagnosed as
+    // ambiguous (issue #12764).
+    //
+    if (auto newStruct = as<StructDecl>(newDecl))
+    {
+        if (auto oldStruct = as<StructDecl>(oldDecl))
+        {
+            // A link-time type alias (`struct Foo : IBar = Baz;`) also lacks a
+            // `{ ... }` body but leaves `hasBody` at its default `true`; it is a
+            // full declaration, not a forward declaration, so exclude either
+            // operand being an alias before pairing forward-decl with definition.
+            bool eitherIsAlias = oldStruct->aliasedType.exp || newStruct->aliasedType.exp;
+            if (!eitherIsAlias && oldStruct->hasBody != newStruct->hasBody)
+            {
+                auto forwardDecl = oldStruct->hasBody ? newStruct : oldStruct;
+                auto definition = oldStruct->hasBody ? oldStruct : newStruct;
+                getSink()->diagnose(Diagnostics::RedundantStructForwardDeclaration{
+                    .decl = forwardDecl,
+                    .definition = definition});
+                forwardDecl->hiddenFromLookup = true;
+                return SLANG_OK;
+            }
+        }
+    }
+
 
     // For all other flavors of declaration, we do not
     // allow duplicate declarations with the same name.

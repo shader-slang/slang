@@ -231,6 +231,17 @@ static void _lookUpDirectAndTransparentMembers(
             if (m == request.declToExclude)
                 continue;
 
+            // A non-local declaration explicitly hidden from lookup (e.g. a
+            // redundant struct forward declaration that the checker has
+            // superseded with a complete definition) must not contribute a
+            // lookup result, so that references resolve to the surviving
+            // declaration without becoming ambiguous. Local variables use
+            // `hiddenFromLookup` for a different, transient purpose (in-order
+            // block-scope visibility, handled by `_isUncheckedLocalVar` above),
+            // so they are deliberately excluded here.
+            if (m->hiddenFromLookup && !isLocalVar(m))
+                continue;
+
             if (!DeclPassesLookupMask(m, request.mask))
                 continue;
 

@@ -296,6 +296,20 @@ static bool isArrayDecl(Decl* decl)
     return false;
 }
 
+/// Returns true if `type` is a sized array whose extent is not a compile-time
+/// literal, i.e. its element count is not a `ConstantIntVal`. This is the shape
+/// produced when a generic value parameter is used as an array extent (e.g. the
+/// parameter `Data values[N]` has element count `int(N)`, a `TypeCastIntVal`
+/// over a `DeclRefIntVal`), as opposed to a fixed-size array like `Data[2]`.
+static bool isArrayWithNonLiteralExtent(Type* type)
+{
+    auto arrayType = as<ArrayExpressionType>(type);
+    if (!arrayType)
+        return false;
+    auto elementCount = arrayType->getElementCount();
+    return elementCount && !as<ConstantIntVal>(elementCount);
+}
+
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
@@ -3589,6 +3603,41 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     getSink()->diagnose(Diagnostics::MoreOverloadCandidates{
                         .count = (int64_t)remainingCount,
                         .location = expr->loc});
+                }
+            }
+
+            // Migration hint (issue #12764): when an argument is an array whose
+            // extent is a generic value parameter (e.g. `Data values[N]` inside
+            // `getData<let N:uint>`), the call is checked while the extent is
+            // still abstract, so it cannot match any fixed-extent overload
+            // (`decode(Data[1])`, `decode(Data[2])`, ...). Point the user at the
+            // supported native formulations, but only when a rejected candidate
+            // actually expected a literal-extent array — otherwise this is an
+            // ordinary overload mismatch and the hint would be noise.
+            bool anyArgHasGenericExtent = false;
+            for (auto arg : expr->arguments)
+            {
+                if (arg->type.type && isArrayWithNonLiteralExtent(arg->type.type))
+                {
+                    anyArgHasGenericExtent = true;
+                    break;
+                }
+            }
+            if (anyArgHasGenericExtent)
+            {
+                for (const auto& candidate : context.bestCandidates)
+                {
+                    if (auto expectedArray =
+                            as<ArrayExpressionType>(candidate.argMismatchExpectedType))
+                    {
+                        if (as<ConstantIntVal>(expectedArray->getElementCount()))
+                        {
+                            getSink()->diagnose(
+                                Diagnostics::ArrayArgumentExtentIsGenericValueParameter{
+                                    .location = expr->loc});
+                            break;
+                        }
+                    }
                 }
             }
         }
