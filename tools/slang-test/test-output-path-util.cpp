@@ -30,17 +30,11 @@ static bool isAbsoluteOnAnyPlatform(const UnownedStringSlice& path)
     return Path::isDriveSpecification(Path::getFirstElement(path));
 }
 
-// Returns true if `path` is *this host's* null device, used as a "discard the output" sink. It is
-// the sanctioned discard target: `docs/generated/tests/_meta/prompts/_common.md` mandates
-// `-o /dev/null` to discard target text while capturing `-dump-ir` on stdout (`-o -` is not a
-// substitute — it mixes the two), and ~1000 nightly directives rely on it. The POSIX spelling
-// `/dev/null` is an absolute path (so without this exemption the check below would reject it);
-// `NUL` is a Windows device name rather than a path.
-//
-// The spelling is host-specific: `/dev/null` on POSIX, `NUL` on Windows. We match only the host's
-// own spelling, so the *other* host's spelling stays subject to the portability check — e.g. a
-// `-o /dev/null` directive run on Windows is refused (it genuinely does not work there), which is
-// the non-portability #12333 targets, rather than being waved through to fail later at `fopen`.
+// Returns true if `path` is *this host's* null device, the sanctioned "discard the output" sink,
+// which is exempt from the absolute-path rejection below (the POSIX spelling `/dev/null` is itself
+// an absolute path). Matched host-specifically so the *other* host's spelling stays subject to the
+// portability check: a `-o /dev/null` directive is still non-portable to Windows and is rejected
+// there.
 static bool isNullDeviceDiscardSink(const UnownedStringSlice& path)
 {
 #if SLANG_WINDOWS_FAMILY

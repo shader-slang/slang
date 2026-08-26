@@ -574,9 +574,8 @@ static SlangResult _normalizeTestOutputPaths(
     const SlangResult res = normalizeTestOutputPathsForTestFile(filePath, args, error);
     if (SLANG_FAILED(res))
     {
-        // A test problem is surfaced through the reporter, never stderr. The only path that reaches
-        // here (processFile -> _runTestsOnFile) always has a reporter installed, so its absence is
-        // a programming error rather than something to fall back from.
+        // Every path that reaches directive parsing installs a reporter first, so a missing one is
+        // a programming error rather than a case to handle.
         SLANG_ASSERT(context && context->getTestReporter());
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
