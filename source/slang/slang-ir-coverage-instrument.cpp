@@ -1543,6 +1543,14 @@ void instrumentCoverage(
     // and keeps the `1` set at record construction.
     if (bindlessIndex >= 0)
         syntheticResource.arraySize = slang::kUnboundedSyntheticResourceArraySize;
+    // `slang.h` promises consumers these two move together, so either one
+    // identifies the bindless form. Nothing else enforces that: the index is
+    // assigned unconditionally just above and the sentinel only under the
+    // branch, so an edit touching one and not the other would quietly break a
+    // contract callers are told they can rely on.
+    SLANG_ASSERT(
+        (bindlessIndex >= 0) ==
+        (syntheticResource.arraySize == slang::kUnboundedSyntheticResourceArraySize));
 
     CoverageInstrumenter instrumenter(
         module,

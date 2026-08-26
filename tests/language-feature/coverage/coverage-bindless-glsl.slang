@@ -8,6 +8,8 @@
 // buffer's contents and the OUTER `[]` is the descriptor array.
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -stage compute -entry computeMain -profile glsl_460 -trace-coverage -trace-coverage-binding 0 31 -trace-coverage-bindless-index 7
+//TEST:SIMPLE(filecheck=NONZERO):-target glsl -stage compute -entry computeMain -profile glsl_460 -trace-coverage -trace-coverage-binding 5 31 -trace-coverage-bindless-index 7
+//TEST:SIMPLE(filecheck=NOUNIFORM):-target glsl -stage compute -entry computeMain -profile glsl_460 -trace-coverage -trace-coverage-bindless-index 7
 
 RWStructuredBuffer<uint> outBuf;
 
@@ -32,3 +34,18 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // The trailing `[]` after the block instance name is the descriptor array;
 // without it this would be a single buffer again.
 //CHECK: }{{.*}}[];
+
+// GLSL emission is an independent path from SPIR-V, so it needs the same two
+// guards the SPIR-V companion carries.
+//
+// `binding = 0` above proves nothing on its own: auto-allocation also lands
+// the array at binding 0, so only the set carries signal there. Pinning a
+// non-zero binding is what shows `-trace-coverage-binding` composes with the
+// bindless form on this path too.
+//NONZERO: layout(std430, binding = 5, set = 31) buffer
+
+// The array index is a compile-time constant and therefore uniform, so the
+// access must NOT be wrapped in `nonuniformEXT` -- doing so would push every
+// counter update onto the non-uniform descriptor-indexing path for no reason.
+// This needs its own prefix so the -NOT scans the whole output.
+//NOUNIFORM-NOT: nonuniformEXT

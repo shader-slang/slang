@@ -5293,9 +5293,9 @@ err(
 )
 
 err(
-    "coverage-bindless-value-out-of-range",
+    "coverage-bindless-negative-index",
     45117,
-    "`TraceCoverageBindlessIndex` requires a non-negative index. The command-line parser rejects negatives, so this reports a host setting the option directly through the API: a negative index would silently fall back to the single-buffer form, giving one binding per shader rather than the shared array that was asked for."
+    "`-trace-coverage-bindless-index` requires a non-negative index, but got a negative one. A negative index selects the single-buffer form, giving one descriptor binding per shader rather than the shared array that was asked for. Pass an index of 0 or greater, or omit the option to use the single-buffer form deliberately."
 )
 
 -- 41xxx - Semantic checking (continued)

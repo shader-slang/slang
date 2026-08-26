@@ -1105,13 +1105,23 @@ Result linkAndOptimizeIR(
     // so this pass is independent of debug-info state. It writes its
     // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
-    // Placement options are read and validated OUTSIDE the gate below --
-    // value kind, value range, and target support alike.
-    // `requiredLoweringPassSet.coverageTracing` is derived from coverage marker
-    // ops present in the IR, so a shader with nothing instrumentable in it
-    // would otherwise accept a contradictory or unsupported option set in
-    // total silence — the user asked for a placement and got no compilation
-    // and no diagnostic.
+    // Placement options are read OUTSIDE the gate below, and the bindless
+    // index is fully validated here -- value kind, value range, and target
+    // support alike.
+    //
+    // The gate is `requiredLoweringPassSet.coverageTracing`, derived from
+    // coverage marker ops present in the IR, so a module with nothing
+    // instrumentable never opens it. Validating the bindless index inside
+    // would mean an empty or declaration-only translation unit accepted an
+    // unsupported option set in total silence: the user asks for the shared
+    // descriptor array, gets no diagnostic, and finds out from a
+    // pipeline-layout mismatch at runtime.
+    //
+    // `-trace-coverage-binding` gets no equivalent checks here -- its values
+    // are consumed by `instrumentCoverage` inside the gate, and an
+    // unsatisfiable binding surfaces there. It is read alongside the index
+    // only because the two describe one placement and are cheaper to read
+    // together than to split across the gate.
     int explicitBinding = -1;
     int explicitSpace = -1;
     int bindlessIndex = -1;
@@ -1171,7 +1181,7 @@ Result linkAndOptimizeIR(
                 if (requestedIndex < 0)
                 {
                     if (sink)
-                        sink->diagnose(Diagnostics::CoverageBindlessValueOutOfRange{});
+                        sink->diagnose(Diagnostics::CoverageBindlessNegativeIndex{});
                     return SLANG_FAIL;
                 }
                 bindlessIndex = requestedIndex;
