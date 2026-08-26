@@ -342,11 +342,7 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["windows-11-vs2026-arm"]'
-      # Temporarily reverted to false: the windows-aarch64 GCS cache entry
-      # this depended on turned out to be mislabeled x64 (built from a
-      # branch missing the arch: arm64 MSVC fix) and has been deleted.
-      # Re-enable once a correctly-native-arm64 entry is reseeded.
-      build-llvm: false
+      build-llvm: true
 
   build-windows-release-cl-aarch64:
     needs: [filter, wait-for-human-priority]
@@ -364,9 +360,7 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["windows-11-vs2026-arm"]'
-      # See the debug job's comment above: reverted pending a correctly
-      # native-arm64 GCS cache entry.
-      build-llvm: false
+      build-llvm: true
 
   # Vet-and-approve gate for the Falcor-only rebuild below. A job that
   # calls a reusable workflow via `uses:` cannot itself carry
