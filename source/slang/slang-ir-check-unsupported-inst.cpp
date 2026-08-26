@@ -106,6 +106,27 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
     }
 }
 
+// False for the targets this check rejects a surviving function-typed value on (issue #12367):
+// kernel C++/CUDA, the Metal and WebGPU families, and `ShaderSharedLibrary`/`ShaderHostCallable`/
+// `ShaderLLVMIR` (which lower through kernel C++). Other targets are handled elsewhere.
+static bool doesTargetSupportFuncTypedValue(TargetRequest* target)
+{
+    switch (target->getTarget())
+    {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::PTX:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::ShaderLLVMIR:
+        return false;
+    default:
+        return !isMetalTarget(target) && !isWGPUTarget(target);
+    }
+}
+
 // True if `funcType` has any parameter or result of type `String`.
 static bool funcTypeReferencesStringType(IRFuncType* funcType)
 {
@@ -165,10 +186,36 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     // any diagnostic.
     const bool rejectString = isKernelCPPOrCUDASourceTarget(target);
 
+    const bool supportsFuncTypedValue = doesTargetSupportFuncTypedValue(target);
+
+    auto diagnoseFuncTypedValue = [&](IRInst* inst)
+    {
+        if (supportsFuncTypedValue || !as<IRFuncType>(unwrapArrayAndPointers(inst->getDataType())))
+            return;
+        // One mistake is reachable as several insts (the local, a parameter it flows to,
+        // synthesized temporaries), some without a location. Reporting only those that can name a
+        // position keeps it to one error per mistake instead of several pointing nowhere.
+        auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+        if (loc.isValid())
+            sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+    };
+
+    if (!supportsFuncTypedValue)
+    {
+        if (auto firstBlock = func->getFirstBlock(); firstBlock)
+        {
+            for (auto param : firstBlock->getParams())
+                diagnoseFuncTypedValue(param);
+        }
+    }
+
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
         {
+            if (inst->getOp() == kIROp_Var)
+                diagnoseFuncTypedValue(inst);
+
             switch (inst->getOp())
             {
             case kIROp_GetArrayLength:
@@ -235,9 +282,38 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
     // the host C++ emitter does.
     const bool supportsMultisampledTexture = !isCUDATarget(target);
+    const bool supportsFuncTypedValue = doesTargetSupportFuncTypedValue(target);
 
     for (auto globalInst : module->getGlobalInsts())
     {
+        if (!supportsFuncTypedValue)
+        {
+            // C++/CUDA/Metal move a global into a `KernelContext` struct field
+            // (`introduceExplicitGlobalContext`), so a function-typed global appears as a field.
+            if (auto structType = as<IRStructType>(globalInst))
+            {
+                for (auto field : structType->getFields())
+                {
+                    if (as<IRFuncType>(unwrapArrayAndPointers(field->getFieldType())))
+                    {
+                        auto key = field->getKey();
+                        auto loc = key->sourceLoc.isValid() ? key->sourceLoc : findFirstUseLoc(key);
+                        sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+                    }
+                }
+            }
+            // WGSL does not run that pass, so its globals stay module-scope variables.
+            else if (globalInst->getOp() == kIROp_GlobalVar)
+            {
+                if (as<IRFuncType>(unwrapArrayAndPointers(globalInst->getDataType())))
+                {
+                    auto loc = globalInst->sourceLoc.isValid() ? globalInst->sourceLoc
+                                                               : findFirstUseLoc(globalInst);
+                    sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+                }
+            }
+        }
+
         switch (globalInst->getOp())
         {
         case kIROp_VectorType:
