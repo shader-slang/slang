@@ -2031,6 +2031,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto valueType = getSpvPointerValueType(ptrType);
         auto rule = getPointerArrayStrideLayoutRule(ptrType, valueType);
 
+        // Array pointees only ever serve element indexing, so use the element
+        // stride. Whole-object stepping goes through the wrapper pointer,
+        // whose pointee is a struct and falls through to the path below.
         if (auto arrayType = as<IRArrayTypeBase>(valueType))
             return getArrayElementStrideValue(arrayType, rule);
 
