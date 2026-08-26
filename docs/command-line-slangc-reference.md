@@ -340,6 +340,14 @@ Record boolean coverage instead of exact execution counts: each counter slot is 
 Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time before any host metadata reads run. Implies `-trace-coverage`. 
 
 
+<a id="trace-coverage-bindless-index"></a>
+### -trace-coverage-bindless-index
+
+**-trace-coverage-bindless-index &lt;index&gt;**
+
+Synthesize `__slang_coverage` as an unbounded descriptor array of structured buffers rather than a single buffer, and index it with &lt;index&gt;: `__slang_coverage\[&lt;index&gt;\]\[slot\]`. Many separately compiled shaders sharing one pipeline then occupy a single descriptor binding rather than one binding each, and each shader's buffer is sized independently by the host. Place the array with `-trace-coverage-binding &lt;index&gt; &lt;space&gt;`, or leave it to auto-allocation. If the host declares the descriptor array with a VARIABLE descriptor count, Vulkan requires it to be the highest-numbered binding in its set; a fixed descriptor count carries no such restriction. That is the host's layout to satisfy, and the compiler cannot see it. &lt;index&gt; is a compile-time constant and so becomes part of the compiled output: a host that keys a shader cache on that output must derive &lt;index&gt; from a stable shader identity rather than from load order, or an unchanged shader recompiles whenever that order shifts. SPIR-V and GLSL only. Implies `-trace-coverage`. 
+
+
 <a id="trace-coverage-reserved-space"></a>
 ### -trace-coverage-reserved-space
 

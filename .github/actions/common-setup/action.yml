@@ -44,6 +44,13 @@ runs:
       # retirement, so a break surfaces now instead of when Node 20 is removed.
       env:
         FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      with:
+        # No arch input defaults to the x64-hosted, x64-target compiler
+        # regardless of host architecture, so a native arm64 host would
+        # silently build under x64 emulation. Force arm64 on native arm64
+        # Windows hosts; every other Windows platform in the current matrix
+        # (x86_64 only — no 32-bit x86 caller exists) falls back to x64.
+        arch: ${{ (inputs.os == 'windows' && inputs.platform == 'aarch64') && 'arm64' || 'x64' }}
 
     - name: Install dependencies (Linux only)
       if: inputs.os == 'linux'

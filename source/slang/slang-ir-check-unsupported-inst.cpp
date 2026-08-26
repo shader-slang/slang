@@ -277,6 +277,10 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
 
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
+    // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
+    // the host C++ emitter does.
+    const bool supportsMultisampledTexture = !isCUDATarget(target);
+
     for (auto globalInst : module->getGlobalInsts())
     {
         switch (globalInst->getOp())
@@ -288,6 +292,20 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
                     !as<IRPackedFloatType>(globalInst->getOperand(0)))
                 {
                     sink->diagnose(Diagnostics::UnsupportedBuiltinType{
+                        .type = globalInst,
+                        .location = findFirstUseLoc(globalInst)});
+                }
+                break;
+            }
+        case kIROp_TextureType:
+            {
+                // Texture types are hoisted, deduplicated global insts, so checking
+                // the type here catches every use site (global param, struct field,
+                // local, parameter) with a single diagnostic.
+                if (!supportsMultisampledTexture &&
+                    as<IRTextureTypeBase>(globalInst)->isMultisample())
+                {
+                    sink->diagnose(Diagnostics::MultisampledTextureNotSupportedOnTarget{
                         .type = globalInst,
                         .location = findFirstUseLoc(globalInst)});
                 }
