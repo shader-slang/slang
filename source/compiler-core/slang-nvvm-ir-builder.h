@@ -27,7 +27,7 @@ public:
         ISlangSharedLibrary* library,
         NVVMIRBuilder& outBuilder);
 
-    /// Validates the V2 diagnostic table and its nested V1 API, then retains its owning library.
+    /// Validates the known V2 prefixes and nested V1 API, then retains its owning library.
     static SlangResult initialize(
         const SlangNVVMBuilderAPI_V2& api,
         ISlangSharedLibrary* library,
@@ -36,8 +36,11 @@ public:
     bool isInitialized() const { return m_api.createModule != nullptr; }
     bool supportsSerializationDiagnostics() const
     {
-        return m_apiV2.serializeModuleWithDiagnostics != nullptr;
+        return m_apiV2.structureSize >= SLANG_NVVM_BUILDER_API_V2_MIN_SIZE &&
+               m_apiV2.serializeModuleWithDiagnostics != nullptr;
     }
+    /// Returns whether the provider advertised the complete Slice 4 scalar-memory prefix.
+    bool supportsScalarOperations() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
     /// Returns the locally supported V2 prefix, with `structureSize` clamped to that prefix.
     const SlangNVVMBuilderAPI_V2* getAPIV2() const
@@ -56,6 +59,19 @@ public:
     /// Gets the module's context-owned void type.
     SlangResult getVoidType(SlangNVVMModuleHandle_1 module, SlangNVVMTypeHandle_1& outType) const;
 
+    /// Gets a module-context-owned signless integer type.
+    SlangResult getIntegerType(
+        SlangNVVMModuleHandle_1 module,
+        uint32_t bitWidth,
+        SlangNVVMTypeHandle_1& outType) const;
+
+    /// Gets a typed pointer with the requested NVVM address space.
+    SlangResult getPointerType(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 pointeeType,
+        SlangNVVMAddressSpace_2 addressSpace,
+        SlangNVVMTypeHandle_1& outType) const;
+
     /// Creates a non-variadic function type from module-owned type handles.
     SlangResult getFunctionType(
         SlangNVVMModuleHandle_1 module,
@@ -71,6 +87,13 @@ public:
         const UnownedStringSlice& name,
         SlangNVVMValueHandle_1& outFunction) const;
 
+    /// Gets a declared function's parameter by its zero-based ABI position.
+    SlangResult getFunctionParameter(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 function,
+        size_t parameterIndex,
+        SlangNVVMValueHandle_1& outValue) const;
+
     /// Appends a basic block to a function owned by the module.
     SlangResult createBlock(
         SlangNVVMModuleHandle_1 module,
@@ -80,6 +103,20 @@ public:
 
     /// Selects a module-owned block as the destination for subsequent instructions.
     SlangResult setInsertBlock(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 block) const;
+
+    /// Emits a non-volatile aligned load into the current insertion block.
+    SlangResult emitLoad(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 pointer,
+        uint32_t alignment,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits a non-volatile aligned store into the current insertion block.
+    SlangResult emitStore(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMValueHandle_1 pointer,
+        uint32_t alignment) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;

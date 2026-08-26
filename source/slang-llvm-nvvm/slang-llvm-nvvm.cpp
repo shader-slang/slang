@@ -14,6 +14,7 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/Alignment.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstring>
@@ -79,6 +80,46 @@ static llvm::StringRef _getStringRef(const char* data, size_t size)
     return size ? llvm::StringRef(data, size) : llvm::StringRef();
 }
 
+static bool _isNVVMAddressSpace(SlangNVVMAddressSpace_2 addressSpace)
+{
+    return addressSpace == SLANG_NVVM_ADDRESS_SPACE_GENERIC ||
+           addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+           addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED ||
+           addressSpace == SLANG_NVVM_ADDRESS_SPACE_CONSTANT ||
+           addressSpace == SLANG_NVVM_ADDRESS_SPACE_LOCAL;
+}
+
+static llvm::PointerType* _getLoadablePointerType(ModuleState* state, llvm::Value* pointer)
+{
+    if (!state || !pointer || &pointer->getContext() != &state->context)
+        return nullptr;
+
+    llvm::PointerType* pointerType = llvm::dyn_cast<llvm::PointerType>(pointer->getType());
+    if (!pointerType || pointerType->isOpaque() ||
+        !_isNVVMAddressSpace(pointerType->getAddressSpace()))
+    {
+        return nullptr;
+    }
+
+    llvm::Type* pointeeType = pointerType->getNonOpaquePointerElementType();
+    return llvm::PointerType::isLoadableOrStorableType(pointeeType) ? pointerType : nullptr;
+}
+
+static bool _hasValidInsertionBlock(ModuleState* state)
+{
+    if (!state)
+        return false;
+
+    llvm::BasicBlock* block = state->builder.GetInsertBlock();
+    return block && !block->getTerminator() && block->getParent() &&
+           block->getParent()->getParent() == state->module.get();
+}
+
+static bool _isValidAlignment(uint32_t alignment)
+{
+    return llvm::isPowerOf2_32(alignment);
+}
+
 static SlangResult SLANG_NVVM_CALL
 _createModule(const char* moduleName, size_t moduleNameSize, SlangNVVMModuleHandle_1* outModule)
 {
@@ -107,6 +148,46 @@ _getVoidType(SlangNVVMModuleHandle_1 module, SlangNVVMTypeHandle_1* outType)
         return SLANG_E_INVALID_ARG;
 
     *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(llvm::Type::getVoidTy(state->context));
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL
+_getIntegerType(SlangNVVMModuleHandle_1 module, uint32_t bitWidth, SlangNVVMTypeHandle_1* outType)
+{
+    if (outType)
+        *outType = nullptr;
+
+    ModuleState* state = _getModule(module);
+    if (!state || !outType || bitWidth == 0 || bitWidth > uint32_t(llvm::IntegerType::MAX_INT_BITS))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    *outType =
+        reinterpret_cast<SlangNVVMTypeHandle_1>(llvm::IntegerType::get(state->context, bitWidth));
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _getPointerType(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1 pointeeType,
+    SlangNVVMAddressSpace_2 addressSpace,
+    SlangNVVMTypeHandle_1* outType)
+{
+    if (outType)
+        *outType = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Type* llvmPointeeType = _getType(pointeeType);
+    if (!state || !llvmPointeeType || &llvmPointeeType->getContext() != &state->context ||
+        !llvm::PointerType::isLoadableOrStorableType(llvmPointeeType) ||
+        !_isNVVMAddressSpace(addressSpace) || !outType)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(
+        llvm::PointerType::get(llvmPointeeType, addressSpace));
     return SLANG_OK;
 }
 
@@ -169,6 +250,28 @@ static SlangResult SLANG_NVVM_CALL _declareFunction(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _getFunctionParameter(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 function,
+    size_t parameterIndex,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Function* llvmFunction = llvm::dyn_cast_or_null<llvm::Function>(_getValue(function));
+    if (!state || !llvmFunction || llvmFunction->getParent() != state->module.get() || !outValue ||
+        parameterIndex >= llvmFunction->arg_size())
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+        llvmFunction->getArg(static_cast<unsigned>(parameterIndex)));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _createBlock(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMValueHandle_1 function,
@@ -202,6 +305,53 @@ _setInsertBlock(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 block)
     }
 
     state->builder.SetInsertPoint(llvmBlock);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitLoad(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 pointer,
+    uint32_t alignment,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmPointer = _getValue(pointer);
+    llvm::PointerType* pointerType = _getLoadablePointerType(state, llvmPointer);
+    if (!pointerType || !_hasValidInsertionBlock(state) || !_isValidAlignment(alignment) ||
+        !outValue)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Type* pointeeType = pointerType->getNonOpaquePointerElementType();
+    llvm::Value* value =
+        state->builder.CreateAlignedLoad(pointeeType, llvmPointer, llvm::Align(alignment));
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(value);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitStore(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1 pointer,
+    uint32_t alignment)
+{
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmValue = _getValue(value);
+    llvm::Value* llvmPointer = _getValue(pointer);
+    llvm::PointerType* pointerType = _getLoadablePointerType(state, llvmPointer);
+    if (!pointerType || !llvmValue || &llvmValue->getContext() != &state->context ||
+        llvmValue->getType() != pointerType->getNonOpaquePointerElementType() ||
+        pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_CONSTANT ||
+        !_hasValidInsertionBlock(state) || !_isValidAlignment(alignment))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    state->builder.CreateAlignedStore(llvmValue, llvmPointer, llvm::Align(alignment));
     return SLANG_OK;
 }
 
@@ -445,6 +595,11 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_2;
     _fillBuilderAPIV1(api.baseAPI);
     api.serializeModuleWithDiagnostics = _serializeModuleWithDiagnostics;
+    api.getIntegerType = _getIntegerType;
+    api.getPointerType = _getPointerType;
+    api.getFunctionParameter = _getFunctionParameter;
+    api.emitLoad = _emitLoad;
+    api.emitStore = _emitStore;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

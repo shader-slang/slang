@@ -54,6 +54,13 @@ extern "C"
 #define SLANG_NVVM_VERIFICATION_VALID ((SlangNVVMVerificationStatus_2)1u)
 #define SLANG_NVVM_VERIFICATION_INVALID ((SlangNVVMVerificationStatus_2)2u)
 
+    typedef uint32_t SlangNVVMAddressSpace_2;
+#define SLANG_NVVM_ADDRESS_SPACE_GENERIC ((SlangNVVMAddressSpace_2)0u)
+#define SLANG_NVVM_ADDRESS_SPACE_GLOBAL ((SlangNVVMAddressSpace_2)1u)
+#define SLANG_NVVM_ADDRESS_SPACE_SHARED ((SlangNVVMAddressSpace_2)3u)
+#define SLANG_NVVM_ADDRESS_SPACE_CONSTANT ((SlangNVVMAddressSpace_2)4u)
+#define SLANG_NVVM_ADDRESS_SPACE_LOCAL ((SlangNVVMAddressSpace_2)5u)
+
     /**
      * Version 1 of the private ABI between Slang and its optional LLVM-backed NVVM IR module.
      *
@@ -146,13 +153,58 @@ extern "C"
         size_t* outDiagnosticSize,
         SlangNVVMVerificationStatus_2* outVerificationStatus);
 
-    /**
-     * Version 2 composes the immutable V1 construction API with atomic serialization diagnostics.
-     *
-     * The caller zero-initializes the structure and supplies its capacity in `structureSize`. The
-     * provider copies only the prefix that fits and returns its complete supported size in that
-     * field. Functions may be appended to V2, but existing fields and semantics are immutable.
-     */
+    /// Gets a signless LLVM integer type. Valid bit widths are 1 through 8,388,608.
+    /// On failure, the output type is null.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMGetIntegerType_2)(
+        SlangNVVMModuleHandle_1 module,
+        uint32_t bitWidth,
+        SlangNVVMTypeHandle_1* outType);
+
+    /// Gets a typed pointer to a same-module loadable type.
+    /// The address space must equal one of the five declared NVVM address-space constants.
+    /// On failure, the output type is null.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMGetPointerType_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 pointeeType,
+        SlangNVVMAddressSpace_2 addressSpace,
+        SlangNVVMTypeHandle_1* outType);
+
+    /// Gets a same-module function parameter by its zero-based ABI position.
+    /// On failure, the output value is null.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMGetFunctionParameter_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 function,
+        size_t parameterIndex,
+        SlangNVVMValueHandle_1* outValue);
+
+    /// Emits a non-volatile load through a same-module typed pointer.
+    /// The module must own the current unterminated insertion block.
+    /// Alignment is a nonzero power-of-two byte count.
+    /// On failure, the output value is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitLoad_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 pointer,
+        uint32_t alignment,
+        SlangNVVMValueHandle_1* outValue);
+
+    /// Emits a non-volatile store through a same-module typed pointer.
+    /// The module must own the current unterminated insertion block.
+    /// The value type must equal the pointee type, and constant address space is read-only.
+    /// Alignment is a nonzero power-of-two byte count. Failure inserts nothing.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitStore_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMValueHandle_1 pointer,
+        uint32_t alignment);
+
+    /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
+    ///
+    /// The caller zero-initializes the structure and supplies its capacity in structureSize.
+    /// The provider copies only the prefix that fits and reports its complete supported size.
+    ///
+    /// Functions may be appended to V2, but existing fields and semantics are immutable.
+    /// Each published minimum-size capability block is all-or-none.
+    /// A size inside a known block is malformed rather than a smaller capability.
     typedef struct SlangNVVMBuilderAPI_V2
     {
         uint32_t structureSize;
@@ -160,12 +212,22 @@ extern "C"
 
         SlangNVVMBuilderAPI_V1 baseAPI;
         SlangNVVMSerializeModuleWithDiagnostics_2 serializeModuleWithDiagnostics;
+
+        SlangNVVMGetIntegerType_2 getIntegerType;
+        SlangNVVMGetPointerType_2 getPointerType;
+        SlangNVVMGetFunctionParameter_2 getFunctionParameter;
+        SlangNVVMEmitLoad_2 emitLoad;
+        SlangNVVMEmitStore_2 emitStore;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
 #define SLANG_NVVM_BUILDER_API_V2_MIN_SIZE                              \
     (offsetof(SlangNVVMBuilderAPI_V2, serializeModuleWithDiagnostics) + \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->serializeModuleWithDiagnostics))
+
+    // This Slice 4 prefix is one coherent scalar-memory capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitStore) + sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitStore))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

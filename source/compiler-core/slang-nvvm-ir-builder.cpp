@@ -3,6 +3,8 @@
 #include "core/slang-blob.h"
 #include "slang-downstream-compiler-util.h"
 
+#include <cstring>
+
 namespace Slang
 {
 
@@ -28,11 +30,22 @@ static bool _isVerificationStatus(SlangNVVMVerificationStatus_2 status)
     return status == SLANG_NVVM_VERIFICATION_VALID || status == SLANG_NVVM_VERIFICATION_INVALID;
 }
 
-// Rejects an ABI implementation that reports success without producing its required handle.
-static SlangResult _validateHandleResult(SlangNVVMResult_1 result, const void* handle)
+// Treats the appended Slice 4 fields as one coherent scalar-memory capability.
+static bool _supportsScalarOperations(const SlangNVVMBuilderAPI_V2& api)
+{
+    return api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE && api.getIntegerType &&
+           api.getPointerType && api.getFunctionParameter && api.emitLoad && api.emitStore;
+}
+
+// Rejects success without a required handle and never exposes a handle from a failed provider call.
+template<typename T>
+static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
 {
     if (result < 0)
+    {
+        handle = nullptr;
         return result;
+    }
     return handle ? result : SLANG_FAIL;
 }
 
@@ -46,12 +59,13 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, const void* h
         loader = DefaultSharedLibraryLoader::getSingleton();
 
     ComPtr<ISlangSharedLibrary> library;
-    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(
-        path,
-        loader,
-        nullptr,
-        "slang-llvm-nvvm",
-        library));
+    SLANG_RETURN_ON_FAIL(
+        DownstreamCompilerUtil::loadSharedLibrary(
+            path,
+            loader,
+            nullptr,
+            "slang-llvm-nvvm",
+            library));
     if (!library)
         return SLANG_FAIL;
 
@@ -100,20 +114,36 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, const void* h
     NVVMIRBuilder& outBuilder)
 {
     outBuilder = NVVMIRBuilder();
-    if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE ||
+    const bool hasPartialScalarPrefix =
+        api.structureSize > SLANG_NVVM_BUILDER_API_V2_MIN_SIZE &&
+        api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE;
+    if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE || hasPartialScalarPrefix ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
-        !api.serializeModuleWithDiagnostics)
+        !api.serializeModuleWithDiagnostics ||
+        (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
+         !_supportsScalarOperations(api)))
     {
         return SLANG_E_NO_INTERFACE;
     }
     if (!library)
         return SLANG_E_INVALID_ARG;
 
-    outBuilder.m_api = api.baseAPI;
-    outBuilder.m_apiV2 = api;
-    outBuilder.m_apiV2.structureSize = uint32_t(sizeof(outBuilder.m_apiV2));
+    const size_t retainedSize = api.structureSize < sizeof(outBuilder.m_apiV2)
+                                    ? api.structureSize
+                                    : sizeof(outBuilder.m_apiV2);
+    SlangNVVMBuilderAPI_V2 retainedAPI = {};
+    std::memcpy(&retainedAPI, &api, retainedSize);
+    retainedAPI.structureSize = uint32_t(retainedSize);
+
+    outBuilder.m_api = retainedAPI.baseAPI;
+    outBuilder.m_apiV2 = retainedAPI;
     outBuilder.m_library = library;
     return SLANG_OK;
+}
+
+bool NVVMIRBuilder::supportsScalarOperations() const
+{
+    return _supportsScalarOperations(m_apiV2);
 }
 
 SlangResult NVVMIRBuilder::createModule(
@@ -142,6 +172,36 @@ SlangResult NVVMIRBuilder::getVoidType(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
     const SlangNVVMResult_1 result = m_api.getVoidType(module, &outType);
+    return _validateHandleResult(result, outType);
+}
+
+SlangResult NVVMIRBuilder::getIntegerType(
+    SlangNVVMModuleHandle_1 module,
+    uint32_t bitWidth,
+    SlangNVVMTypeHandle_1& outType) const
+{
+    outType = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarOperations())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result = m_apiV2.getIntegerType(module, bitWidth, &outType);
+    return _validateHandleResult(result, outType);
+}
+
+SlangResult NVVMIRBuilder::getPointerType(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1 pointeeType,
+    SlangNVVMAddressSpace_2 addressSpace,
+    SlangNVVMTypeHandle_1& outType) const
+{
+    outType = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarOperations())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV2.getPointerType(module, pointeeType, addressSpace, &outType);
     return _validateHandleResult(result, outType);
 }
 
@@ -174,6 +234,22 @@ SlangResult NVVMIRBuilder::declareFunction(
     return _validateHandleResult(result, outFunction);
 }
 
+SlangResult NVVMIRBuilder::getFunctionParameter(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 function,
+    size_t parameterIndex,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarOperations())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV2.getFunctionParameter(module, function, parameterIndex, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
 SlangResult NVVMIRBuilder::createBlock(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMValueHandle_1 function,
@@ -195,6 +271,34 @@ SlangResult NVVMIRBuilder::setInsertBlock(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
     return m_api.setInsertBlock(module, block);
+}
+
+SlangResult NVVMIRBuilder::emitLoad(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 pointer,
+    uint32_t alignment,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarOperations())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result = m_apiV2.emitLoad(module, pointer, alignment, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitStore(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1 pointer,
+    uint32_t alignment) const
+{
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarOperations())
+        return SLANG_E_NOT_AVAILABLE;
+    return m_apiV2.emitStore(module, value, pointer, alignment);
 }
 
 SlangResult NVVMIRBuilder::emitReturnVoid(SlangNVVMModuleHandle_1 module) const

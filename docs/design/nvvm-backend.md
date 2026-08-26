@@ -380,6 +380,60 @@ constants, memory operations, and scalar reference kernels remain the Slice 4 bo
 Modern-dialect support is a later route selected from the target architecture and the optional
 `nvvmLLVMVersion` query. It is not a prerequisite for legacy-dialect compute support.
 
+### Slice 4 scalar-memory builder and differential boundary
+
+Slice 4 appends one coherent capability block to V2 without changing V1 or the frozen Slice 3b V2
+prefix. The block creates signless integer types and typed pointers in an explicit NVVM address
+space, obtains a declared function parameter, and emits aligned non-volatile loads and stores. A
+second minimum-size constant names the complete block. An old provider reporting exactly the Slice
+3b prefix remains valid but does not advertise scalar operations. A provider reporting the new
+minimum must supply every operation; a byte size strictly between the two published minima or a
+missing function is malformed. Future/larger providers remain compatible, and the host retains
+the lesser of the provider-reported size and its local table capacity instead of inflating an old
+table to the local `sizeof`.
+
+Each module owns a unique LLVM context, which is the canonical ownership boundary for returned
+types and values. Pointer types carry their NVVM address space directly; this slice does not round
+trip them through integers or insert casts. Loads and stores require a current module-owned,
+unterminated block, a typed pointer from the same context, and a nonzero power-of-two byte
+alignment. Stores additionally require an exact pointee/value type match and reject address space
+4 because NVVM constant memory is read-only. The provider validates the complete shape before
+inserting an instruction. Host wrappers clear outputs before dispatch and also clear a handle if a
+provider writes one and then reports failure, so a failed call never exposes stale provider state.
+
+The first two reference kernels are the exact CUDA shapes:
+
+```cpp
+extern "C" __global__ void writeScalar(int* destination, int value)
+{
+    *destination = value;
+}
+
+extern "C" __global__ void copyScalar(int* destination, const int* source)
+{
+    *destination = *source;
+}
+```
+
+The builder represents both pointer parameters as `i32 addrspace(1)*`. Global address space 1 is
+intentional: the source contract identifies device-global storage, and LLVM 14 NVPTX lowers that
+canonical type directly to global load/store operations. Generic address space 0 would introduce
+a conversion and is reserved for a later lowering case that actually produces generic pointers.
+The kernels need no constants, GEP, casts, arithmetic, control flow, or synthesized LLVM text.
+
+The differential test compiles the exact CUDA source with NVRTC and the builder-produced bitcode
+with libNVVM for `compute_75`. It compares named-entry parameter order and widths—`[64, 32]` for
+`writeScalar` and `[64, 64]` for `copyScalar`—and requires entry-scoped 32-bit global store, or
+global load plus store, respectively. It deliberately ignores PTX spelling, parameter names,
+register allocation, whitespace, and tool-selected PTX version. CUDA-toolkit `ptxas -arch=sm_75`
+acceptance is the final static syntax and target gate for both routes.
+
+This evidence does not change routing: ordinary PTX requests still use NVRTC, and no Slang IR
+lowering exists at this boundary. It also does not prove strict toolkit identity. Default NVRTC
+discovery may prefer a library beside the executable while libNVVM and `ptxas` are rooted at the
+configured CUDA toolkit. Successful assembly proves that the selected tools interoperate on the
+tested machine; a shared toolkit-root selection contract remains separate discovery work.
+
 ## CUDA Pass Ownership Audit
 
 Before the first Slang-to-NVVM emitter lands, each current CUDA-specific behavior must be placed in
@@ -472,6 +526,8 @@ The program advances through bounded slices:
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
+Slice 4 completes item 4 for the two scalar-memory reference kernels while deliberately adding no
+Slang IR traversal or experimental routing from item 5.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -510,11 +566,25 @@ verified and compiled by the same CUDA 12.2 libNVVM, and the resulting `sm_75` P
 `ptxas`. The existing LLVM 21 module was ruled out as the pre-Blackwell producer; a separate pinned
 LLVM 14 NVVM builder prototype is the next prerequisite.
 
+On 2026-08-26, Slice 4 built the standalone provider in Release against pinned LLVM 14.0.6 and the
+host/unit tests in Debug. With the provider selected, the complete NVVM unit prefix passed 32/32,
+including scalar ABI negotiation, invalid-operation/no-mutation coverage, verified reference
+kernels, NVRTC-versus-libNVVM PTX comparison, and `ptxas` acceptance. The typed AS1 kernels had the
+expected `[64, 32]` and `[64, 64]` parameter widths and global-memory operations. CUDA 12.9
+`ptxas` 12.9.86 accepted both kernels from both routes for `sm_75`.
+
+With the provider absent, four fake-only tests passed and ten real-provider tests ignored. An
+explicit broken provider path failed a selected real test instead of skipping it. The isolated
+two-LLVM coexistence test and the established shared-library, downstream-version, and NVRTC CUDA
+sampler regressions also passed. PE inspection found exactly the V1 and V2 getters and no LLVM DLL
+dependency. Ordinary PTX compilation remains routed through NVRTC.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
 shape, the continued NVRTC default, the binary artifact shape, the separate pinned LLVM 14 builder,
-and the frozen-V1/append-only-V2 diagnostic ABI described above.
+the frozen-V1/append-only-V2 diagnostic ABI, and the coherent AS1 scalar-memory capability and
+differential contract described above.
 
 The following remain open until their named slice supplies evidence:
 
