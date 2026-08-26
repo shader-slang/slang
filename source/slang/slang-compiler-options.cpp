@@ -299,6 +299,17 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                     sb << " -emit-cpu-via-cpp";
             }
             break;
+        case CompilerOptionName::EmitCUDAMethod:
+            // The two CLI selectors parse into this canonical enum, so reconstruct the selector
+            // represented by the stored value. The absent/default value remains implicit.
+            for (auto v : option.value)
+            {
+                if (v.intValue == SLANG_EMIT_CUDA_VIA_NVRTC)
+                    sb << " -emit-cuda-via-nvrtc";
+                else if (v.intValue == SLANG_EMIT_CUDA_VIA_NVVM)
+                    sb << " -emit-cuda-via-nvvm";
+            }
+            break;
         case CompilerOptionName::BindlessSpaceIndex:
         case CompilerOptionName::SPIRVResourceHeapStride:
         case CompilerOptionName::SPIRVSamplerHeapStride:

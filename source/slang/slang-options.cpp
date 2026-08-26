@@ -979,6 +979,14 @@ void initCommandOptions(CommandOptions& options)
          "-emit-cpu-via-llvm",
          nullptr,
          "Generate CPU targets using LLVM"},
+        {OptionKind::EmitCUDAViaNVRTC,
+         "-emit-cuda-via-nvrtc",
+         nullptr,
+         "Generate PTX by compiling generated CUDA source with NVRTC (default)"},
+        {OptionKind::EmitCUDAViaNVVM,
+         "-emit-cuda-via-nvvm",
+         nullptr,
+         "Generate PTX directly using libNVVM (experimental)"},
         {OptionKind::LLVMTargetTriple,
          "-llvm-target-triple",
          "-llvm-target-triple <target triple>",
@@ -4047,6 +4055,18 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                                                       : SLANG_EMIT_CPU_VIA_LLVM;
 
                 getCurrentTarget()->optionSet.set(OptionKind::EmitCPUMethod, selectMethod);
+            }
+            break;
+        case OptionKind::EmitCUDAViaNVRTC:
+        case OptionKind::EmitCUDAViaNVVM:
+            {
+                SlangEmitCUDAMethod selectMethod = (optionKind == OptionKind::EmitCUDAViaNVRTC)
+                                                       ? SLANG_EMIT_CUDA_VIA_NVRTC
+                                                       : SLANG_EMIT_CUDA_VIA_NVVM;
+
+                // Unlike the legacy SPIR-V selectors, neither CUDA route has permanent priority.
+                // Store the latest selection so users can deliberately switch back to NVRTC.
+                getCurrentTarget()->optionSet.set(OptionKind::EmitCUDAMethod, selectMethod);
             }
             break;
         case OptionKind::LLVMTargetTriple:

@@ -1010,6 +1010,13 @@ typedef uint32_t SlangSizeT;
         SLANG_EMIT_CPU_VIA_LLVM = 2,
     };
 
+    enum SlangEmitCUDAMethod
+    {
+        SLANG_EMIT_CUDA_DEFAULT = 0,
+        SLANG_EMIT_CUDA_VIA_NVRTC = 1,
+        SLANG_EMIT_CUDA_VIA_NVVM = 2,
+    };
+
     enum SlangDiagnosticColor
     {
         SLANG_DIAGNOSTIC_COLOR_AUTO = 0,   // Use color if output sink is a tty
@@ -1307,6 +1314,10 @@ typedef uint32_t SlangSizeT;
                  //   `-g2`/`-g3` source is already embedded so the option is a no-op. Requires
                  //   debug information: using it with `-g0`, or without any `-g` option (both
                  //   resolve to no debug info), is an error. Only affects SPIR-V output.
+
+        EmitCUDAMethod = 158,   // enum SlangEmitCUDAMethod (derived; no direct CLI flag)
+        EmitCUDAViaNVRTC = 159, // CLI-only selector; the parser stores `EmitCUDAMethod` instead.
+        EmitCUDAViaNVVM = 160,  // CLI-only selector; the parser stores `EmitCUDAMethod` instead.
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.

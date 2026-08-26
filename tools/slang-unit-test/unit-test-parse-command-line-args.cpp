@@ -13,6 +13,22 @@ namespace
 
 using namespace Slang;
 
+static const slang::CompilerOptionEntry* findCompilerOptionEntry(
+    const slang::TargetDesc& targetDesc,
+    slang::CompilerOptionName optionName)
+{
+    if (!targetDesc.compilerOptionEntries)
+        return nullptr;
+
+    for (SlangInt i = 0; i < targetDesc.compilerOptionEntryCount; ++i)
+    {
+        const auto& entry = targetDesc.compilerOptionEntries[i];
+        if (entry.name == optionName)
+            return &entry;
+    }
+    return nullptr;
+}
+
 struct ParseCommandLineArgsTestContext
 {
     ParseCommandLineArgsTestContext(UnitTestContext* context)
@@ -51,22 +67,6 @@ struct ParseCommandLineArgsTestContext
             argv,
             &sessionDesc,
             allocation.writeRef()));
-
-        const auto findCompilerOptionEntry =
-            [](const slang::TargetDesc& targetDesc,
-               slang::CompilerOptionName optionName) -> const slang::CompilerOptionEntry*
-        {
-            if (!targetDesc.compilerOptionEntries)
-                return nullptr;
-
-            for (SlangInt i = 0; i < targetDesc.compilerOptionEntryCount; ++i)
-            {
-                const auto& entry = targetDesc.compilerOptionEntries[i];
-                if (entry.name == optionName)
-                    return &entry;
-            }
-            return nullptr;
-        };
 
         // Verify we have 2 targets
         SLANG_CHECK(sessionDesc.targetCount == 2);
@@ -146,4 +146,82 @@ SLANG_UNIT_TEST(parseCommandLineArgs)
     const auto result = context.runTests();
 
     SLANG_CHECK(SLANG_SUCCEEDED(result));
+}
+
+SLANG_UNIT_TEST(parseCUDAEmissionMethods)
+{
+    slang::IGlobalSession* slangSession = unitTestContext->slangGlobalSession;
+
+    // Consider three distinct outputs in one request. Repeating an identical target format is
+    // intentionally coalesced by the command-line parser, so PTX, DXIL, and CUDA source give us
+    // three independently observable target option sets. The first two flags switch back to
+    // NVRTC, the middle target makes no selection, and the final two flags switch to NVVM. This
+    // checks both flag orders while also proving that a selection belongs only to its current
+    // target.
+    const char* argv[] = {
+        "-target",
+        "ptx",
+        "-emit-cuda-via-nvvm",
+        "-emit-cuda-via-nvrtc",
+        "-o",
+        "nvrtc.ptx",
+        "-target",
+        "dxil",
+        "-o",
+        "default.dxil",
+        "-target",
+        "cuda",
+        "-emit-cuda-via-nvrtc",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "nvvm.cu",
+        "--",
+        "shader.slang",
+    };
+
+    slang::SessionDesc sessionDesc = {};
+    ComPtr<ISlangUnknown> allocation;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(slangSession->parseCommandLineArguments(
+        SLANG_COUNT_OF(argv),
+        argv,
+        &sessionDesc,
+        allocation.writeRef())));
+    SLANG_CHECK_ABORT(sessionDesc.targetCount == 3);
+
+    SLANG_CHECK(sessionDesc.targets[0].format == SLANG_PTX);
+    SLANG_CHECK(sessionDesc.targets[1].format == SLANG_DXIL);
+    SLANG_CHECK(sessionDesc.targets[2].format == SLANG_CUDA_SOURCE);
+
+    const auto* nvrtcMethod =
+        findCompilerOptionEntry(sessionDesc.targets[0], slang::CompilerOptionName::EmitCUDAMethod);
+    SLANG_CHECK_ABORT(nvrtcMethod != nullptr);
+    SLANG_CHECK(nvrtcMethod->value.kind == slang::CompilerOptionValueKind::Int);
+    SLANG_CHECK(nvrtcMethod->value.intValue0 == SLANG_EMIT_CUDA_VIA_NVRTC);
+
+    // The default remains represented by an absent option. Materializing a default here would make
+    // a flag on the preceding target leak into this otherwise independent target.
+    SLANG_CHECK(
+        findCompilerOptionEntry(
+            sessionDesc.targets[1],
+            slang::CompilerOptionName::EmitCUDAMethod) == nullptr);
+
+    const auto* nvvmMethod =
+        findCompilerOptionEntry(sessionDesc.targets[2], slang::CompilerOptionName::EmitCUDAMethod);
+    SLANG_CHECK_ABORT(nvvmMethod != nullptr);
+    SLANG_CHECK(nvvmMethod->value.kind == slang::CompilerOptionValueKind::Int);
+    SLANG_CHECK(nvvmMethod->value.intValue0 == SLANG_EMIT_CUDA_VIA_NVVM);
+
+    // The command-line spellings are selectors, not independent stored booleans. Keeping one
+    // canonical option prevents routing, serialization, and cache identity from disagreeing.
+    for (SlangInt i = 0; i < sessionDesc.targetCount; ++i)
+    {
+        SLANG_CHECK(
+            findCompilerOptionEntry(
+                sessionDesc.targets[i],
+                slang::CompilerOptionName::EmitCUDAViaNVRTC) == nullptr);
+        SLANG_CHECK(
+            findCompilerOptionEntry(
+                sessionDesc.targets[i],
+                slang::CompilerOptionName::EmitCUDAViaNVVM) == nullptr);
+    }
 }

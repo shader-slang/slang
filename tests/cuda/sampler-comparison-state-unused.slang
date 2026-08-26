@@ -4,6 +4,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -emit-cuda-via-nvrtc -entry computeMain -stage compute
 
 // CHECK: struct GlobalParams
 // CHECK: SamplerComparisonState g_scmp

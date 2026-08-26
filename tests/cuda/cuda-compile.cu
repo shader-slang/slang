@@ -1,4 +1,5 @@
 //TEST(smoke):COMPILE: -pass-through nvrtc -target ptx -entry hello tests/cuda/cuda-compile.cu
+//TEST(smoke):COMPILE: -pass-through nvrtc -target ptx -emit-cuda-via-nvvm -entry hello tests/cuda/cuda-compile.cu
 
 __global__ 
 void hello(char *a, int *b) 

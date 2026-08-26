@@ -5526,6 +5526,18 @@ err(
     "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
 )
 
+err(
+    "nvvm-lowering-not-implemented",
+    52014,
+    "direct NVVM emission is selected, but lowering Slang IR to NVVM IR is not implemented yet"
+)
+
+err(
+    "invalid-cuda-emission-method",
+    52015,
+    "invalid CUDA emission method value '~method:Int'"
+)
+
 warning(
     "mesh-output-must-be-out",
     54001,

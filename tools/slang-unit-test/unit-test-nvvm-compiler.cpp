@@ -14,6 +14,7 @@
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "slang/slang-compiler.h"
 #include "unit-test-nvvm-bitcode-fixture.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -3625,6 +3626,62 @@ SLANG_UNIT_TEST(nvvmIRBuilderDifferentialScalarPTX)
     SLANG_CHECK(nvvmCopy.hasGlobalStore32);
     SLANG_CHECK(nvrtcCopy.hasGlobalLoad32);
     SLANG_CHECK(nvrtcCopy.hasGlobalStore32);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderCompilesScalarBitcodeThroughRegistry)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsScalarOperations());
+
+    ComPtr<ISlangBlob> assemblyBlob;
+    ComPtr<ISlangBlob> bitcodeBlob;
+    String assemblyDiagnostics;
+    String bitcodeDiagnostics;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_buildScalarReferenceModule(
+        builder,
+        assemblyBlob,
+        assemblyDiagnostics,
+        bitcodeBlob,
+        bitcodeDiagnostics)));
+    SLANG_CHECK_ABORT(bitcodeBlob != nullptr);
+    SLANG_CHECK(assemblyDiagnostics.getLength() == 0);
+    SLANG_CHECK(bitcodeDiagnostics.getLength() == 0);
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    auto session = static_cast<Slang::Session*>(globalSession.get());
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring registered NVVM handoff test because no CUDA toolkit was discovered.");
+        SLANG_IGNORE_TEST;
+    }
+    IDownstreamCompiler* compiler = session->m_downstreamCompilers[int(PassThroughMode::NVVM)];
+    SLANG_CHECK_ABORT(compiler != nullptr);
+    SLANG_CHECK_ABORT(compiler->getDesc().type == SLANG_PASS_THROUGH_NVVM);
+
+    ComPtr<IArtifact> sourceArtifact =
+        _createNVVMBitcodeArtifact(bitcodeBlob->getBufferPointer(), bitcodeBlob->getBufferSize());
+    ComPtr<IArtifact> outputArtifact;
+    CompileSettings settings;
+    const SlangResult compileResult =
+        _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
+    IArtifactDiagnostics* diagnostics = _findDiagnostics(outputArtifact);
+    if (SLANG_FAILED(compileResult) || !diagnostics || SLANG_FAILED(diagnostics->getResult()))
+        _reportArtifactDiagnostics(outputArtifact);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+    SLANG_CHECK_ABORT(outputArtifact != nullptr);
+    SLANG_CHECK(
+        outputArtifact->getDesc() ==
+        ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::PTX, ArtifactStyle::Kernel));
+    SLANG_CHECK_ABORT(diagnostics != nullptr);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(diagnostics->getResult()));
+    SLANG_CHECK(_ptxContainsEntry(outputArtifact, toSlice(kWriteScalarKernelName)));
+    SLANG_CHECK(_ptxContainsEntry(outputArtifact, toSlice(kCopyScalarKernelName)));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderCompilesEmptyKernel)

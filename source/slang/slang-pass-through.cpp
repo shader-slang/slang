@@ -140,6 +140,17 @@ PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
     return PassThroughMode::None;
 }
 
+PassThroughMode getDownstreamCompilerRequiredForTarget(
+    TargetRequest* targetReq,
+    CompilerOptionSet& effectiveOptions)
+{
+    const auto target = targetReq->getTarget();
+    if (target != CodeGenTarget::PTX)
+        return getDownstreamCompilerRequiredForTarget(target);
+    return getDownstreamCompilerRequiredForPTXTarget(
+        effectiveOptions.getEmitCUDAMethod(),
+        targetReq->getSession());
+}
 
 void reportExternalCompileError(
     const char* compilerName,

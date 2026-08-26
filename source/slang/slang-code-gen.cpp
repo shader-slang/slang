@@ -357,7 +357,9 @@ static bool _isCPUHostTarget(CodeGenTarget target)
     return desc.style == ArtifactStyle::Host;
 }
 
-SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
+SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
+    ComPtr<IArtifact>& outArtifact,
+    PassThroughMode compilerOverride)
 {
     outArtifact.setNull();
 
@@ -379,13 +381,18 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     }
     else
     {
-        // If we are not in pass through, lookup the default compiler for the emitted source type
-
         // Get the default source codegen type for a given target
         sourceTarget = _getDefaultSourceForTarget(target);
-        compilerType = (PassThroughMode)session->getDownstreamCompilerForTransition(
-            (SlangCompileTarget)sourceTarget,
-            (SlangCompileTarget)target);
+
+        // An explicit emission method belongs to this target program and must not mutate the
+        // session's global transition table. With no override, retain the established lookup.
+        compilerType = compilerOverride;
+        if (compilerType == PassThroughMode::None)
+        {
+            compilerType = (PassThroughMode)session->getDownstreamCompilerForTransition(
+                (SlangCompileTarget)sourceTarget,
+                (SlangCompileTarget)target);
+        }
         // We should have a downstream compiler set at this point
         if (compilerType == PassThroughMode::None)
         {
@@ -1074,6 +1081,23 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
 
 SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
 
+SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifact)
+{
+    outArtifact.setNull();
+
+    // Consider this example:
+    //
+    //     slangc kernel.slang -target ptx -emit-cuda-via-nvvm
+    //
+    // The checked program is ready for backend code generation, but no producer currently runs the
+    // canonical link-and-optimize path and turns its result into the exact LLVM-bitcode kernel
+    // artifact accepted by NVVMDownstreamCompiler. Sending CUDA source or CPU LLVM IR would violate
+    // the downstream artifact contract, and falling back to NVRTC would ignore the explicit
+    // selection. Slice 6 will replace this diagnostic with that producer.
+    getSink()->diagnose(Diagnostics::NvvmLoweringNotImplemented{});
+    return SLANG_E_NOT_AVAILABLE;
+}
+
 static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
 {
     switch (target)
@@ -1191,10 +1215,39 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::DXIL:
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::MetalLib:
-    case CodeGenTarget::PTX:
     case CodeGenTarget::WGSLSPIRV:
         SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
         return SLANG_OK;
+    case CodeGenTarget::PTX:
+        {
+            // Explicit pass-through describes the input representation and retains precedence over
+            // the Slang CUDA emission method.
+            if (isPassThroughEnabled())
+            {
+                SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
+                return SLANG_OK;
+            }
+
+            auto& effectiveOptions = getTargetProgram()->getOptionSet();
+            auto cudaMethod = effectiveOptions.getEmitCUDAMethod();
+            auto compilerType = getDownstreamCompilerRequiredForPTXTarget(cudaMethod, getSession());
+            switch (cudaMethod)
+            {
+            case SLANG_EMIT_CUDA_DEFAULT:
+                SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact, compilerType));
+                return SLANG_OK;
+            case SLANG_EMIT_CUDA_VIA_NVRTC:
+                SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact, compilerType));
+                return SLANG_OK;
+            case SLANG_EMIT_CUDA_VIA_NVVM:
+                SLANG_RETURN_ON_FAIL(emitNVVMForEntryPoints(outArtifact));
+                return SLANG_OK;
+            default:
+                getSink()->diagnose(
+                    Diagnostics::InvalidCudaEmissionMethod{.method = int(cudaMethod)});
+                return SLANG_FAIL;
+            }
+        }
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:

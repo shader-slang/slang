@@ -896,7 +896,10 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::getLoadedModule(SlangInt ind
     return nullptr;
 }
 
-void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
+void Linkage::buildHash(
+    DigestBuilder<SHA1>& builder,
+    SlangInt targetIndex,
+    CompilerOptionSet* effectiveTargetOptions)
 {
     // Add the Slang compiler version to the hash
     auto version = String(getBuildTagString());
@@ -905,12 +908,16 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     // Add compiler options, including search path, preprocessor includes, etc.
     m_optionSet.buildHash(builder);
 
-    auto addTargetDigest = [&](TargetRequest* targetReq)
+    auto addTargetDigest = [&](TargetRequest* targetReq, CompilerOptionSet* targetOptionsOverride)
     {
-        targetReq->getOptionSet().buildHash(builder);
+        CompilerOptionSet& targetOptions =
+            targetOptionsOverride ? *targetOptionsOverride : targetReq->getOptionSet();
+        targetOptions.buildHash(builder);
 
+        // True pass-through is request-level state and does not use the component shader-hash API.
+        // This identity therefore describes the ordinary target-program route.
         const PassThroughMode passThroughMode =
-            getDownstreamCompilerRequiredForTarget(targetReq->getTarget());
+            getDownstreamCompilerRequiredForTarget(targetReq, targetOptions);
         const SourceLanguage sourceLanguage =
             getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
 
@@ -948,15 +955,16 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
     if (targetIndex == -1)
     {
         // -1 means all targets.
+        SLANG_ASSERT(!effectiveTargetOptions);
         for (auto targetReq : targets)
         {
-            addTargetDigest(targetReq);
+            addTargetDigest(targetReq, nullptr);
         }
     }
     else
     {
         auto targetReq = targets[targetIndex];
-        addTargetDigest(targetReq);
+        addTargetDigest(targetReq, effectiveTargetOptions);
     }
 }
 

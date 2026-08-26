@@ -250,7 +250,16 @@ protected:
 
     SlangResult emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact);
 
-    SlangResult emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact);
+    SlangResult emitWithDownstreamForEntryPoints(
+        ComPtr<IArtifact>& outArtifact,
+        PassThroughMode compilerOverride = PassThroughMode::None);
+
+    /// Emits PTX through the direct NVVM route.
+    ///
+    /// Slice 5 establishes this selected route and its diagnostic boundary. Slice 6 replaces the
+    /// deliberate unsupported result with a producer that lowers linked Slang IR to an exact NVVM
+    /// artifact before invoking the already-registered downstream compiler.
+    SlangResult emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifact);
 
     /* Determines a suitable filename to identify the input for a given entry point being compiled.
     If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file

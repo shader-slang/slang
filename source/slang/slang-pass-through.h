@@ -73,6 +73,38 @@ void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
 /// Given a target returns the required downstream compiler
 PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
 
+/// Returns the downstream compiler selected for a target and its effective options.
+///
+/// For PTX, this resolves the effective CUDA method. The default method follows the session's
+/// current CUDA-source-to-PTX transition, while explicit methods are target-program-local. An
+/// invalid method returns `None` so the caller can diagnose it instead of silently selecting a
+/// backend.
+PassThroughMode getDownstreamCompilerRequiredForTarget(
+    TargetRequest* targetReq,
+    CompilerOptionSet& effectiveOptions);
+
+/// Resolves the downstream compiler for a PTX target using the supplied global-session policy.
+///
+/// This narrow form keeps the method-to-compiler mapping shared by production dispatch, cache
+/// identity, and focused tests without exposing a new public API.
+inline PassThroughMode getDownstreamCompilerRequiredForPTXTarget(
+    SlangEmitCUDAMethod emitMethod,
+    slang::IGlobalSession* globalSession)
+{
+    switch (emitMethod)
+    {
+    case SLANG_EMIT_CUDA_DEFAULT:
+        return PassThroughMode(
+            globalSession->getDownstreamCompilerForTransition(SLANG_CUDA_SOURCE, SLANG_PTX));
+    case SLANG_EMIT_CUDA_VIA_NVRTC:
+        return PassThroughMode::NVRTC;
+    case SLANG_EMIT_CUDA_VIA_NVVM:
+        return PassThroughMode::NVVM;
+    default:
+        return PassThroughMode::None;
+    }
+}
+
 /// Given a target returns a downstream compiler the prelude should be taken from.
 SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode compiler);
 

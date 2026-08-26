@@ -48,8 +48,8 @@ Slang source -> semantic checking                                               
                                                                   + libdevice
 ```
 
-The final public output target stays `SLANG_PTX`. The proposed target option follows the existing
-CPU and SPIR-V emission-method pattern:
+The final public output target stays `SLANG_PTX`. The target option follows the existing CPU and
+SPIR-V emission-method pattern:
 
 ```cpp
 enum SlangEmitCUDAMethod
@@ -60,8 +60,9 @@ enum SlangEmitCUDAMethod
 };
 ```
 
-The exact command-line spelling will be finalized with the routing slice. The intended form is
-`-emit-cuda-via-nvrtc` and `-emit-cuda-via-nvvm`.
+The finalized command-line spellings are `-emit-cuda-via-nvrtc` and
+`-emit-cuda-via-nvvm`. They are target-scoped selectors for one canonical option; if both occur
+for the same target, the last one wins. An absent option means `SLANG_EMIT_CUDA_DEFAULT`.
 
 ## Current Slang Pipeline
 
@@ -434,6 +435,43 @@ discovery may prefer a library beside the executable while libNVVM and `ptxas` a
 configured CUDA toolkit. Successful assembly proves that the selected tools interoperate on the
 tested machine; a shared toolkit-root selection contract remains separate discovery work.
 
+### Slice 5 target-option and routing boundary
+
+Slice 5 freezes `SlangEmitCUDAMethod` as `DEFAULT = 0`, `VIA_NVRTC = 1`, and `VIA_NVVM = 2`.
+`CompilerOptionName::EmitCUDAMethod`, `EmitCUDAViaNVRTC`, and `EmitCUDAViaNVVM` are appended as
+numeric values 158, 159, and 160. The two selector names are command-line vocabulary only: parsing
+stores the canonical `EmitCUDAMethod`, and command-line reconstruction maps an explicit canonical
+value back to its selector. CLI selections belong to their target. API clients may also supply the
+canonical option through `linkWithOptions`; the `TargetProgram` effective option set applies that
+component/link-time override consistently to codegen and shader hashing. Only PTX consumes it.
+
+PTX dispatch now resolves four cases at one boundary:
+
+1. Explicit pass-through retains precedence because it already defines the input representation.
+2. The absent/default method follows the session's existing `CUDASource -> PTX` transition.
+3. Explicit NVRTC selects the registered NVRTC compiler without mutating that session transition.
+4. Explicit NVVM enters a dedicated route and never sends CUDA source to the LLVM-bitcode
+   consumer or falls back to NVRTC.
+
+`getDownstreamCompilerRequiredForPTXTarget` is the single method-to-compiler mapping used by PTX
+dispatch, the effective-option cache-hash path, and focused tests. Consequently, the compiler
+prelude and version identity hashed by `Linkage::buildHash` describe the compiler selected for that
+target program, including `linkWithOptions`. An invalid API-provided method maps to no compiler and
+is diagnosed as E52015 instead of silently choosing a route. A malformed non-integer option shape
+violates the public option contract and is release-asserted at the effective-option accessor.
+
+True `-pass-through` selection remains state on the legacy `EndToEndCompileRequest`, not on a
+`ComponentType`, and therefore does not participate in the component shader-hash API. The mixed
+pass-through/method regression proves dispatch precedence; the component hash describes the
+ordinary non-pass-through target-program route.
+
+The direct route intentionally stops at E52014 in this slice: ordinary checked Slang IR has no
+canonical NVVM representation yet. The code-generation boundary neither fabricates a kernel nor
+discovers a compiler as a substitute for lowering. A separate positive test starts with the exact
+LLVM 14 typed-pointer bitcode produced by the Slice 4 builder, asks the public global-session API to
+discover/register NVVM, and compiles through that registered compiler. This proves the downstream
+handoff while leaving the missing producer visible for Slice 6.
+
 ## CUDA Pass Ownership Audit
 
 Before the first Slang-to-NVVM emitter lands, each current CUDA-specific behavior must be placed in
@@ -493,7 +531,7 @@ Source-emission tests whose contract is specifically CUDA C++ spelling, macro ex
 shape, or prelude text stay assigned to NVRTC. Add a semantic counterpart before using such a test
 as evidence for NVVM.
 
-Once the experimental routing slice exists, a checked-in capability ledger should record at least:
+The checked-in [NVVM capability ledger](nvvm-backend-capability-ledger.md) records at least:
 
 - test path and feature bucket;
 - required target/profile and runtime hardware, if any;
@@ -528,6 +566,9 @@ Slice 3b hardens the builder boundary between items 3 and 4 with versioned verif
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
 Slice 4 completes item 4 for the two scalar-memory reference kernels while deliberately adding no
 Slang IR traversal or experimental routing from item 5.
+Slice 5 completes item 5 by freezing the target option, preserving the NVRTC and pass-through
+routes, reserving an honest NVVM dispatch boundary, and proving builder bitcode can reach the
+session-registered compiler. It deliberately leaves the Slang-IR-to-NVVM producer to item 6.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -579,18 +620,26 @@ two-LLVM coexistence test and the established shared-library, downstream-version
 sampler regressions also passed. PE inspection found exactly the V1 and V2 getters and no LLVM DLL
 dependency. Ordinary PTX compilation remains routed through NVRTC.
 
+Later on 2026-08-26, Slice 5 built the Debug `slangc` and unit-test targets and passed the focused
+parser, method resolver, `linkWithOptions` routing/hash, invalid-method, explicit-NVVM diagnostic,
+default/explicit-NVRTC, and raw-pass-through precedence tests. The affected component-hash and
+session-digest regressions also passed. With the LLVM 14 provider selected, the new
+registered-compiler handoff passed and the complete NVVM unit prefix passed 33/33. Default PTX
+remains transition-driven NVRTC, explicit NVRTC bypasses a mutable transition override, and
+explicit NVVM now reaches E52014 without fallback. No ordinary Slang program is claimed as
+NVVM-lowered yet.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
 shape, the continued NVRTC default, the binary artifact shape, the separate pinned LLVM 14 builder,
-the frozen-V1/append-only-V2 diagnostic ABI, and the coherent AS1 scalar-memory capability and
-differential contract described above.
+the frozen-V1/append-only-V2 diagnostic ABI, the coherent AS1 scalar-memory capability and
+differential contract, and the Slice 5 target-option/routing boundary described above.
 
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
 - the CUDA toolkit and GPU CI matrix;
-- the final public spelling and API exposure of the CUDA emission method;
 - whether NVVM IR should become a public compile target;
 - the exact entry-point/global-parameter ABI beyond the first pointer/scalar kernels;
 - the scope of source-level debugging; and

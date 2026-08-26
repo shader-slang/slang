@@ -309,6 +309,18 @@ struct CompilerOptionSet
 
     CodeGenTarget getTarget() { return getEnumOption<CodeGenTarget>(CompilerOptionName::Target); }
 
+    /// Returns the CUDA emission method represented by this effective option set.
+    SlangEmitCUDAMethod getEmitCUDAMethod()
+    {
+        if (auto result = options.tryGetValue(CompilerOptionName::EmitCUDAMethod))
+        {
+            SLANG_RELEASE_ASSERT(
+                result->getCount() != 0 && (*result)[0].kind == CompilerOptionValueKind::Int);
+            return SlangEmitCUDAMethod((*result)[0].intValue);
+        }
+        return SLANG_EMIT_CUDA_DEFAULT;
+    }
+
     SlangTargetFlags getTargetFlags();
     void setTargetFlags(SlangTargetFlags flags);
     void addTargetFlags(SlangTargetFlags flags);

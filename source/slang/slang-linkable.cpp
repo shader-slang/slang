@@ -277,7 +277,9 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     // the compiler, part of hashing the linkage is hashing in the compiler version.
     // Consequently, any encoding differences as a result of different compiler versions
     // will already be reflected in the resulting hash.
-    getLinkage()->buildHash(builder, targetIndex);
+    auto targetReq = getLinkage()->targets[targetIndex];
+    auto targetProgram = getTargetProgram(targetReq);
+    getLinkage()->buildHash(builder, targetIndex, &targetProgram->getOptionSet());
 
     buildHash(builder);
 

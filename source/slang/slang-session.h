@@ -188,7 +188,10 @@ public:
     // Updates the supplied builder with linkage-related information, which includes preprocessor
     // defines, the compiler version, and other compiler options. This is then merged with the hash
     // produced for the program to produce a key that can be used with the shader cache.
-    void buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex = -1);
+    void buildHash(
+        DigestBuilder<SHA1>& builder,
+        SlangInt targetIndex = -1,
+        CompilerOptionSet* effectiveTargetOptions = nullptr);
 
     void addTarget(slang::TargetDesc const& desc);
     SlangResult addSearchPath(char const* path);
