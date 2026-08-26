@@ -779,6 +779,25 @@ jobs:
     with:
       slang-artifact-name: slang-tests-windows-x86_64-cl-release-falcor
 
+  # Not gated behind falcor-ci approval (runs on an ungated Windows perf
+  # runner, not the KVM bridge), so it depends directly on the eagerly-built,
+  # ungated artifact from build-windows-release-cl-x86_64-gpu rather than
+  # waiting on the approval-gated build-windows-release-cl-x86_64-gpu-falcor.
+  # A single `uses:` job can only carry one `needs:` list, so this needed its
+  # own caller job separate from test-falcor above, fixing an artifact-not-
+  # found failure: test-falcor-perf previously had no needs: at all and
+  # could start before build-windows-release-cl-x86_64-gpu had finished
+  # uploading its artifact.
+  test-falcor-perf:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/ci-falcor-perf-test.yml
+    with:
+      slang-artifact-name: slang-tests-windows-x86_64-cl-release
+
   test-compile-regression:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
@@ -843,6 +862,7 @@ jobs:
         check-cmdline-ref,
         check-capability-atoms-ref,
         test-falcor,
+        test-falcor-perf,
         test-compile-regression,
         test-benchmark,
         wait-for-human-priority,

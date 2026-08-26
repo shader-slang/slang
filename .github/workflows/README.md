@@ -54,7 +54,7 @@ flowchart LR
 
   build["ci-slang-build.yml<br>ci-slang-build-container.yml"]
   test["ci-slang-test.yml / -container<br>ci-rhi-test.yml / -container"]
-  suites["ci-falcor-test.yml<br>ci-slang-regression-test.yml<br>ci-mdl-benchmark-test.yml<br>ci-materialx-regression-test.yml"]
+  suites["ci-falcor-test.yml<br>ci-falcor-perf-test.yml<br>ci-slang-regression-test.yml<br>ci-mdl-benchmark-test.yml<br>ci-materialx-regression-test.yml"]
   san["ci-slang-sanitizer.yml"]
   cov["ci-slang-coverage-test.yml"]
   coptbuild["cmake-options-build.yml / -container"]
@@ -162,6 +162,7 @@ No trigger of their own; see the first diagram for who calls them. The
 | `ci-slang-sanitizer.yml`                                       | Sanitizer-instrumented build and test.   |
 | `ci-slang-coverage-test.yml`                                   | Instrumented build plus coverage report. |
 | `ci-falcor-test.yml`                                           | Compile Falcor's shaders.                |
+| `ci-falcor-perf-test.yml`                                      | Falcor compiler perf test.               |
 | `ci-slang-regression-test.yml`                                 | Compile-regression suite.                |
 | `ci-mdl-benchmark-test.yml`                                    | MDL benchmark run.                       |
 | `ci-materialx-regression-test.yml`                             | MaterialX integration test.              |
