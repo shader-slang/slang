@@ -31,10 +31,19 @@ on:
         type: number
         default: 8
       save-sccache:
-        description: "Save sccache to GitHub Actions cache (for populate-sccache on master)"
+        description: "Save sccache to GitHub Actions cache (for sccache-populate on master)"
         required: false
         type: boolean
         default: false
+      artifact-name-suffix:
+        description: >-
+          Optional suffix appended to the build/tests artifact names, so a
+          second call site can produce distinctly-named artifacts from the
+          same build steps (e.g. a Falcor-only rebuild that must not share
+          an artifact name with the regular Windows-release build).
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
@@ -334,18 +343,18 @@ jobs:
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-name-suffix }}
           path: |
             build/dist-${{inputs.config}}/**/ZIP/slang/*
             build.em/Release
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-name-suffix }}
           path: artifacts-staging/
           retention-days: 1
 
-      # Save sccache cache (only when explicitly requested, e.g. from populate-sccache on master)
+      # Save sccache cache (only when explicitly requested, e.g. from sccache-populate on master)
       - name: Save sccache cache
         if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5

@@ -130,7 +130,9 @@ If code relies on this behavior it will be necessary to bind multiple CtexObject
 
 Slang has some preliminary support for TextureSampler type - a combined Texture and SamplerState. To write Slang code that can target CUDA and other platforms using this mechanism will expose the semantics appropriately within the source.
 
-Load is only supported for Texture1D, and the mip map selection argument is ignored. This is because there is tex1Dfetch and no higher dimensional equivalents. CUDA also only allows such access if the backing array is linear memory - meaning the bound texture cannot have mip maps - thus making the mip map parameter superfluous anyway. RWTexture does allow Load on other texture types.
+Load on a read-only texture is supported for `Texture1D`, `Texture2D`, `Texture3D`, and the 1D/2D array forms (it lowers to the `tex*fetch_int<T>` prelude templates); the mip map selection argument is ignored, because these fetch paths read the base level only. RWTexture also allows Load on its supported dimensions.
+
+Reading a half-typed read-only texture (e.g. `Texture2D<half4>`) is not supported on CUDA. `Load` lowers to the `tex*fetch_int<T>` CUDA-prelude templates and `SampleLevel` lowers to the `tex*Lod<T>` CUDA runtime built-ins; neither is defined for `__half` types (both are float/uint/int only), so a half texel is rejected at compile time with an error. Use a float texture instead - CUDA widens f16-format data to f32 on read for free, and you can narrow the result back to half in-shader if needed.
 
 ## RWTexture
 
@@ -254,9 +256,9 @@ If this fails Slang will look for the CUDA_PATH environmental variable, as is ty
 
 If this fails - the prelude include of `cuda_fp16.h` will most likely fail on NVRTC invocation.
 
-CUDA has the `__half` and `__half2` types defined in `cuda_fp16.h`. The `__half2` can produce results just as quickly as doing the same operation on `__half` - in essence for some operations `__half2` is [SIMD](https://en.wikipedia.org/wiki/SIMD) like. The half implementation in Slang tries to take advantage of this optimization.
+CUDA has the `__half` and `__half2` types defined in `cuda_fp16.h`. The `__half2` can produce results just as quickly as doing the same operation on `__half` - in essence for some operations `__half2` is [SIMD](https://en.wikipedia.org/wiki/SIMD) like. Slang's prelude takes advantage of this for 2-wide half vectors: arithmetic on `half2` maps to the native `__half2` intrinsics (`__hadd2`, `__hsub2`, `__hmul2`, `__h2div`, `__hneg2`) rather than being done component-by-component. On architectures with native packed-half support (compute capability 5.3 and above) addition, subtraction, multiplication and negation compile to a single packed instruction; on older architectures CUDA's own intrinsics fall back to two scalar operations. Division always uses two scalar operations, as CUDA has no packed half divide. Wider half vectors (`half3` and `half4`) are backed by their own structs and their arithmetic is performed element-wise.
 
-Since Slang supports up to 4 wide vectors Slang has to build on CUDAs half support. The types `__half3` and `__half4` are implemented in `slang-cuda-prelude.h` for this reason. It is worth noting that `__half3` is made up of a `__half2` and a `__half`. As `__half2` is 4 byte aligned, this means `__half3` is actually 8 bytes, rather than 6 bytes that might be expected.
+Since Slang supports up to 4 wide vectors Slang has to build on CUDAs half support. The types `__half3` and `__half4` are implemented in `slang-cuda-prelude.h` for this reason. It is worth noting that `__half3` is declared as three separate `__half` members (`x`, `y`, `z`) with a 4-byte alignment (`__align__(4)`). Because of that alignment, `__half3` is actually 8 bytes, rather than the 6 bytes that might be expected.
 
 One area where this optimization isn't fully used is in comparisons - as in effect Slang treats all the vector/matrix half comparisons as if they are scalar. This could be perhaps be improved on in the future. Doing so would require using features that are not directly available in the CUDA headers.
 
