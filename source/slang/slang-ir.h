@@ -66,14 +66,18 @@ SLANG_FORCE_INLINE void irPublishInstLink(IRInst*& slot, IRInst* value)
 
 /// Acquire-load a `next`/`first` link of an instruction list.
 ///
-/// Needed by the traversals that run *without* materializing first, since those are the
-/// only ones that can observe a concurrent publication: the decoration walk, reached via
-/// `IRInstListBase::Iterator` and `IRInstList<T>::end()`. The latter is easy to miss --
-/// it *shadows* the base rather than inheriting it, and `getDecorations()` returns it.
+/// Every read of a link goes through this, because every read of a link goes through an
+/// accessor: `getNextInst`/`getPrevInst` and the `peek` pair on `IRInst`, and
+/// `peekFirstDecorationOrChild`/`peekLastDecorationOrChild` on the child list. The
+/// acquire only has work to do for a reader that runs *without* materializing first,
+/// since only that reader can observe a publication in progress -- today the decoration
+/// walk, `IRDecorationList::Iterator`, is the one such reader. A reader that materialized
+/// has already synchronized on the deferred flag, whose release/acquire pair orders
+/// everything the writer wrote.
 ///
-/// Lists reached only through materializing accessors (`IRFilteredInstList`,
-/// `IRModifiableInstList`) do not need it: the caller has already synchronized on the
-/// deferred flag, whose release/acquire pair orders everything the writer wrote.
+/// Paying for it uniformly rather than only on that path is what lets the rule be "read
+/// the link through the accessor" with no second question about which accessor is
+/// permitted where.
 SLANG_FORCE_INLINE IRInst* irLoadInstLink(IRInst* const& slot)
 {
     return std::atomic_ref<IRInst*>(const_cast<IRInst*&>(slot)).load(std::memory_order_acquire);
@@ -318,7 +322,7 @@ struct IRDecorationList
         }
 
         void operator++();
-        IRDecoration* operator*() { return (IRDecoration*)inst; }
+        IRDecoration* operator*();
         bool operator!=(Iterator const& other) const { return inst != other.inst; }
     };
 
@@ -721,11 +725,15 @@ struct IRInst
     /// not grown the type at all. If the layout ever does need enforcing, the thing
     /// to assert is this field's offset relative to `sourceLoc`, not the total.
     ///
-    /// Atomic because a global session is shared across threads: the flag is
-    /// cleared with release ordering after the body has been linked, and read with
-    /// acquire ordering here, so a thread that observes `false` also observes the
-    /// children. Readers that observe `true` fall into the loader, which
-    /// serialises them on its own lock.
+    /// Atomic because of the concurrency Slang supports: the serial-frontend /
+    /// parallel-backend workflow in docs/user-guide/08-compiling.md, where several
+    /// `getEntryPointCode` calls run at once over IR that can still reference a builtin
+    /// module, and so reach the same deferred body. (Running whole compiles concurrently
+    /// on one shared global session is documented as unsupported, and is deliberately not
+    /// the justification here.) The flag is cleared with release ordering once the body
+    /// has been linked and is read here with acquire, so a thread that observes `false`
+    /// also observes the children; one that observes `true` falls into the loader, which
+    /// serialises it on its own lock.
     std::atomic<bool> m_hasDeferredBody{false};
 
     UInt getOperandCount() { return operandCount; }
@@ -1198,12 +1206,6 @@ T* IRInst::findDecoration()
 template<typename T>
 typename IRInstList<T>::Iterator IRInstList<T>::end()
 {
-    // Acquire, for the same reason as `IRInstListBase::end()`, which this shadows rather
-    // than inherits. Missing it here left the typed lists reading the publication link
-    // raw -- and `getDecorations()` is one of them, which is precisely the walk that is
-    // allowed to observe a deferred body's link without going through
-    // `ensureBodyMaterialized()`. Fixing only the base class covered the untyped walk and
-    // left the typed one unsynchronized.
     return Iterator(last ? last->getNextInst() : nullptr);
 }
 

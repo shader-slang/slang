@@ -8934,6 +8934,17 @@ IRDecorationList IRInst::getDecorations()
     return IRDecorationList(getFirstDecoration());
 }
 
+IRDecoration* IRDecorationList::Iterator::operator*()
+{
+    // Everything this list yields is a decoration: `getDecorations()` seeds the head with
+    // `getFirstDecoration()`, which is an `as<IRDecoration>`, and `operator++` below stops
+    // at the first non-decoration. Checked rather than taken on faith, because a raw cast
+    // is the one spelling in this file that would convert a body instruction into a
+    // decoration without complaint.
+    SLANG_ASSERT(as<IRDecoration>(inst));
+    return static_cast<IRDecoration*>(inst);
+}
+
 void IRDecorationList::Iterator::operator++()
 {
     // `peek` rather than `getNextInst`: this walk must not materialize, or looking up
@@ -9289,24 +9300,15 @@ void IRInst::replaceUsesWith(IRInst* other)
 
 // Insert this instruction into the same basic block
 // as `other`, right before it.
-// Materialize before reading a neighbour link.
 //
-// `_insertAt` materializes the parent, but these callers read `other`'s neighbour to
-// compute where to splice, and they read it *before* `_insertAt` runs. On the last
-// decoration of a global whose body is still encoded, that link reads as null; the
-// materialization inside `_insertAt` then attaches the body to it, and the splice
-// proceeds against the stale null -- overwriting the body's first instruction and the
-// parent's last pointer, orphaning the whole body.
-static void _materializeParentOf(IRInst* other)
-{
-    if (auto parent = other->getParent())
-        parent->ensureBodyMaterialized();
-}
-
+// Reading `other`'s neighbour is what decides where to splice, and on the last
+// decoration of a global whose body is still encoded that link reads as null until the
+// body is attached. Nothing here has to arrange for that: `getPrevInst`/`getNextInst`
+// materialize `other`'s parent before returning the link, so the neighbour this splices
+// against is the real one.
 void IRInst::insertBefore(IRInst* other)
 {
     SLANG_ASSERT(other);
-    _materializeParentOf(other);
     if (other->getPrevInst() == this)
         return;
     if (other == this)
@@ -9329,11 +9331,23 @@ void IRInst::moveToStart()
 
 void IRInst::_insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent)
 {
-    // Splicing into a parent whose children are still encoded would build a list
-    // that the later decode then overwrites. Decode first, so the insert happens
-    // against the real child list.
-    if (inParent)
-        inParent->ensureBodyMaterialized();
+    // This deliberately does *not* decode a still-encoded `inParent`, even though it
+    // looks like the natural place for it -- and had it once.
+    //
+    // It is in fact the one place it must not happen. `inPrev` and `inNext` were read by
+    // the caller before this ran, and on a global whose body is still encoded the link
+    // after the last decoration reads as null. Decoding here would attach the body to
+    // that link and then let the splice proceed against the caller's stale null:
+    // `inParent->setLastDecorationOrChild(this)` publishes this instruction as the last
+    // child, and the body decoded a moment earlier is orphaned -- silently, with no crash
+    // and nothing to diagnose.
+    //
+    // Decoding belongs where a link is *read*, which is what `getNextInst`,
+    // `getPrevInst`, `getFirstDecorationOrChild` and `getLastDecorationOrChild` do, and
+    // every caller of this function reaches its neighbours through one of them. A caller that used
+    // the `peek` pair instead does not get here quietly: the neighbour assertions just
+    // below re-read the links through the materializing accessors, so a stale pair fails
+    // there.
 
     // Make sure this instruction has been removed from any previous parent
     this->removeFromParent();
@@ -9372,7 +9386,6 @@ void IRInst::_insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent)
 void IRInst::insertAfter(IRInst* other)
 {
     SLANG_ASSERT(other);
-    _materializeParentOf(other);
     removeFromParent();
     _insertAt(other, other->getNextInst(), other->getParent());
 }
@@ -9418,11 +9431,9 @@ void IRInst::insertAt(IRInsertLoc const& loc)
 // and then destroy it (it had better have no uses!)
 void IRInst::removeFromParent()
 {
-    // Same reasoning as `_insertAt`: unlink against the real child list, not a
-    // list that has yet to be decoded.
-    if (parent)
-        parent->ensureBodyMaterialized();
-
+    // No decoding here either, for the reason `_insertAt` gives: `getPrevInst` and
+    // `getNextInst` below decode the parent before handing back a link, so the unlink
+    // already happens against the real child list without this arranging it first.
     auto oldParent = getParent();
 
     // If we don't currently have a parent, then

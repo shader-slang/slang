@@ -422,12 +422,154 @@ void _roundTripWithBlobMode(
     outInstCount = count;
 }
 
+/// Counts the instructions inside a global's blocks -- the part of it a deferred load
+/// leaves encoded, and so the part a mishandled splice loses.
+Index _countBodyInstsOf(IRInst* global)
+{
+    Index count = 0;
+    for (IRInst* block : global->getChildren())
+        count += _countChildrenOf(block);
+    return count;
+}
+
+/// Which mutation entry point `_mutateGlobalWithDeferredBody` drives.
+enum class DeferredParentMutation
+{
+    /// Splice a block in right after the last decoration -- the exact link a deferred body
+    /// is published into, and so the one a stale read lands on.
+    InsertAfterLastDecoration,
+    /// Append a block to a global whose existing body is still encoded. Where it lands
+    /// says whether `getLastDecorationOrChild` decoded the body before answering.
+    InsertAtEnd,
+    /// Unlink the last decoration of a global whose body is still encoded.
+    RemoveLastDecoration,
+};
+
+/// What a mutation left behind, measured on the reloaded global after it ran.
+struct DeferredParentMutationResult
+{
+    /// Body instructions counted on the module before it was serialized, and on the
+    /// reloaded global after the mutation. They agree only if the body survived.
+    Index expectedBodyInsts = 0;
+    Index actualBodyInsts = 0;
+    /// The global's children after the mutation, and where the spliced block landed among
+    /// them (-1 when the mutation spliced nothing).
+    Index childCount = 0;
+    Index splicedChildIndex = -1;
+    Index decorationCount = 0;
+    /// Whether the body really was still encoded when the mutation ran. Without this an
+    /// eager load would satisfy every check above while testing nothing.
+    bool bodyWasDeferred = false;
+};
+
+/// Runs `mutation` against a global whose body is still encoded, and reports what it left.
+///
+/// Both the surviving body and the spliced block's final position matter. The body says
+/// the mutation did not destroy what it could not see; the position says the mutation saw
+/// the whole list rather than the decorations alone, which is the difference between
+/// appending after the body and appending in front of it.
+DeferredParentMutationResult _mutateGlobalWithDeferredBody(
+    slang::IGlobalSession* globalSession,
+    DeferredParentMutation mutation)
+{
+    DeferredParentMutationResult result;
+
+    Session* session = static_cast<Session*>(globalSession);
+
+    RefPtr<IRModule> original = IRModule::create(session);
+    IRInst* originalFunc = nullptr;
+    {
+        IRBuilder builder(original);
+        builder.setInsertInto(original->getModuleInst());
+        originalFunc = builder.createFunc();
+        // A decoration is required for this to test what it claims. A deferred body is
+        // published into the link *after the last decoration*, so a global with none has
+        // no stale link for a splice to land on.
+        builder.addNameHintDecoration(originalFunc, UnownedStringSlice("mutationProbe"));
+        builder.setInsertInto(originalFunc);
+        builder.emitBlock();
+        IRType* floatType = builder.getFloatType();
+        for (Index i = 0; i < 10; ++i)
+        {
+            builder.emitAdd(
+                floatType,
+                builder.getFloatValue(floatType, IRFloatingPointValue(i)),
+                builder.getFloatValue(floatType, IRFloatingPointValue(1)));
+        }
+        builder.emitReturn();
+    }
+    result.expectedBodyInsts = _countBodyInstsOf(originalFunc);
+
+    ComPtr<ISlangBlob> blob;
+    RefPtr<IRModule> reloaded;
+    if (SLANG_FAILED(_roundTripModule(original, session, blob, reloaded)))
+        return result;
+
+    IRInst* func = nullptr;
+    for (IRInst* global : reloaded->getModuleInst()->getChildren())
+    {
+        if (global->getOp() == kIROp_Func)
+        {
+            func = global;
+            break;
+        }
+    }
+    if (!func)
+        return result;
+
+    // Read before anything below can decode it: past this point the test only means
+    // something if this was true.
+    result.bodyWasDeferred = func->m_hasDeferredBody;
+
+    // The block to splice has to be built somewhere other than `func`. Every way of adding
+    // one to `func` directly goes through an accessor that decodes it first, which is
+    // precisely the state this test needs it to still be in.
+    IRBuilder builder(reloaded);
+    builder.setInsertInto(reloaded->getModuleInst());
+    IRInst* scratch = builder.createFunc();
+    builder.setInsertInto(scratch);
+    IRInst* splicedBlock = builder.emitBlock();
+    bool splicedIntoFunc = true;
+
+    // `getLastDecoration` walks with `peekNextInst` and so does not decode anything, which
+    // is what leaves each mutation below reaching a parent whose body is still encoded.
+    switch (mutation)
+    {
+    case DeferredParentMutation::InsertAfterLastDecoration:
+        splicedBlock->insertAfter(func->getLastDecoration());
+        break;
+    case DeferredParentMutation::InsertAtEnd:
+        splicedBlock->insertAtEnd(func);
+        break;
+    case DeferredParentMutation::RemoveLastDecoration:
+        func->getLastDecoration()->removeFromParent();
+        splicedIntoFunc = false;
+        break;
+    }
+
+    for (IRInst* child : func->getChildren())
+    {
+        if (splicedIntoFunc && child == splicedBlock)
+            result.splicedChildIndex = result.childCount;
+        result.childCount++;
+        // The spliced block is empty, so this counts the original body alone.
+        result.actualBodyInsts += _countChildrenOf(child);
+    }
+    for (IRDecoration* decoration : func->getDecorations())
+    {
+        SLANG_UNUSED(decoration);
+        result.decorationCount++;
+    }
+
+    return result;
+}
+
 } // namespace
 
 
 // Checks that a decoration's own children survive on-demand loading.
 //
-// This guards the `inDecorationSubtree` rule in the load-time scan. Decorations are kept
+// This guards the `inEagerDecoration` rule in `_computeEagerSkeleton`. Decorations are kept
 // eager because the symbol index reads them without materializing anything, and a
 // decoration that is itself a parent means keeping the decoration is not enough: its
 // children are reachable only through it, so nothing on that path would ever trigger the
@@ -689,5 +831,67 @@ SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
         // refused earlier, before there is anything to compare.
         if (isOnDemandIRLoadEnabled())
             SLANG_CHECK((mismatchDelta > 0) == testCase.expectMismatchCounted);
+    }
+}
+
+
+// Checks that a mutation reaching a global whose body is still encoded neither destroys
+// that body nor mistakes the decorations for the whole child list.
+//
+// Decoding a deferred body happens in exactly one kind of place: the accessors that hand
+// back a link -- `getNextInst`, `getPrevInst`, `getFirstDecorationOrChild`,
+// `getLastDecorationOrChild`. Nothing in the mutation path decodes, deliberately, and
+// nothing exercised either half of that arrangement.
+//
+// Both halves fail silently. Decode too late -- read a neighbour off an undecoded parent,
+// then decode in the middle of the splice -- and the last decoration's `next` reads as
+// null, the splice republishes itself as the parent's last child, and the body decoded a
+// moment earlier is orphaned with no crash and no diagnostic; that is the shape this test
+// was written against, and removing the decode from `getNextInst`/`getPrevInst` while
+// leaving one in `_insertAt` makes it fail. Never decode at all and the body survives, but
+// `insertAtEnd` appends after the last *decoration* instead of after the body, which is
+// why the position of the spliced block is checked and not only the body's size.
+//
+// Built rather than compiled, for the reason the neighbouring tests give: the mutation has
+// to run inside the window where the body is still encoded, and reaching that window
+// through a compile means racing whichever pass decodes first.
+SLANG_UNIT_TEST(irDeferredBodySurvivesMutationOfItsParent)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    struct Case
+    {
+        DeferredParentMutation mutation;
+        /// The global's children afterwards, and where the spliced block belongs among
+        /// them: at the head for a splice after the last decoration, and past the body --
+        /// not in front of it -- for an append.
+        Index expectedChildCount;
+        Index expectedSplicedChildIndex;
+        Index expectedDecorationCount;
+    };
+    static const Case kCases[] = {
+        {DeferredParentMutation::InsertAfterLastDecoration, 2, 0, 1},
+        {DeferredParentMutation::InsertAtEnd, 2, 1, 1},
+        {DeferredParentMutation::RemoveLastDecoration, 1, -1, 0},
+    };
+
+    for (const auto& testCase : kCases)
+    {
+        const DeferredParentMutationResult result =
+            _mutateGlobalWithDeferredBody(globalSession, testCase.mutation);
+
+        // Guards the premise: with no body to lose, every check below holds trivially.
+        SLANG_CHECK_ABORT(result.expectedBodyInsts > 0);
+        // Likewise, an eager load has nothing still encoded when the mutation runs, so it
+        // says nothing about any of this.
+        if (isOnDemandIRLoadEnabled())
+            SLANG_CHECK(result.bodyWasDeferred);
+
+        SLANG_CHECK(result.actualBodyInsts == result.expectedBodyInsts);
+        SLANG_CHECK(result.childCount == testCase.expectedChildCount);
+        SLANG_CHECK(result.splicedChildIndex == testCase.expectedSplicedChildIndex);
+        SLANG_CHECK(result.decorationCount == testCase.expectedDecorationCount);
     }
 }
