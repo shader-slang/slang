@@ -6,16 +6,19 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Alignment.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstring>
@@ -120,18 +123,17 @@ static llvm::BasicBlock* _getValidInsertionBlock(ModuleState* state)
     return block;
 }
 
-// Checks whether LLVM permits using a value at the builder's current insertion point.
-static bool _isValueUsableAtInsertionPoint(
+// Checks module/context ownership shared by ordinary uses and phi incoming-edge uses.
+static bool _isValueUsableInFunction(
     ModuleState* state,
-    llvm::BasicBlock* insertionBlock,
+    llvm::Function* function,
     llvm::Value* value)
 {
-    if (!state || !insertionBlock || !value || &value->getContext() != &state->context)
+    if (!state || !function || !value || function->getParent() != state->module.get() ||
+        &value->getContext() != &state->context)
+    {
         return false;
-
-    llvm::Function* function = insertionBlock->getParent();
-    if (!function || function->getParent() != state->module.get())
-        return false;
+    }
 
     // Each ModuleState has its own LLVMContext. A context-owned constant is therefore usable by
     // this module, while a GlobalValue must additionally still be attached to this exact module.
@@ -144,10 +146,27 @@ static bool _isValueUsableAtInsertionPoint(
 
     if (llvm::Argument* argument = llvm::dyn_cast<llvm::Argument>(value))
         return argument->getParent() == function;
+    if (llvm::Instruction* instruction = llvm::dyn_cast<llvm::Instruction>(value))
+        return instruction->getFunction() == function;
+    return false;
+}
+
+// Checks whether LLVM permits using a value at the builder's current insertion point.
+static bool _isValueUsableAtInsertionPoint(
+    ModuleState* state,
+    llvm::BasicBlock* insertionBlock,
+    llvm::Value* value)
+{
+    if (!state || !insertionBlock || !value)
+        return false;
+
+    llvm::Function* function = insertionBlock->getParent();
+    if (!_isValueUsableInFunction(state, function, value))
+        return false;
 
     llvm::Instruction* instruction = llvm::dyn_cast<llvm::Instruction>(value);
-    if (!instruction || instruction->getFunction() != function)
-        return false;
+    if (!instruction)
+        return true;
 
     if (instruction->getParent() == insertionBlock)
     {
@@ -174,6 +193,45 @@ static bool _areMatchingIntegerValues(
         return false;
     }
     return llvm::isa<llvm::IntegerType>(left->getType());
+}
+
+// Checks that every block has its final CFG successors before edge dominance is queried.
+static bool _hasCompleteCFG(llvm::Function* function)
+{
+    if (!function)
+        return false;
+
+    for (llvm::BasicBlock& block : *function)
+    {
+        if (!block.getTerminator())
+            return false;
+    }
+    return true;
+}
+
+// Checks whether a value is available on the outgoing edge of a terminated predecessor.
+static bool _isValueUsableOnIncomingEdge(
+    ModuleState* state,
+    llvm::Function* function,
+    llvm::BasicBlock* predecessor,
+    llvm::Value* value)
+{
+    if (!predecessor || predecessor->getParent() != function ||
+        !_isValueUsableInFunction(state, function, value))
+    {
+        return false;
+    }
+
+    llvm::Instruction* instruction = llvm::dyn_cast<llvm::Instruction>(value);
+    if (!instruction)
+        return true;
+
+    llvm::Instruction* predecessorTerminator = predecessor->getTerminator();
+    if (!predecessorTerminator)
+        return false;
+
+    llvm::DominatorTree dominatorTree(*function);
+    return dominatorTree.dominates(instruction, predecessorTerminator);
 }
 
 static bool _isValidAlignment(uint32_t alignment)
@@ -513,6 +571,97 @@ static SlangResult SLANG_NVVM_CALL _emitConditionalBranch(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _getIntegerConstant(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1 integerType,
+    int64_t value,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::IntegerType* llvmIntegerType =
+        llvm::dyn_cast_or_null<llvm::IntegerType>(_getType(integerType));
+    if (!state || !llvmIntegerType || &llvmIntegerType->getContext() != &state->context ||
+        !llvm::isIntN(llvmIntegerType->getBitWidth(), value) || !outValue)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+        llvm::ConstantInt::getSigned(llvmIntegerType, value));
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitIntegerPhi(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMBlockHandle_1 targetBlock,
+    SlangNVVMTypeHandle_1 integerType,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* llvmTargetBlock = _getBlock(targetBlock);
+    llvm::IntegerType* llvmIntegerType =
+        llvm::dyn_cast_or_null<llvm::IntegerType>(_getType(integerType));
+    if (!state || !llvmTargetBlock || !llvmTargetBlock->getParent() ||
+        llvmTargetBlock->getParent()->getParent() != state->module.get() || !llvmIntegerType ||
+        &llvmIntegerType->getContext() != &state->context || !outValue)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Instruction* firstNonPhi = llvmTargetBlock->getFirstNonPHI();
+    llvm::PHINode* phi = firstNonPhi
+                             ? llvm::PHINode::Create(llvmIntegerType, 0, "", firstNonPhi)
+                             : llvm::PHINode::Create(llvmIntegerType, 0, "", llvmTargetBlock);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(phi);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _addIntegerPhiIncoming(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 phi,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMBlockHandle_1 predecessorBlock)
+{
+    ModuleState* state = _getModule(module);
+    llvm::PHINode* llvmPhi = llvm::dyn_cast_or_null<llvm::PHINode>(_getValue(phi));
+    llvm::Value* llvmValue = _getValue(value);
+    llvm::BasicBlock* llvmPredecessorBlock = _getBlock(predecessorBlock);
+    llvm::BasicBlock* llvmPhiBlock = llvmPhi ? llvmPhi->getParent() : nullptr;
+    llvm::Function* llvmFunction = llvmPhiBlock ? llvmPhiBlock->getParent() : nullptr;
+    llvm::Instruction* firstNonPhi = llvmPhiBlock ? llvmPhiBlock->getFirstNonPHI() : nullptr;
+    if (!state || !llvmPhi || !llvmValue || !llvmPredecessorBlock || !llvmPhiBlock ||
+        !llvmFunction || llvmFunction->getParent() != state->module.get() ||
+        !llvm::isa<llvm::IntegerType>(llvmPhi->getType()) ||
+        &llvmValue->getContext() != &state->context || llvmValue->getType() != llvmPhi->getType() ||
+        llvmPredecessorBlock->getParent() != llvmFunction ||
+        (firstNonPhi && !llvmPhi->comesBefore(firstNonPhi)) ||
+        llvmPhi->getBasicBlockIndex(llvmPredecessorBlock) >= 0 || !_hasCompleteCFG(llvmFunction))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    size_t successorEdgeCount = 0;
+    for (llvm::BasicBlock* successor : llvm::successors(llvmPredecessorBlock))
+    {
+        if (successor == llvmPhiBlock)
+            ++successorEdgeCount;
+    }
+    if (successorEdgeCount != 1 ||
+        !_isValueUsableOnIncomingEdge(state, llvmFunction, llvmPredecessorBlock, llvmValue))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvmPhi->addIncoming(llvmValue, llvmPredecessorBlock);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitReturnVoid(SlangNVVMModuleHandle_1 module)
 {
     ModuleState* state = _getModule(module);
@@ -762,6 +911,9 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitIntegerSignedLessThan = _emitIntegerSignedLessThan;
     api.emitBranch = _emitBranch;
     api.emitConditionalBranch = _emitConditionalBranch;
+    api.getIntegerConstant = _getIntegerConstant;
+    api.emitIntegerPhi = _emitIntegerPhi;
+    api.addIntegerPhiIncoming = _addIntegerPhiIncoming;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

@@ -235,6 +235,32 @@ extern "C"
         SlangNVVMBlockHandle_1 trueBlock,
         SlangNVVMBlockHandle_1 falseBlock);
 
+    /// Gets a same-module integer constant whose signed value is exactly representable by the
+    /// requested integer type. On failure, the output value is null.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMGetIntegerConstant_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 integerType,
+        int64_t value,
+        SlangNVVMValueHandle_1* outValue);
+
+    /// Emits an integer phi at the start of a same-module target block.
+    /// Existing phi instructions remain before it and every non-phi instruction remains after it.
+    /// On failure, the output value is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerPhi_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMBlockHandle_1 targetBlock,
+        SlangNVVMTypeHandle_1 integerType,
+        SlangNVVMValueHandle_1* outValue);
+
+    /// Adds one integer phi input from a predecessor with exactly one edge to the phi block.
+    /// The function CFG must be fully terminated, the value must dominate the predecessor edge,
+    /// and the phi must not already have an input from that predecessor. Failure changes nothing.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMAddIntegerPhiIncoming_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 phi,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMBlockHandle_1 predecessorBlock);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -261,6 +287,10 @@ extern "C"
         SlangNVVMEmitIntegerSignedLessThan_2 emitIntegerSignedLessThan;
         SlangNVVMEmitBranch_2 emitBranch;
         SlangNVVMEmitConditionalBranch_2 emitConditionalBranch;
+
+        SlangNVVMGetIntegerConstant_2 getIntegerConstant;
+        SlangNVVMEmitIntegerPhi_2 emitIntegerPhi;
+        SlangNVVMAddIntegerPhiIncoming_2 addIntegerPhiIncoming;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -276,6 +306,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitConditionalBranch) + \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitConditionalBranch))
+
+    // This Slice 8 prefix is one coherent scalar-SSA capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_SSA_MIN_SIZE          \
+    (offsetof(SlangNVVMBuilderAPI_V2, addIntegerPhiIncoming) + \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->addIntegerPhiIncoming))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

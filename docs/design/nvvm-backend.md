@@ -583,6 +583,74 @@ parameters, builtins, resources, multiple selected entry points, and non-compute
 outside this boundary. In particular, no general loop form is claimed merely because the builder
 can create a backedge; ordinary loop-carried state requires the still-unsupported phi boundary.
 
+### Slice 8 signed-i32 constants, SSA values, and finite loops
+
+Consider this ordinary merge:
+
+```slang
+[CUDAKernel]
+void selectValue(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int x,
+    uniform int y)
+{
+    int selected;
+    if (x < y)
+        selected = x;
+    else
+        selected = y;
+    *destination = selected;
+}
+```
+
+The linked Slang IR already represents `selected` canonically: the merge block has one signed-i32
+parameter, and each arm's unconditional edge carries its chosen value as argument zero. Slice 8
+keeps that representation. It creates an LLVM `phi i32` for the block parameter and later attaches
+`(x, trueBlock)` and `(y, falseBlock)` as incoming pairs. It does not reconstruct a local variable,
+eliminate the phi, or infer values by walking unrelated operands.
+
+The same rule handles canonical loop-carried values. For `for (int i = 0; i < limit; ++i)`, linked
+IR uses an `IRLoop` entry edge carrying the initial `i` and sum, then an unconditional backedge
+carrying their updated values. `IRLoop`'s target is the executable CFG successor; its break and
+continue operands are structured metadata and are validated as same-function blocks but are not
+emitted as extra LLVM edges. Both the entry edge and backedge pair their arguments with header
+parameters by index.
+
+Lowering therefore has four ordered phases. It creates all blocks, creates all destination-block
+phis, emits ordinary bodies and terminators, then attaches phi incoming pairs after all backedge
+values and predecessor terminators exist. Signed-i32 literals are identity-cached and materialized
+on their first body or incoming-edge use because constants have no CFG lifecycle. The phase split is
+a lifecycle constraint of SSA construction, not an alternative representation of the program.
+
+Complete legality still runs before builder discovery. Only exact signed-i32 executable literals,
+signed-i32 non-entry block parameters, and matching argument-bearing unconditional or loop edges
+are added. Every parameterized block must have actual predecessors, and every predecessor must
+supply the exact parameter count and types. A conditional edge cannot target a parameterized block
+because `IRIfElse` carries no values. The validator also checks loop metadata ownership and rejects
+branches to the function entry block.
+
+The private V2 provider table gains one coherent append-only scalar-SSA block:
+
+```text
+getIntegerConstant(module, integerType, signedValue, outValue)
+emitIntegerPhi(module, targetBlock, integerType, outValue)
+addIntegerPhiIncoming(module, phi, value, predecessorBlock)
+```
+
+The first operation accepts only exactly representable signed values. Phi placement names its
+destination block explicitly, so the provider inserts before the first non-phi instruction without
+depending on ambient insertion state. Adding an incoming pair requires a complete function CFG,
+the exact phi type and function, one real predecessor edge, no duplicate predecessor, and a value
+that dominates the predecessor terminator. Every failure is checked before constant, instruction,
+or incoming-list mutation. The Slice 3b, Slice 4, and Slice 7 minimum sizes remain frozen; a provider
+inside the new prefix or missing any of its three functions is malformed, while an exact older
+prefix retains all of its earlier capabilities.
+
+This boundary accepts executable `0` and `1`, merge phis, and finite loops with signed-i32
+loop-carried values. It does not claim termination analysis or add multiplication, calls, non-void
+helper signatures and returns, other scalar types, pointer/aggregate phis, richer terminators, or
+additional address spaces. Direct calls and their helper ABI are the Slice 9 boundary.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -776,6 +844,24 @@ non-dominating, and post-terminator operands are rejected before mutation, only 
 CUDA kernel survives linking, and a conventional parameterized compute entry reaches E52017 before
 builder or libNVVM program creation.
 
+Later on 2026-08-26, Slice 8 rebuilt the Debug host and Release LLVM 14.0.6 provider after pinned
+clang-format 17 and passed the complete `slang-unit-test-tool/nvvm` prefix, 55/55. The exact fake
+graphs covered add-one, the two-arm merge phi, and the canonical six-block `sumToLimit` loop with
+constants `0` and `1`, two header phis, four incoming pairs, a distinct continue block, and a
+distinct exit-to-break edge. The real provider emitted and verified the corresponding two-phi LLVM
+loop. Its rejection test covered signed representability, incomplete CFGs, foreign handles,
+non-predecessors, duplicates, and same-function non-dominating edge values without leaving partial
+IR.
+
+The same six ordinary-Slang scalar/SSA kernels compiled through NVRTC and direct NVVM with matching
+raw parameter widths and global-memory semantics. CUDA 12.9.86 `ptxas` accepted every kernel from
+both routes. On an RTX 5090 (compute capability 12.0, driver 610.62), both routes agreed on add-one
+for positive and negative inputs, every less/greater/equal merge case, and `sumToLimit(0/5/7)` =
+`0/10/21`. Post-format preservation runs also passed CUDA-option parsing (1/1), routing and hashing
+(2/2), the unsupported barrier-call file (1/1), default/explicit NVRTC sampler coverage (3/3), true
+NVRTC pass-through (2/2), and CUDA runtime dispatch (1/1). The provider still exports only the V1
+and V2 getters and has no process-visible LLVM DLL dependency.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -788,6 +874,12 @@ the Slang IR and provider boundaries. The direct route uses one session-owned bu
 and code generation, requires the V2 verifier boundary, and enters the established downstream
 continuation as an internal LLVM-bitcode kernel artifact.
 
+Slice 8 settles exactly representable signed-i32 executable constants, signed-i32 block parameters
+and branch arguments lowered as LLVM phis, canonical `IRLoop` target edges, and signed-i32
+loop-carried state. It also settles the append-only V2 scalar-SSA prefix and its complete-CFG,
+predecessor-edge dominance boundary. These claims cover the demonstrated merge and finite sum loop;
+they do not imply general termination analysis or other value types.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
@@ -795,8 +887,7 @@ The following remain open until their named slice supplies evidence:
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
   pointers;
-- executable constants, block parameters/branch arguments and phis, loops, calls, and richer
-  types;
+- direct calls, non-void helper ABI, and richer scalar/control-flow types;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

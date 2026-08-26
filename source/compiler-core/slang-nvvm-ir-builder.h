@@ -43,6 +43,8 @@ public:
     bool supportsScalarOperations() const;
     /// Returns whether the provider advertised the complete Slice 7 scalar-control-flow prefix.
     bool supportsScalarControlFlow() const;
+    /// Returns whether the provider advertised the complete Slice 8 scalar-SSA prefix.
+    bool supportsScalarSSA() const;
     /// Returns the provider identity that affects generated bitcode and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -147,6 +149,27 @@ public:
         SlangNVVMValueHandle_1 condition,
         SlangNVVMBlockHandle_1 trueBlock,
         SlangNVVMBlockHandle_1 falseBlock) const;
+
+    /// Gets an exactly representable signed integer constant of the requested type.
+    SlangResult getIntegerConstant(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 integerType,
+        int64_t value,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits an integer phi at the start of the explicit target block.
+    SlangResult emitIntegerPhi(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMBlockHandle_1 targetBlock,
+        SlangNVVMTypeHandle_1 integerType,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Adds a validated integer phi input from one predecessor edge.
+    SlangResult addIntegerPhiIncoming(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 phi,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMBlockHandle_1 predecessorBlock) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;

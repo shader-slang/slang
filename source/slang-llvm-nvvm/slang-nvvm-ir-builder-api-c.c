@@ -20,3 +20,10 @@ typedef char SlangNVVMBuilderAPIV2ScalarControlFlowCapabilityOrderCCompileProbe
       SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE)
          ? 1
          : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarSSAMinimumSizeCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_SSA_MIN_SIZE <= sizeof(SlangNVVMBuilderAPI_V2)) ? 1 : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarSSACapabilityOrderCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_SSA_MIN_SIZE >
+      SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE)
+         ? 1
+         : -1];

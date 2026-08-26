@@ -13,8 +13,10 @@ namespace Slang
 namespace
 {
 
-// Slice 7 accepts only CUDA ABI `int`, whose width and natural alignment are both four bytes.
+// The direct scalar ABI accepts only CUDA `int`, whose width and natural alignment are four bytes.
 static const uint32_t kNVVMI32Alignment = 4;
+static const IRIntegerValue kNVVMI32Min = -2147483647 - 1;
+static const IRIntegerValue kNVVMI32Max = 2147483647;
 
 struct ScopedNVVMModule
 {
@@ -69,6 +71,17 @@ bool _isI32Type(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Int;
 }
 
+// Returns an executable signed-i32 literal, excluding layout and other module constants.
+IRIntLit* _asExecutableI32Constant(IRInst* value)
+{
+    auto intLit = as<IRIntLit>(value);
+    if (!intLit || !_isI32Type(intLit->getDataType()))
+        return nullptr;
+
+    const IRIntegerValue intValue = intLit->getValue();
+    return intValue >= kNVVMI32Min && intValue <= kNVVMI32Max ? intLit : nullptr;
+}
+
 // Returns whether `type` is the canonical Boolean result type produced by signed comparison.
 bool _isBoolType(IRInst* type)
 {
@@ -104,7 +117,7 @@ void _requireCapability(NVVMIRCapability& capability, NVVMIRCapability requiredC
         capability = requiredCapability;
 }
 
-// Checks that an executable operand has an accepted earlier definition that dominates its use.
+// Checks that an executable operand has an accepted definition that dominates its use.
 SlangResult _validateAvailableValue(
     CodeGenContext* codeGenContext,
     IRInst* value,
@@ -129,10 +142,18 @@ SlangResult _validateI32Value(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree)
+    IRDominatorTree* dominatorTree,
+    NVVMIRCapability& capability)
 {
     if (!value || !_isI32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 value"));
+
+    if (_asExecutableI32Constant(value))
+    {
+        _requireCapability(capability, NVVMIRCapability::ScalarSSA);
+        return SLANG_OK;
+    }
+
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
@@ -162,6 +183,122 @@ SlangResult _validateBlockTarget(
     if (block && functionBlocks.contains(block))
         return SLANG_OK;
     return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch target"));
+}
+
+// Orders reachable bodies by CFG dominance, then preserves physical order for unreachable bodies.
+List<IRBlock*> _getNVVMBodyOrder(IRFunc* entryPoint, IRDominatorTree* dominatorTree)
+{
+    List<IRBlock*> result;
+    HashSet<IRBlock*> addedBlocks;
+    for (auto block : getReversePostorder(entryPoint))
+    {
+        if (!dominatorTree->isUnreachable(block) && addedBlocks.add(block))
+            result.add(block);
+    }
+    for (auto block : entryPoint->getBlocks())
+    {
+        if (addedBlocks.add(block))
+            result.add(block);
+    }
+    return result;
+}
+
+// Counts the positional SSA values a branch to `block` must provide.
+UInt _getBlockParamCount(IRBlock* block)
+{
+    UInt count = 0;
+    for (auto param : block->getParams())
+    {
+        SLANG_UNUSED(param);
+        ++count;
+    }
+    return count;
+}
+
+// Validates the positional SSA values carried by an actual branch edge.
+SlangResult _validateBranchArguments(
+    CodeGenContext* codeGenContext,
+    IRUnconditionalBranch* branch,
+    IRBlock* entryBlock,
+    const HashSet<IRBlock*>& functionBlocks,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree,
+    NVVMIRCapability& capability)
+{
+    IRBlock* targetBlock = branch->getTargetBlock();
+    SLANG_RETURN_ON_FAIL(_validateBlockTarget(codeGenContext, targetBlock, functionBlocks));
+    if (targetBlock == entryBlock)
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-block branch target"));
+
+    const UInt argumentCount = branch->getArgCount();
+    if (argumentCount != _getBlockParamCount(targetBlock))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch argument count"));
+
+    IRParam* targetParam = targetBlock->getFirstParam();
+    for (UInt argumentIndex = 0; argumentIndex < argumentCount;
+         ++argumentIndex, targetParam = targetParam->getNextParam())
+    {
+        IRInst* argument = branch->getArg(argumentIndex);
+        SLANG_ASSERT(targetParam);
+        if (!argument || !isTypeEqual(argument->getDataType(), targetParam->getDataType()))
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch argument type"));
+        SLANG_RETURN_ON_FAIL(_validateI32Value(
+            codeGenContext,
+            argument,
+            branch,
+            availableValues,
+            dominatorTree,
+            capability));
+    }
+
+    if (argumentCount)
+        _requireCapability(capability, NVVMIRCapability::ScalarSSA);
+    return SLANG_OK;
+}
+
+using NVVMValueMap = Dictionary<IRInst*, SlangNVVMValueHandle_1>;
+
+// Gets the one module-owned i32 type on demand so empty Slice 6 kernels keep their minimal graph.
+SlangResult _getNVVMI32Type(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1& ioType)
+{
+    if (ioType)
+        return SLANG_OK;
+    return _requireBuilderOperation(
+        codeGenContext,
+        "signed i32 type",
+        builder.getIntegerType(module, 32, ioType));
+}
+
+// Returns an already-lowered SSA value or materializes the exact preflighted i32 literal.
+SlangResult _getLoweredNVVMValue(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module,
+    IRInst* irValue,
+    NVVMValueMap& valueMap,
+    SlangNVVMTypeHandle_1& ioI32Type,
+    SlangNVVMValueHandle_1& outValue)
+{
+    outValue = nullptr;
+    if (auto mappedValue = valueMap.tryGetValue(irValue))
+    {
+        outValue = *mappedValue;
+        return SLANG_OK;
+    }
+
+    auto intLit = _asExecutableI32Constant(irValue);
+    SLANG_RELEASE_ASSERT(intLit);
+    SLANG_RETURN_ON_FAIL(_getNVVMI32Type(codeGenContext, builder, module, ioI32Type));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "signed i32 constant",
+        builder.getIntegerConstant(module, ioI32Type, int64_t(intLit->getValue()), outValue)));
+    valueMap[irValue] = outValue;
+    return SLANG_OK;
 }
 
 } // namespace
@@ -202,6 +339,13 @@ SlangResult validateNVVMSupportedIR(
         _requireCapability(outCapability, NVVMIRCapability::ScalarControlFlow);
 
     RefPtr<IRDominatorTree> dominatorTree = computeDominatorTree(entryPoint);
+    List<IRBlock*> bodyOrder = _getNVVMBodyOrder(entryPoint, dominatorTree);
+    for (auto block : bodyOrder)
+    {
+        if (!functionBlocks.contains(block))
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch target"));
+    }
+
     HashSet<IRInst*> availableValues;
     UInt actualParamCount = 0;
     for (auto param : entryPoint->getParams())
@@ -220,10 +364,21 @@ SlangResult validateNVVMSupportedIR(
     if (actualParamCount)
         _requireCapability(outCapability, NVVMIRCapability::ScalarMemory);
 
+    // Register every accepted block parameter before checking uses because emission creates all
+    // phi placeholders before any body. Ordinary values join this set in the second pass, in the
+    // same order in which their LLVM instructions will be emitted.
     for (auto block : entryPoint->getBlocks())
     {
-        if (block != entryBlock && block->getFirstParam())
-            return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
+        if (block != entryBlock)
+        {
+            for (auto param : block->getParams())
+            {
+                if (!_isI32Type(param->getDataType()))
+                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
+                availableValues.add(param);
+                _requireCapability(outCapability, NVVMIRCapability::ScalarSSA);
+            }
+        }
 
         IRTerminatorInst* terminator = block->getTerminator();
         if (!terminator)
@@ -234,10 +389,60 @@ SlangResult validateNVVMSupportedIR(
             switch (inst->getOp())
             {
             case kIROp_Load:
+                if (!_isI32Type(inst->getDataType()))
+                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
+                _requireCapability(outCapability, NVVMIRCapability::ScalarMemory);
+                break;
+
+            case kIROp_Store:
+                _requireCapability(outCapability, NVVMIRCapability::ScalarMemory);
+                break;
+
+            case kIROp_Add:
+            case kIROp_Sub:
+                if (inst->getOperandCount() != 2 || !_isI32Type(inst->getDataType()))
+                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 arithmetic"));
+                _requireCapability(outCapability, NVVMIRCapability::ScalarControlFlow);
+                break;
+
+            case kIROp_Less:
+                if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
+                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 comparison"));
+                _requireCapability(outCapability, NVVMIRCapability::ScalarControlFlow);
+                break;
+
+            case kIROp_Return:
+                break;
+
+            case kIROp_UnconditionalBranch:
+            case kIROp_Loop:
+            case kIROp_IfElse:
+                _requireCapability(outCapability, NVVMIRCapability::ScalarControlFlow);
+                break;
+
+            default:
+                return _diagnoseUnsupportedIR(
+                    codeGenContext,
+                    UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+            }
+        }
+    }
+
+    // Reachable reverse postorder puts every dominating ordinary producer before its consumer
+    // without making physical sibling order part of legality. The helper retains Slice 7's physical
+    // ordering for unreachable blocks. Phi definitions are already available in every block.
+    for (auto block : bodyOrder)
+    {
+        IRTerminatorInst* terminator = block->getTerminator();
+        SLANG_ASSERT(terminator);
+
+        for (auto inst : block->getOrdinaryInsts())
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_Load:
                 {
                     auto load = cast<IRLoad>(inst);
-                    if (!_isI32Type(load->getDataType()))
-                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                     SLANG_RETURN_ON_FAIL(_validatePointerValue(
                         codeGenContext,
                         load->getPtr(),
@@ -246,7 +451,6 @@ SlangResult validateNVVMSupportedIR(
                         dominatorTree,
                         false));
                     availableValues.add(load);
-                    _requireCapability(outCapability, NVVMIRCapability::ScalarMemory);
                 }
                 break;
 
@@ -265,48 +469,29 @@ SlangResult validateNVVMSupportedIR(
                         store->getVal(),
                         store,
                         availableValues,
-                        dominatorTree));
-                    _requireCapability(outCapability, NVVMIRCapability::ScalarMemory);
+                        dominatorTree,
+                        outCapability));
                 }
                 break;
 
             case kIROp_Add:
             case kIROp_Sub:
-                if (inst->getOperandCount() != 2 || !_isI32Type(inst->getDataType()))
-                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 arithmetic"));
-                SLANG_RETURN_ON_FAIL(_validateI32Value(
-                    codeGenContext,
-                    inst->getOperand(0),
-                    inst,
-                    availableValues,
-                    dominatorTree));
-                SLANG_RETURN_ON_FAIL(_validateI32Value(
-                    codeGenContext,
-                    inst->getOperand(1),
-                    inst,
-                    availableValues,
-                    dominatorTree));
-                availableValues.add(inst);
-                _requireCapability(outCapability, NVVMIRCapability::ScalarControlFlow);
-                break;
-
             case kIROp_Less:
-                if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
-                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 comparison"));
                 SLANG_RETURN_ON_FAIL(_validateI32Value(
                     codeGenContext,
                     inst->getOperand(0),
                     inst,
                     availableValues,
-                    dominatorTree));
+                    dominatorTree,
+                    outCapability));
                 SLANG_RETURN_ON_FAIL(_validateI32Value(
                     codeGenContext,
                     inst->getOperand(1),
                     inst,
                     availableValues,
-                    dominatorTree));
+                    dominatorTree,
+                    outCapability));
                 availableValues.add(inst);
-                _requireCapability(outCapability, NVVMIRCapability::ScalarControlFlow);
                 break;
 
             case kIROp_Return:
@@ -325,13 +510,38 @@ SlangResult validateNVVMSupportedIR(
                     auto branch = cast<IRUnconditionalBranch>(inst);
                     if (branch != terminator)
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch position"));
-                    if (branch->getArgCount())
-                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch argument"));
+                    SLANG_RETURN_ON_FAIL(_validateBranchArguments(
+                        codeGenContext,
+                        branch,
+                        entryBlock,
+                        functionBlocks,
+                        availableValues,
+                        dominatorTree,
+                        outCapability));
+                }
+                break;
+
+            case kIROp_Loop:
+                {
+                    auto loop = cast<IRLoop>(inst);
+                    if (loop != terminator)
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("loop position"));
+                    SLANG_RETURN_ON_FAIL(_validateBranchArguments(
+                        codeGenContext,
+                        loop,
+                        entryBlock,
+                        functionBlocks,
+                        availableValues,
+                        dominatorTree,
+                        outCapability));
                     SLANG_RETURN_ON_FAIL(_validateBlockTarget(
                         codeGenContext,
-                        branch->getTargetBlock(),
+                        loop->getBreakBlock(),
                         functionBlocks));
-                    _requireCapability(outCapability, NVVMIRCapability::ScalarControlFlow);
+                    SLANG_RETURN_ON_FAIL(_validateBlockTarget(
+                        codeGenContext,
+                        loop->getContinueBlock(),
+                        functionBlocks));
                 }
                 break;
 
@@ -367,14 +577,40 @@ SlangResult validateNVVMSupportedIR(
                         codeGenContext,
                         ifElse->getAfterBlock(),
                         functionBlocks));
-                    _requireCapability(outCapability, NVVMIRCapability::ScalarControlFlow);
+                    if (ifElse->getTrueBlock()->getFirstParam() ||
+                        ifElse->getFalseBlock()->getFirstParam())
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("conditional branch target parameter"));
+                    }
                 }
                 break;
 
             default:
+                SLANG_UNEXPECTED("NVVM validation reached an unclassified instruction");
+            }
+        }
+    }
+
+    // Every non-entry phi needs at least one actual CFG predecessor. Structural `IRLoop`
+    // break/continue and `IRIfElse::afterBlock` operands are deliberately absent from this list.
+    for (auto block : entryPoint->getBlocks())
+    {
+        if (block == entryBlock || !block->getFirstParam())
+            continue;
+
+        auto predecessors = block->getPredecessors();
+        if (predecessors.isEmpty())
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block predecessor"));
+        for (auto predecessor : predecessors)
+        {
+            auto branch = as<IRUnconditionalBranch>(predecessor->getTerminator());
+            if (!branch || branch->getTargetBlock() != block)
+            {
                 return _diagnoseUnsupportedIR(
                     codeGenContext,
-                    UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                    toSlice("parameterized predecessor edge"));
             }
         }
     }
@@ -440,13 +676,7 @@ SlangResult emitNVVMIRFromLinkedIR(
     List<SlangNVVMTypeHandle_1> parameterTypes;
     for (auto param : entryPoint->getParams())
     {
-        if (!i32Type)
-        {
-            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                codeGenContext,
-                "signed i32 type",
-                builder.getIntegerType(moduleScope.module, 32, i32Type)));
-        }
+        SLANG_RETURN_ON_FAIL(_getNVVMI32Type(codeGenContext, builder, moduleScope.module, i32Type));
 
         if (_isI32Type(param->getDataType()))
         {
@@ -491,7 +721,7 @@ SlangResult emitNVVMIRFromLinkedIR(
             entryPointDecoration->getName()->getStringSlice(),
             function)));
 
-    Dictionary<IRInst*, SlangNVVMValueHandle_1> valueMap;
+    NVVMValueMap valueMap;
     size_t parameterIndex = 0;
     for (auto param : entryPoint->getParams())
     {
@@ -505,7 +735,7 @@ SlangResult emitNVVMIRFromLinkedIR(
     }
 
     // LLVM branches can refer to blocks declared later, so create the complete function CFG before
-    // emitting any body instruction. Values remain one-to-one and are added only when emitted.
+    // emitting any body instruction.
     Dictionary<IRBlock*, SlangNVVMBlockHandle_1> blockMap;
     Index blockIndex = 0;
     for (auto block : entryPoint->getBlocks())
@@ -530,7 +760,35 @@ SlangResult emitNVVMIRFromLinkedIR(
         ++blockIndex;
     }
 
+    // Consider the loop header `header(i, sum)`. Its phis must exist before the compare and body
+    // use them, while their backedge values are not emitted until later blocks. Create every phi
+    // placeholder now; incoming pairs are attached after all bodies and terminators exist.
+    IRBlock* entryBlock = entryPoint->getFirstBlock();
     for (auto block : entryPoint->getBlocks())
+    {
+        if (block == entryBlock)
+            continue;
+
+        for (auto param : block->getParams())
+        {
+            SLANG_RETURN_ON_FAIL(
+                _getNVVMI32Type(codeGenContext, builder, moduleScope.module, i32Type));
+            SlangNVVMValueHandle_1 loweredPhi = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "signed i32 phi",
+                builder.emitIntegerPhi(
+                    moduleScope.module,
+                    blockMap.getValue(block),
+                    i32Type,
+                    loweredPhi)));
+            valueMap[param] = loweredPhi;
+        }
+    }
+
+    RefPtr<IRDominatorTree> dominatorTree = computeDominatorTree(entryPoint);
+    List<IRBlock*> bodyOrder = _getNVVMBodyOrder(entryPoint, dominatorTree);
+    for (auto block : bodyOrder)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
@@ -544,13 +802,22 @@ SlangResult emitNVVMIRFromLinkedIR(
             case kIROp_Load:
                 {
                     auto load = cast<IRLoad>(inst);
+                    SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                        codeGenContext,
+                        builder,
+                        moduleScope.module,
+                        load->getPtr(),
+                        valueMap,
+                        i32Type,
+                        loweredPointer));
                     SlangNVVMValueHandle_1 loweredValue = nullptr;
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
                         "signed i32 load",
                         builder.emitLoad(
                             moduleScope.module,
-                            valueMap.getValue(load->getPtr()),
+                            loweredPointer,
                             kNVVMI32Alignment,
                             loweredValue)));
                     valueMap[load] = loweredValue;
@@ -560,13 +827,31 @@ SlangResult emitNVVMIRFromLinkedIR(
             case kIROp_Store:
                 {
                     auto store = cast<IRStore>(inst);
+                    SlangNVVMValueHandle_1 loweredValue = nullptr;
+                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                        codeGenContext,
+                        builder,
+                        moduleScope.module,
+                        store->getVal(),
+                        valueMap,
+                        i32Type,
+                        loweredValue));
+                    SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                        codeGenContext,
+                        builder,
+                        moduleScope.module,
+                        store->getPtr(),
+                        valueMap,
+                        i32Type,
+                        loweredPointer));
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
                         "signed i32 store",
                         builder.emitStore(
                             moduleScope.module,
-                            valueMap.getValue(store->getVal()),
-                            valueMap.getValue(store->getPtr()),
+                            loweredValue,
+                            loweredPointer,
                             kNVVMI32Alignment)));
                 }
                 break;
@@ -577,6 +862,24 @@ SlangResult emitNVVMIRFromLinkedIR(
                     const SlangNVVMIntegerBinaryOp_2 operation =
                         inst->getOp() == kIROp_Add ? SLANG_NVVM_INTEGER_BINARY_OP_ADD
                                                    : SLANG_NVVM_INTEGER_BINARY_OP_SUB;
+                    SlangNVVMValueHandle_1 loweredLeft = nullptr;
+                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                        codeGenContext,
+                        builder,
+                        moduleScope.module,
+                        inst->getOperand(0),
+                        valueMap,
+                        i32Type,
+                        loweredLeft));
+                    SlangNVVMValueHandle_1 loweredRight = nullptr;
+                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                        codeGenContext,
+                        builder,
+                        moduleScope.module,
+                        inst->getOperand(1),
+                        valueMap,
+                        i32Type,
+                        loweredRight));
                     SlangNVVMValueHandle_1 loweredValue = nullptr;
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
@@ -585,8 +888,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                         builder.emitIntegerBinary(
                             moduleScope.module,
                             operation,
-                            valueMap.getValue(inst->getOperand(0)),
-                            valueMap.getValue(inst->getOperand(1)),
+                            loweredLeft,
+                            loweredRight,
                             loweredValue)));
                     valueMap[inst] = loweredValue;
                 }
@@ -594,14 +897,32 @@ SlangResult emitNVVMIRFromLinkedIR(
 
             case kIROp_Less:
                 {
+                    SlangNVVMValueHandle_1 loweredLeft = nullptr;
+                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                        codeGenContext,
+                        builder,
+                        moduleScope.module,
+                        inst->getOperand(0),
+                        valueMap,
+                        i32Type,
+                        loweredLeft));
+                    SlangNVVMValueHandle_1 loweredRight = nullptr;
+                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                        codeGenContext,
+                        builder,
+                        moduleScope.module,
+                        inst->getOperand(1),
+                        valueMap,
+                        i32Type,
+                        loweredRight));
                     SlangNVVMValueHandle_1 loweredValue = nullptr;
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
                         "signed i32 less-than comparison",
                         builder.emitIntegerSignedLessThan(
                             moduleScope.module,
-                            valueMap.getValue(inst->getOperand(0)),
-                            valueMap.getValue(inst->getOperand(1)),
+                            loweredLeft,
+                            loweredRight,
                             loweredValue)));
                     valueMap[inst] = loweredValue;
                 }
@@ -615,11 +936,12 @@ SlangResult emitNVVMIRFromLinkedIR(
                 break;
 
             case kIROp_UnconditionalBranch:
+            case kIROp_Loop:
                 {
                     auto branch = cast<IRUnconditionalBranch>(inst);
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
-                        "unconditional branch",
+                        inst->getOp() == kIROp_Loop ? "loop entry branch" : "unconditional branch",
                         builder.emitBranch(
                             moduleScope.module,
                             blockMap.getValue(branch->getTargetBlock()))));
@@ -629,12 +951,21 @@ SlangResult emitNVVMIRFromLinkedIR(
             case kIROp_IfElse:
                 {
                     auto ifElse = cast<IRIfElse>(inst);
+                    SlangNVVMValueHandle_1 loweredCondition = nullptr;
+                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                        codeGenContext,
+                        builder,
+                        moduleScope.module,
+                        ifElse->getCondition(),
+                        valueMap,
+                        i32Type,
+                        loweredCondition));
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
                         "conditional branch",
                         builder.emitConditionalBranch(
                             moduleScope.module,
-                            valueMap.getValue(ifElse->getCondition()),
+                            loweredCondition,
                             blockMap.getValue(ifElse->getTrueBlock()),
                             blockMap.getValue(ifElse->getFalseBlock()))));
                 }
@@ -642,6 +973,44 @@ SlangResult emitNVVMIRFromLinkedIR(
 
             default:
                 SLANG_UNEXPECTED("NVVM emission received IR that was not preflighted");
+            }
+        }
+    }
+
+    // Slang block parameters are the phi source of truth: argument N on each actual predecessor
+    // edge feeds parameter N. At this point even loop backedge instructions exist, so every pair
+    // can be attached without reconstructing a local variable or searching an operand graph.
+    for (auto block : entryPoint->getBlocks())
+    {
+        if (block == entryBlock || !block->getFirstParam())
+            continue;
+
+        for (auto predecessor : block->getPredecessors())
+        {
+            auto branch = as<IRUnconditionalBranch>(predecessor->getTerminator());
+            SLANG_RELEASE_ASSERT(branch && branch->getTargetBlock() == block);
+
+            UInt phiParameterIndex = 0;
+            for (auto param : block->getParams())
+            {
+                SlangNVVMValueHandle_1 loweredArgument = nullptr;
+                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                    codeGenContext,
+                    builder,
+                    moduleScope.module,
+                    branch->getArg(phiParameterIndex),
+                    valueMap,
+                    i32Type,
+                    loweredArgument));
+                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                    codeGenContext,
+                    "signed i32 phi incoming value",
+                    builder.addIntegerPhiIncoming(
+                        moduleScope.module,
+                        valueMap.getValue(param),
+                        loweredArgument,
+                        blockMap.getValue(predecessor))));
+                ++phiParameterIndex;
             }
         }
     }
