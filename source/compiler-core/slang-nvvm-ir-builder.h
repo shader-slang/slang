@@ -27,8 +27,23 @@ public:
         ISlangSharedLibrary* library,
         NVVMIRBuilder& outBuilder);
 
+    /// Validates the V2 diagnostic table and its nested V1 API, then retains its owning library.
+    static SlangResult initialize(
+        const SlangNVVMBuilderAPI_V2& api,
+        ISlangSharedLibrary* library,
+        NVVMIRBuilder& outBuilder);
+
     bool isInitialized() const { return m_api.createModule != nullptr; }
+    bool supportsSerializationDiagnostics() const
+    {
+        return m_apiV2.serializeModuleWithDiagnostics != nullptr;
+    }
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
+    /// Returns the locally supported V2 prefix, with `structureSize` clamped to that prefix.
+    const SlangNVVMBuilderAPI_V2* getAPIV2() const
+    {
+        return supportsSerializationDiagnostics() ? &m_apiV2 : nullptr;
+    }
 
     /// Creates a module whose LLVM objects remain owned by the returned module handle.
     SlangResult createModule(
@@ -80,8 +95,19 @@ public:
         SlangNVVMSerializationFormat_1 format,
         ComPtr<ISlangBlob>& outBlob) const;
 
+    /// Serializes through V2 and copies the corresponding verifier bytes into host storage.
+    ///
+    /// Returns `SLANG_E_NOT_AVAILABLE` for a V1-only provider. LLVM verification failure returns
+    /// `SLANG_FAIL`, leaves `outBlob` null, and preserves the verifier text in `outDiagnostics`.
+    SlangResult serializeModule(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMSerializationFormat_1 format,
+        ComPtr<ISlangBlob>& outBlob,
+        String& outDiagnostics) const;
+
 private:
     SlangNVVMBuilderAPI_V1 m_api = {};
+    SlangNVVMBuilderAPI_V2 m_apiV2 = {};
     ComPtr<ISlangSharedLibrary> m_library;
 };
 

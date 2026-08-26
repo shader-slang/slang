@@ -5,7 +5,9 @@
 #include <stdint.h>
 
 #define SLANG_NVVM_BUILDER_ABI_VERSION_1 1u
+#define SLANG_NVVM_BUILDER_ABI_VERSION_2 2u
 #define SLANG_NVVM_BUILDER_GET_API_V1_NAME "slang_getNVVMBuilderAPI_V1"
+#define SLANG_NVVM_BUILDER_GET_API_V2_NAME "slang_getNVVMBuilderAPI_V2"
 
 #if defined(_MSC_VER)
 #define SLANG_NVVM_CALL __stdcall
@@ -46,6 +48,11 @@ extern "C"
     typedef uint32_t SlangNVVMSerializationFormat_1;
 #define SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY ((SlangNVVMSerializationFormat_1)0u)
 #define SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE ((SlangNVVMSerializationFormat_1)1u)
+
+    typedef uint32_t SlangNVVMVerificationStatus_2;
+#define SLANG_NVVM_VERIFICATION_NOT_RUN ((SlangNVVMVerificationStatus_2)0u)
+#define SLANG_NVVM_VERIFICATION_VALID ((SlangNVVMVerificationStatus_2)1u)
+#define SLANG_NVVM_VERIFICATION_INVALID ((SlangNVVMVerificationStatus_2)2u)
 
     /**
      * Version 1 of the private ABI between Slang and its optional LLVM-backed NVVM IR module.
@@ -118,8 +125,56 @@ extern "C"
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V1)(
         SlangNVVMBuilderAPI_V1* outAPI);
 
+    /**
+     * Serializes a module and returns its LLVM verifier diagnostic in the same transaction.
+     *
+     * A query call supplies null destinations and zero capacities. Transport success is reported
+     * separately from `outVerificationStatus`: an invalid module returns transport success,
+     * `SLANG_NVVM_VERIFICATION_INVALID`, no serialized bytes, and a nonzero diagnostic size. Byte
+     * counts exclude a diagnostic NUL terminator. If either supplied buffer is too small, neither
+     * buffer is modified and both required sizes are reported. Destination ranges and the three
+     * output metadata values must occupy non-overlapping storage.
+     */
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMSerializeModuleWithDiagnostics_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMSerializationFormat_1 format,
+        void* serializedDestination,
+        size_t serializedDestinationSize,
+        size_t* outSerializedSize,
+        void* diagnosticDestination,
+        size_t diagnosticDestinationSize,
+        size_t* outDiagnosticSize,
+        SlangNVVMVerificationStatus_2* outVerificationStatus);
+
+    /**
+     * Version 2 composes the immutable V1 construction API with atomic serialization diagnostics.
+     *
+     * The caller zero-initializes the structure and supplies its capacity in `structureSize`. The
+     * provider copies only the prefix that fits and returns its complete supported size in that
+     * field. Functions may be appended to V2, but existing fields and semantics are immutable.
+     */
+    typedef struct SlangNVVMBuilderAPI_V2
+    {
+        uint32_t structureSize;
+        uint32_t abiVersion;
+
+        SlangNVVMBuilderAPI_V1 baseAPI;
+        SlangNVVMSerializeModuleWithDiagnostics_2 serializeModuleWithDiagnostics;
+    } SlangNVVMBuilderAPI_V2;
+
+    // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
+#define SLANG_NVVM_BUILDER_API_V2_MIN_SIZE                              \
+    (offsetof(SlangNVVMBuilderAPI_V2, serializeModuleWithDiagnostics) + \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->serializeModuleWithDiagnostics))
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
+        SlangNVVMBuilderAPI_V2* outAPI);
+
     SLANG_NVVM_BUILDER_API SlangNVVMResult_1 SLANG_NVVM_CALL
     slang_getNVVMBuilderAPI_V1(SlangNVVMBuilderAPI_V1* outAPI);
+
+    SLANG_NVVM_BUILDER_API SlangNVVMResult_1 SLANG_NVVM_CALL
+    slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI);
 
 #ifdef __cplusplus
 }

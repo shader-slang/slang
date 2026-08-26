@@ -4,3 +4,6 @@
 #include "compiler-core/slang-nvvm-ir-builder-api.h"
 
 typedef SlangNVVMBuilderAPI_V1 SlangNVVMBuilderAPIV1CCompileProbe;
+typedef SlangNVVMBuilderAPI_V2 SlangNVVMBuilderAPIV2CCompileProbe;
+typedef char SlangNVVMBuilderAPIV2MinimumSizeCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_MIN_SIZE <= sizeof(SlangNVVMBuilderAPI_V2)) ? 1 : -1];

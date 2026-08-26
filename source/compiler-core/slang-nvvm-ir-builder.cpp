@@ -13,6 +13,21 @@ static bool _hasRequiredFunctions(const SlangNVVMBuilderAPI_V1& api)
            api.markFunctionAsKernel && api.serializeModule;
 }
 
+// Checks the complete frozen V1 contract used by both standalone and nested API tables.
+static bool _isCompatibleV1(const SlangNVVMBuilderAPI_V1& api)
+{
+    return api.structureSize == sizeof(api) && api.abiVersion == SLANG_NVVM_BUILDER_ABI_VERSION_1 &&
+           api.llvmVersionMajor == 14 && api.llvmVersionMinor == 0 && api.llvmVersionPatch == 6 &&
+           api.nvvmIRVersionMajor == 2 && api.nvvmIRVersionMinor == 0 &&
+           api.pointerModel == SLANG_NVVM_POINTER_MODEL_TYPED && _hasRequiredFunctions(api);
+}
+
+// Checks whether a successful V2 transport returned a usable verification classification.
+static bool _isVerificationStatus(SlangNVVMVerificationStatus_2 status)
+{
+    return status == SLANG_NVVM_VERIFICATION_VALID || status == SLANG_NVVM_VERIFICATION_INVALID;
+}
+
 // Rejects an ABI implementation that reports success without producing its required handle.
 static SlangResult _validateHandleResult(SlangNVVMResult_1 result, const void* handle)
 {
@@ -40,6 +55,17 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, const void* h
     if (!library)
         return SLANG_FAIL;
 
+    SlangGetNVVMBuilderAPI_V2 getAPIV2 = reinterpret_cast<SlangGetNVVMBuilderAPI_V2>(
+        library->findFuncByName(SLANG_NVVM_BUILDER_GET_API_V2_NAME));
+    if (getAPIV2)
+    {
+        SlangNVVMBuilderAPI_V2 api = {};
+        api.structureSize = uint32_t(sizeof(api));
+        api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_2;
+        SLANG_RETURN_ON_FAIL(getAPIV2(&api));
+        return initialize(api, library, outBuilder);
+    }
+
     SlangGetNVVMBuilderAPI_V1 getAPI = reinterpret_cast<SlangGetNVVMBuilderAPI_V1>(
         library->findFuncByName(SLANG_NVVM_BUILDER_GET_API_V1_NAME));
     if (!getAPI)
@@ -58,17 +84,34 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, const void* h
     NVVMIRBuilder& outBuilder)
 {
     outBuilder = NVVMIRBuilder();
-    if (api.structureSize != sizeof(api) || api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_1 ||
-        api.llvmVersionMajor != 14 || api.llvmVersionMinor != 0 || api.llvmVersionPatch != 6 ||
-        api.nvvmIRVersionMajor != 2 || api.nvvmIRVersionMinor != 0 ||
-        api.pointerModel != SLANG_NVVM_POINTER_MODEL_TYPED || !_hasRequiredFunctions(api))
+    if (!_isCompatibleV1(api))
+        return SLANG_E_NO_INTERFACE;
+    if (!library)
+        return SLANG_E_INVALID_ARG;
+
+    outBuilder.m_api = api;
+    outBuilder.m_library = library;
+    return SLANG_OK;
+}
+
+/* static */ SlangResult NVVMIRBuilder::initialize(
+    const SlangNVVMBuilderAPI_V2& api,
+    ISlangSharedLibrary* library,
+    NVVMIRBuilder& outBuilder)
+{
+    outBuilder = NVVMIRBuilder();
+    if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE ||
+        api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
+        !api.serializeModuleWithDiagnostics)
     {
         return SLANG_E_NO_INTERFACE;
     }
     if (!library)
         return SLANG_E_INVALID_ARG;
 
-    outBuilder.m_api = api;
+    outBuilder.m_api = api.baseAPI;
+    outBuilder.m_apiV2 = api;
+    outBuilder.m_apiV2.structureSize = uint32_t(sizeof(outBuilder.m_apiV2));
     outBuilder.m_library = library;
     return SLANG_OK;
 }
@@ -175,6 +218,12 @@ SlangResult NVVMIRBuilder::serializeModule(
     SlangNVVMSerializationFormat_1 format,
     ComPtr<ISlangBlob>& outBlob) const
 {
+    if (supportsSerializationDiagnostics())
+    {
+        String diagnostics;
+        return serializeModule(module, format, outBlob, diagnostics);
+    }
+
     outBlob.setNull();
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
@@ -193,6 +242,85 @@ SlangResult NVVMIRBuilder::serializeModule(
         return SLANG_FAIL;
 
     outBlob = ListBlob::moveCreate(storage);
+    return SLANG_OK;
+}
+
+SlangResult NVVMIRBuilder::serializeModule(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMSerializationFormat_1 format,
+    ComPtr<ISlangBlob>& outBlob,
+    String& outDiagnostics) const
+{
+    outBlob.setNull();
+    outDiagnostics = String();
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsSerializationDiagnostics())
+        return SLANG_E_NOT_AVAILABLE;
+
+    size_t requiredSerializedSize = 0;
+    size_t requiredDiagnosticSize = 0;
+    SlangNVVMVerificationStatus_2 queryStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    SLANG_RETURN_ON_FAIL(m_apiV2.serializeModuleWithDiagnostics(
+        module,
+        format,
+        nullptr,
+        0,
+        &requiredSerializedSize,
+        nullptr,
+        0,
+        &requiredDiagnosticSize,
+        &queryStatus));
+
+    if (!_isVerificationStatus(queryStatus) || UInt64(requiredSerializedSize) > UInt64(kMaxIndex) ||
+        UInt64(requiredDiagnosticSize) > UInt64(kMaxIndex))
+    {
+        return SLANG_FAIL;
+    }
+    if (queryStatus == SLANG_NVVM_VERIFICATION_VALID)
+    {
+        if (!requiredSerializedSize)
+            return SLANG_FAIL;
+    }
+    else if (requiredSerializedSize || !requiredDiagnosticSize)
+    {
+        return SLANG_FAIL;
+    }
+
+    List<uint8_t> serializedStorage;
+    serializedStorage.setCount(Index(requiredSerializedSize));
+    List<char> diagnosticStorage;
+    diagnosticStorage.setCount(Index(requiredDiagnosticSize));
+
+    size_t actualSerializedSize = 0;
+    size_t actualDiagnosticSize = 0;
+    SlangNVVMVerificationStatus_2 writeStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    SLANG_RETURN_ON_FAIL(m_apiV2.serializeModuleWithDiagnostics(
+        module,
+        format,
+        serializedStorage.getCount() ? serializedStorage.getBuffer() : nullptr,
+        requiredSerializedSize,
+        &actualSerializedSize,
+        diagnosticStorage.getCount() ? diagnosticStorage.getBuffer() : nullptr,
+        requiredDiagnosticSize,
+        &actualDiagnosticSize,
+        &writeStatus));
+
+    if (actualSerializedSize != requiredSerializedSize ||
+        actualDiagnosticSize != requiredDiagnosticSize || writeStatus != queryStatus)
+    {
+        return SLANG_FAIL;
+    }
+
+    if (requiredDiagnosticSize)
+    {
+        outDiagnostics = String(
+            UnownedStringSlice(diagnosticStorage.getBuffer(), Index(requiredDiagnosticSize)));
+    }
+    if (queryStatus == SLANG_NVVM_VERIFICATION_INVALID)
+        return SLANG_FAIL;
+
+    outBlob = ListBlob::moveCreate(serializedStorage);
     return SLANG_OK;
 }
 

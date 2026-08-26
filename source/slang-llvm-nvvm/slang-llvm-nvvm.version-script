@@ -3,6 +3,7 @@
 {
     global:
         slang_getNVVMBuilderAPI_V1;
+        slang_getNVVMBuilderAPI_V2;
     local:
         *;
 };

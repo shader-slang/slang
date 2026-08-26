@@ -262,6 +262,54 @@ static SlangResult _copySerializedData(
     return SLANG_OK;
 }
 
+// Checks whether the provider supports the requested wire encoding.
+static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
+{
+    return format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY ||
+           format == SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE;
+}
+
+// Verifies once and materializes the one canonical byte result shared by the V1 and V2 getters.
+static SlangResult _materializeModule(
+    ModuleState* state,
+    SlangNVVMSerializationFormat_1 format,
+    llvm::SmallVectorImpl<char>& outSerializedData,
+    llvm::SmallVectorImpl<char>& outDiagnosticData,
+    SlangNVVMVerificationStatus_2& outVerificationStatus)
+{
+    outSerializedData.clear();
+    outDiagnosticData.clear();
+    outVerificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    if (!state)
+        return SLANG_E_INVALID_ARG;
+
+    std::string verifierStorage;
+    llvm::raw_string_ostream verifierOutput(verifierStorage);
+    const bool isInvalid = llvm::verifyModule(*state->module, &verifierOutput);
+    verifierOutput.flush();
+    if (isInvalid)
+    {
+        if (verifierStorage.empty())
+            verifierStorage = "LLVM rejected the module without a verifier diagnostic.";
+        outDiagnosticData.append(verifierStorage.begin(), verifierStorage.end());
+        outVerificationStatus = SLANG_NVVM_VERIFICATION_INVALID;
+        return SLANG_OK;
+    }
+
+    // V1 historically verifies before rejecting an unknown serialization format.
+    if (!_isSerializationFormat(format))
+        return SLANG_E_INVALID_ARG;
+
+    outDiagnosticData.clear();
+    llvm::raw_svector_ostream serializedOutput(outSerializedData);
+    if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)
+        state->module->print(serializedOutput, nullptr);
+    else
+        llvm::WriteBitcodeToFile(*state->module, serializedOutput);
+    outVerificationStatus = SLANG_NVVM_VERIFICATION_VALID;
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _serializeModule(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMSerializationFormat_1 format,
@@ -270,51 +318,81 @@ static SlangResult SLANG_NVVM_CALL _serializeModule(
     size_t* outSerializedSize)
 {
     ModuleState* state = _getModule(module);
-    if (!state)
-        return SLANG_E_INVALID_ARG;
-
-    llvm::raw_null_ostream verifierOutput;
-    if (llvm::verifyModule(*state->module, &verifierOutput))
+    llvm::SmallVector<char, 0> serializedData;
+    llvm::SmallVector<char, 0> diagnosticData;
+    SlangNVVMVerificationStatus_2 verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    const SlangResult materializeResult =
+        _materializeModule(state, format, serializedData, diagnosticData, verificationStatus);
+    if (SLANG_FAILED(materializeResult))
+        return materializeResult;
+    if (verificationStatus == SLANG_NVVM_VERIFICATION_INVALID)
         return SLANG_FAIL;
 
-    switch (format)
-    {
-    case SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY:
-        {
-            std::string storage;
-            llvm::raw_string_ostream stream(storage);
-            state->module->print(stream, nullptr);
-            stream.flush();
-            return _copySerializedData(storage, destination, destinationSize, outSerializedSize);
-        }
-    case SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE:
-        {
-            llvm::SmallVector<char, 0> storage;
-            llvm::raw_svector_ostream stream(storage);
-            llvm::WriteBitcodeToFile(*state->module, stream);
-            return _copySerializedData(
-                llvm::StringRef(storage.data(), storage.size()),
-                destination,
-                destinationSize,
-                outSerializedSize);
-        }
-    default:
-        return SLANG_E_INVALID_ARG;
-    }
+    return _copySerializedData(
+        llvm::StringRef(serializedData.data(), serializedData.size()),
+        destination,
+        destinationSize,
+        outSerializedSize);
 }
 
-} // namespace
-
-extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
-slang_getNVVMBuilderAPI_V1(SlangNVVMBuilderAPI_V1* outAPI)
+static SlangResult SLANG_NVVM_CALL _serializeModuleWithDiagnostics(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMSerializationFormat_1 format,
+    void* serializedDestination,
+    size_t serializedDestinationSize,
+    size_t* outSerializedSize,
+    void* diagnosticDestination,
+    size_t diagnosticDestinationSize,
+    size_t* outDiagnosticSize,
+    SlangNVVMVerificationStatus_2* outVerificationStatus)
 {
-    if (!outAPI || outAPI->structureSize != sizeof(SlangNVVMBuilderAPI_V1) ||
-        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_1)
+    if (outSerializedSize)
+        *outSerializedSize = 0;
+    if (outDiagnosticSize)
+        *outDiagnosticSize = 0;
+    if (outVerificationStatus)
+        *outVerificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+
+    ModuleState* state = _getModule(module);
+    if (!state || !_isSerializationFormat(format) || !outSerializedSize || !outDiagnosticSize ||
+        !outVerificationStatus || (!serializedDestination && serializedDestinationSize) ||
+        (!diagnosticDestination && diagnosticDestinationSize))
     {
-        return SLANG_E_NO_INTERFACE;
+        return SLANG_E_INVALID_ARG;
     }
 
-    SlangNVVMBuilderAPI_V1 api = {};
+    llvm::SmallVector<char, 0> serializedData;
+    llvm::SmallVector<char, 0> diagnosticData;
+    SlangNVVMVerificationStatus_2 verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    const SlangResult materializeResult =
+        _materializeModule(state, format, serializedData, diagnosticData, verificationStatus);
+    if (SLANG_FAILED(materializeResult))
+        return materializeResult;
+
+    *outSerializedSize = serializedData.size();
+    *outDiagnosticSize = diagnosticData.size();
+    *outVerificationStatus = verificationStatus;
+
+    const bool isQuery = !serializedDestination && !diagnosticDestination;
+    if (!isQuery && ((!serializedDestination && !serializedData.empty()) ||
+                     (serializedDestination && serializedDestinationSize < serializedData.size()) ||
+                     (!diagnosticDestination && !diagnosticData.empty()) ||
+                     (diagnosticDestination && diagnosticDestinationSize < diagnosticData.size())))
+    {
+        return SLANG_E_BUFFER_TOO_SMALL;
+    }
+
+    if (serializedDestination && !serializedData.empty())
+        std::memcpy(serializedDestination, serializedData.data(), serializedData.size());
+    if (diagnosticDestination && !diagnosticData.empty())
+        std::memcpy(diagnosticDestination, diagnosticData.data(), diagnosticData.size());
+    return SLANG_OK;
+}
+
+// Fills the canonical V1 table so the standalone and nested exports cannot diverge.
+static void _fillBuilderAPIV1(SlangNVVMBuilderAPI_V1& api)
+{
+    api = {};
     api.structureSize = uint32_t(sizeof(api));
     api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_1;
     api.llvmVersionMajor = LLVM_VERSION_MAJOR;
@@ -333,6 +411,42 @@ slang_getNVVMBuilderAPI_V1(SlangNVVMBuilderAPI_V1* outAPI)
     api.emitReturnVoid = _emitReturnVoid;
     api.markFunctionAsKernel = _markFunctionAsKernel;
     api.serializeModule = _serializeModule;
+}
+
+} // namespace
+
+extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
+slang_getNVVMBuilderAPI_V1(SlangNVVMBuilderAPI_V1* outAPI)
+{
+    if (!outAPI || outAPI->structureSize != sizeof(SlangNVVMBuilderAPI_V1) ||
+        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_1)
+    {
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    SlangNVVMBuilderAPI_V1 api;
+    _fillBuilderAPIV1(api);
     *outAPI = api;
+    return SLANG_OK;
+}
+
+extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
+slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
+{
+    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE ||
+        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2)
+    {
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    const size_t callerCapacity = outAPI->structureSize;
+    SlangNVVMBuilderAPI_V2 api = {};
+    api.structureSize = uint32_t(sizeof(api));
+    api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_2;
+    _fillBuilderAPIV1(api.baseAPI);
+    api.serializeModuleWithDiagnostics = _serializeModuleWithDiagnostics;
+
+    const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
+    std::memcpy(outAPI, &api, copySize);
     return SLANG_OK;
 }

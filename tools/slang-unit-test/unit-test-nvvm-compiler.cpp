@@ -9,6 +9,7 @@
 #include "core/slang-io.h"
 #include "core/slang-process-util.h"
 #include "core/slang-shared-library.h"
+#include "scoped-env-var.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -128,6 +129,9 @@ struct FakeNVVMBuilderBlockStorage
 {
 };
 
+static const char kFakeNVVMBuilderAssembly[] = "fake LLVM assembly";
+static const uint8_t kFakeNVVMBuilderBitcode[] = {0x42, 0x43, 0xc0, 0xde, 0x00, 0x11};
+
 struct FakeNVVMBuilderState
 {
     void resetCalls()
@@ -143,6 +147,8 @@ struct FakeNVVMBuilderState
         markFunctionAsKernelCallCount = 0;
         serializeQueryCallCount = 0;
         serializeWriteCallCount = 0;
+        serializeWithDiagnosticsQueryCallCount = 0;
+        serializeWithDiagnosticsWriteCallCount = 0;
         moduleName = String();
         functionName = String();
         blockName = String();
@@ -152,9 +158,18 @@ struct FakeNVVMBuilderState
     {
         SLANG_ASSERT(liveLibraryCount == 0);
         api = {};
+        apiV2 = {};
         omitAPISymbol = false;
+        omitAPIV2Symbol = true;
         returnNullModule = false;
         reportMismatchedWriteSize = false;
+        verificationStatus = SLANG_NVVM_VERIFICATION_VALID;
+        serializationWithDiagnosticsResult = SLANG_OK;
+        verificationDiagnostic = String();
+        omitValidSerializedOutput = false;
+        reportMismatchedSerializedDiagnosticWriteSize = false;
+        reportMismatchedVerificationDiagnosticWriteSize = false;
+        reportMismatchedVerificationStatus = false;
         loadedPath = String();
         liveLibraryCount = 0;
         destroyedLibraryCount = 0;
@@ -162,9 +177,18 @@ struct FakeNVVMBuilderState
     }
 
     SlangNVVMBuilderAPI_V1 api = {};
+    SlangNVVMBuilderAPI_V2 apiV2 = {};
     bool omitAPISymbol = false;
+    bool omitAPIV2Symbol = true;
     bool returnNullModule = false;
     bool reportMismatchedWriteSize = false;
+    SlangNVVMVerificationStatus_2 verificationStatus = SLANG_NVVM_VERIFICATION_VALID;
+    SlangNVVMResult_1 serializationWithDiagnosticsResult = SLANG_OK;
+    String verificationDiagnostic;
+    bool omitValidSerializedOutput = false;
+    bool reportMismatchedSerializedDiagnosticWriteSize = false;
+    bool reportMismatchedVerificationDiagnosticWriteSize = false;
+    bool reportMismatchedVerificationStatus = false;
     String loadedPath;
     int liveLibraryCount = 0;
     int destroyedLibraryCount = 0;
@@ -186,6 +210,8 @@ struct FakeNVVMBuilderState
     int markFunctionAsKernelCallCount = 0;
     int serializeQueryCallCount = 0;
     int serializeWriteCallCount = 0;
+    int serializeWithDiagnosticsQueryCallCount = 0;
+    int serializeWithDiagnosticsWriteCallCount = 0;
     String moduleName;
     String functionName;
     String blockName;
@@ -332,8 +358,6 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderSerializeModule(
     size_t destinationSize,
     size_t* outSerializedSize)
 {
-    static const char kFakeBuilderAssembly[] = "fake LLVM assembly";
-    static const uint8_t kFakeBuilderBitcode[] = {0x42, 0x43, 0xc0, 0xde, 0x00, 0x11};
     if (module != _getFakeNVVMBuilderModule() || !outSerializedSize ||
         (!destination && destinationSize))
     {
@@ -345,12 +369,12 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderSerializeModule(
     switch (format)
     {
     case SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY:
-        source = kFakeBuilderAssembly;
-        sourceSize = sizeof(kFakeBuilderAssembly) - 1;
+        source = kFakeNVVMBuilderAssembly;
+        sourceSize = sizeof(kFakeNVVMBuilderAssembly) - 1;
         break;
     case SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE:
-        source = kFakeBuilderBitcode;
-        sourceSize = sizeof(kFakeBuilderBitcode);
+        source = kFakeNVVMBuilderBitcode;
+        sourceSize = sizeof(kFakeNVVMBuilderBitcode);
         break;
     default:
         return SLANG_E_INVALID_ARG;
@@ -369,6 +393,85 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderSerializeModule(
     ::memcpy(destination, source, sourceSize);
     if (gFakeNVVMBuilder.reportMismatchedWriteSize)
         *outSerializedSize = sourceSize - 1;
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderSerializeModuleWithDiagnostics(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMSerializationFormat_1 format,
+    void* serializedDestination,
+    size_t serializedDestinationSize,
+    size_t* outSerializedSize,
+    void* diagnosticDestination,
+    size_t diagnosticDestinationSize,
+    size_t* outDiagnosticSize,
+    SlangNVVMVerificationStatus_2* outVerificationStatus)
+{
+    if (module != _getFakeNVVMBuilderModule() || !outSerializedSize || !outDiagnosticSize ||
+        !outVerificationStatus || (!serializedDestination && serializedDestinationSize) ||
+        (!diagnosticDestination && diagnosticDestinationSize))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    const void* serializedSource = nullptr;
+    size_t serializedSize = 0;
+    if (format != SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY &&
+        format != SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+    if (gFakeNVVMBuilder.verificationStatus == SLANG_NVVM_VERIFICATION_VALID &&
+        !gFakeNVVMBuilder.omitValidSerializedOutput)
+    {
+        if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)
+        {
+            serializedSource = kFakeNVVMBuilderAssembly;
+            serializedSize = sizeof(kFakeNVVMBuilderAssembly) - 1;
+        }
+        else
+        {
+            serializedSource = kFakeNVVMBuilderBitcode;
+            serializedSize = sizeof(kFakeNVVMBuilderBitcode);
+        }
+    }
+
+    const size_t diagnosticSize = size_t(gFakeNVVMBuilder.verificationDiagnostic.getLength());
+    *outSerializedSize = serializedSize;
+    *outDiagnosticSize = diagnosticSize;
+    *outVerificationStatus = gFakeNVVMBuilder.verificationStatus;
+
+    const bool isQuery = !serializedDestination && !diagnosticDestination;
+    if (isQuery)
+    {
+        ++gFakeNVVMBuilder.serializeWithDiagnosticsQueryCallCount;
+        return gFakeNVVMBuilder.serializationWithDiagnosticsResult;
+    }
+
+    ++gFakeNVVMBuilder.serializeWithDiagnosticsWriteCallCount;
+    if (serializedDestinationSize < serializedSize || diagnosticDestinationSize < diagnosticSize ||
+        (serializedSize && !serializedDestination) || (diagnosticSize && !diagnosticDestination))
+    {
+        return SLANG_E_BUFFER_TOO_SMALL;
+    }
+    if (gFakeNVVMBuilder.serializationWithDiagnosticsResult < 0)
+        return gFakeNVVMBuilder.serializationWithDiagnosticsResult;
+
+    if (serializedSize)
+        ::memcpy(serializedDestination, serializedSource, serializedSize);
+    if (diagnosticSize)
+    {
+        ::memcpy(
+            diagnosticDestination,
+            gFakeNVVMBuilder.verificationDiagnostic.getBuffer(),
+            diagnosticSize);
+    }
+    if (gFakeNVVMBuilder.reportMismatchedSerializedDiagnosticWriteSize)
+        *outSerializedSize = serializedSize - 1;
+    if (gFakeNVVMBuilder.reportMismatchedVerificationDiagnosticWriteSize)
+        *outDiagnosticSize = diagnosticSize ? diagnosticSize - 1 : 1;
+    if (gFakeNVVMBuilder.reportMismatchedVerificationStatus)
+        *outVerificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
     return SLANG_OK;
 }
 
@@ -396,6 +499,16 @@ static SlangNVVMBuilderAPI_V1 _makeFakeNVVMBuilderAPI()
     return api;
 }
 
+static SlangNVVMBuilderAPI_V2 _makeFakeNVVMBuilderAPIV2()
+{
+    SlangNVVMBuilderAPI_V2 api = {};
+    api.structureSize = uint32_t(sizeof(api));
+    api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_2;
+    api.baseAPI = _makeFakeNVVMBuilderAPI();
+    api.serializeModuleWithDiagnostics = _fakeNVVMBuilderSerializeModuleWithDiagnostics;
+    return api;
+}
+
 static SlangResult SLANG_NVVM_CALL _fakeGetNVVMBuilderAPI(SlangNVVMBuilderAPI_V1* outAPI)
 {
     if (!outAPI || outAPI->structureSize != sizeof(*outAPI) ||
@@ -404,6 +517,23 @@ static SlangResult SLANG_NVVM_CALL _fakeGetNVVMBuilderAPI(SlangNVVMBuilderAPI_V1
         return SLANG_E_NO_INTERFACE;
     }
     *outAPI = gFakeNVVMBuilder.api;
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeGetNVVMBuilderAPIV2(SlangNVVMBuilderAPI_V2* outAPI)
+{
+    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE ||
+        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2)
+    {
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    const uint32_t callerSize = outAPI->structureSize;
+    const uint32_t copySize = callerSize < sizeof(gFakeNVVMBuilder.apiV2)
+                                  ? callerSize
+                                  : uint32_t(sizeof(gFakeNVVMBuilder.apiV2));
+    ::memcpy(outAPI, &gFakeNVVMBuilder.apiV2, copySize);
+    outAPI->structureSize = gFakeNVVMBuilder.apiV2.structureSize;
     return SLANG_OK;
 }
 
@@ -429,7 +559,12 @@ public:
     {
         if (!name || gFakeNVVMBuilder.omitAPISymbol)
             return nullptr;
-        return UnownedStringSlice(name) == SLANG_NVVM_BUILDER_GET_API_V1_NAME
+        const UnownedStringSlice symbol(name);
+        if (!gFakeNVVMBuilder.omitAPIV2Symbol && symbol == SLANG_NVVM_BUILDER_GET_API_V2_NAME)
+        {
+            return reinterpret_cast<void*>(_fakeGetNVVMBuilderAPIV2);
+        }
+        return symbol == SLANG_NVVM_BUILDER_GET_API_V1_NAME
                    ? reinterpret_cast<void*>(_fakeGetNVVMBuilderAPI)
                    : nullptr;
     }
@@ -1039,41 +1174,91 @@ struct ScopedNVVMBuilderModule
     }
 };
 
+struct RealNVVMBuilderLocation
+{
+    String directory;
+    bool isExplicit = false;
+    bool moduleExists = false;
+};
+
+static RealNVVMBuilderLocation _getRealNVVMBuilderLocation(UnitTestContext* context)
+{
+    RealNVVMBuilderLocation location;
+    StringBuilder pathBuilder;
+    location.isExplicit = SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                              toSlice("SLANG_NVVM_BUILDER_PATH"),
+                              pathBuilder)) &&
+                          pathBuilder.getLength();
+    location.directory =
+        location.isExplicit ? pathBuilder.produceString() : String(context->executableDirectory);
+    const String modulePath = Path::combine(
+        location.directory,
+        SharedLibrary::calcPlatformPath(toSlice("slang-llvm-nvvm")));
+    location.moduleExists = File::exists(modulePath);
+    return location;
+}
+
+// Loads the real provider without converting absence into an ignored test. Child-process tests use
+// this form because an ignored child exits successfully and would make the parent pass vacuously.
+static SlangResult _loadRealNVVMBuilder(
+    UnitTestContext* context,
+    NVVMIRBuilder& outBuilder,
+    RealNVVMBuilderLocation* outLocation = nullptr)
+{
+    const RealNVVMBuilderLocation location = _getRealNVVMBuilderLocation(context);
+    if (outLocation)
+        *outLocation = location;
+    if (!location.isExplicit && !location.moduleExists)
+        return SLANG_E_NOT_FOUND;
+    return NVVMIRBuilder::load(
+        location.directory,
+        DefaultSharedLibraryLoader::getSingleton(),
+        outBuilder);
+}
+
 static void _requireRealNVVMBuilder(UnitTestContext* context, NVVMIRBuilder& outBuilder)
 {
-    StringBuilder pathBuilder;
-    const bool hasExplicitPath = SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
-                                     toSlice("SLANG_NVVM_BUILDER_PATH"),
-                                     pathBuilder)) &&
-                                 pathBuilder.getLength();
-    const String path =
-        hasExplicitPath ? pathBuilder.produceString() : String(context->executableDirectory);
-    if (!hasExplicitPath)
+    RealNVVMBuilderLocation location;
+    const SlangResult loadResult = _loadRealNVVMBuilder(context, outBuilder, &location);
+    if (loadResult == SLANG_E_NOT_FOUND && !location.isExplicit && !location.moduleExists)
     {
-        const String modulePath =
-            Path::combine(path, SharedLibrary::calcPlatformPath(toSlice("slang-llvm-nvvm")));
-        if (!File::exists(modulePath))
-        {
-            getTestReporter()->message(
-                TestMessageType::Info,
-                "Ignoring real LLVM 14 NVVM builder test because slang-llvm-nvvm was not found.");
-            SLANG_IGNORE_TEST;
-        }
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring real LLVM 14 NVVM builder test because slang-llvm-nvvm was not found.");
+        SLANG_IGNORE_TEST;
     }
 
-    const SlangResult loadResult =
-        NVVMIRBuilder::load(path, DefaultSharedLibraryLoader::getSingleton(), outBuilder);
     if (SLANG_FAILED(loadResult))
     {
         StringBuilder message;
         message << "Unable to load a compatible LLVM 14 NVVM builder";
-        if (hasExplicitPath)
-            message << " from the explicit SLANG_NVVM_BUILDER_PATH directory: " << path;
+        if (location.isExplicit)
+            message << " from the explicit SLANG_NVVM_BUILDER_PATH directory: "
+                    << location.directory;
         getTestReporter()->message(TestMessageType::Info, message.getBuffer());
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(loadResult));
     }
     if (!outBuilder.isInitialized())
         SLANG_CHECK_ABORT(outBuilder.isInitialized());
+}
+
+static SlangResult _populateEmptyNVVMKernel(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module,
+    const UnownedStringSlice& kernelName)
+{
+    SlangNVVMTypeHandle_1 voidType = nullptr;
+    SlangNVVMTypeHandle_1 functionType = nullptr;
+    SlangNVVMValueHandle_1 function = nullptr;
+    SlangNVVMBlockHandle_1 entryBlock = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(module, voidType, nullptr, 0, functionType));
+    SLANG_RETURN_ON_FAIL(builder.declareFunction(module, functionType, kernelName, function));
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, function, toSlice("entry"), entryBlock));
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
+    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
+    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
+    return SLANG_OK;
 }
 
 static SlangResult _buildEmptyNVVMKernel(
@@ -1088,18 +1273,7 @@ static SlangResult _buildEmptyNVVMKernel(
     ScopedNVVMBuilderModule scope;
     scope.builder = &builder;
     SLANG_RETURN_ON_FAIL(builder.createModule(toSlice("slang-nvvm-unit-test"), scope.module));
-
-    SlangNVVMTypeHandle_1 voidType = nullptr;
-    SlangNVVMTypeHandle_1 functionType = nullptr;
-    SlangNVVMValueHandle_1 function = nullptr;
-    SlangNVVMBlockHandle_1 entryBlock = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.getVoidType(scope.module, voidType));
-    SLANG_RETURN_ON_FAIL(builder.getFunctionType(scope.module, voidType, nullptr, 0, functionType));
-    SLANG_RETURN_ON_FAIL(builder.declareFunction(scope.module, functionType, kernelName, function));
-    SLANG_RETURN_ON_FAIL(builder.createBlock(scope.module, function, toSlice("entry"), entryBlock));
-    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(scope.module, entryBlock));
-    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(scope.module));
-    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(scope.module, function));
+    SLANG_RETURN_ON_FAIL(_populateEmptyNVVMKernel(builder, scope.module, kernelName));
     SLANG_RETURN_ON_FAIL(builder.serializeModule(
         scope.module,
         SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
@@ -1282,6 +1456,88 @@ static void _checkRejectedInputResult(SlangResult result, IArtifact* artifact)
     SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
 }
 
+enum class NVVMLLVMLoadOrder
+{
+    LLVMFirst,
+    NVVMFirst,
+};
+
+static const char kNVVMCoexistenceChildEnv[] = "SLANG_NVVM_COEXISTENCE_CHILD_ORDER";
+static const char kNVVMCoexistenceTestName[] =
+    "slang-unit-test-tool/nvvmIRBuilderCoexistsWithLLVM21";
+
+static SlangResult _queryLLVM21(UnitTestContext* context)
+{
+    int major = 0;
+    int minor = 0;
+    SLANG_RETURN_ON_FAIL(context->slangGlobalSession->getDownstreamCompilerVersion(
+        SLANG_PASS_THROUGH_LLVM,
+        &major,
+        &minor));
+    return major == 21 && minor == 1 ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _buildCoexistenceProbe(
+    const NVVMIRBuilder& builder,
+    const UnownedStringSlice& kernelName)
+{
+    ComPtr<ISlangBlob> assembly;
+    ComPtr<ISlangBlob> bitcode;
+    SLANG_RETURN_ON_FAIL(_buildEmptyNVVMKernel(builder, kernelName, assembly, bitcode));
+    if (!assembly || !bitcode || bitcode->getBufferSize() <= 4)
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+// Runs inside a fully isolated test-server. Unlike slang-test itself, test-server creates a global
+// session without eagerly probing every downstream compiler, so the first call here determines the
+// actual process load order.
+static SlangResult _exerciseNVVMLLVMCoexistence(UnitTestContext* context, NVVMLLVMLoadOrder order)
+{
+    NVVMIRBuilder builder;
+    if (order == NVVMLLVMLoadOrder::NVVMFirst)
+    {
+        SLANG_RETURN_ON_FAIL(_loadRealNVVMBuilder(context, builder));
+        if (builder.getAPI().llvmVersionMajor != 14 || !builder.supportsSerializationDiagnostics())
+        {
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(
+            _buildCoexistenceProbe(builder, toSlice("slangSlice3bNVVMBeforeLLVM")));
+    }
+
+    SLANG_RETURN_ON_FAIL(_queryLLVM21(context));
+
+    if (order == NVVMLLVMLoadOrder::LLVMFirst)
+    {
+        SLANG_RETURN_ON_FAIL(_loadRealNVVMBuilder(context, builder));
+        if (builder.getAPI().llvmVersionMajor != 14 || !builder.supportsSerializationDiagnostics())
+        {
+            return SLANG_FAIL;
+        }
+    }
+
+    SLANG_RETURN_ON_FAIL(_buildCoexistenceProbe(
+        builder,
+        order == NVVMLLVMLoadOrder::LLVMFirst ? toSlice("slangSlice3bLLVMBeforeNVVM")
+                                              : toSlice("slangSlice3bNVVMAfterLLVM")));
+    return _queryLLVM21(context);
+}
+
+static void _reportCoexistenceChildFailure(
+    const char* order,
+    SlangResult executeResult,
+    const ExecuteResult& childResult)
+{
+    StringBuilder message;
+    message << "Fresh-process NVVM/LLVM coexistence probe failed for " << order << ".\n";
+    message << "ProcessUtil result: " << executeResult
+            << ", child exit code: " << childResult.resultCode << "\n";
+    message << "child stdout:\n" << childResult.standardOutput;
+    message << "\nchild stderr:\n" << childResult.standardError;
+    getTestReporter()->message(TestMessageType::TestFailure, message.getBuffer());
+}
+
 } // namespace
 
 SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidABI)
@@ -1319,6 +1575,22 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidABI)
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
 
+    // Once a provider advertises V2, a malformed V2 table is an incompatibility rather than a
+    // reason to silently downgrade to its otherwise valid V1 export.
+    gFakeNVVMBuilder.reset();
+    gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+    gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+    gFakeNVVMBuilder.apiV2.serializeModuleWithDiagnostics = nullptr;
+    gFakeNVVMBuilder.omitAPIV2Symbol = false;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder rejectedBuilder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, rejectedBuilder) == SLANG_E_NO_INTERFACE);
+        SLANG_CHECK(!rejectedBuilder.isInitialized());
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
+
     gFakeNVVMBuilder.reset();
     gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
     {
@@ -1346,6 +1618,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderForwardsVersionedABI)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, builder)));
         loader.setNull();
         SLANG_CHECK(builder.isInitialized());
+        SLANG_CHECK(!builder.supportsSerializationDiagnostics());
+        SLANG_CHECK(builder.getAPIV2() == nullptr);
         SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 1);
         SLANG_CHECK(builder.getAPI().llvmVersionMajor == 14);
         SLANG_CHECK(builder.getAPI().llvmVersionMinor == 0);
@@ -1422,6 +1696,17 @@ SLANG_UNIT_TEST(nvvmIRBuilderForwardsVersionedABI)
                 kExpectedBitcode,
                 SLANG_COUNT_OF(kExpectedBitcode)) == 0);
 
+        ComPtr<ISlangBlob> unavailableDiagnosticSerialization;
+        String unavailableDiagnostics = "stale diagnostics";
+        SLANG_CHECK(
+            builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                unavailableDiagnosticSerialization,
+                unavailableDiagnostics) == SLANG_E_NOT_AVAILABLE);
+        SLANG_CHECK(unavailableDiagnosticSerialization == nullptr);
+        SLANG_CHECK(unavailableDiagnostics.getLength() == 0);
+
         gFakeNVVMBuilder.reportMismatchedWriteSize = true;
         ComPtr<ISlangBlob> malformedOutput;
         SLANG_CHECK(
@@ -1454,6 +1739,265 @@ SLANG_UNIT_TEST(nvvmIRBuilderForwardsVersionedABI)
         builder.destroyModule(scope.module);
         scope.module = nullptr;
         SLANG_CHECK(gFakeNVVMBuilder.destroyModuleCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV2Diagnostics)
+{
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        NVVMIRBuilder rejectedBuilder;
+
+        SlangNVVMBuilderAPI_V2 invalidAPI = _makeFakeNVVMBuilderAPIV2();
+        invalidAPI.structureSize = uint32_t(SLANG_NVVM_BUILDER_API_V2_MIN_SIZE - 1);
+        SLANG_CHECK(
+            NVVMIRBuilder::initialize(invalidAPI, library, rejectedBuilder) ==
+            SLANG_E_NO_INTERFACE);
+
+        invalidAPI = _makeFakeNVVMBuilderAPIV2();
+        invalidAPI.abiVersion += 1;
+        SLANG_CHECK(
+            NVVMIRBuilder::initialize(invalidAPI, library, rejectedBuilder) ==
+            SLANG_E_NO_INTERFACE);
+
+        invalidAPI = _makeFakeNVVMBuilderAPIV2();
+        invalidAPI.serializeModuleWithDiagnostics = nullptr;
+        SLANG_CHECK(
+            NVVMIRBuilder::initialize(invalidAPI, library, rejectedBuilder) ==
+            SLANG_E_NO_INTERFACE);
+
+        invalidAPI = _makeFakeNVVMBuilderAPIV2();
+        invalidAPI.baseAPI.llvmVersionMajor = 15;
+        SLANG_CHECK(
+            NVVMIRBuilder::initialize(invalidAPI, library, rejectedBuilder) ==
+            SLANG_E_NO_INTERFACE);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
+
+    gFakeNVVMBuilder.reset();
+    gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+    gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+    // A provider may append fields to V2. The host accepts its known prefix without reading the
+    // unknown tail, then clamps the retained table size to the local prefix it actually stores.
+    gFakeNVVMBuilder.apiV2.structureSize = uint32_t(sizeof(SlangNVVMBuilderAPI_V2) + 16);
+    gFakeNVVMBuilder.omitAPIV2Symbol = false;
+
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, builder)));
+        loader.setNull();
+        SLANG_CHECK(builder.isInitialized());
+        SLANG_CHECK(builder.supportsSerializationDiagnostics());
+        SLANG_CHECK_ABORT(builder.getAPIV2() != nullptr);
+        SLANG_CHECK(builder.getAPIV2()->structureSize == sizeof(SlangNVVMBuilderAPI_V2));
+        SLANG_CHECK(builder.getAPI().llvmVersionMajor == 14);
+
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("fake-v2-module"), scope.module)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            _populateEmptyNVVMKernel(builder, scope.module, toSlice("fakeV2Kernel"))));
+
+        ComPtr<ISlangBlob> bitcode;
+        String diagnostics = "stale diagnostics";
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+            bitcode,
+            diagnostics)));
+        SLANG_CHECK_ABORT(bitcode != nullptr);
+        SLANG_CHECK_ABORT(bitcode->getBufferSize() == sizeof(kFakeNVVMBuilderBitcode));
+        SLANG_CHECK(
+            ::memcmp(
+                bitcode->getBufferPointer(),
+                kFakeNVVMBuilderBitcode,
+                sizeof(kFakeNVVMBuilderBitcode)) == 0);
+        SLANG_CHECK(diagnostics.getLength() == 0);
+
+        // Make both result buffers non-empty, then undersize only the diagnostic buffer. Atomic
+        // failure means the otherwise sufficient serialization buffer must retain its sentinels.
+        gFakeNVVMBuilder.verificationDiagnostic = "fake valid verification note";
+        size_t requiredSerializedSize = 0;
+        size_t requiredDiagnosticSize = 0;
+        SlangNVVMVerificationStatus_2 verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(gFakeNVVMBuilder.apiV2.serializeModuleWithDiagnostics(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+            nullptr,
+            0,
+            &requiredSerializedSize,
+            nullptr,
+            0,
+            &requiredDiagnosticSize,
+            &verificationStatus)));
+        SLANG_CHECK(requiredSerializedSize == sizeof(kFakeNVVMBuilderBitcode));
+        SLANG_CHECK(requiredDiagnosticSize > 1);
+        SLANG_CHECK(verificationStatus == SLANG_NVVM_VERIFICATION_VALID);
+
+        List<uint8_t> serializedSentinels;
+        serializedSentinels.setCount(Index(requiredSerializedSize));
+        for (auto& value : serializedSentinels)
+            value = 0xa5;
+        uint8_t diagnosticSentinel = 0x5a;
+        size_t reportedSerializedSize = 0;
+        size_t reportedDiagnosticSize = 0;
+        verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+        SLANG_CHECK(
+            gFakeNVVMBuilder.apiV2.serializeModuleWithDiagnostics(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                serializedSentinels.getBuffer(),
+                size_t(serializedSentinels.getCount()),
+                &reportedSerializedSize,
+                &diagnosticSentinel,
+                1,
+                &reportedDiagnosticSize,
+                &verificationStatus) == SLANG_E_BUFFER_TOO_SMALL);
+        SLANG_CHECK(reportedSerializedSize == requiredSerializedSize);
+        SLANG_CHECK(reportedDiagnosticSize == requiredDiagnosticSize);
+        SLANG_CHECK(verificationStatus == SLANG_NVVM_VERIFICATION_VALID);
+        for (const auto value : serializedSentinels)
+            SLANG_CHECK(value == 0xa5);
+        SLANG_CHECK(diagnosticSentinel == 0x5a);
+
+        diagnostics = "stale diagnostics";
+        bitcode.setNull();
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+            bitcode,
+            diagnostics)));
+        SLANG_CHECK_ABORT(bitcode != nullptr);
+        SLANG_CHECK(diagnostics == gFakeNVVMBuilder.verificationDiagnostic);
+
+        gFakeNVVMBuilder.verificationStatus = SLANG_NVVM_VERIFICATION_INVALID;
+        static const char kEmbeddedDiagnostic[] =
+            {'f', 'a', 'k', 'e', 0, 'L', 'L', 'V', 'M', ' ', 'e', 'r', 'r', 'o', 'r'};
+        gFakeNVVMBuilder.verificationDiagnostic =
+            String(UnownedStringSlice(kEmbeddedDiagnostic, SLANG_COUNT_OF(kEmbeddedDiagnostic)));
+        diagnostics = "stale diagnostics";
+        bitcode.setNull();
+        SLANG_CHECK(
+            builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                bitcode,
+                diagnostics) == SLANG_FAIL);
+        SLANG_CHECK(bitcode == nullptr);
+        SLANG_CHECK_ABORT(diagnostics.getLength() == SLANG_COUNT_OF(kEmbeddedDiagnostic));
+        SLANG_CHECK(
+            ::memcmp(
+                diagnostics.getBuffer(),
+                kEmbeddedDiagnostic,
+                SLANG_COUNT_OF(kEmbeddedDiagnostic)) == 0);
+
+        gFakeNVVMBuilder.verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+        gFakeNVVMBuilder.verificationDiagnostic = String();
+        diagnostics = "stale diagnostics";
+        SLANG_CHECK(
+            builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                bitcode,
+                diagnostics) == SLANG_FAIL);
+        SLANG_CHECK(bitcode == nullptr);
+        SLANG_CHECK(diagnostics.getLength() == 0);
+
+        // Malformed successful responses are rejected after the query, before the wrapper asks the
+        // provider to write either buffer.
+        gFakeNVVMBuilder.verificationStatus = SLANG_NVVM_VERIFICATION_INVALID;
+        const int emptyInvalidQueryCount = gFakeNVVMBuilder.serializeWithDiagnosticsQueryCallCount;
+        const int emptyInvalidWriteCount = gFakeNVVMBuilder.serializeWithDiagnosticsWriteCallCount;
+        diagnostics = "stale diagnostics";
+        SLANG_CHECK(
+            builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                bitcode,
+                diagnostics) == SLANG_FAIL);
+        SLANG_CHECK(bitcode == nullptr);
+        SLANG_CHECK(diagnostics.getLength() == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.serializeWithDiagnosticsQueryCallCount == emptyInvalidQueryCount + 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.serializeWithDiagnosticsWriteCallCount == emptyInvalidWriteCount);
+
+        gFakeNVVMBuilder.verificationStatus = SLANG_NVVM_VERIFICATION_VALID;
+        gFakeNVVMBuilder.omitValidSerializedOutput = true;
+        const int emptyValidQueryCount = gFakeNVVMBuilder.serializeWithDiagnosticsQueryCallCount;
+        const int emptyValidWriteCount = gFakeNVVMBuilder.serializeWithDiagnosticsWriteCallCount;
+        diagnostics = "stale diagnostics";
+        SLANG_CHECK(
+            builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                bitcode,
+                diagnostics) == SLANG_FAIL);
+        SLANG_CHECK(bitcode == nullptr);
+        SLANG_CHECK(diagnostics.getLength() == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.serializeWithDiagnosticsQueryCallCount == emptyValidQueryCount + 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.serializeWithDiagnosticsWriteCallCount == emptyValidWriteCount);
+        gFakeNVVMBuilder.omitValidSerializedOutput = false;
+
+        gFakeNVVMBuilder.serializationWithDiagnosticsResult = SLANG_FAIL;
+        diagnostics = "stale diagnostics";
+        SLANG_CHECK(
+            builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                bitcode,
+                diagnostics) == SLANG_FAIL);
+        SLANG_CHECK(bitcode == nullptr);
+        SLANG_CHECK(diagnostics.getLength() == 0);
+        gFakeNVVMBuilder.serializationWithDiagnosticsResult = SLANG_OK;
+        gFakeNVVMBuilder.verificationStatus = SLANG_NVVM_VERIFICATION_VALID;
+
+        gFakeNVVMBuilder.reportMismatchedSerializedDiagnosticWriteSize = true;
+        SLANG_CHECK(
+            builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                bitcode,
+                diagnostics) == SLANG_FAIL);
+        SLANG_CHECK(bitcode == nullptr);
+        gFakeNVVMBuilder.reportMismatchedSerializedDiagnosticWriteSize = false;
+
+        gFakeNVVMBuilder.verificationStatus = SLANG_NVVM_VERIFICATION_INVALID;
+        gFakeNVVMBuilder.verificationDiagnostic = "fake stable diagnostic";
+        gFakeNVVMBuilder.reportMismatchedVerificationDiagnosticWriteSize = true;
+        diagnostics = "stale diagnostics";
+        SLANG_CHECK(
+            builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                bitcode,
+                diagnostics) == SLANG_FAIL);
+        SLANG_CHECK(bitcode == nullptr);
+        SLANG_CHECK(diagnostics.getLength() == 0);
+        gFakeNVVMBuilder.reportMismatchedVerificationDiagnosticWriteSize = false;
+
+        gFakeNVVMBuilder.reportMismatchedVerificationStatus = true;
+        diagnostics = "stale diagnostics";
+        SLANG_CHECK(
+            builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+                bitcode,
+                diagnostics) == SLANG_FAIL);
+        SLANG_CHECK(bitcode == nullptr);
+        SLANG_CHECK(diagnostics.getLength() == 0);
+        gFakeNVVMBuilder.reportMismatchedVerificationStatus = false;
+
+        SLANG_CHECK(gFakeNVVMBuilder.serializeWithDiagnosticsQueryCallCount > 0);
+        SLANG_CHECK(gFakeNVVMBuilder.serializeWithDiagnosticsWriteCallCount > 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -1504,6 +2048,120 @@ SLANG_UNIT_TEST(nvvmIRBuilderSerializesEmptyKernel)
     for (size_t i = 0; i < bitcodeBlob->getBufferSize(); ++i)
         hasEmbeddedNull = hasEmbeddedNull || bitcodeBytes[i] == 0;
     SLANG_CHECK(hasEmbeddedNull);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderRealProviderPreservesShortBuffers)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsSerializationDiagnostics());
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("real-short-buffer"), scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _populateEmptyNVVMKernel(builder, scope.module, toSlice("realShortBufferKernel"))));
+
+    size_t requiredLegacySize = 0;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getAPI().serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+        nullptr,
+        0,
+        &requiredLegacySize)));
+    uint8_t legacySentinels[8];
+    ::memset(legacySentinels, 0xa5, sizeof(legacySentinels));
+    size_t reportedLegacySize = 0;
+    SLANG_CHECK(requiredLegacySize > sizeof(legacySentinels));
+    SLANG_CHECK(
+        builder.getAPI().serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+            legacySentinels,
+            sizeof(legacySentinels),
+            &reportedLegacySize) == SLANG_E_BUFFER_TOO_SMALL);
+    SLANG_CHECK(reportedLegacySize == requiredLegacySize);
+    for (const auto value : legacySentinels)
+        SLANG_CHECK(value == 0xa5);
+
+    const SlangNVVMBuilderAPI_V2* v2API = builder.getAPIV2();
+    SLANG_CHECK_ABORT(v2API != nullptr);
+    SLANG_CHECK_ABORT(v2API->serializeModuleWithDiagnostics != nullptr);
+
+    size_t requiredSerializedSize = 0;
+    size_t requiredDiagnosticSize = 0;
+    SlangNVVMVerificationStatus_2 verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(v2API->serializeModuleWithDiagnostics(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+        nullptr,
+        0,
+        &requiredSerializedSize,
+        nullptr,
+        0,
+        &requiredDiagnosticSize,
+        &verificationStatus)));
+    SLANG_CHECK(requiredSerializedSize == requiredLegacySize);
+    SLANG_CHECK(requiredDiagnosticSize == 0);
+    SLANG_CHECK(verificationStatus == SLANG_NVVM_VERIFICATION_VALID);
+
+    // A query has both destinations null. Supplying even an otherwise-unneeded diagnostic
+    // destination makes this a write, so omitting the non-empty serialized destination must fail
+    // without touching the diagnostic sentinel.
+    uint8_t mixedDiagnosticSentinel = 0x3c;
+    size_t mixedSerializedSize = 0;
+    size_t mixedDiagnosticSize = 1;
+    verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    SLANG_CHECK(
+        v2API->serializeModuleWithDiagnostics(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+            nullptr,
+            0,
+            &mixedSerializedSize,
+            &mixedDiagnosticSentinel,
+            1,
+            &mixedDiagnosticSize,
+            &verificationStatus) == SLANG_E_BUFFER_TOO_SMALL);
+    SLANG_CHECK(mixedSerializedSize == requiredSerializedSize);
+    SLANG_CHECK(mixedDiagnosticSize == requiredDiagnosticSize);
+    SLANG_CHECK(verificationStatus == SLANG_NVVM_VERIFICATION_VALID);
+    SLANG_CHECK(mixedDiagnosticSentinel == 0x3c);
+
+    uint8_t serializedSentinels[8];
+    ::memset(serializedSentinels, 0x5a, sizeof(serializedSentinels));
+    size_t reportedSerializedSize = 0;
+    size_t reportedDiagnosticSize = 1;
+    verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    SLANG_CHECK(requiredSerializedSize > sizeof(serializedSentinels));
+    SLANG_CHECK(
+        v2API->serializeModuleWithDiagnostics(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+            serializedSentinels,
+            sizeof(serializedSentinels),
+            &reportedSerializedSize,
+            nullptr,
+            0,
+            &reportedDiagnosticSize,
+            &verificationStatus) == SLANG_E_BUFFER_TOO_SMALL);
+    SLANG_CHECK(reportedSerializedSize == requiredSerializedSize);
+    SLANG_CHECK(reportedDiagnosticSize == requiredDiagnosticSize);
+    SLANG_CHECK(verificationStatus == SLANG_NVVM_VERIFICATION_VALID);
+    for (const auto value : serializedSentinels)
+        SLANG_CHECK(value == 0x5a);
+
+    ComPtr<ISlangBlob> bitcode;
+    String diagnostics = "stale diagnostics";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+        bitcode,
+        diagnostics)));
+    SLANG_CHECK_ABORT(bitcode != nullptr);
+    SLANG_CHECK(bitcode->getBufferSize() == requiredSerializedSize);
+    SLANG_CHECK(diagnostics.getLength() == 0);
 }
 
 // Exercise the module boundary's rejected input shapes with handles produced by the real LLVM 14
@@ -1584,6 +2242,79 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidOperations)
     SLANG_CHECK(
         builder.markFunctionAsKernel(secondModule.module, firstFunction) == SLANG_E_INVALID_ARG);
 
+    const SlangNVVMSerializationFormat_1 unknownFormat =
+        SlangNVVMSerializationFormat_1(SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE + 1);
+    size_t legacyUnknownFormatSize = 1;
+    SLANG_CHECK(
+        builder.getAPI().serializeModule(
+            firstModule.module,
+            unknownFormat,
+            nullptr,
+            0,
+            &legacyUnknownFormatSize) == SLANG_FAIL);
+    SLANG_CHECK(legacyUnknownFormatSize == 1);
+
+    const SlangNVVMBuilderAPI_V2* v2API = builder.getAPIV2();
+    SLANG_CHECK_ABORT(v2API != nullptr);
+    SLANG_CHECK_ABORT(v2API->serializeModuleWithDiagnostics != nullptr);
+
+    size_t v2UnknownFormatSerializedSize = 1;
+    size_t v2UnknownFormatDiagnosticSize = 1;
+    SlangNVVMVerificationStatus_2 v2UnknownFormatStatus = SLANG_NVVM_VERIFICATION_VALID;
+    SLANG_CHECK(
+        v2API->serializeModuleWithDiagnostics(
+            firstModule.module,
+            unknownFormat,
+            nullptr,
+            0,
+            &v2UnknownFormatSerializedSize,
+            nullptr,
+            0,
+            &v2UnknownFormatDiagnosticSize,
+            &v2UnknownFormatStatus) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(v2UnknownFormatSerializedSize == 0);
+    SLANG_CHECK(v2UnknownFormatDiagnosticSize == 0);
+    SLANG_CHECK(v2UnknownFormatStatus == SLANG_NVVM_VERIFICATION_NOT_RUN);
+
+    size_t invalidSerializedSize = 1;
+    size_t invalidDiagnosticSize = 0;
+    SlangNVVMVerificationStatus_2 invalidStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(v2API->serializeModuleWithDiagnostics(
+        firstModule.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+        nullptr,
+        0,
+        &invalidSerializedSize,
+        nullptr,
+        0,
+        &invalidDiagnosticSize,
+        &invalidStatus)));
+    SLANG_CHECK(invalidSerializedSize == 0);
+    SLANG_CHECK(invalidDiagnosticSize > 0);
+    SLANG_CHECK(invalidStatus == SLANG_NVVM_VERIFICATION_INVALID);
+
+    uint8_t invalidSerializedSentinel = 0xa5;
+    uint8_t invalidDiagnosticSentinel = 0x5a;
+    size_t reportedInvalidSerializedSize = 1;
+    size_t reportedInvalidDiagnosticSize = 0;
+    invalidStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    SLANG_CHECK(
+        v2API->serializeModuleWithDiagnostics(
+            firstModule.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+            &invalidSerializedSentinel,
+            1,
+            &reportedInvalidSerializedSize,
+            &invalidDiagnosticSentinel,
+            1,
+            &reportedInvalidDiagnosticSize,
+            &invalidStatus) == SLANG_E_BUFFER_TOO_SMALL);
+    SLANG_CHECK(reportedInvalidSerializedSize == 0);
+    SLANG_CHECK(reportedInvalidDiagnosticSize == invalidDiagnosticSize);
+    SLANG_CHECK(invalidStatus == SLANG_NVVM_VERIFICATION_INVALID);
+    SLANG_CHECK(invalidSerializedSentinel == 0xa5);
+    SLANG_CHECK(invalidDiagnosticSentinel == 0x5a);
+
     ComPtr<ISlangBlob> invalidBitcode;
     SLANG_CHECK(
         builder.serializeModule(
@@ -1591,6 +2322,17 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidOperations)
             SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
             invalidBitcode) == SLANG_FAIL);
     SLANG_CHECK(invalidBitcode == nullptr);
+
+    String verifierDiagnostics = "stale diagnostics";
+    SLANG_CHECK(
+        builder.serializeModule(
+            firstModule.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+            invalidBitcode,
+            verifierDiagnostics) == SLANG_FAIL);
+    SLANG_CHECK(invalidBitcode == nullptr);
+    SLANG_CHECK(verifierDiagnostics.indexOf("does not have terminator") >= 0);
+    SLANG_CHECK(verifierDiagnostics.indexOf("uniqueKernel") >= 0);
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(firstModule.module, firstBlock)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(firstModule.module)));
@@ -1601,6 +2343,16 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidOperations)
         SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
         invalidBitcode)));
     SLANG_CHECK(invalidBitcode != nullptr);
+
+    invalidBitcode.setNull();
+    verifierDiagnostics = "stale diagnostics";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        firstModule.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+        invalidBitcode,
+        verifierDiagnostics)));
+    SLANG_CHECK(invalidBitcode != nullptr);
+    SLANG_CHECK(verifierDiagnostics.getLength() == 0);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderCompilesEmptyKernel)
@@ -1637,13 +2389,36 @@ SLANG_UNIT_TEST(nvvmIRBuilderCompilesEmptyKernel)
 
 SLANG_UNIT_TEST(nvvmIRBuilderCoexistsWithLLVM21)
 {
-    int llvmMajor = 0;
-    int llvmMinor = 0;
-    const SlangResult llvmResult =
-        unitTestContext->slangGlobalSession->getDownstreamCompilerVersion(
-            SLANG_PASS_THROUGH_LLVM,
-            &llvmMajor,
-            &llvmMinor);
+    StringBuilder childOrderBuilder;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            toSlice(kNVVMCoexistenceChildEnv),
+            childOrderBuilder)) &&
+        childOrderBuilder.getLength())
+    {
+        const String childOrder = childOrderBuilder.produceString();
+        NVVMLLVMLoadOrder order = NVVMLLVMLoadOrder::LLVMFirst;
+        if (childOrder == "llvm-first")
+            order = NVVMLLVMLoadOrder::LLVMFirst;
+        else if (childOrder == "nvvm-first")
+            order = NVVMLLVMLoadOrder::NVVMFirst;
+        else
+        {
+            getTestReporter()->message(
+                TestMessageType::TestFailure,
+                "Unknown NVVM/LLVM coexistence child order.");
+            SLANG_CHECK_ABORT(false);
+        }
+
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_exerciseNVVMLLVMCoexistence(unitTestContext, order)));
+        return;
+    }
+
+    // Establish availability in the parent so dependency absence ignores this test instead of
+    // becoming an apparently successful ignored child. Loading here cannot affect either worker:
+    // each child invocation below executes the probe in its own fully isolated test-server.
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    const SlangResult llvmResult = _queryLLVM21(unitTestContext);
     if (llvmResult == SLANG_E_NOT_FOUND)
     {
         getTestReporter()->message(
@@ -1651,32 +2426,49 @@ SLANG_UNIT_TEST(nvvmIRBuilderCoexistsWithLLVM21)
             "Ignoring LLVM coexistence test because slang-llvm was not found.");
         SLANG_IGNORE_TEST;
     }
-    if (SLANG_FAILED(llvmResult))
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(llvmResult));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(llvmResult));
 
-    NVVMIRBuilder builder;
-    _requireRealNVVMBuilder(unitTestContext, builder);
-    SLANG_CHECK(llvmMajor == 21);
-    SLANG_CHECK(llvmMinor == 1);
-    ComPtr<ISlangBlob> assemblyBlob;
-    ComPtr<ISlangBlob> bitcodeBlob;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_buildEmptyNVVMKernel(
-        builder,
-        toSlice("slangSlice3aCoexistence"),
-        assemblyBlob,
-        bitcodeBlob)));
-    SLANG_CHECK(builder.getAPI().llvmVersionMajor == 14);
-    SLANG_CHECK(bitcodeBlob->getBufferSize() > 4);
+    struct OrderCase
+    {
+        const char* name;
+        const char* environmentValue;
+    };
+    static const OrderCase kOrders[] = {
+        {"LLVM 21 then LLVM 14 NVVM", "llvm-first"},
+        {"LLVM 14 NVVM then LLVM 21", "nvvm-first"},
+    };
 
-    int llvmMajorAfter = 0;
-    int llvmMinorAfter = 0;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(unitTestContext->slangGlobalSession->getDownstreamCompilerVersion(
-            SLANG_PASS_THROUGH_LLVM,
-            &llvmMajorAfter,
-            &llvmMinorAfter)));
-    SLANG_CHECK(llvmMajorAfter == llvmMajor);
-    SLANG_CHECK(llvmMinorAfter == llvmMinor);
+    for (const auto& order : kOrders)
+    {
+        CommandLine commandLine;
+        commandLine.setExecutableLocation(
+            ExecutableLocation(unitTestContext->executableDirectory, "slang-test"));
+        commandLine.addArg("-use-fully-isolated-test-server");
+        commandLine.addArg("-server-count");
+        commandLine.addArg("1");
+        commandLine.addArg("-disable-retries");
+        commandLine.addArg("-skip-api-detection");
+        commandLine.addArg(kNVVMCoexistenceTestName);
+
+        ExecuteResult childResult;
+        childResult.init();
+        SlangResult executeResult = SLANG_FAIL;
+        {
+            SlangUnitTest::ScopedEnvVar childOrder(
+                kNVVMCoexistenceChildEnv,
+                order.environmentValue);
+            executeResult = ProcessUtil::execute(commandLine, childResult);
+        }
+        const bool reportedOnePassingTest =
+            childResult.standardOutput.indexOf("100% of tests passed (1/1)") >= 0;
+        if (SLANG_FAILED(executeResult) || childResult.resultCode != 0 || !reportedOnePassingTest)
+        {
+            _reportCoexistenceChildFailure(order.name, executeResult, childResult);
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeResult));
+        SLANG_CHECK(childResult.resultCode == 0);
+        SLANG_CHECK(reportedOnePassingTest);
+    }
 }
 
 // Exercise the public lazy-discovery path, not just the locator in isolation. This catches a new

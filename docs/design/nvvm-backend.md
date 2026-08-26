@@ -301,9 +301,9 @@ with C++ exceptions, rejects linking the shared LLVM dylib, and requires the sel
 BitWriter, and Support targets to be static libraries. This keeps LLVM 14 and the normal LLVM 21
 `slang-llvm` package out of the same CMake target namespace.
 
-The module exports one symbol, `slang_getNVVMBuilderAPI_V1`. That getter returns a size- and
-version-checked function table from an LLVM-free header that compiles as C and C++. The ABI uses
-fixed-width version/result/classification fields, native-size counts, opaque
+At the Slice 3a boundary the module exports one symbol, `slang_getNVVMBuilderAPI_V1`. That getter
+returns a size- and version-checked function table from an LLVM-free header that compiles as C and
+C++. The ABI uses fixed-width version/result/classification fields, native-size counts, opaque
 module/type/value/block handles, pointer-plus-count strings, and caller-owned serialization
 storage. No LLVM type, C++ object, allocator-owned buffer, or exception crosses the DLL boundary.
 Handles must be live and originate from the module supplied to the call; destroying a module
@@ -325,11 +325,57 @@ in the directory named by `SLANG_NVVM_BUILDER_PATH`; an explicit but broken dire
 not a skip.
 
 The local Windows proof uses upstream tag `llvmorg-14.0.6` at commit
-`f28c006a5895fc0e329fe15fead81e37457cb1d1`. The resulting Release module has only the versioned
-getter in its PE export table and no LLVM DLL dependency. In one test process, the normal LLVM 21.1
-module is loaded first, the LLVM 14 module constructs caller-named empty kernels, CUDA 12.2 libNVVM
-compiles their bitcode to PTX, and CUDA 12.2 `ptxas -arch=sm_75` accepts that PTX. The reverse
-fresh-process load order and non-Windows binary inspection remain later CI/packaging work.
+`f28c006a5895fc0e329fe15fead81e37457cb1d1`. The Slice 3a Release module has only the V1 getter in
+its PE export table and no LLVM DLL dependency. In one test process, the normal LLVM 21.1 module is
+loaded first, the LLVM 14 module constructs caller-named empty kernels, CUDA 12.2 libNVVM compiles
+their bitcode to PTX, and CUDA 12.2 `ptxas -arch=sm_75` accepts that PTX. The reverse fresh-process
+load order was left for Slice 3b; non-Windows binary inspection remains later CI/packaging work.
+
+### Slice 3b diagnostic and ABI evolution boundary
+
+Slice 3b freezes `SlangNVVMBuilderAPI_V1` and its getter byte-for-byte. V2 composes one complete V1
+table with a required `serializeModuleWithDiagnostics` operation. Unlike V1, V2 is append-only and
+size-negotiated: the caller supplies its structure capacity, the provider reports its complete
+structure size, and the caller requires only the prefix through the last field it uses. A larger
+provider table is therefore compatible, while changing an existing field's signature or semantics
+still requires a new ABI version. The Slice 3b minimum-prefix constant remains frozen when fields
+are appended.
+
+The host probes V2 first. It falls back to V1 only when the V2 symbol is absent; finding a V2
+getter and then accepting a malformed table would hide a broken deployment. V1-only providers
+retain the empty-kernel capability, and the host reports that serialization diagnostics are not
+available. A new provider continues to export V1 for older hosts and exports V2 for the diagnostic
+path. These versioned getters remain the complete export allowlist; no LLVM symbol becomes visible
+across the module boundary.
+
+`serializeModuleWithDiagnostics` returns three logically separate outputs from one operation:
+serialized bytes, LLVM verifier bytes, and a fixed-width verification status. Its `SlangResult`
+reports whether argument validation and the caller-owned buffer transport succeeded. The status
+classifies the LLVM work as `NOT_RUN`, `VALID`, or `INVALID`. `NOT_RUN` accompanies a transport
+failure before verification. `VALID` has non-empty serialized output and may include diagnostic
+bytes, allowing a future provider to report verifier warnings without another ABI revision.
+`INVALID` is a successful transport transaction with no serialized output and a non-empty captured
+LLVM verifier diagnostic. If LLVM reports invalidity without emitting text, the provider supplies
+a stable fallback message. The host copies those bytes before mapping the status to a compilation
+failure.
+
+Both byte outputs use one atomic query/write protocol. A query passes null destinations and zero
+capacities and receives exact byte counts. Diagnostic counts exclude a trailing NUL, and arbitrary
+bytes, including embedded NULs, are preserved. Before a write copies either output, the provider
+checks both capacities. An insufficient buffer reports both required sizes and the verification
+status, returns `SLANG_E_BUFFER_TOO_SMALL`, and modifies neither destination. Query and write calls
+run independently, and the host rejects changes in sizes or status between them. Callers provide
+non-overlapping destination ranges and output-metadata storage. No provider-owned pointer,
+allocator, C++ object, or mutable global "last error" crosses the ABI.
+
+The two statically linked LLVM versions are exercised in both orders in fully isolated test-server
+processes. The LLVM-first order queries LLVM 21.1, uses the LLVM 14 NVVM builder, and queries LLVM
+21.1 again. The NVVM-first order uses LLVM 14, loads and queries LLVM 21.1, then uses LLVM 14 again.
+This isolation is necessary because the ordinary test coordinator probes pass-through compilers
+before it dispatches a selected unit test.
+
+Slice 3b does not expand the generated IR. Integer or pointer types, address spaces, parameters,
+constants, memory operations, and scalar reference kernels remain the Slice 4 boundary.
 
 Modern-dialect support is a later route selected from the target architecture and the optional
 `nvvmLLVMVersion` query. It is not a prerequisite for legacy-dialect compute support.
@@ -424,6 +470,9 @@ The program advances through bounded slices:
 11. resources and optimization-quality work; and
 12. advanced capabilities and production-readiness evaluation.
 
+Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
+the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
+
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
 ## Confirmed Local Evidence
@@ -464,12 +513,12 @@ LLVM 14 NVVM builder prototype is the next prerequisite.
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
-shape, the continued NVRTC default, the binary artifact shape, and prototyping a separate LLVM 14
-builder as the next pre-Blackwell implementation direction.
+shape, the continued NVRTC default, the binary artifact shape, the separate pinned LLVM 14 builder,
+and the frozen-V1/append-only-V2 diagnostic ABI described above.
 
 The following remain open until their named slice supplies evidence:
 
-- packaging, ABI versioning, and update policy for the optional LLVM 14 NVVM builder module;
+- packaging and update policy for the optional LLVM 14 NVVM builder module;
 - the CUDA toolkit and GPU CI matrix;
 - the final public spelling and API exposure of the CUDA emission method;
 - whether NVVM IR should become a public compile target;
