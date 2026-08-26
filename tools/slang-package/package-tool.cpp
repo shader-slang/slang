@@ -3,6 +3,7 @@
 #include "package-tool.h"
 
 #include "core/slang-io.h"
+#include "core/slang-process-util.h"
 #include "core/slang-string-util.h"
 #include "package-git.h"
 #include "package-json.h"
@@ -34,6 +35,7 @@ static void _printHelp()
         "  update [--clean] Re-resolve dependencies and update the lock file.\n"
         "  update --from-local [--clean]\n"
         "                   Resolve registered local package manifests into the lock.\n"
+        "  build            Compile each workspace primary to build/<import>.slang-module.\n"
         "  validate         Validate package structure and the locked dependency closure.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
         "  unedit <name>    Return an unchanged checkout to tool ownership.\n"
@@ -598,6 +600,143 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     return SLANG_OK;
 }
 
+/// Return the absolute export roots used to compile workspace modules from source.
+static SlangResult _collectCompilationSearchPaths(
+    const String& projectRoot,
+    const Manifest& manifest,
+    List<String>& outSearchPaths,
+    String& outError)
+{
+    outSearchPaths.clear();
+    for (const auto& exportPath : manifest.exports)
+        outSearchPaths.add(Path::combine(projectRoot, exportPath));
+
+    String lockPath = Path::combine(projectRoot, kLockName);
+    if (!File::exists(lockPath))
+        return SLANG_OK;
+
+    LockFile lock;
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    for (const auto& package : lock.packages)
+    {
+        String packageRoot;
+        SLANG_RETURN_ON_FAIL(getLockedPackageRoot(
+            projectRoot,
+            getWorkspaceDepsDirectory(manifest),
+            package,
+            localPackages,
+            packageRoot,
+            outError));
+        for (const auto& exportPath : package.exports)
+            outSearchPaths.add(Path::combine(packageRoot, exportPath));
+    }
+    return SLANG_OK;
+}
+
+/// Locate an installed tool beside `slang-package`, matching the layout produced by Slang builds
+/// and release packages.
+static SlangResult _findSiblingTool(
+    const char* toolName,
+    String& outExecutablePath,
+    String& outError)
+{
+    StringBuilder fileName;
+    fileName << toolName << Process::getExecutableSuffix();
+    outExecutablePath = Path::combine(
+        Path::getParentDirectory(Path::getExecutablePath()),
+        fileName.produceString());
+    if (!File::exists(outExecutablePath))
+    {
+        outError =
+            String("Cannot find required '") + toolName + "' executable beside slang-package.";
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+/// Execute a sibling Slang tool and preserve its output for an interactive package command.
+static SlangResult _runSiblingTool(
+    const String& executablePath,
+    const List<String>& arguments,
+    String& outError)
+{
+    CommandLine commandLine;
+    commandLine.setExecutableLocation(
+        ExecutableLocation(ExecutableLocation::Type::Path, executablePath));
+    for (const auto& argument : arguments)
+        commandLine.addArg(argument);
+
+    ExecuteResult result;
+    if (SLANG_FAILED(ProcessUtil::execute(commandLine, result)))
+    {
+        outError = String("Cannot execute: ") + commandLine.toString();
+        return SLANG_FAIL;
+    }
+    if (result.standardOutput.getLength())
+        fprintf(stdout, "%s", result.standardOutput.getBuffer());
+    if (result.standardError.getLength())
+        fprintf(stderr, "%s", result.standardError.getBuffer());
+    if (result.resultCode != 0)
+    {
+        outError = result.standardError.trim();
+        if (!outError.getLength())
+            outError = String("Command failed: ") + commandLine.toString();
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+/// Compile each workspace primary to a front-end `.slang-module`, preserving its import-relative
+/// path below the workspace build directory.
+static SlangResult _build(const String& projectRoot, String& outError)
+{
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
+
+    List<PrimaryModule> primaryModules;
+    List<String> warnings;
+    SLANG_RETURN_ON_FAIL(validateProject(projectRoot, outError, &warnings, &primaryModules));
+    for (const auto& warning : warnings)
+        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+
+    List<String> searchPaths;
+    SLANG_RETURN_ON_FAIL(
+        _collectCompilationSearchPaths(projectRoot, manifest, searchPaths, outError));
+    String slangcPath;
+    SLANG_RETURN_ON_FAIL(_findSiblingTool("slangc", slangcPath, outError));
+
+    String buildRoot = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest));
+    for (const auto& module : primaryModules)
+    {
+        String outputPath = Path::combine(buildRoot, module.importPath + ".slang-module");
+        if (!Path::createDirectoryRecursive(Path::getParentDirectory(outputPath)))
+        {
+            outError = String("Cannot create module output directory for: ") + outputPath;
+            return SLANG_FAIL;
+        }
+
+        List<String> arguments;
+        arguments.add(module.sourcePath);
+        for (const auto& searchPath : searchPaths)
+        {
+            arguments.add("-I");
+            arguments.add(searchPath);
+        }
+        arguments.add("-o");
+        arguments.add(outputPath);
+        SLANG_RETURN_ON_FAIL(_runSiblingTool(slangcPath, arguments, outError));
+        if (!File::exists(outputPath))
+        {
+            outError = String("slangc did not produce the expected module: ") + outputPath;
+            return SLANG_FAIL;
+        }
+    }
+    fprintf(stdout, "Built %lld module(s).\n", (long long)primaryModules.getCount());
+    return SLANG_OK;
+}
+
 static SlangResult _registerLocalPackage(
     const String& projectRoot,
     const String& name,
@@ -854,6 +993,8 @@ SlangResult executeInDirectory(
         return _update(projectRoot, true, true, outError);
     if (command == "validate" && argc == 2)
         return _validate(projectRoot, outError);
+    if (command == "build" && argc == 2)
+        return _build(projectRoot, outError);
     if (command == "edit" && argc == 3)
         return _edit(projectRoot, argv[2], outError);
     if (command == "unedit" && argc == 3)

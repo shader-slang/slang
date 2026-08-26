@@ -36,7 +36,7 @@ default run module is `main`: `src/main.slang` must declare `module main;`. `sla
 (not yet implemented) will use that module unless a later option selects another primary.
 
 `tests/` and `docs/` are reserved for package tests and documentation. The initial package tool
-creates these directories but does not run tests or build documentation.
+creates these directories.
 
 How to name those modules, write `import` and `__include`, and keep implementation files from
 colliding across packages is described in
@@ -224,15 +224,13 @@ a portable published resolution.
 Fetched package trees contain source only. Compilation output must be written outside these trees
 because the same source commit can be compiled against different resolved dependency graphs.
 
-`slang package run` is not implemented yet. When it is, it will invoke `slangi` on the workspace
-package's `main` module after dependencies are available on the search path. The default is the
-primary whose import path is `main` (typically `src/main.slang`). A library package that has no
-`main` is not a `run` target.
+`slang package build` validates the materialized package graph and compiles every primary module in
+the workspace package to a front-end `.slang-module` under `workspace.build`, preserving its import
+path. For example, `src/acme/noise.slang` becomes `build/acme/noise.slang-module`.
 
 ## Possible future enhancements
 
 The initial workspace layout deliberately keeps resolver clones in `.slang/cache/` and compile
 inputs in the workspace. Future versions may add a user-global immutable cache with copy-on-edit,
-let compiler sessions consume workspace metadata without `build/search-paths`, build one
-`.slang-module` per primary module, and add `slang package test`, `docs`, `build`, and `run`
-commands. These are not part of the current package-tool contract.
+let compiler sessions consume workspace metadata without `build/search-paths`, and share immutable
+dependency trees between workspaces.

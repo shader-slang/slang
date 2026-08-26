@@ -374,6 +374,39 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(!File::exists(Path::combine(invalidRoot, "slang-package.json")));
 }
 
+SLANG_UNIT_TEST(PackageToolBuild)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(Path::combine(temp.path, "LICENSE"), "Package test license.\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/acme/noise.slang"),
+        "module noise;\n"
+        "__include \"noise/helper\";\n"
+        "public int getNoise() { return helper(); }\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/acme/noise/helper.slang"),
+        "implementing noise;\n"
+        "int helper() { return 1; }\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/main.slang"),
+        "module main;\n"
+        "import acme.noise;\n"
+        "public int getValue() { return getNoise(); }\n")));
+
+    const char* buildArguments[] = {"slang-package", "build"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/acme/noise.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/main.slang-module")));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/acme/noise/helper.slang-module")));
+}
+
 SLANG_UNIT_TEST(PackageToolFetchRequiresLock)
 {
     TemporaryDirectory temp;

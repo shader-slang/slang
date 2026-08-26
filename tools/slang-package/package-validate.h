@@ -11,14 +11,22 @@ namespace Slang
 namespace PackageTool
 {
 
+struct PrimaryModule
+{
+    String importPath;
+    String sourcePath;
+};
+
 /// Return the placeholder text written by `slang package init`.
 const char* getLicensePlaceholderText();
 
-/// Validate the workspace package and its materialized, locked dependency closure.
+/// Validate the workspace package and its materialized, locked dependency closure. When requested,
+/// return the workspace package's primary modules in import-path order.
 SlangResult validateProject(
     const String& projectRoot,
     String& outError,
-    List<String>* outWarnings = nullptr);
+    List<String>* outWarnings = nullptr,
+    List<PrimaryModule>* outPrimaryModules = nullptr);
 
 } // namespace PackageTool
 } // namespace Slang

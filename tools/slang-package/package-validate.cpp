@@ -226,6 +226,7 @@ static SlangResult _readModuleHeader(
 struct ModuleLocation
 {
     String canonicalImport;
+    String importPath;
     String packageName;
     String path;
 };
@@ -277,6 +278,7 @@ static SlangResult _addModule(
     }
     ModuleLocation location;
     location.canonicalImport = canonicalImport;
+    location.importPath = normalizedImport;
     location.packageName = packageName;
     location.path = fullPath;
     ioModules.add(location);
@@ -467,7 +469,11 @@ static SlangResult _readMaterializedManifest(
     return validateLockedPackageManifest(package, outManifest, outError);
 }
 
-SlangResult validateProject(const String& projectRoot, String& outError, List<String>* outWarnings)
+SlangResult validateProject(
+    const String& projectRoot,
+    String& outError,
+    List<String>* outWarnings,
+    List<PrimaryModule>* outPrimaryModules)
 {
     Manifest rootManifest;
     SLANG_RETURN_ON_FAIL(
@@ -475,6 +481,19 @@ SlangResult validateProject(const String& projectRoot, String& outError, List<St
 
     List<ModuleLocation> modules;
     SLANG_RETURN_ON_FAIL(_validatePackageTree(projectRoot, rootManifest, modules, outError));
+    if (outPrimaryModules)
+    {
+        outPrimaryModules->clear();
+        for (const auto& module : modules)
+        {
+            PrimaryModule primary;
+            primary.importPath = module.importPath;
+            primary.sourcePath = module.path;
+            outPrimaryModules->add(primary);
+        }
+        outPrimaryModules->sort([](const PrimaryModule& left, const PrimaryModule& right)
+                                { return left.importPath < right.importPath; });
+    }
 
     String lockPath = Path::combine(projectRoot, kLockName);
     List<LocalPackage> localPackages;
