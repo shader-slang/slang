@@ -636,7 +636,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 sb << "_wgsl";
             sb << ", texture_sm_4_1)]\n";
 
-            // Plain CUDA kernels cannot query the mip count, but OptiX can.
+            // Every mip-level overload also returns the mip count, which plain CUDA cannot
+            // currently query but OptiX can.
             if (cuda.getLength() && includeMipInfo)
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 

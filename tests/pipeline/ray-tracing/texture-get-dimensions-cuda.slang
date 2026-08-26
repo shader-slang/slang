@@ -1,9 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry raygenMain -stage raygeneration
 //TEST(optix):COMPARE_COMPUTE_EX:-cuda -rt -output-using-type -compute-dispatch 6,1,1
 
-//CHECK: txq.level.width.b32
-//CHECK: txq.level.height.b32
-//CHECK: txq.level.depth.b32
+//CHECK: txq.level.width.b32 %0, [%1], %2;
+//CHECK-SAME: "r"((1U))
+//CHECK: txq.level.height.b32 %1, [%2], %3;
+//CHECK: txq.level.depth.b32 %2, [%3], %4;
 //CHECK: txq.num_mipmap_levels.b32
 
 //TEST_INPUT: Texture1D(size=4, content=one, mipMaps=2):name texture1D

@@ -87,9 +87,9 @@ Means can use matrix types containing integer types.
 ## tex.GetDimensions
 
 tex.GetDimensions is the GetDimensions method on 'texture' objects. CUDA supports querying texture
-width, height, and depth. Overloads taking a mip level, including their mip-level-count output, are
-only available in OptiX ray-tracing stages. Array-size and sample-count output parameters are
-currently written as zero. GetDimensions works on Buffer resource types on CUDA.
+width, height, and depth. Overloads taking a mip level are only available in OptiX ray-tracing
+stages, where they also return the mip-level count. Array-size and sample-count output parameters
+are currently written as zero. GetDimensions works on Buffer resource types on CUDA.
 
 <a id="sm6-wave"></a>
 
