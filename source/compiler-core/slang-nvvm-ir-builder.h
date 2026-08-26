@@ -41,6 +41,8 @@ public:
     }
     /// Returns whether the provider advertised the complete Slice 4 scalar-memory prefix.
     bool supportsScalarOperations() const;
+    /// Returns whether the provider advertised the complete Slice 7 scalar-control-flow prefix.
+    bool supportsScalarControlFlow() const;
     /// Returns the provider identity that affects generated bitcode and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -119,6 +121,32 @@ public:
         SlangNVVMValueHandle_1 value,
         SlangNVVMValueHandle_1 pointer,
         uint32_t alignment) const;
+
+    /// Emits ADD or SUB for same-typed scalar integer values.
+    SlangResult emitIntegerBinary(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMIntegerBinaryOp_2 operation,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits a signed integer less-than comparison and returns its i1 result.
+    SlangResult emitIntegerSignedLessThan(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Terminates the current insertion block with an unconditional branch.
+    SlangResult emitBranch(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 targetBlock)
+        const;
+
+    /// Terminates the current insertion block with an i1 conditional branch.
+    SlangResult emitConditionalBranch(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 condition,
+        SlangNVVMBlockHandle_1 trueBlock,
+        SlangNVVMBlockHandle_1 falseBlock) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;

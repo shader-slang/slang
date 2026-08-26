@@ -61,6 +61,10 @@ extern "C"
 #define SLANG_NVVM_ADDRESS_SPACE_CONSTANT ((SlangNVVMAddressSpace_2)4u)
 #define SLANG_NVVM_ADDRESS_SPACE_LOCAL ((SlangNVVMAddressSpace_2)5u)
 
+    typedef uint32_t SlangNVVMIntegerBinaryOp_2;
+#define SLANG_NVVM_INTEGER_BINARY_OP_ADD ((SlangNVVMIntegerBinaryOp_2)0u)
+#define SLANG_NVVM_INTEGER_BINARY_OP_SUB ((SlangNVVMIntegerBinaryOp_2)1u)
+
     /**
      * Version 1 of the private ABI between Slang and its optional LLVM-backed NVVM IR module.
      *
@@ -197,6 +201,40 @@ extern "C"
         SlangNVVMValueHandle_1 pointer,
         uint32_t alignment);
 
+    /// Emits ADD or SUB for same-module scalar integer operands of identical type.
+    /// The module must own the current unterminated insertion block.
+    /// On failure, the output value is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerBinary_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMIntegerBinaryOp_2 operation,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
+    /// Emits a signed less-than comparison for same-module scalar integer operands of identical
+    /// type. The result is i1, the module must own the current unterminated insertion block, and
+    /// failure leaves the output value null without inserting an instruction.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerSignedLessThan_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
+    /// Terminates the current unterminated insertion block with an unconditional branch.
+    /// The target must belong to the current function. Failure inserts no instruction.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitBranch_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMBlockHandle_1 targetBlock);
+
+    /// Terminates the current unterminated insertion block with a conditional branch.
+    /// The condition must be a same-module i1 value and both targets must belong to the current
+    /// function. Failure inserts no instruction.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitConditionalBranch_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 condition,
+        SlangNVVMBlockHandle_1 trueBlock,
+        SlangNVVMBlockHandle_1 falseBlock);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -218,6 +256,11 @@ extern "C"
         SlangNVVMGetFunctionParameter_2 getFunctionParameter;
         SlangNVVMEmitLoad_2 emitLoad;
         SlangNVVMEmitStore_2 emitStore;
+
+        SlangNVVMEmitIntegerBinary_2 emitIntegerBinary;
+        SlangNVVMEmitIntegerSignedLessThan_2 emitIntegerSignedLessThan;
+        SlangNVVMEmitBranch_2 emitBranch;
+        SlangNVVMEmitConditionalBranch_2 emitConditionalBranch;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -228,6 +271,11 @@ extern "C"
     // This Slice 4 prefix is one coherent scalar-memory capability.
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitStore) + sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitStore))
+
+    // This Slice 7 prefix is one coherent scalar-control-flow capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitConditionalBranch) + \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitConditionalBranch))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

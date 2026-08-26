@@ -8,6 +8,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
@@ -105,14 +106,74 @@ static llvm::PointerType* _getLoadablePointerType(ModuleState* state, llvm::Valu
     return llvm::PointerType::isLoadableOrStorableType(pointeeType) ? pointerType : nullptr;
 }
 
-static bool _hasValidInsertionBlock(ModuleState* state)
+static llvm::BasicBlock* _getValidInsertionBlock(ModuleState* state)
 {
     if (!state)
-        return false;
+        return nullptr;
 
     llvm::BasicBlock* block = state->builder.GetInsertBlock();
-    return block && !block->getTerminator() && block->getParent() &&
-           block->getParent()->getParent() == state->module.get();
+    if (!block || block->getTerminator() || !block->getParent() ||
+        block->getParent()->getParent() != state->module.get())
+    {
+        return nullptr;
+    }
+    return block;
+}
+
+// Checks whether LLVM permits using a value at the builder's current insertion point.
+static bool _isValueUsableAtInsertionPoint(
+    ModuleState* state,
+    llvm::BasicBlock* insertionBlock,
+    llvm::Value* value)
+{
+    if (!state || !insertionBlock || !value || &value->getContext() != &state->context)
+        return false;
+
+    llvm::Function* function = insertionBlock->getParent();
+    if (!function || function->getParent() != state->module.get())
+        return false;
+
+    // Each ModuleState has its own LLVMContext. A context-owned constant is therefore usable by
+    // this module, while a GlobalValue must additionally still be attached to this exact module.
+    if (llvm::GlobalValue* globalValue = llvm::dyn_cast<llvm::GlobalValue>(value))
+        return globalValue->getParent() == state->module.get();
+    if (llvm::BlockAddress* blockAddress = llvm::dyn_cast<llvm::BlockAddress>(value))
+        return blockAddress->getFunction()->getParent() == state->module.get();
+    if (llvm::isa<llvm::Constant>(value))
+        return true;
+
+    if (llvm::Argument* argument = llvm::dyn_cast<llvm::Argument>(value))
+        return argument->getParent() == function;
+
+    llvm::Instruction* instruction = llvm::dyn_cast<llvm::Instruction>(value);
+    if (!instruction || instruction->getFunction() != function)
+        return false;
+
+    if (instruction->getParent() == insertionBlock)
+    {
+        const llvm::BasicBlock::iterator insertionPoint = state->builder.GetInsertPoint();
+        return insertionPoint == insertionBlock->end() ||
+               instruction->comesBefore(&*insertionPoint);
+    }
+
+    llvm::DominatorTree dominatorTree(*function);
+    return dominatorTree.dominates(instruction, insertionBlock);
+}
+
+// Validates the common ownership and type contract before integer instruction creation.
+static bool _areMatchingIntegerValues(
+    ModuleState* state,
+    llvm::BasicBlock* insertionBlock,
+    llvm::Value* left,
+    llvm::Value* right)
+{
+    if (!_isValueUsableAtInsertionPoint(state, insertionBlock, left) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, right) ||
+        left->getType() != right->getType())
+    {
+        return false;
+    }
+    return llvm::isa<llvm::IntegerType>(left->getType());
 }
 
 static bool _isValidAlignment(uint32_t alignment)
@@ -320,8 +381,10 @@ static SlangResult SLANG_NVVM_CALL _emitLoad(
     ModuleState* state = _getModule(module);
     llvm::Value* llvmPointer = _getValue(pointer);
     llvm::PointerType* pointerType = _getLoadablePointerType(state, llvmPointer);
-    if (!pointerType || !_hasValidInsertionBlock(state) || !_isValidAlignment(alignment) ||
-        !outValue)
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!pointerType || !insertionBlock ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer) ||
+        !_isValidAlignment(alignment) || !outValue)
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -343,15 +406,110 @@ static SlangResult SLANG_NVVM_CALL _emitStore(
     llvm::Value* llvmValue = _getValue(value);
     llvm::Value* llvmPointer = _getValue(pointer);
     llvm::PointerType* pointerType = _getLoadablePointerType(state, llvmPointer);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     if (!pointerType || !llvmValue || &llvmValue->getContext() != &state->context ||
         llvmValue->getType() != pointerType->getNonOpaquePointerElementType() ||
-        pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_CONSTANT ||
-        !_hasValidInsertionBlock(state) || !_isValidAlignment(alignment))
+        pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_CONSTANT || !insertionBlock ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer) ||
+        !_isValidAlignment(alignment))
     {
         return SLANG_E_INVALID_ARG;
     }
 
     state->builder.CreateAlignedStore(llvmValue, llvmPointer, llvm::Align(alignment));
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitIntegerBinary(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntegerBinaryOp_2 operation,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmLeft = _getValue(left);
+    llvm::Value* llvmRight = _getValue(right);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    const bool isSupportedOperation = operation == SLANG_NVVM_INTEGER_BINARY_OP_ADD ||
+                                      operation == SLANG_NVVM_INTEGER_BINARY_OP_SUB;
+    if (!outValue || !isSupportedOperation || !insertionBlock ||
+        !_areMatchingIntegerValues(state, insertionBlock, llvmLeft, llvmRight))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* result = operation == SLANG_NVVM_INTEGER_BINARY_OP_ADD
+                              ? state->builder.CreateAdd(llvmLeft, llvmRight)
+                              : state->builder.CreateSub(llvmLeft, llvmRight);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitIntegerSignedLessThan(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmLeft = _getValue(left);
+    llvm::Value* llvmRight = _getValue(right);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!outValue || !insertionBlock ||
+        !_areMatchingIntegerValues(state, insertionBlock, llvmLeft, llvmRight))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* result = state->builder.CreateICmpSLT(llvmLeft, llvmRight);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL
+_emitBranch(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 targetBlock)
+{
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::BasicBlock* llvmTargetBlock = _getBlock(targetBlock);
+    if (!insertionBlock || !llvmTargetBlock ||
+        llvmTargetBlock->getParent() != insertionBlock->getParent())
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    state->builder.CreateBr(llvmTargetBlock);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitConditionalBranch(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 condition,
+    SlangNVVMBlockHandle_1 trueBlock,
+    SlangNVVMBlockHandle_1 falseBlock)
+{
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmCondition = _getValue(condition);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::BasicBlock* llvmTrueBlock = _getBlock(trueBlock);
+    llvm::BasicBlock* llvmFalseBlock = _getBlock(falseBlock);
+    if (!insertionBlock || !llvmCondition || !llvmCondition->getType()->isIntegerTy(1) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmCondition) || !llvmTrueBlock ||
+        !llvmFalseBlock || llvmTrueBlock->getParent() != insertionBlock->getParent() ||
+        llvmFalseBlock->getParent() != insertionBlock->getParent())
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    state->builder.CreateCondBr(llvmCondition, llvmTrueBlock, llvmFalseBlock);
     return SLANG_OK;
 }
 
@@ -600,6 +758,10 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.getFunctionParameter = _getFunctionParameter;
     api.emitLoad = _emitLoad;
     api.emitStore = _emitStore;
+    api.emitIntegerBinary = _emitIntegerBinary;
+    api.emitIntegerSignedLessThan = _emitIntegerSignedLessThan;
+    api.emitBranch = _emitBranch;
+    api.emitConditionalBranch = _emitConditionalBranch;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

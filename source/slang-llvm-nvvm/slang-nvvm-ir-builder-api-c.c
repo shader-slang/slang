@@ -11,3 +11,12 @@ typedef char SlangNVVMBuilderAPIV2ScalarMinimumSizeCCompileProbe
     [(SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE <= sizeof(SlangNVVMBuilderAPI_V2)) ? 1 : -1];
 typedef char SlangNVVMBuilderAPIV2CapabilityOrderCCompileProbe
     [(SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE > SLANG_NVVM_BUILDER_API_V2_MIN_SIZE) ? 1 : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarControlFlowMinimumSizeCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE <= sizeof(SlangNVVMBuilderAPI_V2))
+         ? 1
+         : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarControlFlowCapabilityOrderCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE >
+      SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE)
+         ? 1
+         : -1];

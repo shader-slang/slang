@@ -989,6 +989,7 @@ Result linkAndOptimizeIR(
     auto target = codeGenContext->getTargetFormat();
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetProgram = codeGenContext->getTargetProgram();
+    const bool emitNVVMDirectly = targetProgram->shouldEmitNVVMDirectly();
     auto targetCompilerOptions = targetRequest->getOptionSet();
 
     // Get the artifact desc for the target
@@ -1248,6 +1249,10 @@ Result linkAndOptimizeIR(
     // TODO: We should skip this step for CUDA targets.
     // (NM): we actually do need to do this step for OptiX based CUDA targets
     //
+    // The direct NVVM emitter consumes the CUDA kernel signature itself. Collecting uniform
+    // parameters would replace that signature with a synthetic parameter block intended for
+    // shader-style emitters.
+    if (!emitNVVMDirectly)
     {
         CollectEntryPointUniformParamsOptions passOptions;
         passOptions.targetReq = targetRequest;
@@ -1282,8 +1287,11 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     default:
-        SLANG_PASS(moveEntryPointUniformParamsToGlobalScope);
-        validateIRModuleIfEnabled(codeGenContext, irModule);
+        if (!emitNVVMDirectly)
+        {
+            SLANG_PASS(moveEntryPointUniformParamsToGlobalScope);
+            validateIRModuleIfEnabled(codeGenContext, irModule);
+        }
         break;
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
@@ -1308,7 +1316,19 @@ Result linkAndOptimizeIR(
         break;
 
     default:
+        // Remove the transient export pins from every CUDA/Torch function so DCE can still discard
+        // unselected kernels. The direct NVVM emitter consumes only the exact linked entry-point
+        // definitions, so restore a keep-alive pin for those selections before DCE runs.
         SLANG_PASS(removeTorchAndCUDAEntryPoints);
+        if (emitNVVMDirectly)
+        {
+            IRBuilder builder(irModule);
+            for (auto entryPoint : irEntryPoints)
+            {
+                if (!entryPoint->findDecoration<IRKeepAliveDecoration>())
+                    builder.addKeepAliveDecoration(entryPoint);
+            }
+        }
         break;
     }
 
@@ -2515,9 +2535,10 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeFuncsForBufferLoadArgs, codeGenContext);
     }
 
-    // If we are generating code for CUDA, we should translate all immutable buffer loads to
-    // using `__ldg` intrinsic for improved performance.
-    if (isCUDATarget(targetRequest))
+    // CUDA source represents immutable buffer loads with the `__ldg` intrinsic. Direct NVVM
+    // emission keeps the ordinary load so that the LLVM builder can apply the read-only
+    // semantics without introducing a CUDA C++ intrinsic.
+    if (isCUDATarget(targetRequest) && !emitNVVMDirectly)
     {
         SLANG_PASS(lowerImmutableBufferLoadForCUDA, targetProgram);
     }
@@ -2549,12 +2570,10 @@ Result linkAndOptimizeIR(
     //
     SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
 
-    // As a late step, we need to take the SSA-form IR and move things *out*
-    // of SSA form, by eliminating all "phi nodes" (block parameters) and
-    // introducing explicit temporaries instead. Doing this at the IR level
-    // means that subsequent emit logic doesn't need to contend with the
-    // complexities of blocks with parameters.
+    // Source emitters need explicit temporaries, while the direct NVVM emitter consumes the
+    // canonical SSA control-flow graph and rejects unsupported block parameters itself.
     //
+    if (!emitNVVMDirectly)
     {
         // Get the liveness mode.
         const LivenessMode livenessMode =
@@ -2625,7 +2644,8 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
-    SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
+    if (!emitNVVMDirectly)
+        SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
 
     // Metal rejects pointer-to-pointer types in buffer pointee types (e.g.
     // `device int* device*` as a struct field in a [[buffer(N)]] binding).
@@ -2700,7 +2720,9 @@ Result linkAndOptimizeIR(
     //
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    if ((target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly))
+    // The direct NVVM builder consumes SSA values and does not need C-like lexical variable scopes.
+    if (!emitNVVMDirectly && (target != CodeGenTarget::SPIRV) &&
+        (target != CodeGenTarget::SPIRVAssembly))
     {
         // We need to perform a final pass to ensure that all the
         // variables in the IR module have their scopes set correctly.
@@ -3581,23 +3603,34 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
 
     // Consider this example:
     //
-    //     [numthreads(1, 1, 1)]
-    //     void computeMain() {}
+    //     [CUDAKernel]
+    //     void writeScalar(
+    //         uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    //         uniform int value)
+    //     {
+    //         *destination = value;
+    //     }
     //
     // The direct backend must consume the same linked, target-specialized Slang IR that other
     // direct emitters receive. A CUDA-source subcontext would instead apply C++ representation
-    // choices before we can establish an NVVM ABI. This slice therefore keeps resources and
-    // existentials in their canonical linked form and accepts only the exact empty-compute shape.
+    // choices before we can establish an NVVM ABI. Validate and classify that canonical IR before
+    // discovering the optional builder so unsupported shapes fail independently of host setup.
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
     SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(this, linkingAndOptimizationOptions, linkedIR));
-    SLANG_RETURN_ON_FAIL(validateNVVMMinimalComputeIR(this, linkedIR));
+    NVVMIRCapability requiredCapability;
+    SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requiredCapability));
 
     NVVMIRBuilder* builder = nullptr;
     String explicitBuilderPath;
     SlangResult loadResult = getSession()->getOrLoadNVVMIRBuilder(builder, &explicitBuilderPath);
-    if (SLANG_FAILED(loadResult) || !builder || !builder->supportsSerializationDiagnostics())
+    bool supportsRequiredCapability = builder && builder->supportsSerializationDiagnostics();
+    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarMemory)
+        supportsRequiredCapability = builder->supportsScalarOperations();
+    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarControlFlow)
+        supportsRequiredCapability = builder->supportsScalarControlFlow();
+    if (SLANG_FAILED(loadResult) || !supportsRequiredCapability)
     {
         StringBuilder location;
         if (explicitBuilderPath.getLength())

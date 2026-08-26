@@ -37,6 +37,14 @@ static bool _supportsScalarOperations(const SlangNVVMBuilderAPI_V2& api)
            api.getPointerType && api.getFunctionParameter && api.emitLoad && api.emitStore;
 }
 
+// Treats the appended Slice 7 fields as one coherent scalar-control-flow capability.
+static bool _supportsScalarControlFlow(const SlangNVVMBuilderAPI_V2& api)
+{
+    return api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE &&
+           api.emitIntegerBinary && api.emitIntegerSignedLessThan && api.emitBranch &&
+           api.emitConditionalBranch;
+}
+
 // Rejects success without a required handle and never exposes a handle from a failed provider call.
 template<typename T>
 static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
@@ -116,11 +124,16 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     const bool hasPartialScalarPrefix =
         api.structureSize > SLANG_NVVM_BUILDER_API_V2_MIN_SIZE &&
         api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE;
+    const bool hasPartialScalarControlFlowPrefix =
+        api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
+        api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE;
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE || hasPartialScalarPrefix ||
-        api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
-        !api.serializeModuleWithDiagnostics ||
+        hasPartialScalarControlFlowPrefix || api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 ||
+        !_isCompatibleV1(api.baseAPI) || !api.serializeModuleWithDiagnostics ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
-         !_supportsScalarOperations(api)))
+         !_supportsScalarOperations(api)) ||
+        (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE &&
+         !_supportsScalarControlFlow(api)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -145,6 +158,11 @@ bool NVVMIRBuilder::supportsScalarOperations() const
     return _supportsScalarOperations(m_apiV2);
 }
 
+bool NVVMIRBuilder::supportsScalarControlFlow() const
+{
+    return _supportsScalarControlFlow(m_apiV2);
+}
+
 String NVVMIRBuilder::getVersionString() const
 {
     if (!isInitialized())
@@ -159,7 +177,8 @@ String NVVMIRBuilder::getVersionString() const
             << ";llvm=" << m_api.llvmVersionMajor << "." << m_api.llvmVersionMinor << "."
             << m_api.llvmVersionPatch << ";nvvm-ir=" << m_api.nvvmIRVersionMajor << "."
             << m_api.nvvmIRVersionMinor << ";pointer-model=" << uint32_t(m_api.pointerModel)
-            << ";scalar-operations=" << (supportsScalarOperations() ? 1 : 0) << ";timestamp="
+            << ";scalar-operations=" << (supportsScalarOperations() ? 1 : 0)
+            << ";scalar-control-flow=" << (supportsScalarControlFlow() ? 1 : 0) << ";timestamp="
             << SharedLibraryUtils::getSharedLibraryTimestamp(
                    reinterpret_cast<void*>(m_api.createModule));
     return builder.produceString();
@@ -318,6 +337,63 @@ SlangResult NVVMIRBuilder::emitStore(
     if (!supportsScalarOperations())
         return SLANG_E_NOT_AVAILABLE;
     return m_apiV2.emitStore(module, value, pointer, alignment);
+}
+
+SlangResult NVVMIRBuilder::emitIntegerBinary(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntegerBinaryOp_2 operation,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarControlFlow())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV2.emitIntegerBinary(module, operation, left, right, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitIntegerSignedLessThan(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarControlFlow())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV2.emitIntegerSignedLessThan(module, left, right, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitBranch(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMBlockHandle_1 targetBlock) const
+{
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarControlFlow())
+        return SLANG_E_NOT_AVAILABLE;
+    return m_apiV2.emitBranch(module, targetBlock);
+}
+
+SlangResult NVVMIRBuilder::emitConditionalBranch(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 condition,
+    SlangNVVMBlockHandle_1 trueBlock,
+    SlangNVVMBlockHandle_1 falseBlock) const
+{
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarControlFlow())
+        return SLANG_E_NOT_AVAILABLE;
+    return m_apiV2.emitConditionalBranch(module, condition, trueBlock, falseBlock);
 }
 
 SlangResult NVVMIRBuilder::emitReturnVoid(SlangNVVMModuleHandle_1 module) const

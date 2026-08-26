@@ -509,8 +509,79 @@ checked, so the provider-independent unsupported-IR guarantee is specifically th
 module or libNVVM program is created, not that no library-load attempt occurs.
 
 This slice deliberately excludes parameters, values, memory operations, calls, branches, loops,
-builtins, resources, multiple entry points, and every non-compute stage. Those boundaries begin in
-Slice 7.
+builtins, resources, multiple entry points, and every non-compute stage. Slice 7 extends that
+boundary with a deliberately small raw CUDA scalar ABI and acyclic control flow.
+
+### Slice 7 raw CUDA scalar ABI and control-flow boundary
+
+Consider these two raw CUDA kernels:
+
+```slang
+[CUDAKernel]
+void writeScalar(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int value)
+{
+    *destination = value;
+}
+
+[CUDAKernel]
+void chooseScalar(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int x,
+    uniform int y)
+{
+    if (x < y)
+        *destination = x + y;
+    else
+        *destination = x - y;
+}
+```
+
+Slice 7 preserves the raw parameter order and accepts only signed `int` plus
+`Ptr<int, Access::Read, AddressSpace::Device>` or
+`Ptr<int, Access::ReadWrite, AddressSpace::Device>`. An `int` becomes an LLVM `i32`; both pointer
+spellings become `i32 addrspace(1)*`, while the access qualifier remains a Slang-side legality
+rule that rejects stores through the read-only spelling. Loads and stores are aligned to four
+bytes. This is the ABI of an explicitly decorated `[CUDAKernel]`, not a general shader-entry ABI.
+The Slice 6 zero-parameter `[shader("compute")]` case remains valid, but a conventional
+parameterized compute entry is rejected rather than silently assigned the raw CUDA ABI.
+
+The executable subset is `load`, `store`, signed `i32` `add` and `sub`, signed `i32` less-than,
+`ifElse`, zero-argument unconditional branches, and `void` return. The emitter first declares all
+blocks so forward branch targets exist, then emits each block body while maintaining a one-to-one
+map from accepted Slang IR values and blocks to builder handles. The conditional reference kernel
+stores its result in each arm and therefore needs no merge value or phi.
+
+Legality is a complete preflight before builder-module or libNVVM-program creation. The selected
+function must be the only selected entry point, have the exact raw parameter types above, and use
+only values defined by accepted parameters or instructions that dominate each consumer. Blocks
+must belong to that function, branch targets must be among those blocks, and every non-entry block
+must have no parameters. The CUDA entry-point pruning pass still runs for the direct route; only
+the exact selected entry point is retained afterward, so an unrelated `[CUDAKernel]` does not
+become a second semantic global. This keeps selection in the linked-IR producer instead of teaching
+the emitter to ignore an accidentally retained kernel.
+
+The LLVM 14 provider repeats the ownership boundary at the ABI edge. Non-constant operands must
+belong to the current module, function-local values must belong to the current function, and an
+instruction must be available at the current insertion point. Branch blocks must also belong to
+that function. Invalid or post-terminator operations are checked before mutation, so a rejected
+call cannot leave partial LLVM IR behind. The host wrappers also clear output handles before and
+after a failed provider call.
+
+The control-flow operations are a second append-only V2 capability block after Slice 4's scalar
+memory block: integer `add`/`sub`, signed less-than, unconditional branch, and conditional branch.
+The original diagnostic and scalar-memory minimum-size constants remain frozen. A provider that
+reports exactly the scalar-memory prefix remains valid and supports the two straight-line memory
+kernels, but does not advertise control flow. A size inside the new block, or a complete size with
+any required operation missing, is malformed. A complete or larger table is accepted, and the
+builder identity records whether the control-flow prefix is present.
+
+Executable constants, basic-block parameters and branch arguments (and therefore SSA phis), loop
+lowerings, calls, complex/aggregate types, address spaces other than device-global pointer
+parameters, builtins, resources, multiple selected entry points, and non-compute stages remain
+outside this boundary. In particular, no general loop form is claimed merely because the builder
+can create a backedge; ordinary loop-carried state requires the still-unsupported phi boundary.
 
 ## CUDA Pass Ownership Audit
 
@@ -596,11 +667,13 @@ The program advances through bounded slices:
 5. CUDA emission-method selection and experimental PTX routing through the registered compiler;
 6. minimal Slang IR compute lowering;
 7. scalar control flow and the kernel ABI;
-8. address spaces, aggregates, and shared memory;
-9. libdevice and floating-point policy;
-10. atomics and wave operations;
-11. resources and optimization-quality work; and
-12. advanced capabilities and production-readiness evaluation.
+8. complete scalar program structure with executable constants, phis, and loops;
+9. direct calls and the non-void helper ABI;
+10. address spaces, aggregates, and shared memory;
+11. libdevice and floating-point policy;
+12. atomics and wave operations;
+13. resources and optimization-quality work; and
+14. advanced capabilities and production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -612,6 +685,12 @@ session-registered compiler. It deliberately leaves the Slang-IR-to-NVVM produce
 Slice 6 completes item 6 for an empty, zero-parameter compute entry point. It establishes canonical
 linked-IR legality, verified builder bitcode, the internal LLVM-kernel artifact, and real
 libNVVM/`ptxas` handoff while leaving the kernel ABI and scalar control flow to Slice 7.
+Slice 7 completes the first raw CUDA scalar parameter ABI and a deliberately phi-free part of item
+7. It adds signed `i32` arithmetic/comparison and acyclic branches while retaining executable
+constants, block parameters/branch arguments, phis, loops, calls, and richer types as the next
+program-structure boundary. Slice 8 completes that scalar program-structure milestone. Direct calls
+and non-void helpers remain a separately demonstrable Slice 9 ABI boundary before address spaces
+beyond the raw device pointer, aggregates, and shared memory begin in Slice 10.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -680,22 +759,44 @@ emitted `computeMain` for `cuda_sm_7_0`, and CUDA 12.9 `ptxas` accepted the resu
 provider-independent file test reached E52017 on the retained barrier `call`. Default and explicit
 NVRTC behavior and true NVRTC pass-through remained unchanged.
 
+Later on 2026-08-26, Slice 7 rebuilt the Debug host and Release LLVM 14.0.6 provider and exercised
+three ordinary-Slang kernels through both explicit PTX routes: a direct scalar store, a scalar
+load/store copy, and an `if` choosing signed `i32` addition or subtraction. The direct route's fake
+test checked exact parameter order, value producers, memory operands, comparison operands, and
+branch targets. Real NVVM and NVRTC PTX agreed on parameter widths `[64, 32]`, `[64, 64]`, and
+`[64, 32, 32]`, on the expected global-memory operations, and on signed comparison/addition for
+the conditional kernel. CUDA 12.9 `ptxas` accepted all three kernels from both routes for `sm_75`.
+
+The CUDA-driver differential launched both versions of all three kernels on a local device with
+compute capability 7.0 or newer. Both routes stored `37`, copied `-17`, and produced `7`, `4`, `0`,
+and `-1` for less-than, greater-than, equal, and negative signed-comparison inputs. Focused
+rejection tests also proved that an old exact scalar-memory provider does not expose the appended
+control-flow calls, malformed partial tables are rejected, cross-module, cross-function,
+non-dominating, and post-terminator operands are rejected before mutation, only the selected raw
+CUDA kernel survives linking, and a conventional parameterized compute entry reaches E52017 before
+builder or libNVVM program creation.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
 shape, the continued NVRTC default, the binary artifact shape, the separate pinned LLVM 14 builder,
 the frozen-V1/append-only-V2 diagnostic ABI, the coherent AS1 scalar-memory capability and
 differential contract, the Slice 5 target-option/routing boundary, and the Slice 6 exact
-empty-compute subset. The direct route uses one session-owned builder for hashing and code
-generation, requires the V2 verifier boundary, and enters the established downstream continuation
-as an internal LLVM-bitcode kernel artifact.
+empty-compute subset. Slice 7 settles the raw `[CUDAKernel]` signed-`i32`/device-pointer parameter
+ABI, the append-only V2 scalar-control-flow prefix, and dominance and ownership preflight at both
+the Slang IR and provider boundaries. The direct route uses one session-owned builder for hashing
+and code generation, requires the V2 verifier boundary, and enters the established downstream
+continuation as an internal LLVM-bitcode kernel artifact.
 
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
-- the entry-point/global-parameter ABI beyond the empty kernel;
+- conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
+  pointers;
+- executable constants, block parameters/branch arguments and phis, loops, calls, and richer
+  types;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

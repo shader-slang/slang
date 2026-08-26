@@ -8,10 +8,21 @@ namespace Slang
 
 struct CodeGenContext;
 
-/// Checks whether linked Slang IR is in the exact empty-compute subset owned by Slice 6.
-SlangResult validateNVVMMinimalComputeIR(CodeGenContext* codeGenContext, const LinkedIR& linkedIR);
+/// The smallest coherent builder prefix needed by an accepted linked-IR module.
+enum class NVVMIRCapability
+{
+    Minimal,
+    ScalarMemory,
+    ScalarControlFlow,
+};
 
-/// Emits verified LLVM 14 NVVM bitcode from already-validated minimal compute IR.
+/// Checks whether linked Slang IR is in the exact scalar/control-flow subset owned by Slice 7.
+SlangResult validateNVVMSupportedIR(
+    CodeGenContext* codeGenContext,
+    const LinkedIR& linkedIR,
+    NVVMIRCapability& outCapability);
+
+/// Emits verified LLVM 14 NVVM bitcode from already-validated supported IR.
 SlangResult emitNVVMIRFromLinkedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
