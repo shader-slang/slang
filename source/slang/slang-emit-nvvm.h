@@ -15,9 +15,10 @@ enum class NVVMIRCapability
     ScalarMemory,
     ScalarControlFlow,
     ScalarSSA,
+    ScalarFunctions,
 };
 
-/// Checks whether linked Slang IR is in the exact scalar/SSA subset owned by Slice 8.
+/// Checks whether linked Slang IR is in the exact direct scalar-function subset owned by Slice 9.
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,

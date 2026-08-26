@@ -662,6 +662,67 @@ static SlangResult SLANG_NVVM_CALL _addIntegerPhiIncoming(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitIntegerCall(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 callee,
+    const SlangNVVMValueHandle_1* arguments,
+    size_t argumentCount,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Function* llvmCallee = llvm::dyn_cast_or_null<llvm::Function>(_getValue(callee));
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::FunctionType* functionType = llvmCallee ? llvmCallee->getFunctionType() : nullptr;
+    if (!state || !llvmCallee || llvmCallee->getParent() != state->module.get() ||
+        !insertionBlock || !functionType || functionType->isVarArg() ||
+        !llvm::isa<llvm::IntegerType>(functionType->getReturnType()) ||
+        functionType->getNumParams() != argumentCount || (!arguments && argumentCount) || !outValue)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::SmallVector<llvm::Value*, 8> llvmArguments;
+    llvmArguments.reserve(argumentCount);
+    for (size_t i = 0; i < argumentCount; ++i)
+    {
+        llvm::Type* parameterType = functionType->getParamType(static_cast<unsigned>(i));
+        llvm::Value* argument = _getValue(arguments[i]);
+        if (!llvm::isa<llvm::IntegerType>(parameterType) || !argument ||
+            argument->getType() != parameterType ||
+            !_isValueUsableAtInsertionPoint(state, insertionBlock, argument))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+        llvmArguments.push_back(argument);
+    }
+
+    llvm::CallInst* call = state->builder.CreateCall(llvmCallee, llvmArguments);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(call);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL
+_emitIntegerReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
+{
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmValue = _getValue(value);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::Function* function = insertionBlock ? insertionBlock->getParent() : nullptr;
+    if (!state || !llvmValue || !insertionBlock || !function ||
+        !llvm::isa<llvm::IntegerType>(llvmValue->getType()) ||
+        function->getReturnType() != llvmValue->getType() ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    state->builder.CreateRet(llvmValue);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitReturnVoid(SlangNVVMModuleHandle_1 module)
 {
     ModuleState* state = _getModule(module);
@@ -914,6 +975,8 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.getIntegerConstant = _getIntegerConstant;
     api.emitIntegerPhi = _emitIntegerPhi;
     api.addIntegerPhiIncoming = _addIntegerPhiIncoming;
+    api.emitIntegerCall = _emitIntegerCall;
+    api.emitIntegerReturn = _emitIntegerReturn;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

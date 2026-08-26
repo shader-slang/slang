@@ -651,6 +651,75 @@ loop-carried values. It does not claim termination analysis or add multiplicatio
 helper signatures and returns, other scalar types, pointer/aggregate phis, richer terminators, or
 additional address spaces. Direct calls and their helper ABI are the Slice 9 boundary.
 
+### Slice 9 direct signed-i32 helper functions
+
+Consider this transitive helper graph:
+
+```slang
+int increment(int value)
+{
+    return value + 1;
+}
+
+int incrementTwice(int value)
+{
+    return increment(increment(value));
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int value)
+{
+    *destination = increment(value) + incrementTwice(value);
+}
+```
+
+The final linked IR retains three module-owned function definitions. Each call names its exact
+`IRFunc` as operand zero, followed by signed-i32 arguments, and each helper ends in an `IRReturn`
+whose operand is the canonical signed-i32 SSA result. An unrelated helper with multiplication is
+removed by ordinary linking and dead-code elimination before direct-NVVM preflight. Slice 9 follows
+those exact callee operands from the one selected kernel; it does not make every module function an
+entry point, look helpers up by source name, or reconstruct a function from syntax.
+
+The complete direct-call closure is validated before builder discovery. Every helper must be a
+defined, module-global, non-entry `IRFunc` with a signed-i32 result and only signed-i32 parameters.
+Calls must have the exact result, argument count, and argument types, and each argument must be
+available and dominate its call. Function values may occur only as operand zero of a direct call.
+An active/completed traversal rejects cycles defensively, while the retained-global scan ensures no
+semantic function is silently dropped. Each function then passes the same independent block, CFG,
+SSA, phi, and dominance validation established in Slice 8. Entry returns remain void; helper
+returns must carry the declared signed-i32 value.
+
+Emission declares and maps every function and its parameters before creating any body. For each
+function it then creates all blocks and phi placeholders, emits bodies in the same reachable-RPO
+order used by preflight, and attaches phi incoming pairs after that function's CFG is complete.
+Calls refer to the predeclared callee handle, helpers use their canonical mangled linkage names, and
+only the selected `computeMain` function receives the NVVM kernel annotation. This ordering permits
+forward and transitive calls without making physical module order semantic.
+
+The private V2 provider table gains one coherent append-only scalar-function block:
+
+```text
+emitIntegerCall(module, callee, arguments, argumentCount, outValue)
+emitIntegerReturn(module, value)
+```
+
+`setInsertBlock` remains the sole current-function state: the insertion block determines the caller
+and current return type. A call requires a same-module, non-variadic integer function, exact integer
+argument types/count, and arguments available at the insertion point. A valued return requires the
+exact current integer result type and an available value. The provider validates the complete
+operation before creating an LLVM call or return, and the host clears failed call outputs. All prior
+V2 minima remain frozen; an exact Slice 8 provider remains usable for earlier programs, while a
+call-shaped program requires the complete new prefix.
+
+The source fixture deliberately needs no `noinline` attribute: the final Slang IR probe retains all
+four calls, while final PTX is allowed to inline or algebraically combine them. The pre-libNVVM fake
+graph and verified LLVM assembly prove the call/return boundary; differential runtime proves its
+semantics. This slice does not add void helpers, external declarations, indirect calls, recursion,
+function pointers, pointer/aggregate helper ABI, multiplication or other arithmetic, richer scalar
+types, or additional address spaces.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -756,9 +825,9 @@ libNVVM/`ptxas` handoff while leaving the kernel ABI and scalar control flow to 
 Slice 7 completes the first raw CUDA scalar parameter ABI and a deliberately phi-free part of item
 7. It adds signed `i32` arithmetic/comparison and acyclic branches while retaining executable
 constants, block parameters/branch arguments, phis, loops, calls, and richer types as the next
-program-structure boundary. Slice 8 completes that scalar program-structure milestone. Direct calls
-and non-void helpers remain a separately demonstrable Slice 9 ABI boundary before address spaces
-beyond the raw device pointer, aggregates, and shared memory begin in Slice 10.
+program-structure boundary. Slice 8 completes constants, phis, and finite loops. Slice 9 completes
+the separately demonstrable direct-call/non-void-helper ABI before the type-and-memory work beginning
+with Slice 10.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -862,6 +931,21 @@ for positive and negative inputs, every less/greater/equal merge case, and `sumT
 NVRTC pass-through (2/2), and CUDA runtime dispatch (1/1). The provider still exports only the V1
 and V2 getters and has no process-visible LLVM DLL dependency.
 
+Later on 2026-08-26, Slice 9 added the transitive `increment`/`incrementTwice` helper graph without a
+source-level `noinline` attribute. The exact fake graph contained three function definitions, four
+direct calls, two valued helper returns, one kernel void return, and only one kernel annotation. An
+unreachable helper containing multiplication was pruned before preflight. The LLVM 14 provider
+verified the corresponding `define i32`, `call i32`, and `ret i32` module, and its negative tests
+rejected missing insertion points, invalid callees, arity/type/module/function/dominance errors, and
+post-terminator calls/returns without partial mutation.
+
+The ordinary source compiled through NVRTC and direct NVVM with matching `[64, 32]` kernel parameter
+widths and global-store semantics. CUDA 12.9.86 `ptxas` accepted both outputs, and both routes
+produced `13` for input `5` and `-1` for input `-2` on the RTX 5090. The post-format complete NVVM
+prefix passed 60/60 alongside the established routing, NVRTC, pass-through, unsupported-IR, and
+CUDA-runtime regressions. The provider continued to export only its V1/V2 getters with no
+process-visible LLVM DLL dependency.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -880,6 +964,13 @@ loop-carried state. It also settles the append-only V2 scalar-SSA prefix and its
 predecessor-edge dominance boundary. These claims cover the demonstrated merge and finite sum loop;
 they do not imply general termination analysis or other value types.
 
+Slice 9 settles the finite direct-call closure rooted at one selected raw CUDA kernel, canonical
+module-owned helper identities, signed-i32 helper parameters/results, valued returns, and the
+append-only scalar-function provider prefix. It also settles declaration-before-body emission and
+the rule that insertion-block ownership, rather than a second ambient function cursor, identifies
+the caller. These claims do not include external or indirect calls, recursion, void/pointer helpers,
+or preservation of source function attributes.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
@@ -887,7 +978,7 @@ The following remain open until their named slice supplies evidence:
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
   pointers;
-- direct calls, non-void helper ABI, and richer scalar/control-flow types;
+- external/indirect calls, richer helper ABI, and richer scalar/control-flow types;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

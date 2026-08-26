@@ -261,6 +261,25 @@ extern "C"
         SlangNVVMValueHandle_1 value,
         SlangNVVMBlockHandle_1 predecessorBlock);
 
+    /// Emits a direct call to a same-module, non-variadic integer function.
+    /// The module must own the current unterminated insertion block. Every parameter and the
+    /// result must be an integer type, each argument must have the exact corresponding parameter
+    /// type, and every argument must be available at the insertion point. On failure, the output
+    /// value is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerCall_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 callee,
+        const SlangNVVMValueHandle_1* arguments,
+        size_t argumentCount,
+        SlangNVVMValueHandle_1* outValue);
+
+    /// Terminates the current unterminated insertion block with an integer return value.
+    /// The value must be available at the insertion point and exactly match the current function's
+    /// integer return type. Failure inserts no instruction.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerReturn_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 value);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -291,6 +310,9 @@ extern "C"
         SlangNVVMGetIntegerConstant_2 getIntegerConstant;
         SlangNVVMEmitIntegerPhi_2 emitIntegerPhi;
         SlangNVVMAddIntegerPhiIncoming_2 addIntegerPhiIncoming;
+
+        SlangNVVMEmitIntegerCall_2 emitIntegerCall;
+        SlangNVVMEmitIntegerReturn_2 emitIntegerReturn;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -311,6 +333,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_SSA_MIN_SIZE          \
     (offsetof(SlangNVVMBuilderAPI_V2, addIntegerPhiIncoming) + \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->addIntegerPhiIncoming))
+
+    // This Slice 9 prefix is one coherent scalar-function capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_FUNCTION_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerReturn) + \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerReturn))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

@@ -45,6 +45,8 @@ public:
     bool supportsScalarControlFlow() const;
     /// Returns whether the provider advertised the complete Slice 8 scalar-SSA prefix.
     bool supportsScalarSSA() const;
+    /// Returns whether the provider advertised the complete Slice 9 scalar-function prefix.
+    bool supportsScalarFunctions() const;
     /// Returns the provider identity that affects generated bitcode and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -170,6 +172,18 @@ public:
         SlangNVVMValueHandle_1 phi,
         SlangNVVMValueHandle_1 value,
         SlangNVVMBlockHandle_1 predecessorBlock) const;
+
+    /// Emits a direct call to an integer function and returns its integer result.
+    SlangResult emitIntegerCall(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 callee,
+        const SlangNVVMValueHandle_1* arguments,
+        size_t argumentCount,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Terminates the current insertion block with an integer return value.
+    SlangResult emitIntegerReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
+        const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;
