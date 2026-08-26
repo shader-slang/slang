@@ -7799,12 +7799,18 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         auto loweredBase = lowerLValueExpr(context, expr->base);
         UInt elementCount = (UInt)expr->elementIndices.getCount();
 
-        // Assign to 'bs' the elements from 'as' according to the first 'n' indices in 'is'
-        auto backpermute = [](UInt n, const auto as, const auto is, auto bs)
+        // Write in-place to `resultElements` the elements from `sourceElements`
+        // according to the first `n` indices in `indices`.
+        // 
+        // Preconditions:
+        // - `resultElements` and `indices` each have at least `n` elements/slots
+        // - All `indices[i]` must be a valid index into `sourceElements`.
+        auto backpermute = [](UInt n, const auto& sourceElements, const auto& indices,
+                              auto& resultElements)
         {
             for (UInt i = 0; i < n; ++i)
             {
-                bs[i] = as[is[i]];
+                resultElements[i] = sourceElements[indices[i]];
             }
         };
 
@@ -7829,7 +7835,10 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo;
             swizzledLValue->type = irType;
             swizzledLValue->base = baseSwizzleInfo->base;
-            swizzledLValue->elementIndices.add((uint32_t)elementCount);
+
+            // Set the count of indices and leave them uninitialized.
+            // This is safe because `backpermute` fills all `elementCount` slots below.
+            swizzledLValue->elementIndices.setCount((uint32_t)elementCount);
 
             // Take the swizzle element of the "outer" swizzle, as it was
             // written by the user. In our running example of `foo[i].zw.y`
