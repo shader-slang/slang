@@ -368,9 +368,21 @@ jobs:
   # `environment:` (GitHub only allows name/uses/with/secrets/needs/if/
   # permissions on such jobs), so the approval gate has to live on this
   # plain job instead, with the build depending on it.
+  #
+  # Skipped on `merge_group`: every commit reaching the merge queue already
+  # passed this same gate as a `pull_request` run (`check-ci`, which
+  # includes `test-falcor`, is a required status check, so a PR cannot
+  # become mergeable -- and therefore cannot enter the queue -- without an
+  # allowlisted actor or reviewer having already released this gate once).
+  # The merge-queue run only recompiles the PR's already-vetted commits
+  # merged onto a newer `master`; it introduces no code that has not
+  # already cleared Falcor approval. Skipping here avoids asking an
+  # approver to re-click a gate whose outcome is already determined,
+  # without weakening the gate for its actual purpose: keeping unvetted,
+  # first-look PR code off internal Falcor compute.
   falcor-build-approval-gate:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: needs.filter.outputs.should-run == 'true' && github.event_name != 'merge_group'
     environment: falcor-ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -403,6 +415,11 @@ jobs:
   # known, accepted cost: a real Falcor regression needing a code fix
   # already forces a full re-run via a new commit, so this only affects
   # the narrower case of a transient retry with no code change.
+  #
+  # On `merge_group`, falcor-build-approval-gate above is skipped rather
+  # than run -- GitHub treats a skipped `needs` job as satisfying this
+  # job's dependency (not as a failure), so the build proceeds straight
+  # through without waiting on an already-settled approval.
   build-windows-release-cl-x86_64-gpu-falcor:
     needs: [filter, falcor-build-approval-gate]
     if: needs.filter.outputs.should-run == 'true'
