@@ -29,7 +29,18 @@ concurrency:
 jobs:
   agentic-tests:
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    # Headroom, not a target. This job builds Slang from scratch (~30 min) and
+    # then runs the whole generated suite (~12 min), so it has been finishing in
+    # the low 40s of minutes against the 45 it used to be allowed: 44m37s on
+    # 2026-08-15 and 44m42s on 2026-08-16 both landed under the wire, and a
+    # 2026-08-20 re-run was cancelled at 45m06s having already passed every test
+    # it reached. A cancelled job reports as a red X indistinguishable from a
+    # real regression, so the cap was costing triage time on a suite that was
+    # healthy. 45 was set in #11380 when the suite was first wired in; it has
+    # since grown past 6000 tests without the cap moving. 60 leaves roughly a
+    # third of the budget spare at current durations; if runs start creeping into
+    # the mid-50s, raise the cap again rather than trimming the suite to fit it.
+    timeout-minutes: 60
     permissions:
       id-token: write # Workload Identity for GCS-cached LLVM
       contents: read

@@ -6324,6 +6324,16 @@ static bool _isSizeOfType(Type* type)
         return false;
     }
 
+    // A `ModifiedType`'s modifiers are layout-transparent, so whether a type has
+    // a size is decided entirely by its base: `sizeof(unorm float4)` is just
+    // `sizeof(float4)`. This matters because the modifier survives into the type
+    // of an ordinary value — loading from a `RWTexture2D<unorm float4>` yields a
+    // `unorm float4` — so rejecting the wrapper here would reject `sizeof` on a
+    // value the user never spelled a modifier on. Unwrapping keeps the list
+    // below about *kinds* of type rather than repeating each kind in a modified
+    // form.
+    type = unwrapModifiedType(type);
+
     if (as<ArithmeticExpressionType>(type) || as<ArrayExpressionType>(type) ||
         as<PtrTypeBase>(type) || as<TupleType>(type) || as<GenericDeclRefType>(type))
     {
