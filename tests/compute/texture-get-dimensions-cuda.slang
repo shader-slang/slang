@@ -4,27 +4,24 @@
 // - txq.width.b32
 // - txq.height.b32
 // - txq.depth.b32
-// - txq.level.width.b32
-// - txq.level.height.b32
-// - txq.level.depth.b32
 
-//TEST_INPUT: Texture1D(size=4, content = one, mipMaps=2):name cudaT1D
+//TEST_INPUT: Texture1D(size=4, content = one):name cudaT1D
 Texture1D<float> cudaT1D;
-//TEST_INPUT: Texture2D(size=8, content = one, mipMaps=2):name cudaT2D
+//TEST_INPUT: Texture2D(size=8, content = one):name cudaT2D
 Texture2D<float> cudaT2D;
-//TEST_INPUT: Texture3D(size=2, content = one, mipMaps=2):name cudaT3D
+//TEST_INPUT: Texture3D(size=2, content = one):name cudaT3D
 Texture3D<float> cudaT3D;
-//TEST_INPUT: TextureCube(size=16, content = one, mipMaps=2):name cudaTCube
+//TEST_INPUT: TextureCube(size=16, content = one):name cudaTCube
 TextureCube<float> cudaTCube;
-//TEST_INPUT: Texture2D(size=4, content = one, arrayLength=3, mipMaps=2):name cudaT2DArray
+//TEST_INPUT: Texture2D(size=4, content = one, arrayLength=3):name cudaT2DArray
 Texture2DArray<float> cudaT2DArray;
-//TEST_INPUT: TextureCube(size=16, content = one, arrayLength=1, mipMaps=2):name cudaTCubeArray
+//TEST_INPUT: TextureCube(size=16, content = one, arrayLength=1):name cudaTCubeArray
 TextureCubeArray<float> cudaTCubeArray;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name cudaOutputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name cudaOutputBuffer
 RWStructuredBuffer<uint> cudaOutputBuffer;
 
-[numthreads(12, 1, 1)]
+[numthreads(7, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
@@ -32,11 +29,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     uint width = 0;
     uint height = 0;
     uint depth = 0;
-    // Array overloads require elements and mip-level overloads require numberOfLevels,
-    // but CUDA cannot query either output.
     uint elements = 0;
-    uint numberOfLevels = 0;
-    
+
     switch (idx)
     {
         case 0:
@@ -85,45 +79,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         }
         case 6:
         {
-            // Test 1D texture width at mip level 1
-            cudaT1D.GetDimensions(1, width, numberOfLevels);
-            cudaOutputBuffer[idx] = width;
-            break;
-        }
-        case 7:
-        {
-            // Test 2D texture width and height at mip level 1
-            cudaT2D.GetDimensions(1, width, height, numberOfLevels);
-            cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
-            break;
-        }
-        case 8:
-        {
-            // Test 3D texture width, height and depth at mip level 1
-            cudaT3D.GetDimensions(1, width, height, depth, numberOfLevels);
-            cudaOutputBuffer[idx] = ((0xff & width) << 16) | ((0xff & height) << 8) |
-                                    (0xff & depth);
-            break;
-        }
-        case 9:
-        {
-            // Test Cube texture width and height at mip level 1
-            cudaTCube.GetDimensions(1, width, height, numberOfLevels);
-            cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
-            break;
-        }
-        case 10:
-        {
-            // Test 2D array texture width and height at mip level 1
-            cudaT2DArray.GetDimensions(1, width, height, elements, numberOfLevels);
-            cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
-            break;
-        }
-        case 11:
-        {
-            // Test Cube array texture width and height at mip level 1
-            cudaTCubeArray.GetDimensions(1, width, height, elements, numberOfLevels);
-            cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
+            // Reserved for future use
+            cudaOutputBuffer[idx] = 0;
             break;
         }
     }

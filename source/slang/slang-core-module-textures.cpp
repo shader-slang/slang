@@ -421,8 +421,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 metal << "(*($" << String(paramCount) << ") = $0.get_num_mip_levels()),";
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
                     cuda << "; ";
-                cuda << "/* txq.num_mipmap_levels not available in CUDA */ *($"
-                     << String(paramCount) << ") = 0;";
+                cuda << "uint32_t levels; asm(\\\"txq.num_mipmap_levels.b32 %0, [%1];\\\" : "
+                        "\\\"=r\\\"(levels) : \\\"l\\\"($0)); *($"
+                     << String(paramCount) << ") = levels;";
                 wgsl << "($" << String(paramCount)
                      << ") = " << wgslTextureAttributeConversion(dimType, "textureNumLevels($0)")
                      << ";";
@@ -622,7 +623,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             sb << "    __glsl_version(450)\n";
 
             sb << "    [require(cpp";
-            if (cuda.getLength())
+            if (cuda.getLength() && !includeMipInfo)
                 sb << "_cuda";
             if (glsl.getLength())
                 sb << "_glsl";
@@ -634,6 +635,10 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             if (wgsl.getLength())
                 sb << "_wgsl";
             sb << ", texture_sm_4_1)]\n";
+
+            // Plain CUDA kernels cannot query the mip count, but OptiX can.
+            if (cuda.getLength() && includeMipInfo)
+                sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
             writeFunc(
                 "void",
