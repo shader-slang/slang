@@ -3,7 +3,6 @@
 #include "core/slang-list.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
-#include "slang/slang-serialize-ir.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <cstring>
@@ -22,6 +21,12 @@ using namespace Slang;
 // read lazily, so the library's declarations are decoded during semantic checking of the
 // `import` below -- after this call returned. Leaving instruction bodies encoded adds a
 // second route into the same bytes, later still, during linking and emit.
+//
+// So this test is not vacuous under either load mode, and it uses only the public C API --
+// which is why it stays here, in the tool `slang-test` loads, and so runs against the shipped
+// shared library on every configuration CI builds. The extra route that deferral opens is
+// covered separately by `irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans` in
+// `slang-static-unit-test`, whose `Mismatched` case is exactly the blob shape this call had.
 //
 // The test poisons the caller's buffer in place rather than freeing it. Freed memory
 // often still reads back intact, which would make this pass under the bug; overwriting is
@@ -93,22 +98,12 @@ SLANG_UNIT_TEST(addLibraryReferenceDoesNotAliasCallerBuffer)
     const int targetIndex = request->addCodeGenTarget(SLANG_HLSL);
     request->setTargetProfile(targetIndex, globalSession->findProfile("sm_5_0"));
 
-    // Deferral has to actually happen for the poison below to mean anything: if this
-    // library were loaded eagerly, nothing would read the caller's buffer afterwards and
-    // the test would pass whether the bug were present or not.
-    const Index loadersBefore = getDeferredBodyLoaderInstallCount();
-
     SLANG_CHECK_ABORT(
         spAddLibraryReference(
             request,
             nullptr,
             callerBuffer.getBuffer(),
             size_t(callerBuffer.getCount())) == SLANG_OK);
-
-    // Guards the premise. A loader is installed only when a module was left with bodies
-    // still encoded, so this is the assertion that keeps the test from going vacuous.
-    if (isOnDemandIRLoadEnabled())
-        SLANG_CHECK(getDeferredBodyLoaderInstallCount() > loadersBefore);
 
     // The call has returned, so per the contract these bytes are the caller's to do with
     // as it likes. Poison them.

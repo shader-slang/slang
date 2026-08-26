@@ -91,24 +91,24 @@ void _noteIRModuleCreated();
 void _noteIRModuleDestroyed();
 void _noteDeferredBodyLoaderInstalled();
 
-/// Number of `IRModule`s currently alive in this process. Test-only; `SLANG_API` so the
-/// separately linked unit-test tool can see it, and absent from `slang.h` on purpose.
-SLANG_API Index getLiveIRModuleCount();
+/// Number of `IRModule`s currently alive in this process. Read by `slang-static-unit-test`,
+/// which links the compiler statically and so needs no export; absent from `slang.h` on purpose.
+Index getLiveIRModuleCount();
 
 /// Number of modules that have had a deferred-body loader installed. Lets a test assert it
 /// exercised the deferred path at all, rather than passing on an eager load.
-SLANG_API Index getDeferredBodyLoaderInstallCount();
+Index getDeferredBodyLoaderInstallCount();
 
 /// Number of first touches of a deferred body, process-wide. Counts entries to the
 /// loader's slow path, so it answers whether a phase reaches still-deferred bodies.
-SLANG_API Index getDeferredBodyMaterializationCount();
+Index getDeferredBodyMaterializationCount();
 
 void _noteDeferralDeclinedForSpanMismatch();
 
 /// Number of module loads that declined deferral because the blob did not back the flat
 /// table's spans. Makes that decision observable: wrongly saying "safe" surfaces only as a
 /// use-after-free far away, and wrongly saying "unsafe" costs performance with no signal.
-SLANG_API Index getDeferralDeclinedForSpanMismatchCount();
+Index getDeferralDeclinedForSpanMismatchCount();
 
 /// Supplies instruction bodies that were not materialized when a module was
 /// deserialized.
