@@ -1301,10 +1301,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayered<float4>($0, ($1).x, int(($1).y)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayered<int4>($0, ($1).x, int(($1).y)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayered<uint4>($0, ($1).x, int(($1).y)))";
                         __intrinsic_asm "tex1DLayered<$T0>($0, ($1).x, int(($1).y))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayered<float4>($0, ($1).x, ($1).y, int(($1).z)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayered<int4>($0, ($1).x, ($1).y, int(($1).z)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayered<uint4>($0, ($1).x, ($1).y, int(($1).z)))";
                         __intrinsic_asm "tex2DLayered<$T0>($0, ($1).x, ($1).y, int(($1).z))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayered<float4>($0, ($1).x, ($1).y, ($1).z, int(($1).w)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayered<int4>($0, ($1).x, ($1).y, ($1).z, int(($1).w)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayered<uint4>($0, ($1).x, ($1).y, ($1).z, int(($1).w)))";
                         __intrinsic_asm "texCubemapLayered<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w))";
                     default: __intrinsic_asm "invalid texture shape";
                     }
@@ -1314,12 +1332,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1D<float4>($0, ($1)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1D<int4>($0, ($1)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1D<uint4>($0, ($1)))";
                         __intrinsic_asm "tex1D<$T0>($0, ($1))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2D<float4>($0, ($1).x, ($1).y))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2D<int4>($0, ($1).x, ($1).y))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2D<uint4>($0, ($1).x, ($1).y))";
                         __intrinsic_asm "tex2D<$T0>($0, ($1).x, ($1).y)";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3D<float4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3D<int4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3D<uint4>($0, ($1).x, ($1).y, ($1).z))";
                         __intrinsic_asm "tex3D<$T0>($0, ($1).x, ($1).y, ($1).z)";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemap<float4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemap<int4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemap<uint4>($0, ($1).x, ($1).y, ($1).z))";
                         __intrinsic_asm "texCubemap<$T0>($0, ($1).x, ($1).y, ($1).z)";
                     default: __intrinsic_asm "invalid texture shape";
                     }
@@ -2130,10 +2172,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredLod<float4>($0, ($1).x, int(($1).y), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredLod<int4>($0, ($1).x, int(($1).y), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredLod<uint4>($0, ($1).x, int(($1).y), ($2)))";
                         __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($1).x, int(($1).y), ($2))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredLod<float4>($0, ($1).x, ($1).y, int(($1).z), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredLod<int4>($0, ($1).x, ($1).y, int(($1).z), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredLod<uint4>($0, ($1).x, ($1).y, int(($1).z), ($2)))";
                         __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($1).x, ($1).y, int(($1).z), ($2))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredLod<float4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredLod<int4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredLod<uint4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2)))";
                         __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -2144,12 +2204,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLod<float4>($0, ($1), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLod<int4>($0, ($1), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLod<uint4>($0, ($1), ($2)))";
                         __intrinsic_asm "tex1DLod<$T0>($0, ($1), ($2))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLod<float4>($0, ($1).x, ($1).y, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLod<int4>($0, ($1).x, ($1).y, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLod<uint4>($0, ($1).x, ($1).y, ($2)))";
                         __intrinsic_asm "tex2DLod<$T0>($0, ($1).x, ($1).y, ($2))";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DLod<float4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DLod<int4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DLod<uint4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
                         __intrinsic_asm "tex3DLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLod<float4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLod<int4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLod<uint4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
                         __intrinsic_asm "texCubemapLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -2568,10 +2652,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayered<float4>($0, ($2).x, int(($2).y)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayered<int4>($0, ($2).x, int(($2).y)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayered<uint4>($0, ($2).x, int(($2).y)))";
                         __intrinsic_asm "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayered<float4>($0, ($2).x, ($2).y, int(($2).z)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayered<int4>($0, ($2).x, ($2).y, int(($2).z)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayered<uint4>($0, ($2).x, ($2).y, int(($2).z)))";
                         __intrinsic_asm "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayered<float4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayered<int4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayered<uint4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
                         __intrinsic_asm "texCubemapLayered<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -2582,12 +2684,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1D<float4>($0, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1D<int4>($0, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1D<uint4>($0, ($2)))";
                         __intrinsic_asm "tex1D<$T0>($0, ($2))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2D<float4>($0, ($2).x, ($2).y))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2D<int4>($0, ($2).x, ($2).y))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2D<uint4>($0, ($2).x, ($2).y))";
                         __intrinsic_asm "tex2D<$T0>($0, ($2).x, ($2).y)";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3D<float4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3D<int4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3D<uint4>($0, ($2).x, ($2).y, ($2).z))";
                         __intrinsic_asm "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemap<float4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemap<int4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemap<uint4>($0, ($2).x, ($2).y, ($2).z))";
                         __intrinsic_asm "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -3709,10 +3835,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredLod<float4>($0, ($2).x, int(($2).y), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredLod<int4>($0, ($2).x, int(($2).y), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredLod<uint4>($0, ($2).x, int(($2).y), ($3)))";
                         __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($2).x, int(($2).y), ($3))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredLod<float4>($0, ($2).x, ($2).y, int(($2).z), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredLod<int4>($0, ($2).x, ($2).y, int(($2).z), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredLod<uint4>($0, ($2).x, ($2).y, int(($2).z), ($3)))";
                         __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($2).x, ($2).y, int(($2).z), ($3))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredLod<float4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredLod<int4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredLod<uint4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3)))";
                         __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -3723,12 +3867,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLod<float4>($0, ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLod<int4>($0, ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLod<uint4>($0, ($2), ($3)))";
                         __intrinsic_asm "tex1DLod<$T0>($0, ($2), ($3))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLod<float4>($0, ($2).x, ($2).y, ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLod<int4>($0, ($2).x, ($2).y, ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLod<uint4>($0, ($2).x, ($2).y, ($3)))";
                         __intrinsic_asm "tex2DLod<$T0>($0, ($2).x, ($2).y, ($3))";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DLod<float4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DLod<int4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DLod<uint4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
                         __intrinsic_asm "tex3DLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLod<float4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLod<int4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLod<uint4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
                         __intrinsic_asm "texCubemapLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";

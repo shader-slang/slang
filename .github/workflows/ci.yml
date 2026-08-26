@@ -288,6 +288,52 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       warnings-as-errors: false
 
+  # Unit tests for non-exported source/slang entry points. These need SLANG_LIB_TYPE=STATIC, a
+  # configuration no other CI job builds, so they get their own workflow. They
+  # build only the slang-static-unit-test target and run on GitHub-hosted runners
+  # (no GPU needed), so they add no load to the self-hosted Windows pool.
+  static-unit-test-linux-debug-gcc-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: debug
+      runs-on: '["ubuntu-24.04-arm"]'
+
+  static-unit-test-macos-debug-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+
+  static-unit-test-windows-debug-cl-x86_64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["windows-2022"]'
+
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
     needs: [filter, wait-for-human-priority]
@@ -848,6 +894,9 @@ jobs:
         build-macos-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
+        static-unit-test-linux-debug-gcc-aarch64,
+        static-unit-test-macos-debug-clang-aarch64,
+        static-unit-test-windows-debug-cl-x86_64,
         test-windows-release-cl-x86_64-gpu-dx,
         test-windows-release-cl-x86_64-gpu-vk,
         test-windows-release-cl-x86_64-gpu-cuda,
