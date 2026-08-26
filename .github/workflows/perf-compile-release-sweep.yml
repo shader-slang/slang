@@ -40,7 +40,7 @@ on:
         default: false
 
 concurrency:
-  group: compile-perf-release-sweep
+  group: perf-compile-release-sweep
   cancel-in-progress: false
 
 env:

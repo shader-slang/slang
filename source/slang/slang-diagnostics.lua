@@ -3192,6 +3192,13 @@ warning(
     span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
 )
 
+warning(
+    "constexpr-on-callable-ignored",
+    31228,
+    "constexpr on a function or other callable declaration is not a supported Slang feature and is ignored",
+    span { loc = "modifier:Modifier", message = "constexpr modifier is ignored here" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
@@ -5587,6 +5594,13 @@ err(
     55213,
     "'String' is not supported on this target",
     span { loc = "location", message = "the 'String' type and its operations are not supported when generating kernel code for this target; use 'NativeString' for a null-terminated string, or compile for a host target" }
+)
+
+err(
+    "multisampled-texture-not-supported-on-target",
+    55215,
+    "multisampled texture is not supported on this target",
+    span { loc = "location", message = "'~type:IRInst' is a multisampled texture, which is not supported by the current code generation target" }
 )
 
 err(

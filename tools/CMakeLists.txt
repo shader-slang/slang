@@ -480,3 +480,49 @@ if(SLANG_ENABLE_REPLAYER)
         FOLDER test
     )
 endif()
+
+#
+# Unit tests that call non-exported `source/slang` entry points directly.
+#
+# These are separate from `slang-unit-test` because of how they link, not what they
+# test. `slang-unit-test` is a shared library loaded by `slang-test`, so it can reach
+# only the symbols libslang-compiler exports — and the entry points these tests need
+# carry no export annotation, so they are not among them. Linking the compiler
+# statically into an executable resolves them at link time instead, with no annotation
+# and no change to `source/slang`.
+#
+# The target is therefore only defined for a static build. Under
+# SLANG_LIB_TYPE=SHARED the link would fail by design, so guarding the
+# definition here — rather than marking it EXCLUDE_FROM_ALL — means it is part
+# of `all` exactly where it can work.
+#
+# The SLANG_ENABLE_SLANG_RHI condition mirrors the guard on the `unit-test`
+# object library this target links against, even though these tests do not use
+# the RHI themselves.
+if(
+    SLANG_ENABLE_TESTS
+    AND SLANG_ENABLE_SLANG_RHI
+    AND SLANG_LIB_TYPE STREQUAL "STATIC"
+)
+    slang_add_target(
+        slang-static-unit-test
+        EXECUTABLE
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
+            ${slang_SOURCE_DIR}/tools
+        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
+        FOLDER test
+    )
+    # The tests include internal slang headers that transitively pull in the
+    # FIDDLE and capability generated headers. The `slang` target consumes those
+    # as PRIVATE link dependencies so their include directories do not
+    # propagate; expose them here, as `slang-unit-test` does.
+    target_include_directories(
+        slang-static-unit-test
+        PRIVATE
+            $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
+    )
+endif()

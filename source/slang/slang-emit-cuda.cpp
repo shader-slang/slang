@@ -496,6 +496,14 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
             m_writer->emit("static ");
         }
         m_writer->emit("__device__ ");
+
+        // `__noinline__` is a declaration specifier, so it belongs in this specifier
+        // sequence. Kernels are call-graph roots with no caller to be inlined into, so the
+        // request is honoured for ordinary device functions only.
+        if (inst->findDecoration<IRNoInlineDecoration>())
+        {
+            m_writer->emit("__noinline__ ");
+        }
     }
 }
 
@@ -1356,8 +1364,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             IRType* elementType = arrayType->getElementType();
 
             // Emit braces for the FixedArray struct.
-
+            m_writer->emit("{ ");
             _emitInitializerList(elementType, inst->getOperands(), Index(inst->getOperandCount()));
+            m_writer->emit(" }");
 
             return true;
         }

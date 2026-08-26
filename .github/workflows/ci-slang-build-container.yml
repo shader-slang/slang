@@ -225,7 +225,7 @@ jobs:
             exit 1
           fi
 
-      # Save sccache cache (master only, for populate-sccache workflow)
+      # Save sccache cache (master only, for sccache-populate workflow)
       - name: Save sccache cache (master only)
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
