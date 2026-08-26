@@ -10710,6 +10710,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // `SharedIRGenContext::m_entryPointFuncs`). Using that recorded set — rather than scanning
         // decorations — is what keeps a non-entry `[numthreads]` helper out of the derivative-group
         // decoration this feeds (#12392).
+        //
+        // Note the layering caveat: this runs during target-independent module lowering, yet it is
+        // enumerating the front-end's declared entry points. Which functions are actually compiled
+        // as entry points is a per-invocation codegen decision that is not known here, so eagerly
+        // decorating all declared entry points is a known approximation. Eliminating this reliance
+        // (by representing the module-scope derivative-group request as a module-level fact and
+        // propagating it to the selected entry points after selection) is tracked in #12777.
         for (auto entryPointFunc : context->shared->m_entryPointFuncs)
             entryPoints.add(entryPointFunc);
     }
@@ -15456,8 +15463,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     for (auto entryPoint : translationUnit->getEntryPoints())
     {
         auto loweredFunc = getSimpleVal(context, ensureDecl(context, entryPoint->getFuncDecl()));
-        if (!loweredFunc)
-            continue;
         // A generic entry point lowers to an `IRGeneric` whose return value is the function; the
         // entry-point identity belongs on that inner function, not the generic wrapper.
         if (auto irGeneric = as<IRGeneric>(loweredFunc))
@@ -16345,6 +16350,26 @@ bool isUnspecializedGenericFuncDeclRef(DeclRef<Decl> declRef)
     return false;
 }
 
+/// Return true if `caps` requires the SPIR-V `spvShader64BitIndexingEXT` capability.
+///
+/// This scans for the atom in *any* alternative of the capability set (iterating `getAtomSets()`)
+/// rather than calling `caps.implies(spvShader64BitIndexingEXT)`. `implies()` is
+/// AND-across-all-alternatives — it reports the atom only when *every* target alternative requires
+/// it, which is too strict for a presence test: we want to know whether the entry point requires
+/// 64-bit indexing on any path so we can lift the entry-point-scoped execution mode onto it.
+static bool capabilitySetRequiresShader64BitIndexing(const CapabilitySet& caps)
+{
+    for (auto atomSet : caps.getAtomSets())
+    {
+        for (auto atomVal : atomSet)
+        {
+            if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
+                return true;
+        }
+    }
+    return false;
+}
+
 RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 {
     if (m_irModuleForLayout)
@@ -16501,28 +16526,8 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // execution mode would be invalid). The SPIR-V back-end emits all three from this single
         // decoration. Reading the inferred capability set rather than the attribute directly covers
         // the direct, call-graph, and `[require(spvShader64BitIndexingEXT)]` cases uniformly.
-        {
-            bool requiresShader64BitIndexing = false;
-            // Scan for membership of the atom in *any* alternative of the capability set. We
-            // iterate `getAtomSets()` rather than calling `set.implies(spvShader64BitIndexingEXT)`
-            // because `implies()` is AND-across-all-alternatives: it would only report the atom
-            // when *every* target alternative requires it, which is too strict for a presence test.
-            for (auto atomSet : set.getAtomSets())
-            {
-                for (auto atomVal : atomSet)
-                {
-                    if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
-                    {
-                        requiresShader64BitIndexing = true;
-                        break;
-                    }
-                }
-                if (requiresShader64BitIndexing)
-                    break;
-            }
-            if (requiresShader64BitIndexing)
-                builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(irFunc);
-        }
+        if (capabilitySetRequiresShader64BitIndexing(set))
+            builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(irFunc);
     }
 
     // Lets strip and run DCE here
