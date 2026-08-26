@@ -16,6 +16,7 @@ struct Dependency
 {
     String name;
     String git;
+    String path;
     String version;
     String tag;
 };
@@ -23,7 +24,6 @@ struct Dependency
 struct Manifest
 {
     String name;
-    String version;
     List<String> exports;
     List<String> licenseFiles;
     List<Dependency> dependencies;
@@ -35,7 +35,6 @@ struct LockedPackage
     String git;
     String tag;
     String commit;
-    String version;
     String path;
     List<String> exports;
     List<Dependency> dependencies;
@@ -43,7 +42,7 @@ struct LockedPackage
 
 struct LockFile
 {
-    Int lockVersion = 1;
+    Int lockVersion = 2;
     List<LockedPackage> packages;
 };
 

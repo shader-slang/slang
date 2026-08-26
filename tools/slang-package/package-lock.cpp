@@ -32,6 +32,28 @@ SlangResult validateLockedDependency(
     }
 
     const LockedPackage& lockedPackage = lock.packages[outPackageIndex];
+    if (dependency.path.getLength())
+    {
+        if (!lockedPackage.path.getLength() || lockedPackage.git.getLength())
+        {
+            outError = String("Lock file does not use a path for dependency '") + dependency.name +
+                       "'. Run 'slang package update'.";
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+    if (lockedPackage.path.getLength())
+    {
+        if (lockedPackage.git.getLength() && lockedPackage.git != dependency.git)
+        {
+            outError = String("Lock file path for Git dependency '") + dependency.name +
+                       "' uses a different Git location. Run 'slang package update'.";
+            return SLANG_FAIL;
+        }
+        // A manifest path or project-local override shadows the Git requirement. Its transitive
+        // requirements remain locked, but it has no release version to compare with this range.
+        return SLANG_OK;
+    }
     if (lockedPackage.git != dependency.git)
     {
         outError = String("Lock file uses a different Git URL for dependency '") + dependency.name +
@@ -44,10 +66,7 @@ SlangResult validateLockedDependency(
     SlangResult constraintResult = parseDependencyConstraint(dependency, constraint, outError);
     if (SLANG_FAILED(constraintResult))
         return constraintResult;
-    SlangResult versionResult =
-        lockedPackage.path.getLength()
-            ? SemanticVersion::parse(lockedPackage.version.getUnownedSlice(), lockedVersion)
-            : parseReleaseTag(lockedPackage.tag, lockedVersion);
+    SlangResult versionResult = parseReleaseTag(lockedPackage.tag, lockedVersion);
     if (SLANG_FAILED(versionResult) || !constraint.matches(lockedVersion))
     {
         outError = String("Locked version no longer satisfies dependency '") + dependency.name +
@@ -65,20 +84,6 @@ SlangResult validateLockedPackageManifest(
     if (manifest.name != package.name)
     {
         outError = String("Locked package manifest has a different name: ") + package.name;
-        return SLANG_FAIL;
-    }
-
-    SemanticVersion lockedVersion;
-    SemanticVersion manifestVersion;
-    SlangResult versionResult =
-        package.path.getLength()
-            ? SemanticVersion::parse(package.version.getUnownedSlice(), lockedVersion)
-            : parseReleaseTag(package.tag, lockedVersion);
-    if (SLANG_FAILED(versionResult) ||
-        SLANG_FAILED(SemanticVersion::parse(manifest.version.getUnownedSlice(), manifestVersion)) ||
-        lockedVersion != manifestVersion)
-    {
-        outError = String("Package manifest version does not match its lock: ") + package.name;
         return SLANG_FAIL;
     }
 
@@ -112,6 +117,7 @@ SlangResult validateLockedPackageManifest(
         {
             if (dependency.name == lockedDependency.name &&
                 dependency.git == lockedDependency.git &&
+                dependency.path == lockedDependency.path &&
                 dependency.version == lockedDependency.version &&
                 dependency.tag == lockedDependency.tag)
             {

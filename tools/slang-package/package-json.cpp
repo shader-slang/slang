@@ -271,18 +271,43 @@ static SlangResult _readDependencies(
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
-            _readRequiredString(container, pair.value, "git", dependency.git, outError));
-        if (!_isSafeGitLocation(dependency.git))
+            _readOptionalString(container, pair.value, "git", dependency.git, outError));
+        SLANG_RETURN_ON_FAIL(
+            _readOptionalString(container, pair.value, "path", dependency.path, outError));
+        if ((dependency.git.getLength() != 0) == (dependency.path.getLength() != 0))
+        {
+            outError = String("Dependency must contain exactly one of 'git' or 'path': ") +
+                       dependency.name;
+            return SLANG_FAIL;
+        }
+        if (dependency.git.getLength() && !_isSafeGitLocation(dependency.git))
         {
             outError = String("Dependency has an unsafe Git location: ") + dependency.name;
+            return SLANG_FAIL;
+        }
+        if (dependency.path.getLength() && !_isSafeLocalPath(dependency.path))
+        {
+            outError = String("Dependency path must be relative: ") + dependency.name;
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
             _readOptionalString(container, pair.value, "version", dependency.version, outError));
         SLANG_RETURN_ON_FAIL(
             _readOptionalString(container, pair.value, "tag", dependency.tag, outError));
-        VersionConstraint ignored;
-        SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, ignored, outError));
+        if (dependency.path.getLength())
+        {
+            if (dependency.version.getLength() || dependency.tag.getLength())
+            {
+                outError =
+                    String("Path dependency cannot contain 'version' or 'tag': ") + dependency.name;
+                return SLANG_FAIL;
+            }
+        }
+        else
+        {
+            VersionConstraint ignored;
+            SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, ignored, outError));
+        }
         for (const auto& existing : outDependencies)
         {
             if (existing.name == dependency.name)
@@ -306,13 +331,10 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
         outError = String("Invalid package name: ") + outManifest.name;
         return SLANG_FAIL;
     }
-    SLANG_RETURN_ON_FAIL(
-        _readRequiredString(json.container, json.root, "version", outManifest.version, outError));
-    SemanticVersion manifestVersion;
-    if (SLANG_FAILED(
-            SemanticVersion::parse(outManifest.version.getUnownedSlice(), manifestVersion)))
+    if (_find(json.container, json.root, "version").isValid())
     {
-        outError = String("Invalid package version: ") + outManifest.version;
+        outError =
+            "Package manifests do not contain a self version; the Git release tag is the version.";
         return SLANG_FAIL;
     }
     SLANG_RETURN_ON_FAIL(_readRelativePathArray(
@@ -368,17 +390,25 @@ static void _writeDependency(JSONWriter& writer, const Dependency& dependency)
     SLANG_RELEASE_ASSERT(isValidPackageName(dependency.name));
     writer.addUnquotedKey(dependency.name.getUnownedSlice(), SourceLoc());
     writer.startObject(SourceLoc());
-    _writeKey(writer, "git");
-    writer.addStringValue(dependency.git.getUnownedSlice(), SourceLoc());
-    if (dependency.version.getLength() != 0)
+    if (dependency.path.getLength())
     {
-        _writeKey(writer, "version");
-        writer.addStringValue(dependency.version.getUnownedSlice(), SourceLoc());
+        _writeKey(writer, "path");
+        writer.addStringValue(dependency.path.getUnownedSlice(), SourceLoc());
     }
-    if (dependency.tag.getLength() != 0)
+    else
     {
-        _writeKey(writer, "tag");
-        writer.addStringValue(dependency.tag.getUnownedSlice(), SourceLoc());
+        _writeKey(writer, "git");
+        writer.addStringValue(dependency.git.getUnownedSlice(), SourceLoc());
+        if (dependency.version.getLength() != 0)
+        {
+            _writeKey(writer, "version");
+            writer.addStringValue(dependency.version.getUnownedSlice(), SourceLoc());
+        }
+        if (dependency.tag.getLength() != 0)
+        {
+            _writeKey(writer, "tag");
+            writer.addStringValue(dependency.tag.getUnownedSlice(), SourceLoc());
+        }
     }
     writer.endObject(SourceLoc());
 }
@@ -389,8 +419,6 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
     writer.startObject(SourceLoc());
     _writeKey(writer, "name");
     writer.addStringValue(manifest.name.getUnownedSlice(), SourceLoc());
-    _writeKey(writer, "version");
-    writer.addStringValue(manifest.version.getUnownedSlice(), SourceLoc());
     _writeKey(writer, "exports");
     _writeStringArray(writer, manifest.exports);
     _writeKey(writer, "license_files");
@@ -424,12 +452,7 @@ static SlangResult _readLockedPackage(
         return SLANG_FAIL;
     }
     SLANG_RETURN_ON_FAIL(
-        _readRequiredString(container, pair.value, "git", outPackage.git, outError));
-    if (!_isSafeGitLocation(outPackage.git))
-    {
-        outError = String("Locked package has an unsafe Git location: ") + outPackage.name;
-        return SLANG_FAIL;
-    }
+        _readOptionalString(container, pair.value, "git", outPackage.git, outError));
     SLANG_RETURN_ON_FAIL(
         _readOptionalString(container, pair.value, "path", outPackage.path, outError));
     SemanticVersion ignoredVersion;
@@ -447,17 +470,29 @@ static SlangResult _readLockedPackage(
             outError = String("Locked local path must be relative: ") + outPackage.name;
             return SLANG_FAIL;
         }
-        SLANG_RETURN_ON_FAIL(
-            _readRequiredString(container, pair.value, "version", outPackage.version, outError));
-        if (SLANG_FAILED(
-                SemanticVersion::parse(outPackage.version.getUnownedSlice(), ignoredVersion)))
+        if (_find(container, pair.value, "version").isValid())
         {
-            outError = String("Locked local package has an invalid version: ") + outPackage.name;
+            outError = String("Locked path package cannot contain a version: ") + outPackage.name;
+            return SLANG_FAIL;
+        }
+        if (outPackage.git.getLength() && !_isSafeGitLocation(outPackage.git))
+        {
+            outError = String("Locked package has an unsafe Git location: ") + outPackage.name;
             return SLANG_FAIL;
         }
     }
     else
     {
+        if (!outPackage.git.getLength())
+        {
+            outError = String("Locked package must contain 'git' or 'path': ") + outPackage.name;
+            return SLANG_FAIL;
+        }
+        if (!_isSafeGitLocation(outPackage.git))
+        {
+            outError = String("Locked package has an unsafe Git location: ") + outPackage.name;
+            return SLANG_FAIL;
+        }
         if (_find(container, pair.value, "version").isValid())
         {
             outError =
@@ -502,9 +537,11 @@ SlangResult readLockFile(const String& path, LockFile& outLock, String& outError
 
     JSONValue lockVersion = _find(json.container, json.root, "lock_version");
     if (lockVersion.getKind() != JSONValue::Kind::Integer ||
-        json.container->asInteger(lockVersion) != 1)
+        json.container->asInteger(lockVersion) != 2)
     {
-        outError = "Field 'lock_version' must be the integer 1.";
+        outError =
+            "Field 'lock_version' must be the integer 2. Run 'slang package update' to regenerate "
+            "the lock.";
         return SLANG_FAIL;
     }
     JSONValue packages = _find(json.container, json.root, "packages");
@@ -543,12 +580,13 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
         SLANG_RELEASE_ASSERT(isValidPackageName(package.name));
         writer.addUnquotedKey(package.name.getUnownedSlice(), SourceLoc());
         writer.startObject(SourceLoc());
-        _writeKey(writer, "git");
-        writer.addStringValue(package.git.getUnownedSlice(), SourceLoc());
+        if (package.git.getLength())
+        {
+            _writeKey(writer, "git");
+            writer.addStringValue(package.git.getUnownedSlice(), SourceLoc());
+        }
         if (package.path.getLength())
         {
-            _writeKey(writer, "version");
-            writer.addStringValue(package.version.getUnownedSlice(), SourceLoc());
             _writeKey(writer, "path");
             writer.addStringValue(package.path.getUnownedSlice(), SourceLoc());
         }

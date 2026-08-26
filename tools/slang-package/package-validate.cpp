@@ -63,6 +63,27 @@ static bool _isPathWithin(const String& canonicalRoot, const String& canonicalPa
            Path::isDelimiter(path[root.getLength()]);
 }
 
+static SlangResult _validatePathDoesNotEscapeIntoToolState(
+    const String& projectRoot,
+    const String& canonicalDeclaringRoot,
+    const String& canonicalPath,
+    const String& dependencyName,
+    String& outError)
+{
+    String canonicalStateRoot;
+    if (SLANG_SUCCEEDED(
+            Path::getCanonical(Path::combine(projectRoot, ".slang"), canonicalStateRoot)) &&
+        _isPathWithin(canonicalStateRoot, canonicalPath) &&
+        !(_isPathWithin(canonicalStateRoot, canonicalDeclaringRoot) &&
+          _isPathWithin(canonicalDeclaringRoot, canonicalPath)))
+    {
+        outError =
+            String("Path dependency cannot use package-tool state under .slang: ") + dependencyName;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 /// Collect each `.slang` file under an export without following a directory outside that export.
 static SlangResult _collectSourceFilesRec(
     const String& exportRoot,
@@ -459,12 +480,19 @@ static SlangResult _readMaterializedManifest(
     {
         if (package.path.getLength())
         {
-            outError = String("Locked local package '") + package.name +
-                       "' is not registered in .slang/overrides.json.";
-            return SLANG_FAIL;
+            if (package.git.getLength())
+            {
+                outError = String("Locked local override '") + package.name +
+                           "' is not registered in .slang/overrides.json.";
+                return SLANG_FAIL;
+            }
+            outPackageRoot = Path::combine(projectRoot, package.path);
         }
-        outPackageRoot =
-            Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
+        else
+        {
+            outPackageRoot =
+                Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
+        }
     }
     if (SLANG_FAILED(
             readManifest(Path::combine(outPackageRoot, kManifestName), outManifest, outError)))
@@ -476,7 +504,7 @@ static SlangResult _readMaterializedManifest(
     return validateLockedPackageManifest(package, outManifest, outError);
 }
 
-SlangResult validateProject(const String& projectRoot, String& outError)
+SlangResult validateProject(const String& projectRoot, String& outError, List<String>* outWarnings)
 {
     Manifest rootManifest;
     SLANG_RETURN_ON_FAIL(
@@ -504,14 +532,10 @@ SlangResult validateProject(const String& projectRoot, String& outError)
     packageManifests.setCount(lock.packages.getCount());
     List<String> packageRoots;
     packageRoots.setCount(lock.packages.getCount());
-    for (Index i = 0; i < lock.packages.getCount(); ++i)
-        SLANG_RETURN_ON_FAIL(_readMaterializedManifest(
-            projectRoot,
-            lock.packages[i],
-            localPackages,
-            packageRoots[i],
-            packageManifests[i],
-            outError));
+    List<bool> loaded;
+    loaded.setCount(lock.packages.getCount());
+    for (auto& value : loaded)
+        value = false;
     for (const auto& localPackage : localPackages)
     {
         if (findLockedPackageIndex(lock, localPackage.name) < 0)
@@ -531,7 +555,45 @@ SlangResult validateProject(const String& projectRoot, String& outError)
     {
         Index index;
         SLANG_RETURN_ON_FAIL(validateLockedDependency(dependency, lock, index, outError));
-        if (!reachable[index])
+        if (dependency.path.getLength())
+        {
+            String canonicalExpectedPath;
+            String canonicalLockedPath;
+            if (SLANG_FAILED(Path::getCanonical(
+                    Path::combine(projectRoot, dependency.path),
+                    canonicalExpectedPath)) ||
+                SLANG_FAILED(Path::getCanonical(
+                    Path::combine(projectRoot, lock.packages[index].path),
+                    canonicalLockedPath)) ||
+                canonicalExpectedPath != canonicalLockedPath)
+            {
+                outError = String("Locked path does not match dependency '") + dependency.name +
+                           "'. Run 'slang package update'.";
+                return SLANG_FAIL;
+            }
+            String canonicalProjectRoot;
+            if (SLANG_FAILED(Path::getCanonical(projectRoot, canonicalProjectRoot)))
+            {
+                outError = String("Cannot canonicalize package root: ") + projectRoot;
+                return SLANG_FAIL;
+            }
+            SLANG_RETURN_ON_FAIL(_validatePathDoesNotEscapeIntoToolState(
+                projectRoot,
+                canonicalProjectRoot,
+                canonicalExpectedPath,
+                dependency.name,
+                outError));
+            if (!_isPathWithin(canonicalProjectRoot, canonicalExpectedPath) && outWarnings)
+            {
+                String warning = String("Path dependency '") + dependency.name +
+                                 "' escapes package '" + rootManifest.name +
+                                 "': " + dependency.path;
+                if (!outWarnings->contains(warning))
+                    outWarnings->add(warning);
+            }
+        }
+        if ((dependency.path.getLength() || lock.packages[index].git.getLength()) &&
+            !reachable[index])
         {
             reachable[index] = true;
             pending.add(index);
@@ -540,13 +602,62 @@ SlangResult validateProject(const String& projectRoot, String& outError)
     for (Index pendingIndex = 0; pendingIndex < pending.getCount(); ++pendingIndex)
     {
         Index index = pending[pendingIndex];
+        if (!loaded[index])
+        {
+            SLANG_RETURN_ON_FAIL(_readMaterializedManifest(
+                projectRoot,
+                lock.packages[index],
+                localPackages,
+                packageRoots[index],
+                packageManifests[index],
+                outError));
+            loaded[index] = true;
+        }
         const Manifest& manifest = packageManifests[index];
         for (const auto& dependency : manifest.dependencies)
         {
             Index dependencyIndex;
             SLANG_RETURN_ON_FAIL(
                 validateLockedDependency(dependency, lock, dependencyIndex, outError));
-            if (!reachable[dependencyIndex])
+            if (dependency.path.getLength())
+            {
+                String canonicalExpectedPath;
+                String canonicalLockedPath;
+                if (SLANG_FAILED(Path::getCanonical(
+                        Path::combine(packageRoots[index], dependency.path),
+                        canonicalExpectedPath)) ||
+                    SLANG_FAILED(Path::getCanonical(
+                        Path::combine(projectRoot, lock.packages[dependencyIndex].path),
+                        canonicalLockedPath)) ||
+                    canonicalExpectedPath != canonicalLockedPath)
+                {
+                    outError = String("Locked path does not match dependency '") + dependency.name +
+                               "'. Run 'slang package update'.";
+                    return SLANG_FAIL;
+                }
+                String canonicalDeclaringRoot;
+                if (SLANG_FAILED(Path::getCanonical(packageRoots[index], canonicalDeclaringRoot)))
+                {
+                    outError = String("Cannot canonicalize package root: ") + packageRoots[index];
+                    return SLANG_FAIL;
+                }
+                SLANG_RETURN_ON_FAIL(_validatePathDoesNotEscapeIntoToolState(
+                    projectRoot,
+                    canonicalDeclaringRoot,
+                    canonicalExpectedPath,
+                    dependency.name,
+                    outError));
+                if (!_isPathWithin(canonicalDeclaringRoot, canonicalExpectedPath) && outWarnings)
+                {
+                    String warning = String("Path dependency '") + dependency.name +
+                                     "' escapes package '" + manifest.name +
+                                     "': " + dependency.path;
+                    if (!outWarnings->contains(warning))
+                        outWarnings->add(warning);
+                }
+            }
+            if ((dependency.path.getLength() || lock.packages[dependencyIndex].git.getLength()) &&
+                !reachable[dependencyIndex])
             {
                 reachable[dependencyIndex] = true;
                 pending.add(dependencyIndex);
@@ -560,8 +671,11 @@ SlangResult validateProject(const String& projectRoot, String& outError)
     {
         if (!reachable[i])
         {
-            outError =
-                String("Lock file contains unreachable package '") + lock.packages[i].name + "'.";
+            outError = lock.packages[i].path.getLength() && !lock.packages[i].git.getLength()
+                           ? String("Locked path package '") + lock.packages[i].name +
+                                 "' is not selected by a trusted path dependency."
+                           : String("Lock file contains unreachable package '") +
+                                 lock.packages[i].name + "'.";
             return SLANG_FAIL;
         }
     }

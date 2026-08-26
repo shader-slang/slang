@@ -3,6 +3,7 @@
 #ifndef SLANG_PACKAGE_VALIDATE_H
 #define SLANG_PACKAGE_VALIDATE_H
 
+#include "core/slang-list.h"
 #include "core/slang-string.h"
 
 namespace Slang
@@ -14,7 +15,10 @@ namespace PackageTool
 const char* getLicensePlaceholderText();
 
 /// Validate the current package and its materialized, locked dependency closure.
-SlangResult validateProject(const String& projectRoot, String& outError);
+SlangResult validateProject(
+    const String& projectRoot,
+    String& outError,
+    List<String>* outWarnings = nullptr);
 
 } // namespace PackageTool
 } // namespace Slang
