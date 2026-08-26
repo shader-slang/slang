@@ -2594,6 +2594,16 @@ public:
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
 
+    void registerStructuralRayTracingStageConformance(
+        DeclRef<InterfaceDecl> superInterfaceDeclRef,
+        WitnessTable* witnessTable);
+    void diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl);
+    void diagnoseInvalidStructuralRayTracingCallableResult(CallableDecl* callableDecl);
+    void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
+    bool diagnoseInvalidStructuralRayTracingConstruction(InvokeExpr* invoke);
+    bool diagnoseInvalidStructuralRayTracingInvokeResult(InvokeExpr* invoke);
+    bool diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke);
+
     void _checkDifferentialConformance(
         ConformanceCheckingContext* context,
         Type* subType,
@@ -3657,6 +3667,9 @@ public:
         InvokeExpr* invoke,
         FuncType* funcType,
         FunctionDeclBase* funcDeclBase);
+    bool diagnoseDirectStructuralRayTracingStageInvoke(
+        InvokeExpr* invoke,
+        FunctionDeclBase* functionDecl);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
     // Get the type to use when referencing a declaration
     QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
@@ -3781,6 +3794,27 @@ public:
     SubtypeWitness* isFuncForwardDifferentiable(DeclRef<CallableDecl> declRef);
     SubtypeWitness* isFuncBackwardDifferentiable(DeclRef<CallableDecl> declRef);
 };
+
+DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
+    Linkage* linkage,
+    Module* module,
+    Name* name,
+    Profile& ioProfile,
+    DiagnosticSink* sink,
+    bool* outFoundStruct,
+    StructuralRayTracingEntryPointInfo* outInfo);
+void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink);
+void diagnoseMixedRayTracingAPIsInSelectedProgram(
+    Linkage* linkage,
+    List<EntryPoint*> const& entryPoints,
+    DiagnosticSink* sink);
+void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, DiagnosticSink* sink);
+void registerRayTracingAPICall(
+    Linkage* linkage,
+    FunctionDeclBase* caller,
+    FunctionDeclBase* callee,
+    SourceLoc callLoc,
+    DiagnosticSink* sink);
 
 
 inline void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)

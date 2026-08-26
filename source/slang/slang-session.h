@@ -23,6 +23,7 @@
 #include "slang-compiler-options.h"
 #include "slang-content-assist-info.h"
 #include "slang-global-session.h"
+#include "slang-structural-ray-tracing.h"
 
 #include <mutex>
 #include <slang.h>
@@ -405,6 +406,15 @@ public:
 
     SourceManager* getSourceManager() { return m_sourceManager; }
 
+    StructuralRayTracingDeclRegistry& getStructuralRayTracingDeclRegistry()
+    {
+        return m_structuralRayTracingDeclRegistry;
+    }
+    const StructuralRayTracingDeclRegistry& getStructuralRayTracingDeclRegistry() const
+    {
+        return m_structuralRayTracingDeclRegistry;
+    }
+
     /// Override the source manager for the linkage.
     ///
     /// This is only used to install a temporary override when
@@ -490,5 +500,7 @@ private:
     List<Type*> m_specializedTypes;
 
     RefPtr<SharedSemanticsContext> m_semanticsForReflection;
+
+    StructuralRayTracingDeclRegistry m_structuralRayTracingDeclRegistry;
 };
 } // namespace Slang

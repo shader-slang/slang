@@ -1,0 +1,2 @@
+ray[0] stage=21 depth=1 dispatchWidth=2
+ray[1] stage=20 depth=0 dispatchWidth=2

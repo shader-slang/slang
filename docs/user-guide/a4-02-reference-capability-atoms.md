@@ -1510,6 +1510,31 @@ Compound Capabilities
 `shadermemorycontrol_compute`
 > (gfx targets) Capabilities required to use memory barriers that only work for raytracing & compute shader stages
 
+`structural_raytracing_anyhit`
+> Logical any-hit role used by the structural ray-tracing API.
+
+`structural_raytracing_call_shader`
+> Stages that may invoke a callable shader through the structural ray-tracing API.
+
+`structural_raytracing_callable`
+> Logical callable role used by the structural ray-tracing API.
+
+`structural_raytracing_closesthit`
+> Logical closest-hit role used by the structural ray-tracing API.
+
+`structural_raytracing_dispatch_system_values`
+> Ray-dispatch system values used by native ray-tracing stages or by logical structural
+> ray-tracing stages whose Metal implementation is synthesized by the compiler.
+
+`structural_raytracing_intersection`
+> Logical intersection role used by the structural ray-tracing API.
+
+`structural_raytracing_miss`
+> Logical miss role used by the structural ray-tracing API.
+
+`structural_raytracing_trace`
+> Stages that may trace a ray through the structural ray-tracing API.
+
 `structuredbuffer`
 > Capabilities required to use StructuredBuffer
 
@@ -1735,6 +1760,9 @@ Other
 
 `all`
 > User should not use this capability
+
+`metal_raytracing_extended_limits`
+> Enables Metal ray-tracing acceleration structures built with extended limits.
 
 `optix_coopvec`
 > Represents capabilities required for optix cooperative vector support.

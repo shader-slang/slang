@@ -10,6 +10,7 @@
 #include "slang-ir-specialize-target-switch.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-translate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
@@ -335,6 +336,13 @@ IRType* cloneType(IRSpecContextBase* context, IRType* originalType);
 
 IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
 {
+    if (as<IRInterfaceType>(originalValue))
+    {
+        auto clonedInst = cloneGlobalValue(this, originalValue);
+        cloneAnnotations(this, clonedInst, originalValue);
+        return clonedInst;
+    }
+
     switch (originalValue->getOp())
     {
     case kIROp_StructType:
@@ -348,7 +356,6 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_InterfaceRequirementEntry:
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
-    case kIROp_InterfaceType:
     case kIROp_EnumType:
     case kIROp_SymbolAlias:
         {
@@ -389,8 +396,11 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_PtrLit:
         {
             IRConstant* c = (IRConstant*)originalValue;
-            SLANG_RELEASE_ASSERT(c->value.ptrVal == nullptr);
-            return builder->getNullPtrValue(cloneType(this, c->getFullType()));
+            // Non-null pointer literals are used by front-end-only decorations to retain an AST
+            // declaration for diagnostics. Linking stays within the same compiler session, so the
+            // declaration remains valid and must be preserved until the mandatory passes consume
+            // it. Front-end-only instructions are stripped before target legalization and emit.
+            return builder->getPtrValue(cloneType(this, c->getFullType()), c->value.ptrVal);
         }
         break;
 
@@ -895,8 +905,10 @@ IRInterfaceType* cloneInterfaceTypeImpl(
     IRInterfaceType* originalInterface,
     IROriginalValuesForClone const& originalValues)
 {
-    auto clonedInterface =
-        builder->createInterfaceType(originalInterface->getOperandCount(), nullptr);
+    auto clonedInterface = builder->createInterfaceType(
+        originalInterface->getOp(),
+        originalInterface->getOperandCount(),
+        nullptr);
     registerClonedValue(context, clonedInterface, originalValues);
 
     for (UInt i = 0; i < originalInterface->getOperandCount(); i++)
@@ -1074,6 +1086,12 @@ void cloneFunctionCommon(
 ///
 static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* builder)
 {
+    // Structural ray-tracing `invoke` parameters are logical, compiler-owned views rather than
+    // physical entry-point parameters. Their native parameter layouts are created on the adapter
+    // synthesized after linking.
+    if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        return;
+
     auto layoutDecor = func->findDecoration<IRLayoutDecoration>();
     if (!layoutDecor)
         return;
@@ -1107,6 +1125,67 @@ static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* buil
             }
         }
     }
+}
+
+static IRType* _cloneStructuralRayTracingEntryPointType(
+    IRSpecContext* context,
+    ASTBuilder* astBuilder,
+    Type* type)
+{
+    if (!type || type == astBuilder->getVoidType())
+        return context->builder->getVoidType();
+
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return nullptr;
+
+    auto mangledName = getMangledName(astBuilder, declRefType->getDeclRef());
+    auto symbol = context->findSymbols(mangledName.getUnownedSlice());
+    if (!symbol)
+    {
+        auto hashedName = getHashedName(mangledName.getUnownedSlice());
+        symbol = context->findSymbols(hashedName.getUnownedSlice());
+    }
+    return symbol ? as<IRType>(cloneGlobalValue(context, symbol->irGlobalValue)) : nullptr;
+}
+
+static void _addStructuralRayTracingEntryPointInfo(
+    IRSpecContext* context,
+    IRFunc* func,
+    EntryPoint* entryPoint)
+{
+    if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>() ||
+        !entryPoint->getStructuralRayTracingInvokeMethod())
+        return;
+
+    auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
+    auto& info = entryPoint->getStructuralRayTracingInfo();
+    addStructuralRayTracingEntryPointInfo(
+        *context->builder,
+        func,
+        {
+            .stageKind = info.stageKind,
+            .invoke = func,
+            .stageType =
+                _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.stageType),
+            .contextType =
+                _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.contextType),
+            .payloadType =
+                _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.payloadType),
+            .recordType =
+                _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.recordType),
+            .hitAttributesType = _cloneStructuralRayTracingEntryPointType(
+                context,
+                astBuilder,
+                info.hitAttributesType),
+            .callableDataType = _cloneStructuralRayTracingEntryPointType(
+                context,
+                astBuilder,
+                info.callableDataType),
+            .hitAttributesKind = info.hitAttributesKind,
+        });
 }
 
 IRFunc* specializeIRForEntryPoint(
@@ -1242,6 +1321,8 @@ IRFunc* specializeIRForEntryPoint(
                 UnownedStringSlice(entryPoint->getModule()->getName()))};
         context->builder->addDecoration(clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
     }
+
+    _addStructuralRayTracingEntryPointInfo(context, clonedFunc, entryPoint);
 
     // We will also go on and attach layout information
     // to the function parameters, so that we have it
@@ -1415,6 +1496,11 @@ IRInst* cloneInst(
     SLANG_DEFER(_debugResetInstBeingCloned());
 #endif
 
+    if (auto originalInterface = as<IRInterfaceType>(originalInst))
+    {
+        return cloneInterfaceTypeImpl(context, builder, originalInterface, originalValues);
+    }
+
     switch (originalInst->getOp())
     {
         // We need to special-case any instruction that is not
@@ -1468,13 +1554,6 @@ IRInst* cloneInst(
 
     case kIROp_EnumType:
         return cloneEnumTypeImpl(context, builder, cast<IREnumType>(originalInst), originalValues);
-
-    case kIROp_InterfaceType:
-        return cloneInterfaceTypeImpl(
-            context,
-            builder,
-            cast<IRInterfaceType>(originalInst),
-            originalValues);
 
     case kIROp_Generic:
         return cloneGenericImpl(context, builder, cast<IRGeneric>(originalInst), originalValues);
@@ -2529,6 +2608,12 @@ struct IRPrelinkContext : IRSpecContext
             builderForClone = &shared->builderStorage;
         }
         IRInst* clonedInst = nullptr;
+        if (as<IRInterfaceType>(originalVal))
+        {
+            return completeClonedInst(
+                cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
+        }
+
         switch (originalVal->getOp())
         {
         case kIROp_Generic:
@@ -2538,7 +2623,6 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_StructKey:
         case kIROp_InterfaceRequirementEntry:
         case kIROp_GlobalGenericParam:
-        case kIROp_InterfaceType:
             return completeClonedInst(
                 cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
         case kIROp_WitnessTable:

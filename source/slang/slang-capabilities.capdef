@@ -211,6 +211,10 @@ def metallib_4_0 : metallib_3_2;
 /// [Version]
 alias metallib_latest = metallib_4_0;
 
+/// Enables Metal ray-tracing acceleration structures built with extended limits.
+/// [Other]
+def metal_raytracing_extended_limits : metal;
+
 // HLSL versions
 
 def _sm_4_0 : hlsl;
@@ -1515,6 +1519,36 @@ alias callable = _callable + raytracing;
 /// [Stage]
 alias miss = _miss + raytracing;
 
+// Logical stages implemented by the structural ray-tracing API. Metal has no native shader
+// stages for these roles, so the compiler synthesizes their physical dispatch there.
+/// Logical closest-hit role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_closesthit = closesthit | _closesthit + metal;
+/// Logical any-hit role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_anyhit = anyhit | _anyhit + metal;
+/// Logical intersection role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_intersection = intersection | _intersection + metal;
+/// Logical miss role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_miss = miss | _miss + metal;
+/// Logical callable role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_callable = callable | _callable + metal;
+
+/// Stages that may invoke a callable shader through the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_call_shader = glsl_hlsl_spirv + raygen
+                                         | glsl_hlsl_spirv + closesthit
+                                         | glsl_hlsl_spirv + miss
+                                         | glsl_hlsl_spirv + callable
+                                         | _raygen + metal
+                                         | compute + metal
+                                         | _closesthit + metal
+                                         | _miss + metal
+                                         | _callable + metal;
+
 /// Mesh shader stage & mesh shader capabilities
 /// [Stage]
 alias mesh = _mesh + _meshshading;
@@ -1558,6 +1592,13 @@ alias anyhit_intersection = anyhit | intersection;
 /// Collection of shader stages
 /// [Compound]
 alias raygen_closesthit_miss = raygen | closesthit | miss;
+
+/// Stages that may trace a ray through the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_trace = glsl_hlsl_spirv + raygen_closesthit_miss
+                                    | _raygen + metal
+                                    | _closesthit + metal
+                                    | _miss + metal;
 
 /// Collection of shader stages
 /// [Compound]
@@ -2653,6 +2694,18 @@ alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp | llvm;
 /// Collection of capabilities for raytracing with all raytracing stages.
 /// [Compound]
 alias raytracing_allstages = raytracing_stages + raytracing;
+
+/// Ray-dispatch system values used by native ray-tracing stages or by logical structural
+/// ray-tracing stages whose Metal implementation is synthesized by the compiler.
+/// [Compound]
+alias structural_raytracing_dispatch_system_values =
+    cuda_glsl_hlsl_spirv + raytracing_allstages
+    | _raygen + metal
+    | _closesthit + metal
+    | _anyhit + metal
+    | _intersection + metal
+    | _miss + metal
+    | _callable + metal;
 
 /// Collection of capabilities for raytracing with the shader stage of anyhit.
 /// [Compound]

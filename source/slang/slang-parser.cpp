@@ -10075,21 +10075,21 @@ static void addSimpleModifierSyntax(Session* session, Scope* scope, char const* 
 
 static IROp parseIROp(Parser* parser, Token& outToken)
 {
+    IROp op;
     if (AdvanceIf(parser, TokenType::OpSub))
     {
         outToken = parser->ReadToken();
-        return IROp(-stringToInt(outToken.getContent()));
+        op = IROp(-stringToInt(outToken.getContent()));
     }
     else if (parser->LookAheadToken(TokenType::IntegerLiteral))
     {
         outToken = parser->ReadToken();
-        return IROp(stringToInt(outToken.getContent()));
+        op = IROp(stringToInt(outToken.getContent()));
     }
     else
     {
         outToken = parser->ReadToken(TokenType::Identifier);
-        ;
-        auto op = findIROp(outToken.getContent());
+        op = findIROp(outToken.getContent());
 
         if (op == kIROp_Invalid)
         {
@@ -10097,8 +10097,27 @@ static IROp parseIROp(Parser* parser, Token& outToken)
                 .feature = "unknown intrinsic op",
                 .location = outToken.loc});
         }
-        return op;
     }
+
+    if ((op >= kIROp_FirstRaytracingStageInterface && op <= kIROp_LastRaytracingStageInterface) ||
+        (op >= kIROp_FirstStructuralRayTracingStageInputOperation &&
+         op <= kIROp_LastStructuralRayTracingStageInputOperation) ||
+        op == kIROp_StructuralRayTracingTrace || op == kIROp_StructuralRayTracingCallShader ||
+        op == kIROp_MetalStructuralRayTracingTrace ||
+        op == kIROp_MetalStructuralRayTracingCallShader ||
+        op == kIROp_StructuralRayTracingHitGroupInfoDecoration ||
+        op == kIROp_StructuralRayTracingMissGroupInfoDecoration ||
+        op == kIROp_StructuralRayTracingCallableGroupInfoDecoration ||
+        op == kIROp_MetalIntersectionFunctionTable || op == kIROp_MetalVisibleFunctionTable ||
+        op == kIROp_MetalVisibleFunctionDecoration ||
+        op == kIROp_MetalIntersectionFunctionDecoration)
+    {
+        parser->sink->diagnose(Diagnostics::CompilerOwnedIntrinsicOp{
+            .operation = outToken.getContent(),
+            .location = outToken.loc});
+        return kIROp_Invalid;
+    }
+    return op;
 }
 
 static NodeBase* parseIntrinsicOpModifier(Parser* parser, void* /*userData*/)

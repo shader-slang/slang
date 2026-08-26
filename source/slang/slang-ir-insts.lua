@@ -537,6 +537,21 @@ local insts = {
 						},
 					},
 					{ RaytracingAccelerationStructure = { struct_name = "RaytracingAccelerationStructureType" } },
+					{
+						MetalIntersectionFunctionTable = {
+							operands = { { "tagMask", "IRIntLit" }, { "maxLevels", "IRIntLit" } },
+							hoistable = true,
+						},
+					},
+					{
+						MetalVisibleFunctionTable = {
+							operands = {
+								{ "functionType", "IRFuncType" },
+								{ "stageKind", "IRIntLit" },
+							},
+							hoistable = true,
+						},
+					},
 				},
 			},
 			{
@@ -752,6 +767,36 @@ local insts = {
 				class = { struct_name = "ClassType", parent = true },
 			},
 			{ interface = { struct_name = "InterfaceType", global = true } },
+			{
+				RaytracingStageInterface = {
+					global = true,
+					{
+						closest_hit_stage_interface = {
+							struct_name = "ClosestHitStageInterface",
+						},
+					},
+					{
+						any_hit_stage_interface = {
+							struct_name = "AnyHitStageInterface",
+						},
+					},
+					{
+						intersection_stage_interface = {
+							struct_name = "IntersectionStageInterface",
+						},
+					},
+					{
+						miss_stage_interface = {
+							struct_name = "MissStageInterface",
+						},
+					},
+					{
+						callable_stage_interface = {
+							struct_name = "CallableStageInterface",
+						},
+					},
+				},
+			},
 			{
 				associated_type = {
 					struct_name = "AssociatedType",
@@ -1167,6 +1212,129 @@ local insts = {
 	{ GetWorkGroupSize = { hoistable = true } },
 	-- An inst that returns the current stage of the calling entry point.
 	{ GetCurrentStage = {} },
+	{
+		StructuralRayTracingStageInputOperation = {
+			{ structuralRayTracingGetPayload = { operands = { { "input" } } } },
+			{ structuralRayTracingGetCallableData = { operands = { { "input" } } } },
+			{ structuralRayTracingGetRecord = { operands = { { "input" } } } },
+			{ structuralRayTracingGetHitAttributes = { operands = { { "input" } } } },
+			{ structuralRayTracingGetTriangleBarycentricCoord = { operands = { { "input" } } } },
+			{ structuralRayTracingGetTriangleFrontFacing = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetCurveParameter = { operands = { { "input" } } } },
+			{ structuralRayTracingGetRayTMin = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetRayTCurrent = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetRayTime = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetRayFlags = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetHitKind = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetWorldRayOrigin = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetWorldRayDirection = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetObjectSpaceRay = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetPrimitiveIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetGeometryIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetInstanceIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetInstanceID = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetObjectToWorld = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetWorldToObject = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetDispatchRaysIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetDispatchRaysDimensions = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingIgnoreHit = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingAcceptHitAndEndSearch = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingReportHit = { min_operands = 4 } },
+			{ structuralRayTracingReportHitWithKind = { min_operands = 5 } },
+		},
+	},
+	{
+		structuralRayTracingTrace = {
+			operands = {
+				{ "fallback" },
+				{ "programLayout" },
+				{ "traceContext" },
+				{ "motionKind" },
+				{ "hitGroups" },
+				{ "hitGroupTypes" },
+				{ "missGroups" },
+				{ "missGroupTypes" },
+				{ "callableGroups" },
+				{ "callableGroupTypes" },
+				{ "tracer" },
+				{ "desc" },
+				{ "accelerationStructure" },
+				{ "descriptor" },
+				{ "payload" },
+			},
+		},
+	},
+	{
+		structuralRayTracingCallShader = {
+			operands = {
+				{ "fallback" },
+				{ "programLayout" },
+				{ "traceContext" },
+				{ "callableGroups" },
+				{ "callableGroupTypes" },
+				{ "callableContext" },
+				{ "callableDataType" },
+				{ "tracer" },
+				{ "callableIndex" },
+				{ "descriptor" },
+				{ "data" },
+			},
+		},
+	},
+	{
+		metalStructuralRayTracingTrace = {
+			operands = {
+				{ "tagMask" },
+				{ "maxLevels" },
+				{ "missRequirements" },
+				{ "closestHitRequirements" },
+				{ "geometryKind" },
+				{ "hasIntersectionFunctions" },
+				{ "hasMissFunctions" },
+				{ "hasClosestHitFunctions" },
+				{ "origin" },
+				{ "direction" },
+				{ "minDistance" },
+				{ "maxDistance" },
+				{ "time" },
+				{ "rayFlags" },
+				{ "instanceMask" },
+				{ "sbtOffset" },
+				{ "sbtStride" },
+				{ "missIndex" },
+				{ "accelerationStructure" },
+				{ "intersectionFunctions" },
+				{ "missFunctions" },
+				{ "closestHitFunctions" },
+				{ "descriptorResources" },
+				{ "records" },
+				{ "rayData" },
+				{ "missHasGlobalContext" },
+				{ "closestHitHasGlobalContext" },
+				{ "globalContext" },
+			},
+		},
+	},
+	{
+		metalStructuralRayTracingCallShader = {
+			operands = {
+				{ "callableIndex" },
+				{ "data" },
+				{ "dispatchRaysIndex" },
+				{ "dispatchRaysDimensions" },
+				{ "hasDispatchRaysIndex" },
+				{ "hasDispatchRaysDimensions" },
+				{ "descriptorResources" },
+				{ "records" },
+				{ "descriptorResourcesType" },
+				{ "callableFunctionsField" },
+				{ "hasGlobalContext" },
+				{ "globalContext" },
+			},
+		},
+	},
+	{ metalStructuralRayTracingDispatchRaysIndex = {} },
+	{ metalStructuralRayTracingDispatchRaysDimensions = {} },
 	{ param = {} },
 	{ field = { struct_name = "StructField", min_operands = 2 } },
 	{ var = {} },
@@ -2091,6 +2259,98 @@ local insts = {
 						{ "profileInst", "IRIntLit" },
 						{ "name", "IRStringLit" },
 						{ "moduleName", "IRStringLit", optional = true },
+					},
+				},
+			},
+			{
+				structuralRayTracingEntryPointInfo = {
+					struct_name = "StructuralRayTracingEntryPointInfoDecoration",
+					operands = {
+						{ "stageKind", "IRIntLit" },
+						{ "invoke" },
+						{ "stageType", "IRType" },
+						{ "contextType", "IRType" },
+						{ "payloadType", "IRType" },
+						{ "recordType", "IRType" },
+						{ "hitAttributesType", "IRType" },
+						{ "callableDataType", "IRType" },
+						{ "hitAttributesKind", "IRIntLit" },
+					},
+				},
+			},
+			{
+				structuralRayTracingHitGroupInfo = {
+					struct_name = "StructuralRayTracingHitGroupInfoDecoration",
+					operands = {
+						{ "groupType", "IRType" },
+						{ "slotType", "IRType" },
+						{ "slotIndex", "IRIntLit" },
+						{ "contextType", "IRType" },
+						{ "primitiveType", "IRType" },
+						{ "payloadType", "IRType" },
+						{ "recordType", "IRType" },
+						{ "hitAttributesType", "IRType" },
+						{ "hitAttributesKind", "IRIntLit" },
+						{ "closestHitType", "IRType" },
+						{ "closestHit" },
+						{ "anyHitType", "IRType" },
+						{ "anyHit" },
+						{ "intersectionType", "IRType" },
+						{ "intersection" },
+					},
+				},
+			},
+			{
+				structuralRayTracingMissGroupInfo = {
+					struct_name = "StructuralRayTracingMissGroupInfoDecoration",
+					operands = {
+						{ "groupType", "IRType" },
+						{ "slotType", "IRType" },
+						{ "slotIndex", "IRIntLit" },
+						{ "contextType", "IRType" },
+						{ "payloadType", "IRType" },
+						{ "recordType", "IRType" },
+						{ "missType", "IRType" },
+						{ "miss" },
+					},
+				},
+			},
+			{
+				structuralRayTracingCallableGroupInfo = {
+					struct_name = "StructuralRayTracingCallableGroupInfoDecoration",
+					operands = {
+						{ "groupType", "IRType" },
+						{ "slotType", "IRType" },
+						{ "slotIndex", "IRIntLit" },
+						{ "contextType", "IRType" },
+						{ "callableDataType", "IRType" },
+						{ "recordType", "IRType" },
+						{ "callableType", "IRType" },
+						{ "callable" },
+					},
+				},
+			},
+			{
+				metalVisibleFunction = {
+					struct_name = "MetalVisibleFunctionDecoration",
+					operands = {
+						{ "stageKind", "IRIntLit" },
+						{ "tableType", "IRType" },
+					},
+				},
+			},
+			{
+				explicitGlobalContext = {
+					struct_name = "ExplicitGlobalContextDecoration",
+				},
+			},
+			{
+				metalIntersectionFunction = {
+					struct_name = "MetalIntersectionFunctionDecoration",
+					operands = {
+						{ "geometryKind", "IRIntLit" },
+						{ "tagMask", "IRIntLit" },
+						{ "maxLevels", "IRIntLit" },
 					},
 				},
 			},

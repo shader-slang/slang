@@ -7,6 +7,7 @@
 #include "slang-compiler.h"
 #include "slang-deprecated.h"
 #include "slang-lookup.h"
+#include "slang-reflection-structural-ray-tracing.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang.h"
@@ -5390,6 +5391,263 @@ SLANG_API SlangReflectionType* spReflectionTypeParameter_GetConstraintByIndex(
 }
 
 // Shader Reflection
+
+static SlangStage _getReflectedRayTracingStage(StructuralRayTracingStageKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingStageKind::ClosestHit:
+        return SLANG_STAGE_CLOSEST_HIT;
+    case StructuralRayTracingStageKind::AnyHit:
+        return SLANG_STAGE_ANY_HIT;
+    case StructuralRayTracingStageKind::Intersection:
+        return SLANG_STAGE_INTERSECTION;
+    case StructuralRayTracingStageKind::Miss:
+        return SLANG_STAGE_MISS;
+    case StructuralRayTracingStageKind::Callable:
+        return SLANG_STAGE_CALLABLE;
+    default:
+        return SLANG_STAGE_NONE;
+    }
+}
+
+SLANG_API SlangReflectionTraceProgramLayout* spReflection_findTraceProgramLayout(
+    SlangReflection* reflection,
+    char const* name)
+{
+    return (SlangReflectionTraceProgramLayout*)findStructuralRayTracingProgramLayoutReflection(
+        convert(reflection),
+        name);
+}
+
+SLANG_API SlangReflectionType* spReflectionTraceProgramLayout_getType(
+    SlangReflectionTraceProgramLayout* layout)
+{
+    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
+    return reflectedLayout ? convert(reflectedLayout->layoutType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionTraceProgramLayout_getTraceContextType(
+    SlangReflectionTraceProgramLayout* layout)
+{
+    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
+    return reflectedLayout ? convert(reflectedLayout->traceContextType) : nullptr;
+}
+
+SLANG_API SlangUInt
+spReflectionTraceProgramLayout_getHitGroupCount(SlangReflectionTraceProgramLayout* layout)
+{
+    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
+    return reflectedLayout ? SlangUInt(reflectedLayout->hitGroups.getCount()) : 0;
+}
+
+SLANG_API SlangReflectionRayTracingHitGroup* spReflectionTraceProgramLayout_getHitGroup(
+    SlangReflectionTraceProgramLayout* layout,
+    SlangUInt index)
+{
+    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
+    if (!reflectedLayout || index >= SlangUInt(reflectedLayout->hitGroups.getCount()))
+        return nullptr;
+    return (SlangReflectionRayTracingHitGroup*)reflectedLayout->hitGroups[Index(index)].Ptr();
+}
+
+SLANG_API SlangUInt
+spReflectionTraceProgramLayout_getMissGroupCount(SlangReflectionTraceProgramLayout* layout)
+{
+    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
+    return reflectedLayout ? SlangUInt(reflectedLayout->missGroups.getCount()) : 0;
+}
+
+SLANG_API SlangReflectionRayTracingMissGroup* spReflectionTraceProgramLayout_getMissGroup(
+    SlangReflectionTraceProgramLayout* layout,
+    SlangUInt index)
+{
+    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
+    if (!reflectedLayout || index >= SlangUInt(reflectedLayout->missGroups.getCount()))
+        return nullptr;
+    return (SlangReflectionRayTracingMissGroup*)reflectedLayout->missGroups[Index(index)].Ptr();
+}
+
+SLANG_API SlangUInt
+spReflectionTraceProgramLayout_getCallableGroupCount(SlangReflectionTraceProgramLayout* layout)
+{
+    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
+    return reflectedLayout ? SlangUInt(reflectedLayout->callableGroups.getCount()) : 0;
+}
+
+SLANG_API SlangReflectionRayTracingCallableGroup* spReflectionTraceProgramLayout_getCallableGroup(
+    SlangReflectionTraceProgramLayout* layout,
+    SlangUInt index)
+{
+    auto reflectedLayout = (StructuralRayTracingProgramLayoutReflection*)layout;
+    if (!reflectedLayout || index >= SlangUInt(reflectedLayout->callableGroups.getCount()))
+        return nullptr;
+    return (SlangReflectionRayTracingCallableGroup*)reflectedLayout->callableGroups[Index(index)]
+        .Ptr();
+}
+
+SLANG_API SlangInt spReflectionRayTracingHitGroup_getSlot(SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? SlangInt(reflectedGroup->slot) : -1;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getType(
+    SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->groupType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getContextType(
+    SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->contextType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getRecordType(
+    SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->recordType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getPrimitiveType(
+    SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->primitiveType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getIntersectionAttributesType(
+    SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->intersectionAttributesType) : nullptr;
+}
+
+SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingHitGroup_getClosestHit(
+    SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? (SlangReflectionRayTracingStage*)reflectedGroup->closestHit.Ptr()
+                          : nullptr;
+}
+
+SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingHitGroup_getAnyHit(
+    SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? (SlangReflectionRayTracingStage*)reflectedGroup->anyHit.Ptr() : nullptr;
+}
+
+SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingHitGroup_getIntersection(
+    SlangReflectionRayTracingHitGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingHitGroupReflection*)group;
+    return reflectedGroup ? (SlangReflectionRayTracingStage*)reflectedGroup->intersection.Ptr()
+                          : nullptr;
+}
+
+SLANG_API SlangInt
+spReflectionRayTracingMissGroup_getSlot(SlangReflectionRayTracingMissGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingMissGroupReflection*)group;
+    return reflectedGroup ? SlangInt(reflectedGroup->slot) : -1;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingMissGroup_getType(
+    SlangReflectionRayTracingMissGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingMissGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->groupType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingMissGroup_getContextType(
+    SlangReflectionRayTracingMissGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingMissGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->contextType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingMissGroup_getRecordType(
+    SlangReflectionRayTracingMissGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingMissGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->recordType) : nullptr;
+}
+
+SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingMissGroup_getMiss(
+    SlangReflectionRayTracingMissGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingMissGroupReflection*)group;
+    return reflectedGroup ? (SlangReflectionRayTracingStage*)reflectedGroup->miss.Ptr() : nullptr;
+}
+
+SLANG_API SlangInt
+spReflectionRayTracingCallableGroup_getSlot(SlangReflectionRayTracingCallableGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingCallableGroupReflection*)group;
+    return reflectedGroup ? SlangInt(reflectedGroup->slot) : -1;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingCallableGroup_getType(
+    SlangReflectionRayTracingCallableGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingCallableGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->groupType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingCallableGroup_getContextType(
+    SlangReflectionRayTracingCallableGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingCallableGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->contextType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingCallableGroup_getRecordType(
+    SlangReflectionRayTracingCallableGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingCallableGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->recordType) : nullptr;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingCallableGroup_getDataType(
+    SlangReflectionRayTracingCallableGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingCallableGroupReflection*)group;
+    return reflectedGroup ? convert(reflectedGroup->callableDataType) : nullptr;
+}
+
+SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingCallableGroup_getCallable(
+    SlangReflectionRayTracingCallableGroup* group)
+{
+    auto reflectedGroup = (StructuralRayTracingCallableGroupReflection*)group;
+    return reflectedGroup ? (SlangReflectionRayTracingStage*)reflectedGroup->callable.Ptr()
+                          : nullptr;
+}
+
+SLANG_API SlangStage spReflectionRayTracingStage_getStage(SlangReflectionRayTracingStage* stage)
+{
+    auto reflectedStage = (StructuralRayTracingStageReflection*)stage;
+    return reflectedStage ? _getReflectedRayTracingStage(reflectedStage->stageKind)
+                          : SLANG_STAGE_NONE;
+}
+
+SLANG_API SlangReflectionType* spReflectionRayTracingStage_getType(
+    SlangReflectionRayTracingStage* stage)
+{
+    auto reflectedStage = (StructuralRayTracingStageReflection*)stage;
+    return reflectedStage ? convert(reflectedStage->type) : nullptr;
+}
+
+SLANG_API char const* spReflectionRayTracingStage_getEntryPointName(
+    SlangReflectionRayTracingStage* stage)
+{
+    auto reflectedStage = (StructuralRayTracingStageReflection*)stage;
+    return reflectedStage ? reflectedStage->entryPointName.getBuffer() : nullptr;
+}
 
 SLANG_API unsigned spReflection_GetParameterCount(SlangReflection* inProgram)
 {

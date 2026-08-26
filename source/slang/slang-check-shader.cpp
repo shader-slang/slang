@@ -1728,6 +1728,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
+    diagnoseMixedRayTracingAPIUse(entryPoint, sink);
 
     // Check if the return type is valid for a shader entry point
     auto returnType = entryPointFuncDecl->returnType.type;
@@ -2422,6 +2423,17 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
+        if (targetCaps.getCompileTarget() == CapabilityAtom::metal &&
+            entryPoint->getStage() == Stage::RayGeneration &&
+            linkage->getStructuralRayTracingDeclRegistry().functionReachesStructuralTrace(
+                entryPointFuncDecl))
+        {
+            // Structural ray-generation programs become Metal compute kernels, but source code
+            // still executes in the logical ray-generation stage. Using the abstract stage atom
+            // admits only operations with an explicit structural Metal implementation; the target
+            // lowering changes the physical entry-point stage after consuming those operations.
+            stageCapabilitySet = CapabilitySet{CapabilityName::_raygen};
+        }
         targetCaps.join(stageCapabilitySet);
         if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
         {
@@ -2625,6 +2637,29 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     auto sink = compileRequest->getSink();
 
     auto entryPointName = entryPointReq->getName();
+    auto entryPointProfile = entryPointReq->getProfile();
+    bool foundStructuralStage = false;
+    StructuralRayTracingEntryPointInfo structuralInfo;
+    auto structuralEntryPointDeclRef = findStructuralRayTracingEntryPointByName(
+        linkage,
+        translationUnit->getModule(),
+        entryPointName,
+        entryPointProfile,
+        sink,
+        &foundStructuralStage,
+        &structuralInfo);
+    if (foundStructuralStage)
+    {
+        if (!structuralEntryPointDeclRef)
+            return nullptr;
+
+        auto entryPoint =
+            EntryPoint::create(linkage, structuralEntryPointDeclRef, entryPointProfile);
+        entryPoint->setNameOverride(entryPointName);
+        entryPoint->setStructuralRayTracingInfo(structuralInfo);
+        return sink->getErrorCount() ? nullptr : entryPoint;
+    }
+
     DeclRef<FuncDecl> entryPointFuncDeclRef =
         findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
 
@@ -2645,7 +2680,6 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     // then we might be able to infer a stage for the entry point request if
     // it didn't have one, *or* issue a diagnostic if there is a mismatch with the profile.
 
-    auto entryPointProfile = entryPointReq->getProfile();
     resolveStageOfProfileWithEntryPoint(
         entryPointProfile,
         linkage->m_optionSet,
@@ -3069,6 +3103,7 @@ void FrontEndCompileRequest::checkEntryPoints()
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
     auto sink = getSink();
+    List<EntryPoint*> selectedEntryPoints;
 
     // The validation of entry points here will be modal, and controlled
     // by whether the user specified any entry points directly via
@@ -3098,6 +3133,7 @@ void FrontEndCompileRequest::checkEntryPoints()
                 // compilation API doesn't allow for grouping).
                 //
                 entryPointReq->getTranslationUnit()->module->_addEntryPoint(entryPoint);
+                selectedEntryPoints.add(entryPoint);
             }
         }
 
@@ -3127,7 +3163,16 @@ void FrontEndCompileRequest::checkEntryPoints()
         {
             auto translationUnit = translationUnits[tt];
             translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
+            for (auto entryPoint : translationUnit->getModule()->getEntryPoints())
+                selectedEntryPoints.add(entryPoint);
         }
+    }
+
+    diagnoseMixedRayTracingAPIsInSelectedProgram(linkage, selectedEntryPoints, sink);
+
+    for (auto translationUnit : translationUnits)
+    {
+        diagnoseMixedRayTracingAPIsInModule(linkage, translationUnit->getModule(), sink);
     }
 }
 

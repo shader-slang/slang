@@ -13,6 +13,7 @@
 //
 
 #include "slang-linkable.h"
+#include "slang-structural-ray-tracing.h"
 
 namespace Slang
 {
@@ -205,6 +206,10 @@ public:
     /// Get the name of the entry point
     Name* getName() { return m_name; }
 
+    /// Set the source-level name exposed for an entry point whose implementation uses another
+    /// declaration (for example, a structural ray-tracing stage implemented by `invoke`).
+    void setNameOverride(Name* name) { m_name = name; }
+
     /// Get the profile associated with the entry point
     ///
     /// Note: only the stage part of the profile is expected
@@ -215,6 +220,23 @@ public:
 
     /// Get the stage that the entry point is for.
     Stage getStage() { return m_profile.getStage(); }
+
+    void setStructuralRayTracingInfo(const StructuralRayTracingEntryPointInfo& info)
+    {
+        m_structuralRayTracingInfo = info;
+        // `invoke` is the logical implementation selected by this entry-point component. Its
+        // source parameters are compiler-owned views, not native ABI parameters; the structural
+        // lowering synthesizes the physical signature later.
+        m_shaderParams.clear();
+    }
+    FuncDecl* getStructuralRayTracingInvokeMethod() const
+    {
+        return m_structuralRayTracingInfo.invokeMethod;
+    }
+    const StructuralRayTracingEntryPointInfo& getStructuralRayTracingInfo() const
+    {
+        return m_structuralRayTracingInfo;
+    }
 
     /// Get the module that contains the entry point.
     Module* getModule();
@@ -316,6 +338,8 @@ private:
     // The declaration of the entry-point function itself.
     //
     DeclRef<FuncDecl> m_funcDeclRef;
+
+    StructuralRayTracingEntryPointInfo m_structuralRayTracingInfo;
 
     /// The mangled name of the entry point function
     String m_mangledName;

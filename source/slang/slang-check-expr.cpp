@@ -4246,6 +4246,9 @@ void SemanticsVisitor::_checkAliasedOutArguments(
 
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
+    if (diagnoseInvalidStructuralRayTracingConstruction(expr))
+        return CreateErrorExpr(expr);
+
     auto rs = ResolveInvoke(expr);
     if (auto invoke = as<InvokeExpr>(rs))
     {
@@ -4261,6 +4264,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         // validation logic on the inner expr.
         if (expr->arguments.getCount() == 1 && invoke == expr->arguments[0])
             return rs;
+
+        if (diagnoseInvalidStructuralRayTracingInvokeResult(invoke))
+            return CreateErrorExpr(invoke);
+
+        if (diagnoseInvalidStructuralRayTracingGenericArguments(invoke))
+            return CreateErrorExpr(invoke);
 
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
         {
@@ -4278,6 +4287,18 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             FunctionDeclBase* funcDeclBase = nullptr;
             if (funcDeclRefExpr)
                 funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
+
+            registerRayTracingAPICall(
+                getLinkage(),
+                m_parentFunc,
+                funcDeclBase,
+                invoke->functionExpr->loc,
+                getSink());
+
+            if (funcDeclBase && diagnoseDirectStructuralRayTracingStageInvoke(invoke, funcDeclBase))
+            {
+                return CreateErrorExpr(invoke);
+            }
 
             Index paramCount = funcType->getParamCount();
 

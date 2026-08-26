@@ -1,0 +1,2 @@
+ray 0: stage=1 primitiveIndex=0 dispatchWidth=2
+ray 1: stage=2 primitiveIndex=4294967295 dispatchWidth=2

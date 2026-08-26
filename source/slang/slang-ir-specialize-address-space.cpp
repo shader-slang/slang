@@ -367,8 +367,15 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             }
             if (auto func = as<IRFunc>(globalInst))
             {
-                if (func->findDecoration<IREntryPointDecoration>())
+                // Metal function-table functions are physical entry points even though they do
+                // not carry an ordinary EntryPointDecoration. Starting address-space propagation
+                // from them also specializes helpers reached only through an IFT or VFT.
+                if (func->findDecoration<IREntryPointDecoration>() ||
+                    func->findDecoration<IRMetalVisibleFunctionDecoration>() ||
+                    func->findDecoration<IRMetalIntersectionFunctionDecoration>())
+                {
                     workList.add(func);
+                }
             }
         }
 

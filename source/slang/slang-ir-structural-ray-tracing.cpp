@@ -1,0 +1,182 @@
+#include "slang-ir-structural-ray-tracing.h"
+
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
+#include "slang-mangle.h"
+#include "slang-module.h"
+
+namespace Slang
+{
+
+IROp getStructuralRayTracingStageInterfaceOp(StructuralRayTracingStageKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingStageKind::ClosestHit:
+        return kIROp_ClosestHitStageInterface;
+    case StructuralRayTracingStageKind::AnyHit:
+        return kIROp_AnyHitStageInterface;
+    case StructuralRayTracingStageKind::Intersection:
+        return kIROp_IntersectionStageInterface;
+    case StructuralRayTracingStageKind::Miss:
+        return kIROp_MissStageInterface;
+    case StructuralRayTracingStageKind::Callable:
+        return kIROp_CallableStageInterface;
+    default:
+        return kIROp_Invalid;
+    }
+}
+
+IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInputOperationKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingStageInputOperationKind::Payload:
+        return kIROp_StructuralRayTracingGetPayload;
+    case StructuralRayTracingStageInputOperationKind::CallableData:
+        return kIROp_StructuralRayTracingGetCallableData;
+    case StructuralRayTracingStageInputOperationKind::Record:
+        return kIROp_StructuralRayTracingGetRecord;
+    case StructuralRayTracingStageInputOperationKind::HitAttributes:
+        return kIROp_StructuralRayTracingGetHitAttributes;
+    case StructuralRayTracingStageInputOperationKind::TriangleBarycentricCoord:
+        return kIROp_StructuralRayTracingGetTriangleBarycentricCoord;
+    case StructuralRayTracingStageInputOperationKind::TriangleFrontFacing:
+        return kIROp_StructuralRayTracingGetTriangleFrontFacing;
+    case StructuralRayTracingStageInputOperationKind::CurveParameter:
+        return kIROp_StructuralRayTracingGetCurveParameter;
+    case StructuralRayTracingStageInputOperationKind::RayTMin:
+        return kIROp_StructuralRayTracingGetRayTMin;
+    case StructuralRayTracingStageInputOperationKind::RayTCurrent:
+        return kIROp_StructuralRayTracingGetRayTCurrent;
+    case StructuralRayTracingStageInputOperationKind::RayTime:
+        return kIROp_StructuralRayTracingGetRayTime;
+    case StructuralRayTracingStageInputOperationKind::RayFlags:
+        return kIROp_StructuralRayTracingGetRayFlags;
+    case StructuralRayTracingStageInputOperationKind::HitKind:
+        return kIROp_StructuralRayTracingGetHitKind;
+    case StructuralRayTracingStageInputOperationKind::WorldRayOrigin:
+        return kIROp_StructuralRayTracingGetWorldRayOrigin;
+    case StructuralRayTracingStageInputOperationKind::WorldRayDirection:
+        return kIROp_StructuralRayTracingGetWorldRayDirection;
+    case StructuralRayTracingStageInputOperationKind::ObjectSpaceRay:
+        return kIROp_StructuralRayTracingGetObjectSpaceRay;
+    case StructuralRayTracingStageInputOperationKind::PrimitiveIndex:
+        return kIROp_StructuralRayTracingGetPrimitiveIndex;
+    case StructuralRayTracingStageInputOperationKind::GeometryIndex:
+        return kIROp_StructuralRayTracingGetGeometryIndex;
+    case StructuralRayTracingStageInputOperationKind::InstanceIndex:
+        return kIROp_StructuralRayTracingGetInstanceIndex;
+    case StructuralRayTracingStageInputOperationKind::InstanceID:
+        return kIROp_StructuralRayTracingGetInstanceID;
+    case StructuralRayTracingStageInputOperationKind::ObjectToWorld:
+        return kIROp_StructuralRayTracingGetObjectToWorld;
+    case StructuralRayTracingStageInputOperationKind::WorldToObject:
+        return kIROp_StructuralRayTracingGetWorldToObject;
+    case StructuralRayTracingStageInputOperationKind::DispatchRaysIndex:
+        return kIROp_StructuralRayTracingGetDispatchRaysIndex;
+    case StructuralRayTracingStageInputOperationKind::DispatchRaysDimensions:
+        return kIROp_StructuralRayTracingGetDispatchRaysDimensions;
+    case StructuralRayTracingStageInputOperationKind::IgnoreHit:
+        return kIROp_StructuralRayTracingIgnoreHit;
+    case StructuralRayTracingStageInputOperationKind::AcceptHitAndEndSearch:
+        return kIROp_StructuralRayTracingAcceptHitAndEndSearch;
+    case StructuralRayTracingStageInputOperationKind::ReportHit:
+        return kIROp_StructuralRayTracingReportHit;
+    case StructuralRayTracingStageInputOperationKind::ReportHitWithKind:
+        return kIROp_StructuralRayTracingReportHitWithKind;
+    default:
+        return kIROp_Invalid;
+    }
+}
+
+String getStructuralRayTracingSourceTypeName(IRType* type)
+{
+    // Structural stage and group types originate from named source structs. IR lowering preserves
+    // that source name on the canonical type, and generated entry points and table functions both
+    // use it as their public name. A missing decoration means that an upstream producer discarded
+    // required identity; inventing a fallback name here would hide that representation error.
+    auto nameHint = type ? type->findDecoration<IRNameHintDecoration>() : nullptr;
+    SLANG_RELEASE_ASSERT(nameHint);
+    return String(nameHint->getName());
+}
+
+void addStructuralRayTracingEntryPointInfo(
+    IRBuilder& builder,
+    IRFunc* func,
+    const StructuralRayTracingEntryPointIRInfo& info)
+{
+    SLANG_RELEASE_ASSERT(info.invoke && info.stageType);
+    auto voidType = builder.getVoidType();
+    IRInst* operands[] = {
+        builder.getIntValue(builder.getIntType(), IRIntegerValue(info.stageKind)),
+        info.invoke,
+        info.stageType,
+        info.contextType ? info.contextType : voidType,
+        info.payloadType ? info.payloadType : voidType,
+        info.recordType ? info.recordType : voidType,
+        info.hitAttributesType ? info.hitAttributesType : voidType,
+        info.callableDataType ? info.callableDataType : voidType,
+        builder.getIntValue(builder.getIntType(), IRIntegerValue(info.hitAttributesKind)),
+    };
+    builder.addDecoration(
+        func,
+        kIROp_StructuralRayTracingEntryPointInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
+static IRInterfaceType* _findInterfaceType(IRInst* inst)
+{
+    if (auto generic = as<IRGeneric>(inst))
+        inst = findInnerMostGenericReturnVal(generic);
+    return as<IRInterfaceType>(inst);
+}
+
+bool identifyStructuralRayTracingStageInterfaces(
+    Module* module,
+    const StructuralRayTracingDeclRegistry& registry,
+    StructuralRayTracingStageKind* outMissingStage)
+{
+    auto irModule = module->getIRModule();
+    auto astBuilder = module->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
+
+    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
+    {
+        auto kind = StructuralRayTracingStageKind(i);
+        auto interfaceDecl = registry.getStageInterface(kind);
+        auto mangledName = getMangledName(astBuilder, interfaceDecl);
+        auto symbols = irModule->findSymbolByMangledName(ImmutableHashedString(mangledName));
+        auto expectedOp = getStructuralRayTracingStageInterfaceOp(kind);
+        bool found = false;
+
+        for (auto symbol : symbols)
+        {
+            auto interfaceType = _findInterfaceType(symbol);
+            if (!interfaceType)
+                continue;
+            if (interfaceType->getOp() != kIROp_InterfaceType &&
+                interfaceType->getOp() != expectedOp)
+            {
+                continue;
+            }
+
+            // All stage-interface ops have the same storage and operand layout as
+            // IRInterfaceType. The trusted-module load is the point where the ordinary
+            // serialized interface receives its compiler-owned nominal identity.
+            interfaceType->m_op = expectedOp;
+            found = true;
+        }
+
+        if (!found)
+        {
+            if (outMissingStage)
+                *outMissingStage = kind;
+            return false;
+        }
+    }
+    return true;
+}
+
+} // namespace Slang

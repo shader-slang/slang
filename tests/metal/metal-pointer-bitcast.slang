@@ -13,11 +13,19 @@
 // The intermediate variable may be fully renamed (e.g. ptrValue -> _S1).
 // CHECK-DAG: (int device*)(
 
+// A folded pointer cast must be parenthesized before a postfix member access.
+// CHECK-DAG: ((Data_0 device*)({{.*}}))->value_0
+
 // Make sure as_type is NOT used for any pointer conversions
 // CHECK-NOT: as_type<{{.*}}device{{.*}}\*>
 // CHECK-NOT: as_type<{{.*}}\*>
 
 uniform int* inputPtr;
+
+struct Data
+{
+    uint value;
+}
 
 //TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -38,4 +46,6 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     outputBuffer[0] = ptr2[0];
     outputBuffer[1] = uint(ptrValue & 0xFFFFFFFF);
     outputBuffer[2] = uint(ptr3[0]);
+    // Test 4: Pointer cast used directly as the base of a member access.
+    outputBuffer[3] = bit_cast<Data*>(inputPtr)->value;
 }

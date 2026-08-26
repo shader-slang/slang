@@ -5367,12 +5367,14 @@ IRGLSLShaderStorageBufferType* IRBuilder::createGLSLShaderStorableBufferType(
 
 IRInterfaceType* IRBuilder::createInterfaceType(UInt operandCount, IRInst* const* operands)
 {
-    IRInterfaceType* interfaceType = createInst<IRInterfaceType>(
-        this,
-        kIROp_InterfaceType,
-        getTypeKind(),
-        operandCount,
-        operands);
+    return createInterfaceType(kIROp_InterfaceType, operandCount, operands);
+}
+
+IRInterfaceType* IRBuilder::createInterfaceType(IROp op, UInt operandCount, IRInst* const* operands)
+{
+    SLANG_ASSERT(IRInterfaceType::isaImpl(op));
+    IRInterfaceType* interfaceType =
+        createInst<IRInterfaceType>(this, op, getTypeKind(), operandCount, operands);
     addGlobalValue(this, interfaceType);
     return interfaceType;
 }
@@ -7831,6 +7833,9 @@ static bool shouldFoldInstIntoUses(IRDumpContext* context, IRInst* inst)
     if (as<IRConstant>(inst))
         return true;
 
+    if (as<IRInterfaceType>(inst))
+        return false;
+
     // We are going to have a general rule that
     // a type should be folded into its use site,
     // which improves output in most cases, but
@@ -7842,7 +7847,6 @@ static bool shouldFoldInstIntoUses(IRDumpContext* context, IRInst* inst)
     case kIROp_StructType:
     case kIROp_ClassType:
     case kIROp_GLSLShaderStorageBufferType:
-    case kIROp_InterfaceType:
         return false;
 
     default:
@@ -8518,13 +8522,15 @@ static bool _areTypeOperandsEqual(IRInst* a, IRInst* b)
 
 bool isNominalOp(IROp op)
 {
+    if (IRInterfaceType::isaImpl(op))
+        return true;
+
     // True if the op identity is 'nominal'
     switch (op)
     {
     case kIROp_StructType:
     case kIROp_ClassType:
     case kIROp_GLSLShaderStorageBufferType:
-    case kIROp_InterfaceType:
     case kIROp_Generic:
     case kIROp_Param:
         {

@@ -288,7 +288,12 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    add_dependencies(slang-test slang-neural-module slang-workgraph-module)
+    add_dependencies(
+        slang-test
+        slang-neural-module
+        slang-workgraph-module
+        slang-raytracing-module
+    )
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}

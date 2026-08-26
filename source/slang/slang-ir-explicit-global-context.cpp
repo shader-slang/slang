@@ -520,7 +520,7 @@ struct IntroduceExplicitGlobalContextPass
         // will be a local variable declared in the first block.
         //
         auto contextVarPtr = builder.emitVar(m_contextStructType);
-        addKernelContextNameHint(contextVarPtr);
+        decorateKernelContext(contextVarPtr);
         m_mapFuncToContextPtr.add(entryPointFunc, contextVarPtr);
 
         // If there is a global-scope uniform parameter, then
@@ -765,7 +765,7 @@ struct IntroduceExplicitGlobalContextPass
         // list for `func`, with a type of `KernelContext*`.
         //
         IRParam* contextParam = builder.createParam(m_contextStructPtrType);
-        addKernelContextNameHint(contextParam);
+        decorateKernelContext(contextParam);
         contextParam->insertBefore(firstBlock->getFirstOrdinaryInst());
 
         // Update the type of the function to reflect this new parameter.
@@ -843,14 +843,13 @@ struct IntroduceExplicitGlobalContextPass
         return contextParam;
     }
 
-    // Because we have multiple places where instructions representing
-    // the kernel context get introduced, we have factored out a subroutine
-    // for setting up the name hint to be used by those instructions.
-    //
-    void addKernelContextNameHint(IRInst* inst)
+    // Mark every value introduced by this pass as the explicit global context. The name remains a
+    // debugging aid, while later passes use the decoration as the semantic source of truth.
+    void decorateKernelContext(IRInst* inst)
     {
         IRBuilder builder(m_module);
         builder.addNameHintDecoration(inst, UnownedTerminatedStringSlice("kernelContext"));
+        builder.addDecoration(inst, kIROp_ExplicitGlobalContextDecoration);
     }
 };
 
