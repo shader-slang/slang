@@ -1,13 +1,11 @@
 // TEST(smoke,shared-library):CPP_COMPILER_SHARED_LIBRARY:
 
-// This is the only test on the CPU tier that in-process LoadLibrary's a
-// downstream-compiler-built DLL, making it the sole regression guard for
-// native Windows ARM64 host-toolchain selection (calcExecuteCompilerArgs
-// in slang-win-visual-studio-util.cpp): a wrong-architecture DLL fails to
-// load at LoadLibrary time, not link time, so no other cpp-compiler/
-// cpu-program test in this directory reproduces that failure mode. Do not
-// add this test to a skip-list/expected-failure file for an arm64 tier
-// without replacing this coverage.
+// One of several CPU-tier tests (alongside cpp-compile-shared-library.cpp
+// and the -cpu host-callable COMPARE_COMPUTE path) that in-process
+// LoadLibrary a downstream-compiler-built DLL, and is therefore a
+// regression guard for native Windows ARM64 host-toolchain selection
+// (calcExecuteCompilerArgs in slang-win-visual-studio-util.cpp): a
+// wrong-architecture DLL fails at LoadLibrary time, not link time.
 
 #include <stdio.h>
 #include <stdlib.h>
