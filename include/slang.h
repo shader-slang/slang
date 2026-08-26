@@ -4878,10 +4878,13 @@ inline constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 
 /// `SyntheticResourceInfo::arraySize` when the synthetic resource is an
 /// unbounded (runtime-sized) descriptor array, so the compiler cannot
-/// know how many descriptors the host will supply. Derived from
-/// `SLANG_UNBOUNDED_SIZE` so the two carry the same meaning in their
-/// respective widths, rather than agreeing only by coincidence.
-inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = (uint32_t)SLANG_UNBOUNDED_SIZE;
+/// know how many descriptors the host will supply.
+///
+/// Spelled the same way as `SLANG_UNBOUNDED_SIZE` (`~size_t(0)`) rather
+/// than casting it down: both mean "every bit set" in their respective
+/// widths, but narrowing the 64-bit macro to 32 bits is a truncating
+/// conversion that MSVC rejects under warnings-as-errors (C4310).
+inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = ~uint32_t(0);
 
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
