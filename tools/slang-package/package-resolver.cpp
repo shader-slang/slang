@@ -62,6 +62,7 @@ class GitPackageResolverSource : public IPackageResolverSource
 public:
     String projectRoot;
     String cacheRoot;
+    String depsDirectory;
 
     SlangResult initialize(String& outError)
     {
@@ -103,7 +104,7 @@ public:
         SLANG_RETURN_ON_FAIL(
             readManifestText(sourceName, manifestText, outManifest.manifest, outError));
         outManifest.ownerKey = _gitOwnerKey(packageName, candidate.commit);
-        outManifest.lockRoot = Path::combine(".slang", "packages", packageName);
+        outManifest.lockRoot = Path::combine(depsDirectory, packageName);
         outManifest.gitRepositoryPath = repositoryPath;
         outManifest.gitRevision = candidate.commit;
         return SLANG_OK;
@@ -120,8 +121,11 @@ public:
     SlangResult initialize(String& outError)
     {
         gitSource.projectRoot = projectRoot;
+        gitSource.depsDirectory = depsDirectory;
         return gitSource.initialize(outError);
     }
+
+    String depsDirectory;
 
     virtual SlangResult listReleaseTags(
         const String& packageName,
@@ -133,8 +137,33 @@ public:
         if (localIndex < 0)
             return gitSource.listReleaseTags(packageName, git, outCandidates, outError);
 
+        const LocalPackage& localPackage = (*localPackages)[localIndex];
+        if (isEditedLocalPackage(localPackage))
+        {
+            String localRoot;
+            SLANG_RETURN_ON_FAIL(
+                getLocalPackageRoot(projectRoot, localPackage, localRoot, outError));
+            String headCommit;
+            SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(localRoot, headCommit, outError));
+            List<TagCandidate> releaseCandidates;
+            SLANG_RETURN_ON_FAIL(
+                gitSource.listReleaseTags(packageName, git, releaseCandidates, outError));
+            for (const auto& release : releaseCandidates)
+            {
+                if (release.commit != headCommit)
+                    continue;
+                TagCandidate candidate = release;
+                candidate.path = localPackage.path;
+                candidate.isEdit = true;
+                outCandidates.clear();
+                outCandidates.add(candidate);
+                return SLANG_OK;
+            }
+            outError = String("Edited package HEAD is not a published release tag: ") + packageName;
+            return SLANG_FAIL;
+        }
         TagCandidate candidate;
-        candidate.path = (*localPackages)[localIndex].path;
+        candidate.path = localPackage.path;
         outCandidates.clear();
         outCandidates.add(candidate);
         return SLANG_OK;
@@ -147,6 +176,8 @@ public:
         ResolvedManifest& outManifest,
         String& outError) override
     {
+        if (candidate.isEdit)
+            return gitSource.loadManifest(packageName, git, candidate, outManifest, outError);
         if (!candidate.path.getLength())
             return gitSource.loadManifest(packageName, git, candidate, outManifest, outError);
 
@@ -176,8 +207,8 @@ public:
 /// Resolve the workspace package's dependency graph to one lock entry per package name.
 ///
 /// Consider this example: the workspace package depends on `b` from Git (`>=1.0.0`) and on `a` by
-/// relative path, and `a` also depends on `b` by path. Name identity is unique, so there is one `b`.
-/// The path edge wins, Git constraints that only the Git pin contributed must disappear, and
+/// relative path, and `a` also depends on `b` by path. Name identity is unique, so there is one
+/// `b`. The path edge wins, Git constraints that only the Git pin contributed must disappear, and
 /// transitives that existed only because of that pin must be pruned. Path packages are selected
 /// immediately; Git packages are searched by release tag. `ownerKey` records which selected
 /// representation added each Git requirement so a later path selection can retract it.
@@ -663,7 +694,7 @@ private:
             selected.selected = true;
             selected.locked.name = selected.name;
             selected.locked.git = selected.git;
-            if (candidate.path.getLength())
+            if (candidate.path.getLength() && !candidate.isEdit)
             {
                 addWarning(
                     String("Local path for package '") + selected.name +
@@ -739,6 +770,7 @@ SlangResult resolveDependencies(
 {
     GitPackageResolverSource source;
     source.projectRoot = projectRoot;
+    source.depsDirectory = getWorkspaceDepsDirectory(manifest);
     SLANG_RETURN_ON_FAIL(source.initialize(outError));
     Resolver resolver;
     resolver.source = &source;
@@ -757,6 +789,7 @@ SlangResult resolveDependenciesFromLocalPackages(
 {
     LocalPackageResolverSource source;
     source.projectRoot = projectRoot;
+    source.depsDirectory = getWorkspaceDepsDirectory(manifest);
     source.localPackages = &localPackages;
     SLANG_RETURN_ON_FAIL(source.initialize(outError));
     Resolver resolver;

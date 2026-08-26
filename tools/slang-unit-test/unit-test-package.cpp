@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "core/slang-io.h"
+#include "core/slang-string-util.h"
 #include "package-json.h"
 #include "package-lock.h"
 #include "package-resolver.h"
@@ -95,7 +96,8 @@ SLANG_UNIT_TEST(PackageManifestJSON)
                                 "      \"git\": \"https://example.com/noise.git\",\n"
                                 "      \"version\": \">=1.2.0 <2.0.0\"\n"
                                 "    }\n"
-                                "  }\n"
+                                "  },\n"
+                                "  \"workspace\": {\"deps\": \"third-party\", \"build\": \"out\"}\n"
                                 "}\n";
 
     Manifest manifest;
@@ -115,6 +117,8 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.dependencies[0].name == "noise");
     SLANG_CHECK(manifest.dependencies[0].version == ">=1.2.0 <2.0.0");
     SLANG_CHECK(manifest.dependencies[0].tag.getLength() == 0);
+    SLANG_CHECK(manifest.workspace.depsDirectory == "third-party");
+    SLANG_CHECK(manifest.workspace.buildDirectory == "out");
 
     const String taggedText = "{\n"
                               "  \"name\": \"root\",\n"
@@ -185,6 +189,39 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("self-version.json", selfVersionText, manifest, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("self version")) >= 0);
+
+    const String unsafeWorkspaceText =
+        "{\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":[\"LICENSE\"],"
+        "\"dependencies\":{},\"workspace\":{\"deps\":\"../deps\",\"build\":\"build\"}}";
+    SLANG_CHECK(SLANG_FAILED(
+        readManifestText("unsafe-workspace.json", unsafeWorkspaceText, manifest, error)));
+
+    const String overlappingWorkspaceText =
+        "{\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":[\"LICENSE\"],"
+        "\"dependencies\":{},\"workspace\":{\"deps\":\"out\",\"build\":\"out\"}}";
+    SLANG_CHECK(SLANG_FAILED(
+        readManifestText("overlapping-workspace.json", overlappingWorkspaceText, manifest, error)));
+
+    const String implicitDepsOverlapText =
+        "{\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":[\"LICENSE\"],"
+        "\"dependencies\":{},\"workspace\":{\"build\":\"deps\"}}";
+    SLANG_CHECK(SLANG_FAILED(
+        readManifestText("implicit-deps-overlap.json", implicitDepsOverlapText, manifest, error)));
+
+    const String implicitBuildOverlapText =
+        "{\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":[\"LICENSE\"],"
+        "\"dependencies\":{},\"workspace\":{\"deps\":\"build\"}}";
+    SLANG_CHECK(SLANG_FAILED(readManifestText(
+        "implicit-build-overlap.json",
+        implicitBuildOverlapText,
+        manifest,
+        error)));
+
+    const String nestedWorkspaceText =
+        "{\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":[\"LICENSE\"],"
+        "\"dependencies\":{},\"workspace\":{\"deps\":\"state/deps\",\"build\":\"state\"}}";
+    SLANG_CHECK(SLANG_FAILED(
+        readManifestText("nested-workspace.json", nestedWorkspaceText, manifest, error)));
 }
 
 SLANG_UNIT_TEST(PackageLockRejectsOldVersion)
@@ -197,22 +234,28 @@ SLANG_UNIT_TEST(PackageLockRejectsOldVersion)
     PackageTool::LockFile lock;
     String error;
     SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("integer 2")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("integer 3")) >= 0);
+    SLANG_CHECK(SLANG_FAILED(readPreviousLockFile(path, lock, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(path, "{\"lock_version\":2,\"packages\":{}}")));
+    SLANG_CHECK(SLANG_FAILED(readLockFile(path, lock, error)));
+    SLANG_CHECK(SLANG_SUCCEEDED(readPreviousLockFile(path, lock, error)));
+    SLANG_CHECK(lock.lockVersion == 2);
 }
 
 SLANG_UNIT_TEST(PackageLocalRegistryJSON)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
-    String path = Path::combine(temp.path, "overrides.json");
+    String path = Path::combine(temp.path, "slang-workspace.json");
     List<LocalPackage> packages;
     LocalPackage package;
     package.name = "noise";
     package.path = "../noise";
     packages.add(package);
     package.name = "helper";
-    package.path = ".slang/edit/helper";
-    package.baseCommit = "0000000000000000000000000000000000000000";
+    package.path = "deps/helper";
+    package.kind = LocalPackageKind::Edit;
     packages.add(package);
 
     String error;
@@ -220,17 +263,18 @@ SLANG_UNIT_TEST(PackageLocalRegistryJSON)
     List<LocalPackage> roundTrip;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLocalPackages(path, roundTrip, error)));
     SLANG_CHECK(roundTrip.getCount() == 2);
-    SLANG_CHECK(roundTrip[0].path == "../noise");
-    SLANG_CHECK(roundTrip[0].baseCommit.getLength() == 0);
-    SLANG_CHECK(roundTrip[1].path == ".slang/edit/helper");
-    SLANG_CHECK(roundTrip[1].baseCommit == package.baseCommit);
+    SLANG_CHECK(roundTrip[0].name == "helper");
+    SLANG_CHECK(roundTrip[0].path.getLength() == 0);
+    SLANG_CHECK(isEditedLocalPackage(roundTrip[0]));
+    SLANG_CHECK(roundTrip[1].name == "noise");
+    SLANG_CHECK(roundTrip[1].path == "../noise");
+    SLANG_CHECK(!isEditedLocalPackage(roundTrip[1]));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::writeAllText(path, "{\"overrides\":{\"noise\":{\"path\":\"/absolute/noise\"}}}")));
     SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
-        path,
-        "{\"overrides\":{\"noise\":{\"path\":\"../noise\",\"base_commit\":\"bad\"}}}")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(path, "{\"edits\":{\"noise\":{\"unknown\":\"bad\"}}}")));
     SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
 }
 
@@ -238,6 +282,8 @@ SLANG_UNIT_TEST(PackageToolInit)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(Path::combine(temp.path, ".gitignore"), "node_modules\nbuild/\n")));
 
     const char* initArguments[] = {"slang-package", "init"};
     String error;
@@ -246,11 +292,21 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(File::exists(Path::combine(temp.path, "src")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "tests")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "docs")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "deps")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "LICENSE")));
     String gitIgnore;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::readAllText(Path::combine(temp.path, ".gitignore"), gitIgnore)));
     SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice(".slang/")) >= 0);
+    SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("deps/")) >= 0);
+    SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("build/")) >= 0);
+    SLANG_CHECK(
+        gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("slang-workspace.json")) >= 0);
+    Index buildIgnoreCount = 0;
+    for (auto line : LineParser(gitIgnore.getUnownedSlice()))
+        buildIgnoreCount += line.trim() == "build/";
+    SLANG_CHECK(buildIgnoreCount == 1);
 
     Manifest manifest;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -258,9 +314,25 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(manifest.name == Path::getFileName(temp.path));
     SLANG_CHECK(manifest.licenseFiles.getCount() == 1);
     SLANG_CHECK(manifest.licenseFiles[0] == "LICENSE");
+    SLANG_CHECK(manifest.workspace.depsDirectory == "deps");
+    SLANG_CHECK(manifest.workspace.buildDirectory == "build");
 
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+
+    TemporaryDirectory noNewlineTemp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(noNewlineTemp)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(Path::combine(noNewlineTemp.path, ".gitignore"), "node_modules")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        noNewlineTemp.path,
+        SLANG_COUNT_OF(initArguments),
+        initArguments,
+        error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(noNewlineTemp.path, ".gitignore"), gitIgnore)));
+    SLANG_CHECK(
+        gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("node_modules\n.slang/")) >= 0);
 
     const String invalidRoot = Path::combine(temp.path, "invalid package");
     SLANG_CHECK_ABORT(Path::createDirectoryRecursive(invalidRoot));
@@ -284,6 +356,26 @@ SLANG_UNIT_TEST(PackageToolFetchRequiresLock)
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     SLANG_CHECK(
         error.getUnownedSlice().indexOf(UnownedStringSlice("slang-package-lock.json")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageToolUpdateUpgradesPreviousLock)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    String lockPath = Path::combine(temp.path, "slang-package-lock.json");
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(lockPath, "{\"lock_version\":2,\"packages\":{}}")));
+
+    const char* updateArguments[] = {"slang-package", "update"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    PackageTool::LockFile lock;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, lock, error)));
+    SLANG_CHECK(lock.lockVersion == 3);
 }
 
 SLANG_UNIT_TEST(PackageToolFetchRejectsPathLockForGitDependency)
@@ -492,7 +584,7 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     PackageTool::LockFile lock;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
-    SLANG_CHECK(lock.lockVersion == 2);
+    SLANG_CHECK(lock.lockVersion == 3);
     SLANG_CHECK(lock.packages.getCount() == 3);
     Index lockedAIndex = findLockedPackageIndex(lock, "a");
     Index lockedBIndex = findLockedPackageIndex(lock, "b");
@@ -517,7 +609,7 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     String searchPaths;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, ".slang/search-paths"), searchPaths)));
+        File::readAllText(Path::combine(temp.path, "build/search-paths"), searchPaths)));
     SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(UnownedStringSlice("vendor/a/src")) >= 0);
     SLANG_CHECK(
         searchPaths.getUnownedSlice().indexOf(UnownedStringSlice("vendor/a/vendor/b/src")) >= 0);
@@ -736,13 +828,13 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     String searchPaths;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, ".slang", "search-paths"), searchPaths)));
+        File::readAllText(Path::combine(temp.path, "build", "search-paths"), searchPaths)));
     String expectedSearchPath = Path::combine(relativeLocalRoot, "src");
     SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(expectedSearchPath.getUnownedSlice()) >= 0);
     expectedSearchPath = Path::combine(relativeHelperRoot, "src");
     SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(expectedSearchPath.getUnownedSlice()) >= 0);
 
-    String registryPath = Path::combine(temp.path, ".slang", "overrides.json");
+    String registryPath = Path::combine(temp.path, "slang-workspace.json");
     List<LocalPackage> registeredPackages;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLocalPackages(registryPath, registeredPackages, error)));
     Index noiseRegistration = -1;
@@ -775,7 +867,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         writeManifest(Path::combine(localRoot, "slang-package.json"), local, error)));
 
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, ".slang", "overrides.json"))));
+        SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-workspace.json"))));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("is not registered")) >= 0);
@@ -855,7 +947,7 @@ SLANG_UNIT_TEST(PackageValidateRejectsFlattenedModuleAlias)
     root.dependencies.add(dependency);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
-    String packageRoot = Path::combine(Path::combine(temp.path, ".slang", "packages"), "b");
+    String packageRoot = Path::combine(Path::combine(temp.path, "deps"), "b");
     Manifest package;
     package.name = "b";
     package.exports.add("src");
@@ -956,7 +1048,7 @@ public:
             {
                 outManifest.manifest = release.manifest;
                 outManifest.sourceRoot = release.sourceRoot;
-                outManifest.lockRoot = Path::combine(".slang/packages", outManifest.manifest.name);
+                outManifest.lockRoot = Path::combine("deps", outManifest.manifest.name);
                 return SLANG_OK;
             }
         }
@@ -1099,7 +1191,7 @@ SLANG_UNIT_TEST(PackageResolverPathShadowsSelectedGit)
         resolveDependenciesWithSource(temp.path, root, source, lock, error, &warnings)));
     const LockedPackage* lockedQ = _findLockedPackage(lock, "q");
     SLANG_CHECK_ABORT(lockedQ);
-    SLANG_CHECK(lockedQ->path == ".slang/packages/m/vendor/q");
+    SLANG_CHECK(lockedQ->path == "deps/m/vendor/q");
     SLANG_CHECK(lockedQ->git.getLength() == 0);
     SLANG_CHECK(_findLockedPackage(lock, "w") == nullptr);
     SLANG_CHECK(_findLockedPackage(lock, "stale") == nullptr);

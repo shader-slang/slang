@@ -28,11 +28,30 @@ SlangResult readFileAtRevision(
     String& outContents,
     String& outError);
 
+/// Return the commit currently checked out at `HEAD`.
+SlangResult getRepositoryHeadCommit(
+    const String& repositoryPath,
+    String& outCommit,
+    String& outError);
+
 SlangResult materializeRevision(
     const String& workingDirectory,
     const String& gitURL,
     const String& revision,
     const String& destination,
+    String& outError);
+
+/// Materialize `targetCommit` without discarding an existing checkout's work.
+///
+/// If `destination` exists, it must be clean at `currentCommit`. `allowClean` explicitly permits
+/// deleting and cloning a checkout that has changed files, commits, stashes, or a different origin.
+SlangResult materializeLockedRevision(
+    const String& workingDirectory,
+    const String& gitURL,
+    const String& currentCommit,
+    const String& targetCommit,
+    const String& destination,
+    bool allowClean,
     String& outError);
 
 /// Return whether removing a checkout would discard no changes, commits, or stashes.

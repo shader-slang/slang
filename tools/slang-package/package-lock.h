@@ -25,10 +25,11 @@ SlangResult validateLockedPackageManifest(
     const Manifest& manifest,
     String& outError);
 
-/// Resolve the on-disk root for a lock entry: a registered override, a path-only directory, or
-/// the Git checkout under `.slang/packages`.
+/// Resolve the on-disk root for a lock entry: a registered edit/override, a path-only directory,
+/// or the Git checkout under the workspace dependency directory.
 SlangResult getLockedPackageRoot(
     const String& projectRoot,
+    const String& depsDirectory,
     const LockedPackage& package,
     const List<LocalPackage>& localPackages,
     String& outRoot,

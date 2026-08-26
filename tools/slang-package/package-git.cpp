@@ -219,17 +219,33 @@ SlangResult readFileAtRevision(
     return SLANG_OK;
 }
 
+SlangResult getRepositoryHeadCommit(
+    const String& repositoryPath,
+    String& outCommit,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("rev-parse");
+    arguments.add("HEAD");
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    outCommit = result.standardOutput.trim();
+    return SLANG_OK;
+}
+
 static SlangResult _materializeRevision(
     const String& workingDirectory,
     const String& gitURL,
-    const String& revision,
+    const String& currentCommit,
+    const String& targetCommit,
     const String& destination,
-    bool canReplace,
+    bool allowClean,
     String& outError)
 {
     ExecuteResult result;
     SlangPathType pathType;
-    if (SLANG_FAILED(Path::getPathType(destination, &pathType)))
+    bool destinationExisted = SLANG_SUCCEEDED(Path::getPathType(destination, &pathType));
+    if (!destinationExisted)
     {
         List<String> cloneArguments;
         cloneArguments.add("clone");
@@ -241,8 +257,26 @@ static SlangResult _materializeRevision(
     }
     else if (!File::exists(Path::combine(destination, ".git")))
     {
-        outError = String("Package destination is not a Git repository: ") + destination;
-        return SLANG_FAIL;
+        if (!allowClean)
+        {
+            outError = String("Package destination is not a Git repository; refusing to replace "
+                              "it without --clean: ") +
+                       destination;
+            return SLANG_FAIL;
+        }
+        if (SLANG_FAILED(Path::removeNonEmpty(destination)))
+        {
+            outError = String("Cannot replace package destination: ") + destination;
+            return SLANG_FAIL;
+        }
+        return _materializeRevision(
+            workingDirectory,
+            gitURL,
+            String(),
+            targetCommit,
+            destination,
+            false,
+            outError);
     }
 
     List<String> remoteArguments;
@@ -252,9 +286,10 @@ static SlangResult _materializeRevision(
     SLANG_RETURN_ON_FAIL(_runGit(destination, remoteArguments, result, outError));
     if (String(result.standardOutput.trim()) != gitURL)
     {
-        if (!canReplace)
+        if (!allowClean)
         {
-            outError = String("Git reports a different origin after replacing package checkout: ") +
+            outError = String("Package checkout has a different origin; refusing to replace it "
+                              "without --clean: ") +
                        destination;
             return SLANG_FAIL;
         }
@@ -266,7 +301,61 @@ static SlangResult _materializeRevision(
         return _materializeRevision(
             workingDirectory,
             gitURL,
-            revision,
+            String(),
+            targetCommit,
+            destination,
+            false,
+            outError);
+    }
+
+    if (currentCommit.getLength())
+    {
+        bool isSafe = false;
+        SLANG_RETURN_ON_FAIL(
+            isWorkingTreeSafeToRemove(destination, currentCommit, isSafe, outError));
+        if (!isSafe)
+        {
+            if (!allowClean)
+            {
+                outError = String("Package checkout has changed files, commits, or stashes; "
+                                  "refusing to replace it without --clean: ") +
+                           destination;
+                return SLANG_FAIL;
+            }
+            if (SLANG_FAILED(Path::removeNonEmpty(destination)))
+            {
+                outError = String("Cannot replace package checkout: ") + destination;
+                return SLANG_FAIL;
+            }
+            return _materializeRevision(
+                workingDirectory,
+                gitURL,
+                String(),
+                targetCommit,
+                destination,
+                false,
+                outError);
+        }
+    }
+    else if (destinationExisted)
+    {
+        if (!allowClean)
+        {
+            outError = String("Package checkout is not owned by the current lock; refusing to "
+                              "replace it without --clean: ") +
+                       destination;
+            return SLANG_FAIL;
+        }
+        if (SLANG_FAILED(Path::removeNonEmpty(destination)))
+        {
+            outError = String("Cannot replace package checkout: ") + destination;
+            return SLANG_FAIL;
+        }
+        return _materializeRevision(
+            workingDirectory,
+            gitURL,
+            String(),
+            targetCommit,
             destination,
             false,
             outError);
@@ -275,22 +364,14 @@ static SlangResult _materializeRevision(
     List<String> fetchArguments;
     fetchArguments.add("fetch");
     fetchArguments.add("origin");
-    fetchArguments.add(revision);
+    fetchArguments.add(targetCommit);
     SLANG_RETURN_ON_FAIL(_runGit(destination, fetchArguments, result, outError));
 
     List<String> checkoutArguments;
     checkoutArguments.add("checkout");
     checkoutArguments.add("--detach");
-    checkoutArguments.add("--force");
-    checkoutArguments.add(revision);
-    SLANG_RETURN_ON_FAIL(_runGit(destination, checkoutArguments, result, outError));
-
-    List<String> cleanArguments;
-    cleanArguments.add("clean");
-    cleanArguments.add("-d");
-    cleanArguments.add("-f");
-    cleanArguments.add("-x");
-    return _runGit(destination, cleanArguments, result, outError);
+    checkoutArguments.add(targetCommit);
+    return _runGit(destination, checkoutArguments, result, outError);
 }
 
 SlangResult materializeRevision(
@@ -300,7 +381,33 @@ SlangResult materializeRevision(
     const String& destination,
     String& outError)
 {
-    return _materializeRevision(workingDirectory, gitURL, revision, destination, true, outError);
+    return _materializeRevision(
+        workingDirectory,
+        gitURL,
+        revision,
+        revision,
+        destination,
+        false,
+        outError);
+}
+
+SlangResult materializeLockedRevision(
+    const String& workingDirectory,
+    const String& gitURL,
+    const String& currentCommit,
+    const String& targetCommit,
+    const String& destination,
+    bool allowClean,
+    String& outError)
+{
+    return _materializeRevision(
+        workingDirectory,
+        gitURL,
+        currentCommit,
+        targetCommit,
+        destination,
+        allowClean,
+        outError);
 }
 
 SlangResult isWorkingTreeSafeToRemove(

@@ -11,6 +11,7 @@ namespace PackageTool
 {
 
 static const char* const kManifestName = "slang-package.json";
+static const char* const kWorkspaceName = "slang-workspace.json";
 
 Index findLocalPackageIndex(const List<LocalPackage>& packages, const String& name)
 {
@@ -27,13 +28,23 @@ SlangResult readProjectLocalPackages(
     List<LocalPackage>& outPackages,
     String& outError)
 {
-    String path = Path::combine(projectRoot, ".slang", "overrides.json");
+    String path = Path::combine(projectRoot, kWorkspaceName);
     if (!File::exists(path))
     {
         outPackages.clear();
         return SLANG_OK;
     }
-    return readLocalPackages(path, outPackages, outError);
+    SLANG_RETURN_ON_FAIL(readLocalPackages(path, outPackages, outError));
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(
+        readManifest(Path::combine(projectRoot, kManifestName), manifest, outError));
+    String depsDirectory = getWorkspaceDepsDirectory(manifest);
+    for (auto& package : outPackages)
+    {
+        if (isEditedLocalPackage(package))
+            package.path = Path::combine(depsDirectory, package.name);
+    }
+    return SLANG_OK;
 }
 
 SlangResult writeProjectLocalPackages(
@@ -41,13 +52,7 @@ SlangResult writeProjectLocalPackages(
     const List<LocalPackage>& packages,
     String& outError)
 {
-    String slangDirectory = Path::combine(projectRoot, ".slang");
-    if (!Path::createDirectoryRecursive(slangDirectory))
-    {
-        outError = String("Cannot create package state directory: ") + slangDirectory;
-        return SLANG_FAIL;
-    }
-    return writeLocalPackages(Path::combine(slangDirectory, "overrides.json"), packages, outError);
+    return writeLocalPackages(Path::combine(projectRoot, kWorkspaceName), packages, outError);
 }
 
 SlangResult getLocalPackageRoot(

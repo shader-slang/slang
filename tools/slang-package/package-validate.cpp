@@ -428,6 +428,7 @@ static SlangResult _validatePackageTree(
 
 static SlangResult _readMaterializedManifest(
     const String& projectRoot,
+    const String& depsDirectory,
     const LockedPackage& package,
     const List<LocalPackage>& localPackages,
     String& outPackageRoot,
@@ -440,7 +441,7 @@ static SlangResult _readMaterializedManifest(
         if (package.path.getLength() && package.path != localPackages[localIndex].path)
         {
             outError = String("Locked path for package '") + package.name +
-                       "' does not match .slang/overrides.json.";
+                       "' does not match slang-workspace.json.";
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
@@ -448,8 +449,13 @@ static SlangResult _readMaterializedManifest(
     }
     else
     {
-        SLANG_RETURN_ON_FAIL(
-            getLockedPackageRoot(projectRoot, package, localPackages, outPackageRoot, outError));
+        SLANG_RETURN_ON_FAIL(getLockedPackageRoot(
+            projectRoot,
+            depsDirectory,
+            package,
+            localPackages,
+            outPackageRoot,
+            outError));
     }
     if (SLANG_FAILED(
             readManifest(Path::combine(outPackageRoot, kManifestName), outManifest, outError)))
@@ -533,6 +539,7 @@ SlangResult validateProject(const String& projectRoot, String& outError, List<St
         {
             SLANG_RETURN_ON_FAIL(_readMaterializedManifest(
                 projectRoot,
+                getWorkspaceDepsDirectory(rootManifest),
                 lock.packages[index],
                 localPackages,
                 packageRoots[index],

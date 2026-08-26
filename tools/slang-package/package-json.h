@@ -21,6 +21,8 @@ SlangResult readManifestText(
 SlangResult writeManifest(const String& path, const Manifest& manifest, String& outError);
 
 SlangResult readLockFile(const String& path, LockFile& outLock, String& outError);
+/// Read a current or immediately previous lock for checkout-ownership checks during update.
+SlangResult readPreviousLockFile(const String& path, LockFile& outLock, String& outError);
 SlangResult writeLockFile(const String& path, const LockFile& lock, String& outError);
 
 SlangResult readLocalPackages(

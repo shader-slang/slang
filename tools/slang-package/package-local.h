@@ -12,13 +12,13 @@ namespace PackageTool
 
 Index findLocalPackageIndex(const List<LocalPackage>& packages, const String& name);
 
-/// Read the project-local package registry, treating an absent registry as empty.
+/// Read `slang-workspace.json`, treating an absent file as no edits or overrides.
 SlangResult readProjectLocalPackages(
     const String& projectRoot,
     List<LocalPackage>& outPackages,
     String& outError);
 
-/// Write the project-local package registry under `.slang/overrides.json`.
+/// Write edit and override state to `slang-workspace.json`.
 SlangResult writeProjectLocalPackages(
     const String& projectRoot,
     const List<LocalPackage>& packages,

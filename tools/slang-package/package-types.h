@@ -23,22 +23,43 @@ struct Dependency
     String tag;
 };
 
+/// Root-only workspace layout from `slang-package.json`. Dependency manifests may contain these
+/// fields, but only the manifest that starts resolution controls materialization and output.
+struct WorkspaceSettings
+{
+    String depsDirectory;
+    String buildDirectory;
+};
+
 struct Manifest
 {
     String name;
     List<String> exports;
     List<String> licenseFiles;
     List<Dependency> dependencies;
+    WorkspaceSettings workspace;
 };
+
+inline String getWorkspaceDepsDirectory(const Manifest& manifest)
+{
+    return manifest.workspace.depsDirectory.getLength() ? manifest.workspace.depsDirectory : "deps";
+}
+
+inline String getWorkspaceBuildDirectory(const Manifest& manifest)
+{
+    return manifest.workspace.buildDirectory.getLength() ? manifest.workspace.buildDirectory
+                                                         : "build";
+}
 
 /// One package in `slang-package-lock.json`. Exactly one of these shapes is legal:
 ///
 /// - Git pin: `git`, `tag`, and `commit` are set; `path` is empty. Fetch materializes
-///   `.slang/packages/<name>` at that commit.
+///   `workspace.deps/<name>` at that commit. An in-place edit keeps this lock shape; the
+///   gitignored `slang-workspace.json` changes ownership of the checkout.
 /// - Path-only: `path` is set; `git` is empty. The package is used in place and is trusted only
 ///   when a manifest `path` edge selected it.
 /// - Local override: `git` and `path` are both set. The Git identity is retained, but the tree at
-///   `path` is used instead; `.slang/overrides.json` must register the same path.
+///   `path` is used instead; `slang-workspace.json` must register the same path.
 struct LockedPackage
 {
     String name;
@@ -75,16 +96,27 @@ inline bool isTrustedLockSelection(const Dependency& dependency, const LockedPac
 
 struct LockFile
 {
-    Int lockVersion = 2;
+    Int lockVersion = 3;
     List<LockedPackage> packages;
+};
+
+enum class LocalPackageKind
+{
+    Override,
+    Edit,
 };
 
 struct LocalPackage
 {
     String name;
     String path;
-    String baseCommit;
+    LocalPackageKind kind = LocalPackageKind::Override;
 };
+
+inline bool isEditedLocalPackage(const LocalPackage& package)
+{
+    return package.kind == LocalPackageKind::Edit;
+}
 
 enum class VersionComparison
 {
@@ -113,6 +145,7 @@ struct TagCandidate
     String tag;
     String commit;
     String path;
+    bool isEdit = false;
     SemanticVersion version;
 };
 

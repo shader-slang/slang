@@ -140,6 +140,7 @@ SlangResult validateLockedPackageManifest(
 
 SlangResult getLockedPackageRoot(
     const String& projectRoot,
+    const String& depsDirectory,
     const LockedPackage& package,
     const List<LocalPackage>& localPackages,
     String& outRoot,
@@ -151,7 +152,7 @@ SlangResult getLockedPackageRoot(
     if (isLocalOverrideLockedPackage(package))
     {
         outError = String("Locked local override '") + package.name +
-                   "' is not registered in .slang/overrides.json.";
+                   "' is not registered in slang-workspace.json.";
         return SLANG_FAIL;
     }
     if (isPathOnlyLockedPackage(package))
@@ -159,7 +160,7 @@ SlangResult getLockedPackageRoot(
         outRoot = Path::combine(projectRoot, package.path);
         return SLANG_OK;
     }
-    outRoot = Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
+    outRoot = Path::combine(Path::combine(projectRoot, depsDirectory), package.name);
     return SLANG_OK;
 }
 

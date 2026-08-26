@@ -160,6 +160,24 @@ static bool _isSafeRelativePath(const String& path)
     return true;
 }
 
+/// Return whether either simplified relative workspace path contains the other.
+static bool _workspacePathsOverlap(const String& left, const String& right)
+{
+    List<UnownedStringSlice> leftComponents;
+    List<UnownedStringSlice> rightComponents;
+    Path::split(left.getUnownedSlice(), leftComponents);
+    Path::split(right.getUnownedSlice(), rightComponents);
+    Index commonCount = leftComponents.getCount();
+    if (rightComponents.getCount() < commonCount)
+        commonCount = rightComponents.getCount();
+    for (Index i = 0; i < commonCount; ++i)
+    {
+        if (leftComponents[i] != rightComponents[i])
+            return false;
+    }
+    return true;
+}
+
 static bool _isSafeGitLocation(const String& location)
 {
     if (location.getLength() == 0 || location.getBuffer()[0] == '-' ||
@@ -321,6 +339,57 @@ static SlangResult _readDependencies(
     return SLANG_OK;
 }
 
+static SlangResult _readWorkspace(
+    JSONContainer* container,
+    const JSONValue& root,
+    WorkspaceSettings& outWorkspace,
+    String& outError)
+{
+    JSONValue workspace = _find(container, root, "workspace");
+    if (!workspace.isValid())
+        return SLANG_OK;
+    if (workspace.getKind() != JSONValue::Kind::Object)
+    {
+        outError = "Field 'workspace' must be an object.";
+        return SLANG_FAIL;
+    }
+    for (auto pair : container->getObject(workspace))
+    {
+        String key = container->getStringFromKey(pair.key);
+        if (key != "deps" && key != "build")
+        {
+            outError = String("Unknown field in 'workspace': ") + key;
+            return SLANG_FAIL;
+        }
+    }
+    SLANG_RETURN_ON_FAIL(
+        _readOptionalString(container, workspace, "deps", outWorkspace.depsDirectory, outError));
+    SLANG_RETURN_ON_FAIL(
+        _readOptionalString(container, workspace, "build", outWorkspace.buildDirectory, outError));
+    if (outWorkspace.depsDirectory.getLength())
+        outWorkspace.depsDirectory = Path::simplify(outWorkspace.depsDirectory);
+    if (outWorkspace.buildDirectory.getLength())
+        outWorkspace.buildDirectory = Path::simplify(outWorkspace.buildDirectory);
+    if ((outWorkspace.depsDirectory.getLength() &&
+         (outWorkspace.depsDirectory == "." || !_isSafeRelativePath(outWorkspace.depsDirectory))) ||
+        (outWorkspace.buildDirectory.getLength() &&
+         (outWorkspace.buildDirectory == "." || !_isSafeRelativePath(outWorkspace.buildDirectory))))
+    {
+        outError = "Workspace 'deps' and 'build' must be relative paths inside the workspace.";
+        return SLANG_FAIL;
+    }
+    String effectiveDeps =
+        outWorkspace.depsDirectory.getLength() ? outWorkspace.depsDirectory : "deps";
+    String effectiveBuild =
+        outWorkspace.buildDirectory.getLength() ? outWorkspace.buildDirectory : "build";
+    if (_workspacePathsOverlap(effectiveDeps, effectiveBuild))
+    {
+        outError = "Workspace 'deps' and 'build' directories must not overlap.";
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String& outError)
 {
     outManifest = Manifest();
@@ -351,6 +420,8 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
         outError));
     SLANG_RETURN_ON_FAIL(
         _readDependencies(json.container, json.root, outManifest.dependencies, outError));
+    SLANG_RETURN_ON_FAIL(
+        _readWorkspace(json.container, json.root, outManifest.workspace, outError));
     return SLANG_OK;
 }
 
@@ -428,6 +499,23 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
     for (const auto& dependency : manifest.dependencies)
         _writeDependency(writer, dependency);
     writer.endObject(SourceLoc());
+    if (manifest.workspace.depsDirectory.getLength() ||
+        manifest.workspace.buildDirectory.getLength())
+    {
+        _writeKey(writer, "workspace");
+        writer.startObject(SourceLoc());
+        if (manifest.workspace.depsDirectory.getLength())
+        {
+            _writeKey(writer, "deps");
+            writer.addStringValue(manifest.workspace.depsDirectory.getUnownedSlice(), SourceLoc());
+        }
+        if (manifest.workspace.buildDirectory.getLength())
+        {
+            _writeKey(writer, "build");
+            writer.addStringValue(manifest.workspace.buildDirectory.getUnownedSlice(), SourceLoc());
+        }
+        writer.endObject(SourceLoc());
+    }
     writer.endObject(SourceLoc());
     writer.getBuilder() << "\n";
     if (SLANG_FAILED(File::writeAllText(path, writer.getBuilder())))
@@ -529,21 +617,29 @@ static SlangResult _readLockedPackage(
     return SLANG_OK;
 }
 
-SlangResult readLockFile(const String& path, LockFile& outLock, String& outError)
+static SlangResult _readLockFile(
+    const String& path,
+    bool allowPreviousVersion,
+    LockFile& outLock,
+    String& outError)
 {
     ParsedJSON json;
     SLANG_RETURN_ON_FAIL(_parseJSON(path, json, outError));
     outLock = LockFile();
 
     JSONValue lockVersion = _find(json.container, json.root, "lock_version");
+    Int version = lockVersion.getKind() == JSONValue::Kind::Integer
+                      ? json.container->asInteger(lockVersion)
+                      : 0;
     if (lockVersion.getKind() != JSONValue::Kind::Integer ||
-        json.container->asInteger(lockVersion) != 2)
+        (version != 3 && !(allowPreviousVersion && version == 2)))
     {
         outError =
-            "Field 'lock_version' must be the integer 2. Run 'slang package update' to regenerate "
+            "Field 'lock_version' must be the integer 3. Run 'slang package update' to regenerate "
             "the lock.";
         return SLANG_FAIL;
     }
+    outLock.lockVersion = version;
     JSONValue packages = _find(json.container, json.root, "packages");
     if (packages.getKind() != JSONValue::Kind::Object)
     {
@@ -565,6 +661,16 @@ SlangResult readLockFile(const String& path, LockFile& outLock, String& outError
         outLock.packages.add(package);
     }
     return SLANG_OK;
+}
+
+SlangResult readLockFile(const String& path, LockFile& outLock, String& outError)
+{
+    return _readLockFile(path, false, outLock, outError);
+}
+
+SlangResult readPreviousLockFile(const String& path, LockFile& outLock, String& outError)
+{
+    return _readLockFile(path, true, outLock, outError);
 }
 
 SlangResult writeLockFile(const String& path, const LockFile& lock, String& outError)
@@ -621,51 +727,96 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
 {
     ParsedJSON json;
     SLANG_RETURN_ON_FAIL(_parseJSON(path, json, outError));
+    for (auto pair : json.container->getObject(json.root))
+    {
+        String key = json.container->getStringFromKey(pair.key);
+        if (key != "edits" && key != "overrides")
+        {
+            outError = String("Unknown field in slang-workspace.json: ") + key;
+            return SLANG_FAIL;
+        }
+    }
+    outPackages.clear();
+    JSONValue edits = _find(json.container, json.root, "edits");
+    if (edits.isValid() && edits.getKind() != JSONValue::Kind::Object)
+    {
+        outError = "Field 'edits' must be an object.";
+        return SLANG_FAIL;
+    }
+    if (edits.isValid())
+    {
+        for (auto pair : json.container->getObject(edits))
+        {
+            LocalPackage package;
+            package.name = json.container->getStringFromKey(pair.key);
+            if (!isValidPackageName(package.name) ||
+                pair.value.getKind() != JSONValue::Kind::Object)
+            {
+                outError = String("Invalid edited package entry: ") + package.name;
+                return SLANG_FAIL;
+            }
+            for (auto field : json.container->getObject(pair.value))
+            {
+                outError = String("Unknown field in edited package '") + package.name +
+                           "': " + json.container->getStringFromKey(field.key);
+                return SLANG_FAIL;
+            }
+            package.kind = LocalPackageKind::Edit;
+            outPackages.add(package);
+        }
+    }
+
     JSONValue overrides = _find(json.container, json.root, "overrides");
-    if (overrides.getKind() != JSONValue::Kind::Object)
+    if (overrides.isValid() && overrides.getKind() != JSONValue::Kind::Object)
     {
         outError = "Field 'overrides' must be an object.";
         return SLANG_FAIL;
     }
-
-    outPackages.clear();
-    for (auto pair : json.container->getObject(overrides))
+    if (overrides.isValid())
     {
-        LocalPackage package;
-        package.name = json.container->getStringFromKey(pair.key);
-        if (!isValidPackageName(package.name) || pair.value.getKind() != JSONValue::Kind::Object)
+        for (auto pair : json.container->getObject(overrides))
         {
-            outError = String("Invalid local package entry: ") + package.name;
-            return SLANG_FAIL;
+            LocalPackage package;
+            package.name = json.container->getStringFromKey(pair.key);
+            if (!isValidPackageName(package.name) ||
+                pair.value.getKind() != JSONValue::Kind::Object)
+            {
+                outError = String("Invalid override entry: ") + package.name;
+                return SLANG_FAIL;
+            }
+            for (auto field : json.container->getObject(pair.value))
+            {
+                if (json.container->getStringFromKey(field.key) != "path")
+                {
+                    outError = String("Unknown field in override '") + package.name + "'.";
+                    return SLANG_FAIL;
+                }
+            }
+            SLANG_RETURN_ON_FAIL(
+                _readRequiredString(json.container, pair.value, "path", package.path, outError));
+            if (!_isSafeLocalPath(package.path))
+            {
+                outError = String("Override path must be relative: ") + package.name;
+                return SLANG_FAIL;
+            }
+            bool duplicate = false;
+            for (const auto& existing : outPackages)
+                duplicate = duplicate || existing.name == package.name;
+            if (duplicate)
+            {
+                outError = String("Package cannot be both edited and overridden: ") + package.name;
+                return SLANG_FAIL;
+            }
+            outPackages.add(package);
         }
-        SLANG_RETURN_ON_FAIL(
-            _readRequiredString(json.container, pair.value, "path", package.path, outError));
-        if (!_isSafeLocalPath(package.path))
-        {
-            outError = String("Local package path must be relative: ") + package.name;
-            return SLANG_FAIL;
-        }
-        SLANG_RETURN_ON_FAIL(_readOptionalString(
-            json.container,
-            pair.value,
-            "base_commit",
-            package.baseCommit,
-            outError));
-        if (package.baseCommit.getLength() && !_isCommitHash(package.baseCommit))
-        {
-            outError = String("Local package base commit is invalid: ") + package.name;
-            return SLANG_FAIL;
-        }
-        bool duplicate = false;
-        for (const auto& existing : outPackages)
-            duplicate = duplicate || existing.name == package.name;
-        if (duplicate)
-        {
-            outError = String("Duplicate local package entry: ") + package.name;
-            return SLANG_FAIL;
-        }
-        outPackages.add(package);
     }
+    if (!edits.isValid() && !overrides.isValid())
+    {
+        outError = "Workspace file must contain 'edits' or 'overrides'.";
+        return SLANG_FAIL;
+    }
+    outPackages.sort([](const LocalPackage& left, const LocalPackage& right)
+                     { return left.name < right.name; });
     return SLANG_OK;
 }
 
@@ -676,20 +827,29 @@ SlangResult writeLocalPackages(
 {
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
+    _writeKey(writer, "edits");
+    writer.startObject(SourceLoc());
+    for (const auto& package : packages)
+    {
+        if (!isEditedLocalPackage(package))
+            continue;
+        SLANG_RELEASE_ASSERT(isValidPackageName(package.name));
+        writer.addUnquotedKey(package.name.getUnownedSlice(), SourceLoc());
+        writer.startObject(SourceLoc());
+        writer.endObject(SourceLoc());
+    }
+    writer.endObject(SourceLoc());
     _writeKey(writer, "overrides");
     writer.startObject(SourceLoc());
     for (const auto& package : packages)
     {
+        if (isEditedLocalPackage(package))
+            continue;
         SLANG_RELEASE_ASSERT(isValidPackageName(package.name));
         writer.addUnquotedKey(package.name.getUnownedSlice(), SourceLoc());
         writer.startObject(SourceLoc());
         _writeKey(writer, "path");
         writer.addStringValue(package.path.getUnownedSlice(), SourceLoc());
-        if (package.baseCommit.getLength())
-        {
-            _writeKey(writer, "base_commit");
-            writer.addStringValue(package.baseCommit.getUnownedSlice(), SourceLoc());
-        }
         writer.endObject(SourceLoc());
     }
     writer.endObject(SourceLoc());
