@@ -3634,6 +3634,11 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
         supportsRequiredCapability = builder->supportsScalarSSA();
     if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarFunctions)
         supportsRequiredCapability = builder->supportsScalarFunctions();
+    if (supportsRequiredCapability &&
+        requiredCapability >= NVVMIRCapability::ScalarPointerArithmetic)
+    {
+        supportsRequiredCapability = builder->supportsScalarPointerArithmetic();
+    }
     if (SLANG_FAILED(loadResult) || !supportsRequiredCapability)
     {
         StringBuilder location;

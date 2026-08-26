@@ -280,6 +280,16 @@ extern "C"
         SlangNVVMModuleHandle_1 module,
         SlangNVVMValueHandle_1 value);
 
+    /// Emits a non-inbounds element offset from a same-module typed pointer.
+    /// The base pointer must have a sized pointee, and the scalar integer offset and base pointer
+    /// must both be available at the current unterminated insertion point. On failure, the output
+    /// pointer is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitPointerOffset_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 basePointer,
+        SlangNVVMValueHandle_1 elementOffset,
+        SlangNVVMValueHandle_1* outPointer);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -313,6 +323,8 @@ extern "C"
 
         SlangNVVMEmitIntegerCall_2 emitIntegerCall;
         SlangNVVMEmitIntegerReturn_2 emitIntegerReturn;
+
+        SlangNVVMEmitPointerOffset_2 emitPointerOffset;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -338,6 +350,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_FUNCTION_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerReturn) + \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerReturn))
+
+    // This Slice 10 prefix is one coherent scalar-pointer-arithmetic capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_POINTER_ARITHMETIC_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitPointerOffset) +           \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitPointerOffset))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

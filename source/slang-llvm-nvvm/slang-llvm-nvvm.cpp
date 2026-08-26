@@ -723,6 +723,39 @@ _emitIntegerReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitPointerOffset(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 basePointer,
+    SlangNVVMValueHandle_1 elementOffset,
+    SlangNVVMValueHandle_1* outPointer)
+{
+    if (outPointer)
+        *outPointer = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmBasePointer = _getValue(basePointer);
+    llvm::Value* llvmElementOffset = _getValue(elementOffset);
+    llvm::PointerType* pointerType =
+        llvmBasePointer ? llvm::dyn_cast<llvm::PointerType>(llvmBasePointer->getType()) : nullptr;
+    llvm::Type* pointeeType = pointerType && !pointerType->isOpaque()
+                                  ? pointerType->getNonOpaquePointerElementType()
+                                  : nullptr;
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !outPointer || !insertionBlock || !pointerType || pointerType->isOpaque() ||
+        !pointeeType || !pointeeType->isSized() || !llvmElementOffset ||
+        !llvm::isa<llvm::IntegerType>(llvmElementOffset->getType()) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmBasePointer) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmElementOffset))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    // A Slang element offset does not establish LLVM's stronger inbounds provenance contract.
+    llvm::Value* result = state->builder.CreateGEP(pointeeType, llvmBasePointer, llvmElementOffset);
+    *outPointer = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitReturnVoid(SlangNVVMModuleHandle_1 module)
 {
     ModuleState* state = _getModule(module);
@@ -977,6 +1010,7 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.addIntegerPhiIncoming = _addIntegerPhiIncoming;
     api.emitIntegerCall = _emitIntegerCall;
     api.emitIntegerReturn = _emitIntegerReturn;
+    api.emitPointerOffset = _emitPointerOffset;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

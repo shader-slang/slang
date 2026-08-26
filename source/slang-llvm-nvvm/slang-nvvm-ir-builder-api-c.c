@@ -35,3 +35,13 @@ typedef char SlangNVVMBuilderAPIV2ScalarFunctionCapabilityOrderCCompileProbe
       SLANG_NVVM_BUILDER_API_V2_SCALAR_SSA_MIN_SIZE)
          ? 1
          : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarPointerArithmeticMinimumSizeCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_POINTER_ARITHMETIC_MIN_SIZE <=
+      sizeof(SlangNVVMBuilderAPI_V2))
+         ? 1
+         : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarPointerArithmeticCapabilityOrderCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_POINTER_ARITHMETIC_MIN_SIZE >
+      SLANG_NVVM_BUILDER_API_V2_SCALAR_FUNCTION_MIN_SIZE)
+         ? 1
+         : -1];

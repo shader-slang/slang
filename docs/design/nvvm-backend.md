@@ -720,6 +720,70 @@ semantics. This slice does not add void helpers, external declarations, indirect
 function pointers, pointer/aggregate helper ABI, multiplication or other arithmetic, richer scalar
 types, or additional address spaces.
 
+### Slice 10 signed device-pointer element offsets
+
+Consider this example:
+
+```slang
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform Ptr<int, Access::Read, AddressSpace::Device> source,
+    uniform int index)
+{
+    *(destination + index) = *(source + index);
+}
+```
+
+The final linked IR keeps the pointer additions as two canonical `IRGetOffsetPtr` instructions.
+Each instruction has exactly the base pointer and the signed-i32 `index` parameter as operands. The
+destination result has exactly the same read-write device-`int` pointer type as `destination`, and
+the source result has exactly the same read-only device-`int` pointer type as `source`; the access
+qualifier is not dropped or reconstructed. The source result feeds the established load, the
+destination result feeds the established store, and no byte multiplication, cast, or
+`IRGetElementPtr` spelling is introduced.
+
+Preflight consumes that linked representation directly before builder discovery. It accepts only
+an `IRGetOffsetPtr` with two operands, an exactly equal supported base/result pointer type, and an
+available signed-i32 offset that dominates the instruction. The resulting pointer is entered in
+the same canonical value map as parameters and scalar results. Existing load/store validation then
+remains the sole owner of read-versus-write access checks. In particular, the pointer-offset case
+does not walk syntax or operands to rediscover an access qualifier.
+
+The private V2 provider table appends one coherent scalar-pointer-arithmetic prefix:
+
+```text
+emitPointerOffset(module, basePointer, elementOffset, outPointer)
+```
+
+An exact Slice 9 provider remains compatible and continues to compile every earlier shape. A
+pointer-offset module requires the complete new prefix and reaches E52016 after discovery but
+before module creation when that prefix is absent. A size inside the appended field or a complete
+prefix with a null operation is malformed, while a larger table remains compatible. The host
+clears the output before dispatch and again if a provider reports failure after writing a handle,
+and the builder identity records `scalar-pointer-arithmetic=0|1` for shader-cache keys.
+
+At the LLVM boundary, the current unterminated insertion block remains the source of caller
+ownership. Before mutation the provider requires a live module, a non-null output, a typed,
+non-opaque scalar base pointer with a sized pointee, and a scalar integer offset. Both values must
+belong to the same module and be available at the insertion point. The provider derives the GEP
+element type only from the base pointer and emits ordinary LLVM 14 `CreateGEP`, not
+`CreateInBoundsGEP`. A Slang element offset does not establish LLVM's stronger `inbounds`
+object/provenance promise, and the negative-index runtime case intentionally starts from an
+interior pointer rather than claiming that memory before an allocation is valid.
+
+The provider enforces `pointeeType->isSized()` even though the current public builder constructors
+do not expose a safe way to construct an unsized-pointee pointer: `getPointerType` accepts only a
+loadable/storable pointee. The guard protects the ABI boundary and future type constructors, but
+the current black-box rejection tests do not claim to exercise it with an invented raw LLVM
+handle.
+
+This boundary is only signed-i32 element offsetting on the existing device `Ptr<int>` ABI. It does
+not add unsigned or wider offsets, other pointee types, `IRGetElementPtr`, arrays, vectors,
+aggregates, globals, shared/local/constant/generic address spaces, pointer helper parameters or
+results, pointer casts/comparisons/subtraction, byte addressing, bounds checks, or `inbounds`
+provenance. Those remain separate producer and ABI decisions.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -768,7 +832,7 @@ test name. The initial buckets are:
 | 0 | External compiler contract | handwritten NVVM IR, loader failures, verifier logs, `ptxas` acceptance |
 | 1 | Minimal compute ABI | empty kernel, scalar value/pointer parameters, launch shape, entry naming |
 | 2 | Scalar program structure | arithmetic, comparisons, branches, loops, SSA phis, direct calls |
-| 3 | Types and memory | vectors, matrices, aggregates, layout, generic/global/shared/local address spaces |
+| 3 | Types and memory | pointer addressing, vectors, matrices, aggregates, layout, generic/global/shared/local address spaces |
 | 4 | Core CUDA execution | thread/block IDs, barriers, atomics, shared memory, memory ordering |
 | 5 | Numeric library policy | half/bfloat/fp8, transcendental math, libdevice, fast/precise/denormal modes |
 | 6 | Resource ABI | buffers, textures, samplers, surface operations, bindless/resource handles |
@@ -806,11 +870,12 @@ The program advances through bounded slices:
 7. scalar control flow and the kernel ABI;
 8. complete scalar program structure with executable constants, phis, and loops;
 9. direct calls and the non-void helper ABI;
-10. address spaces, aggregates, and shared memory;
-11. libdevice and floating-point policy;
-12. atomics and wave operations;
-13. resources and optimization-quality work; and
-14. advanced capabilities and production-readiness evaluation.
+10. signed device-pointer element offsets;
+11. address spaces, aggregates, and shared memory;
+12. libdevice and floating-point policy;
+13. atomics and wave operations;
+14. resources and optimization-quality work; and
+15. advanced capabilities and production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -826,8 +891,9 @@ Slice 7 completes the first raw CUDA scalar parameter ABI and a deliberately phi
 7. It adds signed `i32` arithmetic/comparison and acyclic branches while retaining executable
 constants, block parameters/branch arguments, phis, loops, calls, and richer types as the next
 program-structure boundary. Slice 8 completes constants, phis, and finite loops. Slice 9 completes
-the separately demonstrable direct-call/non-void-helper ABI before the type-and-memory work beginning
-with Slice 10.
+the separately demonstrable direct-call/non-void-helper ABI. Slice 10 then proves signed-i32 element
+offsetting on the existing device pointer ABI without claiming the arrays, aggregates, shared
+memory, or additional address spaces beginning with Slice 11.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -946,6 +1012,22 @@ prefix passed 60/60 alongside the established routing, NVRTC, pass-through, unsu
 CUDA-runtime regressions. The provider continued to export only its V1/V2 getters with no
 process-visible LLVM DLL dependency.
 
+On 2026-08-27, Slice 10's Release LLVM 14.0.6 provider build passed, and the final formatted
+`slang-unit-test-tool/nvvm` prefix passed 68/68. The verified provider
+fixture emitted two ordinary address-space-1 `getelementptr i32` values without `inbounds`. The fake
+direct-route graph proved that both offsets use the exact shared signed-i32 parameter, that the
+source offset feeds the load, and that the destination offset feeds the store. Negotiation kept an
+exact Slice 9 prefix usable and rejected partial or incomplete pointer-arithmetic prefixes; invalid
+provider operations failed before mutation. The unsigned source offset remained the deterministic
+signed-i32 unsupported boundary.
+
+Direct NVVM and NVRTC exposed matching `[64, 64, 32]` kernel parameter widths and global-memory
+semantics. Both PTX lanes passed CUDA 12.9.86 `ptxas`, and both runtime lanes copied the intended
+element for a positive allocation-base index and for index `-1` from interior base pointers while
+preserving neighboring sentinels. The preservation runs passed CUDA-option parsing (1/1), routing
+and hashing (2/2), the unsupported-IR file (1/1), default/explicit NVRTC sampler coverage (3/3),
+true NVRTC pass-through (2/2), and CUDA runtime dispatch (1/1).
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -971,6 +1053,14 @@ the rule that insertion-block ownership, rather than a second ambient function c
 the caller. These claims do not include external or indirect calls, recursion, void/pointer helpers,
 or preservation of source function attributes.
 
+Slice 10 settles canonical `IRGetOffsetPtr` lowering for signed-i32 element offsets on the existing
+device-`int` pointer ABI, exact equality between result and base pointer types including access,
+ordinary non-`inbounds` LLVM GEP construction, and the append-only scalar-pointer-arithmetic
+provider prefix. It also settles complete pre-mutation ownership, availability, typed-pointer, and
+sized-pointee validation at the provider boundary. These claims do not include `IRGetElementPtr`,
+unsigned or wider offsets, other pointees or address spaces, arrays, aggregates, globals, or shared
+memory.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
@@ -979,6 +1069,8 @@ The following remain open until their named slice supplies evidence:
 - conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
   pointers;
 - external/indirect calls, richer helper ABI, and richer scalar/control-flow types;
+- pointer addressing beyond signed-i32 element offsets, including `IRGetElementPtr`, arrays,
+  aggregates, globals, shared memory, and additional address spaces;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

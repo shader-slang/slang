@@ -498,6 +498,17 @@ SlangResult _validateNVVMFunction(
                 _requireCapability(capability, NVVMIRCapability::ScalarFunctions);
                 break;
 
+            case kIROp_GetOffsetPtr:
+                if (inst->getOperandCount() != 2 ||
+                    !_asSupportedDevicePointerType(inst->getDataType()))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("device i32 pointer offset"));
+                }
+                _requireCapability(capability, NVVMIRCapability::ScalarPointerArithmetic);
+                break;
+
             case kIROp_Return:
                 break;
 
@@ -613,6 +624,35 @@ SlangResult _validateNVVMFunction(
                             capability));
                     }
                     availableValues.add(call);
+                }
+                break;
+
+            case kIROp_GetOffsetPtr:
+                {
+                    IRInst* basePointer = inst->getOperand(0);
+                    IRInst* elementOffset = inst->getOperand(1);
+                    if (!basePointer ||
+                        !isTypeEqual(inst->getDataType(), basePointer->getDataType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("pointer offset result type"));
+                    }
+                    SLANG_RETURN_ON_FAIL(_validatePointerValue(
+                        codeGenContext,
+                        basePointer,
+                        inst,
+                        availableValues,
+                        dominatorTree,
+                        false));
+                    SLANG_RETURN_ON_FAIL(_validateI32Value(
+                        codeGenContext,
+                        elementOffset,
+                        inst,
+                        availableValues,
+                        dominatorTree,
+                        capability));
+                    availableValues.add(inst);
                 }
                 break;
 
@@ -1240,6 +1280,39 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 size_t(loweredArguments.getCount()),
                                 loweredValue)));
                         valueMap[call] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_GetOffsetPtr:
+                    {
+                        SlangNVVMValueHandle_1 loweredBasePointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(0),
+                            valueMap,
+                            i32Type,
+                            loweredBasePointer));
+                        SlangNVVMValueHandle_1 loweredElementOffset = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(1),
+                            valueMap,
+                            i32Type,
+                            loweredElementOffset));
+                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "device i32 pointer offset",
+                            builder.emitPointerOffset(
+                                moduleScope.module,
+                                loweredBasePointer,
+                                loweredElementOffset,
+                                loweredPointer)));
+                        valueMap[inst] = loweredPointer;
                     }
                     break;
 

@@ -47,6 +47,8 @@ public:
     bool supportsScalarSSA() const;
     /// Returns whether the provider advertised the complete Slice 9 scalar-function prefix.
     bool supportsScalarFunctions() const;
+    /// Returns whether the provider advertised the complete Slice 10 pointer-arithmetic prefix.
+    bool supportsScalarPointerArithmetic() const;
     /// Returns the provider identity that affects generated bitcode and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -184,6 +186,13 @@ public:
     /// Terminates the current insertion block with an integer return value.
     SlangResult emitIntegerReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
         const;
+
+    /// Emits a non-inbounds element offset from a typed pointer.
+    SlangResult emitPointerOffset(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 basePointer,
+        SlangNVVMValueHandle_1 elementOffset,
+        SlangNVVMValueHandle_1& outPointer) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;
