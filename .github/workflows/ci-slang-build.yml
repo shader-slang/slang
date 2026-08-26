@@ -211,10 +211,11 @@ jobs:
               exit 1
             fi
 
-            if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
-              # Doing a debug build will try to link against a release built llvm, this
-              # is a problem on Windows, so make slang-llvm in release build and use
-              # that as though it's a fetched binary via these presets.
+            if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" && "${{ inputs.build-llvm }}" != "false" ]]; then
+              # A debug build would try to link against a release-built llvm,
+              # which is a problem on Windows, so when llvm is wanted, build
+              # slang-llvm in release config first and feed it back in as
+              # though it were a fetched binary via these presets.
               cmake --workflow --preset slang-llvm
 
               # Configure, pointing to our just-generated slang-llvm archive
@@ -227,7 +228,10 @@ jobs:
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
-              # linux aarch64 cannot build llvm.
+              # LLVM was explicitly not requested for this platform/config
+              # (e.g. linux/aarch64 cannot build it at all; other callers
+              # may opt out for other reasons — see build-llvm's call sites
+              # in ci.yml).
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
