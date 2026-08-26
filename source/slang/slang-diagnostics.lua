@@ -1423,6 +1423,13 @@ err(
 )
 
 err(
+    "operator-declared-as-member",
+    30073,
+    "operator declared as a member",
+    span { loc = "decl:Decl", message = "operator '~decl' cannot be declared as a member of a type or extension; a call site for this operator resolves its name by lexical scope lookup rather than by member lookup on the operand type, so member operators are not supported. Declare it as a free function 'operator~decl(...)' at module or namespace scope instead." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
