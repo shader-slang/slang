@@ -4878,10 +4878,10 @@ inline constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 
 /// `SyntheticResourceInfo::arraySize` when the synthetic resource is an
 /// unbounded (runtime-sized) descriptor array, so the compiler cannot
-/// know how many descriptors the host will supply. This is
-/// `SLANG_UNBOUNDED_SIZE`'s meaning in the 32-bit width `arraySize`
-/// uses.
-inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = 0xffffffffu;
+/// know how many descriptors the host will supply. Derived from
+/// `SLANG_UNBOUNDED_SIZE` so the two carry the same meaning in their
+/// respective widths, rather than agreeing only by coincidence.
+inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = (uint32_t)SLANG_UNBOUNDED_SIZE;
 
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
@@ -5130,6 +5130,14 @@ struct SyntheticResourceInfo
     /// deliberately, so that a shader does not constrain how many
     /// shaders the host binds alongside it. A host sizing a descriptor
     /// array must not read this as a count.
+    ///
+    /// For coverage, this sentinel and `bindlessIndex >= 0` are set
+    /// together and always agree, so testing either one identifies the
+    /// bindless form. They are separate fields because they answer
+    /// different questions -- `arraySize` describes the binding's shape
+    /// for any synthetic resource, while `bindlessIndex` says which
+    /// element this shader uses -- and a future synthetic resource
+    /// could be an unbounded array without having a per-shader index.
     uint32_t arraySize = 1;
 
     /// Whether the resource is global/root-scoped or attached to a

@@ -1144,6 +1144,14 @@ Result linkAndOptimizeIR(
                 // wrong kind rather than acting on a value that was never
                 // meant as an index. Matches the reserved-space handling
                 // below.
+                //
+                // Reported as an internal "unexpected" diagnostic rather
+                // than a registered one, unlike the range check just below:
+                // a wrong value *kind* means the caller mis-built the option
+                // entry itself, which no CLI input can produce and which the
+                // option's own type contract already forbids. A negative
+                // index is a well-formed option carrying an out-of-range
+                // value, so it gets a user-facing code (E45117).
                 if ((*values)[0].kind != CompilerOptionValueKind::Int)
                 {
                     if (sink)

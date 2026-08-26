@@ -976,9 +976,12 @@ struct CoverageInstrumenter
     IRType* counterElementType;
     IRType* counterElementPtrType;
     IRType* intType;
-    // The `RWStructuredBuffer<T>` type itself — the ARRAY ELEMENT type in
-    // the bindless form, and the global's own type otherwise.
-    IRType* bufferElementType = nullptr;
+    // The `RWStructuredBuffer<T>` type itself: the global's own type in the
+    // single-buffer form, and the descriptor array's element type in the
+    // bindless form. Deliberately not named for either nesting level --
+    // `counterElementType` above is `T`, one level further in, and a name
+    // like `structuredBufferType` reads as though this were the inner one.
+    IRType* structuredBufferType = nullptr;
     // Caller opted in to boolean recording (`-trace-coverage-boolean`): each
     // counter is written with a plain non-atomic store of 1 instead of an
     // atomic add, recording whether the entry executed (0 / non-zero) rather
@@ -1021,7 +1024,7 @@ struct CoverageInstrumenter
         // through `IRArrayType`, not `IRUnsizedArrayType`, and hits a
         // `SLANG_RELEASE_ASSERT` on the latter -- so the explicit-type
         // overload is required here and needs this type kept.
-        bufferElementType = (IRType*)bufferType;
+        structuredBufferType = (IRType*)bufferType;
         counterElementType = bufferType->getElementType();
         counterElementPtrType = tmpBuilder.getPtrType(counterElementType);
         intType = tmpBuilder.getIntType();
@@ -1103,7 +1106,7 @@ struct CoverageInstrumenter
         if (bindlessIndex >= 0)
         {
             bufferInst = builder.emitElementExtract(
-                bufferElementType,
+                structuredBufferType,
                 coverageBuffer,
                 builder.getIntValue(intType, (IRIntegerValue)bindlessIndex));
         }
