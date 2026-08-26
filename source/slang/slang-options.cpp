@@ -848,7 +848,7 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, "
          "ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or "
-         "SPIRV."},
+         "SPIRV. Not C/C++-compatible; for C-compatible layout use -fvk-use-c-layout."},
         {OptionKind::ForceDXLayout,
          "-fvk-use-dx-layout",
          nullptr,

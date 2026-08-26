@@ -464,6 +464,8 @@ For more information, see the following pages:
 
 Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIR-V.
 
+> **Note:** Slang's `scalar` layout is not C/C++-compatible. It does not round a struct's size up to the struct's alignment, and it represents `bool` as 4 bytes, so it does not match a host C/C++ struct's `sizeof`/offsets in general. It also differs from DXC, which changed its scalar-layout option to follow C struct layout (see [microsoft/DirectXShaderCompiler#7996](https://github.com/microsoft/DirectXShaderCompiler/pull/7996)). If you need C-compatible layout, use [`-fvk-use-c-layout`](#-fvk-use-c-layout), which targets standard C/C++ struct rules (though it may not reproduce DXC's output byte-for-byte).
+
 ### -fvk-use-gl-layout
 
 Use std430 layout instead of D3D buffer layout for raw buffer load/stores.

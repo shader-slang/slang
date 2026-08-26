@@ -73,6 +73,8 @@ Use scalar layout for buffer types.
 
 > **Note:** Scalar layout is generally only supported by Vulkan consumers of GLSL, and is not expected to be usable for OpenGL.
 
+> **Note:** Slang's `scalar` layout is not C/C++-compatible. It does not round a struct's size up to the struct's alignment, and it represents `bool` as 4 bytes. It also differs from DXC, which changed its scalar-layout option to follow C struct layout (see [microsoft/DirectXShaderCompiler#7996](https://github.com/microsoft/DirectXShaderCompiler/pull/7996)). If you need C-compatible layout, use `-fvk-use-c-layout`, which targets standard C/C++ struct rules (though it may not reproduce DXC's output byte-for-byte).
+
 ### -fvk-use-dx-layout
 Use D3D buffer layout rules.
 

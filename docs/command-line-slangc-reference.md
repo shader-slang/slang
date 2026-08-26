@@ -540,7 +540,7 @@ Remove all source file information from outputs.
 
 <a id="force-glsl-scalar-layout"></a>
 ### -force-glsl-scalar-layout, -fvk-use-scalar-layout
-Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV. 
+Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV. Not C/C++-compatible; for C-compatible layout use [-fvk-use-c-layout](#fvk-use-c-layout). 
 
 
 <a id="fvk-use-dx-layout"></a>
