@@ -574,22 +574,15 @@ static SlangResult _normalizeTestOutputPaths(
     const SlangResult res = normalizeTestOutputPathsForTestFile(filePath, args, error);
     if (SLANG_FAILED(res))
     {
-        if (context && context->getTestReporter())
-        {
-            context->getTestReporter()->messageFormat(
-                TestMessageType::RunError,
-                "Invalid test directive in file '%s': %s",
-                filePath.getBuffer(),
-                error.getBuffer());
-        }
-        else
-        {
-            fprintf(
-                stderr,
-                "Invalid test directive in file '%s': %s\n",
-                filePath.getBuffer(),
-                error.getBuffer());
-        }
+        // A test problem is surfaced through the reporter, never stderr. The only path that reaches
+        // here (processFile -> _runTestsOnFile) always has a reporter installed, so its absence is
+        // a programming error rather than something to fall back from.
+        SLANG_ASSERT(context && context->getTestReporter());
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "Invalid test directive in file '%s': %s",
+            filePath.getBuffer(),
+            error.getBuffer());
     }
     return res;
 }
