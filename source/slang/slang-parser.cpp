@@ -1471,6 +1471,17 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
             parser->ReadToken(TokenType::RParent);
             break;
 
+        // HLSL/C++ spell an indexing operator as `operator[]`; Slang uses a
+        // `__subscript` declaration instead. Consume the matching `]` so we do
+        // not additionally report an "unexpected ']'" parse error, and point the
+        // user at the Slang spelling rather than the generic invalid-operator note.
+        case TokenType::LBracket:
+            parser->ReadToken(TokenType::RBracket);
+            parser->sink->diagnose(
+                Diagnostics::OperatorSubscriptShouldUseSubscript{.location = nameToken.loc});
+            isValidOperator = false;
+            break;
+
         // Note(tfoley): Even more of a hack!
         case TokenType::QuestionMark:
             if (AdvanceIf(parser, TokenType::Colon))

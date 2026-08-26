@@ -13799,6 +13799,7 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     // we want to consider the "inner" declaration instead when
     // making decisions about what to allow or not.
     //
+    bool eitherIsGeneric = as<GenericDecl>(newDecl) || as<GenericDecl>(oldDecl);
     if (auto newGenericDecl = as<GenericDecl>(newDecl))
         newDecl = newGenericDecl->inner;
     if (auto oldGenericDecl = as<GenericDecl>(oldDecl))
@@ -13827,6 +13828,37 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     {
         // It is allowed to have a decl whose name is the same as the module.
         return SLANG_OK;
+    }
+
+    // A body-less struct forward declaration paired with a complete definition
+    // of the same name is redundant in Slang, which has order-independent
+    // lookup. Hiding the forward declaration from lookup is what keeps a later
+    // reference from resolving to both declarations and being reported as
+    // ambiguous (issue #12764).
+    //
+    if (auto newStruct = as<StructDecl>(newDecl))
+    {
+        if (auto oldStruct = as<StructDecl>(oldDecl))
+        {
+            // A link-time type alias (`struct Foo : IBar = Baz;`) is body-less
+            // yet keeps `hasBody == true`, so it is not a forward declaration.
+            // Generic structs are excluded: lookup finds the enclosing
+            // `GenericDecl` rather than the inner `StructDecl` this branch would
+            // hide, and a duplicated generic struct produces a single
+            // conflicting-declaration error with no ambiguity cascade to
+            // suppress, so it keeps that existing diagnostic.
+            bool eitherIsAlias = oldStruct->aliasedType.exp || newStruct->aliasedType.exp;
+            if (!eitherIsGeneric && !eitherIsAlias && oldStruct->hasBody != newStruct->hasBody)
+            {
+                auto forwardDecl = oldStruct->hasBody ? newStruct : oldStruct;
+                auto definition = oldStruct->hasBody ? oldStruct : newStruct;
+                getSink()->diagnose(Diagnostics::RedundantStructForwardDeclaration{
+                    .decl = forwardDecl,
+                    .definition = definition});
+                forwardDecl->hiddenFromLookup = true;
+                return SLANG_OK;
+            }
+        }
     }
 
 

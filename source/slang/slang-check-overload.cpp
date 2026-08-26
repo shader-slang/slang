@@ -296,6 +296,28 @@ static bool isArrayDecl(Decl* decl)
     return false;
 }
 
+/// Returns true if `type` is a sized array whose extent is not a compile-time
+/// literal, i.e. its element count is not a `ConstantIntVal`. This is the shape
+/// produced when a generic value parameter is used as an array extent (e.g. the
+/// parameter `Data values[N]` has element count `int(N)`, a `TypeCastIntVal`
+/// over a `DeclRefIntVal`), as opposed to a fixed-size array like `Data[2]`.
+static bool isArrayWithNonLiteralExtent(Type* type)
+{
+    auto arrayType = as<ArrayExpressionType>(type);
+    if (!arrayType)
+        return false;
+    auto elementCount = arrayType->getElementCount();
+    return elementCount && !as<ConstantIntVal>(elementCount);
+}
+
+/// Returns true if `type` is a sized array with a compile-time literal extent,
+/// e.g. the fixed-size `Data[2]` parameter of an overload like `decode(Data[2])`.
+static bool isArrayWithLiteralExtent(Type* type)
+{
+    auto arrayType = as<ArrayExpressionType>(type);
+    return arrayType && as<ConstantIntVal>(arrayType->getElementCount());
+}
+
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
@@ -3589,6 +3611,21 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     getSink()->diagnose(Diagnostics::MoreOverloadCandidates{
                         .count = (int64_t)remainingCount,
                         .location = expr->loc});
+                }
+            }
+
+            // Migration hint (issue #12764): fire only when a single rejected
+            // argument slot pairs a value-parameter-extent array actual with a
+            // literal-extent array parameter, so the hint is not shown for an
+            // unrelated overload mismatch that merely happens to involve arrays.
+            for (const auto& candidate : context.bestCandidates)
+            {
+                if (isArrayWithNonLiteralExtent(candidate.argMismatchActualType) &&
+                    isArrayWithLiteralExtent(candidate.argMismatchExpectedType))
+                {
+                    getSink()->diagnose(Diagnostics::ArrayArgumentExtentIsGenericValueParameter{
+                        .location = expr->loc});
+                    break;
                 }
             }
         }
