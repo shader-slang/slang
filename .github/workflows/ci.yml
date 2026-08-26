@@ -380,6 +380,10 @@ jobs:
   # approver to re-click a gate whose outcome is already determined,
   # without weakening the gate for its actual purpose: keeping unvetted,
   # first-look PR code off internal Falcor compute.
+  #
+  # A skipped job here does NOT by itself let the build below proceed --
+  # see the `if` on build-windows-release-cl-x86_64-gpu-falcor, which
+  # explicitly opts back in to running after a skip.
   falcor-build-approval-gate:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true' && github.event_name != 'merge_group'
@@ -417,12 +421,21 @@ jobs:
   # the narrower case of a transient retry with no code change.
   #
   # On `merge_group`, falcor-build-approval-gate above is skipped rather
-  # than run -- GitHub treats a skipped `needs` job as satisfying this
-  # job's dependency (not as a failure), so the build proceeds straight
-  # through without waiting on an already-settled approval.
+  # than run. GitHub Actions does NOT treat a skipped `needs` job as
+  # satisfying a dependent job by default -- "If a job fails or is
+  # skipped, all jobs that need it are skipped unless the jobs use a
+  # conditional expression that causes the job to continue" (GitHub Actions
+  # docs). So this job's `if` must explicitly opt back in with `always()`
+  # and then re-check the gate's own result: proceed when the gate
+  # succeeded (the ordinary pull_request path) or was itself skipped
+  # (the merge_group path added above), but still stop if the gate ran
+  # and failed or was cancelled.
   build-windows-release-cl-x86_64-gpu-falcor:
     needs: [filter, falcor-build-approval-gate]
-    if: needs.filter.outputs.should-run == 'true'
+    if: >-
+      always() && needs.filter.outputs.should-run == 'true' &&
+      (needs.falcor-build-approval-gate.result == 'success' ||
+      needs.falcor-build-approval-gate.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
