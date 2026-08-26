@@ -46,6 +46,7 @@ The manifest declares the package and its source dependencies:
 
 ```json
 {
+  "schema_version": 1,
   "name": "my-shaders",
   "exports": ["src"],
   "license_files": ["LICENSE"],
@@ -62,8 +63,9 @@ The manifest declares the package and its source dependencies:
 }
 ```
 
-`name`, `exports`, and `license_files` are required. `dependencies` and `workspace` are optional.
-Package manifests allow JSON comments.
+`schema_version` is the file format version and is currently `1`. `name`, `exports`, and
+`license_files` are also required. `dependencies` and `workspace` are optional. Package manifests
+allow JSON comments.
 
 `name` identifies the package throughout the dependency graph. `exports` lists relative source
 roots whose primary module paths become importable. Every path in `license_files` must name a
@@ -77,8 +79,9 @@ are `deps/` and `build/`; `slang package init` writes those defaults explicitly.
 a dependency's manifest do not affect the enclosing workspace.
 
 Dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package publishers must
-treat as immutable. The tag is the package's version; `slang-package.json` does not repeat a
-self-version. Fetching fails if a locked tag no longer identifies its locked commit.
+treat as immutable. The tag is the package's version; `schema_version` in `slang-package.json` is
+only the file format version. Fetching fails if a locked tag no longer identifies its locked
+commit.
 
 Each dependency entry contains exactly one source:
 
@@ -126,7 +129,9 @@ always an error.
 
 `slang package update` resolves all manifests reachable from the workspace package, materializes
 the resulting dependency set, and writes one `slang-package-lock.json` in the workspace root. The
-lockfile is the definitive dependency graph and records both Git and path packages. Nested
+lockfile is the definitive dependency graph and records both Git and path packages. It starts with
+`"schema_version": 1`, the same file-format version as `slang-package.json` and
+`slang-workspace.json`. Nested
 packages' lockfiles are not used for that solve. `slang package fetch` requires the workspace
 lockfile, checks that it still satisfies every recorded manifest, and checks out every direct and
 transitive Git dependency under `workspace.deps` (`deps/` by default). Path dependencies remain at their locked
@@ -184,6 +189,7 @@ For example, the generated local-state file may contain:
 
 ```json
 {
+  "schema_version": 1,
   "edits": {
     "noise": {}
   },

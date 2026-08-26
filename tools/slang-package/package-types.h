@@ -12,6 +12,10 @@ namespace Slang
 namespace PackageTool
 {
 
+/// Schema version written in `slang-package.json`, `slang-package-lock.json`, and
+/// `slang-workspace.json`. The prototype currently accepts only `1`.
+inline constexpr Int kSchemaVersion = 1;
+
 struct Dependency
 {
     String name;
@@ -96,7 +100,6 @@ inline bool isTrustedLockSelection(const Dependency& dependency, const LockedPac
 
 struct LockFile
 {
-    Int lockVersion = 3;
     List<LockedPackage> packages;
 };
 

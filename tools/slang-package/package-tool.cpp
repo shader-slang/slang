@@ -542,7 +542,7 @@ static SlangResult _update(
     String lockPath = Path::combine(projectRoot, kLockName);
     if (File::exists(lockPath))
     {
-        SLANG_RETURN_ON_FAIL(readPreviousLockFile(lockPath, previousLock, outError));
+        SLANG_RETURN_ON_FAIL(readLockFile(lockPath, previousLock, outError));
         previousLockPtr = &previousLock;
     }
 

@@ -127,6 +127,27 @@ static SlangResult _readOptionalString(
     return SLANG_OK;
 }
 
+static SlangResult _requireSchemaVersion(
+    JSONContainer* container,
+    const JSONValue& root,
+    const char* fileName,
+    String& outError)
+{
+    JSONValue value = _find(container, root, "schema_version");
+    if (!value.isValid())
+    {
+        outError = String("Field 'schema_version' is required in ") + fileName + ".";
+        return SLANG_FAIL;
+    }
+    if (value.getKind() != JSONValue::Kind::Integer ||
+        container->asInteger(value) != kSchemaVersion)
+    {
+        outError = String("Field 'schema_version' in ") + fileName + " must be the integer 1.";
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 bool isValidPackageName(const String& name)
 {
     if (name.getLength() == 0)
@@ -393,17 +414,28 @@ static SlangResult _readWorkspace(
 static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String& outError)
 {
     outManifest = Manifest();
+    if (json.root.getKind() != JSONValue::Kind::Object)
+    {
+        outError = "Package manifest must be an object.";
+        return SLANG_FAIL;
+    }
+    for (auto pair : json.container->getObject(json.root))
+    {
+        String key = json.container->getStringFromKey(pair.key);
+        if (key != "schema_version" && key != "name" && key != "exports" &&
+            key != "license_files" && key != "dependencies" && key != "workspace")
+        {
+            outError = String("Unknown field in slang-package.json: ") + key;
+            return SLANG_FAIL;
+        }
+    }
+    SLANG_RETURN_ON_FAIL(
+        _requireSchemaVersion(json.container, json.root, "slang-package.json", outError));
     SLANG_RETURN_ON_FAIL(
         _readRequiredString(json.container, json.root, "name", outManifest.name, outError));
     if (!isValidPackageName(outManifest.name))
     {
         outError = String("Invalid package name: ") + outManifest.name;
-        return SLANG_FAIL;
-    }
-    if (_find(json.container, json.root, "version").isValid())
-    {
-        outError =
-            "Package manifests do not contain a self version; the Git release tag is the version.";
         return SLANG_FAIL;
     }
     SLANG_RETURN_ON_FAIL(_readRelativePathArray(
@@ -488,6 +520,8 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
 {
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
+    _writeKey(writer, "schema_version");
+    writer.addIntegerValue(kSchemaVersion, SourceLoc());
     _writeKey(writer, "name");
     writer.addStringValue(manifest.name.getUnownedSlice(), SourceLoc());
     _writeKey(writer, "exports");
@@ -617,29 +651,29 @@ static SlangResult _readLockedPackage(
     return SLANG_OK;
 }
 
-static SlangResult _readLockFile(
-    const String& path,
-    bool allowPreviousVersion,
-    LockFile& outLock,
-    String& outError)
+SlangResult readLockFile(const String& path, LockFile& outLock, String& outError)
 {
     ParsedJSON json;
     SLANG_RETURN_ON_FAIL(_parseJSON(path, json, outError));
     outLock = LockFile();
-
-    JSONValue lockVersion = _find(json.container, json.root, "lock_version");
-    Int version = lockVersion.getKind() == JSONValue::Kind::Integer
-                      ? json.container->asInteger(lockVersion)
-                      : 0;
-    if (lockVersion.getKind() != JSONValue::Kind::Integer ||
-        (version != 3 && !(allowPreviousVersion && version == 2)))
+    if (json.root.getKind() != JSONValue::Kind::Object)
     {
-        outError =
-            "Field 'lock_version' must be the integer 3. Run 'slang package update' to regenerate "
-            "the lock.";
+        outError = "Lock file must be an object.";
         return SLANG_FAIL;
     }
-    outLock.lockVersion = version;
+
+    for (auto pair : json.container->getObject(json.root))
+    {
+        String key = json.container->getStringFromKey(pair.key);
+        if (key != "schema_version" && key != "packages")
+        {
+            outError = String("Unknown field in slang-package-lock.json: ") + key;
+            return SLANG_FAIL;
+        }
+    }
+    SLANG_RETURN_ON_FAIL(
+        _requireSchemaVersion(json.container, json.root, "slang-package-lock.json", outError));
+
     JSONValue packages = _find(json.container, json.root, "packages");
     if (packages.getKind() != JSONValue::Kind::Object)
     {
@@ -663,22 +697,12 @@ static SlangResult _readLockFile(
     return SLANG_OK;
 }
 
-SlangResult readLockFile(const String& path, LockFile& outLock, String& outError)
-{
-    return _readLockFile(path, false, outLock, outError);
-}
-
-SlangResult readPreviousLockFile(const String& path, LockFile& outLock, String& outError)
-{
-    return _readLockFile(path, true, outLock, outError);
-}
-
 SlangResult writeLockFile(const String& path, const LockFile& lock, String& outError)
 {
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
-    _writeKey(writer, "lock_version");
-    writer.addIntegerValue(lock.lockVersion, SourceLoc());
+    _writeKey(writer, "schema_version");
+    writer.addIntegerValue(kSchemaVersion, SourceLoc());
     _writeKey(writer, "packages");
     writer.startObject(SourceLoc());
     for (const auto& package : lock.packages)
@@ -727,15 +751,22 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
 {
     ParsedJSON json;
     SLANG_RETURN_ON_FAIL(_parseJSON(path, json, outError));
+    if (json.root.getKind() != JSONValue::Kind::Object)
+    {
+        outError = "Workspace file must be an object.";
+        return SLANG_FAIL;
+    }
     for (auto pair : json.container->getObject(json.root))
     {
         String key = json.container->getStringFromKey(pair.key);
-        if (key != "edits" && key != "overrides")
+        if (key != "schema_version" && key != "edits" && key != "overrides")
         {
             outError = String("Unknown field in slang-workspace.json: ") + key;
             return SLANG_FAIL;
         }
     }
+    SLANG_RETURN_ON_FAIL(
+        _requireSchemaVersion(json.container, json.root, "slang-workspace.json", outError));
     outPackages.clear();
     JSONValue edits = _find(json.container, json.root, "edits");
     if (edits.isValid() && edits.getKind() != JSONValue::Kind::Object)
@@ -827,6 +858,8 @@ SlangResult writeLocalPackages(
 {
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
+    _writeKey(writer, "schema_version");
+    writer.addIntegerValue(kSchemaVersion, SourceLoc());
     _writeKey(writer, "edits");
     writer.startObject(SourceLoc());
     for (const auto& package : packages)
