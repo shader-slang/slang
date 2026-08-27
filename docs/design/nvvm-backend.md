@@ -190,14 +190,17 @@ preserving pointer provenance and aliasing information.
 
 For each compile, the downstream compiler:
 
-1. creates a fresh `nvvmProgram`;
-2. adds the generated user module normally;
-3. optionally adds toolkit-matched libdevice bitcode lazily;
-4. verifies the program with the intended compile options;
-5. records the complete verifier log;
-6. compiles the program with the same policy options;
-7. records the complete compiler log and retrieves the PTX; and
-8. destroys the program through an RAII scope on every path.
+1. validates the source and compile policy and, when the compatible options explicitly require the
+   CUDA device library, reads the toolkit-matched `libdevice.10.bc`;
+2. creates a fresh `nvvmProgram`;
+3. adds the generated user module normally;
+4. when requested, adds libdevice lazily (or normally only when the optional lazy-add API is
+   absent);
+5. verifies the program with the intended compile options;
+6. records the complete verifier log;
+7. compiles the program with the same policy options;
+8. records the complete compiler log and retrieves the PTX; and
+9. destroys the program through an RAII scope on every path.
 
 Compile and log result sizes include the trailing NUL. An error path still returns an artifact with
 associated diagnostics so the existing caller can report the failure consistently. A verifier or
@@ -226,8 +229,30 @@ the default mode leaves all three libNVVM defaults unchanged. Full debug informa
 only for an unoptimized compile, as required by libNVVM. Minimal and standard line information are
 metadata-driven and add no libNVVM option.
 
+Slice 18 freezes the floating-point controls as two independent matrices:
+
+| Slang floating-point mode | libNVVM options |
+| --- | --- |
+| Default | omit `-prec-div`, `-prec-sqrt`, and `-fma` |
+| Precise | `-prec-div=1`, `-prec-sqrt=1`, and `-fma=0` |
+| Fast | `-prec-div=0`, `-prec-sqrt=0`, and `-fma=1` |
+
+| fp32 denormal mode | libNVVM option |
+| --- | --- |
+| Any | omit `-ftz` |
+| Preserve | `-ftz=0` |
+| FlushToZero | `-ftz=1` |
+
+The two selected rows compose, and the exact resulting vector is supplied unchanged to both
+`nvvmVerifyProgram` and `nvvmCompileProgram`. Non-default fp16 or fp64 denormal modes are rejected
+before program creation because these controls are specifically fp32 policy. Compiler-specific
+arguments may not duplicate or override the managed `-ftz`, `-prec-div`, `-prec-sqrt`, or `-fma`
+families; the typed fields are the sole source of truth. Unrecognized floating-point-mode or fp32
+denormal-mode enum values are also rejected before program creation.
+
 NVRTC's spellings and aggregate fast-math option differ, so differential tests must set both paths
-explicitly instead of relying on either compiler's defaults.
+explicitly instead of relying on either compiler's defaults. Slice 18 does not change NVRTC's
+aggregate fast-math behavior or claim option parity between the two downstream compilers.
 
 ## Discovery and Toolkit Coherency
 
@@ -259,6 +284,18 @@ coherent root rather than combine components speculatively. Discovery must diagn
 installed but the libNVVM component is missing" separately from "no CUDA toolkit was found."
 Library basenames and package composition are versioned inputs and must be probed rather than
 frozen into one permanent filename.
+
+Slice 18 preserves the exact successful filesystem candidate path through compiler construction.
+Only a canonical `<root>/nvvm/bin[/x64]` or `<root>/nvvm/lib[64]` library path yields a selected
+toolkit root; symbol-path derivation remains the fallback for logical/system loading. A requested
+device library is read only from `<selected-root>/nvvm/libdevice/libdevice.10.bc`. Failure to derive
+that root or read that exact opaque bitcode file is reported before program creation. The compiler
+does not retry `CUDA_PATH`, `CUDA_HOME`, `LIBNVVM_HOME`, or `PATH`, and does not silently combine a
+selected libNVVM with another toolkit's libdevice. When the coherent file is present, its timestamp
+joins the downstream compiler identity; rootless compilers retain their libdevice-free identity.
+The explicit demand controls compilation: a zero value never requires, reads, or adds libdevice.
+Version-identity lookup is separate and may stat the exact coherent path when a selected toolkit
+root is known.
 
 ## Dialect and Bitcode Gate
 
@@ -1204,6 +1241,49 @@ stops deterministically at E52017 `'neg'`. After implementation, integrated dire
 the same widths, exact `neg.s32`, and global u32 store while using the raw pointer. Neither route
 uses `sub.s32` or `not.b32` as an alternate spelling.
 
+### Slice 18 toolkit-matched libdevice and floating-point policy
+
+Slice 18 is a downstream compiler and toolkit-policy boundary. A caller requests libdevice through
+the terminal versioned compile-options field:
+
+```text
+uintptr_t requiresCUDADeviceLibrary = 0
+```
+
+The naturally aligned pointer-sized storage prevents the field from reusing an older structure's
+tail padding. Zero means false and any nonzero value means true. A caller whose compatible prefix
+predates the field receives zero, so every established integer module continues to compile without
+requiring, reading, or adding libdevice. Compiler-version identity is independent of compile
+demand and may stat the exact coherent libdevice path when a selected toolkit root is known. The
+flag is an explicit semantic demand; the compiler does not scan LLVM text or bitcode for symbol
+spellings.
+
+When the field is nonzero, all source and floating-policy validation plus the exact
+`<selected-root>/nvvm/libdevice/libdevice.10.bc` read completes before program creation. The file is
+opaque binary data, including embedded NULs. After creation, the compiler adds the user module
+normally as `slang-nvvm-input`, then adds the exact library bytes as `libdevice.10.bc` through
+`nvvmLazyAddModuleToProgram`. Ordinary `nvvmAddModuleToProgram` is used for the library only when
+the optional lazy-add symbol is absent; a failed lazy add is surfaced and never retried eagerly.
+Verification and compilation follow with the one canonical option vector. Every failure after
+creation returns the usual diagnostic artifact and destroys the program exactly once.
+
+The demonstrable floating-point surface in this slice is a compiler-level NVVM module that
+declares and calls an exact libdevice function such as `__nv_sinf`. This does not extend the direct
+linked-Slang-IR emitter. Raw `float` and `Ptr<float>` entry parameters, floating-point constants,
+loads, stores, arithmetic, phis, helpers, and intrinsics remain unsupported there. The direct
+`sin(float)` negative case stops while collecting the call closure because the target-intrinsic
+helper has an unsupported float result, before provider discovery. It therefore proves only that
+the f32/helper boundary stays closed; it does not exercise or claim a `GenericAsm` matcher. No such
+matcher, V2 builder operation, or provider-table byte is added by Slice 18. A later semantic
+intrinsic-producer boundary must request libdevice when it emits an actual declaration and call.
+
+The deterministic request, path, module-order, fallback, diagnostic, identity, and option contracts
+above are the implemented Slice 18 architecture. The focused NVVM suite passed 132/132. The real
+toolkit test produced a named-entry kernel with a global store and no unresolved `.extern .func`,
+the same CUDA 12.9 root's `ptxas` accepted it for `sm_75`, and the RTX 5090 runtime results matched
+host `sinf` within `2e-6`. Preservation passed 1/1 parser, 2/2 routing/hash, 1/1 unsupported
+boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -1328,8 +1408,10 @@ dedicated-operation pattern to exact signed-i32 bitwise AND, and Slice 14 applie
 signed-i32 bitwise OR. Slice 15 applies the same pattern to exact signed-i32 bitwise XOR. Slice 16
 then adds exact signed-i32 bitwise NOT through a dedicated unary operation and a shared
 per-value integer-validation rule. Slice 17 completes the next bounded canonical scalar operation:
-wrapping signed-i32 arithmetic negation. The established Slice 18 roadmap remains libdevice and
-floating-point policy. A future bounded shift candidate must first settle the currently
+wrapping signed-i32 arithmetic negation. Slice 18 then freezes the explicit downstream libdevice
+demand, same-toolkit linking, and fp32 option policy without claiming direct Slang f32 lowering.
+The established Slice 19 roadmap remains atomics and wave operations. A future bounded shift
+candidate must first settle the currently
 inconsistent negative/oversized shift-count policy across AST folding, SCCP, LLVM, and PTX before
 promoting exact signed-i32 left shift; division, remainder, and the other richer scalar policies
 remain separate decisions.
@@ -1586,6 +1668,21 @@ the direct route used the raw pointer; neither route used `sub.s32` or `not.b32`
 NVVM run passed 124/124. Preservation passed 1/1 parser, 2/2 routing/hash, 1/1 unsupported boundary,
 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.
 
+The Slice 18 baseline on 2026-08-27 measured the selected CUDA 12.9
+`nvvm/libdevice/libdevice.10.bc` as 486,144 bytes, UTC `2025-05-27 09:50:51`, with SHA-256
+`CD2824F8DD3F862B6B9259086F49F6CB56CA2547E14C61DE889C1C0D4A7DB175`. Explicit NVRTC emitted f32
+parameter/global-store PTX for scalar multiply-add and inlined its sine implementation. The direct
+f32 arithmetic probe stopped while validating an entry-point parameter; the `sin(float)` probe
+stopped while collecting its float-returning target-helper call closure. Both failures occurred
+before provider discovery. These measurements establish the negative f32/helper boundary and
+reference route only; they do not test intrinsic-helper matching.
+
+The complete focused Slice 18 NVVM suite passed 132/132. The compiler-level libdevice sine test
+found the named entry and a global store with no unresolved `.extern .func`; `ptxas` from the same
+CUDA 12.9 root accepted the PTX for `sm_75`. On the RTX 5090, inputs `0`, `0.5`, `-1.25`, and `20`
+matched host `sinf` within `2e-6`. Preservation passed 1/1 parser, 2/2 routing/hash, 1/1 unsupported
+boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -1684,6 +1781,18 @@ dominance. Slang owns the signed-i32 and wrapping policy; LLVM owns plain unflag
 construction as `sub i32 0, value`. These claims do not include `kIROp_ConstexprNeg`, unsigned,
 narrow, wide, floating-point, vector, matrix, or aggregate negation, shifts, division, remainder,
 or new ABI and storage shapes.
+
+Slice 18 defines downstream CUDA-device-library demand and fp32 compile policy without widening the
+direct emitter or its builder ABI. The terminal naturally aligned, pointer-sized
+`requiresCUDADeviceLibrary = 0` field preserves older compatible option prefixes and makes library
+loading explicit; zero means false and any nonzero value means true. A true request uses only the
+toolkit root retained from the selected libNVVM library, reads exact
+`nvvm/libdevice/libdevice.10.bc` bytes before program creation, and adds user then library modules
+through the lazy API or the eager compatibility path when that optional symbol is absent. The typed
+fp32 mode and denormal fields own the four managed option families; unsupported fp16/fp64 denormal
+policy and compiler-specific overrides are rejected before mutation. Direct Slang float ABI,
+arithmetic, helpers, and intrinsic recognition remain outside this claim; the f32 arithmetic case
+stops at its entry-point parameter, while sine stops at its float-returning helper result.
 
 The following remain open until their named slice supplies evidence:
 

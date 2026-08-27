@@ -19,6 +19,7 @@
 #include "unit-test-nvvm-bitcode-fixture.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <math.h>
 #include <string.h>
 
 using namespace Slang;
@@ -57,12 +58,20 @@ enum class FakeFailure
     None,
     CreateProgram,
     AddModule,
+    LazyAddModule,
+    EagerAddModule,
     VerifyProgram,
     CompileProgram,
     GetResultSize,
     GetResult,
     GetLogSize,
     GetLog,
+};
+
+enum class FakeModuleAddKind
+{
+    Normal,
+    Lazy,
 };
 
 enum class FakeLogPhase
@@ -109,6 +118,27 @@ static const char kMinimalNVVMIR[] =
     "!nvvm.annotations = !{!1}\n"
     "!0 = !{i32 2, i32 0}\n"
     "!1 = !{void ()* @testEmpty, !\"kernel\", i32 1}\n";
+
+static const char kLibdeviceSineKernelName[] = "libdeviceSine";
+static const char kLibdeviceSineNVVMIR[] =
+    "target datalayout = \"e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
+    "i64:64:64-i128:128:128-f32:32:32-f64:64:64-v16:16:16-v32:32:32-v64:64:64-"
+    "v128:128:128-n16:32:64\"\n"
+    "target triple = \"nvptx64-nvidia-cuda\"\n"
+    "\n"
+    "declare float @__nv_sinf(float)\n"
+    "\n"
+    "define void @libdeviceSine(float addrspace(1)* %destination, float %x) {\n"
+    "entry:\n"
+    "  %result = call float @__nv_sinf(float %x)\n"
+    "  store float %result, float addrspace(1)* %destination, align 4\n"
+    "  ret void\n"
+    "}\n"
+    "\n"
+    "!nvvmir.version = !{!0}\n"
+    "!nvvm.annotations = !{!1}\n"
+    "!0 = !{i32 2, i32 0}\n"
+    "!1 = !{void (float addrspace(1)*, float)* @libdeviceSine, !\"kernel\", i32 1}\n";
 
 static const char kFakePTX[] = ".version 7.5\n"
                                ".target sm_75\n"
@@ -2304,6 +2334,7 @@ struct FakeNVVMState
         createProgramCallCount = 0;
         destroyProgramCallCount = 0;
         addModuleCallCount = 0;
+        lazyAddModuleCallCount = 0;
         verifyProgramCallCount = 0;
         compileProgramCallCount = 0;
         getResultSizeCallCount = 0;
@@ -2312,6 +2343,10 @@ struct FakeNVVMState
         getLogCallCount = 0;
         addedModule = String();
         addedModuleName = String();
+        addedLibraryModule = String();
+        addedLibraryModuleName = String();
+        moduleAddKinds.clear();
+        moduleAddNames.clear();
         verifyOptions.clear();
         compileOptions.clear();
         currentLogPhase = FakeLogPhase::General;
@@ -2351,6 +2386,7 @@ struct FakeNVVMState
     int createProgramCallCount = 0;
     int destroyProgramCallCount = 0;
     int addModuleCallCount = 0;
+    int lazyAddModuleCallCount = 0;
     int verifyProgramCallCount = 0;
     int compileProgramCallCount = 0;
     int getResultSizeCallCount = 0;
@@ -2360,6 +2396,10 @@ struct FakeNVVMState
 
     String addedModule;
     String addedModuleName;
+    String addedLibraryModule;
+    String addedLibraryModuleName;
+    List<FakeModuleAddKind> moduleAddKinds;
+    List<String> moduleAddNames;
     List<String> verifyOptions;
     List<String> compileOptions;
     String programLog;
@@ -2462,9 +2502,18 @@ static TestNVVMResult _fakeAddModuleToProgram(
     gFakeNVVM.currentLogPhase = FakeLogPhase::General;
     if (!_isFakeProgram(program) || (!buffer && size) || !name)
         return TestNVVMResult::InvalidInput;
-    gFakeNVVM.addedModule = String(UnownedStringSlice(buffer, size));
-    gFakeNVVM.addedModuleName = name;
-    return _fakeFailureResult(FakeFailure::AddModule);
+    gFakeNVVM.moduleAddKinds.add(FakeModuleAddKind::Normal);
+    gFakeNVVM.moduleAddNames.add(name);
+    if (gFakeNVVM.addModuleCallCount == 1)
+    {
+        gFakeNVVM.addedModule = String(UnownedStringSlice(buffer, size));
+        gFakeNVVM.addedModuleName = name;
+        return _fakeFailureResult(FakeFailure::AddModule);
+    }
+
+    gFakeNVVM.addedLibraryModule = String(UnownedStringSlice(buffer, size));
+    gFakeNVVM.addedLibraryModuleName = name;
+    return _fakeFailureResult(FakeFailure::EagerAddModule);
 }
 
 static TestNVVMResult _fakeVerifyProgram(
@@ -2573,11 +2622,15 @@ static TestNVVMResult _fakeLazyAddModuleToProgram(
     size_t size,
     const char* name)
 {
-    SLANG_UNUSED(program);
-    SLANG_UNUSED(buffer);
-    SLANG_UNUSED(size);
-    SLANG_UNUSED(name);
-    return TestNVVMResult::Success;
+    ++gFakeNVVM.lazyAddModuleCallCount;
+    gFakeNVVM.currentLogPhase = FakeLogPhase::General;
+    if (!_isFakeProgram(program) || (!buffer && size) || !name)
+        return TestNVVMResult::InvalidInput;
+    gFakeNVVM.addedLibraryModule = String(UnownedStringSlice(buffer, size));
+    gFakeNVVM.addedLibraryModuleName = name;
+    gFakeNVVM.moduleAddKinds.add(FakeModuleAddKind::Lazy);
+    gFakeNVVM.moduleAddNames.add(name);
+    return _fakeFailureResult(FakeFailure::LazyAddModule);
 }
 
 static TestNVVMResult _fakeLLVMVersion(const char* architecture, int* major)
@@ -2868,7 +2921,13 @@ struct CompileSettings
         DownstreamCompileOptions::FloatingPointMode::Default;
     DownstreamCompileOptions::FloatingPointDenormalMode denormalModeFp32 =
         DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+    DownstreamCompileOptions::FloatingPointDenormalMode denormalModeFp16 =
+        DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+    DownstreamCompileOptions::FloatingPointDenormalMode denormalModeFp64 =
+        DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+    bool requiresCUDADeviceLibrary = false;
     bool addFakeCompilerArgument = false;
+    const char* compilerSpecificArgument = nullptr;
 };
 
 static SlangResult _compileNVVM(
@@ -2881,7 +2940,6 @@ static SlangResult _compileNVVM(
     DownstreamCompileOptions::CapabilityVersion capability;
     capability.kind = DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM;
     capability.version.set(7, 5);
-    TerminatedCharSlice fakeArgument("-fake-nvvm-option");
 
     DownstreamCompileOptions options;
     options.sourceLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
@@ -2889,11 +2947,17 @@ static SlangResult _compileNVVM(
     options.optimizationLevel = settings.optimizationLevel;
     options.debugInfoType = settings.debugInfoType;
     options.floatingPointMode = settings.floatingPointMode;
+    options.denormalModeFp16 = settings.denormalModeFp16;
     options.denormalModeFp32 = settings.denormalModeFp32;
+    options.denormalModeFp64 = settings.denormalModeFp64;
+    options.requiresCUDADeviceLibrary = settings.requiresCUDADeviceLibrary;
     options.sourceArtifacts = makeSlice(sourceArtifacts, SLANG_COUNT_OF(sourceArtifacts));
     options.requiredCapabilityVersions = makeSlice(&capability, 1);
-    if (settings.addFakeCompilerArgument)
-        options.compilerSpecificArguments = makeSlice(&fakeArgument, 1);
+    TerminatedCharSlice selectedArgument(
+        settings.compilerSpecificArgument ? settings.compilerSpecificArgument
+                                          : "-fake-nvvm-option");
+    if (settings.addFakeCompilerArgument || settings.compilerSpecificArgument)
+        options.compilerSpecificArguments = makeSlice(&selectedArgument, 1);
     return compiler->compile(options, outArtifact);
 }
 
@@ -3232,6 +3296,33 @@ static SlangResult _compileRealNVVMBitcode(
     return SLANG_OK;
 }
 
+static SlangResult _compileRealNVVMIRWithLibdevice(
+    const String& cudaRoot,
+    ComPtr<IArtifact>& outArtifact)
+{
+    outArtifact.setNull();
+    RefPtr<DownstreamCompilerSet> set;
+    IDownstreamCompiler* compiler = nullptr;
+    SLANG_RETURN_ON_FAIL(_locateRealNVVM(cudaRoot, set, compiler));
+    if (!compiler)
+        return SLANG_FAIL;
+
+    ComPtr<IArtifact> sourceArtifact = _createNVVMIRArtifact(kLibdeviceSineNVVMIR);
+    CompileSettings settings;
+    settings.requiresCUDADeviceLibrary = true;
+    const SlangResult compileResult =
+        _compileNVVM(compiler, sourceArtifact, settings, outArtifact.writeRef());
+    IArtifactDiagnostics* diagnostics = _findDiagnostics(outArtifact);
+    if (SLANG_FAILED(compileResult) || !diagnostics || SLANG_FAILED(diagnostics->getResult()))
+    {
+        _reportArtifactDiagnostics(outArtifact);
+        if (SLANG_FAILED(compileResult))
+            return compileResult;
+        return diagnostics ? diagnostics->getResult() : SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 static SlangResult _compileRealNVRTCSource(
     const UnownedStringSlice& source,
     ComPtr<IArtifact>& outArtifact)
@@ -3421,6 +3512,15 @@ void computeMain(
     uniform float y)
 {
     *destination = int(x * y);
+}
+)";
+static const char kDirectNVVMFloatingSineSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float x)
+{
+    *destination = int(sin(x));
 }
 )";
 static const char kDirectNVVMIntegerBitAndSource[] = R"(
@@ -4969,6 +5069,46 @@ static SlangResult _runScalarKernel(
     return actual == expected ? SLANG_OK : SLANG_FAIL;
 }
 
+static SlangResult _runLibdeviceSineKernel(
+    CudaDriverApi& cuda,
+    ISlangBlob* ptxBlob,
+    float input,
+    float tolerance)
+{
+    const String ptx = _getBlobText(ptxBlob);
+    if (!ptx.getLength())
+        return SLANG_E_INVALID_ARG;
+
+    CudaModule module = nullptr;
+    if (cuda.cuModuleLoadData(&module, ptx.getBuffer()) != 0 || !module)
+        return SLANG_FAIL;
+    CudaModuleGuard moduleGuard{cuda, module};
+
+    CudaFunction function = nullptr;
+    if (cuda.cuModuleGetFunction(&function, module, kLibdeviceSineKernelName) != 0 || !function)
+        return SLANG_FAIL;
+
+    CudaDevicePtr destination = 0;
+    if (cuda.cuMemAlloc(&destination, sizeof(float)) != 0 || !destination)
+        return SLANG_FAIL;
+    CudaBufferGuard destinationGuard{cuda, destination};
+    if (cuda.cuMemsetD8(destination, 0, sizeof(float)) != 0)
+        return SLANG_FAIL;
+
+    void* parameters[] = {&destination, &input};
+    if (cuda.cuLaunchKernel(function, 1, 1, 1, 1, 1, 1, 0, nullptr, parameters, nullptr) != 0 ||
+        cuda.cuCtxSynchronize() != 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    float actual = 0.0f;
+    if (cuda.cuMemcpyDtoH(&actual, destination, sizeof(actual)) != 0)
+        return SLANG_FAIL;
+    const float expected = ::sinf(input);
+    return ::fabsf(actual - expected) <= tolerance ? SLANG_OK : SLANG_FAIL;
+}
+
 static SlangResult _runPointerOffsetKernel(
     CudaDriverApi& cuda,
     ISlangBlob* ptxBlob,
@@ -5370,22 +5510,45 @@ static SlangResult _assemblePTX(IArtifact* ptxArtifact, const String& ptxasPath)
     return File::exists(tempOutput.cubinPath) ? SLANG_OK : SLANG_FAIL;
 }
 
-static SlangResult _findPtxasFromCUDAPath(String& outCudaRoot, String& outPtxasPath)
+static SlangResult _findToolkitFromCUDAPath(String& outCudaRoot)
 {
     outCudaRoot = String();
-    outPtxasPath = String();
     StringBuilder cudaRootBuilder;
     if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(toSlice("CUDA_PATH"), cudaRootBuilder)) ||
         !cudaRootBuilder.getLength())
     {
         return SLANG_E_NOT_FOUND;
     }
-
     outCudaRoot = cudaRootBuilder.produceString();
+    return SLANG_OK;
+}
+
+static SlangResult _findPtxasInToolkit(const String& cudaRoot, String& outPtxasPath)
+{
     outPtxasPath = Path::combine(
-        Path::combine(outCudaRoot, "bin"),
+        Path::combine(cudaRoot, "bin"),
         String("ptxas") + String(Process::getExecutableSuffix()));
     return File::exists(outPtxasPath) ? SLANG_OK : SLANG_E_NOT_FOUND;
+}
+
+static SlangResult _findPtxasFromCUDAPath(String& outCudaRoot, String& outPtxasPath)
+{
+    SLANG_RETURN_ON_FAIL(_findToolkitFromCUDAPath(outCudaRoot));
+    return _findPtxasInToolkit(outCudaRoot, outPtxasPath);
+}
+
+static SlangResult _findLibdeviceNVVMToolkitFromCUDAPath(String& outCudaRoot)
+{
+    SLANG_RETURN_ON_FAIL(_findToolkitFromCUDAPath(outCudaRoot));
+    const String libdevicePath =
+        Path::combine(Path::combine(outCudaRoot, "nvvm", "libdevice"), "libdevice.10.bc");
+    if (!File::exists(libdevicePath))
+        return SLANG_E_NOT_FOUND;
+
+    RefPtr<DownstreamCompilerSet> set;
+    IDownstreamCompiler* compiler = nullptr;
+    SLANG_RETURN_ON_FAIL(_locateRealNVVM(outCudaRoot, set, compiler));
+    return compiler ? SLANG_OK : SLANG_FAIL;
 }
 
 struct TempDirectory
@@ -5407,6 +5570,41 @@ static SlangResult _createTempDirectory(TempDirectory& outDirectory)
     if (!Path::createDirectoryRecursive(outDirectory.path))
         return SLANG_FAIL;
     return SLANG_OK;
+}
+static SlangResult _createFakeNVVMToolkit(
+    const String& root,
+    const void* libdeviceBytes,
+    size_t libdeviceSize,
+    String& outCandidatePath,
+    String& outLibdevicePath)
+{
+#if SLANG_WINDOWS_FAMILY
+    const String nvvmBinaryDirectory = Path::combine(Path::combine(root, "nvvm"), "bin");
+    outCandidatePath = Path::combine(nvvmBinaryDirectory, "nvvm64_40_0.dll");
+#elif SLANG_LINUX_FAMILY
+    const String nvvmBinaryDirectory = Path::combine(Path::combine(root, "nvvm"), "lib64");
+    outCandidatePath = Path::combine(nvvmBinaryDirectory, "libnvvm.so.4");
+#else
+    SLANG_UNUSED(root);
+    SLANG_UNUSED(libdeviceBytes);
+    SLANG_UNUSED(libdeviceSize);
+    outCandidatePath = String();
+    outLibdevicePath = String();
+    return SLANG_E_NOT_AVAILABLE;
+#endif
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    const String libdeviceDirectory = Path::combine(Path::combine(root, "nvvm"), "libdevice");
+    if (!Path::createDirectoryRecursive(nvvmBinaryDirectory) ||
+        !Path::createDirectoryRecursive(libdeviceDirectory))
+    {
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(File::writeAllText(outCandidatePath, String()));
+    outLibdevicePath = Path::combine(libdeviceDirectory, "libdevice.10.bc");
+    if (libdeviceBytes || libdeviceSize)
+        SLANG_RETURN_ON_FAIL(File::writeAllBytes(outLibdevicePath, libdeviceBytes, libdeviceSize));
+    return SLANG_OK;
+#endif
 }
 
 static void _checkRejectedCompiledResult(FakeResultMode resultMode)
@@ -14341,6 +14539,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsignedMultiplySource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerMultiplySource, "'entry-point parameter'"},
         {kDirectNVVMFloatingMultiplySource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingSineSource, "'helper function result type'"},
         {kDirectNVVMIntegerLeftShiftSource, "'shl'"},
         {kDirectNVVMIntegerRightShiftSource, "'shr'"},
         {kDirectNVVMIntegerDivideSource, "'div'"},
@@ -17002,6 +17201,420 @@ SLANG_UNIT_TEST(nvvmCompilerAcceptsLLVMBitcodeArtifact)
     SLANG_CHECK(gFakeNVVM.destroyProgramCallCount == 1);
 }
 
+SLANG_UNIT_TEST(nvvmCompilerNegotiatesCUDADeviceLibraryOption)
+{
+    DownstreamCompileOptions defaults;
+    SLANG_CHECK(sizeof(void*) == 4 || sizeof(void*) == 8);
+    const uint32_t oldSize = sizeof(void*) == 8 ? 240u : 148u;
+    SLANG_CHECK(offsetof(DownstreamCompileOptions, requiresCUDADeviceLibrary) == oldSize);
+    SLANG_CHECK(oldSize % alignof(void*) == 0);
+    SLANG_CHECK(
+        sizeof(DownstreamCompileOptions) >= oldSize + sizeof(defaults.requiresCUDADeviceLibrary));
+    SLANG_CHECK(sizeof(defaults.requiresCUDADeviceLibrary) == sizeof(void*));
+
+    SLANG_CHECK(defaults.version.size == sizeof(DownstreamCompileOptions));
+    SLANG_CHECK(!defaults.requiresCUDADeviceLibrary);
+
+    gFakeNVVM.reset();
+    RefPtr<DownstreamCompilerSet> set;
+    IDownstreamCompiler* compiler = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_locateFakeNVVM(set, compiler)));
+    ComPtr<slang::IBlob> rootlessVersionBlob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compiler->getVersionString(rootlessVersionBlob.writeRef())));
+    SLANG_CHECK(_getBlobText(rootlessVersionBlob).indexOf("libdevice=") < 0);
+    ComPtr<IArtifact> sourceArtifact = _createNVVMIRArtifact();
+    IArtifact* sourceArtifacts[] = {sourceArtifact};
+    DownstreamCompileOptions::CapabilityVersion capability;
+    capability.kind = DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM;
+    capability.version.set(7, 5);
+
+    DownstreamCompileOptions oldOptions;
+    oldOptions.version.size = oldSize;
+    oldOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
+    oldOptions.targetType = SLANG_PTX;
+    oldOptions.sourceArtifacts = makeSlice(sourceArtifacts, SLANG_COUNT_OF(sourceArtifacts));
+    oldOptions.requiredCapabilityVersions = makeSlice(&capability, 1);
+    oldOptions.requiresCUDADeviceLibrary = true;
+    ComPtr<IArtifact> outputArtifact;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compiler->compile(oldOptions, outputArtifact.writeRef())));
+    SLANG_CHECK_ABORT(outputArtifact != nullptr);
+    SLANG_CHECK(_findDiagnostics(outputArtifact)->getResult() == SLANG_OK);
+    SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+    SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+    SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 1);
+}
+
+SLANG_UNIT_TEST(nvvmCompilerUsesSelectedToolkitLibdevice)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    static const uint8_t kSelectedLibdevice[] = {0x42, 0x43, 0xc0, 0xde, 0x00, 0x18};
+    static const uint8_t kConflictingLibdevice[] = {0x42, 0x43, 0xc0, 0xde, 0xff, 0xee};
+    TempDirectory selectedToolkit;
+    TempDirectory conflictingToolkit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createTempDirectory(selectedToolkit)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createTempDirectory(conflictingToolkit)));
+    String selectedCandidate;
+    String selectedLibdevicePath;
+    String conflictingCandidate;
+    String conflictingLibdevicePath;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createFakeNVVMToolkit(
+        selectedToolkit.path,
+        kSelectedLibdevice,
+        sizeof(kSelectedLibdevice),
+        selectedCandidate,
+        selectedLibdevicePath)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createFakeNVVMToolkit(
+        conflictingToolkit.path,
+        kConflictingLibdevice,
+        sizeof(kConflictingLibdevice),
+        conflictingCandidate,
+        conflictingLibdevicePath)));
+
+    gFakeNVVM.reset();
+    auto recordingLoader = new RecordingFakeNVVMLoader;
+    ComPtr<ISlangSharedLibraryLoader> loader(recordingLoader);
+    RefPtr<DownstreamCompilerSet> set = new DownstreamCompilerSet;
+    SlangUnitTest::ScopedEnvVar conflictingCUDAPath(
+        "CUDA_PATH",
+        conflictingToolkit.path.getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        NVVMDownstreamCompilerUtil::locateCompilers(selectedToolkit.path, loader, set)));
+    IDownstreamCompiler* compiler = _findNVVMCompiler(set);
+    SLANG_CHECK_ABORT(compiler != nullptr);
+    SLANG_CHECK(recordingLoader->loadRequests.getCount() == 1);
+    ComPtr<slang::IBlob> versionBlob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compiler->getVersionString(versionBlob.writeRef())));
+    StringBuilder expectedLibdeviceIdentity;
+    expectedLibdeviceIdentity << "libdevice="
+                              << SharedLibraryUtils::getFileTimestamp(selectedLibdevicePath);
+    SLANG_CHECK(
+        _getBlobText(versionBlob).indexOf(expectedLibdeviceIdentity.getUnownedSlice()) >= 0);
+
+    CompileSettings settings;
+    ComPtr<IArtifact> sourceArtifact = _createNVVMIRArtifact();
+    ComPtr<IArtifact> outputArtifact;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef())));
+    SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+    SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+    SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 1);
+
+    gFakeNVVM.resetCalls();
+    settings.requiresCUDADeviceLibrary = true;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef())));
+    SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+    SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
+    SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
+    SLANG_CHECK(gFakeNVVM.moduleAddKinds[0] == FakeModuleAddKind::Normal);
+    SLANG_CHECK(gFakeNVVM.moduleAddKinds[1] == FakeModuleAddKind::Lazy);
+    SLANG_CHECK(gFakeNVVM.moduleAddNames[0] == "slang-nvvm-input");
+    SLANG_CHECK(gFakeNVVM.moduleAddNames[1] == "libdevice.10.bc");
+    SLANG_CHECK(gFakeNVVM.addedModule == kMinimalNVVMIR);
+    SLANG_CHECK(gFakeNVVM.addedLibraryModuleName == "libdevice.10.bc");
+    SLANG_CHECK(gFakeNVVM.addedLibraryModule.getLength() == sizeof(kSelectedLibdevice));
+    SLANG_CHECK(
+        ::memcmp(
+            gFakeNVVM.addedLibraryModule.getBuffer(),
+            kSelectedLibdevice,
+            sizeof(kSelectedLibdevice)) == 0);
+    SLANG_CHECK(
+        ::memcmp(
+            gFakeNVVM.addedLibraryModule.getBuffer(),
+            kConflictingLibdevice,
+            sizeof(kConflictingLibdevice)) != 0);
+    SLANG_CHECK(gFakeNVVM.verifyProgramCallCount == 1);
+    SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
+SLANG_UNIT_TEST(nvvmCompilerRejectsUnavailableRequestedLibdevice)
+{
+    ComPtr<IArtifact> sourceArtifact = _createNVVMIRArtifact();
+    CompileSettings settings;
+    settings.requiresCUDADeviceLibrary = true;
+
+    gFakeNVVM.reset();
+    {
+        RefPtr<DownstreamCompilerSet> set;
+        IDownstreamCompiler* compiler = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_locateFakeNVVM(set, compiler)));
+        ComPtr<IArtifact> outputArtifact;
+        const SlangResult result =
+            _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
+        _checkRejectedInputResult(result, outputArtifact);
+        SLANG_CHECK(_diagnosticsContain(_findDiagnostics(outputArtifact), "toolkit root"));
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+    }
+
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    gFakeNVVM.reset();
+    TempDirectory incompleteToolkit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createTempDirectory(incompleteToolkit)));
+    String candidatePath;
+    String libdevicePath;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _createFakeNVVMToolkit(incompleteToolkit.path, nullptr, 0, candidatePath, libdevicePath)));
+    auto recordingLoader = new RecordingFakeNVVMLoader;
+    ComPtr<ISlangSharedLibraryLoader> loader(recordingLoader);
+    RefPtr<DownstreamCompilerSet> set = new DownstreamCompilerSet;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        NVVMDownstreamCompilerUtil::locateCompilers(incompleteToolkit.path, loader, set)));
+    IDownstreamCompiler* compiler = _findNVVMCompiler(set);
+    SLANG_CHECK_ABORT(compiler != nullptr);
+    ComPtr<IArtifact> outputArtifact;
+    CompileSettings noLibrarySettings;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _compileNVVM(compiler, sourceArtifact, noLibrarySettings, outputArtifact.writeRef())));
+    SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+    SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+
+    gFakeNVVM.resetCalls();
+    outputArtifact.setNull();
+    const SlangResult result =
+        _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
+    _checkRejectedInputResult(result, outputArtifact);
+    SLANG_CHECK(_diagnosticsContain(_findDiagnostics(outputArtifact), "libdevice.10.bc"));
+    SLANG_CHECK(gFakeNVVM.addModuleCallCount == 0);
+    SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+#endif
+}
+
+SLANG_UNIT_TEST(nvvmCompilerHandlesLibdeviceModuleAddition)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    static const uint8_t kLibdevice[] = {0x42, 0x43, 0xc0, 0xde, 0x18, 0x00};
+    TempDirectory toolkit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createTempDirectory(toolkit)));
+    String candidatePath;
+    String libdevicePath;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createFakeNVVMToolkit(
+        toolkit.path,
+        kLibdevice,
+        sizeof(kLibdevice),
+        candidatePath,
+        libdevicePath)));
+    ComPtr<IArtifact> sourceArtifact = _createNVVMIRArtifact();
+    CompileSettings settings;
+    settings.requiresCUDADeviceLibrary = true;
+
+    gFakeNVVM.reset();
+    {
+        auto recordingLoader = new RecordingFakeNVVMLoader;
+        ComPtr<ISlangSharedLibraryLoader> loader(recordingLoader);
+        RefPtr<DownstreamCompilerSet> set = new DownstreamCompilerSet;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            NVVMDownstreamCompilerUtil::locateCompilers(toolkit.path, loader, set)));
+        IDownstreamCompiler* compiler = _findNVVMCompiler(set);
+        SLANG_CHECK_ABORT(compiler != nullptr);
+        gFakeNVVM.failure = FakeFailure::LazyAddModule;
+        ComPtr<IArtifact> outputArtifact;
+        const SlangResult result =
+            _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
+        SLANG_CHECK(SLANG_FAILED(result));
+        SLANG_CHECK_ABORT(outputArtifact != nullptr);
+        SLANG_CHECK(_diagnosticsContain(_findDiagnostics(outputArtifact), "device-library"));
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.verifyProgramCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.destroyProgramCallCount == 1);
+    }
+
+    gFakeNVVM.reset();
+    gFakeNVVM.omitOptionalSymbols = true;
+    {
+        auto recordingLoader = new RecordingFakeNVVMLoader;
+        ComPtr<ISlangSharedLibraryLoader> loader(recordingLoader);
+        RefPtr<DownstreamCompilerSet> set = new DownstreamCompilerSet;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            NVVMDownstreamCompilerUtil::locateCompilers(toolkit.path, loader, set)));
+        IDownstreamCompiler* compiler = _findNVVMCompiler(set);
+        SLANG_CHECK_ABORT(compiler != nullptr);
+        ComPtr<IArtifact> outputArtifact;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef())));
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 2);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds[0] == FakeModuleAddKind::Normal);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds[1] == FakeModuleAddKind::Normal);
+        SLANG_CHECK(gFakeNVVM.moduleAddNames[0] == "slang-nvvm-input");
+        SLANG_CHECK(gFakeNVVM.moduleAddNames[1] == "libdevice.10.bc");
+        SLANG_CHECK(gFakeNVVM.addedLibraryModule.getLength() == sizeof(kLibdevice));
+        SLANG_CHECK(
+            ::memcmp(gFakeNVVM.addedLibraryModule.getBuffer(), kLibdevice, sizeof(kLibdevice)) ==
+            0);
+        SLANG_CHECK(gFakeNVVM.verifyProgramCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.destroyProgramCallCount == 1);
+
+        gFakeNVVM.resetCalls();
+        gFakeNVVM.failure = FakeFailure::EagerAddModule;
+        outputArtifact.setNull();
+        const SlangResult eagerFailureResult =
+            _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
+        SLANG_CHECK(SLANG_FAILED(eagerFailureResult));
+        SLANG_CHECK_ABORT(outputArtifact != nullptr);
+        SLANG_CHECK(_diagnosticsContain(_findDiagnostics(outputArtifact), "device-library"));
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 2);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.verifyProgramCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.destroyProgramCallCount == 1);
+        gFakeNVVM.failure = FakeFailure::None;
+    }
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
+SLANG_UNIT_TEST(nvvmCompilerEnforcesFloatingPointPolicy)
+{
+    gFakeNVVM.reset();
+    RefPtr<DownstreamCompilerSet> set;
+    IDownstreamCompiler* compiler = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_locateFakeNVVM(set, compiler)));
+    ComPtr<IArtifact> sourceArtifact = _createNVVMIRArtifact();
+
+    static const DownstreamCompileOptions::FloatingPointMode kModes[] = {
+        DownstreamCompileOptions::FloatingPointMode::Default,
+        DownstreamCompileOptions::FloatingPointMode::Precise,
+        DownstreamCompileOptions::FloatingPointMode::Fast,
+    };
+    static const DownstreamCompileOptions::FloatingPointDenormalMode kDenormalModes[] = {
+        DownstreamCompileOptions::FloatingPointDenormalMode::Any,
+        DownstreamCompileOptions::FloatingPointDenormalMode::Preserve,
+        DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero,
+    };
+    for (auto mode : kModes)
+    {
+        for (auto denormalMode : kDenormalModes)
+        {
+            gFakeNVVM.resetCalls();
+            CompileSettings settings;
+            settings.floatingPointMode = mode;
+            settings.denormalModeFp32 = denormalMode;
+            ComPtr<IArtifact> outputArtifact;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef())));
+            const Index expectedOptionCount =
+                2 + (mode == DownstreamCompileOptions::FloatingPointMode::Default ? 0 : 3) +
+                (denormalMode == DownstreamCompileOptions::FloatingPointDenormalMode::Any ? 0 : 1);
+            SLANG_CHECK(gFakeNVVM.compileOptions.getCount() == expectedOptionCount);
+            SLANG_CHECK(
+                _hasOption(gFakeNVVM.compileOptions, "-prec-div=1") ==
+                (mode == DownstreamCompileOptions::FloatingPointMode::Precise));
+            SLANG_CHECK(
+                _hasOption(gFakeNVVM.compileOptions, "-prec-sqrt=1") ==
+                (mode == DownstreamCompileOptions::FloatingPointMode::Precise));
+            SLANG_CHECK(
+                _hasOption(gFakeNVVM.compileOptions, "-fma=0") ==
+                (mode == DownstreamCompileOptions::FloatingPointMode::Precise));
+            SLANG_CHECK(
+                _hasOption(gFakeNVVM.compileOptions, "-prec-div=0") ==
+                (mode == DownstreamCompileOptions::FloatingPointMode::Fast));
+            SLANG_CHECK(
+                _hasOption(gFakeNVVM.compileOptions, "-prec-sqrt=0") ==
+                (mode == DownstreamCompileOptions::FloatingPointMode::Fast));
+            SLANG_CHECK(
+                _hasOption(gFakeNVVM.compileOptions, "-fma=1") ==
+                (mode == DownstreamCompileOptions::FloatingPointMode::Fast));
+            SLANG_CHECK(
+                _hasOption(gFakeNVVM.compileOptions, "-ftz=0") ==
+                (denormalMode == DownstreamCompileOptions::FloatingPointDenormalMode::Preserve));
+            SLANG_CHECK(
+                _hasOption(gFakeNVVM.compileOptions, "-ftz=1") ==
+                (denormalMode == DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero));
+            SLANG_CHECK(gFakeNVVM.verifyOptions.getCount() == gFakeNVVM.compileOptions.getCount());
+            for (Index i = 0; i < gFakeNVVM.compileOptions.getCount(); ++i)
+                SLANG_CHECK(gFakeNVVM.verifyOptions[i] == gFakeNVVM.compileOptions[i]);
+        }
+    }
+
+    static const char* kManagedOverrides[] = {
+        "-ftz",
+        "-ftz=1",
+        "-prec-div",
+        "-prec-div=0",
+        "-prec-sqrt",
+        "-prec-sqrt=0",
+        "-fma",
+        "-fma=1",
+    };
+    for (const char* managedOverride : kManagedOverrides)
+    {
+        gFakeNVVM.resetCalls();
+        CompileSettings settings;
+        settings.compilerSpecificArgument = managedOverride;
+        ComPtr<IArtifact> outputArtifact;
+        const SlangResult result =
+            _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
+        _checkRejectedInputResult(result, outputArtifact);
+        SLANG_CHECK(_diagnosticsContain(_findDiagnostics(outputArtifact), "managed"));
+    }
+
+    struct UnsupportedDenormalCase
+    {
+        bool fp16;
+        DownstreamCompileOptions::FloatingPointDenormalMode mode;
+        const char* diagnostic;
+    };
+    static const UnsupportedDenormalCase kUnsupportedDenormalCases[] = {
+        {true, DownstreamCompileOptions::FloatingPointDenormalMode::Preserve, "fp16"},
+        {true, DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero, "fp16"},
+        {false, DownstreamCompileOptions::FloatingPointDenormalMode::Preserve, "fp64"},
+        {false, DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero, "fp64"},
+    };
+    for (const auto& unsupportedCase : kUnsupportedDenormalCases)
+    {
+        gFakeNVVM.resetCalls();
+        CompileSettings settings;
+        if (unsupportedCase.fp16)
+            settings.denormalModeFp16 = unsupportedCase.mode;
+        else
+            settings.denormalModeFp64 = unsupportedCase.mode;
+        ComPtr<IArtifact> outputArtifact;
+        const SlangResult result =
+            _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
+        _checkRejectedInputResult(result, outputArtifact);
+        SLANG_CHECK(
+            _diagnosticsContain(_findDiagnostics(outputArtifact), unsupportedCase.diagnostic));
+    }
+
+    gFakeNVVM.resetCalls();
+    CompileSettings invalidFloatingPointSettings;
+    invalidFloatingPointSettings.floatingPointMode =
+        static_cast<DownstreamCompileOptions::FloatingPointMode>(0xff);
+    ComPtr<IArtifact> invalidFloatingPointOutput;
+    SlangResult invalidResult = _compileNVVM(
+        compiler,
+        sourceArtifact,
+        invalidFloatingPointSettings,
+        invalidFloatingPointOutput.writeRef());
+    _checkRejectedInputResult(invalidResult, invalidFloatingPointOutput);
+    SLANG_CHECK(
+        _diagnosticsContain(_findDiagnostics(invalidFloatingPointOutput), "floating-point mode"));
+    SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+
+    gFakeNVVM.resetCalls();
+    CompileSettings invalidDenormalSettings;
+    invalidDenormalSettings.denormalModeFp32 =
+        static_cast<DownstreamCompileOptions::FloatingPointDenormalMode>(0xff);
+    ComPtr<IArtifact> invalidDenormalOutput;
+    invalidResult = _compileNVVM(
+        compiler,
+        sourceArtifact,
+        invalidDenormalSettings,
+        invalidDenormalOutput.writeRef());
+    _checkRejectedInputResult(invalidResult, invalidDenormalOutput);
+    SLANG_CHECK(_diagnosticsContain(_findDiagnostics(invalidDenormalOutput), "fp32 denormal"));
+    SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmCompilerCompilesTrivialIR)
 {
     gFakeNVVM.reset();
@@ -17234,6 +17847,136 @@ SLANG_UNIT_TEST(nvvmCompilerPreservesVerifierLogOnCompilationFailure)
     SLANG_CHECK(verifierLogIndex >= 0);
     SLANG_CHECK(compilerLogIndex > verifierLogIndex);
     SLANG_CHECK(rawText.indexOf("libNVVM compilation failed") > verifierLogIndex);
+}
+
+SLANG_UNIT_TEST(nvvmCompilerCompilesSelfContainedLibdeviceSine)
+{
+    String cudaRoot;
+    const SlangResult prerequisiteResult = _findLibdeviceNVVMToolkitFromCUDAPath(cudaRoot);
+    if (prerequisiteResult == SLANG_E_NOT_FOUND)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring real libdevice compile test because a complete CUDA_PATH toolkit is "
+            "unavailable.");
+        SLANG_IGNORE_TEST;
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(prerequisiteResult));
+
+    ComPtr<IArtifact> outputArtifact;
+    const SlangResult compileResult = _compileRealNVVMIRWithLibdevice(cudaRoot, outputArtifact);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+    SLANG_CHECK_ABORT(outputArtifact != nullptr);
+    SLANG_CHECK(_ptxContainsEntry(outputArtifact, toSlice(kLibdeviceSineKernelName)));
+
+    String ptx;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_loadPTXText(outputArtifact, ptx)));
+    String signature;
+    String body;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_extractPTXEntry(
+        ptx.getUnownedSlice(),
+        toSlice(kLibdeviceSineKernelName),
+        signature,
+        body)));
+    SLANG_CHECK(ptx.indexOf(".extern .func") < 0);
+    SLANG_CHECK(body.getUnownedSlice().indexOf(toSlice("st.global")) >= 0);
+}
+
+SLANG_UNIT_TEST(nvvmCompilerLibdeviceSinePtxasAccepts)
+{
+    String cudaRoot;
+    String ptxasPath;
+    const SlangResult prerequisiteResult = _findLibdeviceNVVMToolkitFromCUDAPath(cudaRoot);
+    const SlangResult ptxasResult = SLANG_SUCCEEDED(prerequisiteResult)
+                                        ? _findPtxasInToolkit(cudaRoot, ptxasPath)
+                                        : prerequisiteResult;
+    if (prerequisiteResult == SLANG_E_NOT_FOUND || ptxasResult == SLANG_E_NOT_FOUND)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring libdevice ptxas test because one coherent CUDA toolkit is unavailable.");
+        SLANG_IGNORE_TEST;
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(prerequisiteResult));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(ptxasResult));
+
+    ComPtr<IArtifact> outputArtifact;
+    const SlangResult compileResult = _compileRealNVVMIRWithLibdevice(cudaRoot, outputArtifact);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+    SLANG_CHECK_ABORT(outputArtifact != nullptr);
+    SLANG_CHECK(_ptxContainsEntry(outputArtifact, toSlice(kLibdeviceSineKernelName)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(outputArtifact, ptxasPath)));
+}
+
+SLANG_UNIT_TEST(nvvmCompilerLibdeviceSineRuns)
+{
+    String cudaRoot;
+    const SlangResult prerequisiteResult = _findLibdeviceNVVMToolkitFromCUDAPath(cudaRoot);
+    if (prerequisiteResult == SLANG_E_NOT_FOUND)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring libdevice runtime test because a complete CUDA_PATH toolkit is unavailable.");
+        SLANG_IGNORE_TEST;
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(prerequisiteResult));
+
+    ComPtr<IArtifact> outputArtifact;
+    const SlangResult compileResult = _compileRealNVVMIRWithLibdevice(cudaRoot, outputArtifact);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+    SLANG_CHECK_ABORT(outputArtifact != nullptr);
+    ComPtr<ISlangBlob> ptxBlob;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(outputArtifact->loadBlob(ArtifactKeep::Yes, ptxBlob.writeRef())));
+
+    CudaDriverApi cuda;
+    if (!cuda.load() || cuda.cuInit(0) != 0)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring libdevice runtime test because the CUDA driver is unavailable.");
+        SLANG_IGNORE_TEST;
+    }
+    int deviceCount = 0;
+    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring libdevice runtime test because no CUDA device is available.");
+        SLANG_IGNORE_TEST;
+    }
+    CudaDevice device = 0;
+    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
+    int computeMajor = 0;
+    int computeMinor = 0;
+    SLANG_CHECK_ABORT(
+        cuda.cuDeviceGetAttribute(
+            &computeMajor,
+            kCudaDeviceAttributeComputeCapabilityMajor,
+            device) == 0);
+    SLANG_CHECK_ABORT(
+        cuda.cuDeviceGetAttribute(
+            &computeMinor,
+            kCudaDeviceAttributeComputeCapabilityMinor,
+            device) == 0);
+    if (computeMajor < 7 || (computeMajor == 7 && computeMinor < 5))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring libdevice runtime test because the device is older than sm_75.");
+        SLANG_IGNORE_TEST;
+    }
+
+    CudaContext context = nullptr;
+    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
+    CudaPrimaryContextGuard contextGuard{cuda, device};
+    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
+
+    static const float kInputs[] = {0.0f, 0.5f, -1.25f, 20.0f};
+    for (float input : kInputs)
+    {
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runLibdeviceSineKernel(cuda, ptxBlob, input, 2.0e-6f)));
+    }
 }
 
 SLANG_UNIT_TEST(nvvmCompilerCompilesEmptyKernel)

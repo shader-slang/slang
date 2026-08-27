@@ -298,6 +298,11 @@ struct DownstreamCompileOptions
     FloatingPointDenormalMode denormalModeFp16 = FloatingPointDenormalMode::Any;
     FloatingPointDenormalMode denormalModeFp32 = FloatingPointDenormalMode::Any;
     FloatingPointDenormalMode denormalModeFp64 = FloatingPointDenormalMode::Any;
+
+    /// Requests the CUDA device library selected from the same toolkit as the downstream compiler.
+    /// Pointer-sized storage keeps this versioned extension outside the prior struct's tail
+    /// padding; zero means false and any nonzero value means true.
+    uintptr_t requiresCUDADeviceLibrary = 0;
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 

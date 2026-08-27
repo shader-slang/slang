@@ -138,7 +138,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString)
         SLANG_OVERRIDE;
 
-    SlangResult init(ISlangSharedLibrary* library);
+    SlangResult init(ISlangSharedLibrary* library, const String& selectedLibraryPath);
 
 private:
     struct ScopeProgram
@@ -179,13 +179,57 @@ private:
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
     String m_libraryPath;
     String m_toolkitRoot;
+    String m_libdevicePath;
     int m_irMajor = 0;
     int m_irMinor = 0;
     int m_debugMetadataMajor = 0;
     int m_debugMetadataMinor = 0;
 };
 
-SlangResult NVVMDownstreamCompiler::init(ISlangSharedLibrary* library)
+// Derives a toolkit root only from the documented libNVVM directory shapes.
+static bool _deriveCUDAToolkitRootFromNVVMLibraryPath(
+    const String& libraryPath,
+    String& outToolkitRoot)
+{
+    outToolkitRoot = String();
+    if (!libraryPath.getLength())
+        return false;
+
+    String libraryDirectory = Path::getParentDirectory(libraryPath);
+    const bool hasX64Directory =
+        Path::getFileName(libraryDirectory).getUnownedSlice().caseInsensitiveEquals(toSlice("x64"));
+    if (hasX64Directory)
+    {
+        libraryDirectory = Path::getParentDirectory(libraryDirectory);
+    }
+
+    const String binaryDirectoryName = Path::getFileName(libraryDirectory);
+    const UnownedStringSlice binaryDirectoryNameSlice = binaryDirectoryName.getUnownedSlice();
+    if ((hasX64Directory && !binaryDirectoryNameSlice.caseInsensitiveEquals(toSlice("bin"))) ||
+        (!binaryDirectoryNameSlice.caseInsensitiveEquals(toSlice("bin")) &&
+         !binaryDirectoryNameSlice.caseInsensitiveEquals(toSlice("lib")) &&
+         !binaryDirectoryNameSlice.caseInsensitiveEquals(toSlice("lib64"))))
+    {
+        return false;
+    }
+
+    const String nvvmRoot = Path::getParentDirectory(libraryDirectory);
+    if (!Path::getFileName(nvvmRoot).getUnownedSlice().caseInsensitiveEquals(toSlice("nvvm")))
+        return false;
+
+    outToolkitRoot = Path::getParentDirectory(nvvmRoot);
+    return outToolkitRoot.getLength() != 0;
+}
+
+// Returns the one libdevice path owned by the selected CUDA toolkit.
+static String _getCUDALibdevicePath(const String& toolkitRoot)
+{
+    return Path::combine(Path::combine(toolkitRoot, "nvvm", "libdevice"), "libdevice.10.bc");
+}
+
+SlangResult NVVMDownstreamCompiler::init(
+    ISlangSharedLibrary* library,
+    const String& selectedLibraryPath)
 {
     if (!library)
         return SLANG_E_INVALID_ARG;
@@ -212,29 +256,13 @@ SlangResult NVVMDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_desc.type = SLANG_PASS_THROUGH_NVVM;
     m_desc.version.set(major, minor);
 
-    m_libraryPath = SharedLibraryUtils::getSharedLibraryFileName((void*)m_nvvmCreateProgram);
-    if (m_libraryPath.getLength())
+    m_libraryPath = selectedLibraryPath;
+    if (!m_libraryPath.getLength())
     {
-        String libraryDirectory = Path::getParentDirectory(m_libraryPath);
-        if (Path::getFileName(libraryDirectory)
-                .getUnownedSlice()
-                .caseInsensitiveEquals(toSlice("x64")))
-        {
-            libraryDirectory = Path::getParentDirectory(libraryDirectory);
-        }
-
-        const String binaryDirectoryName = Path::getFileName(libraryDirectory);
-        const bool isNVVMBinaryDirectory =
-            binaryDirectoryName.getUnownedSlice().caseInsensitiveEquals(toSlice("bin")) ||
-            binaryDirectoryName.getUnownedSlice().caseInsensitiveEquals(toSlice("lib")) ||
-            binaryDirectoryName.getUnownedSlice().caseInsensitiveEquals(toSlice("lib64"));
-        const String nvvmRoot = Path::getParentDirectory(libraryDirectory);
-        if (isNVVMBinaryDirectory &&
-            Path::getFileName(nvvmRoot).getUnownedSlice().caseInsensitiveEquals(toSlice("nvvm")))
-        {
-            m_toolkitRoot = Path::getParentDirectory(nvvmRoot);
-        }
+        m_libraryPath = SharedLibraryUtils::getSharedLibraryFileName((void*)m_nvvmCreateProgram);
     }
+    if (_deriveCUDAToolkitRootFromNVVMLibraryPath(m_libraryPath, m_toolkitRoot))
+        m_libdevicePath = _getCUDALibdevicePath(m_toolkitRoot);
 
     return SLANG_OK;
 }
@@ -250,6 +278,8 @@ SlangResult NVVMDownstreamCompiler::getVersionString(slang::IBlob** outVersionSt
     version << " debug=" << m_debugMetadataMajor << "." << m_debugMetadataMinor;
     version << " library="
             << SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_nvvmCreateProgram);
+    if (m_libdevicePath.getLength() && File::exists(m_libdevicePath))
+        version << " libdevice=" << SharedLibraryUtils::getFileTimestamp(m_libdevicePath);
 
     *outVersionString = StringBlob::moveCreate(version).detach();
     return SLANG_OK;
@@ -260,6 +290,37 @@ SlangResult NVVMDownstreamCompiler::_calcCompileOptions(
     CommandLine& outCommandLine,
     String& outError)
 {
+    if (options.denormalModeFp16 != CompileOptions::FloatingPointDenormalMode::Any ||
+        options.denormalModeFp64 != CompileOptions::FloatingPointDenormalMode::Any)
+    {
+        outError = "libNVVM does not support explicit fp16 or fp64 denormal modes";
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    static const UnownedStringSlice kManagedOptionFamilies[] = {
+        toSlice("-ftz"),
+        toSlice("-prec-div"),
+        toSlice("-prec-sqrt"),
+        toSlice("-fma"),
+    };
+    for (const auto& argument : options.compilerSpecificArguments)
+    {
+        const UnownedStringSlice argumentText(argument.data, argument.count);
+        for (const auto& family : kManagedOptionFamilies)
+        {
+            if (argumentText == family ||
+                (argumentText.startsWith(family) && argumentText.getLength() > family.getLength() &&
+                 argumentText[family.getLength()] == '='))
+            {
+                StringBuilder message;
+                message << "libNVVM compiler-specific argument overrides managed option family "
+                        << family;
+                outError = message.produceString();
+                return SLANG_E_INVALID_ARG;
+            }
+        }
+    }
+
     bool hasArchitecture = false;
     SemanticVersion architecture;
     for (const auto& requirement : options.requiredCapabilityVersions)
@@ -323,6 +384,9 @@ SlangResult NVVMDownstreamCompiler::_calcCompileOptions(
     case CompileOptions::FloatingPointDenormalMode::FlushToZero:
         outCommandLine.addArg("-ftz=1");
         break;
+    default:
+        outError = "libNVVM received an invalid fp32 denormal mode";
+        return SLANG_E_INVALID_ARG;
     }
 
     switch (options.floatingPointMode)
@@ -339,6 +403,9 @@ SlangResult NVVMDownstreamCompiler::_calcCompileOptions(
         outCommandLine.addArg("-prec-sqrt=0");
         outCommandLine.addArg("-fma=1");
         break;
+    default:
+        outError = "libNVVM received an invalid floating-point mode";
+        return SLANG_E_INVALID_ARG;
     }
 
     for (const auto& argument : options.compilerSpecificArguments)
@@ -489,6 +556,30 @@ SlangResult NVVMDownstreamCompiler::compile(
         return _returnArtifact(sourceResult, artifact, outArtifact);
     }
 
+    List<unsigned char> libdeviceBytes;
+    if (options.requiresCUDADeviceLibrary)
+    {
+        if (!m_toolkitRoot.getLength() || !m_libdevicePath.getLength())
+        {
+            _setPlainFailure(
+                diagnostics,
+                SLANG_E_NOT_FOUND,
+                toSlice("libNVVM CUDA device library was requested, but the selected libNVVM does "
+                        "not identify a coherent CUDA toolkit root"));
+            return _returnArtifact(SLANG_E_NOT_FOUND, artifact, outArtifact);
+        }
+
+        const SlangResult libdeviceReadResult = File::readAllBytes(m_libdevicePath, libdeviceBytes);
+        if (SLANG_FAILED(libdeviceReadResult))
+        {
+            StringBuilder message;
+            message << "Unable to read the selected CUDA device library '" << m_libdevicePath
+                    << "'";
+            _setPlainFailure(diagnostics, libdeviceReadResult, message.getUnownedSlice());
+            return _returnArtifact(libdeviceReadResult, artifact, outArtifact);
+        }
+    }
+
     nvvmProgram program = nullptr;
     nvvmResult nvvmResultCode = m_nvvmCreateProgram(&program);
     if (nvvmResultCode != NVVM_SUCCESS)
@@ -496,6 +587,7 @@ SlangResult NVVMDownstreamCompiler::compile(
         _setNVVMFailure(diagnostics, "program creation", nvvmResultCode, String());
         return _returnArtifact(_asSlangResult(nvvmResultCode), artifact, outArtifact);
     }
+
     if (!program)
     {
         _setPlainFailure(
@@ -517,6 +609,28 @@ SlangResult NVVMDownstreamCompiler::compile(
         _getProgramLog(program, log);
         _setNVVMFailure(diagnostics, "module loading", nvvmResultCode, log);
         return _returnArtifact(_asSlangResult(nvvmResultCode), artifact, outArtifact);
+    }
+
+    if (options.requiresCUDADeviceLibrary)
+    {
+        const char* libdeviceData = reinterpret_cast<const char*>(libdeviceBytes.getBuffer());
+        nvvmResultCode = m_nvvmLazyAddModuleToProgram ? m_nvvmLazyAddModuleToProgram(
+                                                            program,
+                                                            libdeviceData,
+                                                            size_t(libdeviceBytes.getCount()),
+                                                            "libdevice.10.bc")
+                                                      : m_nvvmAddModuleToProgram(
+                                                            program,
+                                                            libdeviceData,
+                                                            size_t(libdeviceBytes.getCount()),
+                                                            "libdevice.10.bc");
+        if (nvvmResultCode != NVVM_SUCCESS)
+        {
+            String log;
+            _getProgramLog(program, log);
+            _setNVVMFailure(diagnostics, "CUDA device-library module loading", nvvmResultCode, log);
+            return _returnArtifact(_asSlangResult(nvvmResultCode), artifact, outArtifact);
+        }
     }
 
     List<const char*> optionPointers;
@@ -652,6 +766,7 @@ struct NVVMLibraryPathVisitor : Path::Visitor
 {
     struct Candidate
     {
+        String decoratedPath;
         String loadPath;
         String fileName;
         List<Int> versionComponents;
@@ -755,7 +870,8 @@ struct NVVMLibraryPathVisitor : Path::Visitor
 
         Candidate candidate;
         candidate.fileName = fileName;
-        candidate.loadPath = _getLibraryLoadPath(Path::combine(directory, fileName));
+        candidate.decoratedPath = Path::combine(directory, fileName);
+        candidate.loadPath = _getLibraryLoadPath(candidate.decoratedPath);
         _getVersionComponents(fileName, candidate.versionComponents);
         for (const auto& existing : candidates)
         {
@@ -812,8 +928,10 @@ static void _addToolkitDirectories(const String& root, List<String>& ioDirectori
 static SlangResult _loadFromDirectories(
     const List<String>& directories,
     ISlangSharedLibraryLoader* loader,
-    ComPtr<ISlangSharedLibrary>& outLibrary)
+    ComPtr<ISlangSharedLibrary>& outLibrary,
+    String& outSelectedLibraryPath)
 {
+    outSelectedLibraryPath = String();
     bool sawCandidate = false;
     SlangResult firstLoadFailure = SLANG_E_NOT_FOUND;
     for (const auto& directory : directories)
@@ -832,6 +950,9 @@ static SlangResult _loadFromDirectories(
                 outLibrary.writeRef());
             if (SLANG_SUCCEEDED(loadResult))
             {
+                SLANG_RETURN_ON_FAIL(Path::getCanonical(
+                    visitor.candidates[i].decoratedPath,
+                    outSelectedLibraryPath));
                 return SLANG_OK;
             }
             if (firstLoadFailure == SLANG_E_NOT_FOUND && loadResult != SLANG_E_NOT_FOUND)
@@ -909,11 +1030,14 @@ static void _addAutomaticSearchDirectories(List<String>& outDirectories)
     }
 }
 
-static SlangResult _createCompiler(ISlangSharedLibrary* library, DownstreamCompilerSet* set)
+static SlangResult _createCompiler(
+    ISlangSharedLibrary* library,
+    const String& selectedLibraryPath,
+    DownstreamCompilerSet* set)
 {
     auto compiler = new NVVMDownstreamCompiler;
     ComPtr<IDownstreamCompiler> compilerInterface(compiler);
-    SLANG_RETURN_ON_FAIL(compiler->init(library));
+    SLANG_RETURN_ON_FAIL(compiler->init(library, selectedLibraryPath));
     set->addCompiler(compilerInterface);
     return SLANG_OK;
 }
@@ -927,34 +1051,46 @@ static SlangResult _createCompiler(ISlangSharedLibrary* library, DownstreamCompi
         return SLANG_E_INVALID_ARG;
 
     ComPtr<ISlangSharedLibrary> library;
+    String selectedLibraryPath;
     if (path.getLength())
     {
         SlangPathType pathType;
-        if (SLANG_SUCCEEDED(Path::getPathType(path, &pathType)) &&
-            pathType == SLANG_PATH_TYPE_DIRECTORY)
+        const bool hasPathType = SLANG_SUCCEEDED(Path::getPathType(path, &pathType));
+        if (hasPathType && pathType == SLANG_PATH_TYPE_DIRECTORY)
         {
             List<String> directories;
             _addToolkitDirectories(path, directories);
-            SLANG_RETURN_ON_FAIL(_loadFromDirectories(directories, loader, library));
+            SLANG_RETURN_ON_FAIL(
+                _loadFromDirectories(directories, loader, library, selectedLibraryPath));
         }
         else
         {
             const String loadPath = _getLibraryLoadPath(path);
             SLANG_RETURN_ON_FAIL(
                 loader->loadSharedLibrary(loadPath.getBuffer(), library.writeRef()));
+            if ((hasPathType && pathType == SLANG_PATH_TYPE_FILE) ||
+                Path::getParentDirectory(path).getLength() != 0)
+            {
+                String canonicalPath;
+                const SlangResult canonicalResult = Path::getCanonical(path, canonicalPath);
+                if (hasPathType && pathType == SLANG_PATH_TYPE_FILE)
+                    SLANG_RETURN_ON_FAIL(canonicalResult);
+                if (SLANG_SUCCEEDED(canonicalResult))
+                    selectedLibraryPath = canonicalPath;
+            }
         }
-        return _createCompiler(library, set);
+        return _createCompiler(library, selectedLibraryPath, set);
     }
 
     // Try the logical name before filesystem probing. Besides supporting platform loader paths,
     // this is the stable dependency-injection seam used by fake-library tests.
     if (SLANG_SUCCEEDED(loader->loadSharedLibrary("nvvm", library.writeRef())))
-        return _createCompiler(library, set);
+        return _createCompiler(library, String(), set);
 
     List<String> directories;
     _addAutomaticSearchDirectories(directories);
-    SLANG_RETURN_ON_FAIL(_loadFromDirectories(directories, loader, library));
-    return _createCompiler(library, set);
+    SLANG_RETURN_ON_FAIL(_loadFromDirectories(directories, loader, library, selectedLibraryPath));
+    return _createCompiler(library, selectedLibraryPath, set);
 }
 
 } // namespace Slang

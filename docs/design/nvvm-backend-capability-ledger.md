@@ -68,6 +68,9 @@ fields have not been collected yet.
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangRealIntegerNegateDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, libNVVM, `cuda_sm_7_0` | Pass | Pass | Not applicable | Exact signed-i32 arithmetic negation compiles through both routes | Widths `[64, 32]`, token-safe `neg.s32`, and global u32 stores agree; NVRTC uses address conversion while direct uses the raw pointer, with no `sub.s32` or `not.b32` | PTX size and timing not measured |
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangRealIntegerNegatePtxasAccepts` | 2 | LLVM 14.0.6 provider, NVRTC, libNVVM, CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both signed-i32-negate PTX outputs assemble | Static PTX acceptance | Resource and timing measurements not collected |
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangIntegerNegateRuntimeMatchesNVRTC` | 2 | LLVM 14.0.6 provider, NVRTC, libNVVM, CUDA driver and GPU with compute capability 7.0+ | Pass | Pass | Not applicable | Both routes launch the same signed-i32-negate kernel for zero, positive, negative, and wrapping-minimum inputs | On the RTX 5090, inputs `0`, `1`, `-7`, and `INT_MIN` produce `0`, `-1`, `7`, and `-2147483648` | Kernel timing not measured |
+| `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmCompilerCompilesSelfContainedLibdeviceSine` | 5 | Selected CUDA 12.9 toolkit libNVVM and `nvvm/libdevice/libdevice.10.bc`, `compute_75` | Not compared | Pass | Not applicable | Explicit device-library demand resolves one compiler-level `__nv_sinf` call through toolkit-matched libdevice | PTX contains the named entry and global store with no unresolved `.extern .func` | Libdevice is 486,144 bytes, UTC `2025-05-27 09:50:51`, SHA-256 `CD2824F8DD3F862B6B9259086F49F6CB56CA2547E14C61DE889C1C0D4A7DB175` |
+| `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmCompilerLibdeviceSinePtxasAccepts` | 5 | Selected CUDA toolkit libNVVM, libdevice, and matching-root `ptxas`, `sm_75` | Not applicable | Pass | Not applicable | Compiler-level libdevice sine PTX assembles without an unresolved libdevice external | Static PTX acceptance through `ptxas` from the same CUDA 12.9 root | Resource and timing measurements not collected |
+| `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmCompilerLibdeviceSineRuns` | 5 | Selected CUDA toolkit libNVVM/libdevice, CUDA driver, and GPU with compute capability 7.5+ | Not compared | Pass | Not applicable | The compiler-level libdevice sine kernel launches for zero, finite positive/negative, and range-reduction inputs | On the RTX 5090, inputs `0`, `0.5`, `-1.25`, and `20` match host `sinf` within `2e-6` | Kernel timing not measured |
 | `tests/cuda/nvvm-unsupported-ir.slang` | 4 | None beyond `slangc`; `cuda_sm_7_0` | Not applicable | Expected stop | `emit` | E52017: barrier resolves to a void helper outside the signed-i32 helper ABI | Not applicable | — |
 
 ## Routing and regression evidence
@@ -109,7 +112,12 @@ fields have not been collected yet.
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarIntegerNegateCapability` | An exact Slice 16 V2 provider retains signed-i32 bitwise NOT, while a signed-i32-negate program reaches E52016 after one discovery but before module creation | Pass |
 | `slang-unit-test-tool/nvvmSlangRetainsOnlySelectedCUDAKernel` | CUDA-kernel pruning still removes an unselected kernel before direct emission while preserving the exact selected entry point | Pass |
 | `slang-unit-test-tool/nvvmSlangRejectsConventionalRawKernelParameters` | Only `[CUDAKernel]` receives the raw scalar ABI; a conventional parameterized compute entry reaches E52017 before builder or libNVVM program creation | Pass |
-| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | Signed-i32 left/right shifts, division, and remainder stop at `'shl'`, `'shr'`, `'div'`, and `'irem'`; logical NOT and unsigned/i64/float Neg stop at `'entry-point parameter'`; unsigned or i64 bitwise AND/OR/XOR/NOT, unsigned/wide/floating multiplication, void helper calls, and unsigned pointer offsets retain their established deterministic E52017 boundaries before builder discovery or libNVVM program creation | Pass |
+| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | Signed-i32 left/right shifts, division, and remainder stop at `'shl'`, `'shr'`, `'div'`, and `'irem'`; logical NOT and unsigned/i64/float Neg stop at `'entry-point parameter'`; unsigned or i64 bitwise AND/OR/XOR/NOT, unsigned/wide/floating multiplication, void helper calls, and unsigned pointer offsets retain their established deterministic E52017 boundaries before builder discovery or libNVVM program creation. The Slice 18 f32-sine case stops at the float-returning target helper's unsupported `'helper function result type'`, before provider discovery and without exercising `GenericAsm` matching | Pass |
+| `slang-unit-test-tool/nvvmCompilerNegotiatesCUDADeviceLibraryOption` | The terminal naturally aligned pointer-sized `requiresCUDADeviceLibrary` storage does not reuse prior tail padding; zero means false, nonzero means true, and an older compatible options prefix leaves established libdevice-free compiles independent of a toolkit root | Pass |
+| `slang-unit-test-tool/nvvmCompilerUsesSelectedToolkitLibdevice` | Filesystem discovery carries the canonical successful decorated libNVVM candidate into compiler construction, never retries a conflicting environment root, reads exact `nvvm/libdevice/libdevice.10.bc` only on demand, and includes a coherent libdevice timestamp in compiler identity | Pass |
+| `slang-unit-test-tool/nvvmCompilerRejectsUnavailableRequestedLibdevice` | Zero demand compiles without requiring, reading, or adding libdevice; requested missing-root or missing-file/read failures stop before program creation | Pass |
+| `slang-unit-test-tool/nvvmCompilerHandlesLibdeviceModuleAddition` | Explicit demand reads opaque bytes before program creation, adds user module `slang-nvvm-input` first and `libdevice.10.bc` second, uses ordinary addition only when the lazy API is absent, surfaces a failed lazy add without retry, and destroys each created program exactly once | Pass |
+| `slang-unit-test-tool/nvvmCompilerEnforcesFloatingPointPolicy` | Default/Precise/Fast compose with fp32 Any/Preserve/FlushToZero into the exact managed option matrix used identically for verification and compilation; non-Any fp16/fp64 modes, malformed enum values, and compiler-specific overrides fail before program creation | Pass |
 | `slang-unit-test-tool/parseCUDAEmissionMethods` | Both selector orders are last-wins, only the canonical option is stored, and target settings are isolated | Pass |
 | `slang-unit-test-tool/cudaEmissionMethodSelectsDownstreamCompiler` | Default follows the session transition; explicit NVRTC/NVVM bypass it; invalid input selects no compiler | Pass |
 | `slang-unit-test-tool/cudaEmissionMethodLinkOptionsAffectRoutingAndHash` | A canonical `linkWithOptions` override changes both effective dispatch and the shader hash | Pass |
@@ -209,3 +217,21 @@ outputs. On the RTX 5090, inputs `0`, `1`, `-7`, and `INT_MIN` produce `0`, `-1`
 `-2147483648` on both routes. The first complete focused NVVM run passed 124/124 with the full
 312-byte table. Preservation passed 1/1 parser, 2/2 routing/hash, 1/1 unsupported boundary, 3/3
 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.
+
+Slice 18 extends Bucket 5 at the downstream compiler boundary without adding a direct-Slang float
+or builder capability. The terminal naturally aligned pointer-sized `requiresCUDADeviceLibrary`
+field uses zero for false and any nonzero value for true; older compatible option prefixes receive
+zero. A true request uses only the root retained from the selected libNVVM library, reads exact
+`nvvm/libdevice/libdevice.10.bc` bytes before program creation, adds the user module normally and
+libdevice lazily, and uses ordinary addition only when the optional lazy symbol is absent. The
+Default/Precise/Fast and fp32 Any/Preserve/FlushToZero matrices compose independently; non-default
+fp16/fp64 denormal policy and compiler-specific overrides of the managed families are rejected
+before program creation. The selected CUDA 12.9 libdevice is 486,144 bytes, UTC
+`2025-05-27 09:50:51`, with SHA-256
+`CD2824F8DD3F862B6B9259086F49F6CB56CA2547E14C61DE889C1C0D4A7DB175`. The direct Slang f32
+arithmetic negative case stops during raw parameter validation, while the sine case stops at its
+float-returning target helper's unsupported result type. Both occur before provider discovery and
+neither tests GenericAsm matching. The complete focused Slice 18 NVVM suite passed 132/132. The
+real PTX, same-root `ptxas`, and RTX 5090 runtime lanes passed; preservation passed 1/1 parser, 2/2
+routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime
+dispatch.
