@@ -1846,6 +1846,41 @@ slice, and scalar emission uses the three generic facade methods. The Release fo
 matrix. Debug preservation passes 10/10. The provider exports exactly the V1, V2, and V3 getters;
 PE inspection reports only operating-system dependencies and no process-visible LLVM DLL.
 
+### Slice 29 centralized type legalization
+
+Slice 29 gives canonical linked Slang IR types one construction owner,
+`NVVMTypeLoweringContext`. Each direct emission creates exactly one context after creating its
+provider module, so every cached handle is module-owned and is discarded before that module is
+destroyed. Function results and parameters state whether they belong to the entry point or a helper;
+ordinary values state the value-use contract. The context rejects any type that preflight should not
+have admitted instead of repairing an alternative spelling in the emitter.
+
+The source cache is keyed by exact canonical `IRType*`. It recursively maps the established graph:
+entry-point `void`, helper/value signed `int` to signless LLVM `i32`, comparison `Bool` to `i1` when
+an explicit type handle is needed, device pointers to AS1, nonempty fixed `int` arrays and their AS1
+pointers, exact raw `RWStructuredBuffer<int, DefaultLayout>`, and the canonical scalar-layout
+element pointer produced by resource addressing. Signedness stays operation policy; it does not
+create a second LLVM integer type hierarchy.
+
+Slang access qualifiers are legality metadata and are intentionally absent from LLVM pointer type
+identity. Read and read-write canonical pointer types therefore have separate source-cache entries
+but share one representation-cache entry keyed by exact canonical pointee plus LLVM address space.
+This preserves one AS1 pointer construction for the established copy and fixed-array kernels without
+introducing structural equivalence between Slang types. The raw resource remains the provider's
+dedicated `{ i32 addrspace(1)*, i64 }` launch value; the host does not flatten it.
+
+Adding a type in a future slice now requires one canonical linked-IR classifier with its producer
+and allowed uses, one explicit representation/address-space mapping in the type context, the
+provider constructor only if V3 cannot already express it, and positive/adjacent-negative cache and
+integration evidence. Function declaration, constants, phis, and every existing value path no
+longer own or thread an `i32` handle, and the old scalar/pointer/array/resource singleton maps have
+been removed.
+
+The final Release NVVM prefix passes 193/193, including every real direct/NVRTC differential PTX,
+matching-toolkit `ptxas`, and RTX 5090 runtime lane. Debug preservation passes 10/10. Slice 29 does
+not change the provider ABI, exports, LLVM construction, accepted linked-IR subset, or observable
+PTX/runtime contract.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific

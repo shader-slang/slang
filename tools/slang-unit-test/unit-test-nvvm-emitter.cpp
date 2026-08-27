@@ -128,6 +128,45 @@ SLANG_UNIT_TEST(nvvmSlangEmptyComputeUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangTypeCacheIsModuleLocal)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        // Each compile creates a provider module. Within one module the result, pointer, and every
+        // signed-i32 value share the centralized cache; the second module must reconstruct its own
+        // handles because provider types cannot escape their module lifetime.
+        for (int compileIndex = 0; compileIndex < 2; ++compileIndex)
+        {
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+                globalSession,
+                kDirectNVVMWriteScalarSource,
+                code,
+                diagnostics)));
+            SLANG_CHECK_ABORT(code != nullptr);
+            SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+        }
+
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.destroyModuleCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.getVoidTypeCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.getIntegerTypeCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.getPointerTypeCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.getFunctionTypeCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 2);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangScalarMemoryAndConditionalUseDirectPipeline)
 {
     struct ExpectedBuilderGraph
@@ -613,6 +652,8 @@ SLANG_UNIT_TEST(nvvmSlangScalarFunctionsUseDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 3);
         SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 3);
         SLANG_CHECK(gFakeNVVMBuilder.getFunctionParameterCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.getIntegerTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.getPointerTypeCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.getIntegerConstantCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[0] == 1);
         SLANG_CHECK(gFakeNVVMBuilder.emitIntegerCallCallCount == 4);

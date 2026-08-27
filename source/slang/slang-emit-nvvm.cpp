@@ -5,6 +5,7 @@
 #include "core/slang-dictionary.h"
 #include "slang-code-gen.h"
 #include "slang-diagnostics.h"
+#include "slang-emit-nvvm-type-lowering.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
@@ -55,137 +56,15 @@ SlangResult _requireBuilderOperation(
     return result;
 }
 
-// Returns whether `type` is the canonical signed 32-bit integer type accepted by this slice.
-bool _isI32Type(IRInst* type)
-{
-    auto basicType = as<IRBasicType>(type);
-    return basicType && basicType->getBaseType() == BaseType::Int;
-}
-
 // Returns an executable signed-i32 literal, excluding layout and other module constants.
 IRIntLit* _asExecutableI32Constant(IRInst* value)
 {
     auto intLit = as<IRIntLit>(value);
-    if (!intLit || !_isI32Type(intLit->getDataType()))
+    if (!intLit || !isNVVMSignedI32Type(intLit->getDataType()))
         return nullptr;
 
     const IRIntegerValue intValue = intLit->getValue();
     return intValue >= kNVVMI32Min && intValue <= kNVVMI32Max ? intLit : nullptr;
-}
-
-// Returns whether `type` is the canonical Boolean result type produced by signed comparison.
-bool _isBoolType(IRInst* type)
-{
-    auto basicType = as<IRBasicType>(type);
-    return basicType && basicType->getBaseType() == BaseType::Bool;
-}
-
-// Returns the accepted nonempty fixed i32 array and its exact provider-representable count.
-IRArrayType* _asSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount = nullptr)
-{
-    if (outElementCount)
-        *outElementCount = 0;
-
-    auto arrayType = as<IRArrayType>(type);
-    if (!arrayType || arrayType->getOp() != kIROp_ArrayType || arrayType->getOperandCount() != 2 ||
-        !_isI32Type(arrayType->getElementType()))
-    {
-        return nullptr;
-    }
-
-    auto elementCount = as<IRIntLit>(arrayType->getElementCount());
-    if (!elementCount || elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX)
-        return nullptr;
-
-    if (outElementCount)
-        *outElementCount = uint32_t(elementCount->getValue());
-    return arrayType;
-}
-
-// Returns the accepted CUDA device-pointer type, or null for every other pointer spelling.
-IRPtrTypeBase* _asSupportedDevicePointerType(IRInst* type)
-{
-    auto ptrType = as<IRPtrTypeBase>(type);
-    if (!ptrType || ptrType->getOp() != kIROp_PtrType || !_isI32Type(ptrType->getValueType()) ||
-        ptrType->getAddressSpace() != AddressSpace::UserPointer)
-    {
-        return nullptr;
-    }
-
-    const AccessQualifier access = ptrType->getAccessQualifier();
-    return access == AccessQualifier::Read || access == AccessQualifier::ReadWrite ? ptrType
-                                                                                   : nullptr;
-}
-
-// Returns a device pointer to an accepted fixed i32 array, preserving its canonical array type.
-IRPtrTypeBase* _asSupportedDeviceArrayPointerType(
-    IRInst* type,
-    IRArrayType** outArrayType = nullptr,
-    uint32_t* outElementCount = nullptr)
-{
-    if (outArrayType)
-        *outArrayType = nullptr;
-    if (outElementCount)
-        *outElementCount = 0;
-
-    auto ptrType = as<IRPtrTypeBase>(type);
-    IRArrayType* arrayType = nullptr;
-    uint32_t elementCount = 0;
-    if (!ptrType || ptrType->getOp() != kIROp_PtrType ||
-        !(arrayType = _asSupportedI32ArrayType(ptrType->getValueType(), &elementCount)) ||
-        ptrType->getAddressSpace() != AddressSpace::UserPointer)
-    {
-        return nullptr;
-    }
-
-    const AccessQualifier access = ptrType->getAccessQualifier();
-    if (access != AccessQualifier::Read && access != AccessQualifier::ReadWrite)
-        return nullptr;
-
-    if (outArrayType)
-        *outArrayType = arrayType;
-    if (outElementCount)
-        *outElementCount = elementCount;
-    return ptrType;
-}
-
-// Returns the exact raw CUDA `RWStructuredBuffer<int, DefaultLayout>` launch-value type.
-IRHLSLStructuredBufferTypeBase* _asSupportedRawRWStructuredBufferI32Type(IRInst* type)
-{
-    auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-    if (!bufferType || bufferType->getOp() != kIROp_HLSLRWStructuredBufferType ||
-        bufferType->getOperandCount() != 3 || !_isI32Type(bufferType->getElementType()))
-    {
-        return nullptr;
-    }
-
-    IRType* dataLayout = bufferType->getDataLayout();
-    return dataLayout && dataLayout->getOp() == kIROp_DefaultBufferLayoutType ? bufferType
-                                                                              : nullptr;
-}
-
-// Returns the canonical generic scalar-layout pointer produced by structured-buffer addressing.
-IRPtrTypeBase* _asSupportedRWStructuredBufferI32ElementPointerType(IRInst* type)
-{
-    auto ptrType = as<IRPtrTypeBase>(type);
-    IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
-    if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
-        !_isI32Type(ptrType->getValueType()) ||
-        ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
-        ptrType->getAddressSpace() != AddressSpace::Generic || !dataLayout ||
-        dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
-    {
-        return nullptr;
-    }
-    return ptrType;
-}
-
-// Returns whether `type` has a direct CUDA launch-parameter representation.
-bool _isSupportedParameterType(IRInst* type)
-{
-    return _isI32Type(type) || _asSupportedDevicePointerType(type) ||
-           _asSupportedDeviceArrayPointerType(type) ||
-           _asSupportedRawRWStructuredBufferI32Type(type);
 }
 
 // Records one independent provider semantic required by the accepted linked IR.
@@ -222,7 +101,7 @@ SlangResult _validateI32Value(
     IRDominatorTree* dominatorTree,
     NVVMIRFeatureSet& features)
 {
-    if (!value || !_isI32Type(value->getDataType()))
+    if (!value || !isNVVMSignedI32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 value"));
 
     if (_asExecutableI32Constant(value))
@@ -243,9 +122,10 @@ SlangResult _validatePointerValue(
     IRDominatorTree* dominatorTree,
     bool requireWriteAccess)
 {
-    auto ptrType = value ? _asSupportedDevicePointerType(value->getDataType()) : nullptr;
+    auto ptrType = value ? asNVVMSupportedDevicePointerType(value->getDataType()) : nullptr;
     auto resourceElementPtrType =
-        value ? _asSupportedRWStructuredBufferI32ElementPointerType(value->getDataType()) : nullptr;
+        value ? asNVVMSupportedRWStructuredBufferI32ElementPointerType(value->getDataType())
+              : nullptr;
     if (!ptrType &&
         (!resourceElementPtrType || value->getOp() != kIROp_RWStructuredBufferGetElementPtr))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device i32 pointer"));
@@ -371,11 +251,11 @@ SlangResult _validateNVVMHelperTarget(
     }
     if (helper->getParent() != linkedIR.module->getModuleInst() || !helper->isDefinition())
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("call"));
-    if (!_isI32Type(helper->getResultType()))
+    if (!isNVVMSignedI32Type(helper->getResultType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function result type"));
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
-        if (!_isI32Type(helper->getParamType(parameterIndex)))
+        if (!isNVVMSignedI32Type(helper->getParamType(parameterIndex)))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function parameter"));
     }
     return SLANG_OK;
@@ -519,11 +399,13 @@ SlangResult _validateNVVMFunction(
     for (auto param : function->getParams())
     {
         auto arrayPointerType =
-            isEntryPoint ? _asSupportedDeviceArrayPointerType(param->getDataType()) : nullptr;
+            isEntryPoint ? asNVVMSupportedDeviceArrayPointerType(param->getDataType()) : nullptr;
         auto rawRWStructuredBufferType =
-            isEntryPoint ? _asSupportedRawRWStructuredBufferI32Type(param->getDataType()) : nullptr;
-        const bool isSupportedType = isEntryPoint ? _isSupportedParameterType(param->getDataType())
-                                                  : _isI32Type(param->getDataType());
+            isEntryPoint ? asNVVMSupportedRawRWStructuredBufferI32Type(param->getDataType())
+                         : nullptr;
+        const bool isSupportedType = isEntryPoint
+                                         ? isNVVMSupportedParameterType(param->getDataType())
+                                         : isNVVMSignedI32Type(param->getDataType());
         if (actualParamCount >= function->getParamCount() || !isSupportedType ||
             !isTypeEqual(param->getDataType(), function->getParamType(actualParamCount)))
         {
@@ -558,7 +440,7 @@ SlangResult _validateNVVMFunction(
         {
             for (auto param : block->getParams())
             {
-                if (!_isI32Type(param->getDataType()))
+                if (!isNVVMSignedI32Type(param->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
                 availableValues.add(param);
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
@@ -574,7 +456,7 @@ SlangResult _validateNVVMFunction(
             switch (inst->getOp())
             {
             case kIROp_Load:
-                if (!_isI32Type(inst->getDataType()))
+                if (!isNVVMSignedI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
                 break;
@@ -585,13 +467,13 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_Add:
             case kIROp_Sub:
-                if (inst->getOperandCount() != 2 || !_isI32Type(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 arithmetic"));
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
                 break;
 
             case kIROp_Mul:
-                if (inst->getOperandCount() != 2 || !_isI32Type(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -601,7 +483,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_BitAnd:
-                if (inst->getOperandCount() != 2 || !_isI32Type(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -611,7 +493,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_BitOr:
-                if (inst->getOperandCount() != 2 || !_isI32Type(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 bitwise OR"));
                 }
@@ -619,7 +501,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_BitXor:
-                if (inst->getOperandCount() != 2 || !_isI32Type(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -629,7 +511,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_BitNot:
-                if (inst->getOperandCount() != 1 || !_isI32Type(inst->getDataType()))
+                if (inst->getOperandCount() != 1 || !isNVVMSignedI32Type(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -639,7 +521,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Neg:
-                if (inst->getOperandCount() != 1 || !_isI32Type(inst->getDataType()))
+                if (inst->getOperandCount() != 1 || !isNVVMSignedI32Type(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -650,7 +532,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_AtomicAdd:
                 {
-                    if (inst->getOperandCount() != 3 || !_isI32Type(inst->getDataType()))
+                    if (inst->getOperandCount() != 3 || !isNVVMSignedI32Type(inst->getDataType()))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -667,13 +549,13 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Less:
-                if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 comparison"));
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
                 break;
 
             case kIROp_Eql:
-                if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 equality"));
                 }
@@ -681,7 +563,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Neq:
-                if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 inequality"));
                 }
@@ -689,7 +571,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Greater:
-                if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -701,7 +583,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Leq:
-                if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -713,7 +595,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Geq:
-                if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
+                if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -725,14 +607,14 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Call:
-                if (!inst->getOperandCount() || !_isI32Type(inst->getDataType()))
+                if (!inst->getOperandCount() || !isNVVMSignedI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 call"));
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
                 break;
 
             case kIROp_GetOffsetPtr:
                 if (inst->getOperandCount() != 2 ||
-                    !_asSupportedDevicePointerType(inst->getDataType()))
+                    !asNVVMSupportedDevicePointerType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -743,7 +625,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_GetElementPtr:
                 if (inst->getOperandCount() != 2 ||
-                    !_asSupportedDevicePointerType(inst->getDataType()))
+                    !asNVVMSupportedDevicePointerType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -754,7 +636,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_RWStructuredBufferGetElementPtr:
                 if (inst->getOperandCount() != 2 ||
-                    !_asSupportedRWStructuredBufferI32ElementPointerType(inst->getDataType()))
+                    !asNVVMSupportedRWStructuredBufferI32ElementPointerType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -968,11 +850,11 @@ SlangResult _validateNVVMFunction(
                     IRInst* basePointer = inst->getOperand(0);
                     IRInst* elementIndex = inst->getOperand(1);
                     IRArrayType* arrayType = nullptr;
-                    auto basePointerType = basePointer ? _asSupportedDeviceArrayPointerType(
+                    auto basePointerType = basePointer ? asNVVMSupportedDeviceArrayPointerType(
                                                              basePointer->getDataType(),
                                                              &arrayType)
                                                        : nullptr;
-                    auto resultPointerType = _asSupportedDevicePointerType(inst->getDataType());
+                    auto resultPointerType = asNVVMSupportedDevicePointerType(inst->getDataType());
                     if (!basePointerType || !resultPointerType || !arrayType ||
                         basePointerType->getAddressSpace() !=
                             resultPointerType->getAddressSpace() ||
@@ -1007,7 +889,8 @@ SlangResult _validateNVVMFunction(
                 {
                     IRInst* buffer = inst->getOperand(0);
                     IRInst* elementIndex = inst->getOperand(1);
-                    if (!buffer || !_asSupportedRawRWStructuredBufferI32Type(buffer->getDataType()))
+                    if (!buffer ||
+                        !asNVVMSupportedRawRWStructuredBufferI32Type(buffer->getDataType()))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -1112,7 +995,7 @@ SlangResult _validateNVVMFunction(
                             toSlice("conditional branch position"));
                     }
                     if (!ifElse->getCondition() ||
-                        !_isBoolType(ifElse->getCondition()->getDataType()))
+                        !isNVVMBoolType(ifElse->getCondition()->getDataType()))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -1181,65 +1064,6 @@ SlangResult _validateNVVMFunction(
 
 using NVVMValueMap = Dictionary<IRInst*, SlangNVVMValueHandle_1>;
 
-// Gets the one module-owned i32 type on demand so empty Slice 6 kernels keep their minimal graph.
-SlangResult _getNVVMI32Type(
-    CodeGenContext* codeGenContext,
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMTypeHandle_1& ioType)
-{
-    if (ioType)
-        return SLANG_OK;
-    return _requireBuilderOperation(
-        codeGenContext,
-        "signed i32 type",
-        builder.getIntegerType(module, 32, ioType));
-}
-
-// Gets the provider array and AS1 pointer types for one canonical fixed-i32-array type.
-SlangResult _getNVVMDeviceArrayPointerType(
-    CodeGenContext* codeGenContext,
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle_1 module,
-    IRArrayType* irArrayType,
-    SlangNVVMTypeHandle_1& ioI32Type,
-    Dictionary<IRArrayType*, SlangNVVMTypeHandle_1>& arrayTypeMap,
-    Dictionary<IRArrayType*, SlangNVVMTypeHandle_1>& arrayPointerTypeMap,
-    SlangNVVMTypeHandle_1& outPointerType)
-{
-    outPointerType = nullptr;
-    uint32_t elementCount = 0;
-    SLANG_RELEASE_ASSERT(_asSupportedI32ArrayType(irArrayType, &elementCount));
-    SLANG_RETURN_ON_FAIL(_getNVVMI32Type(codeGenContext, builder, module, ioI32Type));
-
-    SlangNVVMTypeHandle_1 arrayType = nullptr;
-    if (auto mappedType = arrayTypeMap.tryGetValue(irArrayType))
-    {
-        arrayType = *mappedType;
-    }
-    else
-    {
-        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            codeGenContext,
-            "fixed i32 array type",
-            builder.getArrayType(module, ioI32Type, elementCount, arrayType)));
-        arrayTypeMap[irArrayType] = arrayType;
-    }
-
-    if (auto mappedType = arrayPointerTypeMap.tryGetValue(irArrayType))
-    {
-        outPointerType = *mappedType;
-        return SLANG_OK;
-    }
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "device fixed i32 array pointer type",
-        builder
-            .getPointerType(module, arrayType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL, outPointerType)));
-    arrayPointerTypeMap[irArrayType] = outPointerType;
-    return SLANG_OK;
-}
-
 // Returns an already-lowered SSA value or materializes the exact preflighted i32 literal.
 SlangResult _getLoweredNVVMValue(
     CodeGenContext* codeGenContext,
@@ -1247,7 +1071,7 @@ SlangResult _getLoweredNVVMValue(
     SlangNVVMModuleHandle_1 module,
     IRInst* irValue,
     NVVMValueMap& valueMap,
-    SlangNVVMTypeHandle_1& ioI32Type,
+    NVVMTypeLoweringContext& typeContext,
     SlangNVVMValueHandle_1& outValue)
 {
     outValue = nullptr;
@@ -1259,11 +1083,13 @@ SlangResult _getLoweredNVVMValue(
 
     auto intLit = _asExecutableI32Constant(irValue);
     SLANG_RELEASE_ASSERT(intLit);
-    SLANG_RETURN_ON_FAIL(_getNVVMI32Type(codeGenContext, builder, module, ioI32Type));
+    SlangNVVMTypeHandle_1 integerType = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        typeContext.lowerType(intLit->getDataType(), NVVMTypeUse::Value, integerType));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
         "signed i32 constant",
-        builder.getIntegerConstant(module, ioI32Type, int64_t(intLit->getValue()), outValue)));
+        builder.getIntegerConstant(module, integerType, int64_t(intLit->getValue()), outValue)));
     valueMap[irValue] = outValue;
     return SLANG_OK;
 }
@@ -1374,17 +1200,7 @@ SlangResult emitNVVMIRFromLinkedIR(
         "module creation",
         builder.createModule(toSlice("slang-direct-nvvm"), moduleScope.module)));
 
-    SlangNVVMTypeHandle_1 voidType = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "void type",
-        builder.getVoidType(moduleScope.module, voidType)));
-
-    SlangNVVMTypeHandle_1 i32Type = nullptr;
-    SlangNVVMTypeHandle_1 deviceI32PointerType = nullptr;
-    SlangNVVMTypeHandle_1 rawRWStructuredBufferI32Type = nullptr;
-    Dictionary<IRArrayType*, SlangNVVMTypeHandle_1> arrayTypeMap;
-    Dictionary<IRArrayType*, SlangNVVMTypeHandle_1> arrayPointerTypeMap;
+    NVVMTypeLoweringContext typeContext(codeGenContext, builder, moduleScope.module);
     Dictionary<IRFunc*, SlangNVVMValueHandle_1> functionMap;
     NVVMValueMap valueMap;
     Dictionary<IRBlock*, SlangNVVMBlockHandle_1> blockMap;
@@ -1393,74 +1209,22 @@ SlangResult emitNVVMIRFromLinkedIR(
     // that appears later in linked-IR order without turning physical order into a legality rule.
     for (auto function : functions)
     {
-        SlangNVVMTypeHandle_1 resultType = voidType;
-        if (function != entryPoint)
-        {
-            SLANG_RETURN_ON_FAIL(
-                _getNVVMI32Type(codeGenContext, builder, moduleScope.module, i32Type));
-            resultType = i32Type;
-        }
+        const bool isEntryPoint = function == entryPoint;
+        SlangNVVMTypeHandle_1 resultType = nullptr;
+        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+            function->getResultType(),
+            isEntryPoint ? NVVMTypeUse::EntryPointResult : NVVMTypeUse::HelperResult,
+            resultType));
 
         List<SlangNVVMTypeHandle_1> parameterTypes;
         for (auto param : function->getParams())
         {
-            if (_isI32Type(param->getDataType()))
-            {
-                SLANG_RETURN_ON_FAIL(
-                    _getNVVMI32Type(codeGenContext, builder, moduleScope.module, i32Type));
-                parameterTypes.add(i32Type);
-                continue;
-            }
-
-            SLANG_RELEASE_ASSERT(function == entryPoint);
-            SLANG_RETURN_ON_FAIL(
-                _getNVVMI32Type(codeGenContext, builder, moduleScope.module, i32Type));
-            if (_asSupportedDevicePointerType(param->getDataType()))
-            {
-                if (!deviceI32PointerType)
-                {
-                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                        codeGenContext,
-                        "device i32 pointer type",
-                        builder.getPointerType(
-                            moduleScope.module,
-                            i32Type,
-                            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-                            deviceI32PointerType)));
-                }
-                parameterTypes.add(deviceI32PointerType);
-                continue;
-            }
-
-            if (_asSupportedRawRWStructuredBufferI32Type(param->getDataType()))
-            {
-                if (!rawRWStructuredBufferI32Type)
-                {
-                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                        codeGenContext,
-                        "raw RWStructuredBuffer signed i32 type",
-                        builder.getRawRWStructuredBufferI32Type(
-                            moduleScope.module,
-                            rawRWStructuredBufferI32Type)));
-                }
-                parameterTypes.add(rawRWStructuredBufferI32Type);
-                continue;
-            }
-
-            IRArrayType* irArrayType = nullptr;
-            SLANG_RELEASE_ASSERT(
-                _asSupportedDeviceArrayPointerType(param->getDataType(), &irArrayType));
-            SlangNVVMTypeHandle_1 arrayPointerType = nullptr;
-            SLANG_RETURN_ON_FAIL(_getNVVMDeviceArrayPointerType(
-                codeGenContext,
-                builder,
-                moduleScope.module,
-                irArrayType,
-                i32Type,
-                arrayTypeMap,
-                arrayPointerTypeMap,
-                arrayPointerType));
-            parameterTypes.add(arrayPointerType);
+            SlangNVVMTypeHandle_1 parameterType = nullptr;
+            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                param->getDataType(),
+                isEntryPoint ? NVVMTypeUse::EntryPointParameter : NVVMTypeUse::HelperParameter,
+                parameterType));
+            parameterTypes.add(parameterType);
         }
 
         SlangNVVMTypeHandle_1 functionType = nullptr;
@@ -1543,8 +1307,9 @@ SlangResult emitNVVMIRFromLinkedIR(
 
             for (auto param : block->getParams())
             {
+                SlangNVVMTypeHandle_1 parameterType = nullptr;
                 SLANG_RETURN_ON_FAIL(
-                    _getNVVMI32Type(codeGenContext, builder, moduleScope.module, i32Type));
+                    typeContext.lowerType(param->getDataType(), NVVMTypeUse::Value, parameterType));
                 SlangNVVMValueHandle_1 loweredPhi = nullptr;
                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                     codeGenContext,
@@ -1552,7 +1317,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     builder.emitIntegerPhi(
                         moduleScope.module,
                         blockMap.getValue(block),
-                        i32Type,
+                        parameterType,
                         loweredPhi)));
                 valueMap[param] = loweredPhi;
             }
@@ -1581,7 +1346,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             load->getPtr(),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1606,7 +1371,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             store->getVal(),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredValue));
                         SlangNVVMValueHandle_1 loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1615,7 +1380,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             store->getPtr(),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredPointer));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
@@ -1641,7 +1406,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1650,7 +1415,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1676,7 +1441,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1685,7 +1450,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1710,7 +1475,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1719,7 +1484,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1744,7 +1509,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1753,7 +1518,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1778,7 +1543,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1787,7 +1552,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1812,7 +1577,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredOperand));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1836,7 +1601,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredOperand));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1860,7 +1625,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1869,7 +1634,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredValue));
                         SlangNVVMValueHandle_1 loweredOriginalValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1893,7 +1658,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1902,7 +1667,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1927,7 +1692,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1936,7 +1701,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1961,7 +1726,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1970,7 +1735,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1995,7 +1760,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -2004,7 +1769,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -2029,7 +1794,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -2038,7 +1803,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -2063,7 +1828,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredLeft));
                         SlangNVVMValueHandle_1 loweredRight = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -2072,7 +1837,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -2103,7 +1868,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 call->getArg(argumentIndex),
                                 valueMap,
-                                i32Type,
+                                typeContext,
                                 loweredArgument));
                             loweredArguments.add(loweredArgument);
                         }
@@ -2132,7 +1897,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredBasePointer));
                         SlangNVVMValueHandle_1 loweredElementOffset = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -2141,7 +1906,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredElementOffset));
                         SlangNVVMValueHandle_1 loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -2165,7 +1930,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredBasePointer));
                         SlangNVVMValueHandle_1 loweredElementIndex = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -2174,7 +1939,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredElementIndex));
                         SlangNVVMValueHandle_1 loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -2198,7 +1963,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(0),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredBuffer));
                         SlangNVVMValueHandle_1 loweredElementIndex = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -2207,7 +1972,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             inst->getOperand(1),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredElementIndex));
                         SlangNVVMValueHandle_1 loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -2240,7 +2005,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             returnInst->getVal(),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredValue));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
@@ -2273,7 +2038,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             ifElse->getCondition(),
                             valueMap,
-                            i32Type,
+                            typeContext,
                             loweredCondition));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
@@ -2316,7 +2081,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         moduleScope.module,
                         branch->getArg(phiParameterIndex),
                         valueMap,
-                        i32Type,
+                        typeContext,
                         loweredArgument));
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,

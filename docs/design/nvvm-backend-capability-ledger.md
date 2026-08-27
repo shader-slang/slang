@@ -456,3 +456,25 @@ and exact V2 absence fallback. The final Release prefix passes 192/192, includin
 PTX, every `ptxas` lane, and the RTX 5090 runtime matrix. Debug preservation passes 1/1 parser, 2/2
 routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime
 dispatch. The provider exports only V1/V2/V3 getters and has no process-visible LLVM dependency.
+
+Slice 29 changes type-lowering ownership without widening any capability bucket. One module-local
+`NVVMTypeLoweringContext` now maps exact canonical linked-IR types for entry/helper signatures,
+constants, phis, device pointers, fixed arrays, and the raw resource ABI. Exact `IRType*` entries
+reuse their provider handle. A separate representation key of canonical pointee plus LLVM address
+space lets read and read-write Slang pointers share one LLVM type while their qualifiers continue to
+govern preflight legality. No custom structural equivalence, alternate type spelling, or parallel
+semantic type tree is introduced.
+
+`nvvmSlangScalarFunctionsUseDirectPipeline` proves one `i32` construction across three function
+signatures, four parameters, a constant, operations, calls, and returns. Existing scalar-copy and
+fixed-array tests prove one AS1 pointer construction across distinct read/read-write qualifiers and
+one exact array construction/count. `nvvmSlangTypeCacheIsModuleLocal` compiles the same kernel into
+two provider modules and observes one void/i32/pointer construction per module, while the adjacent
+unsigned, wide, floating, aggregate, resource, layout, and conventional-global matrix retains
+E52017 before provider discovery. All semantic, PTX, `ptxas`, and runtime expectations in the rows
+above remain unchanged.
+
+The final Release NVVM prefix passes 193/193, including every real differential PTX, `ptxas`, and
+RTX 5090 runtime lane. Debug preservation passes 1/1 parser, 2/2 routing/hash, 1/1 unsupported
+boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch. The provider ABI and
+export surface are unchanged.
