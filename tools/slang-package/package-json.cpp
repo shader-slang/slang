@@ -411,6 +411,40 @@ static SlangResult _readWorkspace(
     return SLANG_OK;
 }
 
+static SlangResult _readExecutable(
+    JSONContainer* container,
+    const JSONValue& root,
+    ExecutableSettings& outExecutable,
+    String& outError)
+{
+    JSONValue executable = _find(container, root, "executable");
+    if (!executable.isValid())
+        return SLANG_OK;
+    if (executable.getKind() != JSONValue::Kind::Object)
+    {
+        outError = "Field 'executable' must be an object.";
+        return SLANG_FAIL;
+    }
+    for (auto pair : container->getObject(executable))
+    {
+        String key = container->getStringFromKey(pair.key);
+        if (key != "name")
+        {
+            outError = String("Unknown field in 'executable': ") + key;
+            return SLANG_FAIL;
+        }
+    }
+    SLANG_RETURN_ON_FAIL(
+        _readRequiredString(container, executable, "name", outExecutable.name, outError));
+    if (!isValidPackageName(outExecutable.name))
+    {
+        outError = String("Executable 'name' must be a filename without directory separators: ") +
+                   outExecutable.name;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String& outError)
 {
     outManifest = Manifest();
@@ -423,7 +457,8 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
     {
         String key = json.container->getStringFromKey(pair.key);
         if (key != "schema_version" && key != "name" && key != "exports" &&
-            key != "license_files" && key != "dependencies" && key != "workspace")
+            key != "license_files" && key != "dependencies" && key != "workspace" &&
+            key != "executable")
         {
             outError = String("Unknown field in slang-package.json: ") + key;
             return SLANG_FAIL;
@@ -454,6 +489,8 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
         _readDependencies(json.container, json.root, outManifest.dependencies, outError));
     SLANG_RETURN_ON_FAIL(
         _readWorkspace(json.container, json.root, outManifest.workspace, outError));
+    SLANG_RETURN_ON_FAIL(
+        _readExecutable(json.container, json.root, outManifest.executable, outError));
     return SLANG_OK;
 }
 
@@ -548,6 +585,15 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
             _writeKey(writer, "build");
             writer.addStringValue(manifest.workspace.buildDirectory.getUnownedSlice(), SourceLoc());
         }
+        writer.endObject(SourceLoc());
+    }
+    if (manifest.executable.name.getLength())
+    {
+        SLANG_RELEASE_ASSERT(isValidPackageName(manifest.executable.name));
+        _writeKey(writer, "executable");
+        writer.startObject(SourceLoc());
+        _writeKey(writer, "name");
+        writer.addStringValue(manifest.executable.name.getUnownedSlice(), SourceLoc());
         writer.endObject(SourceLoc());
     }
     writer.endObject(SourceLoc());

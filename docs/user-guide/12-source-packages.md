@@ -7,8 +7,8 @@ Slang Source Packages
 =====================
 
 The `slang package` command manages source dependencies stored in Git repositories. The short form
-`slang pkg` accepts the same commands. Package management does not change Slang's `import` syntax
-and does not build or distribute `.slang-module` files.
+`slang pkg` accepts the same commands. Package management does not change Slang's `import` syntax;
+its build command emits workspace `.slang-module` files and an optional native executable.
 
 A **package** is a directory with `slang-package.json`. Its name, exports, license files, and
 dependencies apply wherever that package appears in a graph, including as a Git pin or a path
@@ -54,6 +54,9 @@ The manifest declares the package and its source dependencies:
     "deps": "deps",
     "build": "build"
   },
+  "executable": {
+    "name": "my-shaders"
+  },
   "dependencies": {
     "noise": {
       "git": "https://github.com/example/slang-noise.git",
@@ -64,8 +67,8 @@ The manifest declares the package and its source dependencies:
 ```
 
 `schema_version` is the file format version and is currently `1`. `name`, `exports`, and
-`license_files` are also required. `dependencies` and `workspace` are optional. Package manifests
-allow JSON comments.
+`license_files` are also required. `dependencies`, `workspace`, and `executable` are optional.
+Package manifests allow JSON comments.
 
 `name` identifies the package throughout the dependency graph. `exports` lists relative source
 roots whose primary module paths become importable. Every path in `license_files` must name a
@@ -77,6 +80,11 @@ The `workspace` object is read only from the manifest that starts the solve. `de
 dependency source is materialized, and `build` contains generated workspace output. Their defaults
 are `deps/` and `build/`; `slang package init` writes those defaults explicitly. The same fields in
 a dependency's manifest do not affect the enclosing workspace.
+
+The optional root `executable` object requests a native host executable. Its `name` is a filename
+without directory separators; the package tool adds the platform executable suffix and writes the
+result at the root of `workspace.build`. Dependency manifests may declare this field, but only the
+workspace package controls executable generation.
 
 Dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package publishers must
 treat as immutable. The tag is the package's version; `schema_version` in `slang-package.json` is
@@ -225,19 +233,28 @@ Fetched package trees contain source only. Compilation output must be written ou
 because the same source commit can be compiled against different resolved dependency graphs.
 
 `slang package build` validates the materialized package graph and compiles every primary module in
-the workspace package to a front-end `.slang-module` under `workspace.build`, preserving its import
-path. For example, `src/acme/noise.slang` becomes `build/acme/noise.slang-module`. The same command
-copies every `.md` file below each materialized package's `docs/` directory to
+the workspace package to a front-end `.slang-module` under `workspace.build/modules`, preserving
+its import path. For example, `src/acme/noise.slang` becomes
+`build/modules/acme/noise.slang-module`.
+
+When `executable.name` is present, build also compiles the workspace primary whose import path is
+`main` (normally `src/main.slang`) with the host executable target and writes
+`build/<executable-name>` (plus `.exe` on Windows). The `main` function must use the native ABI,
+such as `export __extern_cpp int main()`, and a supported downstream C++ compiler must be
+available. Build copies the matching `slang-rt` shared library beside the executable so the
+artifact can locate its runtime support. Configuring an executable without a `main` primary is an
+error.
+
+The same command copies every `.md` file below each materialized package's `docs/` directory to
 `build/docs/<package-name>/`, preserving paths below `docs/`. Namespacing the output by package
 keeps files such as `docs/README.md` from different packages distinct. Other file types are not
 copied. Build also writes `build/docs/index.md`: the workspace dependency tree, then an
 alphabetized list of copied Markdown files per package. Every package in the graph is listed;
 only packages that contributed Markdown link from the tree into that file list.
 
-`slang package run` first builds the workspace and then invokes the sibling `slangi` executable on
-`build/main.slang-module`. The default is the primary whose import path is `main` (typically
-`src/main.slang`). A library package that has no `main` is not a `run` target. Arguments after
-`slang package run` are forwarded to the interpreted program.
+`slang package run` executes the existing native artifact named by `executable.name` and forwards
+all trailing arguments. It does not build first. Run fails with instructions when the manifest
+does not configure an executable or when `slang package build` has not produced that artifact.
 
 `slang package test` validates the materialized package graph and invokes the sibling `slang-test`
 executable on the workspace's `tests/` tree. Tests can use slang-test's `$dirname` substitution to

@@ -35,6 +35,13 @@ struct WorkspaceSettings
     String buildDirectory;
 };
 
+/// Root-only native executable output from `slang-package.json`. Dependency manifests may declare
+/// this field, but only the manifest that starts a build controls executable generation.
+struct ExecutableSettings
+{
+    String name;
+};
+
 struct Manifest
 {
     String name;
@@ -42,6 +49,7 @@ struct Manifest
     List<String> licenseFiles;
     List<Dependency> dependencies;
     WorkspaceSettings workspace;
+    ExecutableSettings executable;
 };
 
 inline String getWorkspaceDepsDirectory(const Manifest& manifest)

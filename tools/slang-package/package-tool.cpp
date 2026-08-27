@@ -3,6 +3,7 @@
 #include "package-tool.h"
 
 #include "core/slang-io.h"
+#include "core/slang-platform.h"
 #include "core/slang-process-util.h"
 #include "core/slang-string-util.h"
 #include "package-docs.h"
@@ -36,8 +37,8 @@ static void _printHelp()
         "  update [--clean] Re-resolve dependencies and update the lock file.\n"
         "  update --from-local [--clean]\n"
         "                   Resolve registered local package manifests into the lock.\n"
-        "  build            Compile workspace primaries and copy Markdown into build/docs.\n"
-        "  run [args...]    Build and run the workspace main module with slangi.\n"
+        "  build            Compile modules, an optional executable, and package docs.\n"
+        "  run [args...]    Run the executable produced by the last build.\n"
         "  test             Run slang-test on the workspace tests directory.\n"
         "  docs             Print the location of generated documentation (build/docs).\n"
         "  validate         Validate package structure and the locked dependency closure.\n"
@@ -749,12 +750,69 @@ static SlangResult _runStreamingSiblingTool(
     return SLANG_OK;
 }
 
+static String _getExecutableOutputPath(const String& projectRoot, const Manifest& manifest)
+{
+    return Path::combine(
+        projectRoot,
+        getWorkspaceBuildDirectory(manifest),
+        manifest.executable.name + Process::getExecutableSuffix());
+}
+
+/// Copy the Slang runtime beside a generated host executable so the executable's loader-relative
+/// runtime path remains valid outside the compiler installation.
+static SlangResult _deployExecutableRuntime(
+    const String& slangcPath,
+    const String& buildRoot,
+    String& outError)
+{
+    String binDirectory = Path::getParentDirectory(slangcPath);
+    String installRoot = Path::getParentDirectory(binDirectory);
+    List<String> searchDirectories;
+    searchDirectories.add(binDirectory);
+    searchDirectories.add(Path::combine(installRoot, "lib"));
+
+    for (const auto& directory : searchDirectories)
+    {
+        String runtimePath =
+            SharedLibrary::calcPlatformPath(Path::combine(directory, "slang-rt").getUnownedSlice());
+        if (!File::exists(runtimePath))
+            continue;
+
+        String canonicalRuntimePath;
+        if (SLANG_FAILED(Path::getCanonical(runtimePath, canonicalRuntimePath)))
+        {
+            outError = String("Cannot canonicalize the Slang runtime library: ") + runtimePath;
+            return SLANG_FAIL;
+        }
+        List<String> sourcePaths;
+        sourcePaths.add(canonicalRuntimePath);
+        if (Path::getFileName(runtimePath) != Path::getFileName(canonicalRuntimePath))
+            sourcePaths.add(runtimePath);
+        for (const auto& sourcePath : sourcePaths)
+        {
+            List<unsigned char> contents;
+            String destinationPath = Path::combine(buildRoot, Path::getFileName(sourcePath));
+            if (SLANG_FAILED(File::readAllBytes(sourcePath, contents)) ||
+                SLANG_FAILED(File::writeAllBytes(
+                    destinationPath,
+                    contents.getBuffer(),
+                    contents.getCount())))
+            {
+                outError = String("Cannot copy the Slang runtime library to: ") + destinationPath;
+                return SLANG_FAIL;
+            }
+        }
+        return SLANG_OK;
+    }
+
+    outError = String("Cannot find the Slang runtime library beside: ") + slangcPath;
+    return SLANG_FAIL;
+}
+
 /// Compile each workspace primary to a front-end `.slang-module`, preserving its import-relative
-/// path below the workspace build directory.
-static SlangResult _build(
-    const String& projectRoot,
-    String& outError,
-    List<PrimaryModule>* outPrimaryModules = nullptr)
+/// path below the workspace `build/modules` directory. When requested by the manifest, also compile
+/// the `main` primary to a native executable at the build root.
+static SlangResult _build(const String& projectRoot, String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
@@ -776,10 +834,25 @@ static SlangResult _build(
     String slangcPath;
     SLANG_RETURN_ON_FAIL(_findSiblingTool("slangc", slangcPath, outError));
 
-    String buildRoot = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest));
+    String mainSourcePath;
     for (const auto& module : primaryModules)
     {
-        String outputPath = Path::combine(buildRoot, module.importPath + ".slang-module");
+        if (module.importPath == "main")
+            mainSourcePath = module.sourcePath;
+    }
+    if (manifest.executable.name.getLength() && !mainSourcePath.getLength())
+    {
+        outError =
+            "The workspace configures an executable but does not export a primary module with "
+            "import path 'main'.";
+        return SLANG_FAIL;
+    }
+
+    String buildRoot = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest));
+    String modulesRoot = Path::combine(buildRoot, "modules");
+    for (const auto& module : primaryModules)
+    {
+        String outputPath = Path::combine(modulesRoot, module.importPath + ".slang-module");
         if (!Path::createDirectoryRecursive(Path::getParentDirectory(outputPath)))
         {
             outError = String("Cannot create module output directory for: ") + outputPath;
@@ -802,48 +875,64 @@ static SlangResult _build(
             return SLANG_FAIL;
         }
     }
-    if (outPrimaryModules)
-        *outPrimaryModules = primaryModules;
+    if (manifest.executable.name.getLength())
+    {
+        String executablePath = _getExecutableOutputPath(projectRoot, manifest);
+        if (!Path::createDirectoryRecursive(Path::getParentDirectory(executablePath)))
+        {
+            outError = String("Cannot create executable output directory for: ") + executablePath;
+            return SLANG_FAIL;
+        }
+        List<String> arguments;
+        arguments.add(mainSourcePath);
+        for (const auto& searchPath : searchPaths)
+        {
+            arguments.add("-I");
+            arguments.add(searchPath);
+        }
+        arguments.add("-target");
+        arguments.add("exe");
+        arguments.add("-o");
+        arguments.add(executablePath);
+        SLANG_RETURN_ON_FAIL(_runSiblingTool(slangcPath, arguments, outError));
+        if (!File::exists(executablePath))
+        {
+            outError = String("slangc did not produce the expected executable: ") + executablePath;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(_deployExecutableRuntime(slangcPath, buildRoot, outError));
+    }
     fprintf(stdout, "Built %lld module(s).\n", (long long)primaryModules.getCount());
     SLANG_RETURN_ON_FAIL(buildDocumentation(projectRoot, outError));
     return SLANG_OK;
 }
 
-/// Build and interpret the workspace module whose import path is `main`.
+/// Run the existing native executable configured by the workspace manifest.
 static SlangResult _run(
     const String& projectRoot,
     int argumentCount,
     const char* const* arguments,
     String& outError)
 {
-    List<PrimaryModule> primaryModules;
-    SLANG_RETURN_ON_FAIL(_build(projectRoot, outError, &primaryModules));
-    bool hasMainModule = false;
-    for (const auto& module : primaryModules)
-        hasMainModule = hasMainModule || module.importPath == "main";
-    if (!hasMainModule)
-    {
-        outError = "The workspace does not export a primary module with import path 'main'.";
-        return SLANG_FAIL;
-    }
-
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    String mainModule =
-        Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest), "main.slang-module");
-    if (!File::exists(mainModule))
+    if (!manifest.executable.name.getLength())
     {
-        outError = String("The build did not produce the expected main module: ") + mainModule;
+        outError = "The workspace does not configure an executable. Add 'executable.name' to "
+                   "slang-package.json and run 'slang package build'.";
         return SLANG_FAIL;
     }
-
-    String slangiPath;
-    SLANG_RETURN_ON_FAIL(_findSiblingTool("slangi", slangiPath, outError));
-    List<String> slangiArguments;
-    slangiArguments.add(mainModule);
+    String executablePath = _getExecutableOutputPath(projectRoot, manifest);
+    if (!File::exists(executablePath))
+    {
+        outError = String("The configured executable has not been built: ") + executablePath +
+                   ". Run 'slang package build'.";
+        return SLANG_FAIL;
+    }
+    List<String> executableArguments;
     for (Index i = 0; i < argumentCount; ++i)
-        slangiArguments.add(arguments[i]);
-    return _runStreamingSiblingTool(slangiPath, slangiArguments, outError);
+        executableArguments.add(arguments[i]);
+    return _runStreamingSiblingTool(executablePath, executableArguments, outError);
 }
 
 /// Validate the materialized workspace and run its `tests` tree through the sibling Slang test

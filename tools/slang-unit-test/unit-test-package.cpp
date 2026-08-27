@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "core/slang-io.h"
+#include "core/slang-process-util.h"
 #include "core/slang-string-util.h"
 #include "package-json.h"
 #include "package-lock.h"
@@ -86,20 +87,22 @@ SLANG_UNIT_TEST(PackageVersionConstraint)
 
 SLANG_UNIT_TEST(PackageManifestJSON)
 {
-    const String manifestText = "{\n"
-                                "  // Package manifests allow comments.\n"
-                                "  \"schema_version\": 1,\n"
-                                "  \"name\": \"root\",\n"
-                                "  \"exports\": [\"src\"],\n"
-                                "  \"license_files\": [\"LICENSE\"],\n"
-                                "  \"dependencies\": {\n"
-                                "    \"noise\": {\n"
-                                "      \"git\": \"https://example.com/noise.git\",\n"
-                                "      \"version\": \">=1.2.0 <2.0.0\"\n"
-                                "    }\n"
-                                "  },\n"
-                                "  \"workspace\": {\"deps\": \"third-party\", \"build\": \"out\"}\n"
-                                "}\n";
+    const String manifestText =
+        "{\n"
+        "  // Package manifests allow comments.\n"
+        "  \"schema_version\": 1,\n"
+        "  \"name\": \"root\",\n"
+        "  \"exports\": [\"src\"],\n"
+        "  \"license_files\": [\"LICENSE\"],\n"
+        "  \"dependencies\": {\n"
+        "    \"noise\": {\n"
+        "      \"git\": \"https://example.com/noise.git\",\n"
+        "      \"version\": \">=1.2.0 <2.0.0\"\n"
+        "    }\n"
+        "  },\n"
+        "  \"workspace\": {\"deps\": \"third-party\", \"build\": \"out\"},\n"
+        "  \"executable\": {\"name\": \"root-tool\"}\n"
+        "}\n";
 
     Manifest manifest;
     String error;
@@ -120,6 +123,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.dependencies[0].tag.getLength() == 0);
     SLANG_CHECK(manifest.workspace.depsDirectory == "third-party");
     SLANG_CHECK(manifest.workspace.buildDirectory == "out");
+    SLANG_CHECK(manifest.executable.name == "root-tool");
 
     const String taggedText = "{\n"
                               "  \"schema_version\": 1,\n"
@@ -249,6 +253,24 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"dependencies\":{},\"workspace\":{\"deps\":\"state/deps\",\"build\":\"state\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("nested-workspace.json", nestedWorkspaceText, manifest, error)));
+
+    const String invalidExecutableNameText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "\"LICENSE\"],\"dependencies\":{},\"executable\":{\"name\":\"bin/root\"}}";
+    SLANG_CHECK(SLANG_FAILED(readManifestText(
+        "invalid-executable-name.json",
+        invalidExecutableNameText,
+        manifest,
+        error)));
+
+    const String unknownExecutableFieldText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "\"LICENSE\"],\"dependencies\":{},\"executable\":{\"name\":\"root\",\"source\":\"main\"}}";
+    SLANG_CHECK(SLANG_FAILED(readManifestText(
+        "unknown-executable-field.json",
+        unknownExecutableFieldText,
+        manifest,
+        error)));
 }
 
 SLANG_UNIT_TEST(PackageLockRejectsUnknownFields)
@@ -405,9 +427,10 @@ SLANG_UNIT_TEST(PackageToolBuild)
     const char* buildArguments[] = {"slang-package", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/acme/noise.slang-module")));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/main.slang-module")));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/acme/noise/helper.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/modules/acme/noise.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/modules/main.slang-module")));
+    SLANG_CHECK(
+        !File::exists(Path::combine(temp.path, "out/modules/acme/noise/helper.slang-module")));
     String docsIndex;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::readAllText(Path::combine(temp.path, "out/docs/index.md"), docsIndex)));
@@ -433,6 +456,9 @@ SLANG_UNIT_TEST(PackageToolRun)
     String error;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    Manifest manifest;
+    String manifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
         Path::combine(temp.path, "src/library.slang"),
         "module library;\n"
@@ -441,16 +467,35 @@ SLANG_UNIT_TEST(PackageToolRun)
         Path::combine(temp.path, "src/main.slang"),
         "module main;\n"
         "import library;\n"
-        "int main(int argc, NativeString* argv) { return getValue() + (argc == 2 ? 0 : 1); }\n")));
+        "export __extern_cpp int main(int argc, Ptr<NativeString> argv)\n"
+        "{\n"
+        "    return getValue() + (argc == 2 ? 0 : 1);\n"
+        "}\n")));
 
     const char* runArguments[] = {"slang-package", "run", "argument"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/main.slang-module")));
-
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "src/main.slang"))));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not configure")) >= 0);
+
+    manifest.executable.name = "package-run-test";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has not been built")) >= 0);
+
+    const char* buildArguments[] = {"slang-package", "build"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+    String executablePath =
+        Path::combine(temp.path, String("build/package-run-test") + Process::getExecutableSuffix());
+    SLANG_CHECK(File::exists(executablePath));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/modules/main.slang-module")));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "src/main.slang"))));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not export")) >= 0);
 }
 
@@ -756,7 +801,7 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     const char* buildArguments[] = {"slang-package", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/main.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/modules/main.slang-module")));
     SLANG_CHECK(
         File::exists(Path::combine(Path::combine(temp.path, "build/docs", root.name), "guide.md")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/a/readme.md")));
