@@ -155,6 +155,13 @@ bool _getNVVMFloat32CompareInfo(IRInst* inst, NVVMFloat32CompareInfo& outInfo)
             "float32 unordered inequality",
         };
         return true;
+    case kIROp_Greater:
+        outInfo = {
+            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_GREATER_THAN,
+            SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_THAN,
+            "float32 ordered greater-than",
+        };
+        return true;
     default:
         return false;
     }
@@ -689,6 +696,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_Eql:
             case kIROp_Neq:
+            case kIROp_Greater:
                 {
                     NVVMFloat32CompareInfo info;
                     if (_getNVVMFloat32CompareInfo(inst, info))
@@ -701,26 +709,24 @@ SlangResult _validateNVVMFunction(
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
-                        inst->getOp() == kIROp_Eql ? toSlice("signed i32 equality")
-                                                   : toSlice("signed i32 inequality"));
+                        inst->getOp() == kIROp_Eql   ? toSlice("signed i32 equality")
+                        : inst->getOp() == kIROp_Neq ? toSlice("signed i32 inequality")
+                                                     : toSlice("signed i32 greater-than"));
                 }
-                _requireFeature(
-                    features,
-                    inst->getOp() == kIROp_Eql
-                        ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_EQUAL
-                        : SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NOT_EQUAL);
-                break;
-
-            case kIROp_Greater:
-                if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
+                switch (inst->getOp())
                 {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        toSlice("signed i32 greater-than"));
+                case kIROp_Eql:
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_EQUAL);
+                    break;
+                case kIROp_Neq:
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NOT_EQUAL);
+                    break;
+                default:
+                    _requireFeature(
+                        features,
+                        SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_THAN);
+                    break;
                 }
-                _requireFeature(
-                    features,
-                    SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_THAN);
                 break;
 
             case kIROp_Leq:
@@ -891,7 +897,6 @@ SlangResult _validateNVVMFunction(
             case kIROp_BitOr:
             case kIROp_BitXor:
             case kIROp_Less:
-            case kIROp_Greater:
             case kIROp_Leq:
             case kIROp_Geq:
                 SLANG_RETURN_ON_FAIL(_validateI32Value(
@@ -913,6 +918,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_Eql:
             case kIROp_Neq:
+            case kIROp_Greater:
                 {
                     NVVMFloat32CompareInfo info;
                     if (_getNVVMFloat32CompareInfo(inst, info))
@@ -1933,6 +1939,7 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_Eql:
                 case kIROp_Neq:
+                case kIROp_Greater:
                     {
                         SlangNVVMValueHandle_1 loweredLeft = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1968,53 +1975,29 @@ SlangResult emitNVVMIRFromLinkedIR(
                         }
                         else
                         {
+                            SlangNVVMIntegerCompareOp_3 operation =
+                                SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN;
+                            const char* diagnosticName = "signed i32 greater-than comparison";
+                            if (inst->getOp() == kIROp_Eql)
+                            {
+                                operation = SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL;
+                                diagnosticName = "signed i32 equality comparison";
+                            }
+                            else if (inst->getOp() == kIROp_Neq)
+                            {
+                                operation = SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL;
+                                diagnosticName = "signed i32 inequality comparison";
+                            }
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                inst->getOp() == kIROp_Eql ? "signed i32 equality comparison"
-                                                           : "signed i32 inequality comparison",
+                                diagnosticName,
                                 builder.emitIntegerCompare(
                                     moduleScope.module,
-                                    inst->getOp() == kIROp_Eql
-                                        ? SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL
-                                        : SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL,
+                                    operation,
                                     loweredLeft,
                                     loweredRight,
                                     loweredValue)));
                         }
-                        valueMap[inst] = loweredValue;
-                    }
-                    break;
-
-                case kIROp_Greater:
-                    {
-                        SlangNVVMValueHandle_1 loweredLeft = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(0),
-                            valueMap,
-                            typeContext,
-                            loweredLeft));
-                        SlangNVVMValueHandle_1 loweredRight = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(1),
-                            valueMap,
-                            typeContext,
-                            loweredRight));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "signed i32 greater-than comparison",
-                            builder.emitIntegerCompare(
-                                moduleScope.module,
-                                SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN,
-                                loweredLeft,
-                                loweredRight,
-                                loweredValue)));
                         valueMap[inst] = loweredValue;
                     }
                     break;

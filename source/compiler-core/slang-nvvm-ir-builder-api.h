@@ -641,7 +641,9 @@ extern "C"
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE ((SlangNVVMBuilderFeature_3)24u)
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL ((SlangNVVMBuilderFeature_3)25u)
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL ((SlangNVVMBuilderFeature_3)26u)
-#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 27u
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_GREATER_THAN \
+    ((SlangNVVMBuilderFeature_3)27u)
+#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 28u
 #define SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3 4u
 
     typedef struct SlangNVVMBuilderFeatureSet_3
@@ -719,6 +721,7 @@ extern "C"
     typedef uint32_t SlangNVVMFloatingCompareOp_3;
 #define SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL ((SlangNVVMFloatingCompareOp_3)0u)
 #define SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL ((SlangNVVMFloatingCompareOp_3)1u)
+#define SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_THAN ((SlangNVVMFloatingCompareOp_3)2u)
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitFloatingCompare_3)(
         SlangNVVMModuleHandle_1 module,

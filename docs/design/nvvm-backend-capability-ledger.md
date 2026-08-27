@@ -150,6 +150,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32NotEqualPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32NotEqualRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite, signed-zero, and quiet-NaN unordered-inequality cases | RTX 5090 results are `0` for `3.75 != 3.75` and `+0 != -0`, and `1` for `-8 != 0.5` and `NaN != NaN` | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32GreaterThanKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Existing generic floating-compare callback constructs exact unflagged LLVM `fcmp ogt` whose `i1` result selects zero/one stores | Both text dialects contain one ordered greater-than comparison, two aligned i32 stores, and no fast flag | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32GreaterThanUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical Bool `kIROp_Greater` with Float operands lowers through floating-compare operation 2 while signed-i32 greater-than remains unchanged | Exact original-order Float parameters feed the comparison and existing constant/phi/i32-store graph | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32GreaterThanDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 ordered greater-than compiles through both routes | `[64, 32, 32]`, token-safe float32 relation predicate, one global i32 store, no load/float arithmetic/integer predicate agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32GreaterThanPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32GreaterThanRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite, signed-zero, and quiet-NaN ordered greater-than cases | RTX 5090 results are `1` for `3.75 > 1.5`, and `0` for `-8 > 0.5`, `+0 > -0`, and `NaN > -1` | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -666,4 +672,18 @@ predicate; `ptxas` accepts both. RTX 5090 returns false for equal finite values 
 zeros, and true for unequal finite values and quiet NaNs. Focused tests pass 13/13 and Release passes
 249/249 with sorted-name SHA-256
 `529af4d3eba39ba0aabd6ca881ca3ac66b5f30c5f272c75a54a3b5cdc15156ea`; Debug preservation passes
+10/10.
+
+Slice 39 adds ordered float32 greater-than as feature 27/floating-compare operation 2 through the
+unchanged V3 table. Canonical Bool `kIROp_Greater` is classified by its Float operands and becomes
+unflagged LLVM `fcmp ogt` with original operand order; signed-i32 greater-than and adjacent
+float/pointer relations remain unchanged.
+
+The third comparison descriptor row and descriptor-driven feature negotiation add seven registered
+names with only 60 measured test/support lines, from 20,688 to 20,748. NVVM and NVRTC agree on
+`[64, 32, 32]`, token-safe float32 relation evidence, store/no-load/arithmetic/integer-predicate;
+`ptxas` accepts both. RTX 5090 returns true for `3.75 > 1.5` and false for unequal descending,
+signed-zero-equal, and quiet-NaN cases. Focused tests pass 14/14 and Release passes 256/256 with
+sorted-name SHA-256
+`f8b9a58433982e2583a7310c3e2bc43c82767adee115d121a13147783a8a6fcf`; Debug preservation passes
 10/10.
