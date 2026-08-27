@@ -1,4 +1,48 @@
 // slang-ir-thread-switch-on-constant-phi.cpp
+//
+// Classic jump-threading (a CFG optimization -- unrelated to GPU threads/lanes)
+// for a `switch` whose selector is proven constant on every incoming edge.
+//
+// Consider an `if/else-if` ladder that selects a constant integer tag, feeding a
+// later `switch`:
+//
+//     int selected;
+//     if      (target < c0) selected = 0;
+//     else if (target < c1) selected = 1;
+//     else                  selected = 2;
+//     switch (selected) { case 0: ...; case 1: ...; case 2: ...; }
+//
+// In SSA this lowers to a *chain* of single-parameter merge blocks: each nested
+// `if`'s merge block forwards the running tag one hop outward, ending at the
+// block whose terminator is the `switch` (the "switch header"). So the selector
+// is not a single N-predecessor phi but the tail of a forwarding chain:
+//
+//     A0: br H2(0)        // arm selecting 0
+//     A1: br H1(1)        // arm selecting 1
+//     H1(p1): br H2(p1)   // forwarding merge
+//     A2: br H2(2)        // arm selecting 2
+//     H2(p2): switch(p2) [case 0: C0, case 1: C1, case 2: C2] break: M
+//     C0: br M(r0)   C1: br M(r1)   C2: br M(r2)
+//     M(result): ...continuation...
+//
+// Because each arm proves exactly one case, the runtime `switch` is redundant.
+// The key observation is that the "fused" spelling (dispatching concretely in
+// each arm) has the *same chain topology* carrying the case result instead of
+// the tag. So this pass re-uses the existing chain rather than cloning anything:
+// it splices each case body into the arm that proves its tag and re-types the
+// chain to forward results. After the rewrite the example above becomes
+//
+//     A0: br C0    A1: br C1    A2: br C2   // arms enter case bodies directly
+//     C0: br H2(r0)   C1: br H2(r1)   C2: br H2(r2)
+//     H1(p1): br H2(p1)   // now forwards a result
+//     H2(p2): br M(p2)    // switch replaced by a plain branch
+//     M(result): ...continuation...
+//
+// which the later CFG cleanup collapses to the fused shape. The transform is
+// decomposed as prove-then-apply: `tryPlanSwitchThreading` mutates nothing and
+// assembles a plan only if every safety gate passes; `applySwitchThreading`
+// commits it. Any un-provable shape is left untouched (a bail is a missed
+// optimization, never a miscompile).
 #include "slang-ir-thread-switch-on-constant-phi.h"
 
 #include "slang-ir-dce.h"
@@ -12,8 +56,13 @@
 namespace Slang
 {
 
-// Bound the analysis so a pathological function cannot cause an unbounded walk.
+// Cap a switch's case count: past this many arms the missed optimization is not
+// worth the walk, and it bounds the per-switch work.
 static const UInt kMaxThreadableCases = 64;
+// Cap the number of phi-chain blocks walked backward from the switch header, so
+// a pathological (e.g. cyclic-looking) forwarding graph cannot drive an
+// unbounded walk. Independent of the case count: a chain can be longer than the
+// number of arms when several forwarding hops separate arms.
 static const Index kMaxChainBlocks = 128;
 
 // Return `block`'s terminator only if it is a plain unconditional branch.
@@ -56,9 +105,15 @@ static bool isUsedAsStructuralLabel(
 // The single parameter of a "forwarding" phi merge, together with the branch
 // that forwards it. A forwarding merge has one parameter whose only role is to
 // pass one hop toward the switch header: its terminator is a plain branch that
-// passes exactly that parameter, and the parameter has no other consumer. This
-// is the shape an `if/else-if` ladder selecting a constant tag lowers to in SSA
-// -- each nested `if`'s merge block forwards the running tag value outward.
+// passes exactly that parameter. This is the shape an `if/else-if` ladder
+// selecting a constant tag lowers to in SSA -- each nested `if`'s merge block
+// forwards the running tag value outward.
+//
+// `asForwardingMerge` establishes the structural clauses (single param, pure
+// forwarder, terminator passes the param). The remaining clause -- that the
+// param has *no other consumer* -- is enforced separately by the caller via
+// `paramIsUsedOnlyBy`, because whether an extra use is disqualifying depends on
+// which use is allowed (the forwarding branch here, the switch for the header).
 struct ForwardingMerge
 {
     IRParam* param = nullptr;
@@ -106,8 +161,11 @@ static IRParam* getSelectorPhi(IRSwitch* switchInst, IRBlock* headerBlock)
 }
 
 // Find the case block a `switch` routes a given integer constant to, or the
-// default block when no case matches. Returns null if any case value is not an
-// integer literal (so we cannot reason about coverage).
+// default block (with `outIsDefault = true`) when no case matches. Returns null
+// -- the "switch is unanalyzable" channel, distinct from the not-found/default
+// result -- if it encounters a non-integer-literal case value while searching,
+// since coverage cannot then be reasoned about. (A matching value returns
+// early, so case values *after* the match are not inspected.)
 static IRBlock* findCaseBlockForValue(
     IRSwitch* switchInst,
     IRIntegerValue value,
@@ -136,6 +194,15 @@ static bool isThreadableCaseBlock(IRBlock* caseBlock, IRBlock* mergeBlock, IRSwi
     // Sole predecessor must be the switch itself, and the case block must not
     // double as any structured-region label (which `getPredecessors()` would not
     // reveal), so re-routing a selecting arm into it cannot corrupt a region.
+    //
+    // This rejects `kIROp_IfElse` as well as loops/switches -- stricter than the
+    // header/chain checks, which allow `IfElse`. The asymmetry is deliberate: a
+    // chain block is *expected* to be the merge/after-block of the `if/else`
+    // cascade, so an `IfElse` label there is its normal role. A case block, by
+    // contrast, gains a new predecessor (the redirected arm); if it also labeled
+    // an `if/else` region (as its true/false/after block) that region's single
+    // structured entry would be violated, so any structural-label use disqualifies
+    // it.
     if (caseBlock->getPredecessors().getCount() != 1)
         return false;
     if (isUsedAsStructuralLabel(caseBlock, ownSwitch, {kIROp_Loop, kIROp_IfElse, kIROp_Switch}))
@@ -196,10 +263,11 @@ static bool asForwardingMerge(IRBlock* block, ForwardingMerge& out)
     return true;
 }
 
-// Verify that `param`'s only use is `allowedUse` (the branch arg or switch
-// condition that legitimately consumes the running tag). Any other consumer
-// means the tag escapes the chain and threading would drop a live value.
-static bool paramHasOnlyUse(IRParam* param, IRInst* allowedUser)
+// Verify that the only inst using `param` is `allowedUser` (the forwarding
+// branch or switch condition that legitimately consumes the running tag);
+// `allowedUser` may hold more than one use. Any *other* user means the tag
+// escapes the chain and threading would drop a live value.
+static bool paramIsUsedOnlyBy(IRParam* param, IRInst* allowedUser)
 {
     for (auto use = param->firstUse; use; use = use->nextUse)
     {
@@ -259,7 +327,7 @@ static bool tryPlanSwitchThreading(IRSwitch* switchInst, SwitchThreadingPlan& pl
     plan.chainBlocks.add(headerBlock);
 
     // The header's selector param may only be consumed by the switch condition.
-    if (!paramHasOnlyUse(selectorParam, switchInst))
+    if (!paramIsUsedOnlyBy(selectorParam, switchInst))
         return false;
 
     for (Index wi = 0; wi < workList.getCount(); ++wi)
@@ -269,9 +337,12 @@ static bool tryPlanSwitchThreading(IRSwitch* switchInst, SwitchThreadingPlan& pl
         auto param = block->getFirstParam();
         if (!param || param->getNextParam())
             return false;
+        // `param` is `block`'s own first parameter, so it is always present in
+        // the block: the index is 0 here and never negative. Assert the invariant
+        // rather than silently bailing, so a future change that breaks it is
+        // caught instead of quietly declining to optimize.
         int paramIndex = getParamIndexInBlock(param);
-        if (paramIndex < 0)
-            return false;
+        SLANG_ASSERT(paramIndex >= 0);
 
         for (auto pred : block->getPredecessors())
         {
@@ -327,7 +398,7 @@ static bool tryPlanSwitchThreading(IRSwitch* switchInst, SwitchThreadingPlan& pl
                     return false;
                 if (fm.param != forwardedParam)
                     return false;
-                if (!paramHasOnlyUse(forwardedParam, fm.forwardBranch))
+                if (!paramIsUsedOnlyBy(forwardedParam, fm.forwardBranch))
                     return false;
                 if (!visited.contains(forwardedBlock))
                 {
@@ -387,7 +458,7 @@ static bool tryPlanSwitchThreading(IRSwitch* switchInst, SwitchThreadingPlan& pl
             auto user = use->getUser();
             if (user == switchInst)
                 continue;
-            auto userBlock = as<IRBlock>(getInstInBlock(user)->getParent());
+            auto userBlock = getBlock(user);
             if (userBlock == headerBlock || userBlock == deadDefaultBlock)
                 continue;
             return false;

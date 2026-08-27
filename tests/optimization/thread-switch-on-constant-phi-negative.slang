@@ -31,6 +31,27 @@
 //TEST:SIMPLE(filecheck=NODEF): -target spirv-asm -entry noDefaultMain -stage compute -emit-spirv-directly -O3
 // NODEF-NOT: OpSwitch
 
+// The selector IS a per-edge constant, but the tag is also read after the switch,
+// so the selector phi has a consumer besides the switch. Threading would drop
+// that live use, so the escaping-use gate (`paramIsUsedOnlyBy`) must fire and the
+// switch must survive.
+//TEST:SIMPLE(filecheck=ESCAPE): -target spirv-asm -entry escapingSelectorMain -stage compute -emit-spirv-directly -O3
+// ESCAPE: OpSwitch
+
+// One arm supplies a per-edge constant that matches no case and routes to a real
+// `default`. Threading requires every reaching value to hit a real case (so the
+// switch becomes fully dead); a surviving default edge keeps it live, so the
+// default-edge gate (`isDefault`) must fire and the switch must survive.
+//TEST:SIMPLE(filecheck=DEFEDGE): -target spirv-asm -entry defaultEdgeMain -stage compute -emit-spirv-directly -O3
+// DEFEDGE: OpSwitch
+
+// The switch produces two live results (two variables assigned per case, both
+// read afterward), so its common merge carries two phi parameters. The apply
+// step only retypes/forwards a single result, so the multi-result-merge gate
+// (`mergeParam->getNextParam()`) must fire and the switch must survive.
+//TEST:SIMPLE(filecheck=MULTIRES): -target spirv-asm -entry multiResultMain -stage compute -emit-spirv-directly -O3
+// MULTIRES: OpSwitch
+
 // End-to-end correctness on the CPU target for the loop-break and defaultless
 // shapes below.
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
@@ -73,8 +94,14 @@ int dispatchLoopBreak(int start, int n)
     return r;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
+
+// Distinct float inputs (not compile-time constant) that select different arms
+// of the three decline shapes, so the CPU correctness checks below exercise more
+// than the first case.
+//TEST_INPUT:ubuffer(data=[0.5 0.9 0.9], stride=4):name=xvals
+StructuredBuffer<float> xvals;
 
 // A switch with no explicit default that the pass threads: checked for numeric
 // correctness so a rewrite that mis-routed the selected case's result would
@@ -114,6 +141,69 @@ int dispatchHeaderSideEffect(float x)
     return r;
 }
 
+// Per-edge-constant selector that is ALSO read after the switch, so the selector
+// phi has a consumer besides the switch condition. Threading would drop that
+// live use, so the escaping-use gate must decline and the switch must survive.
+int dispatchEscapingSelector(float x)
+{
+    int selected;
+    if (x < 0.3) selected = 0;
+    else if (x < 0.6) selected = 1;
+    else selected = 2;
+
+    int r = 0;
+    switch (selected)
+    {
+    case 0: r = 100; break;
+    case 1: r = 200; break;
+    case 2: r = 300; break;
+    }
+    return r + selected; // `selected` escapes the phi chain
+}
+
+// One arm selects the constant 5, which matches no case and routes to a real
+// `default`. Threading needs every reaching value to hit a real case (so the
+// switch becomes fully dead); the default edge keeps it live, so the pass must
+// decline and the switch must survive.
+int dispatchDefaultEdge(float x)
+{
+    int selected;
+    if (x < 0.3) selected = 0;
+    else if (x < 0.6) selected = 1;
+    else selected = 5; // matches no case -> default
+
+    int r = 0;
+    switch (selected)
+    {
+    case 0: r = 100; break;
+    case 1: r = 200; break;
+    default: r = 999; break;
+    }
+    return r;
+}
+
+// Two independent results assigned per case and both read after the switch, so
+// its common merge block carries two phi parameters. The rewrite only retypes
+// and forwards a single result, so the multi-result-merge gate must decline and
+// the switch must survive.
+int dispatchMultiResult(float x)
+{
+    int selected;
+    if (x < 0.3) selected = 0;
+    else if (x < 0.6) selected = 1;
+    else selected = 2;
+
+    int a = 0;
+    int b = 0;
+    switch (selected)
+    {
+    case 0: a = 10; b = 1; break;
+    case 1: a = 20; b = 2; break;
+    case 2: a = 30; b = 3; break;
+    }
+    return a * 100 + b;
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void runtimeSelectorMain(uint3 tid : SV_DispatchThreadID)
@@ -144,6 +234,27 @@ void noDefaultMain(uint3 tid : SV_DispatchThreadID)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
+void escapingSelectorMain(uint3 tid : SV_DispatchThreadID)
+{
+    outputBuffer[tid.x] = dispatchEscapingSelector(vals[tid.x]);
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void defaultEdgeMain(uint3 tid : SV_DispatchThreadID)
+{
+    outputBuffer[tid.x] = dispatchDefaultEdge(vals[tid.x]);
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void multiResultMain(uint3 tid : SV_DispatchThreadID)
+{
+    outputBuffer[tid.x] = dispatchMultiResult(vals[tid.x]);
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     // selectors = [7, 9, 3, 5].
@@ -162,4 +273,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // vals[0]==0.0 -> sel=0 -> 100. A source-level defaultless switch, threaded.
     // CHECK: 100
     outputBuffer[4] = dispatchNoDefault(vals[0]);
+    // The three decline shapes still compute correctly with the switch left in
+    // place. xvals = [0.5, 0.9, 0.9].
+    // xvals[0]==0.5 -> selected=1 -> r=200, +selected=1 -> 201.
+    // CHECK: 201
+    outputBuffer[5] = dispatchEscapingSelector(xvals[0]);
+    // xvals[1]==0.9 -> selected=5 (no case) -> default -> 999.
+    // CHECK: 999
+    outputBuffer[6] = dispatchDefaultEdge(xvals[1]);
+    // xvals[2]==0.9 -> selected=2 -> a=30,b=3 -> 30*100+3 = 3003.
+    // CHECK: 3003
+    outputBuffer[7] = dispatchMultiResult(xvals[2]);
 }

@@ -1821,7 +1821,10 @@ Result linkAndOptimizeIR(
 
     // Must run after SSA construction (so the switch selector is a phi) and
     // before any target-specific structured-CFG legalization (so the rewritten
-    // CFG is what those passes consume).
+    // CFG is what those passes consume). Registered outside the branch above so
+    // it runs at every optimization level: at `-O0` the selector is made a phi
+    // by the SCCP + DCE step, at higher levels by `simplifyIR`. When the
+    // selector is not yet a phi the pass finds nothing to thread and is a no-op.
     SLANG_PASS(threadSwitchOnConstantPhi);
 
     // Report checkpointing information.

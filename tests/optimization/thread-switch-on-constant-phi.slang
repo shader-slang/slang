@@ -14,6 +14,20 @@
 // The fused control form never had one.
 // FUSED-NOT: OpSwitch
 
+// CUDA/PTX is a co-equal motivating target in #12792 (the reporter measured
+// +10,232 PTX bytes for the split form), so pin the same dispatch-reduction on
+// the CUDA backend: the threaded split form must emit no `switch` statement,
+// matching the fused control. (A non-threadable selector still emits `switch(`
+// -- see the negative test's runtimeSelectorMain -- so this is not vacuous. The
+// `#line` directives naming this file use `switch-`, not `switch(`, so they do
+// not trip the check.) These need no GPU: the CUDA text is emitted on the host.
+//TEST:SIMPLE(filecheck=CUDASPLIT): -target cuda -entry splitMain -stage compute -O3
+//TEST:SIMPLE(filecheck=CUDAFUSED): -target cuda -entry fusedMain -stage compute -O3
+
+// CUDASPLIT-NOT: switch(
+
+// CUDAFUSED-NOT: switch(
+
 // Also run the threaded (split) path end to end and check it still computes the
 // same values as the fused control -- so a rewrite that wires a case to the
 // wrong result would fail here even though no OpSwitch survives. The -O3 variant
