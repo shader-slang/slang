@@ -2275,6 +2275,37 @@ LF-terminated name set has SHA-256
 `5358536da56531d08b93bd3e2f55d25d3d8cc42a21e461b3a905b1425a1f1fc4`; removing the seven Slice
 41 names reproduces Slice 40's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 42 exact scalar float32 ordered less-than
+
+Slice 42 adds `*destination = left < right ? 1 : 0` for two scalar Float parameters and the raw
+AS1 `Ptr<int>` destination. Canonical Bool `kIROp_Less` with Float operands maps directly to
+feature 30 and operation 5, `ORDERED_LESS_THAN`; signed-i32 less-than remains on its original
+`SCALAR_CONTROL_FLOW` feature and integer operation. No operand reversal, complement, or
+alternative comparison representation is introduced.
+
+The operation reuses `emitFloatingCompare`, leaving V3 at 480 bytes on x64 and 288 bytes on x86.
+The facade adds one comparison-family suffix predicate and maps the operation to its independent
+feature. The provider applies its existing validation before unflagged `CreateFCmpOLT`; generic
+LLVM and negotiated NVVM-2.0 text each contain exactly one `fcmp olt float`. Orderedness makes the
+result false when either operand is a quiet NaN.
+
+The sixth and final scalar comparison descriptor row drives every established layer. Seven
+independently registered names add 50 physical lines across the five measured test/support files,
+from 20,841 to 20,891. Combining signed and floating `kIROp_Less` around the closed classifier also
+removes the original duplicated direct-emission block while retaining its integer feature mapping.
+
+Direct topology remains `[Pointer, Float, Float]` and preserves original parameter order. NVVM and
+NVRTC agree on `[64, 32, 32]`, a token-safe float32 relation predicate family, one global i32 store,
+and no global load, float arithmetic, or integer predicate. PTX may spell the result as direct
+ordered less-than or the complement of unordered greater-equal; CUDA 12.9 `ptxas` accepts both
+outputs. On the RTX 5090, both routes return one for `1.5 < 3.75`, and zero for `0.5 < -8`,
+`+0 < -0`, and quiet `NaN < 1`.
+
+The focused matrix passes 14/14 and the Release NVVM prefix passes 277/277. Its exact sorted
+LF-terminated name set has SHA-256
+`a34a5cdb1532603a18290777a75fe23ea9407f5d294e1d9a1a739ea6b9187ae6`; removing the seven Slice
+42 names reproduces Slice 41's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -3011,8 +3042,8 @@ The following remain open until their named slice supplies evidence:
 - external/indirect calls, richer helper ABI, and scalar operations beyond the established
   signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, bitwise-XOR, bitwise-NOT,
   arithmetic-negate and comparison family, plus scalar float32 add, subtract, multiply, divide,
-  negate, ordered equality, unordered inequality, ordered greater-than, ordered
-  less-than-or-equal, and ordered greater-than-or-equal;
+  negate, ordered equality, unordered inequality, ordered greater-than, ordered less-than,
+  ordered less-than-or-equal, and ordered greater-than-or-equal;
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;

@@ -238,6 +238,7 @@ NVVM_FLOAT32_COMPARISON_DIRECT_TEST(nvvmSlangFloat32LessEqualUsesDirectPipeline,
 NVVM_FLOAT32_COMPARISON_DIRECT_TEST(
     nvvmSlangFloat32GreaterEqualUsesDirectPipeline,
     OrderedGreaterEqual)
+NVVM_FLOAT32_COMPARISON_DIRECT_TEST(nvvmSlangFloat32LessThanUsesDirectPipeline, OrderedLessThan)
 
 #undef NVVM_FLOAT32_COMPARISON_DIRECT_TEST
 
@@ -390,6 +391,9 @@ NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
 NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
     nvvmSlangNegotiatesFloat32GreaterEqualCapability,
     OrderedGreaterEqual)
+NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
+    nvvmSlangNegotiatesFloat32LessThanCapability,
+    OrderedLessThan)
 
 #undef NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST
 
