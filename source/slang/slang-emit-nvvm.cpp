@@ -583,6 +583,16 @@ SlangResult _validateNVVMFunction(
                 _requireCapability(capability, NVVMIRCapability::ScalarIntegerBitXor);
                 break;
 
+            case kIROp_BitNot:
+                if (inst->getOperandCount() != 1 || !_isI32Type(inst->getDataType()))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("signed i32 bitwise NOT"));
+                }
+                _requireCapability(capability, NVVMIRCapability::ScalarIntegerBitNot);
+                break;
+
             case kIROp_Less:
                 if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 comparison"));
@@ -698,6 +708,17 @@ SlangResult _validateNVVMFunction(
                 SLANG_RETURN_ON_FAIL(_validateI32Value(
                     codeGenContext,
                     inst->getOperand(1),
+                    inst,
+                    availableValues,
+                    dominatorTree,
+                    capability));
+                availableValues.add(inst);
+                break;
+
+            case kIROp_BitNot:
+                SLANG_RETURN_ON_FAIL(_validateI32Value(
+                    codeGenContext,
+                    inst->getOperand(0),
                     inst,
                     availableValues,
                     dominatorTree,
@@ -1558,6 +1579,29 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 loweredLeft,
                                 loweredRight,
+                                loweredValue)));
+                        valueMap[inst] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_BitNot:
+                    {
+                        SlangNVVMValueHandle_1 loweredOperand = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(0),
+                            valueMap,
+                            i32Type,
+                            loweredOperand));
+                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "signed i32 bitwise NOT",
+                            builder.emitIntegerBitNot(
+                                moduleScope.module,
+                                loweredOperand,
                                 loweredValue)));
                         valueMap[inst] = loweredValue;
                     }

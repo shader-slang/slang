@@ -179,20 +179,26 @@ static bool _isValueUsableAtInsertionPoint(
     return dominatorTree.dominates(instruction, insertionBlock);
 }
 
-// Validates the common ownership and type contract before integer instruction creation.
+// Checks whether a scalar integer value is usable at the current insertion point.
+static bool _isIntegerValueUsableAtInsertionPoint(
+    ModuleState* state,
+    llvm::BasicBlock* insertionBlock,
+    llvm::Value* value)
+{
+    return _isValueUsableAtInsertionPoint(state, insertionBlock, value) &&
+           llvm::isa<llvm::IntegerType>(value->getType());
+}
+
+// Validates the common ownership and type contract before binary integer instruction creation.
 static bool _areMatchingIntegerValues(
     ModuleState* state,
     llvm::BasicBlock* insertionBlock,
     llvm::Value* left,
     llvm::Value* right)
 {
-    if (!_isValueUsableAtInsertionPoint(state, insertionBlock, left) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, right) ||
-        left->getType() != right->getType())
-    {
-        return false;
-    }
-    return llvm::isa<llvm::IntegerType>(left->getType());
+    return _isIntegerValueUsableAtInsertionPoint(state, insertionBlock, left) &&
+           _isIntegerValueUsableAtInsertionPoint(state, insertionBlock, right) &&
+           left->getType() == right->getType();
 }
 
 // Checks that every block has its final CFG successors before edge dominance is queried.
@@ -624,6 +630,28 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBitXor(
     }
 
     llvm::Value* result = state->builder.CreateXor(llvmLeft, llvmRight);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitIntegerBitNot(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmValue = _getValue(value);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!outValue || !insertionBlock ||
+        !_isIntegerValueUsableAtInsertionPoint(state, insertionBlock, llvmValue))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* result = state->builder.CreateNot(llvmValue);
     *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
     return SLANG_OK;
 }
@@ -1177,6 +1205,7 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitIntegerBitAnd = _emitIntegerBitAnd;
     api.emitIntegerBitOr = _emitIntegerBitOr;
     api.emitIntegerBitXor = _emitIntegerBitXor;
+    api.emitIntegerBitNot = _emitIntegerBitNot;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);
