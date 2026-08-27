@@ -966,6 +966,65 @@ bitwise OR, XOR, or NOT; shifts or logical operations; unsigned, narrow, wide, v
 aggregate bitwise values; or any new ABI, pointer, storage, resource, builtin, atomic, wave, or
 libdevice capability.
 
+### Slice 14 signed-i32 bitwise OR
+
+Consider this example:
+
+```slang
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int x,
+    uniform int y)
+{
+    *destination = x | y;
+}
+```
+
+The front end resolves `|` as `BuiltinOperationKind::BitOr`, and ordinary IR lowering constructs
+exact `kIROp_BitOr`. After the established CUDA passes and `simplifyIR`, the final entry signature
+is `Func(Void, Ptr(Int,RW,UserPointer,DefaultLayout), Int, Int)`. Its body retains one canonical,
+two-operand signed-i32 `kIROp_BitOr`; the kernel parameters are its operands, and its result feeds
+the established device-pointer store. Preflight validates both operands through the existing
+signed-i32 availability and dominance rules, then records the result in the canonical value set and
+provider-value map. It does not accept `kIROp_ConstexprBitOr` or logical `kIROp_Or` as fallbacks or
+reconstruct source syntax.
+
+The private V2 provider table appends one dedicated operation:
+
+```text
+emitIntegerBitOr(module, left, right, outValue)
+```
+
+The operation does not widen either `SlangNVVMIntegerBinaryOp_2`, whose ADD/SUB domain is frozen,
+or the dedicated bitwise-AND callable. A dedicated terminal field negotiates and dispatches
+bitwise OR atomically while preserving the exact contracts of all earlier providers.
+
+The complete V2 table is 288 bytes on the 64-bit build. The exact 280-byte Slice 13 prefix and every
+older minimum remain frozen and compatible for their established programs. Sizes 281 through 287
+inside the new function pointer, or a complete prefix with a null operation, are malformed;
+future-larger tables remain compatible and are clamped to the host's known 288-byte capacity. A
+bitwise-OR program presented to an exact Slice 13 provider reaches E52016 after discovery but
+before module creation or libNVVM use. The host reports `scalar-integer-bit-or=0|1` in the builder
+identity and clears output handles before dispatch and after a failed or success-without-handle
+provider call.
+
+At the LLVM boundary, the provider requires a live module, a non-null output, and a current
+unterminated insertion block belonging to that module. Both operands must be scalar LLVM integers
+of exactly the same type, have valid module, context, and function ownership for their value kind,
+and be available at the insertion point under the established same-block ordering and cross-block
+dominance rules. All validation precedes the sole mutation, `IRBuilder::CreateOr`. LLVM integer
+types are signless; the Slang preflight boundary owns the exact signed-i32 policy.
+
+This boundary is only exact two-operand signed-i32 bitwise OR over already-supported parameters,
+constants, phis, calls, multiplication results, bitwise-AND results, and other signed-i32
+producers. It does not add bitwise XOR or NOT; shifts or logical operations; unsigned, narrow,
+wide, vector, matrix, or aggregate bitwise values; or any new ABI, pointer, storage, resource,
+builtin, atomic, wave, or libdevice capability. Differential PTX evidence requires matching
+`[64, 32, 32]` parameter widths, a token-boundary `or.b32` instruction that cannot be mistaken for
+the suffix of `xor.b32`, and an entry-scoped global i32 store; it does not require textual PTX
+equality.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -1057,10 +1116,11 @@ The program advances through bounded slices:
 12. signed-i32 multiplication;
 13. signed-i32 bitwise AND;
 14. signed-i32 bitwise OR;
-15. libdevice and floating-point policy;
-16. atomics and wave operations;
-17. resources and optimization-quality work; and
-18. advanced capabilities and production-readiness evaluation.
+15. signed-i32 bitwise XOR;
+16. libdevice and floating-point policy;
+17. atomics and wave operations;
+18. resources and optimization-quality work; and
+19. advanced capabilities and production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -1083,9 +1143,9 @@ roadmap: exact fixed signed-i32 arrays behind device entry-point pointers and th
 address spaces. Slice 12 then completes the smallest remaining canonical integer-expression
 boundary: exact two-operand signed-i32 multiplication, without widening the frozen ADD/SUB ABI or
 claiming other integer, floating-point, vector, or matrix operations. Slice 13 applies the same
-dedicated-operation pattern to exact signed-i32 bitwise AND. Bitwise OR remains the next bounded
-canonical scalar operation for Slice 14; XOR, shifts, and the other richer scalar policies remain
-separate decisions.
+dedicated-operation pattern to exact signed-i32 bitwise AND, and Slice 14 applies it to exact
+signed-i32 bitwise OR. Bitwise XOR remains the next bounded canonical scalar operation for Slice
+15; NOT, shifts, and the other richer scalar policies remain separate decisions.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -1267,6 +1327,22 @@ plus the expected global i32 store. CUDA 12.9 `ptxas` accepted both outputs. On 
 runtime lanes produced `0x18` for `0x5a & 0x3c`, `0x12345678` for `-1 & 0x12345678`, `-4` for
 `-2 & -4`, and `0` for `0 & -1`. The final complete focused NVVM prefix passed 92/92.
 
+Later on 2026-08-27, Slice 14 built the Release LLVM 14.0.6 provider and Debug host. The verified
+provider fixture emitted exactly one `or i32` whose result feeds the established address-space-1
+store, and the fake direct-route graph proved that the two scalar parameters are the exact left and
+right operands and that the bitwise-OR result is the stored value. Negotiation retained the exact
+280-byte Slice 13 prefix for bitwise-AND programs, rejected every partial size from 281 through 287
+bytes and a null complete operation, accepted and clamped future-larger tables, and sanitized
+failed outputs. Invalid module, output, integer type, function, availability, dominance, and
+insertion-point shapes were rejected before mutation.
+
+Direct NVVM and NVRTC exposed matching `[64, 32, 32]` parameter widths and each showed token-safe
+`or.b32` plus the expected global i32 store. CUDA 12.9 `ptxas` accepted both outputs. On the RTX
+5090, both runtime lanes produced `0x7e` for `0x5a | 0x3c`, `-13` for `-16 | 3`, `-1` for
+`0 | -1`, and `0x5f5f5f5f` for `0x55555555 | 0x0f0f0f0f`. After correcting the prior Slice 13
+test to distinguish its frozen prefix from the now-larger full table, the complete focused NVVM
+prefix passed 100/100.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -1329,6 +1405,15 @@ construction. These claims do not include `kIROp_ConstexprBitAnd`, bitwise OR/XO
 logical operations, other integer widths or signedness, vectors, matrices, aggregates, or new ABI
 and storage shapes.
 
+Slice 14 settles canonical two-operand `kIROp_BitOr` lowering for signed-i32 values already
+available through the established scalar program structure. It settles the dedicated append-only
+`emitIntegerBitOr` provider operation, exact 280-byte Slice 13 compatibility, a 288-byte complete
+x64 prefix, pre-mutation equal-integer-type and ownership/dominance validation, and the division of
+responsibility in which Slang owns signed-i32 policy while LLVM owns signless `CreateOr`
+construction. These claims do not include `kIROp_ConstexprBitOr`, logical `kIROp_Or`, bitwise
+XOR/NOT, shifts, other integer widths or signedness, vectors, matrices, aggregates, or new ABI and
+storage shapes.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
@@ -1337,7 +1422,7 @@ The following remain open until their named slice supplies evidence:
 - conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
   pointers;
 - external/indirect calls, richer helper ABI, and scalar operations beyond the established
-  signed-i32 add, subtract, multiply, bitwise-AND, and less-than subset;
+  signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, and less-than subset;
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;

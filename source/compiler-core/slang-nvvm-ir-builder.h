@@ -55,6 +55,8 @@ public:
     bool supportsScalarIntegerMultiply() const;
     /// Returns whether the provider advertised the complete Slice 13 integer-bit-AND prefix.
     bool supportsScalarIntegerBitAnd() const;
+    /// Returns whether the provider advertised the complete Slice 14 integer-bit-OR prefix.
+    bool supportsScalarIntegerBitOr() const;
     /// Returns the provider identity that affects generated bitcode and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -223,6 +225,13 @@ public:
 
     /// Emits bitwise AND for same-typed scalar integer values.
     SlangResult emitIntegerBitAnd(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits bitwise OR for same-typed scalar integer values.
+    SlangResult emitIntegerBitOr(
         SlangNVVMModuleHandle_1 module,
         SlangNVVMValueHandle_1 left,
         SlangNVVMValueHandle_1 right,

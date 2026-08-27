@@ -20,9 +20,10 @@ enum class NVVMIRCapability
     ScalarArrayAddressing,
     ScalarIntegerMultiply,
     ScalarIntegerBitAnd,
+    ScalarIntegerBitOr,
 };
 
-/// Checks whether linked Slang IR is in the exact signed-i32-bitwise-AND subset owned by Slice 13.
+/// Checks whether linked Slang IR is in the exact signed-i32-bitwise-OR subset owned by Slice 14.
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
