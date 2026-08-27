@@ -381,6 +381,15 @@ extern "C"
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1* outValue);
 
+    /// Emits inequality for same-module scalar integer operands of identical type.
+    /// The result is i1. Both operands must be available at the current unterminated insertion
+    /// point. On failure, the output value is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerNotEqual_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -438,6 +447,8 @@ extern "C"
         SlangNVVMSerializeModuleWithDiagnostics_2 serializeNVVMIR20AssemblyWithDiagnostics;
 
         SlangNVVMEmitIntegerEqual_2 emitIntegerEqual;
+
+        SlangNVVMEmitIntegerNotEqual_2 emitIntegerNotEqual;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -514,6 +525,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_EQUAL_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerEqual) +       \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerEqual))
+
+    // This Slice 22 prefix is one coherent scalar-integer-inequality capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NOT_EQUAL_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerNotEqual) +        \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerNotEqual))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

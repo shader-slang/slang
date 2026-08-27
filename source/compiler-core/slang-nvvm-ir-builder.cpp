@@ -135,6 +135,13 @@ static bool _supportsScalarIntegerEqual(const SlangNVVMBuilderAPI_V2& api)
            api.emitIntegerEqual;
 }
 
+// Treats the appended Slice 22 field as one coherent scalar-integer-inequality capability.
+static bool _supportsScalarIntegerNotEqual(const SlangNVVMBuilderAPI_V2& api)
+{
+    return api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NOT_EQUAL_MIN_SIZE &&
+           api.emitIntegerNotEqual;
+}
+
 // Rejects success without a required handle and never exposes a handle from a failed provider call.
 template<typename T>
 static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
@@ -253,6 +260,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     const bool hasPartialScalarIntegerEqualPrefix =
         api.structureSize > SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE &&
         api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_EQUAL_MIN_SIZE;
+    const bool hasPartialScalarIntegerNotEqualPrefix =
+        api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_EQUAL_MIN_SIZE &&
+        api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NOT_EQUAL_MIN_SIZE;
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE || hasPartialScalarPrefix ||
         hasPartialScalarControlFlowPrefix || hasPartialScalarSSAPrefix ||
         hasPartialScalarFunctionPrefix || hasPartialScalarPointerArithmeticPrefix ||
@@ -260,8 +270,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         hasPartialScalarIntegerBitAndPrefix || hasPartialScalarIntegerBitOrPrefix ||
         hasPartialScalarIntegerBitXorPrefix || hasPartialScalarIntegerBitNotPrefix ||
         hasPartialScalarIntegerNegatePrefix || hasPartialRelaxedGlobalI32AtomicAddPrefix ||
-        hasPartialScalarIntegerEqualPrefix || api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 ||
-        !_isCompatibleV1(api.baseAPI) || !api.serializeModuleWithDiagnostics ||
+        hasPartialScalarIntegerEqualPrefix || hasPartialScalarIntegerNotEqualPrefix ||
+        api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
+        !api.serializeModuleWithDiagnostics ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
          !_supportsScalarOperations(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE &&
@@ -289,7 +300,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE &&
          !_supportsRelaxedGlobalI32AtomicAdd(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_EQUAL_MIN_SIZE &&
-         !_supportsScalarIntegerEqual(api)))
+         !_supportsScalarIntegerEqual(api)) ||
+        (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NOT_EQUAL_MIN_SIZE &&
+         !_supportsScalarIntegerNotEqual(api)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -384,6 +397,11 @@ bool NVVMIRBuilder::supportsScalarIntegerEqual() const
     return _supportsScalarIntegerEqual(m_apiV2);
 }
 
+bool NVVMIRBuilder::supportsScalarIntegerNotEqual() const
+{
+    return _supportsScalarIntegerNotEqual(m_apiV2);
+}
+
 String NVVMIRBuilder::getVersionString() const
 {
     if (!isInitialized())
@@ -412,7 +430,9 @@ String NVVMIRBuilder::getVersionString() const
             << ";scalar-integer-negate=" << (supportsScalarIntegerNegate() ? 1 : 0)
             << ";nvvm-ir-2.0-assembly=" << (supportsNVVMIR20Assembly() ? 1 : 0)
             << ";relaxed-global-i32-atomic-add=" << (supportsRelaxedGlobalI32AtomicAdd() ? 1 : 0)
-            << ";scalar-integer-equal=" << (supportsScalarIntegerEqual() ? 1 : 0) << ";timestamp="
+            << ";scalar-integer-equal=" << (supportsScalarIntegerEqual() ? 1 : 0)
+            << ";scalar-integer-not-equal=" << (supportsScalarIntegerNotEqual() ? 1 : 0)
+            << ";timestamp="
             << SharedLibraryUtils::getSharedLibraryTimestamp(
                    reinterpret_cast<void*>(m_api.createModule));
     return builder.produceString();
@@ -867,6 +887,21 @@ SlangResult NVVMIRBuilder::emitIntegerEqual(
     if (!supportsScalarIntegerEqual())
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result = m_apiV2.emitIntegerEqual(module, left, right, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitIntegerNotEqual(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarIntegerNotEqual())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result = m_apiV2.emitIntegerNotEqual(module, left, right, &outValue);
     return _validateHandleResult(result, outValue);
 }
 

@@ -69,6 +69,8 @@ public:
     bool supportsRelaxedGlobalI32AtomicAdd() const;
     /// Returns whether the provider advertised the complete Slice 21 integer-equality prefix.
     bool supportsScalarIntegerEqual() const;
+    /// Returns whether the provider advertised the complete Slice 22 integer-inequality prefix.
+    bool supportsScalarIntegerNotEqual() const;
     /// Returns the provider identity that affects generated IR and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -277,6 +279,13 @@ public:
 
     /// Emits scalar integer equality and returns an i1 value.
     SlangResult emitIntegerEqual(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits scalar integer inequality and returns an i1 value.
+    SlangResult emitIntegerNotEqual(
         SlangNVVMModuleHandle_1 module,
         SlangNVVMValueHandle_1 left,
         SlangNVVMValueHandle_1 right,
