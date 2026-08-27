@@ -1533,6 +1533,12 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // Fill in default matrix layout into matrix types that left layout unspecified. This must
+    // run after specializeModule: generic bodies cloned lazily from imported modules mint
+    // matrix types with unspecified layout, which would otherwise survive to emit and clash
+    // with their explicit-layout duplicates (fails spirv-val).
+    SLANG_PASS(specializeMatrixLayout, targetProgram);
+
     if (requiredLoweringPassSet.higherOrderFunc)
     {
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
@@ -1564,12 +1570,6 @@ Result linkAndOptimizeIR(
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     SLANG_PASS(finalizeSpecialization);
-
-    // Fill in default matrix layout into matrix types that left layout unspecified. This runs
-    // after specialization so matrix types minted from lazily imported generics are covered.
-    // Safe to defer: no earlier pass reads matrix layout; its consumers (buffer-element
-    // lowering, legalization, emit) all run later.
-    SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
