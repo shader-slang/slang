@@ -19,6 +19,9 @@ struct P
         Texture2D.Handle                t;
 };
 
+// p1 is intentionally unused. Frontend layout accounts for its parameter space when reserving
+// bindlessSpaceIndex before DCE (shader-slang/slang#9870); the reflection check above verifies
+// that index. REPRO adds p2, but these compute variants do not exercise a live bindless heap.
 ParameterBlock<P> p1;
 
 #if defined(REPRO)
@@ -30,5 +33,7 @@ ParameterBlock<P> p2;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
-    gOutput[tid] = gInput[tid] + p1.t.Load(int3(0,0,0)).x * gOutput[tid];
+    // Nothing is bound to p1.t, so it must not be dereferenced: loading an unbound bindless
+    // descriptor is UB under Vulkan (SIGSEGV on lavapipe).
+    gOutput[tid] = gInput[tid];
 }

@@ -16,7 +16,11 @@ RWStructuredBuffer<float> gOutput;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
+    // These handles are constructed but never dereferenced: constructing them is the
+    // implicit bindless use this test exercises, but nothing is bound to the slots, and
+    // reading an unbound descriptor is UB under Vulkan (SIGSEGV on lavapipe). They do not
+    // affect the "bindlessSpaceIndex" reservation, which the target implies on its own.
     Texture2D<float4> texture = DescriptorHandle<Texture2D<float4>>(uint2(tid, 0));
     SamplerState sampler = DescriptorHandle<SamplerState>(uint2(tid, 0));
-    gOutput[tid] = gInput[tid] + texture.Sample(sampler, float2(0.f,0.f)).x * gOutput[tid];
+    gOutput[tid] = gInput[tid];
 }
