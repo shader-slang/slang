@@ -34,6 +34,9 @@ SlangResult getRepositoryHeadCommit(
     String& outCommit,
     String& outError);
 
+/// Return the configured URL for the repository's `origin` remote.
+SlangResult getRepositoryOrigin(const String& repositoryPath, String& outOrigin, String& outError);
+
 SlangResult materializeRevision(
     const String& workingDirectory,
     const String& gitURL,

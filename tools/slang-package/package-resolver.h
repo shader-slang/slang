@@ -37,6 +37,7 @@ class IPackageResolverSource
 public:
     virtual ~IPackageResolverSource() {}
 
+    /// Return release candidates in descending semantic-version order.
     virtual SlangResult listReleaseTags(
         const String& packageName,
         const String& git,

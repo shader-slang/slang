@@ -273,6 +273,60 @@ private:
         return true;
     }
 
+    const Exclusion* findExclusion(const String& packageName, const SemanticVersion& version) const
+    {
+        for (const auto& exclusion : rootManifest->workspace.exclusions)
+        {
+            if (exclusion.packageName == packageName &&
+                matchesVersionPolicy(exclusion.version, version))
+            {
+                return &exclusion;
+            }
+        }
+        return nullptr;
+    }
+
+    static const Retraction* findRetraction(
+        const List<Retraction>& retractions,
+        const SemanticVersion& version)
+    {
+        for (const auto& retraction : retractions)
+        {
+            if (matchesVersionPolicy(retraction.version, version))
+                return &retraction;
+        }
+        return nullptr;
+    }
+
+    /// Read publisher retractions from the highest release, independently of the workspace's
+    /// version constraint. Local edit and override candidates are explicit developer choices and
+    /// do not participate in remote retraction discovery.
+    SlangResult loadPublisherRetractions(
+        const ResolutionPackage& package,
+        const List<TagCandidate>& candidates,
+        List<Retraction>& outRetractions,
+        String& outError)
+    {
+        outRetractions.clear();
+        const TagCandidate* highestRelease = nullptr;
+        for (const auto& candidate : candidates)
+        {
+            if (!candidate.path.getLength())
+            {
+                highestRelease = &candidate;
+                break;
+            }
+        }
+        if (!highestRelease)
+            return SLANG_OK;
+
+        ResolvedManifest latestManifest;
+        SLANG_RETURN_ON_FAIL(
+            loadCandidateManifest(package, *highestRelease, latestManifest, outError));
+        outRetractions = latestManifest.manifest.retractions;
+        return SLANG_OK;
+    }
+
     void removeGitRequirementsFromOwner(const String& owner)
     {
         // Path selection of `owner`'s package retracts every Git constraint that representation
@@ -668,11 +722,31 @@ private:
         List<TagCandidate> candidates;
         SLANG_RETURN_ON_FAIL(
             source->listReleaseTags(unresolved.name, unresolved.git, candidates, outError));
+        List<Retraction> retractions;
+        SLANG_RETURN_ON_FAIL(
+            loadPublisherRetractions(unresolved, candidates, retractions, outError));
         String lastCandidateError;
         for (const auto& candidate : candidates)
         {
             if (!candidate.path.getLength() && !matchesAll(unresolved, candidate.version))
                 continue;
+            if (!candidate.path.getLength())
+            {
+                if (const Exclusion* exclusion = findExclusion(unresolved.name, candidate.version))
+                {
+                    addWarning(
+                        String("Workspace excludes package '") + unresolved.name + "' release " +
+                        candidate.tag + ": " + exclusion->reason);
+                    continue;
+                }
+                if (const Retraction* retraction = findRetraction(retractions, candidate.version))
+                {
+                    addWarning(
+                        String("Package '") + unresolved.name + "' retracts release " +
+                        candidate.tag + ": " + retraction->reason);
+                    continue;
+                }
+            }
             if (++candidateAttemptCount > kMaxCandidateAttempts)
             {
                 outError = "Dependency resolution exceeds the candidate-attempt limit.";

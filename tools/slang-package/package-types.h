@@ -27,19 +27,44 @@ struct Dependency
     String tag;
 };
 
+/// Publisher-authored advice to avoid selecting releases matching `version`.
+///
+/// The resolver reads these entries from the highest release tag. Existing locks remain valid, but
+/// a later `update` skips retracted candidates.
+struct Retraction
+{
+    String version;
+    String reason;
+};
+
+/// Workspace-authored policy that prevents selecting matching releases of `packageName`.
+struct Exclusion
+{
+    String packageName;
+    String version;
+    String reason;
+};
+
 /// Root-only workspace layout from `slang-package.json`. Dependency manifests may contain these
 /// fields, but only the manifest that starts resolution controls materialization and output.
 struct WorkspaceSettings
 {
     String depsDirectory;
     String buildDirectory;
+    List<Exclusion> exclusions;
 };
 
-/// Root-only native executable output from `slang-package.json`. Dependency manifests may declare
-/// this field, but only the manifest that starts a build controls executable generation.
-struct ExecutableSettings
+/// Root-only native host output from `slang-package.json`. Dependency manifests may declare
+/// this field, but only the workspace that starts a build produces executables.
+///
+/// Each entry in `executables` is both the output filename (without a platform suffix) and the
+/// stem of a workspace primary: `video-preview` requires an exported `video-preview.slang`.
+/// `defaultExecutable` is the artifact `slang package run` executes when no executable name is
+/// given.
+struct HostSettings
 {
-    String name;
+    List<String> executables;
+    String defaultExecutable;
 };
 
 struct Manifest
@@ -48,9 +73,25 @@ struct Manifest
     List<String> exports;
     List<String> licenseFiles;
     List<Dependency> dependencies;
+    List<Retraction> retractions;
     WorkspaceSettings workspace;
-    ExecutableSettings executable;
+    HostSettings host;
 };
+
+inline bool hasHostExecutables(const Manifest& manifest)
+{
+    return manifest.host.executables.getCount() != 0;
+}
+
+inline bool isHostExecutableName(const Manifest& manifest, const String& name)
+{
+    for (const auto& executable : manifest.host.executables)
+    {
+        if (executable == name)
+            return true;
+    }
+    return false;
+}
 
 inline String getWorkspaceDepsDirectory(const Manifest& manifest)
 {
@@ -150,6 +191,9 @@ struct VersionConstraint
 
     bool matches(const SemanticVersion& version) const;
 };
+
+/// Return whether a release version matches a validated policy constraint.
+bool matchesVersionPolicy(const String& constraintText, const SemanticVersion& version);
 
 struct TagCandidate
 {

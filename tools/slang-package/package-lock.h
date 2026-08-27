@@ -41,6 +41,10 @@ SlangResult requireAllLockPackagesTrusted(
     const List<bool>& trusted,
     String& outError);
 
+/// Append human-readable lines describing how `next` differs from `previous`.
+/// Pass a null `previous` when no lock exists yet.
+void describeLockDiff(const LockFile* previous, const LockFile& next, List<String>& outLines);
+
 } // namespace PackageTool
 } // namespace Slang
 

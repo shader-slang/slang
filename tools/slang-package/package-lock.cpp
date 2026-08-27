@@ -184,5 +184,117 @@ SlangResult requireAllLockPackagesTrusted(
     return SLANG_OK;
 }
 
+static bool _dependenciesEqual(const List<Dependency>& left, const List<Dependency>& right)
+{
+    if (left.getCount() != right.getCount())
+        return false;
+    for (const auto& dependency : left)
+    {
+        bool found = false;
+        for (const auto& other : right)
+        {
+            if (dependency.name == other.name && dependency.git == other.git &&
+                dependency.path == other.path && dependency.version == other.version &&
+                dependency.tag == other.tag)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            return false;
+    }
+    return true;
+}
+
+static bool _stringSetsEqual(const List<String>& left, const List<String>& right)
+{
+    if (left.getCount() != right.getCount())
+        return false;
+    for (const auto& value : left)
+    {
+        if (!right.contains(value))
+            return false;
+    }
+    return true;
+}
+
+static bool _lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right)
+{
+    return left.name == right.name && left.git == right.git && left.tag == right.tag &&
+           left.commit == right.commit && left.path == right.path &&
+           _stringSetsEqual(left.exports, right.exports) &&
+           _dependenciesEqual(left.dependencies, right.dependencies);
+}
+
+static String _describeLockedPackage(const LockedPackage& package)
+{
+    if (isLocalOverrideLockedPackage(package))
+        return package.git + " via " + package.path;
+    if (isPathOnlyLockedPackage(package))
+        return String("path ") + package.path;
+    String description = package.git;
+    if (package.tag.getLength())
+        description = description + " " + package.tag;
+    if (package.commit.getLength())
+        description = description + " (" + package.commit + ")";
+    return description;
+}
+
+static void _addSortedUniqueName(List<String>& names, const String& name)
+{
+    for (Index i = 0; i < names.getCount(); ++i)
+    {
+        if (names[i] == name)
+            return;
+        if (names[i] > name)
+        {
+            names.insert(i, name);
+            return;
+        }
+    }
+    names.add(name);
+}
+
+void describeLockDiff(const LockFile* previous, const LockFile& next, List<String>& outLines)
+{
+    outLines.clear();
+    List<String> names;
+    if (previous)
+    {
+        for (const auto& package : previous->packages)
+            _addSortedUniqueName(names, package.name);
+    }
+    for (const auto& package : next.packages)
+        _addSortedUniqueName(names, package.name);
+
+    for (const auto& name : names)
+    {
+        Index previousIndex = previous ? findLockedPackageIndex(*previous, name) : -1;
+        Index nextIndex = findLockedPackageIndex(next, name);
+        if (previousIndex < 0)
+        {
+            outLines.add(
+                String("Would add '") + name + "' as " +
+                _describeLockedPackage(next.packages[nextIndex]));
+            continue;
+        }
+        if (nextIndex < 0)
+        {
+            outLines.add(
+                String("Would remove '") + name + "' (" +
+                _describeLockedPackage(previous->packages[previousIndex]) + ")");
+            continue;
+        }
+        const LockedPackage& before = previous->packages[previousIndex];
+        const LockedPackage& after = next.packages[nextIndex];
+        if (_lockedPackagesEqual(before, after))
+            continue;
+        outLines.add(
+            String("Would change '") + name + "' from " + _describeLockedPackage(before) + " to " +
+            _describeLockedPackage(after));
+    }
+}
+
 } // namespace PackageTool
 } // namespace Slang

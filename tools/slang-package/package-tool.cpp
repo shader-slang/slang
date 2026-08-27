@@ -34,13 +34,15 @@ static void _printHelp()
         "Commands:\n"
         "  init             Create a package manifest and standard directories.\n"
         "  fetch [--clean]  Materialize dependencies from the lock file.\n"
-        "  update [--clean] Re-resolve dependencies and update the lock file.\n"
-        "  update --from-local [--clean]\n"
-        "                   Resolve registered local package manifests into the lock.\n"
-        "  build            Compile modules, an optional executable, and package docs.\n"
-        "  run [args...]    Run the executable produced by the last build.\n"
+        "  update [--from-local] [--clean] [--dry-run]\n"
+        "                   Re-resolve dependencies and update the lock file.\n"
+        "                   --from-local uses registered local package manifests.\n"
+        "                   --dry-run reports lock changes without writing them.\n"
+        "  build            Compile modules, optional host executables, and package docs.\n"
+        "  run [name] [args...]  Run a host executable produced by the last build.\n"
         "  test             Run slang-test on the workspace tests directory.\n"
         "  docs             Print the location of generated documentation (build/docs).\n"
+        "  status           Check lock, local state, materialized packages, and checkouts.\n"
         "  validate         Validate package structure and the locked dependency closure.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
         "  unedit <name>    Return an unchanged checkout to tool ownership.\n"
@@ -220,11 +222,38 @@ static SlangResult _readProjectLock(const String& projectRoot, LockFile& outLock
 ///
 /// Each lock entry stores the dependency requirements from the manifest that produced it. This
 /// lets fetch validate both Git and local package graphs without rediscovering metadata.
+static SlangResult _validateLockExclusions(
+    const Manifest& manifest,
+    const LockFile& lock,
+    String& outError)
+{
+    for (const auto& exclusion : manifest.workspace.exclusions)
+    {
+        Index packageIndex = findLockedPackageIndex(lock, exclusion.packageName);
+        if (packageIndex < 0)
+            continue;
+        const LockedPackage& package = lock.packages[packageIndex];
+        if (package.path.getLength())
+            continue;
+        SemanticVersion version;
+        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(parseReleaseTag(package.tag, version)));
+        if (matchesVersionPolicy(exclusion.version, version))
+        {
+            outError = String("Locked package '") + package.name + "' release " + package.tag +
+                       " is excluded by the workspace: " + exclusion.reason +
+                       ". Run 'slang package update'.";
+            return SLANG_FAIL;
+        }
+    }
+    return SLANG_OK;
+}
+
 static SlangResult _validateLockAgainstManifest(
     const Manifest& manifest,
     const LockFile& lock,
     String& outError)
 {
+    SLANG_RETURN_ON_FAIL(_validateLockExclusions(manifest, lock, outError));
     List<bool> reachablePackages;
     reachablePackages.setCount(lock.packages.getCount());
     for (auto& reachable : reachablePackages)
@@ -531,6 +560,7 @@ static SlangResult _update(
     const String& projectRoot,
     bool fromLocal,
     bool allowClean,
+    bool dryRun,
     String& outError)
 {
     Manifest manifest;
@@ -570,6 +600,23 @@ static SlangResult _update(
         SLANG_RETURN_ON_FAIL(resolveDependencies(projectRoot, manifest, lock, outError, &warnings));
     }
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
+    for (const auto& warning : warnings)
+        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+    if (dryRun)
+    {
+        List<String> changes;
+        describeLockDiff(previousLockPtr, lock, changes);
+        if (changes.getCount() == 0)
+            fprintf(stdout, "Dry run: no lock changes.\n");
+        else
+        {
+            fprintf(stdout, "Dry run: would update slang-package-lock.json:\n");
+            for (const auto& change : changes)
+                fprintf(stdout, "  %s\n", change.getBuffer());
+        }
+        fprintf(stdout, "Dry run: lock and dependency checkouts were not modified.\n");
+        return SLANG_OK;
+    }
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
     SLANG_RETURN_ON_FAIL(_materialize(
         projectRoot,
@@ -583,8 +630,6 @@ static SlangResult _update(
         _validateMaterializedManifests(projectRoot, manifest, lock, localPackages, outError));
     SLANG_RETURN_ON_FAIL(writeLockFile(lockPath, lock, outError));
     SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, manifest, lock, localPackages, outError));
-    for (const auto& warning : warnings)
-        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     if (fromLocal)
     {
         fprintf(
@@ -602,6 +647,95 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     fprintf(stdout, "Package and locked dependencies are valid.\n");
+    return SLANG_OK;
+}
+
+/// Report whether committed resolution, local package state, and materialized checkouts agree.
+static SlangResult _status(const String& projectRoot, String& outError)
+{
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
+
+    String lockPath = Path::combine(projectRoot, kLockName);
+    if (!File::exists(lockPath))
+    {
+        outError =
+            "Workspace has no slang-package-lock.json. Run 'slang package update' to create it.";
+        return SLANG_FAIL;
+    }
+    LockFile lock;
+    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
+
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
+    SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
+    if (SLANG_FAILED(
+            _validateMaterializedManifests(projectRoot, manifest, lock, localPackages, outError)))
+    {
+        outError = outError +
+                   " Run 'slang package fetch' if packages are missing, or 'slang package update' "
+                   "if a path-package manifest changed.";
+        return SLANG_FAIL;
+    }
+
+    Index cleanCheckoutCount = 0;
+    for (const auto& package : lock.packages)
+    {
+        Index localIndex = findLocalPackageIndex(localPackages, package.name);
+        if (localIndex >= 0 || package.path.getLength())
+            continue;
+        String packageRoot =
+            Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest), package.name);
+        String origin;
+        SLANG_RETURN_ON_FAIL(getRepositoryOrigin(packageRoot, origin, outError));
+        if (origin != package.git)
+        {
+            outError = String("Package checkout '") + package.name +
+                       "' has a different Git origin. Run 'slang package fetch --clean' to "
+                       "restore it.";
+            return SLANG_FAIL;
+        }
+        bool isSafe = false;
+        SLANG_RETURN_ON_FAIL(
+            isWorkingTreeSafeToRemove(packageRoot, package.commit, isSafe, outError));
+        if (!isSafe)
+        {
+            outError = String("Package checkout '") + package.name +
+                       "' has changed files, commits, or stashes. Run 'slang package edit " +
+                       package.name +
+                       "' to keep the work, or 'slang package fetch --clean' to discard it.";
+            return SLANG_FAIL;
+        }
+        ++cleanCheckoutCount;
+    }
+
+    fprintf(
+        stdout,
+        "Package '%s': lock is current with %lld package(s).\n",
+        manifest.name.getBuffer(),
+        (long long)lock.packages.getCount());
+    if (localPackages.getCount() == 0)
+    {
+        fprintf(stdout, "Local package state: none.\n");
+    }
+    else
+    {
+        fprintf(stdout, "Local package state:\n");
+        for (const auto& package : localPackages)
+        {
+            fprintf(
+                stdout,
+                "  %s: %s at %s\n",
+                package.name.getBuffer(),
+                isEditedLocalPackage(package) ? "edit" : "override",
+                package.path.getBuffer());
+        }
+    }
+    fprintf(
+        stdout,
+        "Materialized graph is valid; %lld tool-owned Git checkout(s) are clean.\n",
+        (long long)cleanCheckoutCount);
     return SLANG_OK;
 }
 
@@ -750,12 +884,49 @@ static SlangResult _runStreamingSiblingTool(
     return SLANG_OK;
 }
 
-static String _getExecutableOutputPath(const String& projectRoot, const Manifest& manifest)
+static String _getExecutableOutputPath(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const String& executableName)
 {
     return Path::combine(
         projectRoot,
         getWorkspaceBuildDirectory(manifest),
-        manifest.executable.name + Process::getExecutableSuffix());
+        executableName + Process::getExecutableSuffix());
+}
+
+/// Locate the workspace primary whose source filename stem matches a host executable name.
+static SlangResult _findHostExecutableSource(
+    const Manifest& manifest,
+    const List<PrimaryModule>& primaryModules,
+    const String& executableName,
+    String& outSourcePath,
+    String& outError)
+{
+    const PrimaryModule* match = nullptr;
+    for (const auto& module : primaryModules)
+    {
+        if (module.packageName != manifest.name)
+            continue;
+        if (Path::getFileNameWithoutExt(module.sourcePath) != executableName)
+            continue;
+        if (match)
+        {
+            outError = String("Host executable '") + executableName +
+                       "' matches more than one workspace primary.";
+            return SLANG_FAIL;
+        }
+        match = &module;
+    }
+    if (!match)
+    {
+        outError = String("The workspace configures host executable '") + executableName +
+                   "' but does not export a primary whose filename is '" + executableName +
+                   ".slang'.";
+        return SLANG_FAIL;
+    }
+    outSourcePath = match->sourcePath;
+    return SLANG_OK;
 }
 
 /// Copy the Slang runtime beside a generated host executable so the executable's loader-relative
@@ -811,7 +982,8 @@ static SlangResult _deployExecutableRuntime(
 
 /// Compile every primary in the resolved package graph to a front-end `.slang-module`, preserving
 /// its import-relative path below the workspace `build/modules` directory. When requested by the
-/// manifest, also compile the workspace's `main` primary to a native executable at the build root.
+/// workspace `host` section, also compile each listed executable primary to a native artifact at
+/// the build root.
 static SlangResult _build(const String& projectRoot, String& outError)
 {
     Manifest manifest;
@@ -834,18 +1006,17 @@ static SlangResult _build(const String& projectRoot, String& outError)
     String slangcPath;
     SLANG_RETURN_ON_FAIL(_findSiblingTool("slangc", slangcPath, outError));
 
-    String mainSourcePath;
-    for (const auto& module : primaryModules)
+    List<String> executableSources;
+    for (const auto& executableName : manifest.host.executables)
     {
-        if (module.packageName == manifest.name && module.importPath == "main")
-            mainSourcePath = module.sourcePath;
-    }
-    if (manifest.executable.name.getLength() && !mainSourcePath.getLength())
-    {
-        outError =
-            "The workspace configures an executable but does not export a primary module with "
-            "import path 'main'.";
-        return SLANG_FAIL;
+        String sourcePath;
+        SLANG_RETURN_ON_FAIL(_findHostExecutableSource(
+            manifest,
+            primaryModules,
+            executableName,
+            sourcePath,
+            outError));
+        executableSources.add(sourcePath);
     }
 
     String buildRoot = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest));
@@ -875,30 +1046,36 @@ static SlangResult _build(const String& projectRoot, String& outError)
             return SLANG_FAIL;
         }
     }
-    if (manifest.executable.name.getLength())
+    if (manifest.host.executables.getCount())
     {
-        String executablePath = _getExecutableOutputPath(projectRoot, manifest);
-        if (!Path::createDirectoryRecursive(Path::getParentDirectory(executablePath)))
+        for (Index i = 0; i < manifest.host.executables.getCount(); ++i)
         {
-            outError = String("Cannot create executable output directory for: ") + executablePath;
-            return SLANG_FAIL;
-        }
-        List<String> arguments;
-        arguments.add(mainSourcePath);
-        for (const auto& searchPath : searchPaths)
-        {
-            arguments.add("-I");
-            arguments.add(searchPath);
-        }
-        arguments.add("-target");
-        arguments.add("exe");
-        arguments.add("-o");
-        arguments.add(executablePath);
-        SLANG_RETURN_ON_FAIL(_runSiblingTool(slangcPath, arguments, outError));
-        if (!File::exists(executablePath))
-        {
-            outError = String("slangc did not produce the expected executable: ") + executablePath;
-            return SLANG_FAIL;
+            String executablePath =
+                _getExecutableOutputPath(projectRoot, manifest, manifest.host.executables[i]);
+            if (!Path::createDirectoryRecursive(Path::getParentDirectory(executablePath)))
+            {
+                outError =
+                    String("Cannot create executable output directory for: ") + executablePath;
+                return SLANG_FAIL;
+            }
+            List<String> arguments;
+            arguments.add(executableSources[i]);
+            for (const auto& searchPath : searchPaths)
+            {
+                arguments.add("-I");
+                arguments.add(searchPath);
+            }
+            arguments.add("-target");
+            arguments.add("exe");
+            arguments.add("-o");
+            arguments.add(executablePath);
+            SLANG_RETURN_ON_FAIL(_runSiblingTool(slangcPath, arguments, outError));
+            if (!File::exists(executablePath))
+            {
+                outError =
+                    String("slangc did not produce the expected executable: ") + executablePath;
+                return SLANG_FAIL;
+            }
         }
         SLANG_RETURN_ON_FAIL(_deployExecutableRuntime(slangcPath, buildRoot, outError));
     }
@@ -907,7 +1084,7 @@ static SlangResult _build(const String& projectRoot, String& outError)
     return SLANG_OK;
 }
 
-/// Run the existing native executable configured by the workspace manifest.
+/// Run an existing native executable configured by the workspace `host` section.
 static SlangResult _run(
     const String& projectRoot,
     int argumentCount,
@@ -916,13 +1093,22 @@ static SlangResult _run(
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    if (!manifest.executable.name.getLength())
+    if (!hasHostExecutables(manifest))
     {
-        outError = "The workspace does not configure an executable. Add 'executable.name' to "
+        outError = "The workspace does not configure a host executable. Add 'host.executables' to "
                    "slang-package.json and run 'slang package build'.";
         return SLANG_FAIL;
     }
-    String executablePath = _getExecutableOutputPath(projectRoot, manifest);
+
+    String executableName = manifest.host.defaultExecutable;
+    int argumentIndex = 0;
+    if (argumentCount > 0 && isHostExecutableName(manifest, arguments[0]))
+    {
+        executableName = arguments[0];
+        argumentIndex = 1;
+    }
+
+    String executablePath = _getExecutableOutputPath(projectRoot, manifest, executableName);
     if (!File::exists(executablePath))
     {
         outError = String("The configured executable has not been built: ") + executablePath +
@@ -930,7 +1116,7 @@ static SlangResult _run(
         return SLANG_FAIL;
     }
     List<String> executableArguments;
-    for (Index i = 0; i < argumentCount; ++i)
+    for (int i = argumentIndex; i < argumentCount; ++i)
         executableArguments.add(arguments[i]);
     return _runStreamingSiblingTool(executablePath, executableArguments, outError);
 }
@@ -1232,15 +1418,33 @@ SlangResult executeInDirectory(
         return _init(projectRoot, outError);
     if (command == "fetch" && (argc == 2 || (argc == 3 && String(argv[2]) == "--clean")))
         return _fetch(projectRoot, argc == 3, outError);
-    if (command == "update" && argc == 2)
-        return _update(projectRoot, false, false, outError);
-    if (command == "update" && argc == 3 && String(argv[2]) == "--clean")
-        return _update(projectRoot, false, true, outError);
-    if (command == "update" && argc == 3 && String(argv[2]) == "--from-local")
-        return _update(projectRoot, true, false, outError);
-    if (command == "update" && argc == 4 && String(argv[2]) == "--from-local" &&
-        String(argv[3]) == "--clean")
-        return _update(projectRoot, true, true, outError);
+    if (command == "update")
+    {
+        bool fromLocal = false;
+        bool allowClean = false;
+        bool dryRun = false;
+        for (int i = 2; i < argc; ++i)
+        {
+            String flag = argv[i];
+            if (flag == "--from-local")
+                fromLocal = true;
+            else if (flag == "--clean")
+                allowClean = true;
+            else if (flag == "--dry-run")
+                dryRun = true;
+            else
+            {
+                outError = String("Unknown update option: ") + flag;
+                return SLANG_FAIL;
+            }
+        }
+        if (dryRun && allowClean)
+        {
+            outError = "update --dry-run cannot be combined with --clean.";
+            return SLANG_FAIL;
+        }
+        return _update(projectRoot, fromLocal, allowClean, dryRun, outError);
+    }
     if (command == "validate" && argc == 2)
         return _validate(projectRoot, outError);
     if (command == "build" && argc == 2)
@@ -1251,6 +1455,8 @@ SlangResult executeInDirectory(
         return _test(projectRoot, outError);
     if (command == "docs" && argc == 2)
         return _printDocumentationLocation(projectRoot, outError);
+    if (command == "status" && argc == 2)
+        return _status(projectRoot, outError);
     if (command == "edit" && argc == 3)
         return _edit(projectRoot, argv[2], outError);
     if (command == "unedit" && argc == 3)

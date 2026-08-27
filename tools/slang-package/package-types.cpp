@@ -79,6 +79,15 @@ bool VersionConstraint::matches(const SemanticVersion& version) const
     return true;
 }
 
+bool matchesVersionPolicy(const String& constraintText, const SemanticVersion& version)
+{
+    VersionConstraint constraint;
+    String error;
+    SLANG_RELEASE_ASSERT(
+        SLANG_SUCCEEDED(parseVersionConstraint(constraintText, constraint, error)));
+    return constraint.matches(version);
+}
+
 SlangResult parseVersionConstraint(
     const UnownedStringSlice& text,
     VersionConstraint& outConstraint,

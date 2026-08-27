@@ -360,6 +360,125 @@ static SlangResult _readDependencies(
     return SLANG_OK;
 }
 
+static SlangResult _readVersionPolicy(
+    JSONContainer* container,
+    const JSONValue& entry,
+    const char* fieldName,
+    bool allowPackage,
+    String& outVersion,
+    String& outReason,
+    String& outError)
+{
+    if (entry.getKind() != JSONValue::Kind::Object)
+    {
+        outError = String("Every entry in '") + fieldName + "' must be an object.";
+        return SLANG_FAIL;
+    }
+    for (auto pair : container->getObject(entry))
+    {
+        String key = container->getStringFromKey(pair.key);
+        if (key != "version" && key != "reason" && !(allowPackage && key == "package"))
+        {
+            outError = String("Unknown field in '") + fieldName + "': " + key;
+            return SLANG_FAIL;
+        }
+    }
+    SLANG_RETURN_ON_FAIL(_readRequiredString(container, entry, "version", outVersion, outError));
+    SLANG_RETURN_ON_FAIL(_readRequiredString(container, entry, "reason", outReason, outError));
+    VersionConstraint ignored;
+    if (SLANG_FAILED(parseVersionConstraint(outVersion, ignored, outError)))
+    {
+        outError = String("Invalid version in '") + fieldName + "': " + outError;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _readRetractions(
+    JSONContainer* container,
+    const JSONValue& root,
+    List<Retraction>& outRetractions,
+    String& outError)
+{
+    JSONValue retractions = _find(container, root, "retractions");
+    if (!retractions.isValid())
+        return SLANG_OK;
+    if (retractions.getKind() != JSONValue::Kind::Array)
+    {
+        outError = "Field 'retractions' must be an array.";
+        return SLANG_FAIL;
+    }
+    for (auto item : container->getArray(retractions))
+    {
+        Retraction retraction;
+        SLANG_RETURN_ON_FAIL(_readVersionPolicy(
+            container,
+            item,
+            "retractions",
+            false,
+            retraction.version,
+            retraction.reason,
+            outError));
+        for (const auto& existing : outRetractions)
+        {
+            if (existing.version == retraction.version)
+            {
+                outError = String("Duplicate retraction version: ") + retraction.version;
+                return SLANG_FAIL;
+            }
+        }
+        outRetractions.add(retraction);
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _readExclusions(
+    JSONContainer* container,
+    const JSONValue& workspace,
+    List<Exclusion>& outExclusions,
+    String& outError)
+{
+    JSONValue exclusions = _find(container, workspace, "excludes");
+    if (!exclusions.isValid())
+        return SLANG_OK;
+    if (exclusions.getKind() != JSONValue::Kind::Array)
+    {
+        outError = "Workspace 'excludes' must be an array.";
+        return SLANG_FAIL;
+    }
+    for (auto item : container->getArray(exclusions))
+    {
+        Exclusion exclusion;
+        SLANG_RETURN_ON_FAIL(_readVersionPolicy(
+            container,
+            item,
+            "excludes",
+            true,
+            exclusion.version,
+            exclusion.reason,
+            outError));
+        SLANG_RETURN_ON_FAIL(
+            _readRequiredString(container, item, "package", exclusion.packageName, outError));
+        if (!isValidPackageName(exclusion.packageName))
+        {
+            outError = String("Invalid excluded package name: ") + exclusion.packageName;
+            return SLANG_FAIL;
+        }
+        for (const auto& existing : outExclusions)
+        {
+            if (existing.packageName == exclusion.packageName &&
+                existing.version == exclusion.version)
+            {
+                outError = String("Duplicate workspace exclusion: ") + exclusion.packageName + " " +
+                           exclusion.version;
+                return SLANG_FAIL;
+            }
+        }
+        outExclusions.add(exclusion);
+    }
+    return SLANG_OK;
+}
+
 static SlangResult _readWorkspace(
     JSONContainer* container,
     const JSONValue& root,
@@ -377,7 +496,7 @@ static SlangResult _readWorkspace(
     for (auto pair : container->getObject(workspace))
     {
         String key = container->getStringFromKey(pair.key);
-        if (key != "deps" && key != "build")
+        if (key != "deps" && key != "build" && key != "excludes")
         {
             outError = String("Unknown field in 'workspace': ") + key;
             return SLANG_FAIL;
@@ -387,6 +506,7 @@ static SlangResult _readWorkspace(
         _readOptionalString(container, workspace, "deps", outWorkspace.depsDirectory, outError));
     SLANG_RETURN_ON_FAIL(
         _readOptionalString(container, workspace, "build", outWorkspace.buildDirectory, outError));
+    SLANG_RETURN_ON_FAIL(_readExclusions(container, workspace, outWorkspace.exclusions, outError));
     if (outWorkspace.depsDirectory.getLength())
         outWorkspace.depsDirectory = Path::simplify(outWorkspace.depsDirectory);
     if (outWorkspace.buildDirectory.getLength())
@@ -411,38 +531,88 @@ static SlangResult _readWorkspace(
     return SLANG_OK;
 }
 
-static SlangResult _readExecutable(
+static SlangResult _readHost(
     JSONContainer* container,
     const JSONValue& root,
-    ExecutableSettings& outExecutable,
+    HostSettings& outHost,
     String& outError)
 {
-    JSONValue executable = _find(container, root, "executable");
-    if (!executable.isValid())
+    JSONValue host = _find(container, root, "host");
+    if (!host.isValid())
         return SLANG_OK;
-    if (executable.getKind() != JSONValue::Kind::Object)
+    if (host.getKind() != JSONValue::Kind::Object)
     {
-        outError = "Field 'executable' must be an object.";
+        outError = "Field 'host' must be an object.";
         return SLANG_FAIL;
     }
-    for (auto pair : container->getObject(executable))
+    for (auto pair : container->getObject(host))
     {
         String key = container->getStringFromKey(pair.key);
-        if (key != "name")
+        if (key != "executables" && key != "default")
         {
-            outError = String("Unknown field in 'executable': ") + key;
+            outError = String("Unknown field in 'host': ") + key;
             return SLANG_FAIL;
         }
     }
-    SLANG_RETURN_ON_FAIL(
-        _readRequiredString(container, executable, "name", outExecutable.name, outError));
-    if (!isValidPackageName(outExecutable.name))
+
+    JSONValue executables = _find(container, host, "executables");
+    if (executables.getKind() != JSONValue::Kind::Array)
     {
-        outError = String("Executable 'name' must be a filename without directory separators: ") +
-                   outExecutable.name;
+        outError = "Host 'executables' must be a non-empty array of names.";
         return SLANG_FAIL;
     }
-    return SLANG_OK;
+    outHost.executables.clear();
+    for (auto item : container->getArray(executables))
+    {
+        if (item.getKind() != JSONValue::Kind::String)
+        {
+            outError = "Every host executable name must be a string.";
+            return SLANG_FAIL;
+        }
+        String name = container->getString(item);
+        if (!isValidPackageName(name))
+        {
+            outError =
+                String("Host executable name must be a filename without directory separators: ") +
+                name;
+            return SLANG_FAIL;
+        }
+        for (const auto& existing : outHost.executables)
+        {
+            if (existing == name)
+            {
+                outError = String("Duplicate host executable name: ") + name;
+                return SLANG_FAIL;
+            }
+        }
+        outHost.executables.add(name);
+    }
+    if (outHost.executables.getCount() == 0)
+    {
+        outError = "Host 'executables' must contain at least one name.";
+        return SLANG_FAIL;
+    }
+
+    SLANG_RETURN_ON_FAIL(
+        _readOptionalString(container, host, "default", outHost.defaultExecutable, outError));
+    if (outHost.defaultExecutable.getLength() == 0)
+    {
+        if (outHost.executables.getCount() != 1)
+        {
+            outError = "Host 'default' is required when more than one executable is listed.";
+            return SLANG_FAIL;
+        }
+        outHost.defaultExecutable = outHost.executables[0];
+        return SLANG_OK;
+    }
+    for (const auto& executable : outHost.executables)
+    {
+        if (executable == outHost.defaultExecutable)
+            return SLANG_OK;
+    }
+    outError =
+        String("Host 'default' is not listed in 'executables': ") + outHost.defaultExecutable;
+    return SLANG_FAIL;
 }
 
 static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String& outError)
@@ -457,8 +627,8 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
     {
         String key = json.container->getStringFromKey(pair.key);
         if (key != "schema_version" && key != "name" && key != "exports" &&
-            key != "license_files" && key != "dependencies" && key != "workspace" &&
-            key != "executable")
+            key != "license_files" && key != "dependencies" && key != "retractions" &&
+            key != "workspace" && key != "host")
         {
             outError = String("Unknown field in slang-package.json: ") + key;
             return SLANG_FAIL;
@@ -488,9 +658,10 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
     SLANG_RETURN_ON_FAIL(
         _readDependencies(json.container, json.root, outManifest.dependencies, outError));
     SLANG_RETURN_ON_FAIL(
-        _readWorkspace(json.container, json.root, outManifest.workspace, outError));
+        _readRetractions(json.container, json.root, outManifest.retractions, outError));
     SLANG_RETURN_ON_FAIL(
-        _readExecutable(json.container, json.root, outManifest.executable, outError));
+        _readWorkspace(json.container, json.root, outManifest.workspace, outError));
+    SLANG_RETURN_ON_FAIL(_readHost(json.container, json.root, outManifest.host, outError));
     return SLANG_OK;
 }
 
@@ -553,6 +724,25 @@ static void _writeDependency(JSONWriter& writer, const Dependency& dependency)
     writer.endObject(SourceLoc());
 }
 
+static void _writeVersionPolicy(
+    JSONWriter& writer,
+    const String* packageName,
+    const String& version,
+    const String& reason)
+{
+    writer.startObject(SourceLoc());
+    if (packageName)
+    {
+        _writeKey(writer, "package");
+        writer.addStringValue(packageName->getUnownedSlice(), SourceLoc());
+    }
+    _writeKey(writer, "version");
+    writer.addStringValue(version.getUnownedSlice(), SourceLoc());
+    _writeKey(writer, "reason");
+    writer.addStringValue(reason.getUnownedSlice(), SourceLoc());
+    writer.endObject(SourceLoc());
+}
+
 SlangResult writeManifest(const String& path, const Manifest& manifest, String& outError)
 {
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
@@ -570,8 +760,16 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
     for (const auto& dependency : manifest.dependencies)
         _writeDependency(writer, dependency);
     writer.endObject(SourceLoc());
+    if (manifest.retractions.getCount())
+    {
+        _writeKey(writer, "retractions");
+        writer.startArray(SourceLoc());
+        for (const auto& retraction : manifest.retractions)
+            _writeVersionPolicy(writer, nullptr, retraction.version, retraction.reason);
+        writer.endArray(SourceLoc());
+    }
     if (manifest.workspace.depsDirectory.getLength() ||
-        manifest.workspace.buildDirectory.getLength())
+        manifest.workspace.buildDirectory.getLength() || manifest.workspace.exclusions.getCount())
     {
         _writeKey(writer, "workspace");
         writer.startObject(SourceLoc());
@@ -585,15 +783,36 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
             _writeKey(writer, "build");
             writer.addStringValue(manifest.workspace.buildDirectory.getUnownedSlice(), SourceLoc());
         }
+        if (manifest.workspace.exclusions.getCount())
+        {
+            _writeKey(writer, "excludes");
+            writer.startArray(SourceLoc());
+            for (const auto& exclusion : manifest.workspace.exclusions)
+            {
+                _writeVersionPolicy(
+                    writer,
+                    &exclusion.packageName,
+                    exclusion.version,
+                    exclusion.reason);
+            }
+            writer.endArray(SourceLoc());
+        }
         writer.endObject(SourceLoc());
     }
-    if (manifest.executable.name.getLength())
+    if (manifest.host.executables.getCount())
     {
-        SLANG_RELEASE_ASSERT(isValidPackageName(manifest.executable.name));
-        _writeKey(writer, "executable");
+        for (const auto& executable : manifest.host.executables)
+            SLANG_RELEASE_ASSERT(isValidPackageName(executable));
+        _writeKey(writer, "host");
         writer.startObject(SourceLoc());
-        _writeKey(writer, "name");
-        writer.addStringValue(manifest.executable.name.getUnownedSlice(), SourceLoc());
+        _writeKey(writer, "executables");
+        _writeStringArray(writer, manifest.host.executables);
+        if (manifest.host.defaultExecutable.getLength())
+        {
+            SLANG_RELEASE_ASSERT(isValidPackageName(manifest.host.defaultExecutable));
+            _writeKey(writer, "default");
+            writer.addStringValue(manifest.host.defaultExecutable.getUnownedSlice(), SourceLoc());
+        }
         writer.endObject(SourceLoc());
     }
     writer.endObject(SourceLoc());

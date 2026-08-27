@@ -233,6 +233,18 @@ SlangResult getRepositoryHeadCommit(
     return SLANG_OK;
 }
 
+SlangResult getRepositoryOrigin(const String& repositoryPath, String& outOrigin, String& outError)
+{
+    List<String> arguments;
+    arguments.add("remote");
+    arguments.add("get-url");
+    arguments.add("origin");
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    outOrigin = result.standardOutput.trim();
+    return SLANG_OK;
+}
+
 static SlangResult _materializeRevision(
     const String& workingDirectory,
     const String& gitURL,

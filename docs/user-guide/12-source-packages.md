@@ -8,8 +8,8 @@ Slang Source Packages
 
 The `slang package` command manages source dependencies stored in Git repositories. The short form
 `slang pkg` accepts the same commands. Package management does not change Slang's `import` syntax;
-its build command emits `.slang-module` files for the resolved graph and an optional native
-executable.
+its build command emits `.slang-module` files for the resolved graph and optional native
+executables.
 
 A **package** is a directory with `slang-package.json`. Its name, exports, license files, and
 dependencies apply wherever that package appears in a graph, including as a Git pin or a path
@@ -32,9 +32,10 @@ tests/
 docs/
 ```
 
-`src/` contains importable Slang modules. When `exports` includes `src`, the workspace package's
-default run module is `main`: `src/main.slang` must declare `module main;`. `slang package run`
-uses that module.
+`src/` contains importable Slang modules. Host executables are workspace primaries whose filename
+stem matches a name in `host.executables`. For example, `src/video-preview.slang` is the source for
+the `video-preview` executable and must declare `module video_preview;`. `slang package run` uses
+`host.default`, or the only listed executable when `default` is omitted.
 
 `tests/` and `docs/` are reserved for package tests and documentation. The initial package tool
 creates these directories.
@@ -53,22 +54,36 @@ The manifest declares the package and its source dependencies:
   "license_files": ["LICENSE"],
   "workspace": {
     "deps": "deps",
-    "build": "build"
+    "build": "build",
+    "excludes": [
+      {
+        "package": "noise",
+        "version": "1.3.0",
+        "reason": "Known regression in generated gradients"
+      }
+    ]
   },
-  "executable": {
-    "name": "my-shaders"
+  "host": {
+    "executables": ["my-shaders"],
+    "default": "my-shaders"
   },
   "dependencies": {
     "noise": {
       "git": "https://github.com/example/slang-noise.git",
       "version": ">=1.2.0 <2.0.0"
     }
-  }
+  },
+  "retractions": [
+    {
+      "version": "1.1.0",
+      "reason": "Published with an incomplete source export"
+    }
+  ]
 }
 ```
 
 `schema_version` is the file format version and is currently `1`. `name`, `exports`, and
-`license_files` are also required. `dependencies`, `workspace`, and `executable` are optional.
+`license_files` are also required. `dependencies`, `workspace`, and `host` are optional.
 Package manifests allow JSON comments.
 
 `name` identifies the package throughout the dependency graph. `exports` lists relative source
@@ -82,15 +97,34 @@ dependency source is materialized, and `build` contains generated workspace outp
 are `deps/` and `build/`; `slang package init` writes those defaults explicitly. The same fields in
 a dependency's manifest do not affect the enclosing workspace.
 
-The optional root `executable` object requests a native host executable. Its `name` is a filename
-without directory separators; the package tool adds the platform executable suffix and writes the
-result at the root of `workspace.build`. Dependency manifests may declare this field, but only the
-workspace package controls executable generation.
+The optional root `host` object requests native host executables. `executables` lists output
+filenames without directory separators; the package tool adds the platform executable suffix and
+writes each result at the root of `workspace.build`. Each name must match an exported workspace
+primary whose source filename is `<name>.slang`. When more than one executable is listed,
+`default` names the artifact `slang package run` executes if you do not pass an executable name.
+With a single executable, `default` may be omitted and that name is used. Dependency manifests may
+declare this field, but only the workspace package controls executable generation.
 
 Dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package publishers must
 treat as immutable. The tag is the package's version; `schema_version` in `slang-package.json` is
 only the file format version. Fetching fails if a locked tag no longer identifies its locked
 commit.
+
+The optional top-level `retractions` array is publisher advice not to select releases matching a
+version constraint. Each entry requires `version` and a non-empty `reason`. To retract a published
+release, add the entry to the manifest and publish a new, higher release tag. During resolution,
+the package tool reads retractions from the highest available release, even when that release is
+outside the consumer's requested range, and skips matching candidates. A retraction does not
+invalidate an existing lock: `fetch` remains reproducible, while the next `update` moves away from
+the retracted release when another candidate satisfies the graph.
+
+The root-only `workspace.excludes` array is committed consumer policy. Each entry names a
+`package`, a `version` constraint, and a non-empty `reason`. Dependency manifests' workspace
+settings, including exclusions, are ignored. Resolution skips excluded Git releases. Unlike a
+publisher retraction, adding an exclusion changes the workspace's declared resolution intent, so
+`fetch` rejects a lock that still selects an excluded release and asks for `slang package update`.
+Path dependencies and local overrides select trees rather than release versions and are not
+matched against exclusions.
 
 Each dependency entry contains exactly one source:
 
@@ -152,7 +186,10 @@ and returned to tool ownership. Fetch and update refuse to replace an unregister
 changed files, extra commits, or stashes. Pass `--clean` explicitly to permit replacement.
 
 Run `slang package update` deliberately when manifest constraints or upstream releases change.
-Normal CI and developer builds use `slang package fetch`; a missing or inconsistent lock is an
+`slang package update --dry-run` and `slang package update --from-local --dry-run` report how the
+lock would change without writing it or replacing checkouts. Resolver Git clones under
+`.slang/cache/` may still be populated so the tool can inspect available tags. Normal CI and
+developer builds use `slang package fetch`; a missing or inconsistent lock is an
 error.
 
 The tool invokes the `git` executable from the system path. Existing Git credential and SSH
@@ -170,6 +207,13 @@ root and are not added to compiler sessions automatically.
 `slang package validate` checks the current package and every materialized package reachable
 through `slang-package-lock.json`. It validates each manifest and license file, requires all source
 exports to exist, and rejects module import paths exported by more than one package.
+
+`slang package status` checks the root manifest against the lock, verifies registered edits and
+overrides, validates the materialized manifests, and checks that tool-owned Git checkouts remain at
+their locked commits without changed files or stashes. It prints the registered local package
+state and reports the corrective `fetch`, `update`, `update --from-local`, `edit`, or `--clean`
+command when the workspace is inconsistent. The command does not modify package state or contact
+remotes.
 
 Each `.slang` file that is not below a module's companion directory is a primary module file. Its
 first declaration must be `module NAME;`, where `NAME` matches the filename stem with hyphens
@@ -244,13 +288,12 @@ The resulting `build/modules` tree is sufficient for source-free consumption: pl
 consumer's search path and distribute it without the materialized `deps/` source trees. Imports
 from one generated module to another resolve at the same import-relative paths used by source.
 
-When `executable.name` is present, build also compiles the workspace primary whose import path is
-`main` (normally `src/main.slang`) with the host executable target and writes
-`build/<executable-name>` (plus `.exe` on Windows). The `main` function must use the native ABI,
-such as `export __extern_cpp int main()`, and a supported downstream C++ compiler must be
-available. Build copies the matching `slang-rt` shared library beside the executable so the
-artifact can locate its runtime support. Configuring an executable without a `main` primary is an
-error.
+When `host.executables` is present, build also compiles each matching workspace primary with the
+host executable target and writes `build/<executable-name>` (plus `.exe` on Windows). The `main`
+function in that file must use the native ABI, such as `export __extern_cpp int main()`, and a
+supported downstream C++ compiler must be available. Build copies the matching `slang-rt` shared
+library beside the executables so the artifacts can locate their runtime support. Configuring a
+host executable without a matching workspace `.slang` primary is an error.
 
 The same command copies every `.md` file below each materialized package's `docs/` directory to
 `build/docs/<package-name>/`, preserving paths below `docs/`. Namespacing the output by package
@@ -259,9 +302,10 @@ copied. Build also writes `build/docs/index.md`: the workspace dependency tree, 
 alphabetized list of copied Markdown files per package. Every package in the graph is listed;
 only packages that contributed Markdown link from the tree into that file list.
 
-`slang package run` executes the existing native artifact named by `executable.name` and forwards
-all trailing arguments. It does not build first. Run fails with instructions when the manifest
-does not configure an executable or when `slang package build` has not produced that artifact.
+`slang package run` executes an existing native artifact from `host.executables` and forwards
+trailing arguments. With no executable name, it runs `host.default`. It does not build first. Run
+fails with instructions when the manifest does not configure a host executable or when
+`slang package build` has not produced that artifact.
 
 `slang package test` validates the materialized package graph and invokes the sibling `slang-test`
 executable on the workspace's `tests/` tree. Tests can use slang-test's `$dirname` substitution to
@@ -277,4 +321,6 @@ test directive. The command fails if the package tool installation does not incl
 The initial workspace layout deliberately keeps resolver clones in `.slang/cache/` and compile
 inputs in the workspace. Future versions may add a user-global immutable cache with copy-on-edit,
 let compiler sessions consume workspace metadata without `build/search-paths`, and share immutable
-dependency trees between workspaces.
+dependency trees between workspaces. Git-to-Git replacement is also deferred until Slang has a
+global user remapping policy or package-index integration; current overrides intentionally replace
+a dependency with a local path only.
