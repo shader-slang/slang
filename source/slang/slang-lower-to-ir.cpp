@@ -7801,12 +7801,12 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 
         // Write in-place to `resultElements` the elements from `sourceElements`
         // according to the first `n` indices in `indices`.
-        // 
+        //
         // Preconditions:
         // - `resultElements` and `indices` each have at least `n` elements/slots
         // - All `indices[i]` must be a valid index into `sourceElements`.
-        auto backpermute = [](UInt n, const auto& sourceElements, const auto& indices,
-                              auto& resultElements)
+        auto backpermute =
+            [](UInt n, const auto& sourceElements, const auto& indices, auto& resultElements)
         {
             for (UInt i = 0; i < n; ++i)
             {
