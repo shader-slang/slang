@@ -120,6 +120,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32SubtractPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32SubtractRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite subtraction cases | RTX 5090 results `7.5`, `-8.5`, `1280` | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32MultiplyKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Generic floating callback constructs exact unflagged LLVM `fmul` and aligned store | Verified LLVM/NVVM-2.0 assembly with no other floating-binary opcode | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32MultiplyUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical float32 `kIROp_Mul` lowers through floating-binary operation 2 while signed-i32 MUL remains unchanged | Exact ordered parameters and multiplication-result store topology checked | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32MultiplyDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 multiplication compiles through both routes | `[64, 32, 32]`, token-safe `mul.f32`, store, and no load/add/sub agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32MultiplyPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32MultiplyRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite multiplication cases | RTX 5090 results `3`, `-4`, `-256` | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -209,7 +215,7 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarIntegerSignedGreaterEqualCapability` | An exact 360-byte Slice 24 provider still compiles signed-i32 less-than-or-equal, while a signed-greater-equal program reaches E52016 after discovery but before module creation | Pass |
 | `slang-unit-test-tool/nvvmSlangRetainsOnlySelectedCUDAKernel` | CUDA-kernel pruning still removes an unselected kernel before direct emission while preserving the exact selected entry point | Pass |
 | `slang-unit-test-tool/nvvmSlangRejectsConventionalRawKernelParameters` | Only `[CUDAKernel]` receives the raw scalar ABI; a conventional parameterized compute entry reaches E52017 before builder or libNVVM program creation | Pass |
-| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | Signed-i32 left/right shifts, division, and remainder stop at `'shl'`, `'shr'`, `'div'`, and `'irem'`; logical NOT and unsigned/i64/float Neg stop at `'entry-point parameter'`; unsigned or i64 bitwise AND/OR/XOR/NOT, unsigned/wide/floating multiplication and equality, pointer equality, void helper calls, and unsigned pointer offsets retain deterministic E52017 boundaries before builder discovery or libNVVM program creation. The Slice 18 f32-sine case stops at the float-returning target helper's unsupported `'helper function result type'`, before provider discovery and without exercising `GenericAsm` matching | Pass |
+| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | Signed-i32 left/right shifts, division, and remainder stop at `'shl'`, `'shr'`, `'div'`, and `'irem'`; logical NOT and unsigned/i64/float Neg stop at `'entry-point parameter'`; unsigned or i64 bitwise AND/OR/XOR/NOT, unsigned/wide multiplication and equality, pointer equality, void helper calls, and unsigned pointer offsets retain deterministic E52017 boundaries before builder discovery or libNVVM program creation. Float multiplication is accepted, so its old negative fixture now stops at the following unsupported `'castFloatToInt'`. The Slice 18 f32-sine case stops at the float-returning target helper's unsupported `'helper function result type'`, before provider discovery and without exercising `GenericAsm` matching | Pass |
 | `slang-unit-test-tool/nvvmCompilerNegotiatesCUDADeviceLibraryOption` | The terminal naturally aligned pointer-sized `requiresCUDADeviceLibrary` storage does not reuse prior tail padding; zero means false, nonzero means true, and an older compatible options prefix leaves established libdevice-free compiles independent of a toolkit root | Pass |
 | `slang-unit-test-tool/nvvmCompilerUsesSelectedToolkitLibdevice` | Filesystem discovery carries the canonical successful decorated libNVVM candidate into compiler construction, never retries a conflicting environment root, reads exact `nvvm/libdevice/libdevice.10.bc` only on demand, and includes a coherent libdevice timestamp in compiler identity | Pass |
 | `slang-unit-test-tool/nvvmCompilerRejectsUnavailableRequestedLibdevice` | Zero demand compiles without requiring, reading, or adding libdevice; requested missing-root or missing-file/read failures stop before program creation | Pass |
@@ -554,4 +560,22 @@ LLVM/NVVM text has one unflagged `fsub float`, aligned store, no `fadd`, and ker
 and NVRTC agree on `[64, 32, 32]`, `sub.f32`, store/no-load/add; CUDA 12.9 `ptxas` accepts both; and
 RTX 5090 results are `7.5`, `-8.5`, `1280`. Release passes 214/214 with sorted-name SHA-256
 `6ba1df40ff963723a866c61cbf8518aba7596e23213d5743015397547c90af9d`; Debug preservation passes
+10/10.
+
+Slice 34 adds floating-binary MULTIPLY and semantic feature 22 without growing the 464-byte x64 or
+280-byte x86 V3 table. The emitter's closed ADD/SUBTRACT/MULTIPLY mapping supplies the feature,
+wire operation, and diagnostic to both preflight and emission; canonical result type keeps float
+and signed-i32 `kIROp_Mul` paths distinct. The provider emits unflagged `CreateFMul` through the
+existing generic callback.
+
+The same-shape floating-binary tests now share one descriptor and layer-specific runners while
+retaining every ADD/SUBTRACT registered name. The five measured test/support files shrink from
+19,608 to 19,512 physical lines even after seven MULTIPLY names are added. Direct topology proves
+ordered parameter 1/2 operands and the result-store consumer. LLVM/NVVM text has exactly one
+`fmul float`; NVVM and NVRTC agree on `[64, 32, 32]`, token-safe `mul.f32`, store/no-load/add/sub;
+CUDA 12.9 `ptxas` accepts both; and RTX 5090 results are `3`, `-4`, `-256`. The old negative
+float-multiply-plus-cast fixture now reaches its next honest E52017 boundary, `castFloatToInt`.
+
+Release passes 221/221 with sorted-name SHA-256
+`c24e6b4e82e289c2533444b0b0c0dab6cc44064a1df02d75a79928de94c2afa8`; Debug preservation passes
 10/10.

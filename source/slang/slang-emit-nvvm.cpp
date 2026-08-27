@@ -73,6 +73,44 @@ void _requireFeature(NVVMIRFeatureSet& features, SlangNVVMBuilderFeature_3 requi
     features.words[requiredFeature / 64u] |= uint64_t(1) << (requiredFeature % 64u);
 }
 
+struct NVVMFloat32BinaryInfo
+{
+    SlangNVVMBuilderFeature_3 feature;
+    SlangNVVMFloatingBinaryOp_3 operation;
+    const char* diagnosticName;
+};
+
+// Maps a canonical floating binary IR opcode to the provider semantic that owns it.
+bool _getNVVMFloat32BinaryInfo(IROp op, NVVMFloat32BinaryInfo& outInfo)
+{
+    switch (op)
+    {
+    case kIROp_Add:
+        outInfo = {
+            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD,
+            SLANG_NVVM_FLOATING_BINARY_OP_ADD,
+            "float32 addition",
+        };
+        return true;
+    case kIROp_Sub:
+        outInfo = {
+            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT,
+            SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT,
+            "float32 subtraction",
+        };
+        return true;
+    case kIROp_Mul:
+        outInfo = {
+            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY,
+            SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY,
+            "float32 multiplication",
+        };
+        return true;
+    default:
+        return false;
+    }
+}
+
 // Checks that an executable operand has an accepted definition that dominates its use.
 SlangResult _validateAvailableValue(
     CodeGenContext* codeGenContext,
@@ -499,28 +537,25 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_Add:
             case kIROp_Sub:
+            case kIROp_Mul:
                 if (inst->getOperandCount() == 2 && isNVVMFloat32Type(inst->getDataType()))
                 {
-                    _requireFeature(
-                        features,
-                        inst->getOp() == kIROp_Add
-                            ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD
-                            : SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT);
+                    NVVMFloat32BinaryInfo info;
+                    SLANG_RELEASE_ASSERT(_getNVVMFloat32BinaryInfo(inst->getOp(), info));
+                    _requireFeature(features, info.feature);
                     break;
                 }
-                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
-                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 arithmetic"));
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
-                break;
-
-            case kIROp_Mul:
                 if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
-                        toSlice("signed i32 multiplication"));
+                        inst->getOp() == kIROp_Mul ? toSlice("signed i32 multiplication")
+                                                   : toSlice("signed i32 arithmetic"));
                 }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY);
+                _requireFeature(
+                    features,
+                    inst->getOp() == kIROp_Mul ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY
+                                               : SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
                 break;
 
             case kIROp_BitAnd:
@@ -766,6 +801,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_Add:
             case kIROp_Sub:
+            case kIROp_Mul:
                 if (isNVVMFloat32Type(inst->getDataType()))
                 {
                     SLANG_RETURN_ON_FAIL(_validateFloat32Value(
@@ -783,7 +819,7 @@ SlangResult _validateNVVMFunction(
                     availableValues.add(inst);
                     break;
                 }
-            case kIROp_Mul:
+                [[fallthrough]];
             case kIROp_BitAnd:
             case kIROp_BitOr:
             case kIROp_BitXor:
@@ -1474,6 +1510,7 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_Add:
                 case kIROp_Sub:
+                case kIROp_Mul:
                     {
                         SlangNVVMValueHandle_1 loweredLeft = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -1496,27 +1533,42 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         if (isNVVMFloat32Type(inst->getDataType()))
                         {
-                            const bool isAdd = inst->getOp() == kIROp_Add;
+                            NVVMFloat32BinaryInfo info;
+                            SLANG_RELEASE_ASSERT(_getNVVMFloat32BinaryInfo(inst->getOp(), info));
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                isAdd ? "float32 addition" : "float32 subtraction",
+                                info.diagnosticName,
                                 builder.emitFloatingBinary(
                                     moduleScope.module,
-                                    isAdd ? SLANG_NVVM_FLOATING_BINARY_OP_ADD
-                                          : SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT,
+                                    info.operation,
                                     loweredLeft,
                                     loweredRight,
                                     loweredValue)));
                         }
                         else
                         {
-                            const SlangNVVMIntegerBinaryOp_3 operation =
-                                inst->getOp() == kIROp_Add ? SLANG_NVVM_INTEGER_BINARY_OP_3_ADD
-                                                           : SLANG_NVVM_INTEGER_BINARY_OP_3_SUB;
+                            SlangNVVMIntegerBinaryOp_3 operation;
+                            const char* diagnosticName = nullptr;
+                            switch (inst->getOp())
+                            {
+                            case kIROp_Add:
+                                operation = SLANG_NVVM_INTEGER_BINARY_OP_3_ADD;
+                                diagnosticName = "signed i32 addition";
+                                break;
+                            case kIROp_Sub:
+                                operation = SLANG_NVVM_INTEGER_BINARY_OP_3_SUB;
+                                diagnosticName = "signed i32 subtraction";
+                                break;
+                            case kIROp_Mul:
+                                operation = SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY;
+                                diagnosticName = "signed i32 multiplication";
+                                break;
+                            default:
+                                SLANG_UNEXPECTED("invalid NVVM integer binary opcode");
+                            }
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                inst->getOp() == kIROp_Add ? "signed i32 addition"
-                                                           : "signed i32 subtraction",
+                                diagnosticName,
                                 builder.emitIntegerBinaryOperation(
                                     moduleScope.module,
                                     operation,
@@ -1524,40 +1576,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     loweredRight,
                                     loweredValue)));
                         }
-                        valueMap[inst] = loweredValue;
-                    }
-                    break;
-
-                case kIROp_Mul:
-                    {
-                        SlangNVVMValueHandle_1 loweredLeft = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(0),
-                            valueMap,
-                            typeContext,
-                            loweredLeft));
-                        SlangNVVMValueHandle_1 loweredRight = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(1),
-                            valueMap,
-                            typeContext,
-                            loweredRight));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "signed i32 multiplication",
-                            builder.emitIntegerBinaryOperation(
-                                moduleScope.module,
-                                SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY,
-                                loweredLeft,
-                                loweredRight,
-                                loweredValue)));
                         valueMap[inst] = loweredValue;
                     }
                     break;

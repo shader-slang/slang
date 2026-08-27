@@ -2563,7 +2563,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitFloatingBinaryV3(
     gFakeNVVMBuilder.scalarV3Operations.add(
         {FakeNVVMBuilderScalarFamily::FloatingBinary, uint32_t(operation)});
     if (operation != SLANG_NVVM_FLOATING_BINARY_OP_ADD &&
-        operation != SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT)
+        operation != SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT &&
+        operation != SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY)
     {
         if (outValue)
             *outValue = nullptr;
@@ -3551,6 +3552,8 @@ static const char kGreaterThanScalarKernelName[] = "greaterThanScalar";
 static const char kLessEqualScalarKernelName[] = "lessEqualScalar";
 static const char kGreaterEqualScalarKernelName[] = "greaterEqualScalar";
 static const char kFloat32AddKernelName[] = "float32Add";
+static const char kFloat32SubtractKernelName[] = "float32Subtract";
+static const char kFloat32MultiplyKernelName[] = "float32Multiply";
 static const char kScalarReferenceCUDASource[] = R"(
 extern "C" __global__ void writeScalar(int* destination, int value)
 {
@@ -3913,6 +3916,16 @@ void computeMain(
     *destination = left - right;
 }
 )";
+static const char kDirectNVVMFloat32MultiplySource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float left,
+    uniform float right)
+{
+    *destination = left * right;
+}
+)";
 static const char kDirectNVVMFloat32CopySource[] = R"(
 [CUDAKernel]
 void computeMain(
@@ -3922,6 +3935,92 @@ void computeMain(
     *destination = *source;
 }
 )";
+
+enum class NVVMFloat32BinaryTestOperation
+{
+    Add,
+    Subtract,
+    Multiply,
+};
+
+struct NVVMFloat32BinaryRuntimeCase
+{
+    float left;
+    float right;
+    float expected;
+};
+
+struct NVVMFloat32BinaryTestCase
+{
+    NVVMFloat32BinaryTestOperation testOperation;
+    SlangNVVMBuilderFeature_3 feature;
+    SlangNVVMFloatingBinaryOp_3 operation;
+    const char* source;
+    const char* kernelName;
+    const char* llvmOpcode;
+    const char* diagnosticName;
+    const NVVMFloat32BinaryRuntimeCase* runtimeCases;
+    Index runtimeCaseCount;
+};
+
+static const NVVMFloat32BinaryRuntimeCase kNVVMFloat32AddRuntimeCases[] = {
+    {1.5f, 2.25f, 3.75f},
+    {-8.0f, 0.5f, -7.5f},
+    {1024.0f, -256.0f, 768.0f},
+};
+
+static const NVVMFloat32BinaryRuntimeCase kNVVMFloat32SubtractRuntimeCases[] = {
+    {8.0f, 0.5f, 7.5f},
+    {-8.0f, 0.5f, -8.5f},
+    {1024.0f, -256.0f, 1280.0f},
+};
+
+static const NVVMFloat32BinaryRuntimeCase kNVVMFloat32MultiplyRuntimeCases[] = {
+    {1.5f, 2.0f, 3.0f},
+    {-8.0f, 0.5f, -4.0f},
+    {1024.0f, -0.25f, -256.0f},
+};
+
+static const NVVMFloat32BinaryTestCase kNVVMFloat32BinaryTestCases[] = {
+    {NVVMFloat32BinaryTestOperation::Add,
+     SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD,
+     SLANG_NVVM_FLOATING_BINARY_OP_ADD,
+     kDirectNVVMFloat32AddSource,
+     kFloat32AddKernelName,
+     "fadd",
+     "float32-add",
+     kNVVMFloat32AddRuntimeCases,
+     SLANG_COUNT_OF(kNVVMFloat32AddRuntimeCases)},
+    {NVVMFloat32BinaryTestOperation::Subtract,
+     SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT,
+     SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT,
+     kDirectNVVMFloat32SubtractSource,
+     kFloat32SubtractKernelName,
+     "fsub",
+     "float32-subtract",
+     kNVVMFloat32SubtractRuntimeCases,
+     SLANG_COUNT_OF(kNVVMFloat32SubtractRuntimeCases)},
+    {NVVMFloat32BinaryTestOperation::Multiply,
+     SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY,
+     SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY,
+     kDirectNVVMFloat32MultiplySource,
+     kFloat32MultiplyKernelName,
+     "fmul",
+     "float32-multiply",
+     kNVVMFloat32MultiplyRuntimeCases,
+     SLANG_COUNT_OF(kNVVMFloat32MultiplyRuntimeCases)},
+};
+
+static const NVVMFloat32BinaryTestCase& _getNVVMFloat32BinaryTestCase(
+    NVVMFloat32BinaryTestOperation operation)
+{
+    const Index index = Index(operation);
+    SLANG_RELEASE_ASSERT(index >= 0 && index < SLANG_COUNT_OF(kNVVMFloat32BinaryTestCases));
+    const NVVMFloat32BinaryTestCase& testCase = kNVVMFloat32BinaryTestCases[index];
+    SLANG_RELEASE_ASSERT(testCase.testOperation == operation);
+    return testCase;
+}
+
 static const char kDirectNVVMUnsupportedHalfAddSource[] = R"(
 [CUDAKernel]
 void computeMain(
@@ -6428,6 +6527,7 @@ struct PTXEntrySummary
     bool hasAdd32 = false;
     bool hasFloatAdd32 = false;
     bool hasFloatSubtract32 = false;
+    bool hasFloatMultiply32 = false;
     bool hasMultiply32 = false;
     bool hasBitAnd32 = false;
     bool hasBitOr32 = false;
@@ -6451,6 +6551,7 @@ static SlangResult _summarizePTXEntry(
     outSummary.hasAdd32 = false;
     outSummary.hasFloatAdd32 = false;
     outSummary.hasFloatSubtract32 = false;
+    outSummary.hasFloatMultiply32 = false;
     outSummary.hasMultiply32 = false;
     outSummary.hasBitAnd32 = false;
     outSummary.hasBitOr32 = false;
@@ -6476,6 +6577,8 @@ static SlangResult _summarizePTXEntry(
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("add.f32"), 32);
     outSummary.hasFloatSubtract32 =
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("sub.f32"), 32);
+    outSummary.hasFloatMultiply32 =
+        _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("mul.f32"), 32);
     outSummary.hasMultiply32 = _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("mul"), 32);
     outSummary.hasBitAnd32 =
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("and.b32"), 32);

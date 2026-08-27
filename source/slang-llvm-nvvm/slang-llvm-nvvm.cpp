@@ -912,7 +912,8 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingBinaryV3(
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     if (!outValue || !insertionBlock ||
         (operation != SLANG_NVVM_FLOATING_BINARY_OP_ADD &&
-         operation != SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT) ||
+         operation != SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT &&
+         operation != SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmLeft) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmRight) ||
         llvmLeft->getType() != llvm::Type::getFloatTy(state->context) ||
@@ -921,11 +922,23 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingBinaryV3(
         return SLANG_E_INVALID_ARG;
     }
 
-    llvm::Value* result = operation == SLANG_NVVM_FLOATING_BINARY_OP_ADD
-                              ? state->builder.CreateFAdd(llvmLeft, llvmRight)
-                              : state->builder.CreateFSub(llvmLeft, llvmRight);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
-    return SLANG_OK;
+    switch (operation)
+    {
+    case SLANG_NVVM_FLOATING_BINARY_OP_ADD:
+        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+            state->builder.CreateFAdd(llvmLeft, llvmRight));
+        return SLANG_OK;
+    case SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT:
+        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+            state->builder.CreateFSub(llvmLeft, llvmRight));
+        return SLANG_OK;
+    case SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY:
+        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+            state->builder.CreateFMul(llvmLeft, llvmRight));
+        return SLANG_OK;
+    default:
+        return SLANG_E_INVALID_ARG;
+    }
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerCompareV3(

@@ -2005,6 +2005,39 @@ The final Release NVVM prefix passes 214/214. Its exact sorted LF-terminated nam
 `6ba1df40ff963723a866c61cbf8518aba7596e23213d5743015397547c90af9d`. Debug preservation passes
 10/10.
 
+### Slice 34 exact scalar float32 multiplication and scalable evidence
+
+Slice 34 adds exact raw scalar `float` multiplication without returning to per-operation provider
+wrappers or copied test harnesses. Canonical float parameters feed one `kIROp_Mul` and an aligned
+store through the established AS1 float pointer. The same opcode with canonical signed-i32 type
+continues to use the integer-binary family and its independent feature.
+
+One emitter-owned `NVVMFloat32BinaryInfo` mapping now supplies the semantic feature, stable wire
+operation, and diagnostic for ADD, SUBTRACT, and MULTIPLY. Both capability collection and emission
+consume that mapping, so adding an accepted opcode cannot silently update one side without the
+other. Feature 22 and floating operation 2 reuse the generic callback and do not grow the 464-byte
+x64 or 280-byte x86 V3 table. Exact Slice 33 feature sets remain valid, while advertising
+MULTIPLY requires the already-complete float prefix. The real provider applies the common
+ownership/type/availability/dominance/insertion contract and emits one unflagged `CreateFMul`.
+
+The three same-shape operations are also described once by `NVVMFloat32BinaryTestCase`: feature,
+wire operation, source, kernel name, LLVM token, diagnostic label, and exact runtime cases.
+Layer-specific builder, direct-topology, capability, differential-PTX, `ptxas`, and runtime runners
+consume those facts behind thin registered wrappers. Existing ADD/SUBTRACT names and assertions
+remain intact. Across the five test/support files measured by the scalability work, physical lines
+fall from 19,608 to 19,512 while seven MULTIPLY names are added.
+
+Verified LLVM and audited NVVM-2.0 text contain exactly one `fmul float`, one aligned store, kernel
+metadata, no other floating-binary opcode, and no fast flags. Direct NVVM and NVRTC expose
+`[64, 32, 32]`, token-safe `mul.f32`, one global 32-bit store, and no global load/add/sub. CUDA 12.9
+`ptxas` accepts both outputs. On the RTX 5090, both routes produce `3`, `-4`, and `-256` for exactly
+representable finite inputs. The former float-multiply negative fixture now advances to its next
+honest unsupported producer, `castFloatToInt`.
+
+The final Release NVVM prefix passes 221/221. Its exact sorted LF-terminated name set has SHA-256
+`c24e6b4e82e289c2533444b0b0c0dab6cc44064a1df02d75a79928de94c2afa8`. Debug preservation passes
+10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2115,8 +2148,9 @@ The program advances through bounded slices:
 31. exact scalar float32 addition through the generic V3 provider family;
 32. exact scalar float32 device-pointer loads;
 33. exact scalar float32 subtraction through the generic floating-binary family;
-34. further type, memory, resource, and optimization-quality work; and
-35. wave operations and other advanced capabilities, then production-readiness evaluation.
+34. exact scalar float32 multiplication plus descriptor-driven floating-binary evidence;
+35. further type, memory, resource, and optimization-quality work; and
+36. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
