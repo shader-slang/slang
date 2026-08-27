@@ -308,6 +308,15 @@ extern "C"
         SlangNVVMValueHandle_1 elementIndex,
         SlangNVVMValueHandle_1* outPointer);
 
+    /// Emits multiplication for same-module scalar integer operands of identical type.
+    /// Both operands must be available at the current unterminated insertion point. On failure,
+    /// the output value is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerMultiply_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -346,6 +355,8 @@ extern "C"
 
         SlangNVVMGetArrayType_2 getArrayType;
         SlangNVVMEmitArrayElementPointer_2 emitArrayElementPointer;
+
+        SlangNVVMEmitIntegerMultiply_2 emitIntegerMultiply;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -381,6 +392,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_ARRAY_MIN_SIZE          \
     (offsetof(SlangNVVMBuilderAPI_V2, emitArrayElementPointer) + \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitArrayElementPointer))
+
+    // This Slice 12 prefix is one coherent scalar-integer-multiply capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_MULTIPLY_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerMultiply) +       \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerMultiply))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

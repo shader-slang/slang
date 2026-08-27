@@ -51,6 +51,8 @@ public:
     bool supportsScalarPointerArithmetic() const;
     /// Returns whether the provider advertised the complete Slice 11 array-addressing prefix.
     bool supportsScalarArrayAddressing() const;
+    /// Returns whether the provider advertised the complete Slice 12 integer-multiply prefix.
+    bool supportsScalarIntegerMultiply() const;
     /// Returns the provider identity that affects generated bitcode and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -209,6 +211,13 @@ public:
         SlangNVVMValueHandle_1 baseArrayPointer,
         SlangNVVMValueHandle_1 elementIndex,
         SlangNVVMValueHandle_1& outPointer) const;
+
+    /// Emits multiplication for same-typed scalar integer values.
+    SlangResult emitIntegerMultiply(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;

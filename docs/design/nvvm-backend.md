@@ -854,6 +854,61 @@ constant or shared storage; other address spaces; pointer-to-array helper ABI; u
 indices; bounds checks; `inbounds` provenance; thread builtins; barriers; atomics; resources; or
 libdevice. Those shapes have different canonical producers and remain separate slices.
 
+### Slice 12 signed-i32 multiplication
+
+Consider this example:
+
+```slang
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int x,
+    uniform int y)
+{
+    *destination = x * y;
+}
+```
+
+After the established CUDA passes and `simplifyIR`, the final entry signature is exactly
+`Func(Void, Ptr(Int,RW,UserPointer,DefaultLayout), Int, Int)`. Its body contains one canonical,
+two-operand `kIROp_Mul`; the two signed-i32 parameters are its operands, and its signed-i32 result
+feeds the established device-pointer store. Preflight admits that instruction directly, validates
+both operands through the existing signed-i32 availability and dominance rules, and records the
+result in the same canonical value set and provider-value map as the earlier scalar operations. It
+does not reconstruct source syntax or introduce an alternate multiplication spelling.
+
+The private V2 provider table appends one dedicated operation:
+
+```text
+emitIntegerMultiply(module, left, right, outValue)
+```
+
+This operation does not extend `SlangNVVMIntegerBinaryOp_2`. Exact Slice 7 providers implement that
+function only for its frozen ADD/SUB domain, so adding a new enum value would silently widen an old
+call contract and would still require a separately negotiated marker. The dedicated field makes
+multiplication support and dispatch one atomic append-only capability.
+
+The complete V2 table is 272 bytes on the 64-bit build. The exact 264-byte Slice 11 prefix and every
+older minimum remain frozen and compatible for their established programs. A size from 265 through
+271 bytes inside the new function pointer, or a complete prefix with a null operation, is malformed;
+future-larger tables remain compatible and are clamped to the host's known capacity. A
+multiplication program presented to an exact Slice 11 provider reaches E52016 after discovery but
+before module creation. The host reports `scalar-integer-multiply=0|1` in the builder identity and
+clears output handles before dispatch and after a failed or success-without-handle provider call.
+
+At the LLVM boundary, the provider requires a live module, a non-null output, and a current
+unterminated insertion block belonging to that module. Both operands must be scalar LLVM integers
+of exactly the same type, have valid module, context, and function ownership for their value kind,
+and be available at the insertion point under the established same-block ordering and cross-block
+dominance rules. All validation precedes the sole mutation, `IRBuilder::CreateMul`. LLVM integer
+types are signless; the Slang preflight boundary owns the exact signed-i32 policy.
+
+This boundary is only exact two-operand signed-i32 multiplication over already-supported
+parameters, constants, phis, and call results. It does not add unsigned, narrow, wide,
+floating-point, vector, or matrix multiplication; multiply-high, overflow, saturation, fused
+multiply-add, division, remainder, shifts, bitwise operations, or casts; or any new pointer,
+aggregate, storage, resource, libdevice, builtin, barrier, atomic, or wave capability.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -942,10 +997,11 @@ The program advances through bounded slices:
 9. direct calls and the non-void helper ABI;
 10. signed device-pointer element offsets;
 11. fixed device-array element addressing;
-12. libdevice and floating-point policy;
-13. atomics and wave operations;
-14. resources and optimization-quality work; and
-15. advanced capabilities and production-readiness evaluation.
+12. signed-i32 multiplication;
+13. libdevice and floating-point policy;
+14. atomics and wave operations;
+15. resources and optimization-quality work; and
+16. advanced capabilities and production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -965,7 +1021,9 @@ the separately demonstrable direct-call/non-void-helper ABI. Slice 10 then prove
 offsetting on the existing device pointer ABI. Slice 11 takes the next bounded part of the aggregate
 roadmap: exact fixed signed-i32 arrays behind device entry-point pointers and their canonical
 `IRGetElementPtr`, without claiming array values, other aggregates, shared memory, or additional
-address spaces.
+address spaces. Slice 12 then completes the smallest remaining canonical integer-expression
+boundary: exact two-operand signed-i32 multiplication, without widening the frozen ADD/SUB ABI or
+claiming other integer, floating-point, vector, or matrix operations.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -1118,6 +1176,21 @@ dispatch (1/1). Binary inspection found only the frozen V1 and V2 provider gette
 table, a normal `KERNEL32.dll` dependency plus delay-loaded `SHELL32.dll` and `ole32.dll`, and no
 LLVM DLL dependency.
 
+Later on 2026-08-27, Slice 12 built the Release LLVM 14.0.6 provider and Debug host. The verified
+provider fixture emitted exactly one `mul i32` whose result feeds the established address-space-1
+store, and the fake direct-route graph proved that the two scalar parameters are the exact left and
+right operands and that the multiply result is the stored value. Negotiation retained the exact
+Slice 11 prefix for fixed-array programs, rejected a partial or null multiply suffix, accepted
+future-larger tables, and sanitized failed outputs. Invalid module, type, function, availability,
+dominance, insertion-point, and output shapes were rejected before mutation.
+
+Direct NVVM and NVRTC exposed matching `[64, 32, 32]` parameter widths and each showed a 32-bit
+integer multiply plus the expected global i32 store, observed locally as `mul.lo.s32` and
+`st.global.u32`; the test makes a semantic comparison rather than a PTX-text equality claim. CUDA
+12.9 `ptxas` accepted both outputs. On the RTX 5090, both runtime lanes produced `42`, `-42`, and
+`0` for positive, negative, and zero cases. After correcting the prior Slice 11 test to distinguish
+its frozen prefix from the now-larger full table, the complete focused NVVM prefix passed 84/84.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -1162,6 +1235,15 @@ pre-mutation validation. These claims do not include other element types or arra
 values, other aggregates, local or global storage, helper array pointers, unsigned or wider
 indices, additional address spaces, or shared memory.
 
+Slice 12 settles canonical two-operand `kIROp_Mul` lowering for signed-i32 values already available
+through the established scalar program structure. It settles the dedicated append-only
+`emitIntegerMultiply` provider operation, exact Slice 11 compatibility, a 272-byte complete x64
+prefix, pre-mutation equal-integer-type and ownership/dominance validation, and the rule that
+Slang's preflight owns signed-i32 policy while LLVM's signless integer operation owns instruction
+construction. These claims do not include other integer widths or signedness, floating-point or
+aggregate multiplication, overflow variants, fused operations, division, remainder, shifts,
+bitwise operations, or casts.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
@@ -1169,7 +1251,8 @@ The following remain open until their named slice supplies evidence:
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
   pointers;
-- external/indirect calls, richer helper ABI, and richer scalar/control-flow types;
+- external/indirect calls, richer helper ABI, and scalar operations beyond the established
+  signed-i32 add, subtract, multiply, and less-than subset;
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;

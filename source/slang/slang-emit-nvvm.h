@@ -18,9 +18,10 @@ enum class NVVMIRCapability
     ScalarFunctions,
     ScalarPointerArithmetic,
     ScalarArrayAddressing,
+    ScalarIntegerMultiply,
 };
 
-/// Checks whether linked Slang IR is in the exact fixed-device-array subset owned by Slice 11.
+/// Checks whether linked Slang IR is in the exact signed-i32-multiply subset owned by Slice 12.
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,

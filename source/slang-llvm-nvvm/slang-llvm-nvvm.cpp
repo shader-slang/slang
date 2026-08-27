@@ -532,6 +532,30 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBinary(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitIntegerMultiply(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmLeft = _getValue(left);
+    llvm::Value* llvmRight = _getValue(right);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!outValue || !insertionBlock ||
+        !_areMatchingIntegerValues(state, insertionBlock, llvmLeft, llvmRight))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* result = state->builder.CreateMul(llvmLeft, llvmRight);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitIntegerSignedLessThan(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMValueHandle_1 left,
@@ -1077,6 +1101,7 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitPointerOffset = _emitPointerOffset;
     api.getArrayType = _getArrayType;
     api.emitArrayElementPointer = _emitArrayElementPointer;
+    api.emitIntegerMultiply = _emitIntegerMultiply;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);
