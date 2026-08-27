@@ -158,6 +158,14 @@ static bool _supportsScalarIntegerSignedLessEqual(const SlangNVVMBuilderAPI_V2& 
            api.emitIntegerSignedLessEqual;
 }
 
+// Treats the appended Slice 25 field as one coherent signed-integer-greater-equal capability.
+static bool _supportsScalarIntegerSignedGreaterEqual(const SlangNVVMBuilderAPI_V2& api)
+{
+    return api.structureSize >=
+               SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE &&
+           api.emitIntegerSignedGreaterEqual;
+}
+
 // Rejects success without a required handle and never exposes a handle from a failed provider call.
 template<typename T>
 static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
@@ -285,6 +293,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     const bool hasPartialScalarIntegerSignedLessEqualPrefix =
         api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_THAN_MIN_SIZE &&
         api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_LESS_EQUAL_MIN_SIZE;
+    const bool hasPartialScalarIntegerSignedGreaterEqualPrefix =
+        api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_LESS_EQUAL_MIN_SIZE &&
+        api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE;
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE || hasPartialScalarPrefix ||
         hasPartialScalarControlFlowPrefix || hasPartialScalarSSAPrefix ||
         hasPartialScalarFunctionPrefix || hasPartialScalarPointerArithmeticPrefix ||
@@ -295,6 +306,7 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         hasPartialScalarIntegerEqualPrefix || hasPartialScalarIntegerNotEqualPrefix ||
         hasPartialScalarIntegerSignedGreaterThanPrefix ||
         hasPartialScalarIntegerSignedLessEqualPrefix ||
+        hasPartialScalarIntegerSignedGreaterEqualPrefix ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
         !api.serializeModuleWithDiagnostics ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
@@ -331,7 +343,10 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
              SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_THAN_MIN_SIZE &&
          !_supportsScalarIntegerSignedGreaterThan(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_LESS_EQUAL_MIN_SIZE &&
-         !_supportsScalarIntegerSignedLessEqual(api)))
+         !_supportsScalarIntegerSignedLessEqual(api)) ||
+        (api.structureSize >=
+             SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE &&
+         !_supportsScalarIntegerSignedGreaterEqual(api)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -441,6 +456,11 @@ bool NVVMIRBuilder::supportsScalarIntegerSignedLessEqual() const
     return _supportsScalarIntegerSignedLessEqual(m_apiV2);
 }
 
+bool NVVMIRBuilder::supportsScalarIntegerSignedGreaterEqual() const
+{
+    return _supportsScalarIntegerSignedGreaterEqual(m_apiV2);
+}
+
 String NVVMIRBuilder::getVersionString() const
 {
     if (!isInitialized())
@@ -474,7 +494,9 @@ String NVVMIRBuilder::getVersionString() const
             << ";scalar-integer-signed-greater-than="
             << (supportsScalarIntegerSignedGreaterThan() ? 1 : 0)
             << ";scalar-integer-signed-less-equal="
-            << (supportsScalarIntegerSignedLessEqual() ? 1 : 0) << ";timestamp="
+            << (supportsScalarIntegerSignedLessEqual() ? 1 : 0)
+            << ";scalar-integer-signed-greater-equal="
+            << (supportsScalarIntegerSignedGreaterEqual() ? 1 : 0) << ";timestamp="
             << SharedLibraryUtils::getSharedLibraryTimestamp(
                    reinterpret_cast<void*>(m_api.createModule));
     return builder.produceString();
@@ -976,6 +998,22 @@ SlangResult NVVMIRBuilder::emitIntegerSignedLessEqual(
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result =
         m_apiV2.emitIntegerSignedLessEqual(module, left, right, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitIntegerSignedGreaterEqual(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarIntegerSignedGreaterEqual())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV2.emitIntegerSignedGreaterEqual(module, left, right, &outValue);
     return _validateHandleResult(result, outValue);
 }
 
