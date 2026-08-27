@@ -4154,6 +4154,23 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
             return false;
         }
 
+        // A struct with no fields is zero-storage in Slang's layout, but would occupy 1 byte as a
+        // C++/CUDA member (sizeof(struct{}) == 1). If it is retained, every field following it in
+        // an enclosing struct lands 1 byte past its reflected offset (CUDA_ERROR_ILLEGAL_ADDRESS on
+        // CUDA/OptiX, SIGSEGV on the CPU target). Because the retain-vs-drop choice below is
+        // decoration-driven and the CUDA payload transfer path is sized (sizeof) independently per
+        // separately-compiled stage, an empty payload field kept in one stage but dropped in
+        // another also desyncs the register-vs-pointer transfer path across linked ray-tracing
+        // stages. An empty struct must therefore legalize away regardless of any linkage/layout
+        // decoration, so it drops identically for every spelling and every stage
+        // (shader-slang/slang#8125, #12803).
+        if (auto structType = as<IRStructType>(type))
+        {
+            auto fields = structType->getFields();
+            if (!(fields.begin() != fields.end()))
+                return false;
+        }
+
         // If type is used as public interface, then treat it as simple.
         for (auto decor : type->getDecorations())
         {
