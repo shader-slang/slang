@@ -128,6 +128,13 @@ static bool _supportsRelaxedGlobalI32AtomicAdd(const SlangNVVMBuilderAPI_V2& api
     return _supportsNVVMIR20Assembly(api) && api.emitRelaxedGlobalI32AtomicAdd;
 }
 
+// Treats the appended Slice 21 field as one coherent scalar-integer-equality capability.
+static bool _supportsScalarIntegerEqual(const SlangNVVMBuilderAPI_V2& api)
+{
+    return api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_EQUAL_MIN_SIZE &&
+           api.emitIntegerEqual;
+}
+
 // Rejects success without a required handle and never exposes a handle from a failed provider call.
 template<typename T>
 static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
@@ -243,6 +250,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     const bool hasPartialRelaxedGlobalI32AtomicAddPrefix =
         api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE &&
         api.structureSize < SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE;
+    const bool hasPartialScalarIntegerEqualPrefix =
+        api.structureSize > SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE &&
+        api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_EQUAL_MIN_SIZE;
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE || hasPartialScalarPrefix ||
         hasPartialScalarControlFlowPrefix || hasPartialScalarSSAPrefix ||
         hasPartialScalarFunctionPrefix || hasPartialScalarPointerArithmeticPrefix ||
@@ -250,8 +260,8 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         hasPartialScalarIntegerBitAndPrefix || hasPartialScalarIntegerBitOrPrefix ||
         hasPartialScalarIntegerBitXorPrefix || hasPartialScalarIntegerBitNotPrefix ||
         hasPartialScalarIntegerNegatePrefix || hasPartialRelaxedGlobalI32AtomicAddPrefix ||
-        api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
-        !api.serializeModuleWithDiagnostics ||
+        hasPartialScalarIntegerEqualPrefix || api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 ||
+        !_isCompatibleV1(api.baseAPI) || !api.serializeModuleWithDiagnostics ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
          !_supportsScalarOperations(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE &&
@@ -277,7 +287,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE &&
          !_supportsScalarIntegerNegate(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE &&
-         !_supportsRelaxedGlobalI32AtomicAdd(api)))
+         !_supportsRelaxedGlobalI32AtomicAdd(api)) ||
+        (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_EQUAL_MIN_SIZE &&
+         !_supportsScalarIntegerEqual(api)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -367,6 +379,11 @@ bool NVVMIRBuilder::supportsRelaxedGlobalI32AtomicAdd() const
     return _supportsRelaxedGlobalI32AtomicAdd(m_apiV2);
 }
 
+bool NVVMIRBuilder::supportsScalarIntegerEqual() const
+{
+    return _supportsScalarIntegerEqual(m_apiV2);
+}
+
 String NVVMIRBuilder::getVersionString() const
 {
     if (!isInitialized())
@@ -395,7 +412,7 @@ String NVVMIRBuilder::getVersionString() const
             << ";scalar-integer-negate=" << (supportsScalarIntegerNegate() ? 1 : 0)
             << ";nvvm-ir-2.0-assembly=" << (supportsNVVMIR20Assembly() ? 1 : 0)
             << ";relaxed-global-i32-atomic-add=" << (supportsRelaxedGlobalI32AtomicAdd() ? 1 : 0)
-            << ";timestamp="
+            << ";scalar-integer-equal=" << (supportsScalarIntegerEqual() ? 1 : 0) << ";timestamp="
             << SharedLibraryUtils::getSharedLibraryTimestamp(
                    reinterpret_cast<void*>(m_api.createModule));
     return builder.produceString();
@@ -836,6 +853,21 @@ SlangResult NVVMIRBuilder::emitRelaxedGlobalI32AtomicAdd(
     const SlangNVVMResult_1 result =
         m_apiV2.emitRelaxedGlobalI32AtomicAdd(module, pointer, value, &outOriginalValue);
     return _validateHandleResult(result, outOriginalValue);
+}
+
+SlangResult NVVMIRBuilder::emitIntegerEqual(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarIntegerEqual())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result = m_apiV2.emitIntegerEqual(module, left, right, &outValue);
+    return _validateHandleResult(result, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitReturnVoid(SlangNVVMModuleHandle_1 module) const

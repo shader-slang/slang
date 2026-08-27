@@ -723,10 +723,12 @@ static SlangResult SLANG_NVVM_CALL _emitRelaxedGlobalI32AtomicAdd(
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _emitIntegerSignedLessThan(
+// Emits one scalar-integer comparison after applying the shared ownership and dominance contract.
+static SlangResult _emitIntegerComparison(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMValueHandle_1 left,
     SlangNVVMValueHandle_1 right,
+    llvm::CmpInst::Predicate predicate,
     SlangNVVMValueHandle_1* outValue)
 {
     if (outValue)
@@ -742,9 +744,27 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerSignedLessThan(
         return SLANG_E_INVALID_ARG;
     }
 
-    llvm::Value* result = state->builder.CreateICmpSLT(llvmLeft, llvmRight);
+    llvm::Value* result = state->builder.CreateICmp(predicate, llvmLeft, llvmRight);
     *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
     return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitIntegerSignedLessThan(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_SLT, outValue);
+}
+
+static SlangResult SLANG_NVVM_CALL _emitIntegerEqual(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_EQ, outValue);
 }
 
 static SlangResult SLANG_NVVM_CALL
@@ -1426,6 +1446,7 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitIntegerNegate = _emitIntegerNegate;
     api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
     api.serializeNVVMIR20AssemblyWithDiagnostics = _serializeNVVMIR20AssemblyWithDiagnostics;
+    api.emitIntegerEqual = _emitIntegerEqual;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

@@ -23,8 +23,9 @@ The first implementation uses these boundaries:
   architecture reach;
 - 64-bit NVPTX only, using the `nvptx64-nvidia-cuda` target triple;
 - compute kernels first;
-- textual NVVM IR only for bootstrap tests and diagnostics;
-- a validated LLVM 14 typed-pointer bitcode-writer path as a production-readiness gate;
+- textual NVVM IR only as an explicitly negotiated compatibility path or for diagnostics;
+- exact-version typed-pointer writers, including the isolated LLVM 7.0.1 native-bitcode experiment
+  and the LLVM 14.0.6 construction path, as production-readiness gates;
 - an opt-in direct backend, with NVRTC remaining the default; and
 - local validation on the current development machine until a CUDA/toolkit CI matrix is defined.
 
@@ -1408,6 +1409,84 @@ routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA compile/pass-throu
 dispatch. The provider still exports only its V1/V2 getters and has no process-visible LLVM DLL
 dependency.
 
+### Slice 20 isolated LLVM 7.0.1 bitcode experiment
+
+Slice 20 tested whether the LLVM-free provider graph could use the bitcode dialect named by NVVM
+IR 2.0 rather than the LLVM 14 text bridge. The isolated `experiment/nvvm-llvm7-bitcode` branch
+builds exact upstream LLVM 7.0.1 as a statically linked provider and uses generic verified bitcode
+for all thirteen module shapes implemented through Slice 19, including the formerly incompatible
+`atomicrmw`. CUDA 12.9 libNVVM, matching-root `ptxas`, differential PTX, and the RTX 5090 atomic
+old-value runtime fixture all pass. The writer therefore provides an executable compatibility
+oracle and proves that bitcode compatibility is technically achievable without changing Slang IR
+lowering or the LLVM-free provider ABI.
+
+That result does not change this branch's production baseline. LLVM 7 cannot configure with CMake
+4, needs an older CMake frontend and an ancient dependency/update/security policy, and brings a
+larger transitive static-library maintenance surface. The experiment stays isolated while feature
+work continues with exact LLVM 14.0.6 plus the audited NVVM IR 2.0 text serializer. Choosing the
+LLVM 7 writer, keeping the negotiated text bridge, or building a smaller purpose-built writer is a
+separate production dependency decision.
+
+### Slice 21 signed-i32 equality
+
+Consider this example:
+
+```slang
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int left,
+    uniform int right)
+{
+    *destination = left == right ? 1 : 0;
+}
+```
+
+The measured final linked Slang IR retains one exact `kIROp_Eql` with the two signed-`i32`
+parameters as operands and the canonical Boolean type as its result. The existing conditional
+lowering consumes that result, each arm contributes an exact integer constant, the merge block
+selects them through the established integer phi, and the ordinary device-pointer store consumes
+the phi. This canonical opcode and value graph are the source of truth. Direct emission does not
+recognize source syntax, infer equality from branch topology, or synthesize it from subtraction.
+
+The private V2 provider table appends one dedicated operation after the complete Slice 19 prefix:
+
+```text
+emitIntegerEqual(module, left, right, outValue)
+```
+
+The complete table is 336 bytes on x64 and 188 bytes on x86. The exact 328-byte/184-byte Slice 19
+prefix remains valid for every established program but reports `scalar-integer-equal=0`; an
+equality program reaches E52016 after discovery and before module creation. Every byte count inside
+the new function pointer and a complete table with a null callback are malformed. Future-larger
+tables are accepted and clamped, and the host clears stale output handles before dispatch and after
+failure or success without a result.
+
+At the provider boundary, equality shares the established binary integer validation path with
+signed less-than. Both operands must be available same-module, same-function scalar LLVM integers
+of one exact type at the current unterminated insertion point. Complete ownership, ordering,
+dominance, and type validation precedes the sole mutation. The selected predicate is exact LLVM
+`ICMP_EQ`, yielding an `i1`; Slang preflight, not LLVM's signless integer type, owns the signed-i32
+restriction. The resulting Boolean handle is recorded in the existing value map and can feed the
+already-supported Boolean branch consumer without adding Boolean parameter, storage, return, or
+phi ABI.
+
+This boundary does not add inequality, ordered comparisons, unsigned/wide/floating-point/pointer
+equality, vectors, matrices, aggregates, resources, or new pointer and storage shapes. Unsigned,
+wide, and floating equality stop at their unsupported entry parameters; pointer equality reaches
+the exact signed-i32 operand check. All four stop before provider discovery. Provider-level invalid
+operations also reject missing or terminated insertion points, null outputs, wrong or mismatched
+types, cross-module/cross-function handles, and unavailable or non-dominating values before
+mutation.
+
+CUDA 12.9 direct NVVM and NVRTC PTX expose matching `[64, 32, 32]` parameter widths, token-safe
+32-bit equality comparison, and the global 32-bit store. The selected toolkit's `ptxas` accepts
+both outputs. On the RTX 5090, both routes return one for `0 == 0` and `-7 == -7`, and zero for
+`-7 == 7` and `INT_MIN == INT_MAX`. The Release focused NVVM suite passes 148/148; preservation
+passes 1/1 parser, 2/2 routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA
+compile/pass-through, and 1/1 runtime dispatch. The provider still exports only the V1/V2 getters
+and has no process-visible LLVM DLL dependency.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -1504,8 +1583,10 @@ The program advances through bounded slices:
 17. signed-i32 arithmetic negation;
 18. libdevice and floating-point policy;
 19. relaxed global signed-i32 atomic add;
-20. resources and optimization-quality work; and
-21. wave operations and other advanced capabilities, then production-readiness evaluation.
+20. an isolated LLVM 7.0.1 native-bitcode feasibility experiment;
+21. signed-i32 equality;
+22. resources and optimization-quality work; and
+23. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -1825,10 +1906,28 @@ NVVM-2.0 writer applies only those two conversions, and its semantic atomic coun
 rewritten-line count. Direct PTX contains token-safe `atom.global.add.u32`; matching-root `ptxas`
 and RTX 5090 runtime lanes pass for both discarded and consumed old-value results.
 
+The isolated Slice 20 experiment then proved that exact upstream LLVM 7.0.1 bitcode carries the
+complete Slice 19 graph through the same CUDA 12.9 libNVVM, `ptxas`, and runtime boundaries. That
+technical result is preserved on `experiment/nvvm-llvm7-bitcode`; this branch retains the LLVM 14
+text baseline until the dependency policy is decided.
+
+The Slice 21 baseline measured final linked Slang IR containing exact
+`cmpEQ(left, right) : Bool`, consumed by the established conditional/constant/phi/store graph. The
+pre-change direct route stopped at E52017 `cmpEQ`; NVRTC accepted the source and emitted 32-bit
+equality selection. The provider's shared binary comparison validator emits one verifier-valid
+`icmp eq i32`, and the complete host route maps its `i1` result only to the already-supported
+Boolean branch consumer.
+
+Direct NVVM and NVRTC expose matching `[64, 32, 32]` parameters, token-safe 32-bit equality, and a
+global 32-bit store. CUDA 12.9 `ptxas` accepts both outputs. RTX 5090 runtime cases cover equal zero,
+equal negative, unequal signs, and unequal integer extremes on both routes. The focused suite
+passes 148/148 and the preservation matrix passes 10/10.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
-shape, the continued NVRTC default, the binary artifact shape, the separate pinned LLVM 14 builder,
+shape, the continued NVRTC default, the binary artifact shape, the separate exact LLVM 14 builder
+and isolated LLVM 7 feasibility branch,
 the frozen-V1/append-only-V2 diagnostic ABI, the coherent AS1 scalar-memory capability and
 differential contract, the Slice 5 target-option/routing boundary, and the Slice 6 exact
 empty-compute subset. Slice 7 settles the raw `[CUDAKernel]` signed-`i32`/device-pointer parameter
@@ -1945,21 +2044,33 @@ NVVM-2.0 assembly writer form one complete 328-byte x64 prefix after the frozen 
 prefix. Older providers continue to receive bitcode; full providers pass the direct-emission,
 negative, PTX, `ptxas`, and runtime evidence above.
 
+Slice 21 settles exact two-operand `kIROp_Eql` lowering for signed-i32 values already available
+through the established scalar program structure. It appends the dedicated `emitIntegerEqual`
+provider operation after the exact 328-byte Slice 19 prefix, yielding a 336-byte complete x64
+prefix, and reuses the shared binary integer validator for type, ownership, availability, and
+dominance before exact `ICMP_EQ` construction. Slang owns the signed-i32 operand and canonical
+Boolean-result policy; LLVM owns the signless integer comparison and `i1` result. The Boolean may
+feed established control flow, but this slice adds no Boolean ABI, storage, return, or phi surface.
+These claims do not include inequality, other ordered comparisons, unsigned/wide/floating-point/
+pointer equality, vectors, matrices, aggregates, resources, or new ABI and storage shapes.
+
 The following remain open until their named slice supplies evidence:
 
-- packaging and update policy for the optional LLVM 14 NVVM builder module;
+- packaging and update policy for the optional NVVM builder module, including whether production
+  owns LLVM 7.0.1 plus an older CMake frontend or LLVM 14.0.6 plus negotiated text;
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
   pointers;
 - external/indirect calls, richer helper ABI, and scalar operations beyond the established
-  signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, bitwise-XOR, bitwise-NOT, and
-  arithmetic-negate and less-than subset;
+  signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, bitwise-XOR, bitwise-NOT,
+  arithmetic-negate, less-than, and equality subset;
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
-  production-compatible bitcode writer to replace the experimental text bridge;
+  production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
+  bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations, including their lane, mask, convergence, and intrinsic contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.

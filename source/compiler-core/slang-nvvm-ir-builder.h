@@ -67,6 +67,8 @@ public:
     bool supportsNVVMIR20Assembly() const;
     /// Returns whether the provider advertised the complete Slice 19 atomic-add prefix.
     bool supportsRelaxedGlobalI32AtomicAdd() const;
+    /// Returns whether the provider advertised the complete Slice 21 integer-equality prefix.
+    bool supportsScalarIntegerEqual() const;
     /// Returns the provider identity that affects generated IR and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -272,6 +274,13 @@ public:
         SlangNVVMValueHandle_1 pointer,
         SlangNVVMValueHandle_1 value,
         SlangNVVMValueHandle_1& outOriginalValue) const;
+
+    /// Emits scalar integer equality and returns an i1 value.
+    SlangResult emitIntegerEqual(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;
