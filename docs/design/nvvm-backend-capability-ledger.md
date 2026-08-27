@@ -138,6 +138,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32NegatePtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32NegateRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite negation cases | RTX 5090 results `-1.5`, `8`, `-1024` | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32EqualKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Generic floating-compare callback constructs exact unflagged LLVM `fcmp oeq` whose `i1` result selects zero/one stores | Both text dialects contain one ordered float comparison, two aligned i32 stores, and no fast flag | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32EqualUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical Bool `kIROp_Eql` with Float operands lowers through floating-compare operation 0 while signed-i32 equality remains unchanged | Exact Float parameter operands feed the comparison, whose Boolean result controls the existing constant/phi/i32-store graph | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32EqualDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 ordered equality compiles through both routes | `[64, 32, 32]`, token-safe float32 equality predicate, one global i32 store, no load or float arithmetic, and no integer predicate agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32EqualPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32EqualRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite, signed-zero, and quiet-NaN ordered-equality cases | RTX 5090 results are `1` for `3.75 == 3.75` and `+0 == -0`, and `0` for `-8 != 0.5` and `NaN == NaN` | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -622,4 +628,21 @@ assembler, and runtime runners. The five measured test/support files grow from 1
 physical lines for the new ABI suffix, writer audit, fake family, and seven names. Release passes
 235/235 with sorted-name SHA-256
 `2b79918702a9b21110af8251944e4428001a4ea69a2ff79b7a18e488cd13b4ba`; Debug preservation passes
+10/10.
+
+Slice 37 adds ordered float32 equality as feature 25/floating-compare operation 0 and appends one
+generic callback. The V3 table grows from 472 to 480 bytes on x64 and from 280 to 288 bytes on x86;
+exact Slice 36 providers remain valid without the bit. Canonical Bool `kIROp_Eql` is classified by
+its Float operands and becomes unflagged LLVM `fcmp oeq`, while signed-i32 equality and adjacent
+float/pointer comparisons retain their established behavior.
+
+The first `NVVMFloat32ComparisonTestCase` row shares a Boolean-to-i32 provider consumer and the
+generic float `ptxas` runner while keeping float runtime arguments separate from integer comparison
+descriptors. The five measured test/support files grow from 19,841 to 20,503 physical lines; later
+floating predicates reuse this family. NVVM and NVRTC agree on `[64, 32, 32]`, a token-safe
+float32 equality predicate, one global i32 store, and no load/float arithmetic/integer predicate;
+`ptxas` accepts both. RTX 5090 returns true for equal finite values and opposite signed zeros, and
+false for unequal finite values and quiet NaNs. Focused tests pass 12/12 and Release passes 242/242
+with sorted-name SHA-256
+`7bdb7df316f95767ad79c76e2f802dc08504dfd06fbdfd5208a9c0eafd4ca670`; Debug preservation passes
 10/10.

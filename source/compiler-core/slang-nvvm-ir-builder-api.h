@@ -639,7 +639,8 @@ extern "C"
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY ((SlangNVVMBuilderFeature_3)22u)
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE ((SlangNVVMBuilderFeature_3)23u)
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE ((SlangNVVMBuilderFeature_3)24u)
-#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 25u
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL ((SlangNVVMBuilderFeature_3)25u)
+#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 26u
 #define SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3 4u
 
     typedef struct SlangNVVMBuilderFeatureSet_3
@@ -714,6 +715,16 @@ extern "C"
         SlangNVVMValueHandle_1 value,
         SlangNVVMValueHandle_1* outValue);
 
+    typedef uint32_t SlangNVVMFloatingCompareOp_3;
+#define SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL ((SlangNVVMFloatingCompareOp_3)0u)
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitFloatingCompare_3)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMFloatingCompareOp_3 operation,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
     // Version 3 freezes V2 as its compatibility core. Generic callbacks and independent feature
     // bits carry forward-growing operation families and semantic availability.
     typedef struct SlangNVVMBuilderAPI_V3
@@ -728,6 +739,7 @@ extern "C"
         SlangNVVMGetFloatingPointType_3 getFloatingPointType;
         SlangNVVMEmitFloatingBinary_3 emitFloatingBinary;
         SlangNVVMEmitFloatingUnary_3 emitFloatingUnary;
+        SlangNVVMEmitFloatingCompare_3 emitFloatingCompare;
     } SlangNVVMBuilderAPI_V3;
 
 #define SLANG_NVVM_BUILDER_API_V3_MIN_SIZE                  \
@@ -741,6 +753,10 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_NEGATE_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V3, emitFloatingUnary) +       \
      sizeof(((SlangNVVMBuilderAPI_V3*)0)->emitFloatingUnary))
+
+#define SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_EQUAL_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V3, emitFloatingCompare) +    \
+     sizeof(((SlangNVVMBuilderAPI_V3*)0)->emitFloatingCompare))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V3)(
         SlangNVVMBuilderAPI_V3* outAPI);

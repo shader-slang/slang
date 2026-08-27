@@ -150,6 +150,77 @@ NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST(nvvmSlangFloat32NegateUsesDirectPipeline, Ne
 
 #undef NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST
 
+SLANG_UNIT_TEST(nvvmSlangFloat32EqualUsesDirectPipeline)
+{
+    const NVVMFloat32ComparisonTestCase& testCase =
+        _getNVVMFloat32ComparisonTestCase(NVVMFloat32ComparisonTestOperation::OrderedEqual);
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            _compileSlangWithDirectNVVM(globalSession, testCase.source, code, diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.getIntegerTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.getFloatingPointTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.floatingPointBitWidth == 32);
+        SLANG_CHECK(gFakeNVVMBuilder.getPointerTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.pointerPointeeTypes[0] == _getFakeNVVMBuilderIntegerType());
+        SLANG_CHECK(gFakeNVVMBuilder.functionParameterTypeKinds.getCount() == 3);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[0] ==
+            FakeNVVMBuilderParameterTypeKind::Pointer);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[1] ==
+            FakeNVVMBuilderParameterTypeKind::Float);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[2] ==
+            FakeNVVMBuilderParameterTypeKind::Float);
+
+        SLANG_CHECK(
+            gFakeNVVMBuilder
+                .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingCompare)] ==
+            1);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarOperations.getCount() == 1);
+        const FakeNVVMBuilderScalarOperation& comparison = gFakeNVVMBuilder.scalarOperations[0];
+        SLANG_CHECK(comparison.key.family == FakeNVVMBuilderScalarFamily::FloatingCompare);
+        SLANG_CHECK(comparison.key.operation == testCase.operation);
+        SLANG_CHECK(comparison.operandCount == 2);
+        SLANG_CHECK(comparison.operands[0].kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(comparison.operands[0].index == 1);
+        SLANG_CHECK(comparison.operands[1].kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(comparison.operands[1].index == 2);
+        SLANG_CHECK(comparison.callerBlockIndex == gFakeNVVMBuilder.conditionalSourceBlockIndex);
+
+        SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitConditionalBranchCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.getIntegerConstantCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerPhiCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.addIntegerPhiIncomingCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitBranchCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::IntegerPhi);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].index == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storePointerValueRefs[0].kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(gFakeNVVMBuilder.storePointerValueRefs[0].index == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -210,18 +281,14 @@ SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-static void _runNVVMSlangNegotiatesFloat32ArithmeticCapability(
-    NVVMFloat32ArithmeticTestOperation testOperation)
+static void _runNVVMSlangNegotiatesFloat32Capability(
+    const char* source,
+    SlangNVVMBuilderFeature_3 feature,
+    FakeNVVMBuilderScalarFamily family)
 {
-    const NVVMFloat32ArithmeticTestCase& testCase =
-        _getNVVMFloat32ArithmeticTestCase(testOperation);
-    const FakeNVVMBuilderScalarFamily family = testCase.operandCount == 1
-                                                   ? FakeNVVMBuilderScalarFamily::FloatingUnary
-                                                   : FakeNVVMBuilderScalarFamily::FloatingBinary;
     _resetDirectNVVMFakes();
     _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features.words[testCase.feature / 64u] &=
-        ~(uint64_t(1) << (testCase.feature % 64u));
+    gFakeNVVMBuilder.apiV3.features.words[feature / 64u] &= ~(uint64_t(1) << (feature % 64u));
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -231,8 +298,8 @@ static void _runNVVMSlangNegotiatesFloat32ArithmeticCapability(
 
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(
-            _compileSlangWithDirectNVVM(globalSession, testCase.source, code, diagnostics)));
+        SLANG_CHECK(
+            SLANG_FAILED(_compileSlangWithDirectNVVM(globalSession, source, code, diagnostics)));
         SLANG_CHECK(code == nullptr);
         SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
         SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
@@ -244,6 +311,17 @@ static void _runNVVMSlangNegotiatesFloat32ArithmeticCapability(
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+static void _runNVVMSlangNegotiatesFloat32ArithmeticCapability(
+    NVVMFloat32ArithmeticTestOperation testOperation)
+{
+    const NVVMFloat32ArithmeticTestCase& testCase =
+        _getNVVMFloat32ArithmeticTestCase(testOperation);
+    const FakeNVVMBuilderScalarFamily family = testCase.operandCount == 1
+                                                   ? FakeNVVMBuilderScalarFamily::FloatingUnary
+                                                   : FakeNVVMBuilderScalarFamily::FloatingBinary;
+    _runNVVMSlangNegotiatesFloat32Capability(testCase.source, testCase.feature, family);
 }
 
 #define NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(NAME, OPERATION) \
@@ -260,6 +338,16 @@ NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32DivideCapabili
 NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32NegateCapability, Negate)
 
 #undef NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32EqualCapability)
+{
+    const NVVMFloat32ComparisonTestCase& testCase =
+        _getNVVMFloat32ComparisonTestCase(NVVMFloat32ComparisonTestOperation::OrderedEqual);
+    _runNVVMSlangNegotiatesFloat32Capability(
+        testCase.source,
+        testCase.feature,
+        FakeNVVMBuilderScalarFamily::FloatingCompare);
+}
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32CopyCapability)
 {
@@ -2611,7 +2699,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMGroupSharedI32AtomicAddSource, "'device scalar pointer'"},
         {kDirectNVVMUnsignedIntegerEqualSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingEqualSource, "'signed i32 value'"},
         {kDirectNVVMPointerEqualSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedIntegerNotEqualSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerNotEqualSource, "'entry-point parameter'"},
@@ -2635,8 +2722,8 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     // multiply ABI variants, logical NOT/shifts/division/remainder, unsigned/wide AND/OR/XOR/NOT,
     // unsigned/wide negate and floating-negate-plus-cast and atomic-add ABI variants,
     // non-relaxed atomic-add order,
-    // adjacent atomic operations, group-shared atomic add, unsigned/wide/floating equality and
-    // inequality and ordered comparisons, pointer comparisons, unsigned indices,
+    // adjacent atomic operations, group-shared atomic add, unsigned/wide equality, floating and
+    // unsigned/wide inequality and ordered comparisons, pointer comparisons, unsigned indices,
     // and helper-array-pointer shapes remain deterministic before builder discovery.
     for (const auto& unsupported : kCases)
     {

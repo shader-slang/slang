@@ -2105,6 +2105,47 @@ LF-terminated name set has SHA-256
 `2b79918702a9b21110af8251944e4428001a4ea69a2ff79b7a18e488cd13b4ba`. Debug preservation passes
 10/10.
 
+### Slice 37 exact scalar float32 ordered equality
+
+Slice 37 adds `*destination = left == right ? 1 : 0` for two scalar Float parameters and a raw AS1
+`Ptr<int>` destination. Normal lowering produces canonical Bool `kIROp_Eql`; canonical Float
+operand types distinguish the new path from established signed-i32 equality because both forms
+have the same Bool result. The comparison's `i1` output continues through the existing conditional
+branch, zero/one constants, integer phi, and aligned i32 store without an alternate result
+representation.
+
+Feature 25 advertises stable floating-compare operation 0, `ORDERED_EQUAL`, through an
+`emitFloatingCompare` callback appended after the floating-unary field. V3 grows from 472 to 480
+bytes on x64 and from 280 to 288 bytes on x86. An exact Slice 36 provider remains compatible when
+it does not advertise feature 25; advertising it requires the complete suffix plus the float-type
+and compare callbacks. The facade rejects unknown operations before dispatch and clears every
+failed output.
+
+The provider applies the established ownership, insertion, availability, dominance, function, and
+exact LLVM-float checks before emitting one unflagged `CreateFCmpOEQ`. Both generic LLVM and
+negotiated NVVM-2.0 text contain exactly one `fcmp oeq float`; unlike LLVM 14 `fneg`, this opcode
+needs no legacy text conversion. Orderedness makes the source-language NaN rule explicit: equality
+is false when either operand is NaN.
+
+The first `NVVMFloat32ComparisonTestCase` row owns source, feature, operation, text, PTX, and runtime
+data. It shares a Boolean-result-to-i32 provider consumer with integer comparisons and the generic
+float `ptxas` runner, but retains a separate descriptor family because Float argument ABI and
+runtime cases differ from integer comparison data. The five measured test/support files grow from
+19,841 to 20,503 physical lines for the new family scaffolding; another floating predicate needs a
+row and thin wrappers rather than another layer harness.
+
+Direct topology has parameter kinds `[Pointer, Float, Float]`; parameters 1 and 2 feed one floating
+comparison whose Bool result controls the established four-block constant/phi/store graph. NVVM
+and NVRTC agree on parameter widths `[64, 32, 32]`, a token-safe float32 equality predicate, one
+global i32 store, and no global load, float arithmetic, or integer comparison predicate. CUDA 12.9
+`ptxas` accepts both outputs. On the RTX 5090, both routes return one for `3.75 == 3.75` and
+`+0 == -0`, and zero for `-8 != 0.5` and quiet `NaN == NaN`.
+
+The focused matrix passes 12/12 and the Release NVVM prefix passes 242/242. Its exact sorted
+LF-terminated name set has SHA-256
+`7bdb7df316f95767ad79c76e2f802dc08504dfd06fbdfd5208a9c0eafd4ca670`. Debug preservation passes
+10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2218,8 +2259,10 @@ The program advances through bounded slices:
 34. exact scalar float32 multiplication plus descriptor-driven floating-binary evidence;
 35. exact scalar float32 division through the generic floating-binary family;
 36. exact scalar float32 negation through an append-only generic floating-unary V3 suffix;
-37. further type, memory, resource, and optimization-quality work; and
-38. wave operations and other advanced capabilities, then production-readiness evaluation.
+37. exact scalar float32 ordered equality through an append-only generic floating-compare V3
+    suffix;
+38. further type, memory, resource, and optimization-quality work; and
+39. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.

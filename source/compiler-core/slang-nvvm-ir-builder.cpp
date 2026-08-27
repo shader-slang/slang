@@ -484,6 +484,8 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE);
     const bool advertisesFloat32Negate =
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE);
+    const bool advertisesFloat32Equal =
+        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL);
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3 ||
         api.compatibilityAPI.structureSize != sizeof(SlangNVVMBuilderAPI_V2) ||
@@ -493,7 +495,10 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
           !api.getFloatingPointType || !api.emitFloatingBinary)) ||
         (advertisesFloat32Negate &&
          (api.structureSize < SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_NEGATE_MIN_SIZE ||
-          !api.getFloatingPointType || !api.emitFloatingUnary)))
+          !api.getFloatingPointType || !api.emitFloatingUnary)) ||
+        (advertisesFloat32Equal &&
+         (api.structureSize < SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_EQUAL_MIN_SIZE ||
+          !api.getFloatingPointType || !api.emitFloatingCompare)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -758,7 +763,8 @@ SlangResult NVVMIRBuilder::getFloatingPointType(
         !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT) &&
         !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY) &&
         !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE))
+        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE) &&
+        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL))
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result = m_apiV3.getFloatingPointType(module, bitWidth, &outType);
     return _validateHandleResult(result, outType);
@@ -1104,6 +1110,25 @@ SlangResult NVVMIRBuilder::emitFloatingUnary(
     if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE))
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result = m_apiV3.emitFloatingUnary(module, operation, value, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitFloatingCompare(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMFloatingCompareOp_3 operation,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (operation != SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL)
+        return SLANG_E_INVALID_ARG;
+    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL))
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV3.emitFloatingCompare(module, operation, left, right, &outValue);
     return _validateHandleResult(result, outValue);
 }
 

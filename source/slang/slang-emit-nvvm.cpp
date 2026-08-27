@@ -118,6 +118,41 @@ bool _getNVVMFloat32BinaryInfo(IROp op, NVVMFloat32BinaryInfo& outInfo)
     }
 }
 
+struct NVVMFloat32CompareInfo
+{
+    SlangNVVMBuilderFeature_3 feature;
+    SlangNVVMFloatingCompareOp_3 operation;
+    const char* diagnosticName;
+};
+
+// Classifies the exact canonical floating comparison shape accepted by the direct backend.
+bool _getNVVMFloat32CompareInfo(IRInst* inst, NVVMFloat32CompareInfo& outInfo)
+{
+    if (!inst || inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
+        return false;
+
+    IRInst* left = inst->getOperand(0);
+    IRInst* right = inst->getOperand(1);
+    if (!left || !right || !isNVVMFloat32Type(left->getDataType()) ||
+        !isNVVMFloat32Type(right->getDataType()))
+    {
+        return false;
+    }
+
+    switch (inst->getOp())
+    {
+    case kIROp_Eql:
+        outInfo = {
+            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL,
+            SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL,
+            "float32 ordered equality",
+        };
+        return true;
+    default:
+        return false;
+    }
+}
+
 // Checks that an executable operand has an accepted definition that dominates its use.
 SlangResult _validateAvailableValue(
     CodeGenContext* codeGenContext,
@@ -646,6 +681,14 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Eql:
+                {
+                    NVVMFloat32CompareInfo info;
+                    if (_getNVVMFloat32CompareInfo(inst, info))
+                    {
+                        _requireFeature(features, info.feature);
+                        break;
+                    }
+                }
                 if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 equality"));
@@ -841,7 +884,6 @@ SlangResult _validateNVVMFunction(
             case kIROp_BitOr:
             case kIROp_BitXor:
             case kIROp_Less:
-            case kIROp_Eql:
             case kIROp_Neq:
             case kIROp_Greater:
             case kIROp_Leq:
@@ -861,6 +903,46 @@ SlangResult _validateNVVMFunction(
                     dominatorTree,
                     features));
                 availableValues.add(inst);
+                break;
+
+            case kIROp_Eql:
+                {
+                    NVVMFloat32CompareInfo info;
+                    if (_getNVVMFloat32CompareInfo(inst, info))
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateFloat32Value(
+                            codeGenContext,
+                            inst->getOperand(0),
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                        SLANG_RETURN_ON_FAIL(_validateFloat32Value(
+                            codeGenContext,
+                            inst->getOperand(1),
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                        _requireFeature(features, info.feature);
+                    }
+                    else
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateI32Value(
+                            codeGenContext,
+                            inst->getOperand(0),
+                            inst,
+                            availableValues,
+                            dominatorTree,
+                            features));
+                        SLANG_RETURN_ON_FAIL(_validateI32Value(
+                            codeGenContext,
+                            inst->getOperand(1),
+                            inst,
+                            availableValues,
+                            dominatorTree,
+                            features));
+                    }
+                    availableValues.add(inst);
+                }
                 break;
 
             case kIROp_BitNot:
@@ -1863,15 +1945,31 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "signed i32 equality comparison",
-                            builder.emitIntegerCompare(
-                                moduleScope.module,
-                                SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL,
-                                loweredLeft,
-                                loweredRight,
-                                loweredValue)));
+                        NVVMFloat32CompareInfo info;
+                        if (_getNVVMFloat32CompareInfo(inst, info))
+                        {
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                info.diagnosticName,
+                                builder.emitFloatingCompare(
+                                    moduleScope.module,
+                                    info.operation,
+                                    loweredLeft,
+                                    loweredRight,
+                                    loweredValue)));
+                        }
+                        else
+                        {
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "signed i32 equality comparison",
+                                builder.emitIntegerCompare(
+                                    moduleScope.module,
+                                    SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL,
+                                    loweredLeft,
+                                    loweredRight,
+                                    loweredValue)));
+                        }
                         valueMap[inst] = loweredValue;
                     }
                     break;

@@ -969,6 +969,34 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingUnaryV3(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitFloatingCompareV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMFloatingCompareOp_3 operation,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmLeft = _getValue(left);
+    llvm::Value* llvmRight = _getValue(right);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!outValue || !insertionBlock || operation != SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmLeft) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmRight) ||
+        llvmLeft->getType() != llvm::Type::getFloatTy(state->context) ||
+        llvmRight->getType() != llvmLeft->getType())
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    *outValue =
+        reinterpret_cast<SlangNVVMValueHandle_1>(state->builder.CreateFCmpOEQ(llvmLeft, llvmRight));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitIntegerCompareV3(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMIntegerCompareOp_3 operation,
@@ -1749,6 +1777,7 @@ static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
     api.getFloatingPointType = _getFloatingPointType;
     api.emitFloatingBinary = _emitFloatingBinaryV3;
     api.emitFloatingUnary = _emitFloatingUnaryV3;
+    api.emitFloatingCompare = _emitFloatingCompareV3;
 }
 
 } // namespace
