@@ -195,6 +195,9 @@ struct FakeNVVMBuilderIntegerBitXorStorage
 struct FakeNVVMBuilderIntegerBitNotStorage
 {
 };
+struct FakeNVVMBuilderIntegerNegateStorage
+{
+};
 
 enum class FakeNVVMBuilderValueKind
 {
@@ -211,6 +214,7 @@ enum class FakeNVVMBuilderValueKind
     IntegerBitOr,
     IntegerBitXor,
     IntegerBitNot,
+    IntegerNegate,
 };
 
 struct FakeNVVMBuilderValueRef
@@ -275,6 +279,7 @@ struct FakeNVVMBuilderState
         emitIntegerBitOrCallCount = 0;
         emitIntegerBitXorCallCount = 0;
         emitIntegerBitNotCallCount = 0;
+        emitIntegerNegateCallCount = 0;
         integerBitWidth = 0;
         arrayElementCount = 0;
         arrayElementType = nullptr;
@@ -345,6 +350,8 @@ struct FakeNVVMBuilderState
         integerBitXorRightValueRefs.clear();
         integerBitNotCallerBlockIndices.clear();
         integerBitNotValueRefs.clear();
+        integerNegateCallerBlockIndices.clear();
+        integerNegateValueRefs.clear();
         loadPointerValueRefs.clear();
         storePointerValueRefs.clear();
         kernelFunctionIndices.clear();
@@ -374,6 +381,7 @@ struct FakeNVVMBuilderState
         returnNullIntegerBitOr = false;
         returnNullIntegerBitXor = false;
         returnNullIntegerBitNot = false;
+        returnNullIntegerNegate = false;
         failIntegerTypeAfterWrite = false;
         failArrayTypeAfterWrite = false;
         failIntegerBinaryAfterWrite = false;
@@ -388,6 +396,7 @@ struct FakeNVVMBuilderState
         failIntegerBitOrAfterWrite = false;
         failIntegerBitXorAfterWrite = false;
         failIntegerBitNotAfterWrite = false;
+        failIntegerNegateAfterWrite = false;
         reportMismatchedWriteSize = false;
         verificationStatus = SLANG_NVVM_VERIFICATION_VALID;
         serializationWithDiagnosticsResult = SLANG_OK;
@@ -418,6 +427,7 @@ struct FakeNVVMBuilderState
     bool returnNullIntegerBitOr = false;
     bool returnNullIntegerBitXor = false;
     bool returnNullIntegerBitNot = false;
+    bool returnNullIntegerNegate = false;
     bool failIntegerTypeAfterWrite = false;
     bool failArrayTypeAfterWrite = false;
     bool reportMismatchedWriteSize = false;
@@ -457,6 +467,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderIntegerBitOrStorage integerBitOrStorage[16];
     FakeNVVMBuilderIntegerBitXorStorage integerBitXorStorage[16];
     FakeNVVMBuilderIntegerBitNotStorage integerBitNotStorage[16];
+    FakeNVVMBuilderIntegerNegateStorage integerNegateStorage[16];
 
     int createModuleCallCount = 0;
     int destroyModuleCallCount = 0;
@@ -493,6 +504,7 @@ struct FakeNVVMBuilderState
     int emitIntegerBitOrCallCount = 0;
     int emitIntegerBitXorCallCount = 0;
     int emitIntegerBitNotCallCount = 0;
+    int emitIntegerNegateCallCount = 0;
     uint32_t integerBitWidth = 0;
     uint32_t arrayElementCount = 0;
     SlangNVVMTypeHandle_1 arrayElementType = nullptr;
@@ -563,6 +575,8 @@ struct FakeNVVMBuilderState
     List<FakeNVVMBuilderValueRef> integerBitXorRightValueRefs;
     List<Index> integerBitNotCallerBlockIndices;
     List<FakeNVVMBuilderValueRef> integerBitNotValueRefs;
+    List<Index> integerNegateCallerBlockIndices;
+    List<FakeNVVMBuilderValueRef> integerNegateValueRefs;
     List<FakeNVVMBuilderValueRef> loadPointerValueRefs;
     List<FakeNVVMBuilderValueRef> storePointerValueRefs;
     List<Index> kernelFunctionIndices;
@@ -585,6 +599,7 @@ struct FakeNVVMBuilderState
     bool failIntegerBitOrAfterWrite = false;
     bool failIntegerBitXorAfterWrite = false;
     bool failIntegerBitNotAfterWrite = false;
+    bool failIntegerNegateAfterWrite = false;
 };
 
 FakeNVVMBuilderState gFakeNVVMBuilder;
@@ -951,6 +966,25 @@ static bool _getFakeNVVMBuilderIntegerBitNotIndex(SlangNVVMValueHandle_1 value, 
     return false;
 }
 
+static SlangNVVMValueHandle_1 _getFakeNVVMBuilderIntegerNegate(Index index = 0)
+{
+    SLANG_ASSERT(index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.integerNegateStorage));
+    return reinterpret_cast<SlangNVVMValueHandle_1>(&gFakeNVVMBuilder.integerNegateStorage[index]);
+}
+
+static bool _getFakeNVVMBuilderIntegerNegateIndex(SlangNVVMValueHandle_1 value, Index& outIndex)
+{
+    for (Index i = 0; i < gFakeNVVMBuilder.integerNegateValueRefs.getCount(); ++i)
+    {
+        if (value == _getFakeNVVMBuilderIntegerNegate(i))
+        {
+            outIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool _getFakeNVVMBuilderValueRef(
     SlangNVVMValueHandle_1 value,
     FakeNVVMBuilderValueRef& outRef)
@@ -1024,6 +1058,11 @@ static bool _getFakeNVVMBuilderValueRef(
     if (_getFakeNVVMBuilderIntegerBitNotIndex(value, valueIndex))
     {
         outRef = {FakeNVVMBuilderValueKind::IntegerBitNot, valueIndex};
+        return true;
+    }
+    if (_getFakeNVVMBuilderIntegerNegateIndex(value, valueIndex))
+    {
+        outRef = {FakeNVVMBuilderValueKind::IntegerNegate, valueIndex};
         return true;
     }
     return false;
@@ -1114,6 +1153,7 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle_1 value)
     case FakeNVVMBuilderValueKind::IntegerBitOr:
     case FakeNVVMBuilderValueKind::IntegerBitXor:
     case FakeNVVMBuilderValueKind::IntegerBitNot:
+    case FakeNVVMBuilderValueKind::IntegerNegate:
         return true;
     case FakeNVVMBuilderValueKind::PointerOffset:
     case FakeNVVMBuilderValueKind::ArrayElementPointer:
@@ -2072,6 +2112,30 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntegerBitNot(
     return gFakeNVVMBuilder.failIntegerBitNotAfterWrite ? SLANG_FAIL : SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntegerNegate(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1* outValue)
+{
+    ++gFakeNVVMBuilder.emitIntegerNegateCallCount;
+    if (outValue)
+        *outValue = nullptr;
+    FakeNVVMBuilderValueRef valueRef;
+    if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
+        !_isFakeNVVMBuilderIntegerValue(value) || !_getFakeNVVMBuilderValueRef(value, valueRef) ||
+        !outValue ||
+        gFakeNVVMBuilder.integerNegateValueRefs.getCount() >=
+            SLANG_COUNT_OF(gFakeNVVMBuilder.integerNegateStorage))
+        return SLANG_E_INVALID_ARG;
+    const Index resultIndex = gFakeNVVMBuilder.integerNegateValueRefs.getCount();
+    gFakeNVVMBuilder.integerNegateCallerBlockIndices.add(gFakeNVVMBuilder.currentInsertBlockIndex);
+    gFakeNVVMBuilder.integerNegateValueRefs.add(valueRef);
+    *outValue = gFakeNVVMBuilder.returnNullIntegerNegate
+                    ? nullptr
+                    : _getFakeNVVMBuilderIntegerNegate(resultIndex);
+    return gFakeNVVMBuilder.failIntegerNegateAfterWrite ? SLANG_FAIL : SLANG_OK;
+}
+
 static SlangNVVMBuilderAPI_V1 _makeFakeNVVMBuilderAPI()
 {
     SlangNVVMBuilderAPI_V1 api = {};
@@ -2125,6 +2189,7 @@ static SlangNVVMBuilderAPI_V2 _makeFakeNVVMBuilderAPIV2()
     api.emitIntegerBitOr = _fakeNVVMBuilderEmitIntegerBitOr;
     api.emitIntegerBitXor = _fakeNVVMBuilderEmitIntegerBitXor;
     api.emitIntegerBitNot = _fakeNVVMBuilderEmitIntegerBitNot;
+    api.emitIntegerNegate = _fakeNVVMBuilderEmitIntegerNegate;
     return api;
 }
 
@@ -3017,6 +3082,7 @@ static const char kBitAndScalarKernelName[] = "bitAndScalar";
 static const char kBitOrScalarKernelName[] = "bitOrScalar";
 static const char kBitXorScalarKernelName[] = "bitXorScalar";
 static const char kBitNotScalarKernelName[] = "bitNotScalar";
+static const char kNegateScalarKernelName[] = "negateScalar";
 static const char kScalarReferenceCUDASource[] = R"(
 extern "C" __global__ void writeScalar(int* destination, int value)
 {
@@ -3421,6 +3487,42 @@ void computeMain(
     uniform int64_t x)
 {
     *destination = int(~x);
+}
+)";
+static const char kDirectNVVMIntegerNegateSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int x)
+{
+    *destination = -x;
+}
+)";
+static const char kDirectNVVMUnsignedIntegerNegateSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform uint x)
+{
+    *destination = int(-x);
+}
+)";
+static const char kDirectNVVMWideIntegerNegateSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int64_t x)
+{
+    *destination = int(-x);
+}
+)";
+static const char kDirectNVVMFloatingNegateSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float x)
+{
+    *destination = int(-x);
 }
 )";
 static const char kDirectNVVMIntegerLeftShiftSource[] = R"(
@@ -4663,6 +4765,71 @@ static SlangResult _buildIntegerBitNotModule(
     return SLANG_OK;
 }
 
+static SlangResult _populateIntegerNegateKernel(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module)
+{
+    SlangNVVMTypeHandle_1 voidType = nullptr;
+    SlangNVVMTypeHandle_1 integerType = nullptr;
+    SlangNVVMTypeHandle_1 pointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, integerType));
+    SLANG_RETURN_ON_FAIL(
+        builder.getPointerType(module, integerType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL, pointerType));
+    const SlangNVVMTypeHandle_1 parameterTypes[] = {pointerType, integerType};
+    SlangNVVMTypeHandle_1 functionType = nullptr;
+    SlangNVVMValueHandle_1 function = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
+        module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType));
+    SLANG_RETURN_ON_FAIL(
+        builder.declareFunction(module, functionType, toSlice(kNegateScalarKernelName), function));
+    SlangNVVMValueHandle_1 destination = nullptr;
+    SlangNVVMValueHandle_1 x = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 0, destination));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 1, x));
+    SlangNVVMBlockHandle_1 block = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, function, toSlice("entry"), block));
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, block));
+    SlangNVVMValueHandle_1 value = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.emitIntegerNegate(module, x, value));
+    SLANG_RETURN_ON_FAIL(builder.emitStore(module, value, destination, 4));
+    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
+    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
+    return SLANG_OK;
+}
+
+static SlangResult _buildIntegerNegateModule(
+    const NVVMIRBuilder& builder,
+    ComPtr<ISlangBlob>& outAssembly,
+    String& outAssemblyDiagnostics,
+    ComPtr<ISlangBlob>& outBitcode,
+    String& outBitcodeDiagnostics)
+{
+    outAssembly.setNull();
+    outAssemblyDiagnostics = String();
+    outBitcode.setNull();
+    outBitcodeDiagnostics = String();
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_RETURN_ON_FAIL(builder.createModule(toSlice("slang-nvvm-integer-negate"), scope.module));
+    SLANG_RETURN_ON_FAIL(_populateIntegerNegateKernel(builder, scope.module));
+    SLANG_RETURN_ON_FAIL(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        outAssembly,
+        outAssemblyDiagnostics));
+    SLANG_RETURN_ON_FAIL(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
+        outBitcode,
+        outBitcodeDiagnostics));
+    return SLANG_OK;
+}
+
 static SlangResult _createDirectNVVMLinkedProgram(
     slang::IGlobalSession* globalSession,
     const char* source,
@@ -4729,6 +4896,7 @@ enum class ScalarRuntimeOperation
     BitOr,
     BitXor,
     BitNot,
+    Negate,
 };
 
 static SlangResult _runScalarKernel(
@@ -4774,6 +4942,7 @@ static SlangResult _runScalarKernel(
     {
     case ScalarRuntimeOperation::Write:
     case ScalarRuntimeOperation::BitNot:
+    case ScalarRuntimeOperation::Negate:
         parameters = writeParameters;
         break;
     case ScalarRuntimeOperation::Copy:
@@ -5061,6 +5230,8 @@ struct PTXEntrySummary
     bool hasBitOr32 = false;
     bool hasBitXor32 = false;
     bool hasBitNot32 = false;
+    bool hasNegate32 = false;
+    bool hasSubtract32 = false;
     bool hasSignedComparison32 = false;
 };
 
@@ -5078,6 +5249,8 @@ static SlangResult _summarizePTXEntry(
     outSummary.hasBitOr32 = false;
     outSummary.hasBitXor32 = false;
     outSummary.hasBitNot32 = false;
+    outSummary.hasNegate32 = false;
+    outSummary.hasSubtract32 = false;
     outSummary.hasSignedComparison32 = false;
 
     String signature;
@@ -5098,6 +5271,10 @@ static SlangResult _summarizePTXEntry(
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("xor.b32"), 32);
     outSummary.hasBitNot32 =
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("not.b32"), 32);
+    outSummary.hasNegate32 =
+        _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("neg.s32"), 32);
+    outSummary.hasSubtract32 =
+        _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("sub.s32"), 32);
     outSummary.hasSignedComparison32 =
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("setp.lt.s32"), 32) ||
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("setp.ge.s32"), 32);
@@ -7435,7 +7612,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesScalarIntegerBitNotAPI)
         offsetof(SlangNVVMBuilderAPI_V2, emitIntegerBitNot) ==
         SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_XOR_MIN_SIZE);
     SLANG_CHECK(
-        sizeof(SlangNVVMBuilderAPI_V2) ==
+        offsetof(SlangNVVMBuilderAPI_V2, emitIntegerNegate) ==
         SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_XOR_MIN_SIZE == 296);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE == 304);
@@ -7610,6 +7787,191 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesScalarIntegerBitNotAPI)
         SLANG_CHECK(result == nullptr);
         SLANG_CHECK(gFakeNVVMBuilder.emitIntegerBitNotCallCount == 4);
         SLANG_CHECK(gFakeNVVMBuilder.integerBitNotValueRefs.getCount() == 3);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+}
+
+
+SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesScalarIntegerNegateAPI)
+{
+    SLANG_CHECK(
+        offsetof(SlangNVVMBuilderAPI_V2, emitIntegerNegate) ==
+        SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE);
+    SLANG_CHECK(
+        sizeof(SlangNVVMBuilderAPI_V2) == SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE);
+    SLANG_CHECK(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE == 304);
+    SLANG_CHECK(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE == 312);
+
+    // An uninitialized host cannot dispatch the operation and must not expose a stale handle.
+    {
+        NVVMIRBuilder builder;
+        SlangNVVMValueHandle_1 result = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitIntegerNegate(
+                _getFakeNVVMBuilderModule(),
+                _getFakeNVVMBuilderParameter(),
+                result) == SLANG_E_UNINITIALIZED);
+        SLANG_CHECK(result == nullptr);
+    }
+
+    // The frozen Slice 16 prefix retains bitwise NOT but cannot dispatch integer negate.
+    gFakeNVVMBuilder.reset();
+    gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+    gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+    gFakeNVVMBuilder.apiV2.structureSize =
+        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE);
+    gFakeNVVMBuilder.omitAPIV2Symbol = false;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, builder)));
+        loader.setNull();
+        SLANG_CHECK(builder.supportsScalarIntegerBitNot());
+        SLANG_CHECK(!builder.supportsScalarIntegerNegate());
+        SLANG_CHECK(builder.getVersionString().indexOf("scalar-integer-negate=0") >= 0);
+
+        SlangNVVMValueHandle_1 result = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitIntegerNegate(
+                _getFakeNVVMBuilderModule(),
+                _getFakeNVVMBuilderParameter(),
+                result) == SLANG_E_NOT_AVAILABLE);
+        SLANG_CHECK(result == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerNegateCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    // No byte count inside the one-function suffix describes a coherent capability.
+    for (uint32_t partialSize =
+             uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE + 1);
+         partialSize < uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE);
+         ++partialSize)
+    {
+        gFakeNVVMBuilder.reset();
+        gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+        gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+        gFakeNVVMBuilder.apiV2.structureSize = partialSize;
+        gFakeNVVMBuilder.omitAPIV2Symbol = false;
+        {
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+            NVVMIRBuilder builder;
+            SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+            SLANG_CHECK(!builder.isInitialized());
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    }
+
+    // Claiming the complete suffix makes its dedicated operation mandatory.
+    gFakeNVVMBuilder.reset();
+    gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+    gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+    gFakeNVVMBuilder.apiV2.emitIntegerNegate = nullptr;
+    gFakeNVVMBuilder.omitAPIV2Symbol = false;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+        SLANG_CHECK(!builder.isInitialized());
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    // A future provider is accepted, advertises integer negate, and is clamped to the known table.
+    gFakeNVVMBuilder.reset();
+    gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+    gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+    gFakeNVVMBuilder.apiV2.structureSize = uint32_t(sizeof(SlangNVVMBuilderAPI_V2) + 16);
+    gFakeNVVMBuilder.omitAPIV2Symbol = false;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, builder)));
+        loader.setNull();
+        SLANG_CHECK(builder.supportsScalarIntegerNegate());
+        SLANG_CHECK(builder.getVersionString().indexOf("scalar-integer-negate=1") >= 0);
+        SLANG_CHECK_ABORT(builder.getAPIV2() != nullptr);
+        SLANG_CHECK(builder.getAPIV2()->structureSize == sizeof(SlangNVVMBuilderAPI_V2));
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    // The complete suffix forwards exact parameter identities. The host rejects success without
+    // a handle and clears provider-written handles from failed calls.
+    gFakeNVVMBuilder.reset();
+    gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+    gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+    gFakeNVVMBuilder.omitAPIV2Symbol = false;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, builder)));
+        loader.setNull();
+        SLANG_CHECK(builder.supportsScalarIntegerNegate());
+        SLANG_CHECK(builder.getVersionString().indexOf("scalar-integer-negate=1") >= 0);
+
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.createModule(toSlice("fake-integer-bit-not-module"), scope.module)));
+        SlangNVVMTypeHandle_1 voidType = nullptr;
+        SlangNVVMTypeHandle_1 integerType = nullptr;
+        SlangNVVMTypeHandle_1 pointerType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, integerType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+            scope.module,
+            integerType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            pointerType)));
+        const SlangNVVMTypeHandle_1 parameterTypes[] = {pointerType, integerType};
+        SlangNVVMTypeHandle_1 functionType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+            scope.module,
+            voidType,
+            parameterTypes,
+            SLANG_COUNT_OF(parameterTypes),
+            functionType)));
+        SlangNVVMValueHandle_1 function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            toSlice("fakeIntegerNegate"),
+            function)));
+        SlangNVVMValueHandle_1 destination = nullptr;
+        SlangNVVMValueHandle_1 x = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, destination)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 1, x)));
+        SlangNVVMBlockHandle_1 block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+
+        SlangNVVMValueHandle_1 result = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerNegate(scope.module, x, result)));
+        SLANG_CHECK(result == _getFakeNVVMBuilderIntegerNegate());
+        SLANG_CHECK(gFakeNVVMBuilder.integerNegateCallerBlockIndices[0] == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.integerNegateValueRefs[0].kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(gFakeNVVMBuilder.integerNegateValueRefs[0].functionIndex == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.integerNegateValueRefs[0].index == 1);
+
+        result = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitIntegerNegate(scope.module, destination, result) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(result == nullptr);
+
+        gFakeNVVMBuilder.returnNullIntegerNegate = true;
+        result = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(builder.emitIntegerNegate(scope.module, x, result) == SLANG_FAIL);
+        SLANG_CHECK(result == nullptr);
+        gFakeNVVMBuilder.returnNullIntegerNegate = false;
+
+        gFakeNVVMBuilder.failIntegerNegateAfterWrite = true;
+        result = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(builder.emitIntegerNegate(scope.module, x, result) == SLANG_FAIL);
+        SLANG_CHECK(result == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerNegateCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.integerNegateValueRefs.getCount() == 3);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 }
@@ -10665,6 +11027,190 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidIntegerBitNotOperations)
 }
 
 
+SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidIntegerNegateOperations)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsScalarIntegerNegate());
+
+    ScopedNVVMBuilderModule module;
+    module.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("invalid-integer-bit-not"), module.module)));
+    ScopedNVVMBuilderModule foreignModule;
+    foreignModule.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("invalid-integer-bit-not-foreign"), foreignModule.module)));
+
+    SlangNVVMTypeHandle_1 voidType = nullptr;
+    SlangNVVMTypeHandle_1 integerType = nullptr;
+    SlangNVVMTypeHandle_1 pointerType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 32, integerType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        module.module,
+        integerType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        pointerType)));
+
+    const SlangNVVMTypeHandle_1 parameterTypes[] = {
+        pointerType,
+        integerType,
+        integerType,
+    };
+    SlangNVVMTypeHandle_1 functionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        module.module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType)));
+    SlangNVVMValueHandle_1 function = nullptr;
+    SlangNVVMValueHandle_1 otherFunction = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        toSlice("invalidIntegerNegate"),
+        function)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        toSlice("otherIntegerNegate"),
+        otherFunction)));
+
+    SlangNVVMValueHandle_1 destination = nullptr;
+    SlangNVVMValueHandle_1 x = nullptr;
+    SlangNVVMValueHandle_1 y = nullptr;
+    SlangNVVMValueHandle_1 otherX = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, destination)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 1, x)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 2, y)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, otherFunction, 1, otherX)));
+
+    SlangNVVMTypeHandle_1 foreignVoidType = nullptr;
+    SlangNVVMTypeHandle_1 foreignIntegerType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(foreignModule.module, foreignVoidType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getIntegerType(foreignModule.module, 32, foreignIntegerType)));
+    const SlangNVVMTypeHandle_1 foreignParameterTypes[] = {
+        foreignIntegerType,
+        foreignIntegerType,
+    };
+    SlangNVVMTypeHandle_1 foreignFunctionType = nullptr;
+    SlangNVVMValueHandle_1 foreignFunction = nullptr;
+    SlangNVVMValueHandle_1 foreignX = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        foreignModule.module,
+        foreignVoidType,
+        foreignParameterTypes,
+        SLANG_COUNT_OF(foreignParameterTypes),
+        foreignFunctionType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        foreignModule.module,
+        foreignFunctionType,
+        toSlice("foreignIntegerNegate"),
+        foreignFunction)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionParameter(foreignModule.module, foreignFunction, 0, foreignX)));
+
+    auto expectRejectedNegate =
+        [&](SlangNVVMModuleHandle_1 targetModule, SlangNVVMValueHandle_1 value)
+    {
+        SlangNVVMValueHandle_1 rejected = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitIntegerNegate(targetModule, value, rejected) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejected == nullptr);
+    };
+
+    // With no insertion point, every path must reject without inferring function ownership.
+    expectRejectedNegate(module.module, x);
+    SlangNVVMValueHandle_1 rawRejected = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.getAPIV2()->emitIntegerNegate(module.module, x, &rawRejected) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rawRejected == nullptr);
+    expectRejectedNegate(nullptr, x);
+    expectRejectedNegate(foreignModule.module, x);
+
+    SlangNVVMBlockHandle_1 entryBlock = nullptr;
+    SlangNVVMBlockHandle_1 producerBlock = nullptr;
+    SlangNVVMBlockHandle_1 consumerBlock = nullptr;
+    SlangNVVMBlockHandle_1 mergeBlock = nullptr;
+    SlangNVVMBlockHandle_1 otherBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("producer"), producerBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("consumer"), consumerBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("merge"), mergeBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, otherFunction, toSlice("other.entry"), otherBlock)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
+    SlangNVVMValueHandle_1 condition = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitIntegerSignedLessThan(module.module, x, y, condition)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitConditionalBranch(module.module, condition, producerBlock, consumerBlock)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, producerBlock)));
+    SlangNVVMValueHandle_1 nonDominating = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerBinary(
+        module.module,
+        SLANG_NVVM_INTEGER_BINARY_OP_ADD,
+        x,
+        y,
+        nonDominating)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(module.module, mergeBlock)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, consumerBlock)));
+    SLANG_CHECK(
+        builder.getAPIV2()->emitIntegerNegate(module.module, x, nullptr) == SLANG_E_INVALID_ARG);
+    expectRejectedNegate(module.module, nullptr);
+    expectRejectedNegate(module.module, destination);
+    expectRejectedNegate(module.module, foreignX);
+    expectRejectedNegate(module.module, otherX);
+    expectRejectedNegate(module.module, nonDominating);
+
+    SlangNVVMValueHandle_1 combined = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerNegate(module.module, x, combined)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(module.module, combined, destination, 4)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(module.module, mergeBlock)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, mergeBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+    expectRejectedNegate(module.module, x);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, otherBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+
+    ComPtr<ISlangBlob> assemblyBlob;
+    String diagnostics;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        module.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        assemblyBlob,
+        diagnostics)));
+    SLANG_CHECK_ABORT(assemblyBlob != nullptr);
+    SLANG_CHECK(diagnostics.getLength() == 0);
+    const String assembly = _getBlobText(assemblyBlob);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("sub i32")) == 1);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("sub i64")) == 0);
+    SLANG_CHECK(assembly.indexOf("sub i32 0, %1") >= 0);
+    SLANG_CHECK(assembly.indexOf("sub nsw") < 0);
+    SLANG_CHECK(assembly.indexOf("sub nuw") < 0);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("store i32")) == 1);
+    const Index negateIndex = assembly.indexOf("sub i32");
+    const Index storeIndex = assembly.indexOf("store i32");
+    SLANG_CHECK_ABORT(negateIndex >= 0);
+    SLANG_CHECK(storeIndex > negateIndex);
+}
+
+
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarReferenceKernels)
 {
     NVVMIRBuilder builder;
@@ -11115,6 +11661,51 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerBitNotKernel)
     const Index storeIndex = assembly.indexOf("store i32");
     SLANG_CHECK_ABORT(bitNotIndex >= 0);
     SLANG_CHECK(storeIndex > bitNotIndex);
+
+    static const uint8_t kBitcodeMagic[] = {0x42, 0x43, 0xc0, 0xde};
+    SLANG_CHECK(bitcodeBlob->getBufferSize() > SLANG_COUNT_OF(kBitcodeMagic));
+    SLANG_CHECK(
+        ::memcmp(bitcodeBlob->getBufferPointer(), kBitcodeMagic, SLANG_COUNT_OF(kBitcodeMagic)) ==
+        0);
+}
+
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerNegateKernel)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsScalarIntegerNegate());
+
+    ComPtr<ISlangBlob> assemblyBlob;
+    ComPtr<ISlangBlob> bitcodeBlob;
+    String assemblyDiagnostics = "stale assembly diagnostics";
+    String bitcodeDiagnostics = "stale bitcode diagnostics";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_buildIntegerNegateModule(
+        builder,
+        assemblyBlob,
+        assemblyDiagnostics,
+        bitcodeBlob,
+        bitcodeDiagnostics)));
+    SLANG_CHECK_ABORT(assemblyBlob != nullptr);
+    SLANG_CHECK_ABORT(bitcodeBlob != nullptr);
+    SLANG_CHECK(assemblyDiagnostics.getLength() == 0);
+    SLANG_CHECK(bitcodeDiagnostics.getLength() == 0);
+
+    const String assembly = _getBlobText(assemblyBlob);
+    SLANG_CHECK(assembly.indexOf("define void @negateScalar(i32 addrspace(1)* %0, i32 %1)") >= 0);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("sub i32")) == 1);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("sub i64")) == 0);
+    SLANG_CHECK(assembly.indexOf("sub i32 0, %1") >= 0);
+    SLANG_CHECK(assembly.indexOf("sub nsw") < 0);
+    SLANG_CHECK(assembly.indexOf("sub nuw") < 0);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("store i32")) == 1);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("align 4")) == 1);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("ret void")) == 1);
+    SLANG_CHECK(assembly.indexOf("@negateScalar, !\"kernel\", i32 1") >= 0);
+    const Index negateIndex = assembly.indexOf("sub i32");
+    const Index storeIndex = assembly.indexOf("store i32");
+    SLANG_CHECK_ABORT(negateIndex >= 0);
+    SLANG_CHECK(storeIndex > negateIndex);
 
     static const uint8_t kBitcodeMagic[] = {0x42, 0x43, 0xc0, 0xde};
     SLANG_CHECK(bitcodeBlob->getBufferSize() > SLANG_COUNT_OF(kBitcodeMagic));
@@ -12799,6 +13390,102 @@ SLANG_UNIT_TEST(nvvmSlangIntegerBitNotUsesDirectPipeline)
 }
 
 
+SLANG_UNIT_TEST(nvvmSlangIntegerNegateUsesDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMIntegerNegateSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.getIntegerTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.getPointerTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.getFunctionParameterCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeIndices.getCount() == 1);
+        const Index functionTypeIndex = gFakeNVVMBuilder.functionTypeIndices[0];
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultKinds[functionTypeIndex] ==
+            FakeNVVMBuilderResultTypeKind::Void);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[functionTypeIndex] == 2);
+        const Index parameterKindOffset =
+            gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionTypeIndex];
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[parameterKindOffset] ==
+            FakeNVVMBuilderParameterTypeKind::Pointer);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[parameterKindOffset + 1] ==
+            FakeNVVMBuilderParameterTypeKind::Integer);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerNegateCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.integerNegateCallerBlockIndices.getCount() == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.integerNegateCallerBlockIndices[0] == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.integerNegateValueRefs.getCount() == 1);
+        const FakeNVVMBuilderValueRef value = gFakeNVVMBuilder.integerNegateValueRefs[0];
+        SLANG_CHECK(value.kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(value.functionIndex == 0);
+        SLANG_CHECK(value.index == 1);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.storePointerValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storePointerValueRefs[0].kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(gFakeNVVMBuilder.storePointerValueRefs[0].functionIndex == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.storePointerValueRefs[0].index == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::IntegerNegate);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].index == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerBinaryCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerMultiplyCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerBitAndCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerBitOrCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerBitXorCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerBitNotCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerSignedLessThanCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitBranchCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitConditionalBranchCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.getIntegerConstantCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerPhiCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerCallCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerReturnCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.getArrayTypeCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitArrayElementPointerCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitReturnVoidCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.serializeWithDiagnosticsQueryCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.serializeWithDiagnosticsWriteCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+
 SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarControlFlowCapability)
 {
     // A provider frozen at the exact Slice 4 scalar-memory prefix can still compile scalar loads
@@ -13405,6 +14092,69 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarIntegerBitNotCapability)
 }
 
 
+SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarIntegerNegateCapability)
+{
+    // The exact Slice 16 provider retains bitwise NOT from that slice.
+    _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.apiV2.structureSize =
+        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE);
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMIntegerBitNotSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerBitNotCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerNegateCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+
+    // Integer negate needs the appended Slice 17 operation. Gate after provider discovery but
+    // before builder-module creation or libNVVM use.
+    _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.apiV2.structureSize =
+        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE);
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMIntegerNegateSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerNegateCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+
 SLANG_UNIT_TEST(nvvmSlangRetainsOnlySelectedCUDAKernel)
 {
     _resetDirectNVVMFakes();
@@ -13604,12 +14354,15 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
         {kDirectNVVMUnsignedIntegerBitNotSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerBitNotSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerNegateSource, "'entry-point parameter'"},
+        {kDirectNVVMWideIntegerNegateSource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingNegateSource, "'entry-point parameter'"},
     };
 
     // The direct subset retains signed-i32 helper/value policy. Adjacent aggregate, local-memory,
     // multiply ABI variants, logical NOT/shifts/division/remainder, unsigned/wide AND/OR/XOR/NOT,
-    // unsigned indices, and helper-array-pointer shapes remain deterministic before builder
-    // discovery.
+    // unsigned/wide/floating negate, unsigned indices, and helper-array-pointer shapes remain
+    // deterministic before builder discovery.
     for (const auto& unsupported : kCases)
     {
         _resetDirectNVVMFakes();
@@ -14404,6 +15157,85 @@ SLANG_UNIT_TEST(nvvmSlangRealIntegerBitNotDifferentialPTX)
 }
 
 
+SLANG_UNIT_TEST(nvvmSlangRealIntegerNegateDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerNegate());
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
+        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring integer-negate PTX differential because libNVVM or NVRTC was not found.");
+        SLANG_IGNORE_TEST;
+    }
+
+    ComPtr<slang::IBlob> nvvmCode;
+    ComPtr<slang::IBlob> nvvmDiagnostics;
+    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
+        globalSession,
+        kDirectNVVMIntegerNegateSource,
+        SLANG_EMIT_CUDA_VIA_NVVM,
+        nvvmCode,
+        nvvmDiagnostics);
+    if (SLANG_FAILED(nvvmResult))
+    {
+        const String text = _getBlobText(nvvmDiagnostics);
+        if (text.getLength())
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
+    SLANG_CHECK_ABORT(nvvmCode != nullptr);
+
+    ComPtr<slang::IBlob> nvrtcCode;
+    ComPtr<slang::IBlob> nvrtcDiagnostics;
+    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
+        globalSession,
+        kDirectNVVMIntegerNegateSource,
+        SLANG_EMIT_CUDA_VIA_NVRTC,
+        nvrtcCode,
+        nvrtcDiagnostics);
+    if (SLANG_FAILED(nvrtcResult))
+    {
+        const String text = _getBlobText(nvrtcDiagnostics);
+        if (text.getLength())
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
+    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
+
+    PTXEntrySummary nvvmSummary;
+    PTXEntrySummary nvrtcSummary;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
+        _getBlobText(nvvmCode).getUnownedSlice(),
+        toSlice("computeMain"),
+        nvvmSummary)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
+        _getBlobText(nvrtcCode).getUnownedSlice(),
+        toSlice("computeMain"),
+        nvrtcSummary)));
+    static const uint32_t kParameterWidths[] = {64, 32};
+    SLANG_CHECK(
+        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
+    SLANG_CHECK(
+        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
+    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
+    SLANG_CHECK(nvvmSummary.hasNegate32);
+    SLANG_CHECK(nvrtcSummary.hasNegate32);
+    SLANG_CHECK(!nvvmSummary.hasBitNot32);
+    SLANG_CHECK(!nvrtcSummary.hasBitNot32);
+    SLANG_CHECK(!nvvmSummary.hasSubtract32);
+    SLANG_CHECK(!nvrtcSummary.hasSubtract32);
+    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
+    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
+}
+
+
 SLANG_UNIT_TEST(nvvmSlangRealScalarPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
@@ -14788,6 +15620,55 @@ SLANG_UNIT_TEST(nvvmSlangRealIntegerBitNotPtxasAccepts)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
             globalSession,
             kDirectNVVMIntegerBitNotSource,
+            method,
+            code,
+            diagnostics)));
+        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
+        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
+    }
+}
+
+
+SLANG_UNIT_TEST(nvvmSlangRealIntegerNegatePtxasAccepts)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerNegate());
+
+    String cudaRoot;
+    String ptxasPath;
+    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring integer-negate ptxas test because CUDA_PATH does not contain ptxas.");
+        SLANG_IGNORE_TEST;
+    }
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
+        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring integer-negate ptxas test because libNVVM or NVRTC was not found.");
+        SLANG_IGNORE_TEST;
+    }
+
+    static const SlangEmitCUDAMethod kMethods[] = {
+        SLANG_EMIT_CUDA_VIA_NVVM,
+        SLANG_EMIT_CUDA_VIA_NVRTC,
+    };
+    for (SlangEmitCUDAMethod method : kMethods)
+    {
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
+            globalSession,
+            kDirectNVVMIntegerNegateSource,
             method,
             code,
             diagnostics)));
@@ -15613,6 +16494,112 @@ SLANG_UNIT_TEST(nvvmSlangIntegerBitNotRuntimeMatchesNVRTC)
                 cuda,
                 code,
                 ScalarRuntimeOperation::BitNot,
+                runtimeCase.x,
+                0,
+                runtimeCase.expected)));
+        }
+    }
+}
+
+
+SLANG_UNIT_TEST(nvvmSlangIntegerNegateRuntimeMatchesNVRTC)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerNegate());
+
+    CudaDriverApi cuda;
+    if (!cuda.load() || cuda.cuInit(0) != 0)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring integer-negate runtime differential because the CUDA driver is "
+            "unavailable.");
+        SLANG_IGNORE_TEST;
+    }
+    int deviceCount = 0;
+    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring integer-negate runtime differential because no CUDA device is available.");
+        SLANG_IGNORE_TEST;
+    }
+
+    CudaDevice device = 0;
+    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
+    int computeMajor = 0;
+    SLANG_CHECK_ABORT(
+        cuda.cuDeviceGetAttribute(
+            &computeMajor,
+            kCudaDeviceAttributeComputeCapabilityMajor,
+            device) == 0);
+    if (computeMajor < 7)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring integer-negate runtime differential because the device is older than "
+            "sm_70.");
+        SLANG_IGNORE_TEST;
+    }
+
+    CudaContext context = nullptr;
+    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
+    CudaPrimaryContextGuard contextGuard{cuda, device};
+    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
+        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring integer-negate runtime differential because libNVVM or NVRTC was not "
+            "found.");
+        SLANG_IGNORE_TEST;
+    }
+
+    struct NegateRuntimeCase
+    {
+        int x;
+        int expected;
+    };
+    static const NegateRuntimeCase kCases[] = {
+        {0, 0},
+        {1, -1},
+        {-7, 7},
+        {-2147483647 - 1, -2147483647 - 1},
+    };
+    static const SlangEmitCUDAMethod kMethods[] = {
+        SLANG_EMIT_CUDA_VIA_NVVM,
+        SLANG_EMIT_CUDA_VIA_NVRTC,
+    };
+    for (SlangEmitCUDAMethod method : kMethods)
+    {
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult compileResult = _compileSlangWithPTXMethod(
+            globalSession,
+            kDirectNVVMIntegerNegateSource,
+            method,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(compileResult))
+        {
+            const String text = _getBlobText(diagnostics);
+            if (text.getLength())
+                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+        SLANG_CHECK_ABORT(code != nullptr);
+        for (const auto& runtimeCase : kCases)
+        {
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
+                cuda,
+                code,
+                ScalarRuntimeOperation::Negate,
                 runtimeCase.x,
                 0,
                 runtimeCase.expected)));

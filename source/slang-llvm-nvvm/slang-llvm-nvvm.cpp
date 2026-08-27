@@ -656,6 +656,28 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBitNot(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitIntegerNegate(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmValue = _getValue(value);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!outValue || !insertionBlock ||
+        !_isIntegerValueUsableAtInsertionPoint(state, insertionBlock, llvmValue))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* result = state->builder.CreateNeg(llvmValue);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitIntegerSignedLessThan(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMValueHandle_1 left,
@@ -1206,6 +1228,7 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitIntegerBitOr = _emitIntegerBitOr;
     api.emitIntegerBitXor = _emitIntegerBitXor;
     api.emitIntegerBitNot = _emitIntegerBitNot;
+    api.emitIntegerNegate = _emitIntegerNegate;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

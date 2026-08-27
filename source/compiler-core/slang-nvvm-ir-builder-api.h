@@ -352,6 +352,14 @@ extern "C"
         SlangNVVMValueHandle_1 value,
         SlangNVVMValueHandle_1* outValue);
 
+    /// Emits wrapping arithmetic negation for a same-module scalar integer operand.
+    /// The operand must be available at the current unterminated insertion point. On failure,
+    /// the output value is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerNegate_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMValueHandle_1* outValue);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -400,6 +408,8 @@ extern "C"
         SlangNVVMEmitIntegerBitXor_2 emitIntegerBitXor;
 
         SlangNVVMEmitIntegerBitNot_2 emitIntegerBitNot;
+
+        SlangNVVMEmitIntegerNegate_2 emitIntegerNegate;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -460,6 +470,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerBitNot) +        \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerBitNot))
+
+    // This Slice 17 prefix is one coherent scalar-integer-negate capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerNegate) +       \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerNegate))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

@@ -1145,6 +1145,65 @@ builtin, atomic, wave, or libdevice capability. Differential PTX evidence requir
 `[64, 32]` parameter widths, an exact token-boundary `not.b32` instruction, and an entry-scoped
 global u32 store; it does not require textual PTX equality.
 
+### Slice 17 signed-i32 arithmetic negation
+
+Consider this example:
+
+```slang
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int x)
+{
+    *destination = -x;
+}
+```
+
+The front end resolves unary `-` as `BuiltinOperationKind::Neg`, and ordinary IR lowering
+constructs exact `kIROp_Neg`. The measured post-Slice-16 baseline retains the final entry signature
+`Func(Void, Ptr(Int,RW,UserPointer,DefaultLayout), Int)`, one canonical one-operand signed-i32
+`neg(%x)`, and its device-pointer store consumer through the final `simplifyIR`. Preflight validates
+the operand through the established signed-i32 availability and dominance rules, then records the
+result in the canonical value set and provider-value map. It does not accept `kIROp_ConstexprNeg`,
+synthesize Slang-IR subtraction from zero, or reconstruct source syntax as a fallback.
+
+The private V2 provider table appends one dedicated unary operation:
+
+```text
+emitIntegerNegate(module, value, outValue)
+```
+
+The operation does not widen any frozen binary-integer callable or the dedicated BitNot callable.
+A dedicated terminal field negotiates and dispatches arithmetic negation atomically while
+preserving the exact contracts of all earlier providers.
+
+The complete V2 table is 312 bytes on the 64-bit build. The exact 304-byte Slice 16 prefix and every
+older minimum remain frozen and compatible for their established programs. Sizes 305 through 311
+inside the new function pointer, or a complete prefix with a null operation, are malformed;
+future-larger tables remain compatible and are clamped to the host's known 312-byte capacity. A
+Neg program presented to an exact Slice 16 provider must reach E52016 after discovery but before
+module creation or libNVVM use. The host reports `scalar-integer-negate=0|1` in the builder identity
+and clears output handles before dispatch and after a failed or success-without-handle provider
+call.
+
+At the LLVM boundary, the provider requires a live module, a non-null output, and a current
+unterminated insertion block belonging to that module. The operand must satisfy Slice 16's shared
+unary integer validator: scalar LLVM integer type, valid module/context/function ownership, and
+availability under the established same-block ordering and cross-block dominance rules. All
+validation precedes the sole mutation, plain `IRBuilder::CreateNeg` without `nsw` or `nuw`. LLVM
+represents this operation as `sub i32 0, %x`; the absence of no-wrap flags preserves Slang's
+documented wrapping integer arithmetic, including `-INT_MIN == INT_MIN`.
+
+This boundary is only exact one-operand signed-i32 arithmetic negation over already-supported
+parameters, constants, phis, calls, arithmetic and bitwise results, and other signed-i32 producers.
+It does not add unsigned, narrow, wide, floating-point, vector, matrix, or aggregate negation;
+shifts, division, remainder, or logical operations; or any new ABI, pointer, storage, resource,
+builtin, atomic, wave, or libdevice capability. The measured explicit NVRTC baseline exposes
+`[64, 32]`, exact `neg.s32`, `cvta.to.global.u64`, and `st.global.u32`; the pre-change direct route
+stops deterministically at E52017 `'neg'`. After implementation, integrated direct NVVM preserves
+the same widths, exact `neg.s32`, and global u32 store while using the raw pointer. Neither route
+uses `sub.s32` or `not.b32` as an alternate spelling.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -1268,9 +1327,12 @@ claiming other integer, floating-point, vector, or matrix operations. Slice 13 a
 dedicated-operation pattern to exact signed-i32 bitwise AND, and Slice 14 applies it to exact
 signed-i32 bitwise OR. Slice 15 applies the same pattern to exact signed-i32 bitwise XOR. Slice 16
 then adds exact signed-i32 bitwise NOT through a dedicated unary operation and a shared
-per-value integer-validation rule. Wrapping signed-i32 arithmetic negation remains the next bounded
-canonical scalar operation for Slice 17; shifts and the other richer scalar policies remain
-separate decisions.
+per-value integer-validation rule. Slice 17 completes the next bounded canonical scalar operation:
+wrapping signed-i32 arithmetic negation. The established Slice 18 roadmap remains libdevice and
+floating-point policy. A future bounded shift candidate must first settle the currently
+inconsistent negative/oversized shift-count policy across AST folding, SCCP, LLVM, and PTX before
+promoting exact signed-i32 left shift; division, remainder, and the other richer scalar policies
+remain separate decisions.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -1505,6 +1567,25 @@ for `~0`, `0` for `~-1`, `-1431655766` for `~0x55555555`, and `15` for `~-16`. T
 focused NVVM run passed 116/116. Preservation passed 1/1 parser, 2/2 routing/hash, 1/1 unsupported
 boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.
 
+Later on 2026-08-27, Slice 17 built the Release LLVM 14.0.6 provider and Debug host. The verified
+provider fixture emitted exactly one unflagged `sub i32 0, %x` whose result feeds the established
+address-space-1 store, and no `i64`, `nsw`, or `nuw` variant. The fake direct-route graph proved
+that scalar parameter 1 is the exact Negate operand, that the Negate result is the stored value,
+and that unrelated callbacks, including BitNot, remain unused. Negotiation retained the exact
+304-byte Slice 16 prefix for BitNot programs, rejected every partial size from 305 through 311
+bytes and a null complete operation, accepted and clamped future-larger tables, reported the
+capability in identity, and sanitized failed outputs. Invalid unary shapes were rejected before
+mutation while the BitNot predecessor tests remained green. An exact Slice 16 provider compiled
+BitNot, then gated Negate after one discovery but before module creation or libNVVM use.
+
+Direct NVVM and NVRTC exposed matching `[64, 32]` parameter widths, exact token-boundary
+`neg.s32`, and the expected global u32 store. NVRTC included its normal address conversion while
+the direct route used the raw pointer; neither route used `sub.s32` or `not.b32`. CUDA 12.9
+`ptxas` accepted both outputs. On the RTX 5090, both runtime lanes produced `0`, `-1`, `7`, and
+`-2147483648` for inputs `0`, `1`, `-7`, and `INT_MIN`, respectively. The first complete focused
+NVVM run passed 124/124. Preservation passed 1/1 parser, 2/2 routing/hash, 1/1 unsupported boundary,
+3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -1595,6 +1676,15 @@ so its behavior remains unchanged. Slang owns signed-i32 policy while LLVM owns 
 `kIROp_ConstexprBitNot`, logical `kIROp_Not`, arithmetic negation, shifts, division, remainder,
 other integer widths or signedness, vectors, matrices, aggregates, or new ABI and storage shapes.
 
+Slice 17 defines canonical one-operand `kIROp_Neg` lowering for signed-i32 values already available
+through the established scalar program structure. It appends the dedicated `emitIntegerNegate`
+provider operation after the exact 304-byte Slice 16 prefix, yielding a 312-byte complete x64
+prefix, and reuses the shared unary integer validator for type, ownership, availability, and
+dominance. Slang owns the signed-i32 and wrapping policy; LLVM owns plain unflagged `CreateNeg`
+construction as `sub i32 0, value`. These claims do not include `kIROp_ConstexprNeg`, unsigned,
+narrow, wide, floating-point, vector, matrix, or aggregate negation, shifts, division, remainder,
+or new ABI and storage shapes.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
@@ -1604,7 +1694,7 @@ The following remain open until their named slice supplies evidence:
   pointers;
 - external/indirect calls, richer helper ABI, and scalar operations beyond the established
   signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, bitwise-XOR, bitwise-NOT, and
-  less-than subset;
+  arithmetic-negate and less-than subset;
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;

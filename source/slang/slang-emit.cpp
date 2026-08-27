@@ -3663,6 +3663,10 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
     {
         supportsRequiredCapability = builder->supportsScalarIntegerBitNot();
     }
+    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarIntegerNegate)
+    {
+        supportsRequiredCapability = builder->supportsScalarIntegerNegate();
+    }
     if (SLANG_FAILED(loadResult) || !supportsRequiredCapability)
     {
         StringBuilder location;
