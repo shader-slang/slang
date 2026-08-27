@@ -212,6 +212,18 @@ static bool _isSafeGitLocation(const String& location)
     return true;
 }
 
+static bool _isSafeGitRef(const String& ref)
+{
+    if (ref.getLength() == 0 || ref.getBuffer()[0] == '-')
+        return false;
+    for (auto c : ref.getUnownedSlice())
+    {
+        if (c <= ' ' || c == '"' || c == '\'')
+            return false;
+    }
+    return true;
+}
+
 static bool _isCommitHash(const String& commit)
 {
     if (commit.getLength() != 40 && commit.getLength() != 64)
@@ -309,6 +321,15 @@ static SlangResult _readDependencies(
             outError = String("Invalid dependency entry: ") + dependency.name;
             return SLANG_FAIL;
         }
+        for (auto field : container->getObject(pair.value))
+        {
+            String key = container->getStringFromKey(field.key);
+            if (key != "git" && key != "path" && key != "version" && key != "ref" && key != "as")
+            {
+                outError = String("Unknown field in dependency '") + dependency.name + "': " + key;
+                return SLANG_FAIL;
+            }
+        }
         SLANG_RETURN_ON_FAIL(
             _readOptionalString(container, pair.value, "git", dependency.git, outError));
         SLANG_RETURN_ON_FAIL(
@@ -332,20 +353,55 @@ static SlangResult _readDependencies(
         SLANG_RETURN_ON_FAIL(
             _readOptionalString(container, pair.value, "version", dependency.version, outError));
         SLANG_RETURN_ON_FAIL(
-            _readOptionalString(container, pair.value, "tag", dependency.tag, outError));
+            _readOptionalString(container, pair.value, "ref", dependency.ref, outError));
+        SLANG_RETURN_ON_FAIL(
+            _readOptionalString(container, pair.value, "as", dependency.as, outError));
         if (dependency.path.getLength())
         {
-            if (dependency.version.getLength() || dependency.tag.getLength())
+            if (dependency.version.getLength() || dependency.ref.getLength() ||
+                !dependency.as.getLength())
             {
                 outError =
-                    String("Path dependency cannot contain 'version' or 'tag': ") + dependency.name;
+                    String("Path dependency must contain 'path' and 'as' only: ") + dependency.name;
                 return SLANG_FAIL;
             }
         }
         else
         {
-            VersionConstraint ignored;
-            SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, ignored, outError));
+            if ((dependency.ref.getLength() != 0) != (dependency.as.getLength() != 0))
+            {
+                outError = String("Git dependency '") + dependency.name +
+                           "' must contain 'ref' and 'as' together.";
+                return SLANG_FAIL;
+            }
+            if (dependency.ref.getLength() && !_isSafeGitRef(dependency.ref))
+            {
+                outError = String("Dependency has an unsafe Git ref: ") + dependency.name;
+                return SLANG_FAIL;
+            }
+            if (!dependency.version.getLength() && !dependency.ref.getLength())
+            {
+                outError = String("Git dependency '") + dependency.name +
+                           "' requires 'version' or 'ref' with 'as'.";
+                return SLANG_FAIL;
+            }
+        }
+        SemanticVersion providedVersion;
+        if (dependency.as.getLength())
+        {
+            SLANG_RETURN_ON_FAIL(parseExactVersion(dependency.as, providedVersion, outError));
+        }
+        if (dependency.version.getLength())
+        {
+            VersionConstraint constraint;
+            SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, constraint, outError));
+            if (dependency.as.getLength() && !constraint.matches(providedVersion))
+            {
+                outError = String("Dependency '") + dependency.name + "' provides version " +
+                           dependency.as + " via 'as', which does not satisfy 'version' " +
+                           dependency.version + ".";
+                return SLANG_FAIL;
+            }
         }
         for (const auto& existing : outDependencies)
         {
@@ -705,6 +761,8 @@ static void _writeDependency(JSONWriter& writer, const Dependency& dependency)
     {
         _writeKey(writer, "path");
         writer.addStringValue(dependency.path.getUnownedSlice(), SourceLoc());
+        _writeKey(writer, "as");
+        writer.addStringValue(dependency.as.getUnownedSlice(), SourceLoc());
     }
     else
     {
@@ -715,10 +773,12 @@ static void _writeDependency(JSONWriter& writer, const Dependency& dependency)
             _writeKey(writer, "version");
             writer.addStringValue(dependency.version.getUnownedSlice(), SourceLoc());
         }
-        if (dependency.tag.getLength() != 0)
+        if (dependency.ref.getLength() != 0)
         {
-            _writeKey(writer, "tag");
-            writer.addStringValue(dependency.tag.getUnownedSlice(), SourceLoc());
+            _writeKey(writer, "ref");
+            writer.addStringValue(dependency.ref.getUnownedSlice(), SourceLoc());
+            _writeKey(writer, "as");
+            writer.addStringValue(dependency.as.getUnownedSlice(), SourceLoc());
         }
     }
     writer.endObject(SourceLoc());
@@ -838,28 +898,40 @@ static SlangResult _readLockedPackage(
         outError = String("Invalid locked package entry: ") + outPackage.name;
         return SLANG_FAIL;
     }
+    for (auto field : container->getObject(pair.value))
+    {
+        String key = container->getStringFromKey(field.key);
+        if (key != "git" && key != "path" && key != "ref" && key != "version" && key != "commit" &&
+            key != "exports" && key != "dependencies")
+        {
+            outError = String("Unknown field in locked package '") + outPackage.name + "': " + key;
+            return SLANG_FAIL;
+        }
+    }
     SLANG_RETURN_ON_FAIL(
         _readOptionalString(container, pair.value, "git", outPackage.git, outError));
     SLANG_RETURN_ON_FAIL(
         _readOptionalString(container, pair.value, "path", outPackage.path, outError));
+    SLANG_RETURN_ON_FAIL(
+        _readRequiredString(container, pair.value, "version", outPackage.version, outError));
     SemanticVersion ignoredVersion;
+    if (SLANG_FAILED(parseExactVersion(outPackage.version, ignoredVersion, outError)))
+    {
+        outError = String("Locked package has an invalid effective version: ") + outPackage.name;
+        return SLANG_FAIL;
+    }
     if (outPackage.path.getLength())
     {
-        if (_find(container, pair.value, "tag").isValid() ||
+        if (_find(container, pair.value, "ref").isValid() ||
             _find(container, pair.value, "commit").isValid())
         {
-            outError = String("Locked local package cannot also contain tag or commit: ") +
+            outError = String("Locked local package cannot also contain ref or commit: ") +
                        outPackage.name;
             return SLANG_FAIL;
         }
         if (!_isSafeLocalPath(outPackage.path))
         {
             outError = String("Locked local path must be relative: ") + outPackage.name;
-            return SLANG_FAIL;
-        }
-        if (_find(container, pair.value, "version").isValid())
-        {
-            outError = String("Locked path package cannot contain a version: ") + outPackage.name;
             return SLANG_FAIL;
         }
         if (outPackage.git.getLength() && !_isSafeGitLocation(outPackage.git))
@@ -880,17 +952,11 @@ static SlangResult _readLockedPackage(
             outError = String("Locked package has an unsafe Git location: ") + outPackage.name;
             return SLANG_FAIL;
         }
-        if (_find(container, pair.value, "version").isValid())
-        {
-            outError =
-                String("Locked Git package cannot contain a local version: ") + outPackage.name;
-            return SLANG_FAIL;
-        }
         SLANG_RETURN_ON_FAIL(
-            _readRequiredString(container, pair.value, "tag", outPackage.tag, outError));
-        if (SLANG_FAILED(parseReleaseTag(outPackage.tag, ignoredVersion)))
+            _readRequiredString(container, pair.value, "ref", outPackage.ref, outError));
+        if (!_isSafeGitRef(outPackage.ref))
         {
-            outError = String("Locked tag is not a release tag: ") + outPackage.tag;
+            outError = String("Locked package has an unsafe Git ref: ") + outPackage.name;
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
@@ -987,11 +1053,13 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
         }
         else
         {
-            _writeKey(writer, "tag");
-            writer.addStringValue(package.tag.getUnownedSlice(), SourceLoc());
+            _writeKey(writer, "ref");
+            writer.addStringValue(package.ref.getUnownedSlice(), SourceLoc());
             _writeKey(writer, "commit");
             writer.addStringValue(package.commit.getUnownedSlice(), SourceLoc());
         }
+        _writeKey(writer, "version");
+        writer.addStringValue(package.version.getUnownedSlice(), SourceLoc());
         _writeKey(writer, "exports");
         _writeStringArray(writer, package.exports);
         _writeKey(writer, "dependencies");
@@ -1082,7 +1150,8 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
             }
             for (auto field : json.container->getObject(pair.value))
             {
-                if (json.container->getStringFromKey(field.key) != "path")
+                String key = json.container->getStringFromKey(field.key);
+                if (key != "path" && key != "as")
                 {
                     outError = String("Unknown field in override '") + package.name + "'.";
                     return SLANG_FAIL;
@@ -1090,6 +1159,13 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
             }
             SLANG_RETURN_ON_FAIL(
                 _readRequiredString(json.container, pair.value, "path", package.path, outError));
+            SLANG_RETURN_ON_FAIL(
+                _readOptionalString(json.container, pair.value, "as", package.as, outError));
+            if (package.as.getLength())
+            {
+                SemanticVersion ignoredVersion;
+                SLANG_RETURN_ON_FAIL(parseExactVersion(package.as, ignoredVersion, outError));
+            }
             if (!_isSafeLocalPath(package.path))
             {
                 outError = String("Override path must be relative: ") + package.name;
@@ -1148,6 +1224,11 @@ SlangResult writeLocalPackages(
         writer.startObject(SourceLoc());
         _writeKey(writer, "path");
         writer.addStringValue(package.path.getUnownedSlice(), SourceLoc());
+        if (package.as.getLength())
+        {
+            _writeKey(writer, "as");
+            writer.addStringValue(package.as.getUnownedSlice(), SourceLoc());
+        }
         writer.endObject(SourceLoc());
     }
     writer.endObject(SourceLoc());

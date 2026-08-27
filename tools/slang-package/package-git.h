@@ -15,6 +15,13 @@ SlangResult listReleaseTags(
     List<TagCandidate>& outCandidates,
     String& outError);
 
+/// Resolve an opaque branch or tag name to the commit currently advertised by the remote.
+SlangResult resolveReference(
+    const String& gitURL,
+    const String& ref,
+    TagCandidate& outCandidate,
+    String& outError);
+
 SlangResult ensureRepository(
     const String& workingDirectory,
     const String& gitURL,

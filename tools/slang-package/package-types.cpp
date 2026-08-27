@@ -48,6 +48,20 @@ SlangResult parseReleaseTag(const UnownedStringSlice& tag, SemanticVersion& outV
     return _parseVersion(tag.tail(1), outVersion);
 }
 
+SlangResult parseExactVersion(
+    const UnownedStringSlice& text,
+    SemanticVersion& outVersion,
+    String& outError)
+{
+    if (text.startsWith("v") || SLANG_FAILED(_parseVersion(text, outVersion)))
+    {
+        outError =
+            String("Expected an exact semantic version without a 'v' prefix: ") + String(text);
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 bool VersionConstraint::matches(const SemanticVersion& version) const
 {
     for (const auto& predicate : predicates)
@@ -153,26 +167,9 @@ SlangResult parseDependencyConstraint(
     VersionConstraint& outConstraint,
     String& outError)
 {
-    if (dependency.tag.getLength() != 0)
-    {
-        SemanticVersion version;
-        if (SLANG_FAILED(parseReleaseTag(dependency.tag, version)))
-        {
-            outError = String("Dependency tag must be a release tag vMAJOR.MINOR.PATCH: ") +
-                       dependency.tag;
-            return SLANG_FAIL;
-        }
-        outConstraint.predicates.clear();
-        VersionPredicate predicate;
-        predicate.comparison = VersionComparison::Equal;
-        predicate.version = version;
-        outConstraint.predicates.add(predicate);
-        return SLANG_OK;
-    }
-
     if (dependency.version.getLength() == 0)
     {
-        outError = String("Dependency '") + dependency.name + "' requires 'version' or 'tag'.";
+        outError = String("Dependency '") + dependency.name + "' requires 'version'.";
         return SLANG_FAIL;
     }
     return parseVersionConstraint(dependency.version, outConstraint, outError);

@@ -84,7 +84,7 @@ static Index _findCandidate(const List<TagCandidate>& candidates, const String& 
 {
     for (Index i = 0; i < candidates.getCount(); ++i)
     {
-        if (candidates[i].tag == tag)
+        if (candidates[i].ref == tag)
             return i;
     }
     return -1;
@@ -125,7 +125,7 @@ SlangResult listReleaseTags(
         if (candidateIndex < 0)
         {
             TagCandidate candidate;
-            candidate.tag = tag;
+            candidate.ref = tag;
             candidate.commit = fields[0];
             candidate.version = version;
             outCandidates.add(candidate);
@@ -137,6 +137,74 @@ SlangResult listReleaseTags(
     }
     outCandidates.sort([](const TagCandidate& left, const TagCandidate& right)
                        { return left.version > right.version; });
+    return SLANG_OK;
+}
+
+SlangResult resolveReference(
+    const String& gitURL,
+    const String& ref,
+    TagCandidate& outCandidate,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("ls-remote");
+    arguments.add("--");
+    arguments.add(gitURL);
+    arguments.add(ref);
+    if (ref.getUnownedSlice().startsWith("refs/tags/"))
+    {
+        arguments.add(ref + "^{}");
+    }
+    else if (!ref.getUnownedSlice().startsWith("refs/") && ref != "HEAD")
+    {
+        arguments.add(String("refs/heads/") + ref);
+        arguments.add(String("refs/tags/") + ref);
+        arguments.add(String("refs/tags/") + ref + "^{}");
+    }
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(".", arguments, result, outError));
+
+    String branchCommit;
+    String tagCommit;
+    String directCommit;
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        List<UnownedStringSlice> fields;
+        StringUtil::splitOnWhitespace(line, fields);
+        if (fields.getCount() != 2)
+            continue;
+        String reference(fields[1]);
+        String commit(fields[0]);
+        if (reference == ref || (ref == "HEAD" && reference == "HEAD"))
+            directCommit = commit;
+        else if (reference == String("refs/heads/") + ref)
+            branchCommit = commit;
+        else if (reference == String("refs/tags/") + ref)
+        {
+            if (!tagCommit.getLength())
+                tagCommit = commit;
+        }
+        else if (reference == String("refs/tags/") + ref + "^{}")
+            tagCommit = commit;
+        else if (ref.getUnownedSlice().startsWith("refs/tags/") && reference == ref + "^{}")
+            directCommit = commit;
+    }
+    if (branchCommit.getLength() && tagCommit.getLength())
+    {
+        outError = String("Git ref is ambiguous between a branch and tag; use a full ref: ") + ref;
+        return SLANG_FAIL;
+    }
+    String commit = directCommit.getLength()
+                        ? directCommit
+                        : (branchCommit.getLength() ? branchCommit : tagCommit);
+    if (!commit.getLength())
+    {
+        outError = String("Git ref does not exist: ") + ref;
+        return SLANG_FAIL;
+    }
+    outCandidate = TagCandidate();
+    outCandidate.ref = ref;
+    outCandidate.commit = commit;
     return SLANG_OK;
 }
 

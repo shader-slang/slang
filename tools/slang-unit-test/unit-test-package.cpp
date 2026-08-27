@@ -89,11 +89,12 @@ SLANG_UNIT_TEST(PackageVersionConstraint)
     SLANG_CHECK(
         SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("> 1.2.0"), constraint, error)));
 
-    Dependency tagged;
-    tagged.name = "noise";
-    tagged.version = ">=9.0.0";
-    tagged.tag = "v1.4.0";
-    SLANG_CHECK(SLANG_SUCCEEDED(parseDependencyConstraint(tagged, constraint, error)));
+    Dependency pinned;
+    pinned.name = "noise";
+    pinned.version = ">=1.0.0 <2.0.0";
+    pinned.ref = "release";
+    pinned.as = "1.4.0";
+    SLANG_CHECK(SLANG_SUCCEEDED(parseDependencyConstraint(pinned, constraint, error)));
     SLANG_CHECK(constraint.matches(SemanticVersion(1, 4, 0)));
     SLANG_CHECK(!constraint.matches(SemanticVersion(9, 0, 0)));
 }
@@ -143,7 +144,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.dependencies.getCount() == 1);
     SLANG_CHECK(manifest.dependencies[0].name == "noise");
     SLANG_CHECK(manifest.dependencies[0].version == ">=1.2.0 <2.0.0");
-    SLANG_CHECK(manifest.dependencies[0].tag.getLength() == 0);
+    SLANG_CHECK(manifest.dependencies[0].ref.getLength() == 0);
     SLANG_CHECK(manifest.workspace.depsDirectory == "third-party");
     SLANG_CHECK(manifest.workspace.buildDirectory == "out");
     SLANG_CHECK(manifest.retractions.getCount() == 1);
@@ -156,7 +157,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.host.executables[0] == "root-tool");
     SLANG_CHECK(manifest.host.defaultExecutable == "root-tool");
 
-    const String taggedText = "{\n"
+    const String pinnedText = "{\n"
                               "  \"schema_version\": 1,\n"
                               "  \"name\": \"root\",\n"
                               "  \"exports\": [\"src\"],\n"
@@ -164,15 +165,51 @@ SLANG_UNIT_TEST(PackageManifestJSON)
                               "  \"dependencies\": {\n"
                               "    \"noise\": {\n"
                               "      \"git\": \"https://example.com/noise.git\",\n"
-                              "      \"version\": \">=9.0.0\",\n"
-                              "      \"tag\": \"v1.4.0\"\n"
+                              "      \"version\": \">=1.0.0 <2.0.0\",\n"
+                              "      \"ref\": \"release-1.4\",\n"
+                              "      \"as\": \"1.4.0\"\n"
                               "    }\n"
                               "  }\n"
                               "}\n";
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(readManifestText("tagged.json", taggedText, manifest, error)));
-    SLANG_CHECK(manifest.dependencies[0].version == ">=9.0.0");
-    SLANG_CHECK(manifest.dependencies[0].tag == "v1.4.0");
+        SLANG_SUCCEEDED(readManifestText("pinned.json", pinnedText, manifest, error)));
+    SLANG_CHECK(manifest.dependencies[0].version == ">=1.0.0 <2.0.0");
+    SLANG_CHECK(manifest.dependencies[0].ref == "release-1.4");
+    SLANG_CHECK(manifest.dependencies[0].as == "1.4.0");
+
+    const String refOnlyText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+        "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
+        "\"git\":\"https://example.com/noise.git\",\"ref\":\"main\",\"as\":\"2.1.0\"}}}";
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(readManifestText("ref-only.json", refOnlyText, manifest, error)));
+    SLANG_CHECK(manifest.dependencies[0].version.getLength() == 0);
+    SLANG_CHECK(manifest.dependencies[0].ref == "main");
+    SLANG_CHECK(manifest.dependencies[0].as == "2.1.0");
+
+    const String contradictoryPinText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+        "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
+        "\"git\":\"https://example.com/noise.git\",\"version\":\"<2.0.0\","
+        "\"ref\":\"main\",\"as\":\"2.1.0\"}}}";
+    SLANG_CHECK(SLANG_FAILED(
+        readManifestText("contradictory-pin.json", contradictoryPinText, manifest, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not satisfy")) >= 0);
+
+    const String missingAsText = "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+                                 "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
+                                 "\"git\":\"https://example.com/noise.git\",\"ref\":\"main\"}}}";
+    SLANG_CHECK(SLANG_FAILED(readManifestText("missing-as.json", missingAsText, manifest, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("'ref' and 'as' together")) >= 0);
+
+    const String asWithoutRefText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+        "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
+        "\"git\":\"https://example.com/noise.git\",\"version\":\"2.1.0\","
+        "\"as\":\"2.1.0\"}}}";
+    SLANG_CHECK(
+        SLANG_FAILED(readManifestText("as-without-ref.json", asWithoutRefText, manifest, error)));
 
     const String unsafeGitText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
@@ -192,9 +229,10 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("missing-license-files.json", missingLicenseFilesText, manifest, error)));
 
-    const String pathText = "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
-                            "\"license_files\":[\"LICENSE\"],"
-                            "\"dependencies\":{\"noise\":{\"path\":\"../noise\"}}}";
+    const String pathText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
+        "\"license_files\":[\"LICENSE\"],"
+        "\"dependencies\":{\"noise\":{\"path\":\"../noise\",\"as\":\"1.0.0\"}}}";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifestText("path.json", pathText, manifest, error)));
     SLANG_CHECK(manifest.dependencies[0].path == "../noise");
     SLANG_CHECK(manifest.dependencies[0].git.getLength() == 0);
@@ -215,11 +253,12 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"dependencies\":{\"noise\":{\"path\":\"../noise\",\"version\":\"1.0.0\"}}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("versioned-path.json", versionedPathText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Path dependency cannot")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Path dependency must")) >= 0);
 
     const String absolutePathText = "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
                                     "\"license_files\":[\"LICENSE\"],"
-                                    "\"dependencies\":{\"noise\":{\"path\":\"/tmp/noise\"}}}";
+                                    "\"dependencies\":{\"noise\":{\"path\":\"/tmp/noise\","
+                                    "\"as\":\"1.0.0\"}}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("absolute-path.json", absolutePathText, manifest, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must be relative")) >= 0);
@@ -369,6 +408,7 @@ SLANG_UNIT_TEST(PackageLocalRegistryJSON)
     LocalPackage package;
     package.name = "noise";
     package.path = "../noise";
+    package.as = "1.2.0";
     packages.add(package);
     package.name = "helper";
     package.path = "deps/helper";
@@ -644,6 +684,7 @@ SLANG_UNIT_TEST(PackageToolExecutableRequiresWorkspaceSource)
     Dependency toolDependency;
     toolDependency.name = "tool";
     toolDependency.path = "vendor/tool";
+    toolDependency.as = "1.0.0";
     root.dependencies.add(toolDependency);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
@@ -728,6 +769,7 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsPathLockForGitDependency)
     LockedPackage locked;
     locked.name = "noise";
     locked.path = "../untrusted-noise";
+    locked.version = "1.0.0";
     locked.exports.add("src");
     PackageTool::LockFile lock;
     lock.packages.add(locked);
@@ -776,7 +818,8 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsWorkspaceExclusion)
     LockedPackage locked;
     locked.name = "noise";
     locked.git = dependency.git;
-    locked.tag = "v1.0.0";
+    locked.ref = "v1.0.0";
+    locked.version = "1.0.0";
     locked.commit = "0000000000000000000000000000000000000000";
     locked.exports.add("src");
     PackageTool::LockFile lock;
@@ -816,6 +859,7 @@ SLANG_UNIT_TEST(PackageToolRejectsPathIntoSlangState)
     Dependency pathDep;
     pathDep.name = "evil";
     pathDep.path = ".slang/evil";
+    pathDep.as = "1.0.0";
     root.dependencies.add(pathDep);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
@@ -829,6 +873,7 @@ SLANG_UNIT_TEST(PackageToolRejectsPathIntoSlangState)
     LockedPackage locked;
     locked.name = "evil";
     locked.path = ".slang/evil";
+    locked.version = "1.0.0";
     locked.exports.add("src");
     PackageTool::LockFile lock;
     lock.packages.add(locked);
@@ -908,10 +953,12 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     Dependency bPath;
     bPath.name = "b";
     bPath.path = "vendor/b";
+    bPath.as = "1.0.0";
     a.dependencies.add(bPath);
     Dependency cPath;
     cPath.name = "c";
     cPath.path = "../c";
+    cPath.as = "1.0.0";
     a.dependencies.add(cPath);
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(writeManifest(Path::combine(aRoot, "slang-package.json"), a, error)));
@@ -931,11 +978,12 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     Dependency bGit;
     bGit.name = "b";
     bGit.git = "memory:b";
-    bGit.version = ">=9.0.0";
+    bGit.version = ">=1.0.0";
     root.dependencies.add(bGit);
     Dependency aPath;
     aPath.name = "a";
     aPath.path = "vendor/a";
+    aPath.as = "1.0.0";
     root.dependencies.add(aPath);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
@@ -1084,6 +1132,7 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     Dependency conflictingB;
     conflictingB.name = "b";
     conflictingB.path = "vendor/other-b";
+    conflictingB.as = "1.0.0";
     root.dependencies.clear();
     root.dependencies.add(conflictingB);
     root.dependencies.add(aPath);
@@ -1110,14 +1159,15 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     Dependency dependency;
     dependency.name = "noise";
     dependency.git = "memory:noise";
-    dependency.version = ">=5.0.0";
+    dependency.version = ">=1.0.0";
     root.dependencies.add(dependency);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
     LockedPackage locked;
     locked.name = "noise";
     locked.git = dependency.git;
-    locked.tag = "v1.0.0";
+    locked.ref = "v1.0.0";
+    locked.version = "1.0.0";
     locked.commit = "0000000000000000000000000000000000000000";
     locked.exports.add("src");
     PackageTool::LockFile lock;
@@ -1179,12 +1229,31 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         "override",
         "helper",
         relativeHelperRoot.getBuffer(),
+        "2.0.0",
     };
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
         SLANG_COUNT_OF(helperOverrideArguments),
         helperOverrideArguments,
         error)));
+
+    root.dependencies[0].version = ">=5.0.0";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+    const char* incompatibleLocalUpdateArguments[] = {
+        "slang-package",
+        "update",
+        "--from-local",
+        "--dry-run",
+    };
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(incompatibleLocalUpdateArguments),
+        incompatibleLocalUpdateArguments,
+        error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("No package selection satisfies")) >= 0);
+    root.dependencies[0].version = ">=1.0.0";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
     const char* validateArguments[] = {"slang-package", "validate"};
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
@@ -1213,7 +1282,8 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     for (const auto& package : lock.packages)
     {
         SLANG_CHECK(package.path.getLength() != 0);
-        SLANG_CHECK(package.tag.getLength() == 0);
+        SLANG_CHECK(package.ref.getLength() == 0);
+        SLANG_CHECK(package.version.getLength() != 0);
         SLANG_CHECK(package.commit.getLength() == 0);
     }
     SLANG_CHECK(lock.packages[0].name == "helper");
@@ -1259,6 +1329,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         "override",
         "unused",
         relativeUnusedRoot.getBuffer(),
+        "1.0.0",
     };
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
@@ -1280,8 +1351,11 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         error)));
 
     const char* fetchArguments[] = {"slang-package", "fetch"};
-    SLANG_CHECK(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    SlangResult fetchResult =
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error);
+    if (SLANG_FAILED(fetchResult))
+        getTestReporter()->message(TestMessageType::Info, error.getBuffer());
+    SLANG_CHECK(SLANG_SUCCEEDED(fetchResult));
     String searchPaths;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::readAllText(Path::combine(temp.path, "build", "search-paths"), searchPaths)));
@@ -1380,6 +1454,7 @@ SLANG_UNIT_TEST(PackageToolUpdateDryRun)
     Dependency a;
     a.name = "a";
     a.path = "vendor/a";
+    a.as = "1.0.0";
     root.dependencies.add(a);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
@@ -1395,6 +1470,7 @@ SLANG_UNIT_TEST(PackageToolUpdateDryRun)
     Dependency b;
     b.name = "b";
     b.path = "vendor/b";
+    b.as = "1.0.0";
     root.dependencies.add(b);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
@@ -1503,7 +1579,8 @@ SLANG_UNIT_TEST(PackageValidateRejectsFlattenedModuleAlias)
     LockedPackage locked;
     locked.name = "b";
     locked.git = "memory:b";
-    locked.tag = "v1.0.0";
+    locked.ref = "v1.0.0";
+    locked.version = "1.0.0";
     locked.commit = "0000000000000000000000000000000000000000";
     locked.exports.add("src");
     PackageTool::LockFile lock;
@@ -1546,11 +1623,46 @@ public:
         release.git = git;
         release.sourceRoot = sourceRoot;
         release.manifest = manifest;
-        release.candidate.tag = String("v") + version;
-        release.candidate.commit = release.candidate.tag;
+        release.candidate.ref = String("v") + version;
+        release.candidate.commit = release.candidate.ref;
         SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
             SemanticVersion::parse(version.getUnownedSlice(), release.candidate.version)));
         releases.add(release);
+    }
+
+    void addRef(
+        const String& git,
+        const String& ref,
+        const String& version,
+        const Manifest& manifest)
+    {
+        InMemoryRelease release;
+        release.git = git;
+        release.manifest = manifest;
+        release.candidate.ref = ref;
+        release.candidate.commit = String("commit-") + ref;
+        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
+            SemanticVersion::parse(version.getUnownedSlice(), release.candidate.version)));
+        releases.add(release);
+    }
+
+    virtual SlangResult resolveReference(
+        const String&,
+        const String& git,
+        const String& ref,
+        TagCandidate& outCandidate,
+        String& outError) override
+    {
+        for (const auto& release : releases)
+        {
+            if (release.git == git && release.candidate.ref == ref)
+            {
+                outCandidate = release.candidate;
+                return SLANG_OK;
+            }
+        }
+        outError = String("Missing in-memory ref for ") + git + "@" + ref;
+        return SLANG_FAIL;
     }
 
     virtual SlangResult listReleaseTags(
@@ -1584,7 +1696,7 @@ public:
     {
         for (const auto& release : releases)
         {
-            if (release.git == git && release.candidate.tag == candidate.tag)
+            if (release.git == git && release.candidate.ref == candidate.ref)
             {
                 outManifest.manifest = release.manifest;
                 outManifest.sourceRoot = release.sourceRoot;
@@ -1592,7 +1704,7 @@ public:
                 return SLANG_OK;
             }
         }
-        outError = String("Missing in-memory manifest for ") + git + "@" + candidate.tag;
+        outError = String("Missing in-memory manifest for ") + git + "@" + candidate.ref;
         return SLANG_FAIL;
     }
 };
@@ -1654,8 +1766,33 @@ SLANG_UNIT_TEST(PackageResolverTransitiveRange)
     SLANG_CHECK(lock.packages.getCount() == 2);
     const LockedPackage* a = _findLockedPackage(lock, "a");
     const LockedPackage* b = _findLockedPackage(lock, "b");
-    SLANG_CHECK(a && a->tag == "v1.0.0");
-    SLANG_CHECK(b && b->tag == "v1.4.0");
+    SLANG_CHECK(a && a->ref == "v1.0.0");
+    SLANG_CHECK(b && b->ref == "v1.4.0");
+}
+
+SLANG_UNIT_TEST(PackageResolverPinnedRefUsesClaimedVersion)
+{
+    InMemoryPackageSource source;
+    source.addRelease("memory:noise", "1.0.0", _makeManifest("noise"));
+    source.addRef("memory:noise", "main", "1.4.0", _makeManifest("noise"));
+
+    Manifest root = _makeManifest("root");
+    Dependency dependency;
+    dependency.name = "noise";
+    dependency.git = "memory:noise";
+    dependency.version = ">=1.0.0 <2.0.0";
+    dependency.ref = "main";
+    dependency.as = "1.4.0";
+    root.dependencies.add(dependency);
+
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
+    const LockedPackage* noise = _findLockedPackage(lock, "noise");
+    SLANG_CHECK_ABORT(noise);
+    SLANG_CHECK(noise->ref == "main");
+    SLANG_CHECK(noise->version == "1.4.0");
+    SLANG_CHECK(noise->commit == "commit-main");
 }
 
 SLANG_UNIT_TEST(PackageResolverUsesLatestReleaseRetractions)
@@ -1680,7 +1817,7 @@ SLANG_UNIT_TEST(PackageResolverUsesLatestReleaseRetractions)
         SLANG_SUCCEEDED(resolveDependenciesWithSource(".", root, source, lock, error, &warnings)));
     const LockedPackage* noise = _findLockedPackage(lock, "noise");
     SLANG_CHECK_ABORT(noise);
-    SLANG_CHECK(noise->tag == "v1.0.0");
+    SLANG_CHECK(noise->ref == "v1.0.0");
     SLANG_CHECK(warnings.getCount() == 1);
     SLANG_CHECK(warnings[0].getUnownedSlice().indexOf(UnownedStringSlice("retracts")) >= 0);
 }
@@ -1706,7 +1843,7 @@ SLANG_UNIT_TEST(PackageResolverAppliesWorkspaceExclusions)
         SLANG_SUCCEEDED(resolveDependenciesWithSource(".", root, source, lock, error, &warnings)));
     const LockedPackage* noise = _findLockedPackage(lock, "noise");
     SLANG_CHECK_ABORT(noise);
-    SLANG_CHECK(noise->tag == "v1.0.0");
+    SLANG_CHECK(noise->ref == "v1.0.0");
     SLANG_CHECK(warnings.getCount() == 1);
     SLANG_CHECK(warnings[0].getUnownedSlice().indexOf(UnownedStringSlice("excludes")) >= 0);
 }
@@ -1731,6 +1868,7 @@ SLANG_UNIT_TEST(PackageResolverPathPackageGitTransitive)
     Dependency pPath;
     pPath.name = "p";
     pPath.path = "vendor/p";
+    pPath.as = "1.0.0";
     root.dependencies.add(pPath);
     _addDependency(root, "b", "memory:b", "<1.5.0");
 
@@ -1741,7 +1879,7 @@ SLANG_UNIT_TEST(PackageResolverPathPackageGitTransitive)
     const LockedPackage* lockedP = _findLockedPackage(lock, "p");
     const LockedPackage* lockedB = _findLockedPackage(lock, "b");
     SLANG_CHECK(lockedP && lockedP->path == "vendor/p");
-    SLANG_CHECK(lockedB && lockedB->tag == "v1.4.0");
+    SLANG_CHECK(lockedB && lockedB->ref == "v1.4.0");
 }
 
 SLANG_UNIT_TEST(PackageResolverPathShadowsSelectedGit)
@@ -1768,6 +1906,7 @@ SLANG_UNIT_TEST(PackageResolverPathShadowsSelectedGit)
     Dependency qPath;
     qPath.name = "q";
     qPath.path = "vendor/q";
+    qPath.as = "1.0.0";
     m.dependencies.add(qPath);
     source.addRelease("memory:m", "1.0.0", m, mRoot);
     Manifest z = _makeManifest("z");
@@ -1786,6 +1925,7 @@ SLANG_UNIT_TEST(PackageResolverPathShadowsSelectedGit)
     SLANG_CHECK_ABORT(lockedQ);
     SLANG_CHECK(lockedQ->path == "deps/m/vendor/q");
     SLANG_CHECK(lockedQ->git.getLength() == 0);
+    SLANG_CHECK(lockedQ->version == "1.0.0");
     SLANG_CHECK(_findLockedPackage(lock, "w") == nullptr);
     SLANG_CHECK(_findLockedPackage(lock, "stale") == nullptr);
     SLANG_CHECK(warnings.getCount() == 1);
@@ -1806,7 +1946,7 @@ SLANG_UNIT_TEST(PackageResolverCompatibleSelfCycle)
     SLANG_CHECK(lock.packages.getCount() == 1);
     const LockedPackage* lockedA = _findLockedPackage(lock, "a");
     SLANG_CHECK_ABORT(lockedA);
-    SLANG_CHECK(lockedA->tag == "v1.0.0");
+    SLANG_CHECK(lockedA->ref == "v1.0.0");
 }
 
 SLANG_UNIT_TEST(PackageResolverCompatibleCycle)
@@ -1844,7 +1984,7 @@ SLANG_UNIT_TEST(PackageResolverCycleBacktracksEarlierSelection)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
     const LockedPackage* lockedA = _findLockedPackage(lock, "a");
     SLANG_CHECK_ABORT(lockedA);
-    SLANG_CHECK(lockedA->tag == "v1.0.0");
+    SLANG_CHECK(lockedA->ref == "v1.0.0");
 }
 
 SLANG_UNIT_TEST(PackageResolverRejectsUnsatisfiableCycle)
@@ -1863,5 +2003,5 @@ SLANG_UNIT_TEST(PackageResolverRejectsUnsatisfiableCycle)
     String error;
     SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(root, source, lock, error)));
     SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("No release tag satisfies")) >= 0);
+        error.getUnownedSlice().indexOf(UnownedStringSlice("No package selection satisfies")) >= 0);
 }

@@ -46,8 +46,8 @@ static void _printHelp()
         "  validate         Validate package structure and the locked dependency closure.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
         "  unedit <name>    Return an unchanged checkout to tool ownership.\n"
-        "  override <name> <path>\n"
-        "                   Use an existing local package directory.\n"
+        "  override <name> <path> [as]\n"
+        "                   Use a local package as an exact semantic version.\n"
         "  unoverride <name>\n"
         "                   Stop using an existing local package directory.\n"
         "  help             Show this help text.\n");
@@ -163,22 +163,19 @@ static SlangResult _materialize(
             return SLANG_FAIL;
         }
 
-        List<TagCandidate> candidates;
-        SLANG_RETURN_ON_FAIL(listReleaseTags(package.git, candidates, outError));
-        const TagCandidate* matchingTag = nullptr;
-        for (const auto& candidate : candidates)
+        SemanticVersion releaseVersion;
+        if (SLANG_SUCCEEDED(parseReleaseTag(package.ref, releaseVersion)))
         {
-            if (candidate.tag == package.tag)
+            TagCandidate candidate;
+            SLANG_RETURN_ON_FAIL(resolveReference(package.git, package.ref, candidate, outError));
+            if (candidate.commit != package.commit)
             {
-                matchingTag = &candidate;
-                break;
+                outError =
+                    String(
+                        "Locked release tag no longer identifies the locked commit for package '") +
+                    package.name + "'.";
+                return SLANG_FAIL;
             }
-        }
-        if (!matchingTag || matchingTag->commit != package.commit)
-        {
-            outError = String("Locked tag no longer identifies the locked commit for package '") +
-                       package.name + "'.";
-            return SLANG_FAIL;
         }
 
         String currentCommit;
@@ -236,10 +233,12 @@ static SlangResult _validateLockExclusions(
         if (package.path.getLength())
             continue;
         SemanticVersion version;
-        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(parseReleaseTag(package.tag, version)));
+        String versionError;
+        SLANG_RELEASE_ASSERT(
+            SLANG_SUCCEEDED(parseExactVersion(package.version, version, versionError)));
         if (matchesVersionPolicy(exclusion.version, version))
         {
-            outError = String("Locked package '") + package.name + "' release " + package.tag +
+            outError = String("Locked package '") + package.name + "' version " + package.version +
                        " is excluded by the workspace: " + exclusion.reason +
                        ". Run 'slang package update'.";
             return SLANG_FAIL;
@@ -319,6 +318,14 @@ static SlangResult _validateLocalPackages(
         if (package->path.getLength() && package->path != localPackage.path)
         {
             outError = String("Locked path for package '") + package->name +
+                       "' does not match slang-workspace.json. Run "
+                       "'slang package update --from-local'.";
+            return SLANG_FAIL;
+        }
+        if (!isEditedLocalPackage(localPackage) && localPackage.as.getLength() &&
+            package->version != localPackage.as)
+        {
+            outError = String("Locked version for local override '") + package->name +
                        "' does not match slang-workspace.json. Run "
                        "'slang package update --from-local'.";
             return SLANG_FAIL;
@@ -581,6 +588,23 @@ static SlangResult _update(
         SLANG_RETURN_ON_FAIL(readLockFile(lockPath, previousLock, outError));
         previousLockPtr = &previousLock;
     }
+    if (fromLocal)
+    {
+        for (auto& localPackage : localPackages)
+        {
+            if (isEditedLocalPackage(localPackage) || localPackage.as.getLength())
+                continue;
+            Index lockedIndex =
+                previousLockPtr ? findLockedPackageIndex(*previousLockPtr, localPackage.name) : -1;
+            if (lockedIndex < 0)
+            {
+                outError = String("Override for package '") + localPackage.name +
+                           "' requires an 'as' version because no previous lock version exists.";
+                return SLANG_FAIL;
+            }
+            localPackage.as = previousLock.packages[lockedIndex].version;
+        }
+    }
 
     LockFile lock;
     List<String> warnings;
@@ -724,12 +748,30 @@ static SlangResult _status(const String& projectRoot, String& outError)
         fprintf(stdout, "Local package state:\n");
         for (const auto& package : localPackages)
         {
-            fprintf(
-                stdout,
-                "  %s: %s at %s\n",
-                package.name.getBuffer(),
-                isEditedLocalPackage(package) ? "edit" : "override",
-                package.path.getBuffer());
+            if (isEditedLocalPackage(package))
+            {
+                fprintf(
+                    stdout,
+                    "  %s: edit at %s\n",
+                    package.name.getBuffer(),
+                    package.path.getBuffer());
+            }
+            else
+            {
+                String effectiveVersion = package.as;
+                if (!effectiveVersion.getLength())
+                {
+                    Index lockedIndex = findLockedPackageIndex(lock, package.name);
+                    if (lockedIndex >= 0)
+                        effectiveVersion = lock.packages[lockedIndex].version;
+                }
+                fprintf(
+                    stdout,
+                    "  %s: override at %s as %s\n",
+                    package.name.getBuffer(),
+                    package.path.getBuffer(),
+                    effectiveVersion.getBuffer());
+            }
         }
     }
     fprintf(
@@ -1177,6 +1219,7 @@ static SlangResult _registerLocalPackage(
     const String& projectRoot,
     const String& name,
     const String& path,
+    const String& as,
     LocalPackageKind kind,
     List<LocalPackage>& ioPackages,
     String& outError)
@@ -1206,6 +1249,7 @@ static SlangResult _registerLocalPackage(
     LocalPackage package;
     package.name = name;
     package.path = relativePath;
+    package.as = as;
     package.kind = kind;
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(readLocalPackageManifest(projectRoot, package, manifest, outError));
@@ -1257,6 +1301,7 @@ static SlangResult _edit(const String& projectRoot, const String& name, String& 
         projectRoot,
         name,
         destination,
+        String(),
         LocalPackageKind::Edit,
         localPackages,
         outError));
@@ -1337,16 +1382,26 @@ static SlangResult _override(
     const String& projectRoot,
     const String& name,
     const String& path,
+    const String& as,
     String& outError)
 {
     LockFile lock;
     SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
     LockedPackage* lockedPackage = _findLockedPackage(lock, name);
+    if (!lockedPackage && !as.getLength())
+    {
+        outError = String("Override for package '") + name +
+                   "' requires an 'as' version because it is not present in the lock.";
+        return SLANG_FAIL;
+    }
     if (lockedPackage && isPathOnlyLockedPackage(*lockedPackage))
     {
         outError = String("Manifest path dependency cannot be overridden: ") + name;
         return SLANG_FAIL;
     }
+    String providedVersion = as.getLength() ? as : lockedPackage->version;
+    SemanticVersion ignoredVersion;
+    SLANG_RETURN_ON_FAIL(parseExactVersion(providedVersion, ignoredVersion, outError));
 
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
@@ -1354,6 +1409,7 @@ static SlangResult _override(
         projectRoot,
         name,
         path,
+        providedVersion,
         LocalPackageKind::Override,
         localPackages,
         outError));
@@ -1461,8 +1517,13 @@ SlangResult executeInDirectory(
         return _edit(projectRoot, argv[2], outError);
     if (command == "unedit" && argc == 3)
         return _unedit(projectRoot, argv[2], outError);
-    if (command == "override" && argc == 4)
-        return _override(projectRoot, argv[2], argv[3], outError);
+    if (command == "override" && (argc == 4 || argc == 5))
+        return _override(
+            projectRoot,
+            argv[2],
+            argv[3],
+            argc == 5 ? String(argv[4]) : String(),
+            outError);
     if (command == "unoverride" && argc == 3)
         return _unoverride(projectRoot, argv[2], outError);
 

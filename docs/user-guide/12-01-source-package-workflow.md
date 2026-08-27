@@ -70,6 +70,13 @@ less slang-package-lock.json
 `host` is a sibling of `workspace` in the manifest, not a field inside it. A dependency may declare
 `host`; only the package you run `build` and `run` in produces executables.
 
+Most Git dependencies use `git` plus a `version` range. To follow a branch or non-release tag,
+write `git`, `ref`, and `as`; `ref` chooses the Git name while `as` supplies the exact semantic
+version used by the solver. You may also retain `version` as a checked compatibility assertion:
+validation fails when `as` is outside that range. Path dependencies similarly require `path` plus
+`as`. In all cases the lock records the exact effective version, and Git locks additionally record
+the resolved commit.
+
 ## Reproduce the locked graph
 
 ```sh
@@ -176,9 +183,10 @@ Two local mechanisms, both recorded in gitignored `slang-workspace.json`:
 Changing its exports or dependencies still requires a new published tag and a normal `update`.
 `unedit` refuses while the tree has extra commits, dirty files, or stashes.
 
-`slang package override NAME PATH` points the package at another directory you already have.
-That tree does not need to satisfy the shadowed Git version range. Its current manifest
-participates in resolution only when you run:
+`slang package override NAME PATH [AS]` points the package at another directory you already have.
+Its effective version must satisfy every incoming dependency constraint. Omit `AS` to retain the
+version from the current lock, or provide it when the local tree represents a different version.
+Its current manifest participates in resolution only when you run:
 
 ```sh
 slang package update --from-local
@@ -204,8 +212,9 @@ existing lock, so `fetch` in CI stays reproducible after the publisher adds advi
 **Workspace excludes** live in the root manifest's `workspace.excludes` array. They are committed
 consumer policy for *this* workspace. Nested packages' `workspace` objects are ignored. Resolution
 skips excluded Git tags, and `fetch` **rejects** a lock that still selects one: the lock is stale
-relative to declared intent, so you must `update`. Path packages and overrides have no release
-version and are not matched.
+relative to declared intent, so you must `update`. Path packages and overrides are local
+selections, so remote release exclusions do not filter them even though they carry an effective
+version for solver compatibility.
 
 There is no personal exclude in `slang-workspace.json`. A machine-local skip that failed `fetch`
 would make CI and your laptop disagree about the same lock. Use a committed exclude when the

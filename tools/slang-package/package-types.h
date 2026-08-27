@@ -21,10 +21,12 @@ struct Dependency
     String name;
     String git;
     String path;
-    /// Range constraint for a Git dependency, written without a `v` prefix (for example `>=1.2.0`).
-    /// This is not a package self-version; a package's published identity is its Git release tag.
+    /// Range constraint for a Git dependency, written without a `v` prefix.
     String version;
-    String tag;
+    /// An opaque Git branch or tag name that pins this edge instead of selecting a release tag.
+    String ref;
+    /// Exact semantic version that a pinned Git ref or path dependency provides.
+    String as;
 };
 
 /// Publisher-authored advice to avoid selecting releases matching `version`.
@@ -106,18 +108,20 @@ inline String getWorkspaceBuildDirectory(const Manifest& manifest)
 
 /// One package in `slang-package-lock.json`. Exactly one of these shapes is legal:
 ///
-/// - Git pin: `git`, `tag`, and `commit` are set; `path` is empty. Fetch materializes
+/// - Git pin: `git`, `ref`, `version`, and `commit` are set; `path` is empty. Fetch materializes
 ///   `workspace.deps/<name>` at that commit. An in-place edit keeps this lock shape; the
 ///   gitignored `slang-workspace.json` changes ownership of the checkout.
-/// - Path-only: `path` is set; `git` is empty. The package is used in place and is trusted only
-///   when a manifest `path` edge selected it.
+/// - Path-only: `path` and `version` are set; `git` is empty. The package is used in place and is
+///   trusted only when a manifest `path` edge selected it.
 /// - Local override: `git` and `path` are both set. The Git identity is retained, but the tree at
-///   `path` is used instead; `slang-workspace.json` must register the same path.
+///   `path` is used instead; `version` is the version it provides and `slang-workspace.json` must
+///   register the same path.
 struct LockedPackage
 {
     String name;
     String git;
-    String tag;
+    String ref;
+    String version;
     String commit;
     String path;
     List<String> exports;
@@ -162,6 +166,9 @@ struct LocalPackage
 {
     String name;
     String path;
+    /// Optional exact version for an override. When absent, `update --from-local` uses the version
+    /// from the lock row being replaced.
+    String as;
     LocalPackageKind kind = LocalPackageKind::Override;
 };
 
@@ -197,7 +204,7 @@ bool matchesVersionPolicy(const String& constraintText, const SemanticVersion& v
 
 struct TagCandidate
 {
-    String tag;
+    String ref;
     String commit;
     String path;
     bool isEdit = false;
@@ -217,9 +224,7 @@ inline SlangResult parseVersionConstraint(
     return parseVersionConstraint(text.getUnownedSlice(), outConstraint, outError);
 }
 
-/// Convert a dependency's `tag` or `version` into a solver constraint.
-///
-/// `tag` names one Git release tag and wins over `version` when both are present.
+/// Convert a dependency's `version` into a solver constraint.
 SlangResult parseDependencyConstraint(
     const Dependency& dependency,
     VersionConstraint& outConstraint,
@@ -229,6 +234,24 @@ SlangResult parseReleaseTag(const UnownedStringSlice& tag, SemanticVersion& outV
 inline SlangResult parseReleaseTag(const String& tag, SemanticVersion& outVersion)
 {
     return parseReleaseTag(tag.getUnownedSlice(), outVersion);
+}
+
+/// Parse an exact semantic version written without a `v` prefix.
+SlangResult parseExactVersion(
+    const UnownedStringSlice& text,
+    SemanticVersion& outVersion,
+    String& outError);
+inline SlangResult parseExactVersion(
+    const String& text,
+    SemanticVersion& outVersion,
+    String& outError)
+{
+    return parseExactVersion(text.getUnownedSlice(), outVersion, outError);
+}
+
+inline String formatExactVersion(const SemanticVersion& version)
+{
+    return String(version.m_major) + "." + String(version.m_minor) + "." + String(version.m_patch);
 }
 
 /// Append `advice` as a following line of `ioError`.

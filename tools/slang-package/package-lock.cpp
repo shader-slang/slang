@@ -37,10 +37,10 @@ SlangResult validateLockedDependency(
     const LockedPackage& lockedPackage = lock.packages[outPackageIndex];
     if (dependency.path.getLength())
     {
-        if (!isPathOnlyLockedPackage(lockedPackage))
+        if (!isPathOnlyLockedPackage(lockedPackage) || lockedPackage.version != dependency.as)
         {
-            outError = String("Lock file does not use a path for dependency '") + dependency.name +
-                       "'. Run 'slang package update'.";
+            outError = String("Lock file does not use the declared path version for dependency '") +
+                       dependency.name + "'. Run 'slang package update'.";
             return SLANG_FAIL;
         }
         return SLANG_OK;
@@ -53,28 +53,36 @@ SlangResult validateLockedDependency(
                        "' uses a different Git location. Run 'slang package update'.";
             return SLANG_FAIL;
         }
-        // A manifest path or project-local override shadows the Git requirement. Its transitive
-        // requirements remain locked, but it has no release version to compare with this range.
-        return SLANG_OK;
     }
-    if (lockedPackage.git != dependency.git)
+    else if (lockedPackage.git != dependency.git)
     {
         outError = String("Lock file uses a different Git URL for dependency '") + dependency.name +
                    "'. Run 'slang package update'.";
         return SLANG_FAIL;
     }
 
-    VersionConstraint constraint;
     SemanticVersion lockedVersion;
-    SlangResult constraintResult = parseDependencyConstraint(dependency, constraint, outError);
-    if (SLANG_FAILED(constraintResult))
-        return constraintResult;
-    SlangResult versionResult = parseReleaseTag(lockedPackage.tag, lockedVersion);
-    if (SLANG_FAILED(versionResult) || !constraint.matches(lockedVersion))
+    SLANG_RETURN_ON_FAIL(parseExactVersion(lockedPackage.version, lockedVersion, outError));
+    if (dependency.version.getLength())
     {
-        outError = String("Locked version no longer satisfies dependency '") + dependency.name +
-                   "'. Run 'slang package update'.";
-        return SLANG_FAIL;
+        VersionConstraint constraint;
+        SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, constraint, outError));
+        if (!constraint.matches(lockedVersion))
+        {
+            outError = String("Locked version no longer satisfies dependency '") + dependency.name +
+                       "'. Run 'slang package update'.";
+            return SLANG_FAIL;
+        }
+    }
+    if (dependency.ref.getLength())
+    {
+        if (lockedPackage.version != dependency.as ||
+            (!lockedPackage.path.getLength() && lockedPackage.ref != dependency.ref))
+        {
+            outError = String("Lock file no longer matches the pinned ref for dependency '") +
+                       dependency.name + "'. Run 'slang package update'.";
+            return SLANG_FAIL;
+        }
     }
     return SLANG_OK;
 }
@@ -122,7 +130,7 @@ SlangResult validateLockedPackageManifest(
                 dependency.git == lockedDependency.git &&
                 dependency.path == lockedDependency.path &&
                 dependency.version == lockedDependency.version &&
-                dependency.tag == lockedDependency.tag)
+                dependency.ref == lockedDependency.ref && dependency.as == lockedDependency.as)
             {
                 found = true;
                 break;
@@ -195,7 +203,7 @@ static bool _dependenciesEqual(const List<Dependency>& left, const List<Dependen
         {
             if (dependency.name == other.name && dependency.git == other.git &&
                 dependency.path == other.path && dependency.version == other.version &&
-                dependency.tag == other.tag)
+                dependency.ref == other.ref && dependency.as == other.as)
             {
                 found = true;
                 break;
@@ -221,21 +229,21 @@ static bool _stringSetsEqual(const List<String>& left, const List<String>& right
 
 static bool _lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right)
 {
-    return left.name == right.name && left.git == right.git && left.tag == right.tag &&
-           left.commit == right.commit && left.path == right.path &&
-           _stringSetsEqual(left.exports, right.exports) &&
+    return left.name == right.name && left.git == right.git && left.ref == right.ref &&
+           left.version == right.version && left.commit == right.commit &&
+           left.path == right.path && _stringSetsEqual(left.exports, right.exports) &&
            _dependenciesEqual(left.dependencies, right.dependencies);
 }
 
 static String _describeLockedPackage(const LockedPackage& package)
 {
     if (isLocalOverrideLockedPackage(package))
-        return package.git + " via " + package.path;
+        return package.git + " via " + package.path + " as " + package.version;
     if (isPathOnlyLockedPackage(package))
-        return String("path ") + package.path;
+        return String("path ") + package.path + " as " + package.version;
     String description = package.git;
-    if (package.tag.getLength())
-        description = description + " " + package.tag;
+    if (package.ref.getLength())
+        description = description + " " + package.ref + " as " + package.version;
     if (package.commit.getLength())
         description = description + " (" + package.commit + ")";
     return description;

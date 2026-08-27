@@ -288,7 +288,7 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), editedLock, error)));
     SLANG_CHECK_ABORT(editedLock.packages.getCount() == 1);
     SLANG_CHECK(editedLock.packages[0].git == repository);
-    SLANG_CHECK(editedLock.packages[0].tag == "v1.0.0");
+    SLANG_CHECK(editedLock.packages[0].ref == "v1.0.0");
     SLANG_CHECK(editedLock.packages[0].path.getLength() == 0);
 
     SLANG_CHECK_ABORT(
@@ -341,8 +341,25 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), editedLock, error)));
-    SLANG_CHECK(editedLock.packages[0].tag == "v1.1.0");
+    SLANG_CHECK(editedLock.packages[0].ref == "v1.1.0");
     SLANG_CHECK(File::exists(checkoutSource));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(checkoutSource, restoredSource)));
     SLANG_CHECK(restoredSource == "module noise;\n// v1.1");
+
+    List<String> branchArguments;
+    branchArguments.add("-C");
+    branchArguments.add(repository);
+    branchArguments.add("branch");
+    branchArguments.add("feature-ref");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(branchArguments)));
+    root.dependencies[0].version = ">=1.0.0 <2.0.0";
+    root.dependencies[0].ref = "feature-ref";
+    root.dependencies[0].as = "1.1.0";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), editedLock, error)));
+    SLANG_CHECK(editedLock.packages[0].ref == "feature-ref");
+    SLANG_CHECK(editedLock.packages[0].version == "1.1.0");
 }

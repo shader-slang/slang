@@ -106,10 +106,10 @@ primary whose source filename is `<name>.slang`. When more than one executable i
 With a single executable, `default` may be omitted and that name is used. Dependency manifests may
 declare this field, but only the workspace package controls executable generation.
 
-Dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package publishers must
-treat as immutable. The tag is the package's version; `schema_version` in `slang-package.json` is
-only the file format version. Fetching fails if a locked tag no longer identifies its locked
-commit.
+Ordinary dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package
+publishers must treat as immutable. A manifest may instead pin an opaque branch or tag with `ref`
+and assign its solver identity with `as`. `schema_version` in `slang-package.json` is only the file
+format version. The lock always records the resolved ref, exact semantic version, and commit.
 
 The optional top-level `retractions` array is publisher advice not to select releases matching a
 version constraint. Each entry requires `version` and a non-empty `reason`. To retract a published
@@ -124,18 +124,24 @@ The root-only `workspace.excludes` array is committed consumer policy. Each entr
 settings, including exclusions, are ignored. Resolution skips excluded Git releases. Unlike a
 publisher retraction, adding an exclusion changes the workspace's declared resolution intent, so
 `fetch` rejects a lock that still selects an excluded release and asks for `slang package update`.
-Path dependencies and local overrides select trees rather than release versions and are not
-matched against exclusions.
+Path dependencies and local overrides carry an effective version for solver compatibility, but
+workspace exclusions apply only to remote Git selections.
 
-Each dependency entry contains exactly one source:
+Each dependency entry has one of four shapes:
 
-- A Git dependency contains `git` and either `version` or `tag`. `git` may be a URL or a local Git
-  repository path. `version` is a space-separated intersection of `>`, `>=`, `<`, and `<=`
-  comparisons, or a single exact version, written without a `v` prefix. `tag` names one Git tag,
-  including the `v` prefix. When both version selectors are present, `tag` wins.
-- A path dependency contains only `path`, which must be relative to the manifest that declares it.
-  The target directory must contain its own `slang-package.json`, and its package name must match
-  the dependency key. A path selects that one tree of files and therefore has no version range.
+- `git` plus `version` selects the highest compatible `vMAJOR.MINOR.PATCH` release tag.
+- `path` plus `as` uses one relative tree as the exact semantic version named by `as`.
+- `git`, `ref`, and `as` pins an opaque branch or tag and uses `as` as its exact solver version.
+- `git`, `version`, `ref`, and `as` adds a compatibility assertion: `as` must satisfy `version`, or
+  manifest validation fails.
+
+`git` may be a URL or a local Git repository path. A `version` is a space-separated intersection
+of `>`, `>=`, `<`, and `<=` comparisons, or a single exact version. Both `version` and `as` omit
+the release tag's `v` prefix. `ref` is normally a branch or tag; the lock, rather than the
+manifest, records the exact commit.
+
+A dependency `path` must be relative to the manifest that declares it. The target directory must
+contain its own `slang-package.json`, and its package name must match the dependency key.
 
 For example, a package can check in another package under `vendor/noise`:
 
@@ -146,7 +152,8 @@ For example, a package can check in another package under `vendor/noise`:
   "license_files": ["LICENSE"],
   "dependencies": {
     "noise": {
-      "path": "vendor/noise"
+      "path": "vendor/noise",
+      "as": "1.4.0"
     }
   }
 }
@@ -158,10 +165,11 @@ dependencies in the workspace lock. Path packages are used in place and are not 
 
 One package name identifies one node in the graph. Git requirements from multiple dependents must
 use the same Git location, and the resolver intersects their constraints and chooses the highest
-satisfying tag. Path requirements for one name must resolve to the same canonical directory or
-resolution fails. A path requirement wins over a Git requirement for the same name without
-checking the Git version range, and the tool warns that the Git requirement was shadowed. The path
-package's transitive dependencies are still resolved normally.
+satisfying tag. Path requirements for one name must resolve to the same canonical directory and
+claim the same `as` version or resolution fails. A path requirement wins over the Git source for
+the same name, but its `as` version must satisfy every Git version constraint and pinned `as`
+identity. The tool warns that the Git source was shadowed. The path package's transitive
+dependencies are still resolved normally.
 
 A path in the workspace package or another local package may use `..` to leave the package that
 declares it, which supports sibling packages in a larger checkout. `slang package update` and
@@ -181,6 +189,11 @@ lockfile, checks that it still satisfies every recorded manifest, and checks out
 transitive Git dependency under `workspace.deps` (`deps/` by default). Path dependencies remain at their locked
 relative locations. Fetch never changes dependency resolution, so it is the appropriate command
 for normal builds and CI.
+
+Every lock row has an exact `version`. A Git row also records the selected `ref` and `commit`; a
+range-selected release uses its `vMAJOR.MINOR.PATCH` tag as the ref. A path row records its
+effective `as` version as `version`. A local-override row records its original Git location, local
+path, and effective version.
 
 Dependency checkout paths are stable. A pin stays at `deps/NAME` while it is tool-owned, edited,
 and returned to tool ownership. Fetch and update refuse to replace an unregistered checkout with
@@ -249,7 +262,8 @@ For example, the generated local-state file may contain:
   },
   "overrides": {
     "shared": {
-      "path": "../shared"
+      "path": "../shared",
+      "as": "2.3.0"
     }
   }
 }
@@ -257,10 +271,11 @@ For example, the generated local-state file may contain:
 
 Use the package commands to change this file; its schema is tool-owned and may evolve.
 
-`slang package override NAME PATH` uses an existing local package directory instead. Both commands
-register local state in `slang-workspace.json`, which must remain uncommitted. An override does not
-copy or modify the supplied directory. `slang package unoverride NAME` removes an override
-registration.
+`slang package override NAME PATH [AS]` uses an existing local package directory instead. `AS` is
+an exact semantic version for solver compatibility. When it is omitted, the command uses the
+version in the package's current lock row. Both commands register local state in
+`slang-workspace.json`, which must remain uncommitted. An override does not copy or modify the
+supplied directory. `slang package unoverride NAME` removes an override registration.
 `unoverride` refuses while the lock has a local-path entry for the package; run normal
 `slang package update` first to restore a published pin.
 
@@ -270,10 +285,10 @@ running normal `slang package update`. Use an override when local manifest chang
 in resolution before publication. `slang package update --from-local` resolves override manifests
 and their transitive requirements into the definitive lock. An override records both its original
 Git location and its effective path and requires the matching registration in
-`slang-workspace.json`; it therefore fails explicitly on another machine or in CI. A local tree
-does not need to satisfy the shadowed Git version range, but all of its transitive dependencies are
-resolved. Run normal `slang package update` before removing an override registration or committing
-a portable published resolution.
+`slang-workspace.json`; it therefore fails explicitly on another machine or in CI. The override's
+effective version must satisfy every incoming constraint, and all of its transitive dependencies
+are resolved. Run normal `slang package update` before removing an override registration or
+committing a portable published resolution.
 
 Fetched package trees contain source only. Compilation output must be written outside these trees
 because the same source commit can be compiled against different resolved dependency graphs.
