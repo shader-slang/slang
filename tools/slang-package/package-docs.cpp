@@ -7,7 +7,6 @@
 #include "package-local.h"
 #include "package-lock.h"
 #include "package-path.h"
-#include "package-validate.h"
 
 #include <stdio.h>
 
@@ -41,6 +40,110 @@ public:
     }
 };
 
+/// Rewrite a path copied from `docs/` so Markdown links use `/` even on Windows.
+static String _toMarkdownRelativePath(const String& path)
+{
+    StringBuilder builder;
+    for (char c : path.getUnownedSlice())
+        builder.append(c == '\\' ? '/' : c);
+    return builder.produceString();
+}
+
+static void _setPackageDependencies(
+    Dictionary<String, List<String>>& dependenciesByPackage,
+    const String& name,
+    const List<Dependency>& dependencies)
+{
+    List<String> names;
+    for (const auto& dependency : dependencies)
+        names.add(dependency.name);
+    dependenciesByPackage.set(name, names);
+}
+
+/// Emit one node of the workspace dependency tree. Every reachable package is listed. Packages that
+/// contributed Markdown link to their generated file list; packages that did not are named only. A
+/// package that has already been expanded is listed again but not re-expanded, which keeps cyclic
+/// dependencies finite.
+static void _appendDocumentationGraph(
+    StringBuilder& builder,
+    const String& name,
+    const Dictionary<String, List<String>>& dependenciesByPackage,
+    const HashSet<String>& packagesWithFiles,
+    HashSet<String>& expandedPackages,
+    Index indent)
+{
+    for (Index i = 0; i < indent; ++i)
+        builder << "  ";
+    if (packagesWithFiles.contains(name))
+        builder << "- [" << name << "](#" << name << ")\n";
+    else
+        builder << "- " << name << "\n";
+    if (expandedPackages.contains(name))
+        return;
+    expandedPackages.add(name);
+    List<String> children;
+    dependenciesByPackage.tryGetValue(name, children);
+    for (const auto& child : children)
+    {
+        _appendDocumentationGraph(
+            builder,
+            child,
+            dependenciesByPackage,
+            packagesWithFiles,
+            expandedPackages,
+            indent + 1);
+    }
+}
+
+static SlangResult _writeDocumentationIndex(
+    const String& destinationRoot,
+    const String& workspaceName,
+    const Dictionary<String, List<String>>& dependenciesByPackage,
+    const Dictionary<String, List<String>>& filesByPackage,
+    String& outError)
+{
+    HashSet<String> packagesWithFiles;
+    List<String> packageNames;
+    for (const auto& pair : filesByPackage)
+    {
+        if (pair.second.getCount() == 0)
+            continue;
+        packagesWithFiles.add(pair.first);
+        packageNames.add(pair.first);
+    }
+    packageNames.sort([](const String& left, const String& right) { return left < right; });
+
+    StringBuilder builder;
+    builder << "# Package documentation\n\n";
+    builder << "## Dependency graph\n\n";
+    HashSet<String> expandedPackages;
+    _appendDocumentationGraph(
+        builder,
+        workspaceName,
+        dependenciesByPackage,
+        packagesWithFiles,
+        expandedPackages,
+        0);
+    builder << "\n## Packages\n";
+    for (const auto& packageName : packageNames)
+    {
+        List<String> files;
+        filesByPackage.tryGetValue(packageName, files);
+        files.sort([](const String& left, const String& right) { return left < right; });
+        builder << "\n### " << packageName << "\n\n";
+        for (const auto& file : files)
+            builder << "- [" << file << "](" << packageName << "/" << file << ")\n";
+    }
+
+    String indexPath = Path::combine(destinationRoot, "index.md");
+    if (SLANG_FAILED(File::writeAllText(indexPath, builder.produceString())))
+    {
+        outError = String("Cannot write documentation index: ") + indexPath;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 /// Copy Markdown files recursively while refusing directory links that leave the package's docs
 /// tree.
 static SlangResult _copyMarkdownFilesRec(
@@ -50,6 +153,7 @@ static SlangResult _copyMarkdownFilesRec(
     const String& destinationRoot,
     const String& canonicalDestinationRoot,
     List<String>& ioVisitedDirectories,
+    List<String>& ioCopiedFiles,
     Index& ioFileCount,
     String& outError)
 {
@@ -93,6 +197,7 @@ static SlangResult _copyMarkdownFilesRec(
                 destinationRoot,
                 canonicalDestinationRoot,
                 ioVisitedDirectories,
+                ioCopiedFiles,
                 ioFileCount,
                 outError));
             continue;
@@ -152,6 +257,7 @@ static SlangResult _copyMarkdownFilesRec(
             outError = String("Cannot copy documentation file: ") + sourcePath;
             return SLANG_FAIL;
         }
+        ioCopiedFiles.add(_toMarkdownRelativePath(relativePath));
         ++ioFileCount;
     }
     return SLANG_OK;
@@ -159,16 +265,6 @@ static SlangResult _copyMarkdownFilesRec(
 
 SlangResult buildDocumentation(const String& projectRoot, String& outError)
 {
-    List<String> warnings;
-    SLANG_RETURN_ON_FAIL(validateProject(
-        projectRoot,
-        outError,
-        &warnings,
-        nullptr,
-        ProjectValidationMode::SourceAndDependencies));
-    for (const auto& warning : warnings)
-        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
-
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(
         readManifest(Path::combine(projectRoot, kManifestName), manifest, outError));
@@ -176,6 +272,9 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
     List<String> packageRoots;
     packageNames.add(manifest.name);
     packageRoots.add(projectRoot);
+
+    Dictionary<String, List<String>> dependenciesByPackage;
+    _setPackageDependencies(dependenciesByPackage, manifest.name, manifest.dependencies);
 
     String lockPath = Path::combine(projectRoot, kLockName);
     if (File::exists(lockPath))
@@ -196,6 +295,7 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
                 outError));
             packageNames.add(package.name);
             packageRoots.add(packageRoot);
+            _setPackageDependencies(dependenciesByPackage, package.name, package.dependencies);
         }
     }
 
@@ -213,6 +313,7 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
         return SLANG_FAIL;
     }
 
+    Dictionary<String, List<String>> filesByPackage;
     Index copiedFileCount = 0;
     for (Index i = 0; i < packageRoots.getCount(); ++i)
     {
@@ -236,6 +337,7 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
         }
 
         List<String> visitedDirectories;
+        List<String> copiedFiles;
         String packageDestination = Path::combine(destinationRoot, packageNames[i]);
         if (!Path::createDirectoryRecursive(packageDestination))
         {
@@ -258,9 +360,18 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
             packageDestination,
             canonicalPackageDestination,
             visitedDirectories,
+            copiedFiles,
             copiedFileCount,
             outError));
+        if (copiedFiles.getCount())
+            filesByPackage.set(packageNames[i], copiedFiles);
     }
+    SLANG_RETURN_ON_FAIL(_writeDocumentationIndex(
+        destinationRoot,
+        manifest.name,
+        dependenciesByPackage,
+        filesByPackage,
+        outError));
     fprintf(stdout, "Copied %lld documentation file(s).\n", (long long)copiedFileCount);
     return SLANG_OK;
 }

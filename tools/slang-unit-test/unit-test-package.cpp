@@ -408,6 +408,13 @@ SLANG_UNIT_TEST(PackageToolBuild)
     SLANG_CHECK(File::exists(Path::combine(temp.path, "out/acme/noise.slang-module")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "out/main.slang-module")));
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/acme/noise/helper.slang-module")));
+    String docsIndex;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, "out/docs/index.md"), docsIndex)));
+    String unlinkedWorkspace = String("- ") + manifest.name + "\n";
+    SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(unlinkedWorkspace.getUnownedSlice()) >= 0);
+    String linkedWorkspace = String("[") + manifest.name + "](#" + manifest.name + ")";
+    SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(linkedWorkspace.getUnownedSlice()) < 0);
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
         Path::combine(temp.path, "src/main.slang"),
@@ -750,10 +757,6 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "build/main.slang-module")));
-
-    const char* docsArguments[] = {"slang-package", "docs"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(docsArguments), docsArguments, error)));
     SLANG_CHECK(
         File::exists(Path::combine(Path::combine(temp.path, "build/docs", root.name), "guide.md")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/a/readme.md")));
@@ -761,6 +764,25 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/c/reference.md")));
     SLANG_CHECK(!File::exists(
         Path::combine(Path::combine(temp.path, "build/docs", root.name), "ignored.txt")));
+    String docsIndex;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, "build/docs/index.md"), docsIndex)));
+    SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(UnownedStringSlice("[a](#a)")) >= 0);
+    SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(UnownedStringSlice("[b](#b)")) >= 0);
+    SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(UnownedStringSlice("[c](#c)")) >= 0);
+    SLANG_CHECK(
+        docsIndex.getUnownedSlice().indexOf(UnownedStringSlice("[readme.md](a/readme.md)")) >= 0);
+    SLANG_CHECK(
+        docsIndex.getUnownedSlice().indexOf(
+            UnownedStringSlice("[reference/api.md](b/reference/api.md)")) >= 0);
+    SLANG_CHECK(
+        docsIndex.getUnownedSlice().indexOf(UnownedStringSlice("[reference.md](c/reference.md)")) >=
+        0);
+    String rootGuideLink = String("[guide.md](") + root.name + "/guide.md)";
+    SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(rootGuideLink.getUnownedSlice()) >= 0);
+    const char* docsArguments[] = {"slang-package", "docs"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(docsArguments), docsArguments, error)));
 
     List<String> warnings;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(validateProject(temp.path, error, &warnings)));

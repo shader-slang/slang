@@ -36,10 +36,10 @@ static void _printHelp()
         "  update [--clean] Re-resolve dependencies and update the lock file.\n"
         "  update --from-local [--clean]\n"
         "                   Resolve registered local package manifests into the lock.\n"
-        "  build            Compile each workspace primary to build/<import>.slang-module.\n"
+        "  build            Compile workspace primaries and copy Markdown into build/docs.\n"
         "  run [args...]    Build and run the workspace main module with slangi.\n"
         "  test             Run slang-test on the workspace tests directory.\n"
-        "  docs             Copy package Markdown files to build/docs/<package>.\n"
+        "  docs             Print the location of generated documentation (build/docs).\n"
         "  validate         Validate package structure and the locked dependency closure.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
         "  unedit <name>    Return an unchanged checkout to tool ownership.\n"
@@ -805,6 +805,7 @@ static SlangResult _build(
     if (outPrimaryModules)
         *outPrimaryModules = primaryModules;
     fprintf(stdout, "Built %lld module(s).\n", (long long)primaryModules.getCount());
+    SLANG_RETURN_ON_FAIL(buildDocumentation(projectRoot, outError));
     return SLANG_OK;
 }
 
@@ -885,6 +886,16 @@ static SlangResult _test(const String& projectRoot, String& outError)
     // because it has no test-file extension.
     testArguments.add(relativeTestsPath + "/");
     return _runStreamingSiblingTool(slangTestPath, testArguments, outError);
+}
+
+/// Print the workspace documentation directory so the user can open `build/docs/index.md`.
+static SlangResult _printDocumentationLocation(const String& projectRoot, String& outError)
+{
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
+    String docsDirectory = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest), "docs");
+    fprintf(stdout, "Open the generated documentation in '%s'.\n", docsDirectory.getBuffer());
+    return SLANG_OK;
 }
 
 static SlangResult _registerLocalPackage(
@@ -1150,7 +1161,7 @@ SlangResult executeInDirectory(
     if (command == "test" && argc == 2)
         return _test(projectRoot, outError);
     if (command == "docs" && argc == 2)
-        return buildDocumentation(projectRoot, outError);
+        return _printDocumentationLocation(projectRoot, outError);
     if (command == "edit" && argc == 3)
         return _edit(projectRoot, argv[2], outError);
     if (command == "unedit" && argc == 3)

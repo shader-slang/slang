@@ -226,7 +226,13 @@ because the same source commit can be compiled against different resolved depend
 
 `slang package build` validates the materialized package graph and compiles every primary module in
 the workspace package to a front-end `.slang-module` under `workspace.build`, preserving its import
-path. For example, `src/acme/noise.slang` becomes `build/acme/noise.slang-module`.
+path. For example, `src/acme/noise.slang` becomes `build/acme/noise.slang-module`. The same command
+copies every `.md` file below each materialized package's `docs/` directory to
+`build/docs/<package-name>/`, preserving paths below `docs/`. Namespacing the output by package
+keeps files such as `docs/README.md` from different packages distinct. Other file types are not
+copied. Build also writes `build/docs/index.md`: the workspace dependency tree, then an
+alphabetized list of copied Markdown files per package. Every package in the graph is listed;
+only packages that contributed Markdown link from the tree into that file list.
 
 `slang package run` first builds the workspace and then invokes the sibling `slangi` executable on
 `build/main.slang-module`. The default is the primary whose import path is `main` (typically
@@ -238,10 +244,9 @@ executable on the workspace's `tests/` tree. Tests can use slang-test's `$dirnam
 refer to workspace exports; for example, a test under `tests/` can add `-I $dirname/../src` to its
 test directive. The command fails if the package tool installation does not include `slang-test`.
 
-`slang package docs` copies every `.md` file below each materialized package's `docs/` directory to
-`build/docs/<package-name>/`, preserving paths below `docs/`. Namespacing the output by package
-keeps files such as `docs/README.md` from different packages distinct. Other file types are not
-copied.
+`slang package docs` prints the path of the generated `build/docs/` directory so you can open
+`index.md` and the copied package files. It does not copy or regenerate documentation; run
+`slang package build` for that.
 
 ## Possible future enhancements
 
