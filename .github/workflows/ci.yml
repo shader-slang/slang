@@ -848,6 +848,12 @@ jobs:
             exit 1
           fi
 
+  # Deliberately NOT added to check-ci's required needs list below: the
+  # Falcor 1 bridge (vet/approve flow, KVM environment, approval gate) is
+  # still being tuned, so it still runs and reports status on every PR that
+  # runs CI at all (see the `filter` job above for what skips CI entirely),
+  # but its result does not yet block merge. Promote it back to required
+  # once the vet/approve balance has settled.
   test-falcor:
     needs: [filter, build-windows-release-cl-x86_64-gpu-falcor]
     if: needs.filter.outputs.should-run == 'true'
@@ -940,7 +946,6 @@ jobs:
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
         check-capability-atoms-ref,
-        test-falcor,
         test-falcor-perf,
         test-compile-regression,
         test-benchmark,
