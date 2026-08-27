@@ -256,6 +256,17 @@ public:
         SlangNVVMValueHandle_1 value,
         SlangNVVMBlockHandle_1 predecessorBlock) const;
 
+    /// Emits a direct call to a same-module scalar function.
+    SlangResult emitCall(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 callee,
+        const SlangNVVMValueHandle_1* arguments,
+        size_t argumentCount,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits a scalar valued return in the current function.
+    SlangResult emitValueReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value) const;
+
     /// Emits a signed integer less-than comparison and returns its i1 result.
     SlangResult emitIntegerSignedLessThan(
         SlangNVVMModuleHandle_1 module,

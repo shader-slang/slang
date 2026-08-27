@@ -497,6 +497,8 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT);
     const bool advertisesScalarPhi =
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI);
+    const bool advertisesGenericScalarFunctions =
+        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3 ||
         api.compatibilityAPI.structureSize != sizeof(SlangNVVMBuilderAPI_V2) ||
@@ -515,7 +517,10 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
           !api.getFloatingPointType || !api.getFloatingPointConstant)) ||
         (advertisesScalarPhi &&
          (api.structureSize < SLANG_NVVM_BUILDER_API_V3_SCALAR_PHI_MIN_SIZE || !api.emitPhi ||
-          !api.addPhiIncoming)))
+          !api.addPhiIncoming)) ||
+        (advertisesGenericScalarFunctions &&
+         (api.structureSize < SLANG_NVVM_BUILDER_API_V3_GENERIC_SCALAR_FUNCTIONS_MIN_SIZE ||
+          !api.getFloatingPointType || !api.emitCall || !api.emitValueReturn)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -788,7 +793,8 @@ SlangResult NVVMIRBuilder::getFloatingPointType(
         !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_GREATER_EQUAL) &&
         !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_LESS_THAN) &&
         !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI))
+        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI) &&
+        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS))
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result = m_apiV3.getFloatingPointType(module, bitWidth, &outType);
     return _validateHandleResult(result, outType);
@@ -1224,6 +1230,34 @@ SlangResult NVVMIRBuilder::addPhiIncoming(
     if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI))
         return SLANG_E_NOT_AVAILABLE;
     return m_apiV3.addPhiIncoming(module, phi, value, predecessorBlock);
+}
+
+SlangResult NVVMIRBuilder::emitCall(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 callee,
+    const SlangNVVMValueHandle_1* arguments,
+    size_t argumentCount,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS))
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV3.emitCall(module, callee, arguments, argumentCount, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitValueReturn(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 value) const
+{
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS))
+        return SLANG_E_NOT_AVAILABLE;
+    return m_apiV3.emitValueReturn(module, value);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerSignedLessThan(

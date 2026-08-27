@@ -1247,12 +1247,18 @@ static SlangResult SLANG_NVVM_CALL _addPhiIncomingV3(
     return _addPhiIncomingImpl(module, phi, value, predecessorBlock, false);
 }
 
-static SlangResult SLANG_NVVM_CALL _emitIntegerCall(
+static bool _isSupportedScalarFunctionType(llvm::Type* type, bool requireInteger)
+{
+    return type && (type->isIntegerTy() || (!requireInteger && type->isFloatTy()));
+}
+
+static SlangResult _emitCallImpl(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMValueHandle_1 callee,
     const SlangNVVMValueHandle_1* arguments,
     size_t argumentCount,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle_1* outValue,
+    bool requireInteger)
 {
     if (outValue)
         *outValue = nullptr;
@@ -1263,7 +1269,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerCall(
     llvm::FunctionType* functionType = llvmCallee ? llvmCallee->getFunctionType() : nullptr;
     if (!state || !llvmCallee || llvmCallee->getParent() != state->module.get() ||
         !insertionBlock || !functionType || functionType->isVarArg() ||
-        !llvm::isa<llvm::IntegerType>(functionType->getReturnType()) ||
+        !_isSupportedScalarFunctionType(functionType->getReturnType(), requireInteger) ||
         functionType->getNumParams() != argumentCount || (!arguments && argumentCount) || !outValue)
     {
         return SLANG_E_INVALID_ARG;
@@ -1275,7 +1281,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerCall(
     {
         llvm::Type* parameterType = functionType->getParamType(static_cast<unsigned>(i));
         llvm::Value* argument = _getValue(arguments[i]);
-        if (!llvm::isa<llvm::IntegerType>(parameterType) || !argument ||
+        if (!_isSupportedScalarFunctionType(parameterType, requireInteger) || !argument ||
             argument->getType() != parameterType ||
             !_isValueUsableAtInsertionPoint(state, insertionBlock, argument))
         {
@@ -1289,15 +1295,37 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerCall(
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL
-_emitIntegerReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
+static SlangResult SLANG_NVVM_CALL _emitIntegerCall(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 callee,
+    const SlangNVVMValueHandle_1* arguments,
+    size_t argumentCount,
+    SlangNVVMValueHandle_1* outValue)
+{
+    return _emitCallImpl(module, callee, arguments, argumentCount, outValue, true);
+}
+
+static SlangResult SLANG_NVVM_CALL _emitCallV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 callee,
+    const SlangNVVMValueHandle_1* arguments,
+    size_t argumentCount,
+    SlangNVVMValueHandle_1* outValue)
+{
+    return _emitCallImpl(module, callee, arguments, argumentCount, outValue, false);
+}
+
+static SlangResult _emitValueReturnImpl(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 value,
+    bool requireInteger)
 {
     ModuleState* state = _getModule(module);
     llvm::Value* llvmValue = _getValue(value);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     llvm::Function* function = insertionBlock ? insertionBlock->getParent() : nullptr;
     if (!state || !llvmValue || !insertionBlock || !function ||
-        !llvm::isa<llvm::IntegerType>(llvmValue->getType()) ||
+        !_isSupportedScalarFunctionType(llvmValue->getType(), requireInteger) ||
         function->getReturnType() != llvmValue->getType() ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue))
     {
@@ -1306,6 +1334,18 @@ _emitIntegerReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
 
     state->builder.CreateRet(llvmValue);
     return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL
+_emitIntegerReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
+{
+    return _emitValueReturnImpl(module, value, true);
+}
+
+static SlangResult SLANG_NVVM_CALL
+_emitValueReturnV3(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
+{
+    return _emitValueReturnImpl(module, value, false);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitPointerOffset(
@@ -1873,6 +1913,8 @@ static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
     api.getFloatingPointConstant = _getFloatingPointConstantV3;
     api.emitPhi = _emitPhiV3;
     api.addPhiIncoming = _addPhiIncomingV3;
+    api.emitCall = _emitCallV3;
+    api.emitValueReturn = _emitValueReturnV3;
 }
 
 } // namespace

@@ -263,11 +263,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
     // helper signature.
     const bool isLegal = (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-                         (use == NVVMTypeUse::HelperResult && isI32) ||
+                         (use == NVVMTypeUse::HelperResult && (isI32 || isFloat32)) ||
                          (use == NVVMTypeUse::EntryPointParameter &&
                           (isI32 || isFloat32 || devicePointer || deviceFloat32Pointer ||
                            deviceArrayPointer || rawResource)) ||
-                         (use == NVVMTypeUse::HelperParameter && isI32) ||
+                         (use == NVVMTypeUse::HelperParameter && (isI32 || isFloat32)) ||
                          (use == NVVMTypeUse::Value &&
                           (isI32 || isFloat32 || isBool || devicePointer || deviceFloat32Pointer ||
                            deviceArrayPointer || rawResource || resourceElementPointer));

@@ -256,6 +256,34 @@ SlangResult _validateFloat32Value(
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
+// Checks an available canonical scalar value using its semantic type.
+SlangResult _validateScalarValue(
+    CodeGenContext* codeGenContext,
+    IRInst* value,
+    IRInst* consumer,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree,
+    NVVMIRFeatureSet& features)
+{
+    if (value && isNVVMFloat32Type(value->getDataType()))
+    {
+        return _validateFloat32Value(
+            codeGenContext,
+            value,
+            consumer,
+            availableValues,
+            dominatorTree,
+            features);
+    }
+    return _validateI32Value(
+        codeGenContext,
+        value,
+        consumer,
+        availableValues,
+        dominatorTree,
+        features);
+}
+
 // Checks an available device pointer and enforces the source access qualifier for stores.
 SlangResult _validatePointerValue(
     CodeGenContext* codeGenContext,
@@ -360,28 +388,17 @@ SlangResult _validateBranchArguments(
         SLANG_ASSERT(targetParam);
         if (!argument || !isTypeEqual(argument->getDataType(), targetParam->getDataType()))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch argument type"));
-        if (isNVVMFloat32Type(targetParam->getDataType()))
-        {
-            SLANG_RETURN_ON_FAIL(_validateFloat32Value(
-                codeGenContext,
-                argument,
-                branch,
-                availableValues,
-                dominatorTree,
-                features));
-            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI);
-        }
-        else
-        {
-            SLANG_RETURN_ON_FAIL(_validateI32Value(
-                codeGenContext,
-                argument,
-                branch,
-                availableValues,
-                dominatorTree,
-                features));
-            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
-        }
+        SLANG_RETURN_ON_FAIL(_validateScalarValue(
+            codeGenContext,
+            argument,
+            branch,
+            availableValues,
+            dominatorTree,
+            features));
+        _requireFeature(
+            features,
+            isNVVMFloat32Type(targetParam->getDataType()) ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI
+                                                          : SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
     }
     return SLANG_OK;
 }
@@ -396,6 +413,29 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
         return entryPointDecoration->getName()->getStringSlice();
     }
     return getMangledName(function);
+}
+
+// Returns whether a type is an accepted canonical scalar in a helper signature.
+bool _isSupportedNVVMHelperScalarType(IRInst* type)
+{
+    return isNVVMSignedI32Type(type) || isNVVMFloat32Type(type);
+}
+
+// Returns whether a canonical helper signature needs the generic V3 scalar-function path.
+bool _usesGenericNVVMScalarFunctions(IRFunc* helper)
+{
+    SLANG_RELEASE_ASSERT(helper);
+    SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperScalarType(helper->getResultType()));
+    if (isNVVMFloat32Type(helper->getResultType()))
+        return true;
+    for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
+    {
+        IRType* parameterType = helper->getParamType(parameterIndex);
+        SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperScalarType(parameterType));
+        if (isNVVMFloat32Type(parameterType))
+            return true;
+    }
+    return false;
 }
 
 // Checks the exact helper ABI before adding a direct callee to the accepted closure.
@@ -414,11 +454,11 @@ SlangResult _validateNVVMHelperTarget(
     }
     if (helper->getParent() != linkedIR.module->getModuleInst() || !helper->isDefinition())
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("call"));
-    if (!isNVVMSignedI32Type(helper->getResultType()))
+    if (!_isSupportedNVVMHelperScalarType(helper->getResultType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function result type"));
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
-        if (!isNVVMSignedI32Type(helper->getParamType(parameterIndex)))
+        if (!_isSupportedNVVMHelperScalarType(helper->getParamType(parameterIndex)))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function parameter"));
     }
     return SLANG_OK;
@@ -567,11 +607,12 @@ SlangResult _validateNVVMFunction(
             isEntryPoint ? asNVVMSupportedRawRWStructuredBufferI32Type(param->getDataType())
                          : nullptr;
         const bool usesFloat32 =
-            isEntryPoint && (isNVVMFloat32Type(param->getDataType()) ||
-                             asNVVMSupportedDeviceFloat32PointerType(param->getDataType()));
+            isEntryPoint ? (isNVVMFloat32Type(param->getDataType()) ||
+                            asNVVMSupportedDeviceFloat32PointerType(param->getDataType()))
+                         : isNVVMFloat32Type(param->getDataType());
         const bool isSupportedType = isEntryPoint
                                          ? isNVVMSupportedParameterType(param->getDataType())
-                                         : isNVVMSignedI32Type(param->getDataType());
+                                         : _isSupportedNVVMHelperScalarType(param->getDataType());
         if (actualParamCount >= function->getParamCount() || !isSupportedType ||
             !isTypeEqual(param->getDataType(), function->getParamType(actualParamCount)))
         {
@@ -585,7 +626,10 @@ SlangResult _validateNVVMFunction(
         if (rawRWStructuredBufferType)
             _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32);
         if (usesFloat32)
-            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
+            _requireFeature(
+                features,
+                isEntryPoint ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD
+                             : SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
         availableValues.add(param);
         ++actualParamCount;
     }
@@ -800,9 +844,18 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Call:
-                if (!inst->getOperandCount() || !isNVVMSignedI32Type(inst->getDataType()))
-                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 call"));
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
+                {
+                    auto call = as<IRCall>(inst);
+                    auto callee =
+                        call && call->getOperandCount() ? as<IRFunc>(call->getOperand(0)) : nullptr;
+                    if (!callee || !_isSupportedNVVMHelperScalarType(inst->getDataType()))
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar call"));
+                    _requireFeature(
+                        features,
+                        _usesGenericNVVMScalarFunctions(callee)
+                            ? SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS
+                            : SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
+                }
                 break;
 
             case kIROp_GetOffsetPtr:
@@ -1076,7 +1129,9 @@ SlangResult _validateNVVMFunction(
                         !isTypeEqual(call->getDataType(), callee->getResultType()) ||
                         call->getArgCount() != callee->getParamCount())
                     {
-                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("direct i32 call"));
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("direct scalar call"));
                     }
                     for (UInt argumentIndex = 0; argumentIndex < call->getArgCount();
                          ++argumentIndex)
@@ -1090,7 +1145,7 @@ SlangResult _validateNVVMFunction(
                                 codeGenContext,
                                 toSlice("call argument type"));
                         }
-                        SLANG_RETURN_ON_FAIL(_validateI32Value(
+                        SLANG_RETURN_ON_FAIL(_validateScalarValue(
                             codeGenContext,
                             argument,
                             call,
@@ -1223,7 +1278,7 @@ SlangResult _validateNVVMFunction(
                                 codeGenContext,
                                 toSlice("helper return type"));
                         }
-                        SLANG_RETURN_ON_FAIL(_validateI32Value(
+                        SLANG_RETURN_ON_FAIL(_validateScalarValue(
                             codeGenContext,
                             returnInst->getVal(),
                             returnInst,
@@ -1434,8 +1489,16 @@ SlangResult validateNVVMSupportedIR(
     SLANG_RETURN_ON_FAIL(_validateNVVMFunctionNames(codeGenContext, entryPoint, functions));
     SLANG_RETURN_ON_FAIL(_validateNVVMFunctionUses(codeGenContext, functions));
 
-    if (functions.getCount() > 1)
-        _requireFeature(outFeatures, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
+    for (auto function : functions)
+    {
+        if (function == entryPoint)
+            continue;
+        _requireFeature(
+            outFeatures,
+            _usesGenericNVVMScalarFunctions(function)
+                ? SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS
+                : SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
+    }
     for (auto function : functions)
     {
         SLANG_RETURN_ON_FAIL(
@@ -2079,16 +2142,26 @@ SlangResult emitNVVMIRFromLinkedIR(
                         }
 
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        const bool usesGenericScalarFunctions =
+                            _usesGenericNVVMScalarFunctions(callee);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "signed i32 call",
-                            builder.emitIntegerCall(
-                                moduleScope.module,
-                                functionMap.getValue(callee),
-                                loweredArguments.getCount() ? loweredArguments.getBuffer()
-                                                            : nullptr,
-                                size_t(loweredArguments.getCount()),
-                                loweredValue)));
+                            usesGenericScalarFunctions ? "generic scalar call" : "signed i32 call",
+                            usesGenericScalarFunctions
+                                ? builder.emitCall(
+                                      moduleScope.module,
+                                      functionMap.getValue(callee),
+                                      loweredArguments.getCount() ? loweredArguments.getBuffer()
+                                                                  : nullptr,
+                                      size_t(loweredArguments.getCount()),
+                                      loweredValue)
+                                : builder.emitIntegerCall(
+                                      moduleScope.module,
+                                      functionMap.getValue(callee),
+                                      loweredArguments.getCount() ? loweredArguments.getBuffer()
+                                                                  : nullptr,
+                                      size_t(loweredArguments.getCount()),
+                                      loweredValue)));
                         valueMap[call] = loweredValue;
                     }
                     break;
@@ -2214,8 +2287,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredValue));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "signed i32 return",
-                            builder.emitIntegerReturn(moduleScope.module, loweredValue)));
+                            _usesGenericNVVMScalarFunctions(function) ? "generic scalar return"
+                                                                      : "signed i32 return",
+                            _usesGenericNVVMScalarFunctions(function)
+                                ? builder.emitValueReturn(moduleScope.module, loweredValue)
+                                : builder.emitIntegerReturn(moduleScope.module, loweredValue)));
                     }
                     break;
 

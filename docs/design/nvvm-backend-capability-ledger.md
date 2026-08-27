@@ -186,6 +186,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32PhiPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both conditional-merge outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32PhiRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite and signed-zero choices through the typed callable runtime harness | RTX 5090 selects the requested finite operand and preserves selected `-0.0` versus `+0.0` bits | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32FunctionKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Generic call/valued-return callbacks construct a two-argument Float helper while frozen V2 integer functions remain unchanged | Both text dialects contain one Float helper definition, `call float`, `ret float`, and `fadd float` | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32FunctionsUseDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical helper signature and call arguments request feature 33 and choose the generic scalar-function pair | Void `[FloatPointer, Float, Float]` kernel calls Float `[Float, Float]` helper; addition returns to the sole store | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32FunctionDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 helper call compiles through both routes | `[64, 32, 32]`, Float add, one global 32-bit store, and no load or Float predicate agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32FunctionPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both Float-helper outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32FunctionRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite and signed-zero additions through the typed callable runtime harness | RTX 5090 results agree for finite values and preserve exact `-0 + -0` and `+0 + -0` bits | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -784,4 +790,19 @@ NVRTC agree on `[64, 32, 32, 32]`, store/no-load/Float-arithmetic/Float-predicat
 both, and the RTX 5090 selects finite values and preserves selected signed-zero bits through both
 routes. Focused tests pass 14/14 and Release passes 291/291 with sorted-name SHA-256
 `c18462cd303630788566c59409f369ef57a46614652571a97663acf0ffb01690`; Debug preservation passes
+10/10.
+
+Slice 45 adds canonical Float helper signatures, calls, results, and returns as feature 33 through
+an appended generic call/valued-return pair. The complete semantic helper signature chooses generic
+V3 when any result or parameter is Float; all-i32 helpers retain frozen V2. Shared provider
+validation preserves same-module ownership, non-variadic exact scalar signatures, insertion-point
+availability, return type, and dominance. The x64 V3 table grows from 504 to 520 bytes and x86 from
+296 to 304 bytes; exact Slice 44 tables remain loadable without feature 33.
+
+The generic call/fake/result/return base plus seven evidence names adds 683 measured test/support
+lines, from 22,154 to 22,837. LLVM and negotiated NVVM text each contain one Float helper,
+`call float`, `ret float`, and `fadd float`. NVVM and NVRTC agree on `[64, 32, 32]`, Float add,
+store/no-load/predicate; `ptxas` accepts both, and the RTX 5090 agrees for finite and signed-zero
+results. Focused tests pass 14/14 and Release passes 298/298 with sorted-name SHA-256
+`71658634899192b09f2d12461c25a5efb9d85c3c4f2db7c285ba35ef35d44066`; Debug preservation passes
 10/10.

@@ -349,6 +349,98 @@ SLANG_UNIT_TEST(nvvmSlangFloat32PhiUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangFloat32FunctionsUseDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMFloat32FunctionSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.getFunctionParameterCallCount == 5);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeResultKinds.getCount() == 2);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultKinds[0] == FakeNVVMBuilderResultTypeKind::Void);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultKinds[1] == FakeNVVMBuilderResultTypeKind::Float);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[0] == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[1] == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.functionParameterTypeKinds.getCount() == 5);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[0] ==
+            FakeNVVMBuilderParameterTypeKind::FloatPointer);
+        for (Index i = 1; i < 5; ++i)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.functionParameterTypeKinds[i] ==
+                FakeNVVMBuilderParameterTypeKind::Float);
+        }
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerCallCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerReturnCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.callCalleeFunctionIndices[0] == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.callArgumentCounts[0] == 2);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.callResultTypeKinds[0] == FakeNVVMBuilderScalarTypeKind::Float);
+        const Index argumentOffset = gFakeNVVMBuilder.callArgumentOffsets[0];
+        const FakeNVVMBuilderValueRef leftArgument =
+            gFakeNVVMBuilder.callArgumentValueRefs[argumentOffset];
+        const FakeNVVMBuilderValueRef rightArgument =
+            gFakeNVVMBuilder.callArgumentValueRefs[argumentOffset + 1];
+        SLANG_CHECK(leftArgument.kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(leftArgument.functionIndex == 0);
+        SLANG_CHECK(leftArgument.index == 1);
+        SLANG_CHECK(rightArgument.kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(rightArgument.functionIndex == 0);
+        SLANG_CHECK(rightArgument.index == 2);
+
+        SLANG_CHECK(
+            gFakeNVVMBuilder
+                .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingBinary)] == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarOperations.getCount() == 1);
+        const FakeNVVMBuilderScalarOperation& addition = gFakeNVVMBuilder.scalarOperations[0];
+        SLANG_CHECK(addition.key.family == FakeNVVMBuilderScalarFamily::FloatingBinary);
+        SLANG_CHECK(addition.key.operation == SLANG_NVVM_FLOATING_BINARY_OP_ADD);
+        SLANG_CHECK(addition.operands[0].functionIndex == 1);
+        SLANG_CHECK(addition.operands[0].index == 0);
+        SLANG_CHECK(addition.operands[1].functionIndex == 1);
+        SLANG_CHECK(addition.operands[1].index == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.scalarReturnValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::ScalarOperation);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs[0].index == 0);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::Call);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].index == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storePointerValueRefs[0].kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(gFakeNVVMBuilder.storePointerValueRefs[0].functionIndex == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.storePointerValueRefs[0].index == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -565,6 +657,40 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarPhiCapability)
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emitPhiCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.addPhiIncomingCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesGenericScalarFunctionCapability)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    gFakeNVVMBuilder.apiV3.features
+        .words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
+        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMFloat32FunctionSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
@@ -2895,7 +3021,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsignedMultiplySource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerMultiplySource, "'entry-point parameter'"},
         {kDirectNVVMFloatingMultiplySource, "'castFloatToInt'"},
-        {kDirectNVVMFloatingSineSource, "'helper function result type'"},
+        {kDirectNVVMFloatingSineSource, "'castFloatToInt'"},
         {kDirectNVVMIntegerLeftShiftSource, "'shl'"},
         {kDirectNVVMIntegerRightShiftSource, "'shr'"},
         {kDirectNVVMIntegerDivideSource, "'div'"},
@@ -2936,7 +3062,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMPointerGreaterEqualSource, "'signed i32 value'"},
     };
 
-    // The direct subset retains signed-i32 helper/value policy. Adjacent aggregate, local-memory,
+    // The direct subset retains scalar-only helper/value policy. Adjacent aggregate, local-memory,
     // multiply ABI variants, logical NOT/shifts/division/remainder, unsigned/wide AND/OR/XOR/NOT,
     // unsigned/wide negate and floating-negate-plus-cast and atomic-add ABI variants,
     // non-relaxed atomic-add order,

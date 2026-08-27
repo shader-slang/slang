@@ -2378,6 +2378,47 @@ set has SHA-256 `c18462cd303630788566c59409f369ef57a46614652571a97663acf0ffb0169
 removing the seven Slice 44 names reproduces Slice 43's count and hash exactly. Debug preservation
 passes 10/10.
 
+### Slice 45 generic scalar functions and float32 helper calls
+
+Slice 45 adds a reachable `float addFloat32(float left, float right)` helper whose result reaches an
+aligned AS1 Float store in the kernel. Slang's canonical direct-call closure, semantic helper
+signature, positional call arguments, and return value remain the only representation; the backend
+does not reconstruct a helper ABI or introduce type-specific call nodes.
+
+Feature 33, `GENERIC_SCALAR_FUNCTIONS`, appends generic
+`emitCall(module, callee, arguments, count, outValue)` and
+`emitValueReturn(module, value)` callbacks. The callee function type and value handles carry the
+scalar types, so one pair serves Integer and Float rather than growing per-type wrappers. V3 grows
+from 504 to 520 bytes on x64 and from 296 to 304 bytes on x86. Exact Slice 44 tables remain valid
+without feature 33, while an advertised feature requires floating-point type discovery and both
+complete callbacks. Frozen V2 signed-i32 call/return callbacks and feature 3 remain unchanged.
+
+The provider shares construction and validation between V2 integer adapters and generic V3
+adapters. It preserves the same-module non-variadic callee, non-void scalar result, exact scalar
+parameter/argument types, usable insertion-point operands, current-function return type, and
+dominance checks. V2 requires Integer throughout; V3 accepts scalar Integer and Float, including
+mixed signatures. The direct emitter chooses the path from the complete canonical helper signature
+and asserts that signature was already preflighted.
+
+The fake graph contains a Void kernel with `[FloatPointer, Float, Float]` and a Float helper with
+`[Float, Float]`. Original kernel parameters 1 and 2 feed one typed Float call, the helper's
+parameters feed one Float addition and generic valued return, and the call result feeds the sole
+store. Generic LLVM and negotiated NVVM-2.0 text each contain one Float helper definition, one
+`call float`, one `ret float`, and one `fadd float`.
+
+NVVM and NVRTC agree on `[64, 32, 32]`, one Float addition, one global 32-bit store, and no global
+load or Float predicate. CUDA 12.9 `ptxas` accepts both outputs. On the RTX 5090 both routes agree
+for finite additions and preserve the exact results of `-0.0 + -0.0` and `+0.0 + -0.0`. The
+previous floating-sine boundary now passes its Float helper signature and stops later at the still
+unsupported `castFloatToInt`; every other unsupported-matrix boundary remains stable.
+
+The generic call/fake/result/return base plus seven independently registered evidence layers adds
+683 physical lines across the five measured test/support files, from 22,154 to 22,837. The focused
+matrix passes 14/14 and the Release NVVM prefix passes 298/298. Its exact sorted LF-terminated name
+set has SHA-256 `71658634899192b09f2d12461c25a5efb9d85c3c4f2db7c285ba35ef35d44066`;
+removing the seven Slice 45 names reproduces Slice 44's count and hash exactly. Debug preservation
+passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2501,7 +2542,7 @@ The program advances through bounded slices:
 42. exact scalar float32 ordered less-than through the generic floating-compare family;
 43. exact scalar float32 constants through an append-only exact-bit V3 callback;
 44. generic scalar phis and exact float32 block-parameter SSA merging;
-45. further type, memory, resource, and optimization-quality work; and
+45. generic scalar functions and exact float32 helper parameters, calls, results, and returns;
 46. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and

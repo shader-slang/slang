@@ -89,7 +89,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
     const uint32_t phiOffset = sizeof(void*) == 8 ? 488u : 288u;
     const uint32_t phiIncomingOffset = sizeof(void*) == 8 ? 496u : 292u;
     const uint32_t phiMinimumSize = sizeof(void*) == 8 ? 504u : 296u;
-    const uint32_t completeSize = phiMinimumSize;
+    const uint32_t callOffset = sizeof(void*) == 8 ? 504u : 296u;
+    const uint32_t valueReturnOffset = sizeof(void*) == 8 ? 512u : 300u;
+    const uint32_t scalarFunctionMinimumSize = sizeof(void*) == 8 ? 520u : 304u;
+    const uint32_t completeSize = scalarFunctionMinimumSize;
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, features) == featureOffset);
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitIntegerUnary) == unaryOffset);
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitIntegerBinary) == binaryOffset);
@@ -102,6 +105,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
         offsetof(SlangNVVMBuilderAPI_V3, getFloatingPointConstant) == floatingConstantOffset);
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitPhi) == phiOffset);
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, addPhiIncoming) == phiIncomingOffset);
+    SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitCall) == callOffset);
+    SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitValueReturn) == valueReturnOffset);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_MIN_SIZE == minimumSize);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_ADD_MIN_SIZE == floatingMinimumSize);
     SLANG_CHECK(
@@ -114,6 +119,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
     SLANG_CHECK(
         SLANG_NVVM_BUILDER_API_V3_FLOATING_CONSTANT_MIN_SIZE == floatingConstantMinimumSize);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_SCALAR_PHI_MIN_SIZE == phiMinimumSize);
+    SLANG_CHECK(
+        SLANG_NVVM_BUILDER_API_V3_GENERIC_SCALAR_FUNCTIONS_MIN_SIZE == scalarFunctionMinimumSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderAPI_V3) == completeSize);
 
     gFakeNVVMBuilder.reset();
@@ -216,6 +223,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32AddAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
         api.structureSize = uint32_t(SLANG_NVVM_BUILDER_API_V3_MIN_SIZE);
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -397,6 +406,7 @@ static void _runNVVMIRBuilderNegotiatesFloat32BinaryAPI(
             SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_LESS_THAN,
             SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT,
             SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI,
+            SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS,
         };
         for (auto feature : floatFeatures)
             api.features.words[feature / 64u] &= ~(uint64_t(1) << (feature % 64u));
@@ -499,6 +509,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32NegateAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
         api.structureSize = sizeof(void*) == 8 ? 464u : 280u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -630,6 +642,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32EqualAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
         api.structureSize = sizeof(void*) == 8 ? 472u : 280u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -841,6 +855,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32ConstantAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
         api.structureSize = sizeof(void*) == 8 ? 480u : 288u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -946,6 +962,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesScalarPhiAPI)
         SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
         api.structureSize = sizeof(void*) == 8 ? 488u : 288u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -1068,6 +1086,186 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesScalarPhiAPI)
                 _getFakeNVVMBuilderFloatType(),
                 phi) == SLANG_FAIL);
         SLANG_CHECK(phi == nullptr);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesGenericScalarFunctionAPI)
+{
+    // The exact Slice 44 table remains valid when it does not advertise the appended pair.
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
+        api.structureSize = sizeof(void*) == 8 ? 504u : 296u;
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
+        SlangNVVMValueHandle_1 value = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitCall(_getFakeNVVMBuilderModule(), nullptr, nullptr, 0, value) ==
+            SLANG_E_NOT_AVAILABLE);
+        SLANG_CHECK(value == nullptr);
+        SLANG_CHECK(
+            builder.emitValueReturn(_getFakeNVVMBuilderModule(), nullptr) == SLANG_E_NOT_AVAILABLE);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    const uint32_t callOffset = uint32_t(offsetof(SlangNVVMBuilderAPI_V3, emitCall));
+    for (uint32_t partialSize = callOffset;
+         partialSize < SLANG_NVVM_BUILDER_API_V3_GENERIC_SCALAR_FUNCTIONS_MIN_SIZE;
+         ++partialSize)
+    {
+        gFakeNVVMBuilder.reset();
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        api.structureSize = partialSize;
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::initialize(api, library, builder) == SLANG_E_NO_INTERFACE);
+        SLANG_CHECK(!builder.isInitialized());
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    for (Index callbackIndex = 0; callbackIndex < 3; ++callbackIndex)
+    {
+        gFakeNVVMBuilder.reset();
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        if (callbackIndex == 0)
+            api.getFloatingPointType = nullptr;
+        else if (callbackIndex == 1)
+            api.emitCall = nullptr;
+        else
+            api.emitValueReturn = nullptr;
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::initialize(api, library, builder) == SLANG_E_NO_INTERFACE);
+        SLANG_CHECK(!builder.isInitialized());
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            NVVMIRBuilder::initialize(_makeFakeNVVMBuilderAPIV3(), library, builder)));
+
+        const SlangNVVMTypeHandle_1 helperParameterTypes[] = {
+            _getFakeNVVMBuilderFloatType(),
+            _getFakeNVVMBuilderFloatType(),
+        };
+        SlangNVVMTypeHandle_1 helperType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+            _getFakeNVVMBuilderModule(),
+            _getFakeNVVMBuilderFloatType(),
+            helperParameterTypes,
+            SLANG_COUNT_OF(helperParameterTypes),
+            helperType)));
+        SlangNVVMValueHandle_1 helper = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            _getFakeNVVMBuilderModule(),
+            helperType,
+            toSlice("fakeFloatHelper"),
+            helper)));
+        SlangNVVMValueHandle_1 helperLeft = nullptr;
+        SlangNVVMValueHandle_1 helperRight = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionParameter(_getFakeNVVMBuilderModule(), helper, 0, helperLeft)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionParameter(_getFakeNVVMBuilderModule(), helper, 1, helperRight)));
+
+        SlangNVVMTypeHandle_1 callerType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+            _getFakeNVVMBuilderModule(),
+            _getFakeNVVMBuilderVoidType(),
+            helperParameterTypes,
+            SLANG_COUNT_OF(helperParameterTypes),
+            callerType)));
+        SlangNVVMValueHandle_1 caller = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            _getFakeNVVMBuilderModule(),
+            callerType,
+            toSlice("fakeFloatCaller"),
+            caller)));
+        SlangNVVMValueHandle_1 callerLeft = nullptr;
+        SlangNVVMValueHandle_1 callerRight = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionParameter(_getFakeNVVMBuilderModule(), caller, 0, callerLeft)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionParameter(_getFakeNVVMBuilderModule(), caller, 1, callerRight)));
+
+        SlangNVVMBlockHandle_1 helperBlock = nullptr;
+        SlangNVVMBlockHandle_1 callerBlock = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createBlock(
+            _getFakeNVVMBuilderModule(),
+            helper,
+            toSlice("helper.entry"),
+            helperBlock)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createBlock(
+            _getFakeNVVMBuilderModule(),
+            caller,
+            toSlice("caller.entry"),
+            callerBlock)));
+
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.setInsertBlock(_getFakeNVVMBuilderModule(), helperBlock)));
+        SlangNVVMValueHandle_1 sum = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitFloatingBinary(
+            _getFakeNVVMBuilderModule(),
+            SLANG_NVVM_FLOATING_BINARY_OP_ADD,
+            helperLeft,
+            helperRight,
+            sum)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.emitValueReturn(_getFakeNVVMBuilderModule(), sum)));
+
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.setInsertBlock(_getFakeNVVMBuilderModule(), callerBlock)));
+        const SlangNVVMValueHandle_1 arguments[] = {callerLeft, callerRight};
+        SlangNVVMValueHandle_1 callResult = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitCall(
+            _getFakeNVVMBuilderModule(),
+            helper,
+            arguments,
+            SLANG_COUNT_OF(arguments),
+            callResult)));
+        SLANG_CHECK(callResult == _getFakeNVVMBuilderCall());
+        SLANG_CHECK(_isFakeNVVMBuilderFloatValue(callResult));
+        SLANG_CHECK(gFakeNVVMBuilder.callArgumentValueRefs.getCount() == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.callArgumentValueRefs[0].functionIndex == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.callArgumentValueRefs[0].index == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.callArgumentValueRefs[1].functionIndex == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.callArgumentValueRefs[1].index == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.scalarReturnValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::ScalarOperation);
+
+        callResult = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitCall(_getFakeNVVMBuilderModule(), helper, nullptr, 2, callResult) ==
+            SLANG_E_INVALID_ARG);
+        SLANG_CHECK(callResult == nullptr);
+
+        gFakeNVVMBuilder.failCallAfterWrite = true;
+        callResult = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitCall(
+                _getFakeNVVMBuilderModule(),
+                helper,
+                arguments,
+                SLANG_COUNT_OF(arguments),
+                callResult) == SLANG_FAIL);
+        SLANG_CHECK(callResult == nullptr);
+
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.setInsertBlock(_getFakeNVVMBuilderModule(), helperBlock)));
+        gFakeNVVMBuilder.failValueReturn = true;
+        SLANG_CHECK(builder.emitValueReturn(_getFakeNVVMBuilderModule(), sum) == SLANG_FAIL);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 }
@@ -4073,6 +4271,51 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32PhiKernel)
     SLANG_CHECK(value == nullptr);
     SLANG_CHECK(
         api->addPhiIncoming(scope.module, nullptr, nullptr, nullptr) == SLANG_E_INVALID_ARG);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32FunctionKernel)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS));
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("float32-function-module"), scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateFloat32FunctionKernel(
+        builder,
+        scope.module,
+        toSlice("float32Function"),
+        toSlice("addFloat32"))));
+
+    const SlangNVVMSerializationFormat_1 formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat_1 format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        SLANG_CHECK_ABORT(assembly != nullptr);
+        const UnownedStringSlice text(
+            static_cast<const char*>(assembly->getBufferPointer()),
+            assembly->getBufferSize());
+        SLANG_CHECK(text.indexOf(toSlice("define float @addFloat32(float")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("define void @float32Function(float addrspace(1)*")) >= 0);
+        SLANG_CHECK(_countOccurrences(text, toSlice("call float @addFloat32")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("ret float")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("fadd float")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("store float")) == 1);
+        SLANG_CHECK(text.indexOf(toSlice("align 4")) >= 0);
+    }
+
+    const SlangNVVMBuilderAPI_V3* api = builder.getAPIV3();
+    SLANG_CHECK_ABORT(api != nullptr);
+    SlangNVVMValueHandle_1 value = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(api->emitCall(scope.module, nullptr, nullptr, 0, &value) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(value == nullptr);
+    SLANG_CHECK(api->emitValueReturn(scope.module, nullptr) == SLANG_E_INVALID_ARG);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32CopyKernel)
