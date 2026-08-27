@@ -149,11 +149,43 @@ IRPtrTypeBase* _asSupportedDeviceArrayPointerType(
     return ptrType;
 }
 
+// Returns the exact raw CUDA `RWStructuredBuffer<int, DefaultLayout>` launch-value type.
+IRHLSLStructuredBufferTypeBase* _asSupportedRawRWStructuredBufferI32Type(IRInst* type)
+{
+    auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
+    if (!bufferType || bufferType->getOp() != kIROp_HLSLRWStructuredBufferType ||
+        bufferType->getOperandCount() != 3 || !_isI32Type(bufferType->getElementType()))
+    {
+        return nullptr;
+    }
+
+    IRType* dataLayout = bufferType->getDataLayout();
+    return dataLayout && dataLayout->getOp() == kIROp_DefaultBufferLayoutType ? bufferType
+                                                                              : nullptr;
+}
+
+// Returns the canonical generic scalar-layout pointer produced by structured-buffer addressing.
+IRPtrTypeBase* _asSupportedRWStructuredBufferI32ElementPointerType(IRInst* type)
+{
+    auto ptrType = as<IRPtrTypeBase>(type);
+    IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
+    if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
+        !_isI32Type(ptrType->getValueType()) ||
+        ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        ptrType->getAddressSpace() != AddressSpace::Generic || !dataLayout ||
+        dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
+    {
+        return nullptr;
+    }
+    return ptrType;
+}
+
 // Returns whether `type` has a direct CUDA launch-parameter representation.
 bool _isSupportedParameterType(IRInst* type)
 {
     return _isI32Type(type) || _asSupportedDevicePointerType(type) ||
-           _asSupportedDeviceArrayPointerType(type);
+           _asSupportedDeviceArrayPointerType(type) ||
+           _asSupportedRawRWStructuredBufferI32Type(type);
 }
 
 // Raises the required builder prefix without weakening an already stronger requirement.
@@ -213,9 +245,19 @@ SlangResult _validatePointerValue(
     bool requireWriteAccess)
 {
     auto ptrType = value ? _asSupportedDevicePointerType(value->getDataType()) : nullptr;
-    if (!ptrType)
+    auto resourceElementPtrType =
+        value ? _asSupportedRWStructuredBufferI32ElementPointerType(value->getDataType()) : nullptr;
+    if (!ptrType &&
+        (!resourceElementPtrType || value->getOp() != kIROp_RWStructuredBufferGetElementPtr))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device i32 pointer"));
-    if (requireWriteAccess && ptrType->getAccessQualifier() != AccessQualifier::ReadWrite)
+    if (resourceElementPtrType && consumer->getOp() != kIROp_Store)
+    {
+        return _diagnoseUnsupportedIR(
+            codeGenContext,
+            toSlice("raw RWStructuredBuffer signed i32 store consumer"));
+    }
+    if (requireWriteAccess && ptrType &&
+        ptrType->getAccessQualifier() != AccessQualifier::ReadWrite)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("read-only pointer store"));
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
@@ -479,6 +521,8 @@ SlangResult _validateNVVMFunction(
     {
         auto arrayPointerType =
             isEntryPoint ? _asSupportedDeviceArrayPointerType(param->getDataType()) : nullptr;
+        auto rawRWStructuredBufferType =
+            isEntryPoint ? _asSupportedRawRWStructuredBufferI32Type(param->getDataType()) : nullptr;
         const bool isSupportedType = isEntryPoint ? _isSupportedParameterType(param->getDataType())
                                                   : _isI32Type(param->getDataType());
         if (actualParamCount >= function->getParamCount() || !isSupportedType ||
@@ -491,6 +535,8 @@ SlangResult _validateNVVMFunction(
         }
         if (arrayPointerType)
             _requireCapability(capability, NVVMIRCapability::ScalarArrayAddressing);
+        if (rawRWStructuredBufferType)
+            _requireCapability(capability, NVVMIRCapability::RawRWStructuredBufferI32);
         availableValues.add(param);
         ++actualParamCount;
     }
@@ -699,6 +745,17 @@ SlangResult _validateNVVMFunction(
                         toSlice("device i32 array element pointer"));
                 }
                 _requireCapability(capability, NVVMIRCapability::ScalarArrayAddressing);
+                break;
+
+            case kIROp_RWStructuredBufferGetElementPtr:
+                if (inst->getOperandCount() != 2 ||
+                    !_asSupportedRWStructuredBufferI32ElementPointerType(inst->getDataType()))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("raw RWStructuredBuffer signed i32 element pointer"));
+                }
+                _requireCapability(capability, NVVMIRCapability::RawRWStructuredBufferI32);
                 break;
 
             case kIROp_Return:
@@ -926,6 +983,33 @@ SlangResult _validateNVVMFunction(
                     SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                         codeGenContext,
                         basePointer,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    SLANG_RETURN_ON_FAIL(_validateI32Value(
+                        codeGenContext,
+                        elementIndex,
+                        inst,
+                        availableValues,
+                        dominatorTree,
+                        capability));
+                    availableValues.add(inst);
+                }
+                break;
+
+            case kIROp_RWStructuredBufferGetElementPtr:
+                {
+                    IRInst* buffer = inst->getOperand(0);
+                    IRInst* elementIndex = inst->getOperand(1);
+                    if (!buffer || !_asSupportedRawRWStructuredBufferI32Type(buffer->getDataType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("raw RWStructuredBuffer signed i32 relation"));
+                    }
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        buffer,
                         inst,
                         availableValues,
                         dominatorTree));
@@ -1294,6 +1378,7 @@ SlangResult emitNVVMIRFromLinkedIR(
 
     SlangNVVMTypeHandle_1 i32Type = nullptr;
     SlangNVVMTypeHandle_1 deviceI32PointerType = nullptr;
+    SlangNVVMTypeHandle_1 rawRWStructuredBufferI32Type = nullptr;
     Dictionary<IRArrayType*, SlangNVVMTypeHandle_1> arrayTypeMap;
     Dictionary<IRArrayType*, SlangNVVMTypeHandle_1> arrayPointerTypeMap;
     Dictionary<IRFunc*, SlangNVVMValueHandle_1> functionMap;
@@ -1340,6 +1425,21 @@ SlangResult emitNVVMIRFromLinkedIR(
                             deviceI32PointerType)));
                 }
                 parameterTypes.add(deviceI32PointerType);
+                continue;
+            }
+
+            if (_asSupportedRawRWStructuredBufferI32Type(param->getDataType()))
+            {
+                if (!rawRWStructuredBufferI32Type)
+                {
+                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                        codeGenContext,
+                        "raw RWStructuredBuffer signed i32 type",
+                        builder.getRawRWStructuredBufferI32Type(
+                            moduleScope.module,
+                            rawRWStructuredBufferI32Type)));
+                }
+                parameterTypes.add(rawRWStructuredBufferI32Type);
                 continue;
             }
 
@@ -2067,6 +2167,39 @@ SlangResult emitNVVMIRFromLinkedIR(
                             builder.emitArrayElementPointer(
                                 moduleScope.module,
                                 loweredBasePointer,
+                                loweredElementIndex,
+                                loweredPointer)));
+                        valueMap[inst] = loweredPointer;
+                    }
+                    break;
+
+                case kIROp_RWStructuredBufferGetElementPtr:
+                    {
+                        SlangNVVMValueHandle_1 loweredBuffer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(0),
+                            valueMap,
+                            i32Type,
+                            loweredBuffer));
+                        SlangNVVMValueHandle_1 loweredElementIndex = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(1),
+                            valueMap,
+                            i32Type,
+                            loweredElementIndex));
+                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw RWStructuredBuffer signed i32 element pointer",
+                            builder.emitRawRWStructuredBufferI32ElementPointer(
+                                moduleScope.module,
+                                loweredBuffer,
                                 loweredElementIndex,
                                 loweredPointer)));
                         valueMap[inst] = loweredPointer;

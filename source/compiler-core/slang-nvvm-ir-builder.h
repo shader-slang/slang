@@ -77,6 +77,8 @@ public:
     bool supportsScalarIntegerSignedLessEqual() const;
     /// Returns whether the provider advertised the complete Slice 25 signed-greater-equal prefix.
     bool supportsScalarIntegerSignedGreaterEqual() const;
+    /// Returns whether the provider advertised the complete Slice 26 raw resource prefix.
+    bool supportsRawRWStructuredBufferI32() const;
     /// Returns the provider identity that affects generated IR and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -317,6 +319,18 @@ public:
         SlangNVVMValueHandle_1 left,
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1& outValue) const;
+
+    /// Gets the exact raw CUDA ABI type for `RWStructuredBuffer<int>`.
+    SlangResult getRawRWStructuredBufferI32Type(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1& outType) const;
+
+    /// Emits an element pointer from an exact raw CUDA `RWStructuredBuffer<int>` value.
+    SlangResult emitRawRWStructuredBufferI32ElementPointer(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 buffer,
+        SlangNVVMValueHandle_1 elementIndex,
+        SlangNVVMValueHandle_1& outPointer) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;

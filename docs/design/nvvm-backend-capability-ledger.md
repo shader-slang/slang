@@ -409,3 +409,24 @@ and a global 32-bit store. CUDA 12.9 `ptxas` accepts both outputs, and the RTX 5
 the expected zero/one results for equal, less, greater, and signed-extreme pairs. The final Release
 NVVM prefix passes 180/180. Preservation passes 1/1 parser, 2/2 routing/hash, 1/1 unsupported
 boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.
+
+Slice 26 begins Bucket 6 with the exact raw CUDA `RWStructuredBuffer<int, DefaultLayout>` launch
+value and canonical `kIROp_RWStructuredBufferGetElementPtr` addressing producer. Slang preflight
+owns the exact resource type, signed-i32 index and result-pointee shape, availability, and producer
+relationship. The provider owns one `{ i32 addrspace(1)*, i64 }` ABI type and validates exact type,
+ownership, availability, dominance, and insertion state before extracting the data-pointer field
+and emitting one non-`inbounds` GEP. The complete x64 provider prefix is 384 bytes; the exact
+368-byte Slice 25 prefix stays compatible for all established programs, sizes 369 through 383 and
+a complete table missing either new callback are rejected, and future-larger tables are accepted
+and clamped. The identity records `raw-rw-structured-buffer-i32`.
+
+Conventional global parameter blocks, read-only structured buffers, unsigned/floating-point
+resource elements, raw read-write resource loads/atomics, and neighboring resource operations
+remain deterministic E52017 boundaries before provider discovery. Direct NVVM and NVRTC expose
+the same `.align 8 .b8[16]` raw resource
+parameter followed by i32 index, first-u64 data-pointer load, signed index scaling, and global u32
+store. CUDA 12.9 `ptxas` accepts both with four registers and no stack, spills, or barriers. On the
+RTX 5090, both routes store 42 through the exact one-element `{device pointer, count}` launch
+value. The final Release NVVM prefix passes 188/188. Preservation passes 1/1 parser, 2/2
+routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime
+dispatch.

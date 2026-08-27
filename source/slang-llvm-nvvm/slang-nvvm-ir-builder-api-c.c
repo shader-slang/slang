@@ -164,3 +164,13 @@ typedef char SlangNVVMBuilderAPIV2ScalarIntegerSignedGreaterEqualCapabilityOrder
       SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_LESS_EQUAL_MIN_SIZE)
          ? 1
          : -1];
+typedef char SlangNVVMBuilderAPIV2RawRWStructuredBufferI32MinimumSizeCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_RAW_RW_STRUCTURED_BUFFER_I32_MIN_SIZE <=
+      sizeof(SlangNVVMBuilderAPI_V2))
+         ? 1
+         : -1];
+typedef char SlangNVVMBuilderAPIV2RawRWStructuredBufferI32CapabilityOrderCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_RAW_RW_STRUCTURED_BUFFER_I32_MIN_SIZE >
+      SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE)
+         ? 1
+         : -1];

@@ -166,6 +166,13 @@ static bool _supportsScalarIntegerSignedGreaterEqual(const SlangNVVMBuilderAPI_V
            api.emitIntegerSignedGreaterEqual;
 }
 
+// Treats the two appended Slice 26 fields as one coherent raw-resource capability.
+static bool _supportsRawRWStructuredBufferI32(const SlangNVVMBuilderAPI_V2& api)
+{
+    return api.structureSize >= SLANG_NVVM_BUILDER_API_V2_RAW_RW_STRUCTURED_BUFFER_I32_MIN_SIZE &&
+           api.getRawRWStructuredBufferI32Type && api.emitRawRWStructuredBufferI32ElementPointer;
+}
+
 // Rejects success without a required handle and never exposes a handle from a failed provider call.
 template<typename T>
 static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
@@ -296,6 +303,10 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     const bool hasPartialScalarIntegerSignedGreaterEqualPrefix =
         api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_LESS_EQUAL_MIN_SIZE &&
         api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE;
+    const bool hasPartialRawRWStructuredBufferI32Prefix =
+        api.structureSize >
+            SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE &&
+        api.structureSize < SLANG_NVVM_BUILDER_API_V2_RAW_RW_STRUCTURED_BUFFER_I32_MIN_SIZE;
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE || hasPartialScalarPrefix ||
         hasPartialScalarControlFlowPrefix || hasPartialScalarSSAPrefix ||
         hasPartialScalarFunctionPrefix || hasPartialScalarPointerArithmeticPrefix ||
@@ -307,6 +318,7 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         hasPartialScalarIntegerSignedGreaterThanPrefix ||
         hasPartialScalarIntegerSignedLessEqualPrefix ||
         hasPartialScalarIntegerSignedGreaterEqualPrefix ||
+        hasPartialRawRWStructuredBufferI32Prefix ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
         !api.serializeModuleWithDiagnostics ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
@@ -346,7 +358,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
          !_supportsScalarIntegerSignedLessEqual(api)) ||
         (api.structureSize >=
              SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE &&
-         !_supportsScalarIntegerSignedGreaterEqual(api)))
+         !_supportsScalarIntegerSignedGreaterEqual(api)) ||
+        (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_RAW_RW_STRUCTURED_BUFFER_I32_MIN_SIZE &&
+         !_supportsRawRWStructuredBufferI32(api)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -461,6 +475,11 @@ bool NVVMIRBuilder::supportsScalarIntegerSignedGreaterEqual() const
     return _supportsScalarIntegerSignedGreaterEqual(m_apiV2);
 }
 
+bool NVVMIRBuilder::supportsRawRWStructuredBufferI32() const
+{
+    return _supportsRawRWStructuredBufferI32(m_apiV2);
+}
+
 String NVVMIRBuilder::getVersionString() const
 {
     if (!isInitialized())
@@ -496,7 +515,9 @@ String NVVMIRBuilder::getVersionString() const
             << ";scalar-integer-signed-less-equal="
             << (supportsScalarIntegerSignedLessEqual() ? 1 : 0)
             << ";scalar-integer-signed-greater-equal="
-            << (supportsScalarIntegerSignedGreaterEqual() ? 1 : 0) << ";timestamp="
+            << (supportsScalarIntegerSignedGreaterEqual() ? 1 : 0)
+            << ";raw-rw-structured-buffer-i32=" << (supportsRawRWStructuredBufferI32() ? 1 : 0)
+            << ";timestamp="
             << SharedLibraryUtils::getSharedLibraryTimestamp(
                    reinterpret_cast<void*>(m_api.createModule));
     return builder.produceString();
@@ -1015,6 +1036,38 @@ SlangResult NVVMIRBuilder::emitIntegerSignedGreaterEqual(
     const SlangNVVMResult_1 result =
         m_apiV2.emitIntegerSignedGreaterEqual(module, left, right, &outValue);
     return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::getRawRWStructuredBufferI32Type(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1& outType) const
+{
+    outType = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsRawRWStructuredBufferI32())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result = m_apiV2.getRawRWStructuredBufferI32Type(module, &outType);
+    return _validateHandleResult(result, outType);
+}
+
+SlangResult NVVMIRBuilder::emitRawRWStructuredBufferI32ElementPointer(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 buffer,
+    SlangNVVMValueHandle_1 elementIndex,
+    SlangNVVMValueHandle_1& outPointer) const
+{
+    outPointer = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsRawRWStructuredBufferI32())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result = m_apiV2.emitRawRWStructuredBufferI32ElementPointer(
+        module,
+        buffer,
+        elementIndex,
+        &outPointer);
+    return _validateHandleResult(result, outPointer);
 }
 
 SlangResult NVVMIRBuilder::emitReturnVoid(SlangNVVMModuleHandle_1 module) const

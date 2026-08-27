@@ -417,6 +417,23 @@ extern "C"
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1* outValue);
 
+    /// Gets the raw CUDA ABI type for `RWStructuredBuffer<int>`: a naturally aligned aggregate
+    /// containing an AS1 i32 data pointer followed by a 64-bit element count. On failure, the
+    /// output type is null.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMGetRawRWStructuredBufferI32Type_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1* outType);
+
+    /// Emits a non-inbounds element address from a raw CUDA `RWStructuredBuffer<int>` value.
+    /// The buffer and scalar i32 index must be available at the current unterminated insertion
+    /// point. On failure, the output pointer is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(
+        SLANG_NVVM_CALL* SlangNVVMEmitRawRWStructuredBufferI32ElementPointer_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 buffer,
+        SlangNVVMValueHandle_1 elementIndex,
+        SlangNVVMValueHandle_1* outPointer);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -482,6 +499,10 @@ extern "C"
         SlangNVVMEmitIntegerSignedLessEqual_2 emitIntegerSignedLessEqual;
 
         SlangNVVMEmitIntegerSignedGreaterEqual_2 emitIntegerSignedGreaterEqual;
+
+        SlangNVVMGetRawRWStructuredBufferI32Type_2 getRawRWStructuredBufferI32Type;
+        SlangNVVMEmitRawRWStructuredBufferI32ElementPointer_2
+            emitRawRWStructuredBufferI32ElementPointer;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -578,6 +599,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerSignedGreaterEqual) +         \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerSignedGreaterEqual))
+
+    // This Slice 26 prefix is one coherent raw-CUDA RWStructuredBuffer<i32> capability.
+#define SLANG_NVVM_BUILDER_API_V2_RAW_RW_STRUCTURED_BUFFER_I32_MIN_SIZE             \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitRawRWStructuredBufferI32ElementPointer) + \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitRawRWStructuredBufferI32ElementPointer))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

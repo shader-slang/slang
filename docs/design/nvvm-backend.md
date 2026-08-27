@@ -1723,6 +1723,71 @@ suite passes 180/180; preservation passes 1/1 parser, 2/2 routing/hash, 1/1 unsu
 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch. The provider still exports
 only the V1/V2 getters and has no process-visible LLVM DLL dependency.
 
+### Slice 26 raw `RWStructuredBuffer<int>` storage
+
+Consider this raw CUDA kernel:
+
+```slang
+[CUDAKernel]
+void computeMain(RWStructuredBuffer<int> destination, uniform int index)
+{
+    destination[index] = 42;
+}
+```
+
+Final linking retains one exact `HLSLRWStructuredBufferType(Int, DefaultBufferLayout)` entry-point
+parameter and one `kIROp_RWStructuredBufferGetElementPtr(destination, index)`. The result is the
+canonical generic, read-write, scalar-buffer-layout pointer to signed `i32`, and the established
+constant/store graph consumes it directly. This is an intentional raw CUDA launch-value shape, not
+malformed IR that an earlier pass should flatten or legalize. Removing the exact parameter and
+producer cases restores E52017 at the entry parameter and element-pointer operation.
+
+A conventional shader global has a different canonical shape. For example,
+`RWStructuredBuffer<int> destination;` under a `[numthreads]` entry point retains a
+`ConstantBuffer<GlobalParams>`, `get_field_addr`, load, and then the same resource element-pointer
+operation. NVRTC places that parameter block in a `SLANG_globalParams` constant symbol instead of
+the raw kernel parameter list. Slice 26 therefore accepts only the measured raw `[CUDAKernel]`
+shape; it does not treat the conventional representation as an equivalent spelling.
+
+The private V2 provider table appends one coherent two-operation capability after Slice 25:
+
+```text
+getRawRWStructuredBufferI32Type(module, outType)
+emitRawRWStructuredBufferI32ElementPointer(module, buffer, index, outPointer)
+```
+
+The complete table is 384 bytes on x64 and 212 bytes on x86. Exact 368/204-byte Slice 25 providers
+remain usable for all established programs and report `raw-rw-structured-buffer-i32=0`; a resource
+program reaches E52016 after provider discovery and before module creation. Sizes 369 through 383
+on x64, sizes 205 through 211 on x86, and complete tables missing either callback are malformed.
+Future-larger providers are accepted and clamped. Both wrappers clear stale handles before
+dispatch and after failure or success without a result.
+
+The provider owns one structural source of truth for the raw CUDA ABI: the naturally aligned LLVM
+aggregate `{ i32 addrspace(1)*, i64 }`, matching the CUDA prelude's data pointer followed by
+`size_t count`. The element-pointer operation requires that exact aggregate, an exact i32 index,
+same-module ownership, same-function availability, dominance, and a current unterminated insertion
+point before mutation. It then emits one `extractvalue` for field zero and one ordinary,
+non-`inbounds` `getelementptr i32`. The existing four-byte signed-i32 store consumes that AS1
+pointer; no text manipulation, source-syntax reconstruction, aggregate flattening, or fallback is
+involved.
+
+Conventional globals, read-only `StructuredBuffer<int>`, unsigned and floating-point resource
+elements, reads or atomics through even an otherwise supported raw read-write resource pointer,
+and neighboring address operations stop at exact preflight checks before provider discovery.
+Provider-level null, wrong-type, cross-module, cross-function, unavailable, and terminated-block
+calls clear their outputs and insert no resource address instructions.
+
+Direct NVVM and NVRTC both expose `.param .align 8 .b8[16]` followed by the signed-i32 index
+parameter, load the first u64 data-pointer field, scale the signed i32 index, and issue one global
+u32 store. The direct PTX is 611 bytes and the NVRTC reference is 8,559 bytes; size is recorded as
+evidence, not a performance claim. CUDA 12.9 `ptxas` accepts both with four registers, no barriers,
+no stack or spills, and 372 bytes of `cmem[0]`; NVRTC additionally reports its module-level gmem and
+`cmem[4]`. On the RTX 5090, both routes launch the exact 16-byte `{device pointer, count}` argument
+and store 42 into the one-element allocation. The Release focused NVVM suite passes 188/188 and
+the preservation matrix passes 10/10. The provider still exports only the V1/V2 getters and has no
+process-visible LLVM DLL dependency.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -1737,7 +1802,7 @@ NVVM representation, or obsolete after the split. Important initial audit items 
 | CUDA varying-parameter legalization | Which part defines the CUDA launch ABI and which part only emits C++ parameters? |
 | Parameter-copy and const-reference transforms | Can NVVM preserve values/SSA instead of reconstructing C++ reference semantics? |
 | Phi elimination | Keep SSA for NVVM unless a measured libNVVM constraint requires otherwise. |
-| Resource legalization disabled for CUDA source | Define the concrete NVVM resource representation instead of relying on prelude templates. |
+| Resource legalization disabled for CUDA source | Slice 26 defines exact raw `RWStructuredBuffer<int>` launch storage; conventional globals and every other resource shape remain open. |
 
 Every retained special case needs a concrete producer, canonical input shape, downstream consumer,
 and test proving that this layer owns it.
@@ -2214,6 +2279,20 @@ equal zero, equal negative, unequal signs in both directions, and both orderings
 extremes on both routes. The focused suite passes 180/180 and the preservation matrix passes
 10/10.
 
+The Slice 26 baseline measured one exact raw
+`HLSLRWStructuredBufferType(Int, DefaultBufferLayout)` entry parameter and
+`rwstructuredBufferGetElementPtr(destination, index)` producer. The pre-change direct route
+stopped at E52017 on the resource entry parameter. The conventional global spelling instead
+retained `ConstantBuffer<GlobalParams>`, `get_field_addr`, and a load, confirming that it is a
+separate ABI rather than an alternative raw-resource spelling.
+
+The provider maps the raw resource to exact `{ i32 addrspace(1)*, i64 }`, extracts field zero, and
+applies one non-`inbounds` signed-i32 GEP before the established store. Direct NVVM and NVRTC expose
+the same aligned 16-byte aggregate plus i32 index parameters, first-u64 data-pointer load, signed
+index scaling, and global u32 store. CUDA 12.9 `ptxas` accepts both, and RTX 5090 execution stores
+42 through the exact `{device pointer, count}` launch value. The focused suite passes 188/188 and
+the preservation matrix passes 10/10.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -2388,14 +2467,25 @@ reconstruct it from other comparisons or accept an alternative spelling. These c
 include unsigned/wide/floating-point/pointer ordered comparisons, vectors, matrices, aggregates,
 resources, or new ABI and storage shapes.
 
+Slice 26 begins the resource-ABI bucket with exact raw `[CUDAKernel]`
+`RWStructuredBuffer<int, DefaultLayout>` parameters and their canonical
+`kIROp_RWStructuredBufferGetElementPtr` producer. It appends one coherent type/addressing provider
+capability after the exact 368-byte Slice 25 x64 prefix, yielding a 384-byte complete x64 prefix.
+The provider's single structural source of truth is `{ i32 addrspace(1)*, i64 }`; it validates the
+exact aggregate, signed-i32 index, ownership, availability, dominance, and insertion state before
+one field-zero extraction and non-`inbounds` GEP. Conventional global parameter blocks are a
+different measured ABI and remain unsupported, as do read-only buffers and non-i32 resource
+elements. The direct consumer does not flatten the launch value, reconstruct source syntax, or
+accept alternative structural spellings.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
   owns LLVM 7.0.1 plus an older CMake frontend or LLVM 14.0.6 plus negotiated text;
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
-- conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
-  pointers;
+- conventional shader-entry parameters and raw CUDA parameters beyond signed `i32`, device
+  pointers, fixed i32 array pointers, and exact raw `RWStructuredBuffer<int>`;
 - external/indirect calls, richer helper ABI, and scalar operations beyond the established
   signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, bitwise-XOR, bitwise-NOT,
   arithmetic-negate and the signed-i32 comparison family;

@@ -340,6 +340,35 @@ static SlangResult SLANG_NVVM_CALL _getArrayType(
     return SLANG_OK;
 }
 
+// Returns the one structural source of truth for the raw CUDA `RWStructuredBuffer<int>` ABI.
+static llvm::StructType* _getRawRWStructuredBufferI32LLVMType(ModuleState* state)
+{
+    if (!state)
+        return nullptr;
+
+    llvm::Type* fields[] = {
+        llvm::PointerType::get(
+            llvm::Type::getInt32Ty(state->context),
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL),
+        llvm::Type::getInt64Ty(state->context),
+    };
+    return llvm::StructType::get(state->context, fields, false);
+}
+
+static SlangResult SLANG_NVVM_CALL
+_getRawRWStructuredBufferI32Type(SlangNVVMModuleHandle_1 module, SlangNVVMTypeHandle_1* outType)
+{
+    if (outType)
+        *outType = nullptr;
+
+    ModuleState* state = _getModule(module);
+    if (!state || !outType)
+        return SLANG_E_INVALID_ARG;
+
+    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(_getRawRWStructuredBufferI32LLVMType(state));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _getFunctionType(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMTypeHandle_1 resultType,
@@ -1067,6 +1096,38 @@ static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitRawRWStructuredBufferI32ElementPointer(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 buffer,
+    SlangNVVMValueHandle_1 elementIndex,
+    SlangNVVMValueHandle_1* outPointer)
+{
+    if (outPointer)
+        *outPointer = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmBuffer = _getValue(buffer);
+    llvm::Value* llvmElementIndex = _getValue(elementIndex);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::StructType* bufferType = _getRawRWStructuredBufferI32LLVMType(state);
+    if (!state || !outPointer || !insertionBlock || !llvmBuffer || !llvmElementIndex ||
+        llvmBuffer->getType() != bufferType || !llvmElementIndex->getType()->isIntegerTy(32) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmBuffer) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmElementIndex))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* dataPointer = state->builder.CreateExtractValue(llvmBuffer, {0});
+    // A Slang structured-buffer index does not establish LLVM's stronger inbounds provenance.
+    llvm::Value* result = state->builder.CreateGEP(
+        llvm::Type::getInt32Ty(state->context),
+        dataPointer,
+        llvmElementIndex);
+    *outPointer = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitReturnVoid(SlangNVVMModuleHandle_1 module)
 {
     ModuleState* state = _getModule(module);
@@ -1487,6 +1548,8 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitIntegerSignedGreaterThan = _emitIntegerSignedGreaterThan;
     api.emitIntegerSignedLessEqual = _emitIntegerSignedLessEqual;
     api.emitIntegerSignedGreaterEqual = _emitIntegerSignedGreaterEqual;
+    api.getRawRWStructuredBufferI32Type = _getRawRWStructuredBufferI32Type;
+    api.emitRawRWStructuredBufferI32ElementPointer = _emitRawRWStructuredBufferI32ElementPointer;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);
