@@ -809,9 +809,9 @@ static SlangResult _deployExecutableRuntime(
     return SLANG_FAIL;
 }
 
-/// Compile each workspace primary to a front-end `.slang-module`, preserving its import-relative
-/// path below the workspace `build/modules` directory. When requested by the manifest, also compile
-/// the `main` primary to a native executable at the build root.
+/// Compile every primary in the resolved package graph to a front-end `.slang-module`, preserving
+/// its import-relative path below the workspace `build/modules` directory. When requested by the
+/// manifest, also compile the workspace's `main` primary to a native executable at the build root.
 static SlangResult _build(const String& projectRoot, String& outError)
 {
     Manifest manifest;
@@ -837,7 +837,7 @@ static SlangResult _build(const String& projectRoot, String& outError)
     String mainSourcePath;
     for (const auto& module : primaryModules)
     {
-        if (module.importPath == "main")
+        if (module.packageName == manifest.name && module.importPath == "main")
             mainSourcePath = module.sourcePath;
     }
     if (manifest.executable.name.getLength() && !mainSourcePath.getLength())

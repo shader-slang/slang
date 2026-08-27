@@ -231,6 +231,24 @@ struct ModuleLocation
     String path;
 };
 
+/// Copy the validated module index into the public build inventory.
+static void _collectPrimaryModules(
+    const List<ModuleLocation>& modules,
+    List<PrimaryModule>& outPrimaryModules)
+{
+    outPrimaryModules.clear();
+    for (const auto& module : modules)
+    {
+        PrimaryModule primary;
+        primary.importPath = module.importPath;
+        primary.packageName = module.packageName;
+        primary.sourcePath = module.path;
+        outPrimaryModules.add(primary);
+    }
+    outPrimaryModules.sort([](const PrimaryModule& left, const PrimaryModule& right)
+                           { return left.importPath < right.importPath; });
+}
+
 /// Find the primary module file whose same-named directory contains `relativePath`.
 static String _findOwningModule(
     const String& relativePath,
@@ -484,19 +502,6 @@ SlangResult validateProject(
 
     List<ModuleLocation> modules;
     SLANG_RETURN_ON_FAIL(_validatePackageTree(projectRoot, rootManifest, modules, mode, outError));
-    if (outPrimaryModules)
-    {
-        outPrimaryModules->clear();
-        for (const auto& module : modules)
-        {
-            PrimaryModule primary;
-            primary.importPath = module.importPath;
-            primary.sourcePath = module.path;
-            outPrimaryModules->add(primary);
-        }
-        outPrimaryModules->sort([](const PrimaryModule& left, const PrimaryModule& right)
-                                { return left.importPath < right.importPath; });
-    }
 
     String lockPath = Path::combine(projectRoot, kLockName);
     List<LocalPackage> localPackages;
@@ -504,7 +509,11 @@ SlangResult validateProject(
     if (!File::exists(lockPath))
     {
         if (rootManifest.dependencies.getCount() == 0 && localPackages.getCount() == 0)
+        {
+            if (outPrimaryModules)
+                _collectPrimaryModules(modules, *outPrimaryModules);
             return SLANG_OK;
+        }
         outError = localPackages.getCount()
                        ? "Registered local packages require slang-package-lock.json."
                        : "Package dependencies require slang-package-lock.json.";
@@ -594,7 +603,10 @@ SlangResult validateProject(
         SLANG_RETURN_ON_FAIL(
             _validatePackageTree(packageRoots[index], manifest, modules, mode, outError));
     }
-    return requireAllLockPackagesTrusted(lock, reachable, outError);
+    SLANG_RETURN_ON_FAIL(requireAllLockPackagesTrusted(lock, reachable, outError));
+    if (outPrimaryModules)
+        _collectPrimaryModules(modules, *outPrimaryModules);
+    return SLANG_OK;
 }
 
 } // namespace PackageTool

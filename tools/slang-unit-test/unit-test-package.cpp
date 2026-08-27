@@ -44,6 +44,19 @@ static SlangResult _writeFile(const String& path, const String& contents)
     return File::writeAllText(path, contents);
 }
 
+static SlangResult _runSlangc(const List<String>& arguments, ExecuteResult& outResult)
+{
+    String executablePath = Path::combine(
+        Path::getParentDirectory(Path::getExecutablePath()),
+        String("slangc") + Process::getExecutableSuffix());
+    CommandLine commandLine;
+    commandLine.setExecutableLocation(
+        ExecutableLocation(ExecutableLocation::Type::Path, executablePath));
+    for (const auto& argument : arguments)
+        commandLine.addArg(argument);
+    return ProcessUtil::execute(commandLine, outResult);
+}
+
 } // namespace
 
 SLANG_UNIT_TEST(PackageVersionConstraint)
@@ -499,6 +512,51 @@ SLANG_UNIT_TEST(PackageToolRun)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not export")) >= 0);
 }
 
+SLANG_UNIT_TEST(PackageToolExecutableRequiresWorkspaceMain)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+
+    String dependencyRoot = Path::combine(temp.path, "vendor/tool");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(dependencyRoot));
+    Manifest dependency;
+    dependency.name = "tool";
+    dependency.exports.add("src");
+    dependency.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(dependencyRoot, "slang-package.json"), dependency, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(dependencyRoot, "LICENSE"), "Tool license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(dependencyRoot, "src/main.slang"),
+        "module main;\n"
+        "public int dependencyMain() { return 0; }\n")));
+
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    Manifest root;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    root.executable.name = "root-tool";
+    Dependency toolDependency;
+    toolDependency.name = "tool";
+    toolDependency.path = "vendor/tool";
+    root.dependencies.add(toolDependency);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* updateArguments[] = {"slang-package", "update"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    const char* buildArguments[] = {"slang-package", "build"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("workspace configures an executable")) >=
+        0);
+}
+
 SLANG_UNIT_TEST(PackageToolTest)
 {
     TemporaryDirectory temp;
@@ -678,8 +736,11 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(writeManifest(Path::combine(bRoot, "slang-package.json"), b, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(Path::combine(bRoot, "LICENSE"), "B license\n")));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(_writeFile(Path::combine(bRoot, "src/b.slang"), "module b;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(bRoot, "src/b.slang"),
+        "module b;\n"
+        "import c;\n"
+        "public int bValue() { return cValue(); }\n")));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_writeFile(Path::combine(bRoot, "docs/reference/api.md"), "# B API\n")));
 
@@ -692,8 +753,10 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(writeManifest(Path::combine(cRoot, "slang-package.json"), c, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(Path::combine(cRoot, "LICENSE"), "C license\n")));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(_writeFile(Path::combine(cRoot, "src/c.slang"), "module c;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(cRoot, "src/c.slang"),
+        "module c;\n"
+        "public int cValue() { return 1; }\n")));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_writeFile(Path::combine(cRoot, "docs/reference.md"), "# C reference\n")));
 
@@ -712,8 +775,12 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(writeManifest(Path::combine(aRoot, "slang-package.json"), a, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(Path::combine(aRoot, "LICENSE"), "A license\n")));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(_writeFile(Path::combine(aRoot, "src/a.slang"), "module a;\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(aRoot, "src/a.slang"),
+        "module a;\n"
+        "import b;\n"
+        "import c;\n"
+        "public int aValue() { return bValue() + cValue(); }\n")));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_writeFile(Path::combine(aRoot, "docs/readme.md"), "# A readme\n")));
 
@@ -796,12 +863,35 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
         Path::combine(temp.path, "src/main.slang"),
         "module main;\n"
-        "import b;\n"
-        "public int useB() { return 0; }\n")));
+        "import a;\n"
+        "public int useA() { return aValue(); }\n")));
     const char* buildArguments[] = {"slang-package", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/modules/a.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/modules/b.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/modules/c.slang-module")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "build/modules/main.slang-module")));
+
+    String shippedConsumerPath = Path::combine(temp.path, "shipped/consumer.slang");
+    String shippedOutputPath = Path::combine(temp.path, "shipped/consumer.slang-module");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        shippedConsumerPath,
+        "module consumer;\n"
+        "import a;\n"
+        "public int consume() { return aValue(); }\n")));
+    List<String> slangcArguments;
+    slangcArguments.add(shippedConsumerPath);
+    slangcArguments.add("-I");
+    slangcArguments.add(Path::combine(temp.path, "build/modules"));
+    slangcArguments.add("-o");
+    slangcArguments.add(shippedOutputPath);
+    ExecuteResult slangcResult;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runSlangc(slangcArguments, slangcResult)));
+    if (slangcResult.resultCode != 0)
+        getTestReporter()->message(TestMessageType::Info, slangcResult.standardError.getBuffer());
+    SLANG_CHECK(slangcResult.resultCode == 0);
+    SLANG_CHECK(File::exists(shippedOutputPath));
     SLANG_CHECK(
         File::exists(Path::combine(Path::combine(temp.path, "build/docs", root.name), "guide.md")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/a/readme.md")));

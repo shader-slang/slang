@@ -14,6 +14,7 @@ namespace PackageTool
 struct PrimaryModule
 {
     String importPath;
+    String packageName;
     String sourcePath;
 };
 
@@ -27,7 +28,7 @@ enum class ProjectValidationMode
 const char* getLicensePlaceholderText();
 
 /// Validate the workspace package and its materialized, locked dependency closure. When requested,
-/// return the workspace package's primary modules in import-path order.
+/// return every primary module in the resolved graph in import-path order.
 SlangResult validateProject(
     const String& projectRoot,
     String& outError,

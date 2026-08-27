@@ -8,7 +8,8 @@ Slang Source Packages
 
 The `slang package` command manages source dependencies stored in Git repositories. The short form
 `slang pkg` accepts the same commands. Package management does not change Slang's `import` syntax;
-its build command emits workspace `.slang-module` files and an optional native executable.
+its build command emits `.slang-module` files for the resolved graph and an optional native
+executable.
 
 A **package** is a directory with `slang-package.json`. Its name, exports, license files, and
 dependencies apply wherever that package appears in a graph, including as a Git pin or a path
@@ -233,9 +234,15 @@ Fetched package trees contain source only. Compilation output must be written ou
 because the same source commit can be compiled against different resolved dependency graphs.
 
 `slang package build` validates the materialized package graph and compiles every primary module in
-the workspace package to a front-end `.slang-module` under `workspace.build/modules`, preserving
-its import path. For example, `src/acme/noise.slang` becomes
-`build/modules/acme/noise.slang-module`.
+the workspace and its resolved dependencies to a front-end `.slang-module` under
+`workspace.build/modules`, preserving its import path. For example, an exported
+`src/acme/noise.slang` becomes `build/modules/acme/noise.slang-module`, whether that source belongs
+to the workspace or a dependency. Companion files included by that primary are compiled into the
+same artifact and do not produce separate files.
+
+The resulting `build/modules` tree is sufficient for source-free consumption: place it on the
+consumer's search path and distribute it without the materialized `deps/` source trees. Imports
+from one generated module to another resolve at the same import-relative paths used by source.
 
 When `executable.name` is present, build also compiles the workspace primary whose import path is
 `main` (normally `src/main.slang`) with the host executable target and writes
