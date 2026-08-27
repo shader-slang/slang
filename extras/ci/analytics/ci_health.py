@@ -319,7 +319,7 @@ def fetch_pending_approvals(repo):
     is a PR that sits until its job timeout and then reports as a test failure.
     """
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    from gh_api import gh_api_list
+    from gh_api import find_pr_number_by_head, get_pr_title, gh_api_list, parse_merge_queue_pr_number
 
     runs, err = gh_api_list(
         f"repos/{repo}/actions/runs?status=waiting&per_page=100",
@@ -330,6 +330,14 @@ def fetch_pending_approvals(repo):
 
     now = datetime.now(timezone.utc)
     pending = []
+    # Several waiting runs can share one PR (a workflow_dispatch rerun plus a
+    # merge_group run of the same PR, say), so cache title lookups by
+    # pr_number instead of re-fetching per run. Cap the number of distinct
+    # PRs looked up, matching the JS path's MAX_TITLE_LOOKUPS, so a burst of
+    # unresolved titles cannot fire more requests than the retry budget in
+    # gh_api's _run_gh_command can absorb without stalling the report.
+    MAX_TITLE_LOOKUPS = 20
+    title_cache = {}
     for run in runs:
         created = run.get("created_at") or ""
         try:
@@ -338,16 +346,40 @@ def fetch_pending_approvals(repo):
             )
         except ValueError:
             waited_min = 0
+        event = run.get("event", "")
+        branch = run.get("head_branch", "")
         prs = run.get("pull_requests") or []
         pr_number = prs[0].get("number") if prs else None
+        if pr_number is None and event == "pull_request":
+            # A run triggered from a fork branch has an empty `pull_requests`
+            # field (GitHub only populates it for same-repo branches), so the
+            # PR has to be looked up by head owner/branch instead.
+            head_owner = ((run.get("head_repository") or {}).get("owner") or {}).get("login")
+            pr_number = find_pr_number_by_head(repo, head_owner, branch)
+        elif pr_number is None and event == "merge_group":
+            # A merge-queue run's `pull_requests` field is never populated by
+            # GitHub, but the branch name itself encodes the PR number.
+            merge_pr = parse_merge_queue_pr_number(branch)
+            pr_number = int(merge_pr) if merge_pr else None
+        title = run.get("display_title", "")
+        if pr_number and title == run.get("name", ""):
+            # `display_title` is only the PR subject line for the run
+            # triggered directly by the `pull_request` event. A
+            # `workflow_dispatch` rerun or a `merge_group` run of the same PR
+            # carries no PR-title context at trigger time, so GitHub falls
+            # back to the workflow's `name:` field (e.g. "CI") even though
+            # `pr_number` above proves the run is still tied to that PR.
+            if pr_number not in title_cache and len(title_cache) < MAX_TITLE_LOOKUPS:
+                title_cache[pr_number] = get_pr_title(repo, pr_number)
+            title = title_cache.get(pr_number) or title
         pending.append(
             {
                 "run_id": run.get("id"),
                 "url": run.get("html_url", ""),
                 "actor": (run.get("actor") or {}).get("login", "?"),
-                "event": run.get("event", ""),
-                "branch": run.get("head_branch", ""),
-                "title": run.get("display_title", ""),
+                "event": event,
+                "branch": branch,
+                "title": title,
                 "waited_min": waited_min,
                 "pr_number": pr_number,
             }
@@ -1198,9 +1230,11 @@ buildCharts(24);
 def render_pending_approvals(data):
     """Render runs paused on a deployment approval, oldest first.
 
-    Age is the number that matters. A run waiting a couple of minutes is the
-    approval bot about to pick it up; one waiting half an hour means nobody is
-    coming, and the job will eventually time out and report as a test failure.
+    Most of these gate the Falcor bridge, which is approved by hand rather
+    than on a bot SLA, so a nonempty queue is the normal state, not an
+    incident -- it just means nobody has vetted the run yet. The indicator
+    only distinguishes "some runs are waiting" (informational) from "the
+    fetch itself failed" (a real problem); it does not escalate on wait time.
     """
     if not data:
         return "<p>Pending approvals unavailable.</p>"
@@ -1215,11 +1249,8 @@ def render_pending_approvals(data):
     elif not pending:
         fg, bg, label = "#198754", "#d1e7dd", "OK"
         summary = "Nothing waiting for approval"
-    elif oldest >= 30:
-        fg, bg, label = "#dc3545", "#f8d7da", "STALLED"
-        summary = f"{len(pending)} waiting, oldest {oldest} min"
     else:
-        fg, bg, label = "#fd7e14", "#fff3cd", "WAITING"
+        fg, bg, label = "#0d6efd", "#cfe2ff", "WAITING"
         summary = f"{len(pending)} waiting, oldest {oldest} min"
 
     html = f"""
@@ -1247,7 +1278,7 @@ def render_pending_approvals(data):
             f"<strong>{_esc(event)}</strong>" if event == "merge_group" else _esc(event)
         )
         pr_number = p.get("pr_number")
-        pr_cell = _link(f"https://github.com/shader-slang/slang/pull/{pr_number}", f"#{pr_number}") if pr_number else ""
+        pr_cell = _link(f"https://github.com/shader-slang/slang/pull/{pr_number}/changes", f"#{pr_number}") if pr_number else ""
         html += (
             "  <tr>"
             f"<td>{p['waited_min']} min</td>"
@@ -1370,27 +1401,103 @@ PENDING_APPROVALS_JS = """
       var pending = runs.map(function (r) {
         var waited = Math.floor((now - new Date(r.created_at).getTime()) / 60000);
         var prs = r.pull_requests || [];
+        var prNumber = prs.length ? prs[0].number : null;
+        if (prNumber === null && r.event === "merge_group") {
+          // A merge-queue run's `pull_requests` field is never populated by
+          // GitHub, but the branch name encodes the PR number:
+          // gh-readonly-queue/master/pr-NNNN-SHA.
+          var m = /^gh-readonly-queue\/[^/]+\/pr-(\d+)-/.exec(r.head_branch || "");
+          if (m) prNumber = parseInt(m[1], 10);
+        }
         return {
           run_id: r.id,
           url: r.html_url,
           actor: (r.actor || {}).login || "?",
           event: r.event || "",
           branch: r.head_branch || "",
+          head_owner: ((r.head_repository || {}).owner || {}).login || "",
+          name: r.name || "",
           title: r.display_title || String(r.id),
           waited: waited,
-          pr_number: prs.length ? prs[0].number : null,
+          pr_number: prNumber,
         };
       }).sort(function (a, b) { return b.waited - a.waited; });
 
+      // A run triggered from a fork branch has an empty `pull_requests`
+      // field (GitHub only populates it for same-repo branches), so the PR
+      // has to be looked up separately by head owner/branch. Dedup by
+      // owner/branch (several waiting runs can share one PR) and cap the
+      // number of lookups so a burst of unresolved fork runs cannot fire
+      // more requests than an unauthenticated client's rate limit allows.
+      var MAX_HEAD_LOOKUPS = 20;
+      var seenKeys = {};
+      var uniqueTargets = [];
+      pending.forEach(function (p) {
+        if (p.pr_number !== null || p.event !== "pull_request" || !p.head_owner) return;
+        var key = p.head_owner + ":" + p.branch;
+        if (seenKeys[key]) return;
+        seenKeys[key] = true;
+        if (uniqueTargets.length < MAX_HEAD_LOOKUPS) uniqueTargets.push(key);
+      });
+
+      var lookups = uniqueTargets.map(function (key) {
+        var lookupUrl = "https://api.github.com/repos/" + repo + "/pulls?head=" +
+          encodeURIComponent(key.split(":")[0]) + ":" + encodeURIComponent(key.split(":").slice(1).join(":")) +
+          "&state=open";
+        return fetch(lookupUrl)
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (prs) {
+            if (!prs.length) return;
+            pending.forEach(function (p) {
+              if (p.pr_number === null && (p.head_owner + ":" + p.branch) === key) {
+                p.pr_number = prs[0].number;
+              }
+            });
+          })
+          .catch(function () {});
+      });
+
+      return Promise.all(lookups).then(function () {
+        // `display_title` is only the PR subject line for the run
+        // triggered directly by the `pull_request` event. A
+        // `workflow_dispatch` rerun or a `merge_group` run of the same PR
+        // carries no PR-title context at trigger time, so GitHub falls
+        // back to the workflow's `name:` field (e.g. "CI") even though
+        // `pr_number` above proves the run is still tied to that PR. Look
+        // the real title up from the PR itself, deduped and capped the
+        // same way as the head-branch lookups above.
+        var MAX_TITLE_LOOKUPS = 20;
+        var seenPrs = {};
+        var titleTargets = [];
+        pending.forEach(function (p) {
+          if (!p.pr_number || p.title !== p.name || seenPrs[p.pr_number]) return;
+          seenPrs[p.pr_number] = true;
+          if (titleTargets.length < MAX_TITLE_LOOKUPS) titleTargets.push(p.pr_number);
+        });
+        var titleLookups = titleTargets.map(function (prNumber) {
+          return fetch("https://api.github.com/repos/" + repo + "/pulls/" + prNumber)
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (pr) {
+              if (!pr || !pr.title) return;
+              pending.forEach(function (p) {
+                if (p.pr_number === prNumber && p.title === p.name) p.title = pr.title;
+              });
+            })
+            .catch(function () {});
+        });
+        return Promise.all(titleLookups).then(function () { return pending; });
+      });
+    })
+    .then(function (pending) {
       var oldest = pending.length ? pending[0].waited : 0;
       var fg, bg, label, summary;
       if (!pending.length) {
         fg = "#198754"; bg = "#d1e7dd"; label = "OK"; summary = "Nothing waiting for approval";
-      } else if (oldest >= 30) {
-        fg = "#dc3545"; bg = "#f8d7da"; label = "STALLED";
-        summary = pending.length + " waiting, oldest " + oldest + " min";
       } else {
-        fg = "#fd7e14"; bg = "#fff3cd"; label = "WAITING";
+        // Most of these gate the Falcor bridge, which is approved by hand
+        // rather than on a bot SLA, so a nonempty queue is normal, not an
+        // incident -- this stays informational regardless of wait time.
+        fg = "#0d6efd"; bg = "#cfe2ff"; label = "WAITING";
         summary = pending.length + " waiting, oldest " + oldest + " min";
       }
 
@@ -1409,7 +1516,7 @@ PENDING_APPROVALS_JS = """
           var event = p.event === "merge_group"
             ? "<strong>merge_group</strong>" : esc(p.event);
           var pr = p.pr_number
-            ? '<a href="https://github.com/shader-slang/slang/pull/' + p.pr_number + '">#' + p.pr_number + '</a>'
+            ? '<a href="https://github.com/shader-slang/slang/pull/' + p.pr_number + '/changes">#' + p.pr_number + '</a>'
             : '';
           html += '<tr>' +
             '<td>' + p.waited + ' min</td>' +
