@@ -335,6 +335,15 @@ extern "C"
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1* outValue);
 
+    /// Emits bitwise XOR for same-module scalar integer operands of identical type.
+    /// Both operands must be available at the current unterminated insertion point. On failure,
+    /// the output value is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerBitXor_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -379,6 +388,8 @@ extern "C"
         SlangNVVMEmitIntegerBitAnd_2 emitIntegerBitAnd;
 
         SlangNVVMEmitIntegerBitOr_2 emitIntegerBitOr;
+
+        SlangNVVMEmitIntegerBitXor_2 emitIntegerBitXor;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -429,6 +440,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_OR_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerBitOr) +        \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerBitOr))
+
+    // This Slice 15 prefix is one coherent scalar-integer-bit-XOR capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_XOR_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerBitXor) +        \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerBitXor))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);
