@@ -113,6 +113,7 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
+          cpu-only: ${{ inputs.cpu-only }}
 
       # slang-test's CUDA pass-through compiles through NVRTC, so the
       # offline (non-NVRTC) branch of the prelude is never compiled by the

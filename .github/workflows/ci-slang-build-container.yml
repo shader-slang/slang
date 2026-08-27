@@ -244,7 +244,7 @@ jobs:
             exit 1
           fi
 
-      # Save sccache cache (master only, for populate-sccache workflow).
+      # Save sccache cache (master only, for sccache-populate workflow).
       #
       # Two guards beyond the master-ref check:
       #   - env.IS_FORK_PR != 'true' — fork PRs (via pull_request or /ci)

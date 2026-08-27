@@ -65,6 +65,11 @@ For each test in the bundle:
      (callees emit before entry points) where `CHECK-DAG` was meant;
    - an optimization-dependent assertion (inlined/folded away) without
      `-O1` on the directive (slang-test defaults to `-O0`);
+   - a pinned token the anchored claim does not depend on — typically a
+     declaration specifier or qualifier next to the subject (`__device__`,
+     `__noinline__`, `inline`, `static`) or a decoration the claim never
+     mentions. Ask of each pinned token: if it changed, would the claim be
+     false? If no, it should be wild or absent (rule 8);
    - a feature asserted on a target that does not support it;
    - a `DIAGNOSTIC_TEST` with an invented message string, a mis-aligned
      caret, or a wrong `non-exhaustive` (present when all diagnostics are
