@@ -132,6 +132,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32DividePtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32DivideRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite nonzero-denominator division cases | RTX 5090 results `4`, `-16`, `-4` | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32NegateKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Generic floating-unary callback constructs exact unflagged LLVM `fneg`; audited wire text lowers it to legacy `fsub -0.0` | Both forms, aligned store, metadata, and absence of other float arithmetic are checked | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32NegateUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical float32 `kIROp_Neg` lowers through floating-unary operation 0 while signed-i32 NEG remains unchanged | Exact parameter operand and unary-result store topology checked | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32NegateDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact finite scalar float32 negation compiles through both routes | `[64, 32]`, token-safe `neg.f32`, store, and no load/binary-float operation agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32NegatePtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32NegateRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite negation cases | RTX 5090 results `-1.5`, `8`, `-1024` | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -597,4 +603,23 @@ LLVM/NVVM text has exactly one `fdiv float`; NVVM and NVRTC agree on `[64, 32, 3
 `4`, `-16`, `-4`. Seven names add only 48 lines to the five measured test/support files, from
 19,512 to 19,560. Release passes 228/228 with sorted-name SHA-256
 `99dec82e0909050b0dc909113dad988369dfe9b2666e5385faaec947c6c29bc7`; Debug preservation passes
+10/10.
+
+Slice 36 adds floating-unary NEGATE as feature 24/operation 0 and appends one V3 callback. The x64
+table grows from 464 to 472 bytes; the x86 callback occupies existing tail padding, leaving its
+size at 280 bytes. Exact Slice 35 providers remain valid without the new feature. Canonical Float
+`kIROp_Neg` uses the new family, signed-i32 NEG remains on its old path, and the former
+float-negate-plus-cast negative reaches E52017 `castFloatToInt`.
+
+The provider module has exactly one unflagged `fneg float`. CUDA 12.9 libNVVM rejects that LLVM-14
+opcode in NVVM-2.0 text, so the audited writer validates and count-matches semantic fneg
+instructions before emitting the exact legacy `fsub float -0.0, value` spelling. NVVM and NVRTC
+then agree on `[64, 32]`, token-safe `neg.f32`, store/no-load/binary-float; `ptxas` accepts both;
+and RTX 5090 results are `-1.5`, `8`, `-1024`.
+
+One five-row float-arithmetic descriptor now drives binary and unary kernel, topology, PTX,
+assembler, and runtime runners. The five measured test/support files grow from 19,560 to 19,841
+physical lines for the new ABI suffix, writer audit, fake family, and seven names. Release passes
+235/235 with sorted-name SHA-256
+`2b79918702a9b21110af8251944e4428001a4ea69a2ff79b7a18e488cd13b4ba`; Debug preservation passes
 10/10.

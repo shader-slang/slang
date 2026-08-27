@@ -66,10 +66,14 @@ SLANG_UNIT_TEST(nvvmSlangV3RoutesGenericScalarFamilies)
     }
 }
 
-static void _runNVVMSlangFloat32BinaryUsesDirectPipeline(
-    NVVMFloat32BinaryTestOperation testOperation)
+static void _runNVVMSlangFloat32ArithmeticUsesDirectPipeline(
+    NVVMFloat32ArithmeticTestOperation testOperation)
 {
-    const NVVMFloat32BinaryTestCase& testCase = _getNVVMFloat32BinaryTestCase(testOperation);
+    const NVVMFloat32ArithmeticTestCase& testCase =
+        _getNVVMFloat32ArithmeticTestCase(testOperation);
+    const FakeNVVMBuilderScalarFamily family = testCase.operandCount == 1
+                                                   ? FakeNVVMBuilderScalarFamily::FloatingUnary
+                                                   : FakeNVVMBuilderScalarFamily::FloatingBinary;
     _resetDirectNVVMFakes();
     _enableFakeNVVMBuilderV3();
     {
@@ -91,27 +95,33 @@ static void _runNVVMSlangFloat32BinaryUsesDirectPipeline(
         SLANG_CHECK(gFakeNVVMBuilder.getPointerTypeCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.pointerPointeeTypes.getCount() == 1);
         SLANG_CHECK(gFakeNVVMBuilder.pointerPointeeTypes[0] == _getFakeNVVMBuilderFloatType());
-        SLANG_CHECK(gFakeNVVMBuilder.functionParameterTypeKinds.getCount() == 3);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds.getCount() == testCase.operandCount + 1);
         SLANG_CHECK(
             gFakeNVVMBuilder.functionParameterTypeKinds[0] ==
             FakeNVVMBuilderParameterTypeKind::FloatPointer);
         SLANG_CHECK(
             gFakeNVVMBuilder.functionParameterTypeKinds[1] ==
             FakeNVVMBuilderParameterTypeKind::Float);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.functionParameterTypeKinds[2] ==
-            FakeNVVMBuilderParameterTypeKind::Float);
-        SLANG_CHECK(
-            gFakeNVVMBuilder
-                .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingBinary)] == 1);
+        if (testCase.operandCount == 2)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.functionParameterTypeKinds[2] ==
+                FakeNVVMBuilderParameterTypeKind::Float);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.scalarV3FamilyCallCounts[Index(family)] == 1);
         SLANG_CHECK(gFakeNVVMBuilder.scalarOperations.getCount() == 1);
         const FakeNVVMBuilderScalarOperation& operation = gFakeNVVMBuilder.scalarOperations[0];
-        SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::FloatingBinary);
+        SLANG_CHECK(operation.key.family == family);
         SLANG_CHECK(operation.key.operation == testCase.operation);
+        SLANG_CHECK(operation.operandCount == testCase.operandCount);
         SLANG_CHECK(operation.operands[0].kind == FakeNVVMBuilderValueKind::Parameter);
         SLANG_CHECK(operation.operands[0].index == 1);
-        SLANG_CHECK(operation.operands[1].kind == FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(operation.operands[1].index == 2);
+        if (testCase.operandCount == 2)
+        {
+            SLANG_CHECK(operation.operands[1].kind == FakeNVVMBuilderValueKind::Parameter);
+            SLANG_CHECK(operation.operands[1].index == 2);
+        }
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
         SLANG_CHECK(
             gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
@@ -125,18 +135,20 @@ static void _runNVVMSlangFloat32BinaryUsesDirectPipeline(
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-#define NVVM_FLOAT32_BINARY_DIRECT_TEST(NAME, OPERATION)                                         \
-    SLANG_UNIT_TEST(NAME)                                                                        \
-    {                                                                                            \
-        _runNVVMSlangFloat32BinaryUsesDirectPipeline(NVVMFloat32BinaryTestOperation::OPERATION); \
+#define NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                    \
+    {                                                        \
+        _runNVVMSlangFloat32ArithmeticUsesDirectPipeline(    \
+            NVVMFloat32ArithmeticTestOperation::OPERATION);  \
     }
 
-NVVM_FLOAT32_BINARY_DIRECT_TEST(nvvmSlangFloat32AddUsesDirectPipeline, Add)
-NVVM_FLOAT32_BINARY_DIRECT_TEST(nvvmSlangFloat32SubtractUsesDirectPipeline, Subtract)
-NVVM_FLOAT32_BINARY_DIRECT_TEST(nvvmSlangFloat32MultiplyUsesDirectPipeline, Multiply)
-NVVM_FLOAT32_BINARY_DIRECT_TEST(nvvmSlangFloat32DivideUsesDirectPipeline, Divide)
+NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST(nvvmSlangFloat32AddUsesDirectPipeline, Add)
+NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST(nvvmSlangFloat32SubtractUsesDirectPipeline, Subtract)
+NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST(nvvmSlangFloat32MultiplyUsesDirectPipeline, Multiply)
+NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST(nvvmSlangFloat32DivideUsesDirectPipeline, Divide)
+NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST(nvvmSlangFloat32NegateUsesDirectPipeline, Negate)
 
-#undef NVVM_FLOAT32_BINARY_DIRECT_TEST
+#undef NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST
 
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
 {
@@ -190,15 +202,22 @@ SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
         SLANG_CHECK(
             gFakeNVVMBuilder
                 .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingBinary)] == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder
+                .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingUnary)] == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-static void _runNVVMSlangNegotiatesFloat32BinaryCapability(
-    NVVMFloat32BinaryTestOperation testOperation)
+static void _runNVVMSlangNegotiatesFloat32ArithmeticCapability(
+    NVVMFloat32ArithmeticTestOperation testOperation)
 {
-    const NVVMFloat32BinaryTestCase& testCase = _getNVVMFloat32BinaryTestCase(testOperation);
+    const NVVMFloat32ArithmeticTestCase& testCase =
+        _getNVVMFloat32ArithmeticTestCase(testOperation);
+    const FakeNVVMBuilderScalarFamily family = testCase.operandCount == 1
+                                                   ? FakeNVVMBuilderScalarFamily::FloatingUnary
+                                                   : FakeNVVMBuilderScalarFamily::FloatingBinary;
     _resetDirectNVVMFakes();
     _enableFakeNVVMBuilderV3();
     gFakeNVVMBuilder.apiV3.features.words[testCase.feature / 64u] &=
@@ -220,27 +239,27 @@ static void _runNVVMSlangNegotiatesFloat32BinaryCapability(
         SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.getFloatingPointTypeCallCount == 0);
-        SLANG_CHECK(
-            gFakeNVVMBuilder
-                .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingBinary)] == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarV3FamilyCallCounts[Index(family)] == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-#define NVVM_FLOAT32_BINARY_CAPABILITY_TEST(NAME, OPERATION)                                       \
-    SLANG_UNIT_TEST(NAME)                                                                          \
-    {                                                                                              \
-        _runNVVMSlangNegotiatesFloat32BinaryCapability(NVVMFloat32BinaryTestOperation::OPERATION); \
+#define NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                        \
+    {                                                            \
+        _runNVVMSlangNegotiatesFloat32ArithmeticCapability(      \
+            NVVMFloat32ArithmeticTestOperation::OPERATION);      \
     }
 
-NVVM_FLOAT32_BINARY_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32AddCapability, Add)
-NVVM_FLOAT32_BINARY_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32SubtractCapability, Subtract)
-NVVM_FLOAT32_BINARY_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32MultiplyCapability, Multiply)
-NVVM_FLOAT32_BINARY_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32DivideCapability, Divide)
+NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32AddCapability, Add)
+NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32SubtractCapability, Subtract)
+NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32MultiplyCapability, Multiply)
+NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32DivideCapability, Divide)
+NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32NegateCapability, Negate)
 
-#undef NVVM_FLOAT32_BINARY_CAPABILITY_TEST
+#undef NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32CopyCapability)
 {
@@ -2582,7 +2601,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMWideIntegerBitNotSource, "'entry-point parameter'"},
         {kDirectNVVMUnsignedIntegerNegateSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerNegateSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingNegateSource, "'signed i32 arithmetic negation'"},
+        {kDirectNVVMFloatingNegateSource, "'castFloatToInt'"},
         {kDirectNVVMUnsignedAtomicAddSource, "'entry-point parameter'"},
         {kDirectNVVMWideAtomicAddSource, "'entry-point parameter'"},
         {kDirectNVVMFloatingAtomicAddSource, "'relaxed global signed i32 atomic add'"},
@@ -2614,7 +2633,8 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 
     // The direct subset retains signed-i32 helper/value policy. Adjacent aggregate, local-memory,
     // multiply ABI variants, logical NOT/shifts/division/remainder, unsigned/wide AND/OR/XOR/NOT,
-    // unsigned/wide/floating negate and atomic-add ABI variants, non-relaxed atomic-add order,
+    // unsigned/wide negate and floating-negate-plus-cast and atomic-add ABI variants,
+    // non-relaxed atomic-add order,
     // adjacent atomic operations, group-shared atomic add, unsigned/wide/floating equality and
     // inequality and ordered comparisons, pointer comparisons, unsigned indices,
     // and helper-array-pointer shapes remain deterministic before builder discovery.

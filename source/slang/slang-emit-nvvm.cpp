@@ -607,6 +607,11 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Neg:
+                if (inst->getOperandCount() == 1 && isNVVMFloat32Type(inst->getDataType()))
+                {
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE);
+                    break;
+                }
                 if (inst->getOperandCount() != 1 || !isNVVMSignedI32Type(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
@@ -870,13 +875,26 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Neg:
-                SLANG_RETURN_ON_FAIL(_validateI32Value(
-                    codeGenContext,
-                    inst->getOperand(0),
-                    inst,
-                    availableValues,
-                    dominatorTree,
-                    features));
+                if (isNVVMFloat32Type(inst->getDataType()))
+                {
+                    SLANG_RETURN_ON_FAIL(_validateFloat32Value(
+                        codeGenContext,
+                        inst->getOperand(0),
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE);
+                }
+                else
+                {
+                    SLANG_RETURN_ON_FAIL(_validateI32Value(
+                        codeGenContext,
+                        inst->getOperand(0),
+                        inst,
+                        availableValues,
+                        dominatorTree,
+                        features));
+                }
                 availableValues.add(inst);
                 break;
 
@@ -1731,14 +1749,28 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredOperand));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "signed i32 arithmetic negation",
-                            builder.emitIntegerUnary(
-                                moduleScope.module,
-                                SLANG_NVVM_INTEGER_UNARY_OP_NEGATE,
-                                loweredOperand,
-                                loweredValue)));
+                        if (isNVVMFloat32Type(inst->getDataType()))
+                        {
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "float32 negation",
+                                builder.emitFloatingUnary(
+                                    moduleScope.module,
+                                    SLANG_NVVM_FLOATING_UNARY_OP_NEGATE,
+                                    loweredOperand,
+                                    loweredValue)));
+                        }
+                        else
+                        {
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "signed i32 arithmetic negation",
+                                builder.emitIntegerUnary(
+                                    moduleScope.module,
+                                    SLANG_NVVM_INTEGER_UNARY_OP_NEGATE,
+                                    loweredOperand,
+                                    loweredValue)));
+                        }
                         valueMap[inst] = loweredValue;
                     }
                     break;

@@ -216,30 +216,33 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarDifferentialPTX)
     }
 }
 
-static bool _hasNVVMFloat32BinaryPTXEvidence(
+static bool _hasNVVMFloat32ArithmeticPTXEvidence(
     const PTXEntrySummary& summary,
-    NVVMFloat32BinaryTestOperation operation)
+    NVVMFloat32ArithmeticTestOperation operation)
 {
     switch (operation)
     {
-    case NVVMFloat32BinaryTestOperation::Add:
+    case NVVMFloat32ArithmeticTestOperation::Add:
         return summary.hasFloatAdd32;
-    case NVVMFloat32BinaryTestOperation::Subtract:
+    case NVVMFloat32ArithmeticTestOperation::Subtract:
         return summary.hasFloatSubtract32;
-    case NVVMFloat32BinaryTestOperation::Multiply:
+    case NVVMFloat32ArithmeticTestOperation::Multiply:
         return summary.hasFloatMultiply32;
-    case NVVMFloat32BinaryTestOperation::Divide:
+    case NVVMFloat32ArithmeticTestOperation::Divide:
         return summary.hasFloatDivide32;
+    case NVVMFloat32ArithmeticTestOperation::Negate:
+        return summary.hasFloatNegate32;
     default:
         SLANG_UNEXPECTED("unknown NVVM float32 binary PTX operation");
     }
 }
 
-static void _runNVVMSlangRealFloat32BinaryDifferentialPTX(
+static void _runNVVMSlangRealFloat32ArithmeticDifferentialPTX(
     UnitTestContext* unitTestContext,
-    NVVMFloat32BinaryTestOperation testOperation)
+    NVVMFloat32ArithmeticTestOperation testOperation)
 {
-    const NVVMFloat32BinaryTestCase& testCase = _getNVVMFloat32BinaryTestCase(testOperation);
+    const NVVMFloat32ArithmeticTestCase& testCase =
+        _getNVVMFloat32ArithmeticTestCase(testOperation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
     SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(testCase.feature));
@@ -252,7 +255,8 @@ static void _runNVVMSlangRealFloat32BinaryDifferentialPTX(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-binary PTX differential because libNVVM or NVRTC was not found.");
+            "Ignoring float32-arithmetic PTX differential because libNVVM or NVRTC was not "
+            "found.");
         SLANG_IGNORE_TEST;
     }
 
@@ -284,36 +288,35 @@ static void _runNVVMSlangRealFloat32BinaryDifferentialPTX(
             toSlice("computeMain"),
             summaries[i])));
         static const uint32_t kParameterWidths[] = {64, 32, 32};
-        SLANG_CHECK(_hasPTXParameterWidths(
-            summaries[i],
-            kParameterWidths,
-            SLANG_COUNT_OF(kParameterWidths)));
+        SLANG_CHECK(
+            _hasPTXParameterWidths(summaries[i], kParameterWidths, testCase.operandCount + 1));
         SLANG_CHECK(summaries[i].hasGlobalStore32);
         SLANG_CHECK(!summaries[i].hasGlobalLoad32);
-        for (const auto& binaryCase : kNVVMFloat32BinaryTestCases)
+        for (const auto& arithmeticCase : kNVVMFloat32ArithmeticTestCases)
         {
             SLANG_CHECK(
-                _hasNVVMFloat32BinaryPTXEvidence(summaries[i], binaryCase.testOperation) ==
-                (&binaryCase == &testCase));
+                _hasNVVMFloat32ArithmeticPTXEvidence(summaries[i], arithmeticCase.testOperation) ==
+                (&arithmeticCase == &testCase));
         }
     }
     SLANG_CHECK(_haveEqualPTXParameterWidths(summaries[0], summaries[1]));
 }
 
-#define NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST(NAME, OPERATION) \
-    SLANG_UNIT_TEST(NAME)                                      \
-    {                                                          \
-        _runNVVMSlangRealFloat32BinaryDifferentialPTX(         \
-            unitTestContext,                                   \
-            NVVMFloat32BinaryTestOperation::OPERATION);        \
+#define NVVM_FLOAT32_ARITHMETIC_DIFFERENTIAL_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                          \
+    {                                                              \
+        _runNVVMSlangRealFloat32ArithmeticDifferentialPTX(         \
+            unitTestContext,                                       \
+            NVVMFloat32ArithmeticTestOperation::OPERATION);        \
     }
 
-NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST(nvvmSlangRealFloat32AddDifferentialPTX, Add)
-NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST(nvvmSlangRealFloat32SubtractDifferentialPTX, Subtract)
-NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST(nvvmSlangRealFloat32MultiplyDifferentialPTX, Multiply)
-NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST(nvvmSlangRealFloat32DivideDifferentialPTX, Divide)
+NVVM_FLOAT32_ARITHMETIC_DIFFERENTIAL_TEST(nvvmSlangRealFloat32AddDifferentialPTX, Add)
+NVVM_FLOAT32_ARITHMETIC_DIFFERENTIAL_TEST(nvvmSlangRealFloat32SubtractDifferentialPTX, Subtract)
+NVVM_FLOAT32_ARITHMETIC_DIFFERENTIAL_TEST(nvvmSlangRealFloat32MultiplyDifferentialPTX, Multiply)
+NVVM_FLOAT32_ARITHMETIC_DIFFERENTIAL_TEST(nvvmSlangRealFloat32DivideDifferentialPTX, Divide)
+NVVM_FLOAT32_ARITHMETIC_DIFFERENTIAL_TEST(nvvmSlangRealFloat32NegateDifferentialPTX, Negate)
 
-#undef NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST
+#undef NVVM_FLOAT32_ARITHMETIC_DIFFERENTIAL_TEST
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyDifferentialPTX)
 {
@@ -915,11 +918,12 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarPtxasAccepts)
     }
 }
 
-static void _runNVVMSlangRealFloat32BinaryPtxasAccepts(
+static void _runNVVMSlangRealFloat32ArithmeticPtxasAccepts(
     UnitTestContext* unitTestContext,
-    NVVMFloat32BinaryTestOperation testOperation)
+    NVVMFloat32ArithmeticTestOperation testOperation)
 {
-    const NVVMFloat32BinaryTestCase& testCase = _getNVVMFloat32BinaryTestCase(testOperation);
+    const NVVMFloat32ArithmeticTestCase& testCase =
+        _getNVVMFloat32ArithmeticTestCase(testOperation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
     SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(testCase.feature));
@@ -930,7 +934,7 @@ static void _runNVVMSlangRealFloat32BinaryPtxasAccepts(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-binary ptxas test because CUDA_PATH does not contain ptxas.");
+            "Ignoring float32-arithmetic ptxas test because CUDA_PATH does not contain ptxas.");
         SLANG_IGNORE_TEST;
     }
 
@@ -942,7 +946,7 @@ static void _runNVVMSlangRealFloat32BinaryPtxasAccepts(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-binary ptxas test because libNVVM or NVRTC was not found.");
+            "Ignoring float32-arithmetic ptxas test because libNVVM or NVRTC was not found.");
         SLANG_IGNORE_TEST;
     }
 
@@ -962,20 +966,21 @@ static void _runNVVMSlangRealFloat32BinaryPtxasAccepts(
     }
 }
 
-#define NVVM_FLOAT32_BINARY_PTXAS_TEST(NAME, OPERATION) \
-    SLANG_UNIT_TEST(NAME)                               \
-    {                                                   \
-        _runNVVMSlangRealFloat32BinaryPtxasAccepts(     \
-            unitTestContext,                            \
-            NVVMFloat32BinaryTestOperation::OPERATION); \
+#define NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                   \
+    {                                                       \
+        _runNVVMSlangRealFloat32ArithmeticPtxasAccepts(     \
+            unitTestContext,                                \
+            NVVMFloat32ArithmeticTestOperation::OPERATION); \
     }
 
-NVVM_FLOAT32_BINARY_PTXAS_TEST(nvvmSlangRealFloat32AddPtxasAccepts, Add)
-NVVM_FLOAT32_BINARY_PTXAS_TEST(nvvmSlangRealFloat32SubtractPtxasAccepts, Subtract)
-NVVM_FLOAT32_BINARY_PTXAS_TEST(nvvmSlangRealFloat32MultiplyPtxasAccepts, Multiply)
-NVVM_FLOAT32_BINARY_PTXAS_TEST(nvvmSlangRealFloat32DividePtxasAccepts, Divide)
+NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(nvvmSlangRealFloat32AddPtxasAccepts, Add)
+NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(nvvmSlangRealFloat32SubtractPtxasAccepts, Subtract)
+NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(nvvmSlangRealFloat32MultiplyPtxasAccepts, Multiply)
+NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(nvvmSlangRealFloat32DividePtxasAccepts, Divide)
+NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(nvvmSlangRealFloat32NegatePtxasAccepts, Negate)
 
-#undef NVVM_FLOAT32_BINARY_PTXAS_TEST
+#undef NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyPtxasAccepts)
 {
@@ -1413,11 +1418,12 @@ SLANG_UNIT_TEST(nvvmSlangScalarRuntimeMatchesNVRTC)
     }
 }
 
-static void _runNVVMSlangFloat32BinaryRuntimeMatchesNVRTC(
+static void _runNVVMSlangFloat32ArithmeticRuntimeMatchesNVRTC(
     UnitTestContext* unitTestContext,
-    NVVMFloat32BinaryTestOperation testOperation)
+    NVVMFloat32ArithmeticTestOperation testOperation)
 {
-    const NVVMFloat32BinaryTestCase& testCase = _getNVVMFloat32BinaryTestCase(testOperation);
+    const NVVMFloat32ArithmeticTestCase& testCase =
+        _getNVVMFloat32ArithmeticTestCase(testOperation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
     SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(testCase.feature));
@@ -1427,7 +1433,7 @@ static void _runNVVMSlangFloat32BinaryRuntimeMatchesNVRTC(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-binary runtime because the CUDA driver is unavailable.");
+            "Ignoring float32-arithmetic runtime because the CUDA driver is unavailable.");
         SLANG_IGNORE_TEST;
     }
     int deviceCount = 0;
@@ -1435,7 +1441,7 @@ static void _runNVVMSlangFloat32BinaryRuntimeMatchesNVRTC(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-binary runtime because no CUDA device is available.");
+            "Ignoring float32-arithmetic runtime because no CUDA device is available.");
         SLANG_IGNORE_TEST;
     }
 
@@ -1451,7 +1457,7 @@ static void _runNVVMSlangFloat32BinaryRuntimeMatchesNVRTC(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-binary runtime because the device is older than sm_70.");
+            "Ignoring float32-arithmetic runtime because the device is older than sm_70.");
         SLANG_IGNORE_TEST;
     }
 
@@ -1468,7 +1474,7 @@ static void _runNVVMSlangFloat32BinaryRuntimeMatchesNVRTC(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32-binary runtime because libNVVM or NVRTC was not found.");
+            "Ignoring float32-arithmetic runtime because libNVVM or NVRTC was not found.");
         SLANG_IGNORE_TEST;
     }
 
@@ -1492,10 +1498,11 @@ static void _runNVVMSlangFloat32BinaryRuntimeMatchesNVRTC(
         SLANG_CHECK_ABORT(code != nullptr);
         for (Index i = 0; i < testCase.runtimeCaseCount; ++i)
         {
-            const NVVMFloat32BinaryRuntimeCase& runtimeCase = testCase.runtimeCases[i];
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runFloat32BinaryKernel(
+            const NVVMFloat32ArithmeticRuntimeCase& runtimeCase = testCase.runtimeCases[i];
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runFloat32ArithmeticKernel(
                 cuda,
                 code,
+                testCase.operandCount,
                 runtimeCase.left,
                 runtimeCase.right,
                 runtimeCase.expected)));
@@ -1503,20 +1510,21 @@ static void _runNVVMSlangFloat32BinaryRuntimeMatchesNVRTC(
     }
 }
 
-#define NVVM_FLOAT32_BINARY_RUNTIME_TEST(NAME, OPERATION) \
-    SLANG_UNIT_TEST(NAME)                                 \
-    {                                                     \
-        _runNVVMSlangFloat32BinaryRuntimeMatchesNVRTC(    \
-            unitTestContext,                              \
-            NVVMFloat32BinaryTestOperation::OPERATION);   \
+#define NVVM_FLOAT32_ARITHMETIC_RUNTIME_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                     \
+    {                                                         \
+        _runNVVMSlangFloat32ArithmeticRuntimeMatchesNVRTC(    \
+            unitTestContext,                                  \
+            NVVMFloat32ArithmeticTestOperation::OPERATION);   \
     }
 
-NVVM_FLOAT32_BINARY_RUNTIME_TEST(nvvmSlangFloat32AddRuntimeMatchesNVRTC, Add)
-NVVM_FLOAT32_BINARY_RUNTIME_TEST(nvvmSlangFloat32SubtractRuntimeMatchesNVRTC, Subtract)
-NVVM_FLOAT32_BINARY_RUNTIME_TEST(nvvmSlangFloat32MultiplyRuntimeMatchesNVRTC, Multiply)
-NVVM_FLOAT32_BINARY_RUNTIME_TEST(nvvmSlangFloat32DivideRuntimeMatchesNVRTC, Divide)
+NVVM_FLOAT32_ARITHMETIC_RUNTIME_TEST(nvvmSlangFloat32AddRuntimeMatchesNVRTC, Add)
+NVVM_FLOAT32_ARITHMETIC_RUNTIME_TEST(nvvmSlangFloat32SubtractRuntimeMatchesNVRTC, Subtract)
+NVVM_FLOAT32_ARITHMETIC_RUNTIME_TEST(nvvmSlangFloat32MultiplyRuntimeMatchesNVRTC, Multiply)
+NVVM_FLOAT32_ARITHMETIC_RUNTIME_TEST(nvvmSlangFloat32DivideRuntimeMatchesNVRTC, Divide)
+NVVM_FLOAT32_ARITHMETIC_RUNTIME_TEST(nvvmSlangFloat32NegateRuntimeMatchesNVRTC, Negate)
 
-#undef NVVM_FLOAT32_BINARY_RUNTIME_TEST
+#undef NVVM_FLOAT32_ARITHMETIC_RUNTIME_TEST
 
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyRuntimeMatchesNVRTC)
 {

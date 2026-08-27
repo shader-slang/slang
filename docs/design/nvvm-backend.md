@@ -1352,7 +1352,7 @@ new `SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY` format. Generic assem
 still returns raw LLVM 14 text, including explicit atomic alignment; the direct path neither
 content-sniffs nor retries after libNVVM failure.
 
-The provider-owned compatibility writer has only two conversions demonstrated by direct libNVVM
+The provider-owned compatibility writer has only three conversions demonstrated by direct libNVVM
 probes:
 
 1. Each function parameter receives a stable `slangParameterN` name when the LLVM function is
@@ -1360,13 +1360,17 @@ probes:
    parser rejects, while named parameters are valid in both dialects.
 2. For the negotiated writer only, the provider removes LLVM 14's terminal `, align 4` spelling
    from `atomicrmw`. LLVM 7 gives this operation natural alignment and rejects that newer suffix.
+3. LLVM 14 prints canonical float negation as `fneg`, which CUDA 12.9 libNVVM's NVVM-2.0 parser
+   rejects. For the negotiated writer only, one validated unflagged scalar `fneg float` becomes the
+   legacy spelling `fsub float -0.0, value` used by the older dialect.
 
-The second conversion is not an unbounded text replacement. Before printing, the provider walks
-the LLVM instructions and requires every semantic atomic to be non-volatile AS1 i32 ADD with
-alignment four, Monotonic ordering, and System sync scope. It rewrites only an instruction-result
-line ending in the exact suffix, and the rewritten line count must equal the semantic atomic count.
-Any future atomic shape or printer spelling fails with `SLANG_E_NOT_AVAILABLE`. The LLVM module,
-generic assembly, and bitcode remain unchanged.
+The latter two conversions are not unbounded text replacements. Before printing, the provider
+walks the LLVM instructions and requires every semantic atomic to be non-volatile AS1 i32 ADD with
+alignment four, Monotonic ordering, and System sync scope, and every rewritten negation to have one
+same-typed scalar `float` operand and result. It rewrites only exact instruction-result lines, and
+each rewritten line count must equal its semantic instruction count. Any future shape or printer
+spelling fails with `SLANG_E_NOT_AVAILABLE`. The LLVM module, generic assembly, and bitcode remain
+unchanged.
 
 Numba provides independent production evidence for this architecture: it submits textual LLVM IR
 to libNVVM and performs version-specific normalization at that boundary. NVIDIA deprecates textual
@@ -2062,6 +2066,45 @@ The final Release NVVM prefix passes 228/228. Its exact sorted LF-terminated nam
 `99dec82e0909050b0dc909113dad988369dfe9b2666e5385faaec947c6c29bc7`. Debug preservation passes
 10/10.
 
+### Slice 36 exact scalar float32 negation and compatible V3 suffix
+
+Slice 36 adds `*destination = -value` for a raw AS1 `Ptr<float>` and scalar float parameter.
+Canonical Float `kIROp_Neg` now follows float validation and a new generic floating-unary family;
+the same opcode with signed-i32 type retains the established integer-unary path. Unsigned and wide
+entry parameters remain unsupported, and the older float-negate-plus-int-cast fixture now advances
+to its next honest E52017 boundary, `castFloatToInt`.
+
+Feature 24 advertises stable unary operation 0 through `emitFloatingUnary`, appended after the
+floating-binary callback. V3 grows from 464 to 472 bytes on x64. On x86 the new four-byte function
+pointer occupies Slice 35's tail padding, so both old and new `sizeof` values are 280 bytes. An exact
+Slice 35 provider remains compatible because it cannot advertise feature 24; advertising the bit
+requires the complete suffix and non-null float-type and unary callbacks. Unknown operations clear
+their output and fail before dispatch.
+
+The provider constructs one canonical unflagged LLVM `fneg float`. A direct probe found that CUDA
+12.9 libNVVM's NVVM-2.0 textual reader rejects that LLVM-14 opcode with `parse expected instruction
+opcode`. The audited compatibility writer therefore validates each semantic scalar float `fneg`
+and rewrites only its exact printed line to legacy `fsub float -0.000000e+00, value`; semantic and
+rewritten counts must agree. Generic LLVM assembly remains `fneg`, and no zero value or alternative
+graph is introduced into Slang IR or the provider module. This slice claims exact finite ordinary
+cases, not NaN payload, denormal, or constrained/fast-math behavior.
+
+The former binary descriptor is now one five-row `NVVMFloat32ArithmeticTestCase` table with operand
+count. Provider-kernel construction, direct topology, PTX evidence, `ptxas`, and runtime launch all
+consume that descriptor, so unary support does not copy a second layer harness. The five measured
+test/support files grow from 19,560 to 19,841 physical lines while adding the new ABI-prefix tests,
+legacy-writer audit, fake family, and seven registered names.
+
+Direct topology is `[FloatPointer, Float]` with operand parameter 1 and a store of its unary result.
+NVVM and NVRTC agree on parameter widths `[64, 32]`, token-safe `neg.f32`, one global store, and no
+global load or binary float instruction. CUDA 12.9 `ptxas` accepts both outputs. On the RTX 5090,
+both routes produce `-1.5`, `8`, and `-1024` for the descriptor's exact finite cases.
+
+The focused matrix passes 11/11 and the final Release NVVM prefix passes 235/235. Its exact sorted
+LF-terminated name set has SHA-256
+`2b79918702a9b21110af8251944e4428001a4ea69a2ff79b7a18e488cd13b4ba`. Debug preservation passes
+10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2174,8 +2217,9 @@ The program advances through bounded slices:
 33. exact scalar float32 subtraction through the generic floating-binary family;
 34. exact scalar float32 multiplication plus descriptor-driven floating-binary evidence;
 35. exact scalar float32 division through the generic floating-binary family;
-36. further type, memory, resource, and optimization-quality work; and
-37. wave operations and other advanced capabilities, then production-readiness evaluation.
+36. exact scalar float32 negation through an append-only generic floating-unary V3 suffix;
+37. further type, memory, resource, and optimization-quality work; and
+38. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.

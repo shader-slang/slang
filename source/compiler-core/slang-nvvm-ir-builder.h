@@ -219,6 +219,13 @@ public:
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1& outValue) const;
 
+    /// Emits one stable V3 scalar floating-point unary operation.
+    SlangResult emitFloatingUnary(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMFloatingUnaryOp_3 operation,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMValueHandle_1& outValue) const;
+
     /// Emits a signed integer less-than comparison and returns its i1 result.
     SlangResult emitIntegerSignedLessThan(
         SlangNVVMModuleHandle_1 module,

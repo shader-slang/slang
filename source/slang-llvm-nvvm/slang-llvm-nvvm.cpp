@@ -946,6 +946,29 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingBinaryV3(
     }
 }
 
+static SlangResult SLANG_NVVM_CALL _emitFloatingUnaryV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMFloatingUnaryOp_3 operation,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmValue = _getValue(value);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!outValue || !insertionBlock || operation != SLANG_NVVM_FLOATING_UNARY_OP_NEGATE ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue) ||
+        llvmValue->getType() != llvm::Type::getFloatTy(state->context))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(state->builder.CreateFNeg(llvmValue));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitIntegerCompareV3(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMIntegerCompareOp_3 operation,
@@ -1337,21 +1360,35 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
 // Writes the legacy LLVM textual dialect accepted by libNVVM's documented LLVM 7 reader.
 //
 // LLVM 14 made atomic alignment explicit in assembly, but LLVM 7 gives atomicrmw its natural
-// alignment and rejects the suffix. The provider currently exposes exactly one atomic shape, so
-// validate every semantic atomic before removing that one newer spelling. Counting the semantic
-// instructions and rewritten lines prevents an unrelated occurrence or future atomic form from
-// being accepted accidentally.
+// alignment and rejects the suffix. LLVM 14 also prints unary negation as `fneg`, which the
+// libNVVM NVVM-2.0 reader rejects; the older dialect expresses finite scalar negation as
+// `fsub -0.0, value`. The provider exposes exactly one shape of each rewritten operation, so
+// validate every semantic instruction before changing its spelling. Counting semantic
+// instructions and rewritten lines prevents an unrelated occurrence or future form from being
+// accepted accidentally.
 static SlangResult _writeLegacyNVVMAssembly(
     ModuleState* state,
     llvm::SmallVectorImpl<char>& outSerializedData)
 {
     size_t semanticAtomicCount = 0;
+    size_t semanticFloatNegateCount = 0;
     for (llvm::Function& function : *state->module)
     {
         for (llvm::BasicBlock& block : function)
         {
             for (llvm::Instruction& instruction : block)
             {
+                if (instruction.getOpcode() == llvm::Instruction::FNeg)
+                {
+                    ++semanticFloatNegateCount;
+                    if (instruction.getNumOperands() != 1 || !instruction.getType()->isFloatTy() ||
+                        instruction.getOperand(0)->getType() != instruction.getType())
+                    {
+                        return SLANG_E_NOT_AVAILABLE;
+                    }
+                    continue;
+                }
+
                 auto atomic = llvm::dyn_cast<llvm::AtomicRMWInst>(&instruction);
                 if (!atomic)
                     continue;
@@ -1376,8 +1413,11 @@ static SlangResult _writeLegacyNVVMAssembly(
 
     const llvm::StringRef atomicMarker(" = atomicrmw ");
     const llvm::StringRef llvm14AlignmentSuffix(", align 4");
+    const llvm::StringRef floatNegateMarker(" = fneg float ");
+    const llvm::StringRef legacyFloatNegateMarker(" = fsub float -0.000000e+00, ");
     llvm::StringRef remaining(llvm14Assembly.data(), llvm14Assembly.size());
     size_t rewrittenAtomicCount = 0;
+    size_t rewrittenFloatNegateCount = 0;
     while (!remaining.empty())
     {
         const size_t newlineIndex = remaining.find('\n');
@@ -1393,6 +1433,20 @@ static SlangResult _writeLegacyNVVMAssembly(
             outSerializedData.append(legacyLine.begin(), legacyLine.end());
             ++rewrittenAtomicCount;
         }
+        else if (trimmedLine.startswith("%") && trimmedLine.contains(floatNegateMarker))
+        {
+            const size_t markerIndex = line.find(floatNegateMarker);
+            const llvm::StringRef result = line.take_front(markerIndex);
+            const llvm::StringRef operand = line.drop_front(markerIndex + floatNegateMarker.size());
+            if (operand.empty())
+                return SLANG_E_NOT_AVAILABLE;
+            outSerializedData.append(result.begin(), result.end());
+            outSerializedData.append(
+                legacyFloatNegateMarker.begin(),
+                legacyFloatNegateMarker.end());
+            outSerializedData.append(operand.begin(), operand.end());
+            ++rewrittenFloatNegateCount;
+        }
         else
         {
             outSerializedData.append(line.begin(), line.end());
@@ -1404,7 +1458,10 @@ static SlangResult _writeLegacyNVVMAssembly(
         remaining = remaining.drop_front(newlineIndex + 1);
     }
 
-    return rewrittenAtomicCount == semanticAtomicCount ? SLANG_OK : SLANG_E_NOT_AVAILABLE;
+    return rewrittenAtomicCount == semanticAtomicCount &&
+                   rewrittenFloatNegateCount == semanticFloatNegateCount
+               ? SLANG_OK
+               : SLANG_E_NOT_AVAILABLE;
 }
 
 // Verifies once and materializes the one canonical byte result shared by the V1 and V2 getters.
@@ -1691,6 +1748,7 @@ static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
     api.emitIntegerCompare = _emitIntegerCompareV3;
     api.getFloatingPointType = _getFloatingPointType;
     api.emitFloatingBinary = _emitFloatingBinaryV3;
+    api.emitFloatingUnary = _emitFloatingUnaryV3;
 }
 
 } // namespace
