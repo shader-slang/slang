@@ -414,6 +414,69 @@ NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST(
 
 #undef NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST
 
+SLANG_UNIT_TEST(nvvmSlangRealFloat32ConstantDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(
+        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT));
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
+        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring float32-constant PTX differential because libNVVM or NVRTC was not found.");
+        SLANG_IGNORE_TEST;
+    }
+
+    PTXEntrySummary summaries[2];
+    static const SlangEmitCUDAMethod kMethods[] = {
+        SLANG_EMIT_CUDA_VIA_NVVM,
+        SLANG_EMIT_CUDA_VIA_NVRTC,
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(kMethods); ++i)
+    {
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult compileResult = _compileSlangWithPTXMethod(
+            globalSession,
+            kDirectNVVMFloat32ConstantSource,
+            kMethods[i],
+            code,
+            diagnostics);
+        if (SLANG_FAILED(compileResult))
+        {
+            const String text = _getBlobText(diagnostics);
+            if (text.getLength())
+                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
+            _getBlobText(code).getUnownedSlice(),
+            toSlice("computeMain"),
+            summaries[i])));
+        static const uint32_t kParameterWidths[] = {64};
+        SLANG_CHECK(_hasPTXParameterWidths(
+            summaries[i],
+            kParameterWidths,
+            SLANG_COUNT_OF(kParameterWidths)));
+        SLANG_CHECK(summaries[i].hasGlobalStore32);
+        SLANG_CHECK(!summaries[i].hasGlobalLoad32);
+        SLANG_CHECK(!summaries[i].hasFloatAdd32);
+        SLANG_CHECK(!summaries[i].hasFloatSubtract32);
+        SLANG_CHECK(!summaries[i].hasFloatMultiply32);
+        SLANG_CHECK(!summaries[i].hasFloatDivide32);
+        SLANG_CHECK(!summaries[i].hasFloatNegate32);
+        SLANG_CHECK(!summaries[i].hasFloatComparison32);
+    }
+    SLANG_CHECK(_haveEqualPTXParameterWidths(summaries[0], summaries[1]));
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1114,6 +1177,14 @@ NVVM_FLOAT32_COMPARISON_PTXAS_TEST(nvvmSlangRealFloat32LessThanPtxasAccepts, Ord
 
 #undef NVVM_FLOAT32_COMPARISON_PTXAS_TEST
 
+SLANG_UNIT_TEST(nvvmSlangRealFloat32ConstantPtxasAccepts)
+{
+    _runNVVMSlangRealFloat32PtxasAccepts(
+        unitTestContext,
+        kDirectNVVMFloat32ConstantSource,
+        SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT);
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1769,6 +1840,93 @@ NVVM_FLOAT32_COMPARISON_RUNTIME_TEST(
 NVVM_FLOAT32_COMPARISON_RUNTIME_TEST(nvvmSlangFloat32LessThanRuntimeMatchesNVRTC, OrderedLessThan)
 
 #undef NVVM_FLOAT32_COMPARISON_RUNTIME_TEST
+
+SLANG_UNIT_TEST(nvvmSlangFloat32ConstantRuntimeMatchesNVRTC)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(
+        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT));
+
+    CudaDriverApi cuda;
+    if (!cuda.load() || cuda.cuInit(0) != 0)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring float32-constant runtime differential because the CUDA driver is "
+            "unavailable.");
+        SLANG_IGNORE_TEST;
+    }
+    int deviceCount = 0;
+    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring float32-constant runtime differential because no CUDA device is "
+            "available.");
+        SLANG_IGNORE_TEST;
+    }
+
+    CudaDevice device = 0;
+    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
+    int computeMajor = 0;
+    SLANG_CHECK_ABORT(
+        cuda.cuDeviceGetAttribute(
+            &computeMajor,
+            kCudaDeviceAttributeComputeCapabilityMajor,
+            device) == 0);
+    if (computeMajor < 7)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring float32-constant runtime differential because the device is older than "
+            "sm_70.");
+        SLANG_IGNORE_TEST;
+    }
+
+    CudaContext context = nullptr;
+    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
+    CudaPrimaryContextGuard contextGuard{cuda, device};
+    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
+        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring float32-constant runtime differential because libNVVM or NVRTC was not "
+            "found.");
+        SLANG_IGNORE_TEST;
+    }
+
+    static const SlangEmitCUDAMethod kMethods[] = {
+        SLANG_EMIT_CUDA_VIA_NVVM,
+        SLANG_EMIT_CUDA_VIA_NVRTC,
+    };
+    for (SlangEmitCUDAMethod method : kMethods)
+    {
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult compileResult = _compileSlangWithPTXMethod(
+            globalSession,
+            kDirectNVVMFloat32ConstantSource,
+            method,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(compileResult))
+        {
+            const String text = _getBlobText(diagnostics);
+            if (text.getLength())
+                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runFloat32ConstantKernel(cuda, code, 1.5f)));
+    }
+}
 
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyRuntimeMatchesNVRTC)
 {

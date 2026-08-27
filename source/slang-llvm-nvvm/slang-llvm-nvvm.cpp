@@ -1,6 +1,8 @@
 #include "compiler-core/slang-nvvm-ir-builder-api.h"
 #include "slang.h"
 
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -1113,6 +1115,31 @@ static SlangResult SLANG_NVVM_CALL _getIntegerConstant(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _getFloatingPointConstantV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1 floatingPointType,
+    uint32_t bitWidth,
+    uint64_t bitPattern,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Type* llvmFloatingPointType = _getType(floatingPointType);
+    if (!state || !llvmFloatingPointType || !llvmFloatingPointType->isFloatTy() || bitWidth != 32 ||
+        (bitPattern >> 32) != 0 || &llvmFloatingPointType->getContext() != &state->context ||
+        !outValue)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    const llvm::APFloat value(llvm::APFloat::IEEEsingle(), llvm::APInt(32, uint32_t(bitPattern)));
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+        llvm::ConstantFP::get(llvmFloatingPointType, value));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitIntegerPhi(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMBlockHandle_1 targetBlock,
@@ -1804,6 +1831,7 @@ static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
     api.emitFloatingBinary = _emitFloatingBinaryV3;
     api.emitFloatingUnary = _emitFloatingUnaryV3;
     api.emitFloatingCompare = _emitFloatingCompareV3;
+    api.getFloatingPointConstant = _getFloatingPointConstantV3;
 }
 
 } // namespace

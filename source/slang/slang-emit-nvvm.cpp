@@ -67,6 +67,13 @@ IRIntLit* _asExecutableI32Constant(IRInst* value)
     return intValue >= kNVVMI32Min && intValue <= kNVVMI32Max ? intLit : nullptr;
 }
 
+// Returns an executable scalar float32 literal, excluding layout and other module constants.
+IRFloatLit* _asExecutableFloat32Constant(IRInst* value)
+{
+    auto floatLit = as<IRFloatLit>(value);
+    return floatLit && isNVVMFloat32Type(floatLit->getDataType()) ? floatLit : nullptr;
+}
+
 // Records one independent provider semantic required by the accepted linked IR.
 void _requireFeature(NVVMIRFeatureSet& features, SlangNVVMBuilderFeature_3 requiredFeature)
 {
@@ -234,10 +241,18 @@ SlangResult _validateFloat32Value(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree)
+    IRDominatorTree* dominatorTree,
+    NVVMIRFeatureSet& features)
 {
     if (!value || !isNVVMFloat32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("float32 value"));
+
+    if (_asExecutableFloat32Constant(value))
+    {
+        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT);
+        return SLANG_OK;
+    }
+
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
@@ -865,7 +880,8 @@ SlangResult _validateNVVMFunction(
                             store->getVal(),
                             store,
                             availableValues,
-                            dominatorTree));
+                            dominatorTree,
+                            features));
                     }
                     else
                     {
@@ -891,13 +907,15 @@ SlangResult _validateNVVMFunction(
                         inst->getOperand(0),
                         inst,
                         availableValues,
-                        dominatorTree));
+                        dominatorTree,
+                        features));
                     SLANG_RETURN_ON_FAIL(_validateFloat32Value(
                         codeGenContext,
                         inst->getOperand(1),
                         inst,
                         availableValues,
-                        dominatorTree));
+                        dominatorTree,
+                        features));
                     availableValues.add(inst);
                     break;
                 }
@@ -938,13 +956,15 @@ SlangResult _validateNVVMFunction(
                             inst->getOperand(0),
                             inst,
                             availableValues,
-                            dominatorTree));
+                            dominatorTree,
+                            features));
                         SLANG_RETURN_ON_FAIL(_validateFloat32Value(
                             codeGenContext,
                             inst->getOperand(1),
                             inst,
                             availableValues,
-                            dominatorTree));
+                            dominatorTree,
+                            features));
                         _requireFeature(features, info.feature);
                     }
                     else
@@ -987,7 +1007,8 @@ SlangResult _validateNVVMFunction(
                         inst->getOperand(0),
                         inst,
                         availableValues,
-                        dominatorTree));
+                        dominatorTree,
+                        features));
                     _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE);
                 }
                 else
@@ -1312,7 +1333,7 @@ SlangResult _validateNVVMFunction(
 
 using NVVMValueMap = Dictionary<IRInst*, SlangNVVMValueHandle_1>;
 
-// Returns an already-lowered SSA value or materializes the exact preflighted i32 literal.
+// Returns an already-lowered SSA value or materializes an exact preflighted scalar literal.
 SlangResult _getLoweredNVVMValue(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
@@ -1329,15 +1350,30 @@ SlangResult _getLoweredNVVMValue(
         return SLANG_OK;
     }
 
-    auto intLit = _asExecutableI32Constant(irValue);
-    SLANG_RELEASE_ASSERT(intLit);
-    SlangNVVMTypeHandle_1 integerType = nullptr;
+    if (auto intLit = _asExecutableI32Constant(irValue))
+    {
+        SlangNVVMTypeHandle_1 integerType = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            typeContext.lowerType(intLit->getDataType(), NVVMTypeUse::Value, integerType));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "signed i32 constant",
+            builder
+                .getIntegerConstant(module, integerType, int64_t(intLit->getValue()), outValue)));
+        valueMap[irValue] = outValue;
+        return SLANG_OK;
+    }
+
+    auto floatLit = _asExecutableFloat32Constant(irValue);
+    SLANG_RELEASE_ASSERT(floatLit);
+    SlangNVVMTypeHandle_1 floatingPointType = nullptr;
     SLANG_RETURN_ON_FAIL(
-        typeContext.lowerType(intLit->getDataType(), NVVMTypeUse::Value, integerType));
+        typeContext.lowerType(floatLit->getDataType(), NVVMTypeUse::Value, floatingPointType));
+    const uint32_t bitPattern = uint32_t(FloatAsInt(float(floatLit->getValue())));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
-        "signed i32 constant",
-        builder.getIntegerConstant(module, integerType, int64_t(intLit->getValue()), outValue)));
+        "float32 constant",
+        builder.getFloatingPointConstant(module, floatingPointType, 32, bitPattern, outValue)));
     valueMap[irValue] = outValue;
     return SLANG_OK;
 }

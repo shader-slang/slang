@@ -174,6 +174,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32LessThanPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32LessThanRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite, signed-zero, and quiet-NaN ordered less-than cases | RTX 5090 results are `1` for `1.5 < 3.75`, and `0` for `0.5 < -8`, `+0 < -0`, and `NaN < 1` | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32ConstantKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Exact-bit callback constructs scalar float32 `1.5` without decimal transport or synthetic arithmetic | Both text dialects contain one aligned `store float 1.500000e+00` | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32ConstantUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical Float literal rounds once to semantic float32 and requests feature 31 | One width-32 `FloatingPointConstant` node with payload `0x3fc00000` feeds the sole Float-pointer store | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32ConstantDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 constant compiles through both routes | `[64]`, one global 32-bit store, and no load, Float arithmetic, or predicate agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32ConstantPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both constant-store outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32ConstantRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch the exact constant store | RTX 5090 writes float32 `1.5` through both routes | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -744,3 +750,16 @@ for `1.5 < 3.75`, and false for `0.5 < -8`, signed-zero equality, and quiet NaN.
 14/14 and Release passes 277/277 with sorted-name SHA-256
 `a34a5cdb1532603a18290777a75fe23ea9407f5d294e1d9a1a739ea6b9187ae6`; Debug preservation passes
 10/10.
+
+Slice 43 adds canonical scalar float32 literals as feature 31 through an appended exact-bit
+constant callback. The direct emitter rounds Slang's double-backed Float literal storage once to
+semantic float32 and transports payload `0x3fc00000`; V2 signed-i32 constants remain unchanged.
+The x64 V3 table grows from 480 to 488 bytes, while the x86 callback consumes tail padding and the
+complete table remains 288 bytes. Exact Slice 42 tables remain loadable without feature 31.
+
+The new value-family infrastructure plus seven evidence names adds 554 measured test/support lines,
+from 20,891 to 21,445. LLVM and negotiated NVVM text each contain one exact constant store. NVVM
+and NVRTC agree on `[64]`, store/no-load/arithmetic/predicate; `ptxas` accepts both, and the RTX 5090
+writes float32 `1.5` through both routes. Focused tests pass 14/14 and Release passes 284/284 with
+sorted-name SHA-256 `3e78b6b3069dd0a12cbde4d78e4d804e5eeace161cdbf86d620262b5e9d9a72d`;
+Debug preservation passes 10/10.

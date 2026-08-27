@@ -648,7 +648,8 @@ extern "C"
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_GREATER_EQUAL \
     ((SlangNVVMBuilderFeature_3)29u)
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_LESS_THAN ((SlangNVVMBuilderFeature_3)30u)
-#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 31u
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT ((SlangNVVMBuilderFeature_3)31u)
+#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 32u
 #define SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3 4u
 
     typedef struct SlangNVVMBuilderFeatureSet_3
@@ -738,6 +739,14 @@ extern "C"
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1* outValue);
 
+    /// Gets an exact floating-point constant from its width-bounded IEEE-754 bit pattern.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMGetFloatingPointConstant_3)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 floatingPointType,
+        uint32_t bitWidth,
+        uint64_t bitPattern,
+        SlangNVVMValueHandle_1* outValue);
+
     // Version 3 freezes V2 as its compatibility core. Generic callbacks and independent feature
     // bits carry forward-growing operation families and semantic availability.
     typedef struct SlangNVVMBuilderAPI_V3
@@ -753,6 +762,7 @@ extern "C"
         SlangNVVMEmitFloatingBinary_3 emitFloatingBinary;
         SlangNVVMEmitFloatingUnary_3 emitFloatingUnary;
         SlangNVVMEmitFloatingCompare_3 emitFloatingCompare;
+        SlangNVVMGetFloatingPointConstant_3 getFloatingPointConstant;
     } SlangNVVMBuilderAPI_V3;
 
 #define SLANG_NVVM_BUILDER_API_V3_MIN_SIZE                  \
@@ -773,6 +783,13 @@ extern "C"
 
 #define SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_EQUAL_MIN_SIZE \
     SLANG_NVVM_BUILDER_API_V3_FLOATING_COMPARE_MIN_SIZE
+
+#define SLANG_NVVM_BUILDER_API_V3_FLOATING_CONSTANT_MIN_SIZE      \
+    (offsetof(SlangNVVMBuilderAPI_V3, getFloatingPointConstant) + \
+     sizeof(((SlangNVVMBuilderAPI_V3*)0)->getFloatingPointConstant))
+
+#define SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_CONSTANT_MIN_SIZE \
+    SLANG_NVVM_BUILDER_API_V3_FLOATING_CONSTANT_MIN_SIZE
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V3)(
         SlangNVVMBuilderAPI_V3* outAPI);

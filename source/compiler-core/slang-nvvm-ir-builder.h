@@ -234,6 +234,14 @@ public:
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1& outValue) const;
 
+    /// Gets an exact scalar floating-point constant from its width-bounded IEEE-754 bits.
+    SlangResult getFloatingPointConstant(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 floatingPointType,
+        uint32_t bitWidth,
+        uint64_t bitPattern,
+        SlangNVVMValueHandle_1& outValue) const;
+
     /// Emits a signed integer less-than comparison and returns its i1 result.
     SlangResult emitIntegerSignedLessThan(
         SlangNVVMModuleHandle_1 module,

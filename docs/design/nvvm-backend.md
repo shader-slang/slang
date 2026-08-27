@@ -2306,6 +2306,40 @@ LF-terminated name set has SHA-256
 `a34a5cdb1532603a18290777a75fe23ea9407f5d294e1d9a1a739ea6b9187ae6`; removing the seven Slice
 42 names reproduces Slice 41's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 43 exact scalar float32 constants
+
+Slice 43 adds `*destination = 1.5f` for a raw AS1 `Ptr<float>` destination. Canonical Float
+`kIROp_FloatLit` stores its value in Slang's double-backed `IRFloatingPointValue`, so the direct
+emitter rounds once to the semantic float32 value and transports the exact IEEE-754 payload
+`0x3fc00000`. It does not serialize decimal text or route Float values through the frozen signed-i32
+constant callback.
+
+Feature 31, `SCALAR_FLOAT32_CONSTANT`, appends a generic
+`getFloatingPointConstant(module, type, bitWidth, bitPattern, outValue)` callback. The facade and
+provider accept only width 32 with zero high bits in this slice, validate the Float type's module
+context, clear failed outputs, and construct `ConstantFP` from LLVM `APFloat`/`APInt`. The x64 V3
+table grows from 480 to 488 bytes. On x86, the callback occupies the former tail padding: its
+semantic minimum and complete table remain 288 bytes. Exact Slice 42 tables remain valid when they
+do not advertise feature 31.
+
+Direct preflight now treats only canonical scalar Float literals as executable constant operands,
+requests feature 31, and materializes them on demand through the type-lowering cache. The fake
+provider records one `FloatingPointConstant` node with width 32 and payload `0x3fc00000`; the store
+consumes that node through the sole Float-pointer parameter. Signed-i32 literals continue to request
+`SCALAR_SSA` and use V2 `getIntegerConstant` unchanged.
+
+The new value-family infrastructure and seven independently registered evidence layers add 554
+physical lines across the five measured test/support files, from 20,891 to 21,445. Generic LLVM and
+negotiated NVVM-2.0 text each contain one `store float 1.500000e+00` and no synthetic arithmetic.
+NVVM and NVRTC agree on the single `[64]` pointer parameter, one global 32-bit store, and no global
+load, Float arithmetic, or predicate. CUDA 12.9 `ptxas` accepts both outputs, and both routes write
+the exact float32 value `1.5` on the RTX 5090.
+
+The focused matrix passes 14/14 and the Release NVVM prefix passes 284/284. Its exact sorted
+LF-terminated name set has SHA-256
+`3e78b6b3069dd0a12cbde4d78e4d804e5eeace161cdbf86d620262b5e9d9a72d`; removing the seven Slice
+43 names reproduces Slice 42's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2427,8 +2461,9 @@ The program advances through bounded slices:
 41. exact scalar float32 ordered greater-than-or-equal through the generic floating-compare
     family;
 42. exact scalar float32 ordered less-than through the generic floating-compare family;
-43. further type, memory, resource, and optimization-quality work; and
-44. wave operations and other advanced capabilities, then production-readiness evaluation.
+43. exact scalar float32 constants through an append-only exact-bit V3 callback;
+44. further type, memory, resource, and optimization-quality work; and
+45. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
