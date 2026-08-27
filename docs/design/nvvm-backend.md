@@ -2340,6 +2340,44 @@ LF-terminated name set has SHA-256
 `3e78b6b3069dd0a12cbde4d78e4d804e5eeace161cdbf86d620262b5e9d9a72d`; removing the seven Slice
 43 names reproduces Slice 42's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 44 generic scalar phis and float32 SSA merging
+
+Slice 44 adds a conditional merge of two Float entry parameters before an aligned AS1 Float store.
+Slang's canonical representation is already a Float block parameter plus positional Float
+arguments on its two actual predecessor branches. The direct backend now accepts that semantic
+type alongside signed i32 instead of reconstructing a local variable or introducing another SSA
+form.
+
+Feature 32, `SCALAR_PHI`, appends generic
+`emitPhi(module, targetBlock, type, outValue)` and
+`addPhiIncoming(module, phi, value, predecessorBlock)` callbacks. The type handle makes this one
+scalar family rather than one callback pair per scalar type. V3 grows from 488 to 504 bytes on x64
+and from 288 to 296 bytes on x86. Exact Slice 43 tables remain valid without feature 32, while an
+advertised feature requires both complete callbacks. Frozen V2 integer-phi callbacks and feature 6
+remain unchanged.
+
+The provider shares phi construction and incoming-edge validation between its V2 integer adapters
+and generic V3 adapters. It preserves exact type/module/function ownership, insertion before the
+first non-phi, complete CFG, one real predecessor edge, duplicate rejection, and incoming-value
+dominance. Generic V3 accepts scalar Integer and Float types; the completed direct slice uses it for
+Float only. The fake similarly records a typed `ScalarPhi`, while retaining its separate frozen-V2
+integer record for compatibility evidence.
+
+For the motivating source, direct topology is `[FloatPointer, Integer, Float, Float]`. One integer
+condition controls four blocks, and one Float phi receives original parameters 2 and 3 from the
+two actual predecessors before the store. Generic LLVM and negotiated NVVM-2.0 text each contain
+exactly one `phi float`. NVVM and NVRTC agree on `[64, 32, 32, 32]`, one global 32-bit store, and no
+global load, Float arithmetic, or Float predicate. CUDA 12.9 `ptxas` accepts both outputs. On the
+RTX 5090 both routes select finite values and preserve the selected `-0.0` versus `+0.0` bit.
+
+The generic phi/fake/runtime-family base plus seven independently registered evidence layers adds
+709 physical lines across the five measured test/support files, from 21,445 to 22,154. The runtime
+setup is factored into a typed callable harness for reuse by later Float type slices. The focused
+matrix passes 14/14 and the Release NVVM prefix passes 291/291. Its exact sorted LF-terminated name
+set has SHA-256 `c18462cd303630788566c59409f369ef57a46614652571a97663acf0ffb01690`;
+removing the seven Slice 44 names reproduces Slice 43's count and hash exactly. Debug preservation
+passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2462,8 +2500,9 @@ The program advances through bounded slices:
     family;
 42. exact scalar float32 ordered less-than through the generic floating-compare family;
 43. exact scalar float32 constants through an append-only exact-bit V3 callback;
-44. further type, memory, resource, and optimization-quality work; and
-45. wave operations and other advanced capabilities, then production-readiness evaluation.
+44. generic scalar phis and exact float32 block-parameter SSA merging;
+45. further type, memory, resource, and optimization-quality work; and
+46. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.

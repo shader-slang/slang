@@ -180,6 +180,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32ConstantPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both constant-store outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32ConstantRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch the exact constant store | RTX 5090 writes float32 `1.5` through both routes | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32PhiKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Generic typed-phi callbacks construct the canonical Float merge while frozen V2 integer phis remain unchanged | Both text dialects contain exactly one `phi float` with the two actual predecessor values | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32PhiUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical Float block parameter and positional branch arguments request feature 32 and use the generic scalar-phi pair | `[FloatPointer, Integer, Float, Float]`; parameters 2 and 3 feed one typed `ScalarPhi`, then the sole store | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32PhiDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 conditional merge compiles through both routes | `[64, 32, 32, 32]`, one global 32-bit store, and no load, Float arithmetic, or Float predicate agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32PhiPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both conditional-merge outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32PhiRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite and signed-zero choices through the typed callable runtime harness | RTX 5090 selects the requested finite operand and preserves selected `-0.0` versus `+0.0` bits | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -763,3 +769,19 @@ and NVRTC agree on `[64]`, store/no-load/arithmetic/predicate; `ptxas` accepts b
 writes float32 `1.5` through both routes. Focused tests pass 14/14 and Release passes 284/284 with
 sorted-name SHA-256 `3e78b6b3069dd0a12cbde4d78e4d804e5eeace161cdbf86d620262b5e9d9a72d`;
 Debug preservation passes 10/10.
+
+Slice 44 adds canonical Float block-parameter SSA merging as feature 32 through an appended generic
+typed-phi callback pair. Slang's existing Float block parameter and positional branch arguments
+remain the source of truth; direct emission chooses the generic pair from that semantic type while
+frozen V2 signed-i32 phis retain their original callbacks. Shared provider validation preserves
+type/module/function ownership, insertion order, complete CFG edges, uniqueness, and dominance.
+The x64 V3 table grows from 488 to 504 bytes and the x86 table from 288 to 296 bytes; exact Slice 43
+tables remain loadable without feature 32.
+
+The generic phi/fake/runtime-family base plus seven evidence names adds 709 measured test/support
+lines, from 21,445 to 22,154. LLVM and negotiated NVVM text each contain one `phi float`. NVVM and
+NVRTC agree on `[64, 32, 32, 32]`, store/no-load/Float-arithmetic/Float-predicate; `ptxas` accepts
+both, and the RTX 5090 selects finite values and preserves selected signed-zero bits through both
+routes. Focused tests pass 14/14 and Release passes 291/291 with sorted-name SHA-256
+`c18462cd303630788566c59409f369ef57a46614652571a97663acf0ffb01690`; Debug preservation passes
+10/10.

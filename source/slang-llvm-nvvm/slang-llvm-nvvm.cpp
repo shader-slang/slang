@@ -1140,39 +1140,59 @@ static SlangResult SLANG_NVVM_CALL _getFloatingPointConstantV3(
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _emitIntegerPhi(
+static SlangResult _emitPhiImpl(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMBlockHandle_1 targetBlock,
-    SlangNVVMTypeHandle_1 integerType,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMTypeHandle_1 type,
+    SlangNVVMValueHandle_1* outValue,
+    bool requireInteger)
 {
     if (outValue)
         *outValue = nullptr;
 
     ModuleState* state = _getModule(module);
     llvm::BasicBlock* llvmTargetBlock = _getBlock(targetBlock);
-    llvm::IntegerType* llvmIntegerType =
-        llvm::dyn_cast_or_null<llvm::IntegerType>(_getType(integerType));
+    llvm::Type* llvmType = _getType(type);
+    const bool isSupportedType =
+        llvmType && (llvmType->isIntegerTy() || (!requireInteger && llvmType->isFloatTy()));
     if (!state || !llvmTargetBlock || !llvmTargetBlock->getParent() ||
-        llvmTargetBlock->getParent()->getParent() != state->module.get() || !llvmIntegerType ||
-        &llvmIntegerType->getContext() != &state->context || !outValue)
+        llvmTargetBlock->getParent()->getParent() != state->module.get() || !isSupportedType ||
+        &llvmType->getContext() != &state->context || !outValue)
     {
         return SLANG_E_INVALID_ARG;
     }
 
     llvm::Instruction* firstNonPhi = llvmTargetBlock->getFirstNonPHI();
-    llvm::PHINode* phi = firstNonPhi
-                             ? llvm::PHINode::Create(llvmIntegerType, 0, "", firstNonPhi)
-                             : llvm::PHINode::Create(llvmIntegerType, 0, "", llvmTargetBlock);
+    llvm::PHINode* phi = firstNonPhi ? llvm::PHINode::Create(llvmType, 0, "", firstNonPhi)
+                                     : llvm::PHINode::Create(llvmType, 0, "", llvmTargetBlock);
     *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(phi);
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _addIntegerPhiIncoming(
+static SlangResult SLANG_NVVM_CALL _emitIntegerPhi(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMBlockHandle_1 targetBlock,
+    SlangNVVMTypeHandle_1 integerType,
+    SlangNVVMValueHandle_1* outValue)
+{
+    return _emitPhiImpl(module, targetBlock, integerType, outValue, true);
+}
+
+static SlangResult SLANG_NVVM_CALL _emitPhiV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMBlockHandle_1 targetBlock,
+    SlangNVVMTypeHandle_1 type,
+    SlangNVVMValueHandle_1* outValue)
+{
+    return _emitPhiImpl(module, targetBlock, type, outValue, false);
+}
+
+static SlangResult _addPhiIncomingImpl(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMValueHandle_1 phi,
     SlangNVVMValueHandle_1 value,
-    SlangNVVMBlockHandle_1 predecessorBlock)
+    SlangNVVMBlockHandle_1 predecessorBlock,
+    bool requireInteger)
 {
     ModuleState* state = _getModule(module);
     llvm::PHINode* llvmPhi = llvm::dyn_cast_or_null<llvm::PHINode>(_getValue(phi));
@@ -1181,9 +1201,10 @@ static SlangResult SLANG_NVVM_CALL _addIntegerPhiIncoming(
     llvm::BasicBlock* llvmPhiBlock = llvmPhi ? llvmPhi->getParent() : nullptr;
     llvm::Function* llvmFunction = llvmPhiBlock ? llvmPhiBlock->getParent() : nullptr;
     llvm::Instruction* firstNonPhi = llvmPhiBlock ? llvmPhiBlock->getFirstNonPHI() : nullptr;
+    const bool isSupportedType = llvmPhi && (llvmPhi->getType()->isIntegerTy() ||
+                                             (!requireInteger && llvmPhi->getType()->isFloatTy()));
     if (!state || !llvmPhi || !llvmValue || !llvmPredecessorBlock || !llvmPhiBlock ||
-        !llvmFunction || llvmFunction->getParent() != state->module.get() ||
-        !llvm::isa<llvm::IntegerType>(llvmPhi->getType()) ||
+        !llvmFunction || llvmFunction->getParent() != state->module.get() || !isSupportedType ||
         &llvmValue->getContext() != &state->context || llvmValue->getType() != llvmPhi->getType() ||
         llvmPredecessorBlock->getParent() != llvmFunction ||
         (firstNonPhi && !llvmPhi->comesBefore(firstNonPhi)) ||
@@ -1206,6 +1227,24 @@ static SlangResult SLANG_NVVM_CALL _addIntegerPhiIncoming(
 
     llvmPhi->addIncoming(llvmValue, llvmPredecessorBlock);
     return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _addIntegerPhiIncoming(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 phi,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMBlockHandle_1 predecessorBlock)
+{
+    return _addPhiIncomingImpl(module, phi, value, predecessorBlock, true);
+}
+
+static SlangResult SLANG_NVVM_CALL _addPhiIncomingV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 phi,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMBlockHandle_1 predecessorBlock)
+{
+    return _addPhiIncomingImpl(module, phi, value, predecessorBlock, false);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerCall(
@@ -1832,6 +1871,8 @@ static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
     api.emitFloatingUnary = _emitFloatingUnaryV3;
     api.emitFloatingCompare = _emitFloatingCompareV3;
     api.getFloatingPointConstant = _getFloatingPointConstantV3;
+    api.emitPhi = _emitPhiV3;
+    api.addPhiIncoming = _addPhiIncomingV3;
 }
 
 } // namespace

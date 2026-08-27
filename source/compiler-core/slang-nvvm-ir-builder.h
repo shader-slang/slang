@@ -242,6 +242,20 @@ public:
         uint64_t bitPattern,
         SlangNVVMValueHandle_1& outValue) const;
 
+    /// Emits a typed scalar phi at the start of the explicit target block.
+    SlangResult emitPhi(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMBlockHandle_1 targetBlock,
+        SlangNVVMTypeHandle_1 type,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Adds one exact-typed scalar phi input from a predecessor edge.
+    SlangResult addPhiIncoming(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 phi,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMBlockHandle_1 predecessorBlock) const;
+
     /// Emits a signed integer less-than comparison and returns its i1 result.
     SlangResult emitIntegerSignedLessThan(
         SlangNVVMModuleHandle_1 module,

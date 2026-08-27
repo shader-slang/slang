@@ -360,17 +360,29 @@ SlangResult _validateBranchArguments(
         SLANG_ASSERT(targetParam);
         if (!argument || !isTypeEqual(argument->getDataType(), targetParam->getDataType()))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch argument type"));
-        SLANG_RETURN_ON_FAIL(_validateI32Value(
-            codeGenContext,
-            argument,
-            branch,
-            availableValues,
-            dominatorTree,
-            features));
+        if (isNVVMFloat32Type(targetParam->getDataType()))
+        {
+            SLANG_RETURN_ON_FAIL(_validateFloat32Value(
+                codeGenContext,
+                argument,
+                branch,
+                availableValues,
+                dominatorTree,
+                features));
+            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI);
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(_validateI32Value(
+                codeGenContext,
+                argument,
+                branch,
+                availableValues,
+                dominatorTree,
+                features));
+            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
+        }
     }
-
-    if (argumentCount)
-        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
     return SLANG_OK;
 }
 
@@ -596,10 +608,19 @@ SlangResult _validateNVVMFunction(
         {
             for (auto param : block->getParams())
             {
-                if (!isNVVMSignedI32Type(param->getDataType()))
+                if (isNVVMSignedI32Type(param->getDataType()))
+                {
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
+                }
+                else if (isNVVMFloat32Type(param->getDataType()))
+                {
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI);
+                }
+                else
+                {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
+                }
                 availableValues.add(param);
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
             }
         }
 
@@ -1597,12 +1618,17 @@ SlangResult emitNVVMIRFromLinkedIR(
                 SlangNVVMValueHandle_1 loweredPhi = nullptr;
                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                     codeGenContext,
-                    "signed i32 phi",
-                    builder.emitIntegerPhi(
-                        moduleScope.module,
-                        blockMap.getValue(block),
-                        parameterType,
-                        loweredPhi)));
+                    isNVVMFloat32Type(param->getDataType()) ? "float32 phi" : "signed i32 phi",
+                    isNVVMFloat32Type(param->getDataType()) ? builder.emitPhi(
+                                                                  moduleScope.module,
+                                                                  blockMap.getValue(block),
+                                                                  parameterType,
+                                                                  loweredPhi)
+                                                            : builder.emitIntegerPhi(
+                                                                  moduleScope.module,
+                                                                  blockMap.getValue(block),
+                                                                  parameterType,
+                                                                  loweredPhi)));
                 valueMap[param] = loweredPhi;
             }
         }
@@ -2264,12 +2290,19 @@ SlangResult emitNVVMIRFromLinkedIR(
                         loweredArgument));
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
-                        "signed i32 phi incoming value",
-                        builder.addIntegerPhiIncoming(
-                            moduleScope.module,
-                            valueMap.getValue(param),
-                            loweredArgument,
-                            blockMap.getValue(predecessor))));
+                        isNVVMFloat32Type(param->getDataType()) ? "float32 phi incoming value"
+                                                                : "signed i32 phi incoming value",
+                        isNVVMFloat32Type(param->getDataType())
+                            ? builder.addPhiIncoming(
+                                  moduleScope.module,
+                                  valueMap.getValue(param),
+                                  loweredArgument,
+                                  blockMap.getValue(predecessor))
+                            : builder.addIntegerPhiIncoming(
+                                  moduleScope.module,
+                                  valueMap.getValue(param),
+                                  loweredArgument,
+                                  blockMap.getValue(predecessor))));
                     ++phiParameterIndex;
                 }
             }

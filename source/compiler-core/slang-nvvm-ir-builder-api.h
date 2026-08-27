@@ -649,7 +649,8 @@ extern "C"
     ((SlangNVVMBuilderFeature_3)29u)
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_LESS_THAN ((SlangNVVMBuilderFeature_3)30u)
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT ((SlangNVVMBuilderFeature_3)31u)
-#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 32u
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI ((SlangNVVMBuilderFeature_3)32u)
+#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 33u
 #define SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3 4u
 
     typedef struct SlangNVVMBuilderFeatureSet_3
@@ -747,6 +748,20 @@ extern "C"
         uint64_t bitPattern,
         SlangNVVMValueHandle_1* outValue);
 
+    /// Creates a typed scalar phi at the start of the explicit target block.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitPhi_3)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMBlockHandle_1 targetBlock,
+        SlangNVVMTypeHandle_1 type,
+        SlangNVVMValueHandle_1* outValue);
+
+    /// Adds one exact-typed scalar phi input from a predecessor edge.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMAddPhiIncoming_3)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 phi,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMBlockHandle_1 predecessorBlock);
+
     // Version 3 freezes V2 as its compatibility core. Generic callbacks and independent feature
     // bits carry forward-growing operation families and semantic availability.
     typedef struct SlangNVVMBuilderAPI_V3
@@ -763,6 +778,8 @@ extern "C"
         SlangNVVMEmitFloatingUnary_3 emitFloatingUnary;
         SlangNVVMEmitFloatingCompare_3 emitFloatingCompare;
         SlangNVVMGetFloatingPointConstant_3 getFloatingPointConstant;
+        SlangNVVMEmitPhi_3 emitPhi;
+        SlangNVVMAddPhiIncoming_3 addPhiIncoming;
     } SlangNVVMBuilderAPI_V3;
 
 #define SLANG_NVVM_BUILDER_API_V3_MIN_SIZE                  \
@@ -790,6 +807,10 @@ extern "C"
 
 #define SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_CONSTANT_MIN_SIZE \
     SLANG_NVVM_BUILDER_API_V3_FLOATING_CONSTANT_MIN_SIZE
+
+#define SLANG_NVVM_BUILDER_API_V3_SCALAR_PHI_MIN_SIZE   \
+    (offsetof(SlangNVVMBuilderAPI_V3, addPhiIncoming) + \
+     sizeof(((SlangNVVMBuilderAPI_V3*)0)->addPhiIncoming))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V3)(
         SlangNVVMBuilderAPI_V3* outAPI);
