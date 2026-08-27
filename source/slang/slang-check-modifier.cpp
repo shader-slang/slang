@@ -310,11 +310,6 @@ static void _collectContainerCandidates(
     }
 }
 
-// Resolve a qualified attribute name (e.g. `[my_namespace::Example(...)]`) by walking its
-// namespace/type qualifier segments and resolving the final segment as an attribute in the
-// resulting container. Reached only after the flat folded-name lookups fail to produce a usable
-// attribute, so builtin qualified attributes (`[vk::binding]`, registered under the flat name
-// `vk_binding`) never take this path.
 AttributeDecl* SemanticsVisitor::lookUpQualifiedAttributeDecl(
     List<NameLoc> const& segments,
     Scope* scope)
