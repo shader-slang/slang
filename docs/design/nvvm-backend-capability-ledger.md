@@ -114,6 +114,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32CopyPtxasAccepts` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM and matching-root `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both scalar-float32-copy PTX outputs assemble | Static PTX acceptance | Resource and timing measurements not collected |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32CopyRuntimeMatchesNVRTC` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, and GPU with compute capability 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite float32 copy cases | On the RTX 5090, both routes copy `3.75`, `-7.5`, `0`, and `1024` | Kernel timing not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32SubtractKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Generic floating callback constructs exact unflagged LLVM `fsub` and aligned store | Verified LLVM/NVVM-2.0 assembly; no runtime | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32SubtractUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical float32 `kIROp_Sub` lowers through floating-binary operation 1 | Exact ordered parameters and subtraction-result store topology checked | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32SubtractDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 subtraction compiles through both routes | `[64, 32, 32]`, `sub.f32`, store, no load/add agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32SubtractPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32SubtractRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite subtraction cases | RTX 5090 results `7.5`, `-8.5`, `1280` | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -536,4 +542,16 @@ Direct NVVM and NVRTC agree on widths `[64, 64]`, one global 32-bit load/store, 
 CUDA 12.9 `ptxas` accepts both. On the RTX 5090, both routes copy `3.75`, `-7.5`, `0`, and `1024`.
 Release passes 207/207; the sorted LF-terminated name set has SHA-256
 `5e9c007c59d45c4db5bf9724e6b76c039455d342330f06b8aa68cd2e5eb2316b`. Debug preservation passes
+10/10.
+
+Slice 33 adds floating-binary SUBTRACT and semantic feature 21 without growing the 464-byte x64 or
+280-byte x86 V3 table. Exact older feature sets remain valid; advertising subtraction requires the
+existing complete float prefix. Generic facade, provider, and fake dispatch select operation 1,
+while canonical result type keeps integer and float `kIROp_Sub` paths distinct.
+
+Direct topology proves ordered parameter 1/2 operands and the subtraction-result store consumer.
+LLVM/NVVM text has one unflagged `fsub float`, aligned store, no `fadd`, and kernel metadata. NVVM
+and NVRTC agree on `[64, 32, 32]`, `sub.f32`, store/no-load/add; CUDA 12.9 `ptxas` accepts both; and
+RTX 5090 results are `7.5`, `-8.5`, `1280`. Release passes 214/214 with sorted-name SHA-256
+`6ba1df40ff963723a866c61cbf8518aba7596e23213d5743015397547c90af9d`; Debug preservation passes
 10/10.

@@ -1982,6 +1982,29 @@ The final Release NVVM prefix passes 207/207. Its exact sorted LF-terminated nam
 `5e9c007c59d45c4db5bf9724e6b76c039455d342330f06b8aa68cd2e5eb2316b`. Debug preservation
 passes 10/10.
 
+### Slice 33 exact scalar float32 subtraction
+
+Slice 33 adds exact raw scalar `float` subtraction. Canonical float parameters feed one
+`kIROp_Sub`, whose result is stored through the established AS1 float pointer. Preflight selects
+integer versus floating semantics from the canonical result type, and emission routes ADD and
+SUBTRACT through the same floating-binary facade with ordered operands.
+
+V3 adds feature bit 21 and floating operation 1 but no table member: x64/x86 remain 464/280 bytes.
+Exact Slice 31/32 feature sets continue to support addition and loads without subtraction. A
+provider advertising subtraction must expose the already-complete float prefix; the facade checks
+the requested operation's feature before dispatch. The provider applies its established
+ownership/type/availability/dominance/insertion validation and emits one unflagged `CreateFSub`.
+
+Verified LLVM and audited NVVM-2.0 text contain one `fsub float`, aligned store, kernel metadata,
+no `fadd`, and no fast flags. NVVM and NVRTC expose `[64, 32, 32]`, `sub.f32`, a global 32-bit
+store, and no global load/add. CUDA 12.9 `ptxas` accepts both. On the RTX 5090, both routes produce
+`7.5`, `-8.5`, and `1280` for exact finite cases. Constants, helpers, phis, multiply/divide,
+negation, comparisons, half/double, aggregates, and fast/constrained FP remain outside this slice.
+
+The final Release NVVM prefix passes 214/214. Its exact sorted LF-terminated name set has SHA-256
+`6ba1df40ff963723a866c61cbf8518aba7596e23213d5743015397547c90af9d`. Debug preservation passes
+10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2091,8 +2114,9 @@ The program advances through bounded slices:
 30. table-driven consolidation of the scalar provider and end-to-end test matrix;
 31. exact scalar float32 addition through the generic V3 provider family;
 32. exact scalar float32 device-pointer loads;
-33. further type, memory, resource, and optimization-quality work; and
-34. wave operations and other advanced capabilities, then production-readiness evaluation.
+33. exact scalar float32 subtraction through the generic floating-binary family;
+34. further type, memory, resource, and optimization-quality work; and
+35. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.

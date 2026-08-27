@@ -2562,7 +2562,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitFloatingBinaryV3(
     ++gFakeNVVMBuilder.scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingBinary)];
     gFakeNVVMBuilder.scalarV3Operations.add(
         {FakeNVVMBuilderScalarFamily::FloatingBinary, uint32_t(operation)});
-    if (operation != SLANG_NVVM_FLOATING_BINARY_OP_ADD)
+    if (operation != SLANG_NVVM_FLOATING_BINARY_OP_ADD &&
+        operation != SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT)
     {
         if (outValue)
             *outValue = nullptr;
@@ -3800,10 +3801,11 @@ void computeMain(
 }
 )";
 
-static SlangResult _populateFloat32AddKernel(
+static SlangResult _populateFloat32BinaryKernel(
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle_1 module,
-    const UnownedStringSlice& kernelName)
+    const UnownedStringSlice& kernelName,
+    SlangNVVMFloatingBinaryOp_3 operation)
 {
     SlangNVVMTypeHandle_1 voidType = nullptr;
     SlangNVVMTypeHandle_1 floatType = nullptr;
@@ -3840,8 +3842,7 @@ static SlangResult _populateFloat32AddKernel(
     SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 2, right));
     SLANG_RETURN_ON_FAIL(builder.createBlock(module, function, toSlice("entry"), entryBlock));
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
-    SLANG_RETURN_ON_FAIL(
-        builder.emitFloatingBinary(module, SLANG_NVVM_FLOATING_BINARY_OP_ADD, left, right, sum));
+    SLANG_RETURN_ON_FAIL(builder.emitFloatingBinary(module, operation, left, right, sum));
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, sum, destination, 4));
     SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
     SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
@@ -3900,6 +3901,16 @@ void computeMain(
     uniform float right)
 {
     *destination = left + right;
+}
+)";
+static const char kDirectNVVMFloat32SubtractSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float left,
+    uniform float right)
+{
+    *destination = left - right;
 }
 )";
 static const char kDirectNVVMFloat32CopySource[] = R"(
@@ -5925,7 +5936,7 @@ static SlangResult _runScalarKernel(
     return actual == expected ? SLANG_OK : SLANG_FAIL;
 }
 
-static SlangResult _runFloat32AddKernel(
+static SlangResult _runFloat32BinaryKernel(
     CudaDriverApi& cuda,
     ISlangBlob* ptxBlob,
     float left,
@@ -6416,6 +6427,7 @@ struct PTXEntrySummary
     bool hasGlobalStore32 = false;
     bool hasAdd32 = false;
     bool hasFloatAdd32 = false;
+    bool hasFloatSubtract32 = false;
     bool hasMultiply32 = false;
     bool hasBitAnd32 = false;
     bool hasBitOr32 = false;
@@ -6438,6 +6450,7 @@ static SlangResult _summarizePTXEntry(
     outSummary.hasGlobalStore32 = false;
     outSummary.hasAdd32 = false;
     outSummary.hasFloatAdd32 = false;
+    outSummary.hasFloatSubtract32 = false;
     outSummary.hasMultiply32 = false;
     outSummary.hasBitAnd32 = false;
     outSummary.hasBitOr32 = false;
@@ -6461,6 +6474,8 @@ static SlangResult _summarizePTXEntry(
     outSummary.hasAdd32 = _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("add"), 32);
     outSummary.hasFloatAdd32 =
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("add.f32"), 32);
+    outSummary.hasFloatSubtract32 =
+        _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("sub.f32"), 32);
     outSummary.hasMultiply32 = _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("mul"), 32);
     outSummary.hasBitAnd32 =
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("and.b32"), 32);

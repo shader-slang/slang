@@ -498,13 +498,16 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Add:
+            case kIROp_Sub:
                 if (inst->getOperandCount() == 2 && isNVVMFloat32Type(inst->getDataType()))
                 {
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
+                    _requireFeature(
+                        features,
+                        inst->getOp() == kIROp_Add
+                            ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD
+                            : SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT);
                     break;
                 }
-                [[fallthrough]];
-            case kIROp_Sub:
                 if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 arithmetic"));
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
@@ -762,6 +765,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Add:
+            case kIROp_Sub:
                 if (isNVVMFloat32Type(inst->getDataType()))
                 {
                     SLANG_RETURN_ON_FAIL(_validateFloat32Value(
@@ -779,8 +783,6 @@ SlangResult _validateNVVMFunction(
                     availableValues.add(inst);
                     break;
                 }
-                [[fallthrough]];
-            case kIROp_Sub:
             case kIROp_Mul:
             case kIROp_BitAnd:
             case kIROp_BitOr:
@@ -1494,12 +1496,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         if (isNVVMFloat32Type(inst->getDataType()))
                         {
+                            const bool isAdd = inst->getOp() == kIROp_Add;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                "float32 addition",
+                                isAdd ? "float32 addition" : "float32 subtraction",
                                 builder.emitFloatingBinary(
                                     moduleScope.module,
-                                    SLANG_NVVM_FLOATING_BINARY_OP_ADD,
+                                    isAdd ? SLANG_NVVM_FLOATING_BINARY_OP_ADD
+                                          : SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT,
                                     loweredLeft,
                                     loweredRight,
                                     loweredValue)));

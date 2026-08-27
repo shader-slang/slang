@@ -477,13 +477,14 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     NVVMIRBuilder& outBuilder)
 {
     outBuilder = NVVMIRBuilder();
-    const bool advertisesFloat32Add =
-        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
+    const bool advertisesFloat32Binary =
+        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD) ||
+        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT);
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3 ||
         api.compatibilityAPI.structureSize != sizeof(SlangNVVMBuilderAPI_V2) ||
         !api.emitIntegerUnary || !api.emitIntegerBinary || !api.emitIntegerCompare ||
-        (advertisesFloat32Add &&
+        (advertisesFloat32Binary &&
          (api.structureSize < SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_ADD_MIN_SIZE ||
           !api.getFloatingPointType || !api.emitFloatingBinary)))
     {
@@ -746,7 +747,8 @@ SlangResult NVVMIRBuilder::getFloatingPointType(
     outType = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD))
+    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD) &&
+        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT))
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result = m_apiV3.getFloatingPointType(module, bitWidth, &outType);
     return _validateHandleResult(result, outType);
@@ -1053,9 +1055,19 @@ SlangResult NVVMIRBuilder::emitFloatingBinary(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (operation != SLANG_NVVM_FLOATING_BINARY_OP_ADD)
+    SlangNVVMBuilderFeature_3 requiredFeature = 0;
+    switch (operation)
+    {
+    case SLANG_NVVM_FLOATING_BINARY_OP_ADD:
+        requiredFeature = SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD;
+        break;
+    case SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT:
+        requiredFeature = SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT;
+        break;
+    default:
         return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD))
+    }
+    if (!supportsFeature(requiredFeature))
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result =
         m_apiV3.emitFloatingBinary(module, operation, left, right, &outValue);
