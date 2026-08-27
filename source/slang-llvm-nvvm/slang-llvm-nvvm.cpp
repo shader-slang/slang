@@ -1010,6 +1010,10 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingCompareV3(
         *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
             state->builder.CreateFCmpOLE(llvmLeft, llvmRight));
         return SLANG_OK;
+    case SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_EQUAL:
+        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+            state->builder.CreateFCmpOGE(llvmLeft, llvmRight));
+        return SLANG_OK;
     default:
         return SLANG_E_INVALID_ARG;
     }

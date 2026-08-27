@@ -2244,6 +2244,37 @@ LF-terminated name set has SHA-256
 `f93467f3b27def96040db05fca0fec79c5e22a5010ae6a3226fab4d249d860a1`; removing the seven Slice
 40 names reproduces Slice 39's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 41 exact scalar float32 ordered greater-than-or-equal
+
+Slice 41 adds `*destination = left >= right ? 1 : 0` for two scalar Float parameters and the raw
+AS1 `Ptr<int>` destination. Canonical Bool `kIROp_Geq` with Float operands maps directly to feature
+29 and operation 4, `ORDERED_GREATER_EQUAL`; signed-i32 greater-than-or-equal remains on its
+established integer operation. No operand reversal, complement, or alternative comparison
+representation is introduced.
+
+The operation reuses `emitFloatingCompare`, leaving V3 at 480 bytes on x64 and 288 bytes on x86.
+The facade adds one comparison-family suffix predicate and maps the operation to its independent
+feature. The provider applies its existing validation before unflagged `CreateFCmpOGE`; generic
+LLVM and negotiated NVVM-2.0 text each contain exactly one `fcmp oge float`. Orderedness makes the
+result false when either operand is a quiet NaN.
+
+The fifth comparison descriptor row drives every established layer. Seven independently registered
+names add only 52 physical lines across the five measured test/support files, from 20,789 to 20,841.
+Combining signed and floating `kIROp_Geq` around the closed classifier also removes the old
+duplicated direct-emission block.
+
+Direct topology remains `[Pointer, Float, Float]` and preserves original parameter order. NVVM and
+NVRTC agree on `[64, 32, 32]`, a token-safe float32 relation predicate family, one global i32 store,
+and no global load, float arithmetic, or integer predicate. PTX may spell the result as direct
+ordered greater-equal or the complement of unordered less-than; CUDA 12.9 `ptxas` accepts both
+outputs. On the RTX 5090, both routes return one for `3.75 >= 1.5` and `+0 >= -0`, and zero for
+`-8 >= 0.5` and quiet `NaN >= -1`.
+
+The focused matrix passes 14/14 and the Release NVVM prefix passes 270/270. Its exact sorted
+LF-terminated name set has SHA-256
+`5358536da56531d08b93bd3e2f55d25d3d8cc42a21e461b3a905b1425a1f1fc4`; removing the seven Slice
+41 names reproduces Slice 40's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2364,8 +2395,9 @@ The program advances through bounded slices:
 40. exact scalar float32 ordered less-than-or-equal through the generic floating-compare family;
 41. exact scalar float32 ordered greater-than-or-equal through the generic floating-compare
     family;
-42. further type, memory, resource, and optimization-quality work; and
-43. wave operations and other advanced capabilities, then production-readiness evaluation.
+42. exact scalar float32 ordered less-than through the generic floating-compare family;
+43. further type, memory, resource, and optimization-quality work; and
+44. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -2979,8 +3011,8 @@ The following remain open until their named slice supplies evidence:
 - external/indirect calls, richer helper ABI, and scalar operations beyond the established
   signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, bitwise-XOR, bitwise-NOT,
   arithmetic-negate and comparison family, plus scalar float32 add, subtract, multiply, divide,
-  negate, ordered equality, unordered inequality, ordered greater-than, and ordered
-  less-than-or-equal;
+  negate, ordered equality, unordered inequality, ordered greater-than, ordered
+  less-than-or-equal, and ordered greater-than-or-equal;
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;

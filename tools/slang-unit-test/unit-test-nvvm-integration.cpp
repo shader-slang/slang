@@ -405,6 +405,9 @@ NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST(
 NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST(
     nvvmSlangRealFloat32LessEqualDifferentialPTX,
     OrderedLessEqual)
+NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST(
+    nvvmSlangRealFloat32GreaterEqualDifferentialPTX,
+    OrderedGreaterEqual)
 
 #undef NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST
 
@@ -1101,6 +1104,9 @@ NVVM_FLOAT32_COMPARISON_PTXAS_TEST(nvvmSlangRealFloat32EqualPtxasAccepts, Ordere
 NVVM_FLOAT32_COMPARISON_PTXAS_TEST(nvvmSlangRealFloat32NotEqualPtxasAccepts, UnorderedNotEqual)
 NVVM_FLOAT32_COMPARISON_PTXAS_TEST(nvvmSlangRealFloat32GreaterThanPtxasAccepts, OrderedGreaterThan)
 NVVM_FLOAT32_COMPARISON_PTXAS_TEST(nvvmSlangRealFloat32LessEqualPtxasAccepts, OrderedLessEqual)
+NVVM_FLOAT32_COMPARISON_PTXAS_TEST(
+    nvvmSlangRealFloat32GreaterEqualPtxasAccepts,
+    OrderedGreaterEqual)
 
 #undef NVVM_FLOAT32_COMPARISON_PTXAS_TEST
 
@@ -1753,6 +1759,9 @@ NVVM_FLOAT32_COMPARISON_RUNTIME_TEST(
     nvvmSlangFloat32GreaterThanRuntimeMatchesNVRTC,
     OrderedGreaterThan)
 NVVM_FLOAT32_COMPARISON_RUNTIME_TEST(nvvmSlangFloat32LessEqualRuntimeMatchesNVRTC, OrderedLessEqual)
+NVVM_FLOAT32_COMPARISON_RUNTIME_TEST(
+    nvvmSlangFloat32GreaterEqualRuntimeMatchesNVRTC,
+    OrderedGreaterEqual)
 
 #undef NVVM_FLOAT32_COMPARISON_RUNTIME_TEST
 
