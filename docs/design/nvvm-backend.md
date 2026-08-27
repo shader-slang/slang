@@ -1890,8 +1890,13 @@ The program advances through bounded slices:
 23. signed-i32 greater-than;
 24. signed-i32 less-than-or-equal;
 25. signed-i32 greater-than-or-equal;
-26. resources and optimization-quality work; and
-27. wave operations and other advanced capabilities, then production-readiness evaluation.
+26. exact raw `RWStructuredBuffer<int>` storage;
+27. behavior-preserving decomposition of the NVVM test harness;
+28. a generic V3 provider ABI and feature-set negotiation, with frozen V2 fallback;
+29. centralized Slang-IR-to-NVVM type legalization and provider-type caching;
+30. table-driven consolidation of the scalar provider and end-to-end test matrix;
+31. further type, memory, resource, and optimization-quality work; and
+32. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -1928,6 +1933,22 @@ contracts. A future bounded shift candidate must first settle the currently
 inconsistent negative/oversized shift-count policy across AST folding, SCCP, LLVM, and PTX before
 promoting exact signed-i32 left shift; division, remainder, and the other richer scalar policies
 remain separate decisions.
+
+Slices 21 through 25 complete the exact signed-i32 comparison family, and Slice 26 begins the
+resource bucket with the measured raw `RWStructuredBuffer<int>` launch ABI. Those deliberately
+narrow vertical slices established strong ownership, no-mutation, differential-PTX, assembler,
+and runtime contracts, but their one-provider-callback and bespoke-test pattern is not the
+steady-state architecture. Before another semantic capability is added, Slices 27 through 30 form
+a scalability transition. Slice 27 separates fake-provider, builder-ABI, direct-emitter,
+downstream-compiler, and real integration/runtime tests without changing their names or behavior.
+Slice 28 freezes V2 and introduces a V3 provider surface whose Slang-owned operation enums and
+feature set grow by semantic family rather than by slice prefix. The host prefers V3, falls back to
+V2 only when the V3 export is absent, and treats a present but malformed V3 provider as an error.
+Slice 29 makes one type-legalization/cache context own every mapping from canonical Slang IR types
+to provider handles while preserving the exact Slice 26 subset. Slice 30 replaces duplicated
+scalar fake state and test bodies with recorded generic operations and table-driven cases. New
+types, resources, atomics, and waves resume only after this transition passes the established
+focused, preservation, `ptxas`, and runtime evidence.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
