@@ -19530,16 +19530,10 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
-    // This struct is shared by the raytracing and rayquery APIs. The capability
-    // system cannot express "raytracing OR rayquery", so the struct carries no
-    // capability requirement of its own; any use of the type is guaranteed to pull
-    // in one of the two. The SPIR-V type-emit for RaytracingAccelerationStructureType
-    // registers the extension through the "any" mechanism
-    // (SPV_KHR_ray_tracing | SPV_KHR_ray_query) and resolves it to whichever ray
-    // capability is actually in effect. The uint64_t constructor below therefore must
-    // not declare an extension itself: hard-coding SPV_KHR_ray_tracing would leak it
-    // into ray-query-only modules that carry no RayTracingKHR capability, producing
-    // invalid SPIR-V (VUID-VkShaderModuleCreateInfo-pCode-08742).
+    // Shared by the raytracing and rayquery APIs; since the capability system cannot
+    // express "raytracing OR rayquery", this struct carries no capability of its own.
+    // Its SPIR-V type-emit supplies the required extension via the "any" mechanism,
+    // resolving to whichever ray capability is actually in effect.
     __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl_spirv)]
     [__readNone]
