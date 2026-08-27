@@ -460,7 +460,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DepFile,
          "-depfile",
          "-depfile <path>",
-         "Save the source file dependency list in a file.\n"
+         "Save the dependency list in a file. Lists source files and any imported precompiled\n"
+         ".slang-module files.\n"
          "Uses Makefile dependency syntax: <output>: <dep> <dep...>\n"
          "When no -o is given, - is used as the make target (output goes to stdout)."},
         {OptionKind::EntryPointName,
@@ -584,7 +585,10 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DisableWarnings,
          "-warnings-disable",
          "-warnings-disable <id>[,<id>...]",
-         "Disable specific warning ids."},
+         "Disable specific warnings, given by numeric id or name. A numeric id that this compiler "
+         "version does not recognize is silently ignored, so one option value can be shared across "
+         "compiler versions that do not all define the warning; an unrecognized warning name is "
+         "still reported as an error."},
         {OptionKind::WarningLevel,
          "-Wall,-Wextra,-Wpedantic",
          "-Wall | -Wextra | -Wpedantic",
@@ -655,6 +659,26 @@ void initCommandOptions(CommandOptions& options)
          "(register index, space) instead of auto-allocating a slot. "
          "Useful when the host needs the binding fixed at compile time "
          "before any host metadata reads run. Implies `-trace-coverage`."},
+        {OptionKind::TraceCoverageBindlessIndex,
+         "-trace-coverage-bindless-index",
+         "-trace-coverage-bindless-index <index>",
+         "Synthesize `__slang_coverage` as an unbounded descriptor "
+         "array of structured buffers rather than a single buffer, and index it "
+         "with <index>: `__slang_coverage[<index>][slot]`. Many separately "
+         "compiled shaders sharing one pipeline then occupy a single descriptor "
+         "binding rather than one binding each, and each shader's buffer is "
+         "sized independently by the host. "
+         "Place the array with `-trace-coverage-binding <index> <space>`, or "
+         "leave it to auto-allocation. If the host declares the descriptor "
+         "array with a VARIABLE descriptor count, Vulkan requires it to be the "
+         "highest-numbered binding in its set; a fixed descriptor count carries "
+         "no such restriction. That is the host's layout to satisfy, and the "
+         "compiler cannot see it. "
+         "<index> is a compile-time constant and so becomes part of the "
+         "compiled output: a host that keys a shader cache on that output must "
+         "derive <index> from a stable shader identity rather than from load "
+         "order, or an unchanged shader recompiles whenever that order shifts. "
+         "SPIR-V and GLSL only. Implies `-trace-coverage`."},
         {OptionKind::TraceCoverageReservedSpace,
          "-trace-coverage-reserved-space",
          "-trace-coverage-reserved-space <space>",
@@ -3217,6 +3241,29 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     (int)bindingIndex,
                     (int)bindingSpace);
                 // Implies -trace-coverage so users don't have to spell both.
+                linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
+                break;
+            }
+        case OptionKind::TraceCoverageBindlessIndex:
+            {
+                // -trace-coverage-bindless-index <index>
+                // Negative is rejected up front: -1 is the internal "not
+                // requested" sentinel, so accepting it would silently mean the
+                // single-buffer form.
+                Int bindlessIndex;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindlessIndex));
+                if (bindlessIndex > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindlessIndex,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.set(
+                    OptionKind::TraceCoverageBindlessIndex,
+                    (int)bindlessIndex);
                 linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
                 break;
             }
