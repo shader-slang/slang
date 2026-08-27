@@ -1363,15 +1363,24 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
 
     ModuleState* state = _getModule(module);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!state || !insertionBlock || operation != SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX ||
-        argumentCount || !outValue)
+    if (!state || !insertionBlock || argumentCount || !outValue)
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(
-        state->module.get(),
-        llvm::Intrinsic::nvvm_read_ptx_sreg_laneid);
+    llvm::Intrinsic::ID intrinsicID;
+    switch (operation)
+    {
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX:
+        intrinsicID = llvm::Intrinsic::nvvm_read_ptx_sreg_laneid;
+        break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_COUNT:
+        intrinsicID = llvm::Intrinsic::nvvm_read_ptx_sreg_warpsize;
+        break;
+    default:
+        return SLANG_E_INVALID_ARG;
+    }
+    llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
     llvm::CallInst* call = state->builder.CreateCall(intrinsic);
     *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(call);
     return SLANG_OK;
@@ -1551,24 +1560,25 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
 // LLVM 14 made atomic alignment explicit in assembly, but LLVM 7 gives atomicrmw its natural
 // alignment and rejects the suffix. LLVM 14 also prints unary negation as `fneg`, which the
 // libNVVM NVVM-2.0 reader rejects; the older dialect expresses finite scalar negation as
-// `fsub -0.0, value`. Finally, LLVM 14 gives the lane-id intrinsic function attributes that the
-// LLVM 7 parser does not know. Removing optimization-only attributes retains the intrinsic's
-// semantic name and type. The provider exposes exactly one shape of each rewritten operation, so
-// validate every semantic instruction or declaration before changing its spelling. Counting
-// semantic objects and rewritten lines prevents an unrelated occurrence or future form from being
-// accepted accidentally.
+// `fsub -0.0, value`. Finally, LLVM 14 gives NVVM special-register intrinsics function attributes
+// that the LLVM 7 parser does not know. Removing optimization-only attributes retains each
+// intrinsic's semantic name and type. LLVM may share one numbered attribute group between several
+// declarations, so count unique validated semantic attribute sets. The provider exposes exactly
+// one shape of each rewritten operation; validate every semantic instruction or declaration before
+// changing its spelling.
 static SlangResult _writeLegacyNVVMAssembly(
     ModuleState* state,
     llvm::SmallVectorImpl<char>& outSerializedData)
 {
     size_t semanticAtomicCount = 0;
     size_t semanticFloatNegateCount = 0;
-    size_t semanticWaveLaneIndexDeclarationCount = 0;
+    llvm::SmallVector<llvm::AttributeSet, 2> semanticLegacyIntrinsicAttributeSets;
     for (llvm::Function& function : *state->module)
     {
-        if (function.getIntrinsicID() == llvm::Intrinsic::nvvm_read_ptx_sreg_laneid)
+        const llvm::Intrinsic::ID intrinsicID = function.getIntrinsicID();
+        if (intrinsicID == llvm::Intrinsic::nvvm_read_ptx_sreg_laneid ||
+            intrinsicID == llvm::Intrinsic::nvvm_read_ptx_sreg_warpsize)
         {
-            ++semanticWaveLaneIndexDeclarationCount;
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
             if (!function.isDeclaration() || !function.getReturnType()->isIntegerTy(32) ||
                 function.arg_size() != 0 || functionAttributes.getNumAttributes() != 6 ||
@@ -1581,6 +1591,17 @@ static SlangResult _writeLegacyNVVMAssembly(
             {
                 return SLANG_E_NOT_AVAILABLE;
             }
+            bool hasAttributeSet = false;
+            for (const llvm::AttributeSet& attributeSet : semanticLegacyIntrinsicAttributeSets)
+            {
+                if (attributeSet == functionAttributes)
+                {
+                    hasAttributeSet = true;
+                    break;
+                }
+            }
+            if (!hasAttributeSet)
+                semanticLegacyIntrinsicAttributeSets.push_back(functionAttributes);
         }
         for (llvm::BasicBlock& block : function)
         {
@@ -1623,13 +1644,13 @@ static SlangResult _writeLegacyNVVMAssembly(
     const llvm::StringRef llvm14AlignmentSuffix(", align 4");
     const llvm::StringRef floatNegateMarker(" = fneg float ");
     const llvm::StringRef legacyFloatNegateMarker(" = fsub float -0.000000e+00, ");
-    const llvm::StringRef waveLaneIndexAttributeMarker(
+    const llvm::StringRef llvm14SpecialRegisterAttributeMarker(
         " = { nofree nosync nounwind readnone speculatable willreturn }");
-    const llvm::StringRef legacyWaveLaneIndexAttributes(" = { nounwind readnone }");
+    const llvm::StringRef legacySpecialRegisterAttributes(" = { nounwind readnone }");
     llvm::StringRef remaining(llvm14Assembly.data(), llvm14Assembly.size());
     size_t rewrittenAtomicCount = 0;
     size_t rewrittenFloatNegateCount = 0;
-    size_t rewrittenWaveLaneIndexDeclarationCount = 0;
+    size_t rewrittenLegacyIntrinsicAttributeSetCount = 0;
     while (!remaining.empty())
     {
         const size_t newlineIndex = remaining.find('\n');
@@ -1660,14 +1681,16 @@ static SlangResult _writeLegacyNVVMAssembly(
             ++rewrittenFloatNegateCount;
         }
         else if (
-            trimmedLine.startswith("attributes #") && line.endswith(waveLaneIndexAttributeMarker))
+            trimmedLine.startswith("attributes #") &&
+            line.endswith(llvm14SpecialRegisterAttributeMarker))
         {
-            const llvm::StringRef prefix = line.drop_back(waveLaneIndexAttributeMarker.size());
+            const llvm::StringRef prefix =
+                line.drop_back(llvm14SpecialRegisterAttributeMarker.size());
             outSerializedData.append(prefix.begin(), prefix.end());
             outSerializedData.append(
-                legacyWaveLaneIndexAttributes.begin(),
-                legacyWaveLaneIndexAttributes.end());
-            ++rewrittenWaveLaneIndexDeclarationCount;
+                legacySpecialRegisterAttributes.begin(),
+                legacySpecialRegisterAttributes.end());
+            ++rewrittenLegacyIntrinsicAttributeSetCount;
         }
         else
         {
@@ -1682,7 +1705,8 @@ static SlangResult _writeLegacyNVVMAssembly(
 
     return rewrittenAtomicCount == semanticAtomicCount &&
                    rewrittenFloatNegateCount == semanticFloatNegateCount &&
-                   rewrittenWaveLaneIndexDeclarationCount == semanticWaveLaneIndexDeclarationCount
+                   rewrittenLegacyIntrinsicAttributeSetCount ==
+                       semanticLegacyIntrinsicAttributeSets.size()
                ? SLANG_OK
                : SLANG_E_NOT_AVAILABLE;
 }

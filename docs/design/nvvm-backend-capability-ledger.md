@@ -827,3 +827,23 @@ Seven evidence names add 531 measured test/support lines, from 22,837 to 23,368.
 Slice 45/46 matrix passes 14/14 and the Release NVVM prefix passes 305/305 with sorted-name SHA-256
 `a5d99d25f4218d69bf938e171083e49c3826150873a58506c42e2b8bcbf98dbb`; removing the seven
 Slice 46 names reproduces Slice 45's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 47 adds exact `WaveGetLaneCount()` as feature 35/intrinsic operation 1 through the unchanged
+generic callback. CUDA target selection produces a zero-parameter UInt helper ending in
+`GenericAsm("(warpSize)")`; one descriptor maps exact assembly text to operation/feature for both
+lane index and lane count. The composed kernel stores lane count at the lane-indexed UInt pointer.
+V3 remains 528 bytes on x64 and 308 bytes on x86, and exact Slice 46 tables remain loadable without
+feature 35.
+
+The provider maps operation 1 to `llvm.nvvm.read.ptx.sreg.warpsize`. LLVM shares one six-attribute
+group between the lane-id and warp-size declarations; the audited writer validates both semantic
+declarations, counts their unique attribute set, and emits one LLVM-7-compatible
+`nounwind readnone` group. Both dialects contain one call to each intrinsic, two UInt helper
+calls/returns, one pointer offset, and one store. NVVM and NVRTC agree on `[64]`, one global 32-bit
+store, and no load; direct PTX uses `%laneid` and `WARP_SZ`. CUDA 12.9 `ptxas` accepts both, and one
+32-thread RTX 5090 warp writes 32 in every lane through each route.
+
+Seven evidence names add 364 measured test/support lines, from 23,368 to 23,732. The focused
+Slice 46/47 matrix passes 14/14 and the Release NVVM prefix passes 312/312 with sorted-name SHA-256
+`dbd8d587f633ab06ac2daaf086690a14fa3b9f4cab8c22332d0a75e562d65ab7`; removing the seven
+Slice 47 names reproduces Slice 46's count and hash exactly. Debug preservation passes 10/10.

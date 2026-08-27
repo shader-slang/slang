@@ -602,21 +602,19 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32FunctionDifferentialPTX)
     SLANG_CHECK(_haveEqualPTXParameterWidths(summaries[0], summaries[1]));
 }
 
-SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
+template<typename TCheckPTX>
+static void _runNVVMSlangWaveDifferentialPTX(
+    const char* source,
+    const char* unavailableMessage,
+    TCheckPTX checkPTX)
 {
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
         SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
     {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring wave-lane-index PTX differential because libNVVM or NVRTC was not found.");
+        getTestReporter()->message(TestMessageType::Info, unavailableMessage);
         SLANG_IGNORE_TEST;
     }
 
@@ -629,12 +627,8 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMWaveLaneIndexSource,
-            kMethods[i],
-            code,
-            diagnostics);
+        const SlangResult compileResult =
+            _compileSlangWithPTXMethod(globalSession, source, kMethods[i], code, diagnostics);
         if (SLANG_FAILED(compileResult))
         {
             const String text = _getBlobText(diagnostics);
@@ -644,16 +638,7 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
         SLANG_CHECK_ABORT(code != nullptr);
         const String ptx = _getBlobText(code);
-        if (kMethods[i] == SLANG_EMIT_CUDA_VIA_NVVM)
-        {
-            SLANG_CHECK(ptx.indexOf("%laneid") >= 0);
-        }
-        else
-        {
-            SLANG_CHECK(ptx.indexOf("%tid.x") >= 0);
-            SLANG_CHECK(ptx.indexOf("and.b32") >= 0);
-            SLANG_CHECK(ptx.indexOf(", 31") >= 0);
-        }
+        checkPTX(kMethods[i], ptx);
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
             _summarizePTXEntry(ptx.getUnownedSlice(), toSlice("computeMain"), summaries[i])));
         static const uint32_t kParameterWidths[] = {64};
@@ -665,6 +650,51 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
         SLANG_CHECK(!summaries[i].hasGlobalLoad32);
     }
     SLANG_CHECK(_haveEqualPTXParameterWidths(summaries[0], summaries[1]));
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
+
+    _runNVVMSlangWaveDifferentialPTX(
+        kDirectNVVMWaveLaneIndexSource,
+        "Ignoring wave-lane-index PTX differential because libNVVM or NVRTC was not found.",
+        [](SlangEmitCUDAMethod method, const String& ptx)
+        {
+            if (method == SLANG_EMIT_CUDA_VIA_NVVM)
+            {
+                SLANG_CHECK(ptx.indexOf("%laneid") >= 0);
+            }
+            else
+            {
+                SLANG_CHECK(ptx.indexOf("%tid.x") >= 0);
+                SLANG_CHECK(ptx.indexOf("and.b32") >= 0);
+                SLANG_CHECK(ptx.indexOf(", 31") >= 0);
+            }
+        });
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveLaneCountDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
+    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT));
+
+    _runNVVMSlangWaveDifferentialPTX(
+        kDirectNVVMWaveLaneCountSource,
+        "Ignoring wave-lane-count PTX differential because libNVVM or NVRTC was not found.",
+        [](SlangEmitCUDAMethod method, const String& ptx)
+        {
+            SLANG_CHECK(ptx.indexOf("%tid.x") >= 0 || ptx.indexOf("%laneid") >= 0);
+            if (method == SLANG_EMIT_CUDA_VIA_NVVM)
+            {
+                SLANG_CHECK(ptx.indexOf("%laneid") >= 0);
+                SLANG_CHECK(ptx.indexOf("WARP_SZ") >= 0);
+            }
+        });
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyDifferentialPTX)
@@ -1397,6 +1427,14 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexPtxasAccepts)
         unitTestContext,
         kDirectNVVMWaveLaneIndexSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveLaneCountPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMWaveLaneCountSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyPtxasAccepts)
@@ -2263,6 +2301,16 @@ SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexRuntimeMatchesNVRTC)
         kDirectNVVMWaveLaneIndexSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveLaneIndexKernel(cuda, code); });
+}
+
+SLANG_UNIT_TEST(nvvmSlangWaveLaneCountRuntimeMatchesNVRTC)
+{
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT,
+        kDirectNVVMWaveLaneCountSource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        { return _runWaveLaneCountKernel(cuda, code); });
 }
 
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyRuntimeMatchesNVRTC)

@@ -87,6 +87,41 @@ struct NVVMFloat32BinaryInfo
     const char* diagnosticName;
 };
 
+struct NVVMGenericAsmIntrinsicInfo
+{
+    const char* assembly;
+    SlangNVVMBuilderFeature_3 feature;
+    SlangNVVMIntrinsicOp_3 operation;
+    const char* diagnosticName;
+};
+
+// Maps an exact CUDA-selected GenericAsm terminator to one negotiated provider semantic.
+const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(IRGenericAsm* genericAsm)
+{
+    static const NVVMGenericAsmIntrinsicInfo kInfos[] = {
+        {
+            "_getLaneId()",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX,
+            "wave lane index intrinsic",
+        },
+        {
+            "(warpSize)",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_COUNT,
+            "wave lane count intrinsic",
+        },
+    };
+    if (!genericAsm)
+        return nullptr;
+    for (const NVVMGenericAsmIntrinsicInfo& info : kInfos)
+    {
+        if (genericAsm->getAsm() == UnownedStringSlice(info.assembly))
+            return &info;
+    }
+    return nullptr;
+}
+
 // Maps a canonical floating binary IR opcode to the provider semantic that owns it.
 bool _getNVVMFloat32BinaryInfo(IROp op, NVVMFloat32BinaryInfo& outInfo)
 {
@@ -886,15 +921,16 @@ SlangResult _validateNVVMFunction(
             case kIROp_GenericAsm:
                 {
                     auto genericAsm = as<IRGenericAsm>(inst);
+                    const NVVMGenericAsmIntrinsicInfo* intrinsicInfo =
+                        _findNVVMGenericAsmIntrinsicInfo(genericAsm);
                     if (isEntryPoint || genericAsm != terminator ||
                         functionBlocks.getCount() != 1 || function->getParamCount() != 0 ||
                         genericAsm->getOperandCount() != 1 ||
-                        !isNVVMUnsignedI32Type(function->getResultType()) ||
-                        genericAsm->getAsm() != toSlice("_getLaneId()"))
+                        !isNVVMUnsignedI32Type(function->getResultType()) || !intrinsicInfo)
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                     }
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX);
+                    _requireFeature(features, intrinsicInfo->feature);
                 }
                 break;
 
@@ -2213,13 +2249,16 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_GenericAsm:
                     {
+                        const NVVMGenericAsmIntrinsicInfo* intrinsicInfo =
+                            _findNVVMGenericAsmIntrinsicInfo(as<IRGenericAsm>(inst));
+                        SLANG_RELEASE_ASSERT(intrinsicInfo);
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "wave lane index intrinsic",
+                            intrinsicInfo->diagnosticName,
                             builder.emitIntrinsic(
                                 moduleScope.module,
-                                SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX,
+                                intrinsicInfo->operation,
                                 nullptr,
                                 0,
                                 loweredValue)));

@@ -501,6 +501,8 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
     const bool advertisesWaveLaneIndex =
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX);
+    const bool advertisesWaveLaneCount =
+        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT);
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3 ||
         api.compatibilityAPI.structureSize != sizeof(SlangNVVMBuilderAPI_V2) ||
@@ -523,7 +525,7 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         (advertisesGenericScalarFunctions &&
          (api.structureSize < SLANG_NVVM_BUILDER_API_V3_GENERIC_SCALAR_FUNCTIONS_MIN_SIZE ||
           !api.getFloatingPointType || !api.emitCall || !api.emitValueReturn)) ||
-        (advertisesWaveLaneIndex &&
+        ((advertisesWaveLaneIndex || advertisesWaveLaneCount) &&
          (api.structureSize < SLANG_NVVM_BUILDER_API_V3_WAVE_LANE_INDEX_MIN_SIZE ||
           !api.emitIntrinsic)))
     {
@@ -1275,9 +1277,19 @@ SlangResult NVVMIRBuilder::emitIntrinsic(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (operation != SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX)
+    SlangNVVMBuilderFeature_3 requiredFeature = 0;
+    switch (operation)
+    {
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX:
+        requiredFeature = SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX;
+        break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_COUNT:
+        requiredFeature = SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT;
+        break;
+    default:
         return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX))
+    }
+    if (!supportsFeature(requiredFeature))
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result =
         m_apiV3.emitIntrinsic(module, operation, arguments, argumentCount, &outValue);

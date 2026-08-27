@@ -2463,6 +2463,44 @@ LF-terminated name set has SHA-256
 `a5d99d25f4218d69bf938e171083e49c3826150873a58506c42e2b8bcbf98dbb`; removing the seven
 Slice 46 names reproduces Slice 45's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 47 wave lane count and composed target intrinsics
+
+Slice 47 adds a kernel that combines `WaveGetLaneIndex()` and `WaveGetLaneCount()`, storing the
+lane count through `destination[laneIndex]`. CUDA target selection produces a second canonical
+zero-parameter `Func(UInt)` helper whose sole block terminates in exact
+`GenericAsm("(warpSize)")`. One direct-emitter descriptor now owns the exact GenericAsm spelling,
+provider operation, feature, and diagnostic for both wave helpers; preflight and emission consume
+the same mapping.
+
+Feature 35, `WAVE_LANE_COUNT`, and intrinsic operation 1 extend the existing generic callback.
+The V3 table remains 528 bytes on x64 and 308 bytes on x86; exact Slice 46 tables and operations
+remain valid when feature 35 is clear. The wrapper maps each known operation to its independent
+feature, while unknown operations remain invalid. No callback, table field, ABI version, V2 field,
+or operation-specific facade method is added.
+
+The provider maps operation 1 to `llvm.nvvm.read.ptx.sreg.warpsize`. Lane-id and warp-size
+declarations carry the same exact six LLVM 14 optimization attributes, and LLVM serializes one
+shared numbered attribute group. The legacy writer validates every semantic declaration but counts
+unique semantic attribute sets, then requires that count to equal the rewritten serialized groups.
+Generic LLVM and negotiated NVVM 2.0 text contain one call to each intrinsic, two UInt helper
+calls/returns, one pointer offset, and one store; the legacy text contains one shared
+`nounwind readnone` group.
+
+The fake graph records two Integer helpers, intrinsic operations 0 and 1 in their respective
+blocks, two generic UInt returns and calls, the lane-index call as pointer offset, and the
+lane-count call as stored value. The provider-builder and runtime helpers share one wave-intrinsic
+topology/launch implementation, so the second operation does not copy another full harness.
+
+NVVM and NVRTC agree on the `[64]` launch ABI, one global 32-bit store, and no global load. Direct
+NVVM selects `%laneid` and PTX `WARP_SZ`; CUDA 12.9 `ptxas` accepts both routes. One 32-thread RTX
+5090 warp writes exactly 32 to all 32 lane-indexed elements through both compilers.
+
+Seven independently registered evidence layers add 364 physical lines across the five measured
+test/support files, from 23,368 to 23,732. The focused Slice 46/47 matrix passes 14/14 and the
+Release NVVM prefix passes 312/312. Its exact sorted LF-terminated name set has SHA-256
+`dbd8d587f633ab06ac2daaf086690a14fa3b9f4cab8c22332d0a75e562d65ab7`; removing the seven
+Slice 47 names reproduces Slice 46's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2588,7 +2626,8 @@ The program advances through bounded slices:
 44. generic scalar phis and exact float32 block-parameter SSA merging;
 45. generic scalar functions and exact float32 helper parameters, calls, results, and returns;
 46. exact wave lane index through a generic intrinsic family and canonical unsigned-i32 transport;
-47. remaining wave operations and other advanced capabilities, then production-readiness
+47. exact wave lane count through the existing generic intrinsic family, composed with lane index;
+48. remaining wave operations and other advanced capabilities, then production-readiness
     evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
