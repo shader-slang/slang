@@ -1950,6 +1950,38 @@ harness. The final Release NVVM prefix passes 201/201. Its exact sorted LF-termi
 SHA-256 `73434ac732eccaf42c9fad54ad2956b13aa5e2371e9e2e72d5fbbc2aaaf6e2e2`.
 Debug preservation passes 10/10.
 
+### Slice 32 exact scalar float32 device loads
+
+Slice 32 admits the direct float memory producer deliberately left outside Slice 31: a raw CUDA
+kernel may load one canonical float32 value from an AS1 read or read-write `Ptr<float>` and feed it
+to the established aligned float store. The final graph has two pointer parameters, one load, and
+one store. The shared pointer validator proves that the canonical pointer pointee equals the load
+result and that the pointer is available at the consumer; there is no cast, helper, offset,
+aggregate, or reconstructed value.
+
+This capability requires the existing `SCALAR_MEMORY` and `SCALAR_FLOAT32_ADD` feature bundle but
+adds no provider feature, callback, table field, export, or text rewrite. The original generic load
+callback already constructs a typed aligned load from its pointer's LLVM pointee. Consequently an
+exact Slice 31 provider already implements the complete provider side of this graph, and V1/V2/V3
+sizes and compatibility rules remain unchanged.
+
+The fake provider now indexes generic load values and records each result's scalar kind from the
+typed pointer record. Integer pointer, pointer-offset, array-element, and resource-element loads
+remain integer; a float-pointer parameter produces a float load. Both integer and float fake value
+validators consume that record, so evidence no longer assumes that every load is i32 and does not
+add per-type load callbacks or storage bundles.
+
+Verified LLVM and audited NVVM-2.0 text contain exactly one aligned `load float` and one aligned
+`store float`, with no `fadd`. Direct NVVM and NVRTC expose `[64, 64]`, a global 32-bit load and
+store, and no float add. Matching-toolkit CUDA 12.9 `ptxas` accepts both outputs; on the RTX 5090,
+both routes copy `3.75`, `-7.5`, `0`, and `1024` exactly. Pointer offsets, arrays, resources,
+local/shared/global storage, volatile/atomic loads, half/double, and aggregates remain outside the
+accepted float-load subset.
+
+The final Release NVVM prefix passes 207/207. Its exact sorted LF-terminated name set has SHA-256
+`5e9c007c59d45c4db5bf9724e6b76c039455d342330f06b8aa68cd2e5eb2316b`. Debug preservation
+passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2058,8 +2090,9 @@ The program advances through bounded slices:
 29. centralized Slang-IR-to-NVVM type legalization and provider-type caching;
 30. table-driven consolidation of the scalar provider and end-to-end test matrix;
 31. exact scalar float32 addition through the generic V3 provider family;
-32. further type, memory, resource, and optimization-quality work; and
-33. wave operations and other advanced capabilities, then production-readiness evaluation.
+32. exact scalar float32 device-pointer loads;
+33. further type, memory, resource, and optimization-quality work; and
+34. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.

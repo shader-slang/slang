@@ -3036,6 +3036,51 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32AddKernel)
     SLANG_CHECK(nvvmText.indexOf("!\"kernel\", i32 1") >= 0);
 }
 
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32CopyKernel)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD));
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("float32-copy-module"), scope.module)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_populateFloat32CopyKernel(builder, scope.module, toSlice("float32Copy"))));
+
+    ComPtr<ISlangBlob> llvmAssembly;
+    ComPtr<ISlangBlob> nvvmAssembly;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        llvmAssembly)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+        nvvmAssembly)));
+    SLANG_CHECK_ABORT(llvmAssembly != nullptr && nvvmAssembly != nullptr);
+
+    const String llvmText(UnownedStringSlice(
+        static_cast<const char*>(llvmAssembly->getBufferPointer()),
+        llvmAssembly->getBufferSize()));
+    const String nvvmText(UnownedStringSlice(
+        static_cast<const char*>(nvvmAssembly->getBufferPointer()),
+        nvvmAssembly->getBufferSize()));
+    const String texts[] = {llvmText, nvvmText};
+    for (const String& text : texts)
+    {
+        SLANG_CHECK(text.indexOf("define void @float32Copy(float addrspace(1)*") >= 0);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("float addrspace(1)*")) >= 4);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("load float")) == 1);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("store float")) == 1);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("align 4")) == 2);
+        SLANG_CHECK(text.indexOf("fadd float") < 0);
+    }
+    SLANG_CHECK(nvvmText.indexOf("!nvvmir.version") >= 0);
+    SLANG_CHECK(nvvmText.indexOf("!\"kernel\", i32 1") >= 0);
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderRealProviderPreservesShortBuffers)
 {
     NVVMIRBuilder builder;

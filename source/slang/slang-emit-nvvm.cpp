@@ -482,7 +482,9 @@ SlangResult _validateNVVMFunction(
             switch (inst->getOp())
             {
             case kIROp_Load:
-                if (!isNVVMSignedI32Type(inst->getDataType()))
+                if (isNVVMFloat32Type(inst->getDataType()))
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
+                else if (!isNVVMSignedI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
                 break;
@@ -1424,7 +1426,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "signed i32 load",
+                            isNVVMFloat32Type(load->getDataType()) ? "float32 load"
+                                                                   : "signed i32 load",
                             builder.emitLoad(
                                 moduleScope.module,
                                 loweredPointer,

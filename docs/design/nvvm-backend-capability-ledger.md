@@ -108,6 +108,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32AddPtxasAccepts` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM and matching-root `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both scalar-float32-add PTX outputs assemble | Static PTX acceptance | Resource and timing measurements not collected |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32AddRuntimeMatchesNVRTC` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, and GPU with compute capability 7.0+ | Pass | Pass | Not applicable | Both routes launch exactly representable finite normal addition cases | On the RTX 5090, both routes produce `3.75`, `-7.5`, and `768` | Kernel timing not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32CopyKernel` | 2-3 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Existing generic callbacks construct exact aligned LLVM float32 load/store | Verified LLVM and NVVM-2.0 assembly; no runtime | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32CopyUsesDirectPipeline` | 2-3 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical AS1 float pointer load and store lower without a new provider operation | Two shared FloatPointer parameters, typed generic load result, and exact result-store topology checked | Fake-only; no performance measurements |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32CopyDifferentialPTX` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM, `cuda_sm_7_0` | Pass | Pass | Not applicable | Exact scalar float32 device copy compiles through both routes | Parameter widths `[64, 64]`, one global 32-bit load/store, and no float add agree | PTX size and timing not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32CopyPtxasAccepts` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM and matching-root `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both scalar-float32-copy PTX outputs assemble | Static PTX acceptance | Resource and timing measurements not collected |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32CopyRuntimeMatchesNVRTC` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, and GPU with compute capability 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite float32 copy cases | On the RTX 5090, both routes copy `3.75`, `-7.5`, `0`, and `1024` | Kernel timing not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -510,4 +516,24 @@ global load. Matching-root CUDA 12.9 `ptxas` accepts both outputs. On the RTX 50
 produce `3.75`, `-7.5`, and `768` for the exact finite cases. Release passes 201/201; the sorted
 LF-terminated name set has SHA-256
 `73434ac732eccaf42c9fad54ad2956b13aa5e2371e9e2e72d5fbbc2aaaf6e2e2`. Debug preservation passes
+10/10.
+
+Slice 32 admits exact scalar float32 device-pointer loads without changing the provider boundary.
+The final linked graph has read-write and read AS1 `Ptr<float>` parameters, one canonical float
+load, and one established aligned float store. Preflight requires the existing float32 and scalar
+memory features and uses the shared pointer/pointee/availability validator. Emission continues
+through the original generic load/store callbacks, so the x64/x86 V3 sizes remain 464/280 bytes,
+V1/V2 are unchanged, and no provider export or text rewrite is added.
+
+The fake now indexes generic load handles and records `Integer` or `Float` from their typed pointer
+producer. The direct topology proves one float type, one shared AS1 pointer type for both access
+qualifiers, source parameter 1 feeding the float load, and load result 0 feeding the store through
+destination parameter 0. Established integer, pointer-offset, array, and resource load identities
+remain integer, while non-direct float memory shapes remain deterministic boundaries.
+
+Verified LLVM/NVVM text contains exactly one aligned `load float` and `store float` and no `fadd`.
+Direct NVVM and NVRTC agree on widths `[64, 64]`, one global 32-bit load/store, and no float add;
+CUDA 12.9 `ptxas` accepts both. On the RTX 5090, both routes copy `3.75`, `-7.5`, `0`, and `1024`.
+Release passes 207/207; the sorted LF-terminated name set has SHA-256
+`5e9c007c59d45c4db5bf9724e6b76c039455d342330f06b8aa68cd2e5eb2316b`. Debug preservation passes
 10/10.

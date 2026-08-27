@@ -285,6 +285,12 @@ enum class FakeNVVMBuilderParameterTypeKind
     RawRWStructuredBufferI32,
 };
 
+enum class FakeNVVMBuilderScalarTypeKind
+{
+    Integer,
+    Float,
+};
+
 static const char kFakeNVVMBuilderAssembly[] = "fake LLVM assembly";
 static const uint8_t kFakeNVVMBuilderBitcode[] = {0x42, 0x43, 0xc0, 0xde, 0x00, 0x11};
 
@@ -390,6 +396,7 @@ struct FakeNVVMBuilderState
         relaxedGlobalI32AtomicAddPointerValueRefs.clear();
         relaxedGlobalI32AtomicAddValueRefs.clear();
         loadPointerValueRefs.clear();
+        loadResultTypeKinds.clear();
         storePointerValueRefs.clear();
         kernelFunctionIndices.clear();
         currentInsertBlockIndex = -1;
@@ -495,7 +502,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderArrayPointerTypeStorage arrayPointerTypeStorage;
     FakeNVVMBuilderRawRWStructuredBufferI32TypeStorage rawRWStructuredBufferI32TypeStorage;
     FakeNVVMBuilderParameterStorage parameterStorage[64];
-    FakeNVVMBuilderLoadStorage loadStorage;
+    FakeNVVMBuilderLoadStorage loadStorage[16];
     FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[64];
     FakeNVVMBuilderIntegerConstantStorage integerConstantStorage[8];
     FakeNVVMBuilderIntegerPhiStorage integerPhiStorage[8];
@@ -597,6 +604,7 @@ struct FakeNVVMBuilderState
     List<FakeNVVMBuilderValueRef> relaxedGlobalI32AtomicAddPointerValueRefs;
     List<FakeNVVMBuilderValueRef> relaxedGlobalI32AtomicAddValueRefs;
     List<FakeNVVMBuilderValueRef> loadPointerValueRefs;
+    List<FakeNVVMBuilderScalarTypeKind> loadResultTypeKinds;
     List<FakeNVVMBuilderValueRef> storePointerValueRefs;
     List<Index> kernelFunctionIndices;
     Index currentInsertBlockIndex = -1;
@@ -774,9 +782,23 @@ static bool _getFakeNVVMBuilderParameterRef(
     return false;
 }
 
-static SlangNVVMValueHandle_1 _getFakeNVVMBuilderLoad()
+static SlangNVVMValueHandle_1 _getFakeNVVMBuilderLoad(Index index = 0)
 {
-    return reinterpret_cast<SlangNVVMValueHandle_1>(&gFakeNVVMBuilder.loadStorage);
+    SLANG_ASSERT(index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.loadStorage));
+    return reinterpret_cast<SlangNVVMValueHandle_1>(&gFakeNVVMBuilder.loadStorage[index]);
+}
+
+static bool _getFakeNVVMBuilderLoadIndex(SlangNVVMValueHandle_1 value, Index& outIndex)
+{
+    for (Index i = 0; i < gFakeNVVMBuilder.loadResultTypeKinds.getCount(); ++i)
+    {
+        if (value == _getFakeNVVMBuilderLoad(i))
+        {
+            outIndex = i;
+            return true;
+        }
+    }
+    return false;
 }
 
 static bool _isFakeNVVMBuilderScalarOperation(
@@ -1008,9 +1030,9 @@ static bool _getFakeNVVMBuilderValueRef(
             parameterFunctionIndex};
         return true;
     }
-    if (value == _getFakeNVVMBuilderLoad())
+    if (_getFakeNVVMBuilderLoadIndex(value, valueIndex))
     {
-        outRef = {FakeNVVMBuilderValueKind::Load, 0};
+        outRef = {FakeNVVMBuilderValueKind::Load, valueIndex};
         return true;
     }
     if (_getFakeNVVMBuilderScalarOperationIndex(value, valueIndex))
@@ -1132,6 +1154,10 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle_1 value)
                    parameterTypeKind == FakeNVVMBuilderParameterTypeKind::Integer;
         }
     case FakeNVVMBuilderValueKind::Load:
+        return valueRef.index >= 0 &&
+               valueRef.index < gFakeNVVMBuilder.loadResultTypeKinds.getCount() &&
+               gFakeNVVMBuilder.loadResultTypeKinds[valueRef.index] ==
+                   FakeNVVMBuilderScalarTypeKind::Integer;
     case FakeNVVMBuilderValueKind::IntegerConstant:
     case FakeNVVMBuilderValueKind::IntegerPhi:
     case FakeNVVMBuilderValueKind::Call:
@@ -1161,6 +1187,13 @@ static bool _isFakeNVVMBuilderFloatValue(SlangNVVMValueHandle_1 value)
         FakeNVVMBuilderParameterTypeKind parameterTypeKind;
         return _getFakeNVVMBuilderParameterTypeKind(valueRef, parameterTypeKind) &&
                parameterTypeKind == FakeNVVMBuilderParameterTypeKind::Float;
+    }
+    if (valueRef.kind == FakeNVVMBuilderValueKind::Load)
+    {
+        return valueRef.index >= 0 &&
+               valueRef.index < gFakeNVVMBuilder.loadResultTypeKinds.getCount() &&
+               gFakeNVVMBuilder.loadResultTypeKinds[valueRef.index] ==
+                   FakeNVVMBuilderScalarTypeKind::Float;
     }
     return valueRef.kind == FakeNVVMBuilderValueKind::ScalarOperation &&
            gFakeNVVMBuilder.scalarOperations[valueRef.index].key.family ==
@@ -1669,14 +1702,38 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitLoad(
     size_t pointerIndex = size_t(-1);
     FakeNVVMBuilderValueRef pointerRef;
     if (module != _getFakeNVVMBuilderModule() || !_isFakeNVVMBuilderPointerValue(pointer) ||
-        !_getFakeNVVMBuilderValueRef(pointer, pointerRef) || !outValue)
+        !_getFakeNVVMBuilderValueRef(pointer, pointerRef) || !outValue ||
+        gFakeNVVMBuilder.loadResultTypeKinds.getCount() >=
+            SLANG_COUNT_OF(gFakeNVVMBuilder.loadStorage))
     {
         return SLANG_E_INVALID_ARG;
     }
+
+    FakeNVVMBuilderScalarTypeKind resultTypeKind = FakeNVVMBuilderScalarTypeKind::Integer;
+    if (pointerRef.kind == FakeNVVMBuilderValueKind::Parameter)
+    {
+        FakeNVVMBuilderParameterTypeKind parameterTypeKind;
+        if (!_getFakeNVVMBuilderParameterTypeKind(pointerRef, parameterTypeKind))
+            return SLANG_E_INVALID_ARG;
+        if (parameterTypeKind == FakeNVVMBuilderParameterTypeKind::FloatPointer)
+            resultTypeKind = FakeNVVMBuilderScalarTypeKind::Float;
+        else if (parameterTypeKind != FakeNVVMBuilderParameterTypeKind::Pointer)
+            return SLANG_E_INVALID_ARG;
+    }
+    else if (
+        pointerRef.kind != FakeNVVMBuilderValueKind::PointerOffset &&
+        pointerRef.kind != FakeNVVMBuilderValueKind::ArrayElementPointer &&
+        pointerRef.kind != FakeNVVMBuilderValueKind::RawRWStructuredBufferI32ElementPointer)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
     _getFakeNVVMBuilderParameterRef(pointer, pointerFunctionIndex, pointerIndex);
+    const Index resultIndex = gFakeNVVMBuilder.loadResultTypeKinds.getCount();
     gFakeNVVMBuilder.loadPointerParameterIndices.add(pointerIndex);
     gFakeNVVMBuilder.loadPointerValueRefs.add(pointerRef);
-    *outValue = _getFakeNVVMBuilderLoad();
+    gFakeNVVMBuilder.loadResultTypeKinds.add(resultTypeKind);
+    *outValue = _getFakeNVVMBuilderLoad(resultIndex);
     return SLANG_OK;
 }
 
@@ -1710,7 +1767,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitStore(
     Index valueBinaryIndex = -1;
     if (_getFakeNVVMBuilderParameterRef(value, valueParameterFunctionIndex, valueParameterIndex))
         gFakeNVVMBuilder.storeValueKinds.add(FakeNVVMBuilderValueKind::Parameter);
-    else if (value == _getFakeNVVMBuilderLoad())
+    else if (valueRef.kind == FakeNVVMBuilderValueKind::Load)
         gFakeNVVMBuilder.storeValueKinds.add(FakeNVVMBuilderValueKind::Load);
     else if (_getFakeNVVMBuilderScalarOperationIndex(value, valueBinaryIndex))
     {
@@ -3790,6 +3847,51 @@ static SlangResult _populateFloat32AddKernel(
     SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
     return SLANG_OK;
 }
+
+static SlangResult _populateFloat32CopyKernel(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module,
+    const UnownedStringSlice& kernelName)
+{
+    SlangNVVMTypeHandle_1 voidType = nullptr;
+    SlangNVVMTypeHandle_1 floatType = nullptr;
+    SlangNVVMTypeHandle_1 globalFloatPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
+    SLANG_RETURN_ON_FAIL(builder.getFloatingPointType(module, 32, floatType));
+    SLANG_RETURN_ON_FAIL(builder.getPointerType(
+        module,
+        floatType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        globalFloatPointerType));
+
+    const SlangNVVMTypeHandle_1 parameterTypes[] = {
+        globalFloatPointerType,
+        globalFloatPointerType,
+    };
+    SlangNVVMTypeHandle_1 functionType = nullptr;
+    SlangNVVMValueHandle_1 function = nullptr;
+    SlangNVVMValueHandle_1 destination = nullptr;
+    SlangNVVMValueHandle_1 source = nullptr;
+    SlangNVVMValueHandle_1 value = nullptr;
+    SlangNVVMBlockHandle_1 entryBlock = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
+        module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType));
+    SLANG_RETURN_ON_FAIL(builder.declareFunction(module, functionType, kernelName, function));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 0, destination));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 1, source));
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, function, toSlice("entry"), entryBlock));
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
+    SLANG_RETURN_ON_FAIL(builder.emitLoad(module, source, 4, value));
+    SLANG_RETURN_ON_FAIL(builder.emitStore(module, value, destination, 4));
+    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
+    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
+    return SLANG_OK;
+}
+
 static const char kDirectNVVMFloat32AddSource[] = R"(
 [CUDAKernel]
 void computeMain(
@@ -3800,7 +3902,7 @@ void computeMain(
     *destination = left + right;
 }
 )";
-static const char kDirectNVVMUnsupportedFloat32LoadSource[] = R"(
+static const char kDirectNVVMFloat32CopySource[] = R"(
 [CUDAKernel]
 void computeMain(
     uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
@@ -5861,6 +5963,51 @@ static SlangResult _runFloat32AddKernel(
     if (cuda.cuMemcpyDtoH(&actual, destination, sizeof(actual)) != 0)
         return SLANG_FAIL;
     return actual == expected ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _runFloat32CopyKernel(
+    CudaDriverApi& cuda,
+    ISlangBlob* ptxBlob,
+    float sourceValue)
+{
+    const String ptx = _getBlobText(ptxBlob);
+    if (!ptx.getLength())
+        return SLANG_E_INVALID_ARG;
+
+    CudaModule module = nullptr;
+    if (cuda.cuModuleLoadData(&module, ptx.getBuffer()) != 0 || !module)
+        return SLANG_FAIL;
+    CudaModuleGuard moduleGuard{cuda, module};
+
+    CudaFunction function = nullptr;
+    if (cuda.cuModuleGetFunction(&function, module, "computeMain") != 0 || !function)
+        return SLANG_FAIL;
+
+    CudaDevicePtr destination = 0;
+    if (cuda.cuMemAlloc(&destination, sizeof(float)) != 0 || !destination)
+        return SLANG_FAIL;
+    CudaBufferGuard destinationGuard{cuda, destination};
+    if (cuda.cuMemsetD8(destination, 0, sizeof(float)) != 0)
+        return SLANG_FAIL;
+
+    CudaDevicePtr source = 0;
+    if (cuda.cuMemAlloc(&source, sizeof(float)) != 0 || !source)
+        return SLANG_FAIL;
+    CudaBufferGuard sourceGuard{cuda, source};
+    if (cuda.cuMemcpyHtoD(source, &sourceValue, sizeof(sourceValue)) != 0)
+        return SLANG_FAIL;
+
+    void* parameters[] = {&destination, &source};
+    if (cuda.cuLaunchKernel(function, 1, 1, 1, 1, 1, 1, 0, nullptr, parameters, nullptr) != 0 ||
+        cuda.cuCtxSynchronize() != 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    float actual = 0.0f;
+    if (cuda.cuMemcpyDtoH(&actual, destination, sizeof(actual)) != 0)
+        return SLANG_FAIL;
+    return actual == sourceValue ? SLANG_OK : SLANG_FAIL;
 }
 
 static SlangResult _runRelaxedGlobalI32AtomicAddKernel(
