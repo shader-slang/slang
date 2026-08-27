@@ -478,3 +478,10 @@ The final Release NVVM prefix passes 193/193, including every real differential 
 RTX 5090 runtime lane. Debug preservation passes 1/1 parser, 2/2 routing/hash, 1/1 unsupported
 boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch. The provider ABI and
 export surface are unchanged.
+
+Slice 30 changes only how the established scalar evidence is represented. The eleven repeated
+unary, binary, and comparison cases share descriptors and layer-specific runners while retaining
+all 88 operation/layer wrapper names referenced above. The exact sorted 193-name set keeps SHA-256
+`1f35f717b93e1cb62c3f872e99b819386ab9c5474b203256e58ee1bdb41c97b7`, so no row, selector,
+bucket, or semantic claim changes. Release remains 193/193, including real differential PTX,
+`ptxas`, and RTX 5090 runtime evidence; Debug preservation remains 10/10.

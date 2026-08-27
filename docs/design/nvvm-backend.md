@@ -1881,6 +1881,38 @@ matching-toolkit `ptxas`, and RTX 5090 runtime lane. Debug preservation passes 1
 not change the provider ABI, exports, LLVM construction, accepted linked-IR subset, or observable
 PTX/runtime contract.
 
+### Slice 30 table-driven scalar evidence
+
+Slice 30 changes no production behavior. The fake provider now records every V3 unary, binary, and
+comparison callback as one `FakeNVVMBuilderScalarOperation`: a family and wire operation, ordered
+operands, result handle, and insertion block. Frozen V2 callbacks remain as thin adapters into that
+same stream, and failure injection is keyed by family and operation rather than stored in one field
+per opcode. Dedicated atomic, resource, pointer, and array records stay separate because their
+operand and result contracts are not scalar-family operations.
+
+The eleven post-control-flow scalar operations with repeated evidence are declared in separate
+unary, binary, and comparison descriptor arrays. A descriptor owns its Slang source, V3 operation,
+kernel name, LLVM opcode classification, PTX evidence class, runtime operation, and diagnostic
+name. Shared runners preserve independent provider-negotiation, invalid-operation, real-builder,
+direct-topology, capability-gating, differential-PTX, `ptxas`, and runtime checks. Thin generated
+wrappers retain all 88 operation/layer test names, so failures and capability-ledger references
+remain granular. Add/subtract/signed-less-than continue in their established combined scalar CFG
+fixtures, but use the same generic fake record.
+
+Adding a future same-shaped V3 scalar operation therefore extends the appropriate descriptor family,
+adds explicit runtime values and any operation-specific PTX assertion, and registers the applicable
+thin evidence wrappers. It does not require fake storage, counters, operand lists, failure flags,
+callback bodies, compile harnesses, assembler harnesses, or launch harnesses. The historical V2
+layout cases remain explicit because their byte offsets, callback names, and predecessor prefixes
+are frozen compatibility facts; new V3-only operations do not extend that matrix.
+
+Across the five NVVM test/support files, physical source lines fall from 26,353 to 17,818 (down
+8,535, or 32.4%), and nonblank lines fall from 24,476 to 16,613. The exact sorted 193-name set keeps
+SHA-256 `1f35f717b93e1cb62c3f872e99b819386ab9c5474b203256e58ee1bdb41c97b7`.
+Release passes 193/193, including every real PTX, `ptxas`, and RTX 5090 runtime lane; Debug
+preservation passes 10/10. No production source, provider ABI, export, accepted IR shape, or
+environment gate changes.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific

@@ -462,11 +462,82 @@ SLANG_UNIT_TEST(nvvmSlangRealRawRWStructuredBufferI32DifferentialPTX)
     SLANG_CHECK(nvrtcBody.indexOf("ld.param.u64") >= 0);
 }
 
-SLANG_UNIT_TEST(nvvmSlangRealIntegerMultiplyDifferentialPTX)
+static bool _supportsNVVMScalarTestOperation(
+    const NVVMIRBuilder& builder,
+    NVVMScalarTestOperation operation)
 {
+    switch (operation)
+    {
+    case NVVMScalarTestOperation::Multiply:
+        return builder.supportsScalarIntegerMultiply();
+    case NVVMScalarTestOperation::BitAnd:
+        return builder.supportsScalarIntegerBitAnd();
+    case NVVMScalarTestOperation::BitOr:
+        return builder.supportsScalarIntegerBitOr();
+    case NVVMScalarTestOperation::BitXor:
+        return builder.supportsScalarIntegerBitXor();
+    case NVVMScalarTestOperation::BitNot:
+        return builder.supportsScalarIntegerBitNot();
+    case NVVMScalarTestOperation::Negate:
+        return builder.supportsScalarIntegerNegate();
+    case NVVMScalarTestOperation::Equal:
+        return builder.supportsScalarIntegerEqual();
+    case NVVMScalarTestOperation::NotEqual:
+        return builder.supportsScalarIntegerNotEqual();
+    case NVVMScalarTestOperation::SignedGreaterThan:
+        return builder.supportsScalarIntegerSignedGreaterThan();
+    case NVVMScalarTestOperation::SignedLessEqual:
+        return builder.supportsScalarIntegerSignedLessEqual();
+    case NVVMScalarTestOperation::SignedGreaterEqual:
+        return builder.supportsScalarIntegerSignedGreaterEqual();
+    }
+    return false;
+}
+
+static void _checkNVVMScalarPTXEvidence(
+    const PTXEntrySummary& summary,
+    NVVMScalarPTXEvidence evidence)
+{
+    switch (evidence)
+    {
+    case NVVMScalarPTXEvidence::Multiply:
+        SLANG_CHECK(summary.hasMultiply32);
+        break;
+    case NVVMScalarPTXEvidence::BitAnd:
+        SLANG_CHECK(summary.hasBitAnd32);
+        break;
+    case NVVMScalarPTXEvidence::BitOr:
+        SLANG_CHECK(summary.hasBitOr32);
+        break;
+    case NVVMScalarPTXEvidence::BitXor:
+        SLANG_CHECK(summary.hasBitXor32);
+        SLANG_CHECK(!summary.hasBitOr32);
+        break;
+    case NVVMScalarPTXEvidence::BitNot:
+        SLANG_CHECK(summary.hasBitNot32);
+        SLANG_CHECK(!summary.hasBitXor32);
+        break;
+    case NVVMScalarPTXEvidence::Negate:
+        SLANG_CHECK(summary.hasNegate32);
+        SLANG_CHECK(!summary.hasBitNot32);
+        break;
+    case NVVMScalarPTXEvidence::EqualityComparison:
+        SLANG_CHECK(summary.hasEqualityComparison32);
+        break;
+    case NVVMScalarPTXEvidence::SignedComparison:
+        SLANG_CHECK(summary.hasSignedComparison32);
+        break;
+    }
+}
+
+static void _runNVVMScalarDifferentialPTX(
+    UnitTestContext* unitTestContext,
+    NVVMScalarTestOperation operation)
+{
+    const NVVMScalarTestCase& testCase = _getNVVMScalarTestCase(operation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerMultiply());
+    SLANG_CHECK_ABORT(_supportsNVVMScalarTestOperation(preflightBuilder, operation));
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -474,824 +545,83 @@ SLANG_UNIT_TEST(nvvmSlangRealIntegerMultiplyDifferentialPTX)
     if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
         SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
     {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-multiply PTX differential because libNVVM or NVRTC was not found.");
+        StringBuilder message;
+        message << "Ignoring " << testCase.diagnosticName
+                << " PTX differential because libNVVM or NVRTC was not found.";
+        getTestReporter()->message(TestMessageType::Info, message.getBuffer());
         SLANG_IGNORE_TEST;
     }
 
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerMultiplySource,
+    ComPtr<slang::IBlob> code[2];
+    const SlangEmitCUDAMethod methods[] = {
         SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerMultiplySource,
         SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(methods); ++i)
     {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithPTXMethod(
+            globalSession,
+            testCase.source,
+            methods[i],
+            code[i],
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String text = _getBlobText(diagnostics);
+            if (text.getLength())
+                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code[i] != nullptr);
     }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
 
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasMultiply32);
-    SLANG_CHECK(nvrtcSummary.hasMultiply32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
+    PTXEntrySummary summaries[2];
+    for (Index i = 0; i < SLANG_COUNT_OF(summaries); ++i)
+    {
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
+            _getBlobText(code[i]).getUnownedSlice(),
+            toSlice("computeMain"),
+            summaries[i])));
+    }
+    static const uint32_t kUnaryParameterWidths[] = {64, 32};
+    static const uint32_t kBinaryParameterWidths[] = {64, 32, 32};
+    const bool isUnary = testCase.key.family == FakeNVVMBuilderScalarFamily::Unary;
+    const uint32_t* parameterWidths = isUnary ? kUnaryParameterWidths : kBinaryParameterWidths;
+    const Index parameterCount =
+        isUnary ? SLANG_COUNT_OF(kUnaryParameterWidths) : SLANG_COUNT_OF(kBinaryParameterWidths);
+    for (const PTXEntrySummary& summary : summaries)
+    {
+        SLANG_CHECK(_hasPTXParameterWidths(summary, parameterWidths, parameterCount));
+        _checkNVVMScalarPTXEvidence(summary, testCase.ptxEvidence);
+        SLANG_CHECK(summary.hasGlobalStore32);
+    }
+    SLANG_CHECK(_haveEqualPTXParameterWidths(summaries[0], summaries[1]));
 }
 
-SLANG_UNIT_TEST(nvvmSlangRealIntegerEqualDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerEqual());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-equality PTX differential because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
+#define NVVM_SCALAR_DIFFERENTIAL_TEST(NAME, OPERATION)                                      \
+    SLANG_UNIT_TEST(NAME)                                                                   \
+    {                                                                                       \
+        _runNVVMScalarDifferentialPTX(unitTestContext, NVVMScalarTestOperation::OPERATION); \
     }
 
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerEqualSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
+NVVM_SCALAR_DIFFERENTIAL_TEST(nvvmSlangRealIntegerMultiplyDifferentialPTX, Multiply)
+NVVM_SCALAR_DIFFERENTIAL_TEST(nvvmSlangRealIntegerEqualDifferentialPTX, Equal)
+NVVM_SCALAR_DIFFERENTIAL_TEST(nvvmSlangRealIntegerNotEqualDifferentialPTX, NotEqual)
+NVVM_SCALAR_DIFFERENTIAL_TEST(
+    nvvmSlangRealIntegerSignedGreaterThanDifferentialPTX,
+    SignedGreaterThan)
+NVVM_SCALAR_DIFFERENTIAL_TEST(nvvmSlangRealIntegerSignedLessEqualDifferentialPTX, SignedLessEqual)
+NVVM_SCALAR_DIFFERENTIAL_TEST(
+    nvvmSlangRealIntegerSignedGreaterEqualDifferentialPTX,
+    SignedGreaterEqual)
+NVVM_SCALAR_DIFFERENTIAL_TEST(nvvmSlangRealIntegerBitAndDifferentialPTX, BitAnd)
+NVVM_SCALAR_DIFFERENTIAL_TEST(nvvmSlangRealIntegerBitOrDifferentialPTX, BitOr)
+NVVM_SCALAR_DIFFERENTIAL_TEST(nvvmSlangRealIntegerBitXorDifferentialPTX, BitXor)
+NVVM_SCALAR_DIFFERENTIAL_TEST(nvvmSlangRealIntegerBitNotDifferentialPTX, BitNot)
+NVVM_SCALAR_DIFFERENTIAL_TEST(nvvmSlangRealIntegerNegateDifferentialPTX, Negate)
 
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerEqualSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasEqualityComparison32);
-    SLANG_CHECK(nvrtcSummary.hasEqualityComparison32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerNotEqualDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerNotEqual());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-inequality PTX differential because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerNotEqualSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerNotEqualSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasEqualityComparison32);
-    SLANG_CHECK(nvrtcSummary.hasEqualityComparison32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerSignedGreaterThanDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerSignedGreaterThan());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-than PTX differential because libNVVM or NVRTC was "
-            "not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerSignedGreaterThanSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerSignedGreaterThanSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasSignedComparison32);
-    SLANG_CHECK(nvrtcSummary.hasSignedComparison32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerSignedLessEqualDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerSignedLessEqual());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-less-equal PTX differential because libNVVM or NVRTC was "
-            "not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerSignedLessEqualSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerSignedLessEqualSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasSignedComparison32);
-    SLANG_CHECK(nvrtcSummary.hasSignedComparison32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerSignedGreaterEqualDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerSignedGreaterEqual());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-equal PTX differential because libNVVM or NVRTC was "
-            "not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerSignedGreaterEqualSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerSignedGreaterEqualSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasSignedComparison32);
-    SLANG_CHECK(nvrtcSummary.hasSignedComparison32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerBitAndDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitAnd());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-AND PTX differential because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerBitAndSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerBitAndSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasBitAnd32);
-    SLANG_CHECK(nvrtcSummary.hasBitAnd32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerBitOrDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitOr());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-OR PTX differential because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerBitOrSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerBitOrSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasBitOr32);
-    SLANG_CHECK(nvrtcSummary.hasBitOr32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerBitXorDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitXor());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-XOR PTX differential because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerBitXorSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerBitXorSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasBitXor32);
-    SLANG_CHECK(nvrtcSummary.hasBitXor32);
-    SLANG_CHECK(!nvvmSummary.hasBitOr32);
-    SLANG_CHECK(!nvrtcSummary.hasBitOr32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerBitNotDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitNot());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-NOT PTX differential because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerBitNotSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerBitNotSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasBitNot32);
-    SLANG_CHECK(nvrtcSummary.hasBitNot32);
-    SLANG_CHECK(!nvvmSummary.hasBitXor32);
-    SLANG_CHECK(!nvrtcSummary.hasBitXor32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerNegateDifferentialPTX)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerNegate());
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-negate PTX differential because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IBlob> nvvmCode;
-    ComPtr<slang::IBlob> nvvmDiagnostics;
-    const SlangResult nvvmResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerNegateSource,
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        nvvmCode,
-        nvvmDiagnostics);
-    if (SLANG_FAILED(nvvmResult))
-    {
-        const String text = _getBlobText(nvvmDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvvmResult));
-    SLANG_CHECK_ABORT(nvvmCode != nullptr);
-
-    ComPtr<slang::IBlob> nvrtcCode;
-    ComPtr<slang::IBlob> nvrtcDiagnostics;
-    const SlangResult nvrtcResult = _compileSlangWithPTXMethod(
-        globalSession,
-        kDirectNVVMIntegerNegateSource,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-        nvrtcCode,
-        nvrtcDiagnostics);
-    if (SLANG_FAILED(nvrtcResult))
-    {
-        const String text = _getBlobText(nvrtcDiagnostics);
-        if (text.getLength())
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(nvrtcResult));
-    SLANG_CHECK_ABORT(nvrtcCode != nullptr);
-
-    PTXEntrySummary nvvmSummary;
-    PTXEntrySummary nvrtcSummary;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvvmCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvvmSummary)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_summarizePTXEntry(
-        _getBlobText(nvrtcCode).getUnownedSlice(),
-        toSlice("computeMain"),
-        nvrtcSummary)));
-    static const uint32_t kParameterWidths[] = {64, 32};
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvvmSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(
-        _hasPTXParameterWidths(nvrtcSummary, kParameterWidths, SLANG_COUNT_OF(kParameterWidths)));
-    SLANG_CHECK(_haveEqualPTXParameterWidths(nvvmSummary, nvrtcSummary));
-    SLANG_CHECK(nvvmSummary.hasNegate32);
-    SLANG_CHECK(nvrtcSummary.hasNegate32);
-    SLANG_CHECK(!nvvmSummary.hasBitNot32);
-    SLANG_CHECK(!nvrtcSummary.hasBitNot32);
-    SLANG_CHECK(!nvvmSummary.hasSubtract32);
-    SLANG_CHECK(!nvrtcSummary.hasSubtract32);
-    SLANG_CHECK(nvvmSummary.hasGlobalStore32);
-    SLANG_CHECK(nvrtcSummary.hasGlobalStore32);
-}
-
-
+#undef NVVM_SCALAR_DIFFERENTIAL_TEST
 SLANG_UNIT_TEST(nvvmSlangRealRelaxedGlobalI32AtomicAddDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1574,19 +904,21 @@ SLANG_UNIT_TEST(nvvmSlangRealRawRWStructuredBufferI32PtxasAccepts)
     }
 }
 
-SLANG_UNIT_TEST(nvvmSlangRealIntegerMultiplyPtxasAccepts)
+static void _runNVVMScalarPtxas(UnitTestContext* unitTestContext, NVVMScalarTestOperation operation)
 {
+    const NVVMScalarTestCase& testCase = _getNVVMScalarTestCase(operation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerMultiply());
+    SLANG_CHECK_ABORT(_supportsNVVMScalarTestOperation(preflightBuilder, operation));
 
     String cudaRoot;
     String ptxasPath;
     if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
     {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-multiply ptxas test because CUDA_PATH does not contain ptxas.");
+        StringBuilder message;
+        message << "Ignoring " << testCase.diagnosticName
+                << " ptxas test because CUDA_PATH does not contain ptxas.";
+        getTestReporter()->message(TestMessageType::Info, message.getBuffer());
         SLANG_IGNORE_TEST;
     }
 
@@ -1596,9 +928,10 @@ SLANG_UNIT_TEST(nvvmSlangRealIntegerMultiplyPtxasAccepts)
     if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
         SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
     {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-multiply ptxas test because libNVVM or NVRTC was not found.");
+        StringBuilder message;
+        message << "Ignoring " << testCase.diagnosticName
+                << " ptxas test because libNVVM or NVRTC was not found.";
+        getTestReporter()->message(TestMessageType::Info, message.getBuffer());
         SLANG_IGNORE_TEST;
     }
 
@@ -1610,508 +943,33 @@ SLANG_UNIT_TEST(nvvmSlangRealIntegerMultiplyPtxasAccepts)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerMultiplySource,
-            method,
-            code,
-            diagnostics)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            _compileSlangWithPTXMethod(globalSession, testCase.source, method, code, diagnostics)));
         ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
         SLANG_CHECK_ABORT(ptxArtifact != nullptr);
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
     }
 }
 
-SLANG_UNIT_TEST(nvvmSlangRealIntegerBitAndPtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitAnd());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-AND ptxas test because CUDA_PATH does not contain ptxas.");
-        SLANG_IGNORE_TEST;
+#define NVVM_SCALAR_PTXAS_TEST(NAME, OPERATION)                                   \
+    SLANG_UNIT_TEST(NAME)                                                         \
+    {                                                                             \
+        _runNVVMScalarPtxas(unitTestContext, NVVMScalarTestOperation::OPERATION); \
     }
 
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-AND ptxas test because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerMultiplyPtxasAccepts, Multiply)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerBitAndPtxasAccepts, BitAnd)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerBitOrPtxasAccepts, BitOr)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerBitXorPtxasAccepts, BitXor)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerBitNotPtxasAccepts, BitNot)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerNegatePtxasAccepts, Negate)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerEqualPtxasAccepts, Equal)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerNotEqualPtxasAccepts, NotEqual)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerSignedGreaterThanPtxasAccepts, SignedGreaterThan)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerSignedLessEqualPtxasAccepts, SignedLessEqual)
+NVVM_SCALAR_PTXAS_TEST(nvvmSlangRealIntegerSignedGreaterEqualPtxasAccepts, SignedGreaterEqual)
 
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerBitAndSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerBitOrPtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitOr());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-OR ptxas test because CUDA_PATH does not contain ptxas.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-OR ptxas test because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerBitOrSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerBitXorPtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitXor());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-XOR ptxas test because CUDA_PATH does not contain ptxas.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-XOR ptxas test because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerBitXorSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerBitNotPtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitNot());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-NOT ptxas test because CUDA_PATH does not contain ptxas.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-NOT ptxas test because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerBitNotSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerNegatePtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerNegate());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-negate ptxas test because CUDA_PATH does not contain ptxas.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-negate ptxas test because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerNegateSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerEqualPtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerEqual());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-equality ptxas test because CUDA_PATH does not contain ptxas.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-equality ptxas test because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerEqualSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerNotEqualPtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerNotEqual());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-inequality ptxas test because CUDA_PATH does not contain ptxas.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-inequality ptxas test because libNVVM or NVRTC was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerNotEqualSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerSignedGreaterThanPtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerSignedGreaterThan());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-than ptxas test because CUDA_PATH does not contain "
-            "ptxas.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-than ptxas test because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerSignedGreaterThanSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerSignedLessEqualPtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerSignedLessEqual());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-less-equal ptxas test because CUDA_PATH does not contain "
-            "ptxas.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-less-equal ptxas test because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerSignedLessEqualSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangRealIntegerSignedGreaterEqualPtxasAccepts)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerSignedGreaterEqual());
-
-    String cudaRoot;
-    String ptxasPath;
-    if (SLANG_FAILED(_findPtxasFromCUDAPath(cudaRoot, ptxasPath)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-equal ptxas test because CUDA_PATH does not contain "
-            "ptxas.");
-        SLANG_IGNORE_TEST;
-    }
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-equal ptxas test because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerSignedGreaterEqualSource,
-            method,
-            code,
-            diagnostics)));
-        ComPtr<IArtifact> ptxArtifact = _createPTXArtifact(code);
-        SLANG_CHECK_ABORT(ptxArtifact != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(ptxArtifact, ptxasPath)));
-    }
-}
-
-
+#undef NVVM_SCALAR_PTXAS_TEST
 SLANG_UNIT_TEST(nvvmSlangRealRelaxedGlobalI32AtomicAddPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
@@ -2542,394 +1400,41 @@ SLANG_UNIT_TEST(nvvmSlangRawRWStructuredBufferI32RuntimeMatchesNVRTC)
     }
 }
 
-SLANG_UNIT_TEST(nvvmSlangIntegerMultiplyRuntimeMatchesNVRTC)
+struct NVVMScalarRuntimeCase
 {
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerMultiply());
+    int x;
+    int y;
+    int expected;
+};
 
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-multiply runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-multiply runtime differential because no CUDA device is available.");
-        SLANG_IGNORE_TEST;
-    }
+static void _getNVVMScalarRuntimeCases(
+    NVVMScalarTestOperation operation,
+    const NVVMScalarRuntimeCase*& outCases,
+    Index& outCaseCount)
+{
+#define RETURN_CASES(CASES)               \
+    outCases = CASES;                     \
+    outCaseCount = SLANG_COUNT_OF(CASES); \
+    return
 
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-multiply runtime differential because the device is older than "
-            "sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-multiply runtime differential because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct MultiplyRuntimeCase
-    {
-        int x;
-        int y;
-        int expected;
-    };
-    static const MultiplyRuntimeCase kCases[] = {
+    static const NVVMScalarRuntimeCase kMultiplyCases[] = {
         {6, 7, 42},
         {-7, 6, -42},
         {0, -19, 0},
     };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerMultiplySource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::Multiply,
-                runtimeCase.x,
-                runtimeCase.y,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangIntegerEqualRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerEqual());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-equality runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-equality runtime differential because no CUDA device is available.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-equality runtime differential because the device is older than "
-            "sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-equality runtime differential because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct EqualRuntimeCase
-    {
-        int left;
-        int right;
-        int expected;
-    };
-    static const EqualRuntimeCase kCases[] = {
+    static const NVVMScalarRuntimeCase kEqualCases[] = {
         {0, 0, 1},
         {-7, -7, 1},
         {-7, 7, 0},
         {INT_MIN, INT_MAX, 0},
     };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerEqualSource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::Equal,
-                runtimeCase.left,
-                runtimeCase.right,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangIntegerNotEqualRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerNotEqual());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-inequality runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-inequality runtime differential because no CUDA device is "
-            "available.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-inequality runtime differential because the device is older than "
-            "sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-inequality runtime differential because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct NotEqualRuntimeCase
-    {
-        int left;
-        int right;
-        int expected;
-    };
-    static const NotEqualRuntimeCase kCases[] = {
+    static const NVVMScalarRuntimeCase kNotEqualCases[] = {
         {0, 0, 0},
         {-7, -7, 0},
         {-7, 7, 1},
         {INT_MIN, INT_MAX, 1},
     };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerNotEqualSource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::NotEqual,
-                runtimeCase.left,
-                runtimeCase.right,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangIntegerSignedGreaterThanRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerSignedGreaterThan());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-than runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-than runtime differential because no CUDA device is "
-            "available.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-than runtime differential because the device is older "
-            "than "
-            "sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-than runtime differential because libNVVM or NVRTC "
-            "was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct SignedGreaterThanRuntimeCase
-    {
-        int left;
-        int right;
-        int expected;
-    };
-    static const SignedGreaterThanRuntimeCase kCases[] = {
+    static const NVVMScalarRuntimeCase kSignedGreaterThanCases[] = {
         {0, 0, 0},
         {-7, -7, 0},
         {-7, 7, 0},
@@ -2937,108 +1442,7 @@ SLANG_UNIT_TEST(nvvmSlangIntegerSignedGreaterThanRuntimeMatchesNVRTC)
         {INT_MIN, INT_MAX, 0},
         {INT_MAX, INT_MIN, 1},
     };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerSignedGreaterThanSource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::GreaterThan,
-                runtimeCase.left,
-                runtimeCase.right,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangIntegerSignedLessEqualRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerSignedLessEqual());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-less-equal runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-less-equal runtime differential because no CUDA device is "
-            "available.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-less-equal runtime differential because the device is older "
-            "than sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-less-equal runtime differential because libNVVM or NVRTC "
-            "was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct SignedLessEqualRuntimeCase
-    {
-        int left;
-        int right;
-        int expected;
-    };
-    static const SignedLessEqualRuntimeCase kCases[] = {
+    static const NVVMScalarRuntimeCase kSignedLessEqualCases[] = {
         {0, 0, 1},
         {-7, -7, 1},
         {-7, 7, 1},
@@ -3046,108 +1450,7 @@ SLANG_UNIT_TEST(nvvmSlangIntegerSignedLessEqualRuntimeMatchesNVRTC)
         {INT_MIN, INT_MAX, 1},
         {INT_MAX, INT_MIN, 0},
     };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerSignedLessEqualSource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::LessEqual,
-                runtimeCase.left,
-                runtimeCase.right,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangIntegerSignedGreaterEqualRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerSignedGreaterEqual());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-equal runtime differential because the CUDA driver "
-            "is unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-equal runtime differential because no CUDA device is "
-            "available.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-equal runtime differential because the device is "
-            "older than sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-signed-greater-equal runtime differential because libNVVM or NVRTC "
-            "was not found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct SignedGreaterEqualRuntimeCase
-    {
-        int left;
-        int right;
-        int expected;
-    };
-    static const SignedGreaterEqualRuntimeCase kCases[] = {
+    static const NVVMScalarRuntimeCase kSignedGreaterEqualCases[] = {
         {0, 0, 1},
         {-7, -7, 1},
         {-7, 7, 0},
@@ -3155,325 +1458,133 @@ SLANG_UNIT_TEST(nvvmSlangIntegerSignedGreaterEqualRuntimeMatchesNVRTC)
         {INT_MIN, INT_MAX, 0},
         {INT_MAX, INT_MIN, 1},
     };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerSignedGreaterEqualSource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::GreaterEqual,
-                runtimeCase.left,
-                runtimeCase.right,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangIntegerBitAndRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitAnd());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-AND runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-AND runtime differential because no CUDA device is available.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-AND runtime differential because the device is older than "
-            "sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-AND runtime differential because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct BitAndRuntimeCase
-    {
-        int x;
-        int y;
-        int expected;
-    };
-    static const BitAndRuntimeCase kCases[] = {
+    static const NVVMScalarRuntimeCase kBitAndCases[] = {
         {0x5a, 0x3c, 0x18},
         {-1, 0x12345678, 0x12345678},
         {-2, -4, -4},
         {0, -1, 0},
     };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerBitAndSource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::BitAnd,
-                runtimeCase.x,
-                runtimeCase.y,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangIntegerBitOrRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitOr());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-OR runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-OR runtime differential because no CUDA device is available.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-OR runtime differential because the device is older than "
-            "sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-OR runtime differential because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct BitOrRuntimeCase
-    {
-        int x;
-        int y;
-        int expected;
-    };
-    static const BitOrRuntimeCase kCases[] = {
+    static const NVVMScalarRuntimeCase kBitOrCases[] = {
         {0x5a, 0x3c, 0x7e},
         {-16, 3, -13},
         {0, -1, -1},
         {0x55555555, 0x0f0f0f0f, 0x5f5f5f5f},
     };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerBitOrSource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::BitOr,
-                runtimeCase.x,
-                runtimeCase.y,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangIntegerBitXorRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitXor());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-XOR runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-XOR runtime differential because no CUDA device is available.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-XOR runtime differential because the device is older than "
-            "sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-XOR runtime differential because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct BitXorRuntimeCase
-    {
-        int x;
-        int y;
-        int expected;
-    };
-    static const BitXorRuntimeCase kCases[] = {
+    static const NVVMScalarRuntimeCase kBitXorCases[] = {
         {0x5a, 0x3c, 0x66},
         {-1, 0x12345678, -305419897},
         {-16, -1, 15},
         {0, -1, -1},
     };
+    static const NVVMScalarRuntimeCase kBitNotCases[] = {
+        {0, 0, -1},
+        {-1, 0, 0},
+        {0x55555555, 0, -1431655766},
+        {-16, 0, 15},
+    };
+    static const NVVMScalarRuntimeCase kNegateCases[] = {
+        {0, 0, 0},
+        {1, 0, -1},
+        {-7, 0, 7},
+        {-2147483647 - 1, 0, -2147483647 - 1},
+    };
+
+    switch (operation)
+    {
+    case NVVMScalarTestOperation::Multiply:
+        RETURN_CASES(kMultiplyCases);
+    case NVVMScalarTestOperation::BitAnd:
+        RETURN_CASES(kBitAndCases);
+    case NVVMScalarTestOperation::BitOr:
+        RETURN_CASES(kBitOrCases);
+    case NVVMScalarTestOperation::BitXor:
+        RETURN_CASES(kBitXorCases);
+    case NVVMScalarTestOperation::BitNot:
+        RETURN_CASES(kBitNotCases);
+    case NVVMScalarTestOperation::Negate:
+        RETURN_CASES(kNegateCases);
+    case NVVMScalarTestOperation::Equal:
+        RETURN_CASES(kEqualCases);
+    case NVVMScalarTestOperation::NotEqual:
+        RETURN_CASES(kNotEqualCases);
+    case NVVMScalarTestOperation::SignedGreaterThan:
+        RETURN_CASES(kSignedGreaterThanCases);
+    case NVVMScalarTestOperation::SignedLessEqual:
+        RETURN_CASES(kSignedLessEqualCases);
+    case NVVMScalarTestOperation::SignedGreaterEqual:
+        RETURN_CASES(kSignedGreaterEqualCases);
+    }
+    SLANG_UNEXPECTED("unknown NVVM scalar runtime operation");
+
+#undef RETURN_CASES
+}
+
+static void _runNVVMScalarRuntime(
+    UnitTestContext* unitTestContext,
+    NVVMScalarTestOperation operation)
+{
+    const NVVMScalarTestCase& testCase = _getNVVMScalarTestCase(operation);
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(_supportsNVVMScalarTestOperation(preflightBuilder, operation));
+
+    CudaDriverApi cuda;
+    if (!cuda.load() || cuda.cuInit(0) != 0)
+    {
+        StringBuilder message;
+        message << "Ignoring " << testCase.diagnosticName
+                << " runtime differential because the CUDA driver is unavailable.";
+        getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+        SLANG_IGNORE_TEST;
+    }
+    int deviceCount = 0;
+    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
+    {
+        StringBuilder message;
+        message << "Ignoring " << testCase.diagnosticName
+                << " runtime differential because no CUDA device is available.";
+        getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+        SLANG_IGNORE_TEST;
+    }
+
+    CudaDevice device = 0;
+    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
+    int computeMajor = 0;
+    SLANG_CHECK_ABORT(
+        cuda.cuDeviceGetAttribute(
+            &computeMajor,
+            kCudaDeviceAttributeComputeCapabilityMajor,
+            device) == 0);
+    if (computeMajor < 7)
+    {
+        StringBuilder message;
+        message << "Ignoring " << testCase.diagnosticName
+                << " runtime differential because the device is older than sm_70.";
+        getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+        SLANG_IGNORE_TEST;
+    }
+
+    CudaContext context = nullptr;
+    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
+    CudaPrimaryContextGuard contextGuard{cuda, device};
+    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
+        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        StringBuilder message;
+        message << "Ignoring " << testCase.diagnosticName
+                << " runtime differential because libNVVM or NVRTC was not found.";
+        getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+        SLANG_IGNORE_TEST;
+    }
+
+    const NVVMScalarRuntimeCase* runtimeCases = nullptr;
+    Index runtimeCaseCount = 0;
+    _getNVVMScalarRuntimeCases(operation, runtimeCases, runtimeCaseCount);
     static const SlangEmitCUDAMethod kMethods[] = {
         SLANG_EMIT_CUDA_VIA_NVVM,
         SLANG_EMIT_CUDA_VIA_NVRTC,
@@ -3482,12 +1593,8 @@ SLANG_UNIT_TEST(nvvmSlangIntegerBitXorRuntimeMatchesNVRTC)
     {
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerBitXorSource,
-            method,
-            code,
-            diagnostics);
+        const SlangResult compileResult =
+            _compileSlangWithPTXMethod(globalSession, testCase.source, method, code, diagnostics);
         if (SLANG_FAILED(compileResult))
         {
             const String text = _getBlobText(diagnostics);
@@ -3496,12 +1603,13 @@ SLANG_UNIT_TEST(nvvmSlangIntegerBitXorRuntimeMatchesNVRTC)
         }
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
         SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
+        for (Index i = 0; i < runtimeCaseCount; ++i)
         {
+            const NVVMScalarRuntimeCase& runtimeCase = runtimeCases[i];
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
                 cuda,
                 code,
-                ScalarRuntimeOperation::BitXor,
+                testCase.runtimeOperation,
                 runtimeCase.x,
                 runtimeCase.y,
                 runtimeCase.expected)));
@@ -3509,219 +1617,25 @@ SLANG_UNIT_TEST(nvvmSlangIntegerBitXorRuntimeMatchesNVRTC)
     }
 }
 
-
-SLANG_UNIT_TEST(nvvmSlangIntegerBitNotRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerBitNot());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-NOT runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-NOT runtime differential because no CUDA device is available.");
-        SLANG_IGNORE_TEST;
+#define NVVM_SCALAR_RUNTIME_TEST(NAME, OPERATION)                                   \
+    SLANG_UNIT_TEST(NAME)                                                           \
+    {                                                                               \
+        _runNVVMScalarRuntime(unitTestContext, NVVMScalarTestOperation::OPERATION); \
     }
 
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-NOT runtime differential because the device is older than "
-            "sm_70.");
-        SLANG_IGNORE_TEST;
-    }
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerMultiplyRuntimeMatchesNVRTC, Multiply)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerEqualRuntimeMatchesNVRTC, Equal)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerNotEqualRuntimeMatchesNVRTC, NotEqual)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerSignedGreaterThanRuntimeMatchesNVRTC, SignedGreaterThan)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerSignedLessEqualRuntimeMatchesNVRTC, SignedLessEqual)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerSignedGreaterEqualRuntimeMatchesNVRTC, SignedGreaterEqual)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerBitAndRuntimeMatchesNVRTC, BitAnd)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerBitOrRuntimeMatchesNVRTC, BitOr)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerBitXorRuntimeMatchesNVRTC, BitXor)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerBitNotRuntimeMatchesNVRTC, BitNot)
+NVVM_SCALAR_RUNTIME_TEST(nvvmSlangIntegerNegateRuntimeMatchesNVRTC, Negate)
 
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-bit-NOT runtime differential because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct BitNotRuntimeCase
-    {
-        int x;
-        int expected;
-    };
-    static const BitNotRuntimeCase kCases[] = {
-        {0, -1},
-        {-1, 0},
-        {0x55555555, -1431655766},
-        {-16, 15},
-    };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerBitNotSource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::BitNot,
-                runtimeCase.x,
-                0,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-
-SLANG_UNIT_TEST(nvvmSlangIntegerNegateRuntimeMatchesNVRTC)
-{
-    NVVMIRBuilder preflightBuilder;
-    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarIntegerNegate());
-
-    CudaDriverApi cuda;
-    if (!cuda.load() || cuda.cuInit(0) != 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-negate runtime differential because the CUDA driver is "
-            "unavailable.");
-        SLANG_IGNORE_TEST;
-    }
-    int deviceCount = 0;
-    if (cuda.cuDeviceGetCount(&deviceCount) != 0 || deviceCount == 0)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-negate runtime differential because no CUDA device is available.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaDevice device = 0;
-    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
-    int computeMajor = 0;
-    SLANG_CHECK_ABORT(
-        cuda.cuDeviceGetAttribute(
-            &computeMajor,
-            kCudaDeviceAttributeComputeCapabilityMajor,
-            device) == 0);
-    if (computeMajor < 7)
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-negate runtime differential because the device is older than "
-            "sm_70.");
-        SLANG_IGNORE_TEST;
-    }
-
-    CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
-    CudaPrimaryContextGuard contextGuard{cuda, device};
-    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
-        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
-    {
-        getTestReporter()->message(
-            TestMessageType::Info,
-            "Ignoring integer-negate runtime differential because libNVVM or NVRTC was not "
-            "found.");
-        SLANG_IGNORE_TEST;
-    }
-
-    struct NegateRuntimeCase
-    {
-        int x;
-        int expected;
-    };
-    static const NegateRuntimeCase kCases[] = {
-        {0, 0},
-        {1, -1},
-        {-7, 7},
-        {-2147483647 - 1, -2147483647 - 1},
-    };
-    static const SlangEmitCUDAMethod kMethods[] = {
-        SLANG_EMIT_CUDA_VIA_NVVM,
-        SLANG_EMIT_CUDA_VIA_NVRTC,
-    };
-    for (SlangEmitCUDAMethod method : kMethods)
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithPTXMethod(
-            globalSession,
-            kDirectNVVMIntegerNegateSource,
-            method,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
-        {
-            const String text = _getBlobText(diagnostics);
-            if (text.getLength())
-                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        for (const auto& runtimeCase : kCases)
-        {
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runScalarKernel(
-                cuda,
-                code,
-                ScalarRuntimeOperation::Negate,
-                runtimeCase.x,
-                0,
-                runtimeCase.expected)));
-        }
-    }
-}
-
-
+#undef NVVM_SCALAR_RUNTIME_TEST
 SLANG_UNIT_TEST(nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC)
 {
     NVVMIRBuilder preflightBuilder;
