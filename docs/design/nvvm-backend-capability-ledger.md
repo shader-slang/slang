@@ -430,3 +430,12 @@ RTX 5090, both routes store 42 through the exact one-element `{device pointer, c
 value. The final Release NVVM prefix passes 188/188. Preservation passes 1/1 parser, 2/2
 routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime
 dispatch.
+
+Slice 27 changes test ownership without changing capability evidence. The former 25,941-line NVVM
+unit-test source is separated into provider-builder (66 registered tests), direct-emitter (44),
+real integration/runtime (52), and downstream compiler/loader (26) owners plus a support header
+that registers no tests. The exact sorted 188-name set has the same pre/post SHA-256,
+`c197159202001f39765394b2399146398d0c4534803864b3ea44cc694827ac78`, so every row above retains
+its established selector and semantic claim. The final Release prefix passes 188/188 and Debug
+preservation passes 1/1 parser, 2/2 routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA
+compile/pass-through, and 1/1 runtime dispatch. No production source or provider export changes.

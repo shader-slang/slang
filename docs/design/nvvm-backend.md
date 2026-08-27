@@ -1788,6 +1788,23 @@ and store 42 into the one-element allocation. The Release focused NVVM suite pas
 the preservation matrix passes 10/10. The provider still exports only the V1/V2 getters and has no
 process-visible LLVM DLL dependency.
 
+### Slice 27 test ownership
+
+Slice 27 changes no backend behavior. It separates the former 25,941-line NVVM unit-test monolith
+into four registered-test owners: provider-builder ABI and invalid-operation coverage, fake direct
+Slang emitter topology and capability gating, real differential PTX/`ptxas`/runtime integration,
+and downstream compiler/loader/libdevice policy. A shared internal support header retains the
+existing anonymous-namespace fixtures so each translation unit owns private fake state; it
+registers no tests and exports no test ABI.
+
+The exact sorted set of 188 registered test names is unchanged, including every name referenced by
+the capability ledger. Its pre/post SHA-256 is
+`c197159202001f39765394b2399146398d0c4534803864b3ea44cc694827ac78`. The focused Release suite
+passes 188/188 and the Debug preservation matrix passes 10/10. This slice deliberately preserves
+the historical per-operation fake representation. Slice 28 can now change provider tests without
+mixing compiler/runtime ownership, and Slice 30 owns replacing that fake representation and the
+duplicated scalar runners after the generic provider surface is established.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
