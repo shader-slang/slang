@@ -5,6 +5,7 @@
 #include "core/slang-io.h"
 #include "core/slang-process-util.h"
 #include "core/slang-string-util.h"
+#include "package-docs.h"
 #include "package-git.h"
 #include "package-json.h"
 #include "package-local.h"
@@ -36,6 +37,9 @@ static void _printHelp()
         "  update --from-local [--clean]\n"
         "                   Resolve registered local package manifests into the lock.\n"
         "  build            Compile each workspace primary to build/<import>.slang-module.\n"
+        "  run [args...]    Build and run the workspace main module with slangi.\n"
+        "  test             Run slang-test on the workspace tests directory.\n"
+        "  docs             Copy package Markdown files to build/docs/<package>.\n"
         "  validate         Validate package structure and the locked dependency closure.\n"
         "  edit <name>      Make a dependency checkout editable in place.\n"
         "  unedit <name>    Return an unchanged checkout to tool ownership.\n"
@@ -688,16 +692,81 @@ static SlangResult _runSiblingTool(
     return SLANG_OK;
 }
 
+/// Execute a sibling tool while forwarding its output as it is produced. This is used for
+/// long-running or user-visible commands; compiler subprocesses use `_runSiblingTool` so their
+/// diagnostics can be attached directly to the package error.
+static SlangResult _runStreamingSiblingTool(
+    const String& executablePath,
+    const List<String>& arguments,
+    String& outError)
+{
+    CommandLine commandLine;
+    commandLine.setExecutableLocation(
+        ExecutableLocation(ExecutableLocation::Type::Path, executablePath));
+    for (const auto& argument : arguments)
+        commandLine.addArg(argument);
+
+    RefPtr<Process> process;
+    if (SLANG_FAILED(
+            Process::create(commandLine, Process::Flag::DisableStdErrRedirection, process)))
+    {
+        outError = String("Cannot execute: ") + commandLine.toString();
+        return SLANG_FAIL;
+    }
+    if (Stream* standardInput = process->getStream(StdStreamType::In))
+        standardInput->close();
+
+    Stream* standardOutput = process->getStream(StdStreamType::Out);
+    while (!process->isTerminated())
+    {
+        List<Byte> output;
+        SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscard(standardOutput, 0, &output));
+        if (output.getCount())
+        {
+            fwrite(output.getBuffer(), 1, output.getCount(), stdout);
+            fflush(stdout);
+        }
+        else
+        {
+            Process::sleepCurrentThread(0);
+        }
+    }
+    for (;;)
+    {
+        List<Byte> output;
+        SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscard(standardOutput, 0, &output));
+        if (!output.getCount())
+            break;
+        fwrite(output.getBuffer(), 1, output.getCount(), stdout);
+    }
+    fflush(stdout);
+
+    if (process->getReturnValue() != 0 || process->getTerminationSignal() != 0)
+    {
+        outError = String("Command failed: ") + commandLine.toString();
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 /// Compile each workspace primary to a front-end `.slang-module`, preserving its import-relative
 /// path below the workspace build directory.
-static SlangResult _build(const String& projectRoot, String& outError)
+static SlangResult _build(
+    const String& projectRoot,
+    String& outError,
+    List<PrimaryModule>* outPrimaryModules = nullptr)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
 
     List<PrimaryModule> primaryModules;
     List<String> warnings;
-    SLANG_RETURN_ON_FAIL(validateProject(projectRoot, outError, &warnings, &primaryModules));
+    SLANG_RETURN_ON_FAIL(validateProject(
+        projectRoot,
+        outError,
+        &warnings,
+        &primaryModules,
+        ProjectValidationMode::SourceAndDependencies));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
 
@@ -733,8 +802,89 @@ static SlangResult _build(const String& projectRoot, String& outError)
             return SLANG_FAIL;
         }
     }
+    if (outPrimaryModules)
+        *outPrimaryModules = primaryModules;
     fprintf(stdout, "Built %lld module(s).\n", (long long)primaryModules.getCount());
     return SLANG_OK;
+}
+
+/// Build and interpret the workspace module whose import path is `main`.
+static SlangResult _run(
+    const String& projectRoot,
+    int argumentCount,
+    const char* const* arguments,
+    String& outError)
+{
+    List<PrimaryModule> primaryModules;
+    SLANG_RETURN_ON_FAIL(_build(projectRoot, outError, &primaryModules));
+    bool hasMainModule = false;
+    for (const auto& module : primaryModules)
+        hasMainModule = hasMainModule || module.importPath == "main";
+    if (!hasMainModule)
+    {
+        outError = "The workspace does not export a primary module with import path 'main'.";
+        return SLANG_FAIL;
+    }
+
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
+    String mainModule =
+        Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest), "main.slang-module");
+    if (!File::exists(mainModule))
+    {
+        outError = String("The build did not produce the expected main module: ") + mainModule;
+        return SLANG_FAIL;
+    }
+
+    String slangiPath;
+    SLANG_RETURN_ON_FAIL(_findSiblingTool("slangi", slangiPath, outError));
+    List<String> slangiArguments;
+    slangiArguments.add(mainModule);
+    for (Index i = 0; i < argumentCount; ++i)
+        slangiArguments.add(arguments[i]);
+    return _runStreamingSiblingTool(slangiPath, slangiArguments, outError);
+}
+
+/// Validate the materialized workspace and run its `tests` tree through the sibling Slang test
+/// infrastructure.
+static SlangResult _test(const String& projectRoot, String& outError)
+{
+    List<String> warnings;
+    SLANG_RETURN_ON_FAIL(validateProject(
+        projectRoot,
+        outError,
+        &warnings,
+        nullptr,
+        ProjectValidationMode::SourceAndDependencies));
+    for (const auto& warning : warnings)
+        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+
+    String testsPath = Path::combine(projectRoot, "tests");
+    SlangPathType testsType;
+    if (SLANG_FAILED(Path::getPathType(testsPath, &testsType)) ||
+        testsType != SLANG_PATH_TYPE_DIRECTORY)
+    {
+        outError = String("Workspace tests directory does not exist: ") + testsPath;
+        return SLANG_FAIL;
+    }
+
+    String slangTestPath;
+    SLANG_RETURN_ON_FAIL(_findSiblingTool("slang-test", slangTestPath, outError));
+    String relativeTestsPath = Path::getRelativePath(Path::getCurrentPath(), testsPath);
+    if (Path::isAbsolute(relativeTestsPath))
+    {
+        outError = "Workspace tests must be on the same filesystem as the current directory.";
+        return SLANG_FAIL;
+    }
+    List<String> testArguments;
+    testArguments.add("-test-dir");
+    testArguments.add(relativeTestsPath);
+    // A prefix keeps slang-test from selecting its linked unit-test registry when this command is
+    // itself exercised by a unit test. The trailing separator still matches every file below the
+    // directory, while the directory entry that slang-test adds for an existing prefix is ignored
+    // because it has no test-file extension.
+    testArguments.add(relativeTestsPath + "/");
+    return _runStreamingSiblingTool(slangTestPath, testArguments, outError);
 }
 
 static SlangResult _registerLocalPackage(
@@ -995,6 +1145,12 @@ SlangResult executeInDirectory(
         return _validate(projectRoot, outError);
     if (command == "build" && argc == 2)
         return _build(projectRoot, outError);
+    if (command == "run")
+        return _run(projectRoot, argc - 2, argv + 2, outError);
+    if (command == "test" && argc == 2)
+        return _test(projectRoot, outError);
+    if (command == "docs" && argc == 2)
+        return buildDocumentation(projectRoot, outError);
     if (command == "edit" && argc == 3)
         return _edit(projectRoot, argv[2], outError);
     if (command == "unedit" && argc == 3)

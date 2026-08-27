@@ -398,9 +398,11 @@ static SlangResult _validatePackageTree(
     const String& packageRoot,
     const Manifest& manifest,
     List<ModuleLocation>& ioModules,
+    ProjectValidationMode mode,
     String& outError)
 {
-    SLANG_RETURN_ON_FAIL(_validateLicenseFiles(packageRoot, manifest, outError));
+    if (mode == ProjectValidationMode::Full)
+        SLANG_RETURN_ON_FAIL(_validateLicenseFiles(packageRoot, manifest, outError));
     if (manifest.exports.getCount() == 0)
     {
         outError =
@@ -473,14 +475,15 @@ SlangResult validateProject(
     const String& projectRoot,
     String& outError,
     List<String>* outWarnings,
-    List<PrimaryModule>* outPrimaryModules)
+    List<PrimaryModule>* outPrimaryModules,
+    ProjectValidationMode mode)
 {
     Manifest rootManifest;
     SLANG_RETURN_ON_FAIL(
         readManifest(Path::combine(projectRoot, kManifestName), rootManifest, outError));
 
     List<ModuleLocation> modules;
-    SLANG_RETURN_ON_FAIL(_validatePackageTree(projectRoot, rootManifest, modules, outError));
+    SLANG_RETURN_ON_FAIL(_validatePackageTree(projectRoot, rootManifest, modules, mode, outError));
     if (outPrimaryModules)
     {
         outPrimaryModules->clear();
@@ -589,7 +592,7 @@ SlangResult validateProject(
         }
 
         SLANG_RETURN_ON_FAIL(
-            _validatePackageTree(packageRoots[index], manifest, modules, outError));
+            _validatePackageTree(packageRoots[index], manifest, modules, mode, outError));
     }
     return requireAllLockPackagesTrusted(lock, reachable, outError);
 }

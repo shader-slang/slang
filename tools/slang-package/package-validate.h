@@ -17,6 +17,12 @@ struct PrimaryModule
     String sourcePath;
 };
 
+enum class ProjectValidationMode
+{
+    Full,
+    SourceAndDependencies,
+};
+
 /// Return the placeholder text written by `slang package init`.
 const char* getLicensePlaceholderText();
 
@@ -26,7 +32,8 @@ SlangResult validateProject(
     const String& projectRoot,
     String& outError,
     List<String>* outWarnings = nullptr,
-    List<PrimaryModule>* outPrimaryModules = nullptr);
+    List<PrimaryModule>* outPrimaryModules = nullptr,
+    ProjectValidationMode mode = ProjectValidationMode::Full);
 
 } // namespace PackageTool
 } // namespace Slang

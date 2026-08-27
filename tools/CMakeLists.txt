@@ -429,6 +429,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         slang-unit-test
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-docs.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-git.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-json.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-local.cpp

@@ -382,8 +382,11 @@ SLANG_UNIT_TEST(PackageToolBuild)
     String error;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::writeAllText(Path::combine(temp.path, "LICENSE"), "Package test license.\n")));
+    Manifest manifest;
+    String manifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
+    manifest.workspace.buildDirectory = "out";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
         Path::combine(temp.path, "src/acme/noise.slang"),
         "module noise;\n"
@@ -402,9 +405,77 @@ SLANG_UNIT_TEST(PackageToolBuild)
     const char* buildArguments[] = {"slang-package", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/acme/noise.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/acme/noise.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/main.slang-module")));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/acme/noise/helper.slang-module")));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/main.slang"),
+        "module main;\n"
+        "int broken() { return missingValue; }\n")));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("undefined identifier")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageToolRun)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/library.slang"),
+        "module library;\n"
+        "public int getValue() { return 0; }\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/main.slang"),
+        "module main;\n"
+        "import library;\n"
+        "int main(int argc, NativeString* argv) { return getValue() + (argc == 2 ? 0 : 1); }\n")));
+
+    const char* runArguments[] = {"slang-package", "run", "argument"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "build/main.slang-module")));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/acme/noise/helper.slang-module")));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "src/main.slang"))));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not export")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageToolTest)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/library.slang"),
+        "module library;\n"
+        "public int getValue() { return 1; }\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "tests/library-test.slang"),
+        "//TEST:SIMPLE: -I $dirname/../src\n"
+        "import library;\n"
+        "int useLibrary() { return getValue(); }\n")));
+
+    const char* testArguments[] = {"slang-package", "test"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(testArguments), testArguments, error)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "tests/library-test.slang"),
+        "//TEST:SIMPLE:\n"
+        "int useMissingValue() { return missingValue; }\n")));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(testArguments), testArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Command failed")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolFetchRequiresLock)
@@ -540,6 +611,10 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(temp.path, "docs/guide.md"), "# Root guide\n")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(temp.path, "docs/ignored.txt"), "Not docs\n")));
 
     String aRoot = Path::combine(temp.path, "vendor/a");
     String bRoot = Path::combine(aRoot, "vendor/b");
@@ -553,6 +628,8 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(Path::combine(bRoot, "LICENSE"), "B license\n")));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_writeFile(Path::combine(bRoot, "src/b.slang"), "module b;\n")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(bRoot, "docs/reference/api.md"), "# B API\n")));
 
     String cRoot = Path::combine(temp.path, "vendor/c");
     SLANG_CHECK_ABORT(Path::createDirectoryRecursive(cRoot));
@@ -565,6 +642,8 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(Path::combine(cRoot, "LICENSE"), "C license\n")));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_writeFile(Path::combine(cRoot, "src/c.slang"), "module c;\n")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(cRoot, "docs/reference.md"), "# C reference\n")));
 
     Manifest a;
     a.name = "a";
@@ -583,6 +662,8 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(Path::combine(aRoot, "LICENSE"), "A license\n")));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_writeFile(Path::combine(aRoot, "src/a.slang"), "module a;\n")));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(aRoot, "docs/readme.md"), "# A readme\n")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -659,6 +740,27 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK(
         searchPaths.getUnownedSlice().indexOf(UnownedStringSlice("vendor/a/vendor/b/src")) >= 0);
     SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(UnownedStringSlice("vendor/c/src")) >= 0);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/main.slang"),
+        "module main;\n"
+        "import b;\n"
+        "public int useB() { return 0; }\n")));
+    const char* buildArguments[] = {"slang-package", "build"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/main.slang-module")));
+
+    const char* docsArguments[] = {"slang-package", "docs"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(docsArguments), docsArguments, error)));
+    SLANG_CHECK(
+        File::exists(Path::combine(Path::combine(temp.path, "build/docs", root.name), "guide.md")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/a/readme.md")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/b/reference/api.md")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/c/reference.md")));
+    SLANG_CHECK(!File::exists(
+        Path::combine(Path::combine(temp.path, "build/docs", root.name), "ignored.txt")));
 
     List<String> warnings;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(validateProject(temp.path, error, &warnings)));

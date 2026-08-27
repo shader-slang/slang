@@ -33,7 +33,7 @@ docs/
 
 `src/` contains importable Slang modules. When `exports` includes `src`, the workspace package's
 default run module is `main`: `src/main.slang` must declare `module main;`. `slang package run`
-(not yet implemented) will use that module unless a later option selects another primary.
+uses that module.
 
 `tests/` and `docs/` are reserved for package tests and documentation. The initial package tool
 creates these directories.
@@ -227,6 +227,21 @@ because the same source commit can be compiled against different resolved depend
 `slang package build` validates the materialized package graph and compiles every primary module in
 the workspace package to a front-end `.slang-module` under `workspace.build`, preserving its import
 path. For example, `src/acme/noise.slang` becomes `build/acme/noise.slang-module`.
+
+`slang package run` first builds the workspace and then invokes the sibling `slangi` executable on
+`build/main.slang-module`. The default is the primary whose import path is `main` (typically
+`src/main.slang`). A library package that has no `main` is not a `run` target. Arguments after
+`slang package run` are forwarded to the interpreted program.
+
+`slang package test` validates the materialized package graph and invokes the sibling `slang-test`
+executable on the workspace's `tests/` tree. Tests can use slang-test's `$dirname` substitution to
+refer to workspace exports; for example, a test under `tests/` can add `-I $dirname/../src` to its
+test directive. The command fails if the package tool installation does not include `slang-test`.
+
+`slang package docs` copies every `.md` file below each materialized package's `docs/` directory to
+`build/docs/<package-name>/`, preserving paths below `docs/`. Namespacing the output by package
+keeps files such as `docs/README.md` from different packages distinct. Other file types are not
+copied.
 
 ## Possible future enhancements
 
