@@ -279,8 +279,11 @@ jobs:
           "$bin_dir/slang-test" "${via_glsl_args[@]}"
 
       - name: Check via-glsl slang-test worktree cleanliness
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: always() && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run GLSL backend tests on release for pull requests and /ci dispatches,
+        # and not on merge_group, to reduce CI load. Mirrors the "Test Slang via
+        # glsl" step's own if: above -- this check is only meaningful when that
+        # step actually ran.
+        if: always() && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && (github.event_name == 'pull_request' || github.event_name == 'repository_dispatch')
         run: |
           status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
           if [[ -n "$status" ]]; then

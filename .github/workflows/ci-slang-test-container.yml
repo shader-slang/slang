@@ -228,7 +228,9 @@ jobs:
             -expected-failure-list tests/expected-failure-linux-gpu.txt
 
       - name: Check via-glsl slang-test worktree cleanliness
-        if: always() && inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Mirrors the "Test Slang via glsl" step's own if: above -- this check
+        # is only meaningful when that step actually ran.
+        if: always() && inputs.gpu-tier == 't4' && inputs.config == 'release' && (github.event_name == 'pull_request' || github.event_name == 'repository_dispatch')
         run: |
           status="$(git status --short --untracked-files=all -- . ':(exclude)artifacts/**')"
           if [[ -n "$status" ]]; then
