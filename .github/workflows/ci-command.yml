@@ -47,6 +47,7 @@ jobs:
     outputs:
       head-sha: ${{ steps.pin.outputs.head-sha }}
       head-repo: ${{ steps.pin.outputs.head-repo }}
+      base-sha: ${{ steps.pin.outputs.base-sha }}
       is-fork: ${{ steps.pin.outputs.is-fork }}
       skip: ${{ steps.inflight.outputs.skip }}
     steps:
@@ -55,14 +56,16 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.client_payload.pull_request.head.sha }}
           HEAD_REPO: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          BASE_SHA: ${{ github.event.client_payload.pull_request.base.sha }}
           IS_FORK: ${{ github.event.client_payload.pull_request.head.repo.fork }}
         run: |
           {
             echo "head-sha=$HEAD_SHA"
             echo "head-repo=$HEAD_REPO"
+            echo "base-sha=$BASE_SHA"
             echo "is-fork=$IS_FORK"
           } >> "$GITHUB_OUTPUT"
-          echo "PR #${{ github.event.client_payload.pull_request.number }} head: $HEAD_REPO@$HEAD_SHA (fork=$IS_FORK)"
+          echo "PR #${{ github.event.client_payload.pull_request.number }} head: $HEAD_REPO@$HEAD_SHA (fork=$IS_FORK), base: $BASE_SHA"
 
       - id: inflight
         name: Check for in-flight CI runs on this PR head
@@ -73,10 +76,17 @@ jobs:
           # Don't cancel a CI run that's already running for this SHA.
           # If a normal pull_request CI run or a previous /ci is mid-flight,
           # refuse politely instead of duplicating work.
+          #
+          # No server-side status= filter: a run GitHub has accepted but not
+          # yet started reports queued/requested/waiting/pending, not
+          # in_progress. Filtering only on in_progress would let two /ci
+          # comments in quick succession (or /ci right after a push) both
+          # pass this check while the first run sits queued for a runner.
           in_flight=$(gh api -X GET "repos/${{ github.repository }}/actions/runs" \
             -f head_sha="$HEAD_SHA" \
-            -f status=in_progress \
-            --jq '[.workflow_runs[] | select(.name == "CI" or .name == "/ci command")] | length' \
+            --jq '[.workflow_runs[]
+                   | select(.name == "CI" or .name == "/ci command")
+                   | select(.status != "completed")] | length' \
             || echo "0")
           in_flight=${in_flight:-0}
           if ! [[ "$in_flight" =~ ^[0-9]+$ ]]; then
@@ -119,6 +129,7 @@ jobs:
       ref: ${{ needs.trust-check.outputs.head-sha }}
       repository: ${{ needs.trust-check.outputs.head-repo }}
       is-fork-pr: ${{ needs.trust-check.outputs.is-fork == 'true' }}
+      base-sha: ${{ needs.trust-check.outputs.base-sha }}
 
   final-status:
     needs: [trust-check, matrix]

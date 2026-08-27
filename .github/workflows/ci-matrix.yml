@@ -26,6 +26,14 @@ on:
         required: false
         type: boolean
         default: false
+      base-sha:
+        description: >-
+          PR base SHA, for sanitizer PR-vs-preexisting finding classification
+          under repository_dispatch (empty under pull_request/merge_group,
+          which derive it from the event payload directly).
+        required: false
+        type: string
+        default: ""
 
 # Ceiling for every job in this workflow: a job's own `permissions:` can only
 # restrict further, never exceed, what's granted here (GitHub Actions never
@@ -221,6 +229,7 @@ jobs:
       ref: ${{ inputs.ref }}
       repository: ${{ inputs.repository }}
       is-fork-pr: ${{ inputs.is-fork-pr }}
+      base-sha: ${{ inputs.base-sha }}
 
   # macOS builds
   build-macos-debug-clang-aarch64:

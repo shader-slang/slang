@@ -29,6 +29,15 @@ on:
         required: false
         type: boolean
         default: false
+      base-sha:
+        description: >-
+          PR base SHA to diff against for PR-vs-preexisting finding
+          classification. Empty under pull_request/merge_group, which derive
+          it from the event payload directly; set by /ci (repository_dispatch),
+          which has no event payload to derive it from.
+        required: false
+        type: string
+        default: ""
       upload-binaries:
         # Publish the ASan-instrumented build as a `sanitizer-binaries`
         # artifact so downstream projects can run their own ASan suites
@@ -76,12 +85,23 @@ jobs:
       - name: Compute PR changed files
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          # repository_dispatch (the /ci slash command) has no pull_request or
+          # merge_group event payload to derive a base SHA from, so ci-command.yml
+          # threads it through explicitly via inputs.base-sha instead.
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || inputs.base-sha }}
         run: |
-          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "merge_group" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "merge_group" ] || [ "$EVENT_NAME" = "repository_dispatch" ]; then
             if [ -z "$BASE_SHA" ]; then
               echo "::error::The $EVENT_NAME event did not provide a base SHA"
               exit 1
+            fi
+            # Under /ci on a fork PR, checkout above pulled history from the
+            # fork (inputs.repository), which may never have fetched this SHA
+            # from the base repo. Fetch it explicitly if the checkout's history
+            # doesn't already contain it.
+            if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+              echo "Base SHA not in checkout history; fetching from shader-slang/slang"
+              git fetch --depth=1 https://github.com/shader-slang/slang.git "$BASE_SHA"
             fi
             echo "Computing diff against PR base: $BASE_SHA"
             git diff --name-only "$BASE_SHA"...HEAD > /tmp/pr-changed-files.txt
