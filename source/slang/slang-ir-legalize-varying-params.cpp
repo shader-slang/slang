@@ -1135,19 +1135,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
 
-    // Return true if a register-based payload write-back has already been
-    // registered for `payloadType` (i.e. this payload's input direction took the
-    // register path). Used to skip the redundant output-direction readback for
-    // exactly that payload, without affecting other payloads on the same entry
-    // point that used the pointer-packing fallback (#12532).
-    //
-    // Note: the registration site (`m_payloadWritebacks.getCount() == 0`) records
-    // at most one register payload per entry point, so this list holds <= 1 entry
-    // under the current rule. The per-type match therefore only distinguishes that
-    // single registered payload from pointer-packed payloads; it does not (yet)
-    // support multiple register payloads on one entry point -- that configuration
-    // is already unsupported (register indices reset per parameter, so two register
-    // payloads would collide) and is not standard OptiX usage.
     bool hasRegisteredPayloadWriteback(IRType* payloadType) const
     {
         return m_payloadWritebacks.findFirstIndex(
@@ -2329,21 +2316,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
 
-                // An `inout` payload is legalized twice: as `VaryingInput` to
-                // read the incoming value, and as `VaryingOutput` to produce the
-                // outgoing one. On the register path the input pass already read
-                // the registers into a local and `processMutableParam` copied that
-                // into the body's `IRTempCallArgVar`; the write-back registered
-                // below reads that same var back out before return. So the output
-                // pass has nothing left to read; re-running the readback here just
-                // emits dead `optixGetPayload`s that survive DCE (#12532). Skip it,
-                // but only for the specific payload that registered a register
-                // write-back (matched by type): another payload on the same entry
-                // point that used the pointer-packing fallback must still reach its
-                // own assignment below, so we must not key off the entry-point-
-                // global write-back count. Returning an empty value lets
-                // `processMutableParam`'s output assignment no-op while the
-                // write-back remains the single source of the outgoing value.
+                // The incoming value of an `inout` register payload is read once,
+                // on the `VaryingInput` pass; its outgoing value is produced by the
+                // write-back registered on that same pass. The `VaryingOutput` pass
+                // therefore has no register read to perform, so return an empty
+                // value (making the output assignment a no-op) rather than emitting
+                // a redundant readback. Match by payload type so that a distinct
+                // payload using the pointer-packing fallback still reaches its own
+                // output assignment.
                 if (info.kind == LayoutResourceKind::VaryingOutput &&
                     hasRegisteredPayloadWriteback(info.type))
                 {
