@@ -156,6 +156,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32GreaterThanPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32GreaterThanRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite, signed-zero, and quiet-NaN ordered greater-than cases | RTX 5090 results are `1` for `3.75 > 1.5`, and `0` for `-8 > 0.5`, `+0 > -0`, and `NaN > -1` | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32LessEqualKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Existing generic floating-compare callback constructs exact unflagged LLVM `fcmp ole` whose `i1` result selects zero/one stores | Both text dialects contain one ordered less-equal comparison, two aligned i32 stores, and no fast flag | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32LessEqualUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical Bool `kIROp_Leq` with Float operands lowers through floating-compare operation 3 while signed-i32 less-equal remains unchanged | Exact original-order Float parameters feed the comparison and existing constant/phi/i32-store graph | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32LessEqualDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 ordered less-than-or-equal compiles through both routes | `[64, 32, 32]`, token-safe float32 relation predicate, one global i32 store, no load/float arithmetic/integer predicate agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32LessEqualPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32LessEqualRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite, signed-zero, and quiet-NaN ordered less-equal cases | RTX 5090 results are `1` for `1.5 <= 3.75` and `+0 <= -0`, and `0` for `0.5 <= -8` and `NaN <= 1` | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -686,4 +692,17 @@ names with only 60 measured test/support lines, from 20,688 to 20,748. NVVM and 
 signed-zero-equal, and quiet-NaN cases. Focused tests pass 14/14 and Release passes 256/256 with
 sorted-name SHA-256
 `f8b9a58433982e2583a7310c3e2bc43c82767adee115d121a13147783a8a6fcf`; Debug preservation passes
+10/10.
+
+Slice 40 adds ordered float32 less-than-or-equal as feature 28/floating-compare operation 3 through
+the unchanged V3 table. Canonical Bool `kIROp_Leq` is classified by its Float operands and becomes
+unflagged LLVM `fcmp ole` with original operand order; signed-i32 less-equal and adjacent
+float/pointer relations remain unchanged.
+
+The fourth comparison descriptor row adds seven registered names with only 41 measured
+test/support lines, from 20,748 to 20,789. NVVM and NVRTC agree on `[64, 32, 32]`, token-safe
+float32 relation evidence, store/no-load/arithmetic/integer-predicate; `ptxas` accepts both. RTX
+5090 returns true for `1.5 <= 3.75` and signed-zero equality, and false for `0.5 <= -8` and quiet
+NaN. Focused tests pass 14/14 and Release passes 263/263 with sorted-name SHA-256
+`f93467f3b27def96040db05fca0fec79c5e22a5010ae6a3226fab4d249d860a1`; Debug preservation passes
 10/10.

@@ -234,6 +234,7 @@ NVVM_FLOAT32_COMPARISON_DIRECT_TEST(nvvmSlangFloat32NotEqualUsesDirectPipeline, 
 NVVM_FLOAT32_COMPARISON_DIRECT_TEST(
     nvvmSlangFloat32GreaterThanUsesDirectPipeline,
     OrderedGreaterThan)
+NVVM_FLOAT32_COMPARISON_DIRECT_TEST(nvvmSlangFloat32LessEqualUsesDirectPipeline, OrderedLessEqual)
 
 #undef NVVM_FLOAT32_COMPARISON_DIRECT_TEST
 
@@ -380,6 +381,9 @@ NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
 NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
     nvvmSlangNegotiatesFloat32GreaterThanCapability,
     OrderedGreaterThan)
+NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
+    nvvmSlangNegotiatesFloat32LessEqualCapability,
+    OrderedLessEqual)
 
 #undef NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST
 
@@ -2742,7 +2746,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMPointerGreaterThanSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedIntegerLessEqualSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerLessEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingLessEqualSource, "'signed i32 value'"},
         {kDirectNVVMPointerLessEqualSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedIntegerGreaterEqualSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerGreaterEqualSource, "'entry-point parameter'"},
