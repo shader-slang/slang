@@ -121,6 +121,12 @@ public:
         uint32_t bitWidth,
         SlangNVVMTypeHandle_1& outType) const;
 
+    /// Gets the module-context-owned IEEE floating-point type used by an advertised feature.
+    SlangResult getFloatingPointType(
+        SlangNVVMModuleHandle_1 module,
+        uint32_t bitWidth,
+        SlangNVVMTypeHandle_1& outType) const;
+
     /// Gets a typed pointer with the requested NVVM address space.
     SlangResult getPointerType(
         SlangNVVMModuleHandle_1 module,
@@ -201,6 +207,14 @@ public:
     SlangResult emitIntegerCompare(
         SlangNVVMModuleHandle_1 module,
         SlangNVVMIntegerCompareOp_3 operation,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits one stable V3 scalar floating-point binary operation.
+    SlangResult emitFloatingBinary(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMFloatingBinaryOp_3 operation,
         SlangNVVMValueHandle_1 left,
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1& outValue) const;

@@ -1913,6 +1913,43 @@ Release passes 193/193, including every real PTX, `ptxas`, and RTX 5090 runtime 
 preservation passes 10/10. No production source, provider ABI, export, accepted IR shape, or
 environment gate changes.
 
+### Slice 31 exact scalar float32 addition
+
+Slice 31 admits one exact second scalar family: raw CUDA kernels may receive scalar `float`
+parameters and a read or read-write device `Ptr<float>`, add two available parameter values, and
+store the result through the pointer. The final linked graph contains canonical `Float`, one AS1
+float pointer, one `kIROp_Add`, and one four-byte-aligned store. Float loads remain outside the
+accepted graph, so the supported source does not rely on constants, casts, helper calls, phis, or
+another producer that would broaden this contract.
+
+The append-only V3 provider table adds a `getFloatingPointType` constructor and a generic
+`emitFloatingBinary` dispatcher. Feature bit `SCALAR_FLOAT32_ADD` requires both callbacks and the
+complete prefix. The x64 table grows from the exact 448-byte V3 core to 464 bytes. On x86 the old
+core's terminal-callback minimum remains 268 bytes, the new complete-prefix minimum is 276 bytes,
+and structure padding makes `sizeof` 280 bytes. An old exact V3 core remains valid when it does not
+advertise the feature; partial or null advertised prefixes are malformed. V2 neither grows nor
+synthesizes the feature.
+
+The module-local type context remains the only Slang-type-to-provider-type owner. It recognizes
+only canonical `Float` and exact AS1 float pointers, caches the LLVM `float` and pointer handles,
+and preserves access qualifiers as legality rather than LLVM type identity. The provider accepts
+only bit width 32 and emits one unflagged LLVM `fadd` for available, dominating, same-module,
+same-function LLVM `float` operands at an unterminated insertion point. The established audited
+NVVM-2.0 text bridge already represents that graph, so this slice adds no textual rewrite.
+
+Direct NVVM and NVRTC expose parameter widths `[64, 32, 32]`, a token-safe `add.f32`, and one
+global 32-bit store with no global load. Matching-toolkit `ptxas` accepts both outputs, and CUDA
+runtime results agree for `1.5 + 2.25 = 3.75`, `-8 + 0.5 = -7.5`, and
+`1024 + -256 = 768`. Float subtraction, multiplication, negation, comparison, constants, loads,
+helpers, phis, casts, half/double, vectors, aggregates, resources, and atomics remain deterministic
+boundaries.
+
+The fake provider records the new instruction through the same family/operation/ordered-operands
+stream introduced in Slice 30; it gains no per-operation state bundle or dedicated end-to-end
+harness. The final Release NVVM prefix passes 201/201. Its exact sorted LF-terminated name set has
+SHA-256 `73434ac732eccaf42c9fad54ad2956b13aa5e2371e9e2e72d5fbbc2aaaf6e2e2`.
+Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2020,8 +2057,9 @@ The program advances through bounded slices:
 28. a generic V3 provider ABI and feature-set negotiation, with frozen V2 fallback;
 29. centralized Slang-IR-to-NVVM type legalization and provider-type caching;
 30. table-driven consolidation of the scalar provider and end-to-end test matrix;
-31. further type, memory, resource, and optimization-quality work; and
-32. wave operations and other advanced capabilities, then production-readiness evaluation.
+31. exact scalar float32 addition through the generic V3 provider family;
+32. further type, memory, resource, and optimization-quality work; and
+33. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.

@@ -66,6 +66,101 @@ SLANG_UNIT_TEST(nvvmSlangV3RoutesGenericScalarFamilies)
     }
 }
 
+SLANG_UNIT_TEST(nvvmSlangFloat32AddUsesDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMFloat32AddSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.getFloatingPointTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.floatingPointBitWidth == 32);
+        SLANG_CHECK(gFakeNVVMBuilder.getPointerTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.pointerPointeeTypes.getCount() == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.pointerPointeeTypes[0] == _getFakeNVVMBuilderFloatType());
+        SLANG_CHECK(gFakeNVVMBuilder.functionParameterTypeKinds.getCount() == 3);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[0] ==
+            FakeNVVMBuilderParameterTypeKind::FloatPointer);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[1] ==
+            FakeNVVMBuilderParameterTypeKind::Float);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[2] ==
+            FakeNVVMBuilderParameterTypeKind::Float);
+        SLANG_CHECK(
+            gFakeNVVMBuilder
+                .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingBinary)] == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarOperations.getCount() == 1);
+        const FakeNVVMBuilderScalarOperation& operation = gFakeNVVMBuilder.scalarOperations[0];
+        SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::FloatingBinary);
+        SLANG_CHECK(operation.key.operation == SLANG_NVVM_FLOATING_BINARY_OP_ADD);
+        SLANG_CHECK(operation.operands[0].kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(operation.operands[0].index == 1);
+        SLANG_CHECK(operation.operands[1].kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(operation.operands[1].index == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].index == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storePointerValueRefs[0].kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(gFakeNVVMBuilder.storePointerValueRefs[0].index == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32AddCapability)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    gFakeNVVMBuilder.apiV3.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD / 64u] &=
+        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD % 64u));
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMFloat32AddSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.getFloatingPointTypeCallCount == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder
+                .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingBinary)] == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangEmptyComputeUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -2348,13 +2443,16 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsignedPointerOffsetSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedFixedArrayIndexSource, "'signed i32 value'"},
         {kDirectNVVMUnsupportedFloatArraySource, "'entry-point parameter'"},
+        {kDirectNVVMUnsupportedFloat32LoadSource, "'load result type'"},
+        {kDirectNVVMUnsupportedHalfAddSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsupportedDoubleAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedNestedArraySource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedLocalArraySource, "'var'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
         {kDirectNVVMUnsignedMultiplySource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerMultiplySource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingMultiplySource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingMultiplySource, "'signed i32 multiplication'"},
         {kDirectNVVMFloatingSineSource, "'helper function result type'"},
         {kDirectNVVMIntegerLeftShiftSource, "'shl'"},
         {kDirectNVVMIntegerRightShiftSource, "'shr'"},
@@ -2371,33 +2469,33 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMWideIntegerBitNotSource, "'entry-point parameter'"},
         {kDirectNVVMUnsignedIntegerNegateSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerNegateSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingNegateSource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingNegateSource, "'signed i32 arithmetic negation'"},
         {kDirectNVVMUnsignedAtomicAddSource, "'entry-point parameter'"},
         {kDirectNVVMWideAtomicAddSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingAtomicAddSource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingAtomicAddSource, "'relaxed global signed i32 atomic add'"},
         {kDirectNVVMAtomicSubSource, "'atomicSub'"},
         {kDirectNVVMAtomicExchangeSource, "'atomicExchange'"},
         {kDirectNVVMAcquireGlobalI32AtomicAddSource, "'relaxed atomic-add memory order'"},
-        {kDirectNVVMGroupSharedI32AtomicAddSource, "'device i32 pointer'"},
+        {kDirectNVVMGroupSharedI32AtomicAddSource, "'device scalar pointer'"},
         {kDirectNVVMUnsignedIntegerEqualSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingEqualSource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingEqualSource, "'signed i32 value'"},
         {kDirectNVVMPointerEqualSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedIntegerNotEqualSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerNotEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingNotEqualSource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingNotEqualSource, "'signed i32 value'"},
         {kDirectNVVMPointerNotEqualSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedIntegerGreaterThanSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerGreaterThanSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingGreaterThanSource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingGreaterThanSource, "'signed i32 value'"},
         {kDirectNVVMPointerGreaterThanSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedIntegerLessEqualSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerLessEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingLessEqualSource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingLessEqualSource, "'signed i32 value'"},
         {kDirectNVVMPointerLessEqualSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedIntegerGreaterEqualSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerGreaterEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingGreaterEqualSource, "'entry-point parameter'"},
+        {kDirectNVVMFloatingGreaterEqualSource, "'signed i32 value'"},
         {kDirectNVVMPointerGreaterEqualSource, "'signed i32 value'"},
     };
 
@@ -2424,6 +2522,13 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
             SLANG_CHECK(code == nullptr);
             const String diagnosticText = _getBlobText(diagnostics);
             SLANG_CHECK(diagnosticText.indexOf("E52017") >= 0);
+            if (diagnosticText.indexOf(unsupported.expectedConstruct) < 0)
+            {
+                StringBuilder message;
+                message << "Expected unsupported construct " << unsupported.expectedConstruct
+                        << ", but received: " << diagnosticText;
+                getTestReporter()->message(TestMessageType::TestFailure, message.getBuffer());
+            }
             SLANG_CHECK(diagnosticText.indexOf(unsupported.expectedConstruct) >= 0);
             SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
             SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 0);

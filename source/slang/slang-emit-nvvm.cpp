@@ -15,8 +15,8 @@ namespace Slang
 namespace
 {
 
-// The direct scalar ABI accepts only CUDA `int`, whose width and natural alignment are four bytes.
-static const uint32_t kNVVMI32Alignment = 4;
+// CUDA `int` and `float` both use four-byte natural alignment in the accepted direct scalar ABI.
+static const uint32_t kNVVMScalar32Alignment = 4;
 static const IRIntegerValue kNVVMI32Min = -2147483647 - 1;
 static const IRIntegerValue kNVVMI32Max = 2147483647;
 
@@ -113,6 +113,19 @@ SlangResult _validateI32Value(
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
+// Checks that an executable operand is an available canonical float32 value.
+SlangResult _validateFloat32Value(
+    CodeGenContext* codeGenContext,
+    IRInst* value,
+    IRInst* consumer,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree)
+{
+    if (!value || !isNVVMFloat32Type(value->getDataType()))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("float32 value"));
+    return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
+}
+
 // Checks an available device pointer and enforces the source access qualifier for stores.
 SlangResult _validatePointerValue(
     CodeGenContext* codeGenContext,
@@ -120,23 +133,31 @@ SlangResult _validatePointerValue(
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree,
-    bool requireWriteAccess)
+    bool requireWriteAccess,
+    IRType* expectedPointeeType)
 {
     auto ptrType = value ? asNVVMSupportedDevicePointerType(value->getDataType()) : nullptr;
+    auto float32PtrType =
+        value ? asNVVMSupportedDeviceFloat32PointerType(value->getDataType()) : nullptr;
     auto resourceElementPtrType =
         value ? asNVVMSupportedRWStructuredBufferI32ElementPointerType(value->getDataType())
               : nullptr;
-    if (!ptrType &&
+    IRPtrTypeBase* devicePtrType = ptrType ? ptrType : float32PtrType;
+    if (!devicePtrType &&
         (!resourceElementPtrType || value->getOp() != kIROp_RWStructuredBufferGetElementPtr))
-        return _diagnoseUnsupportedIR(codeGenContext, toSlice("device i32 pointer"));
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
+    IRType* actualPointeeType =
+        devicePtrType ? devicePtrType->getValueType() : resourceElementPtrType->getValueType();
+    if (!expectedPointeeType || !isTypeEqual(actualPointeeType, expectedPointeeType))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("device pointer pointee type"));
     if (resourceElementPtrType && consumer->getOp() != kIROp_Store)
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
             toSlice("raw RWStructuredBuffer signed i32 store consumer"));
     }
-    if (requireWriteAccess && ptrType &&
-        ptrType->getAccessQualifier() != AccessQualifier::ReadWrite)
+    if (requireWriteAccess && devicePtrType &&
+        devicePtrType->getAccessQualifier() != AccessQualifier::ReadWrite)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("read-only pointer store"));
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
@@ -403,6 +424,9 @@ SlangResult _validateNVVMFunction(
         auto rawRWStructuredBufferType =
             isEntryPoint ? asNVVMSupportedRawRWStructuredBufferI32Type(param->getDataType())
                          : nullptr;
+        const bool usesFloat32 =
+            isEntryPoint && (isNVVMFloat32Type(param->getDataType()) ||
+                             asNVVMSupportedDeviceFloat32PointerType(param->getDataType()));
         const bool isSupportedType = isEntryPoint
                                          ? isNVVMSupportedParameterType(param->getDataType())
                                          : isNVVMSignedI32Type(param->getDataType());
@@ -418,6 +442,8 @@ SlangResult _validateNVVMFunction(
             _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_ARRAY_ADDRESSING);
         if (rawRWStructuredBufferType)
             _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32);
+        if (usesFloat32)
+            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
         availableValues.add(param);
         ++actualParamCount;
     }
@@ -462,10 +488,20 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Store:
+                if (inst->getOperandCount() != 2 || !inst->getOperand(0))
+                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("store"));
+                if (isNVVMFloat32Type(inst->getOperand(0)->getDataType()))
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
                 break;
 
             case kIROp_Add:
+                if (inst->getOperandCount() == 2 && isNVVMFloat32Type(inst->getDataType()))
+                {
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
+                    break;
+                }
+                [[fallthrough]];
             case kIROp_Sub:
                 if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 arithmetic"));
@@ -684,7 +720,8 @@ SlangResult _validateNVVMFunction(
                         load,
                         availableValues,
                         dominatorTree,
-                        false));
+                        false,
+                        load->getDataType()));
                     availableValues.add(load);
                 }
                 break;
@@ -698,18 +735,49 @@ SlangResult _validateNVVMFunction(
                         store,
                         availableValues,
                         dominatorTree,
-                        true));
-                    SLANG_RETURN_ON_FAIL(_validateI32Value(
-                        codeGenContext,
-                        store->getVal(),
-                        store,
-                        availableValues,
-                        dominatorTree,
-                        features));
+                        true,
+                        store->getVal()->getDataType()));
+                    if (isNVVMFloat32Type(store->getVal()->getDataType()))
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateFloat32Value(
+                            codeGenContext,
+                            store->getVal(),
+                            store,
+                            availableValues,
+                            dominatorTree));
+                    }
+                    else
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateI32Value(
+                            codeGenContext,
+                            store->getVal(),
+                            store,
+                            availableValues,
+                            dominatorTree,
+                            features));
+                    }
                 }
                 break;
 
             case kIROp_Add:
+                if (isNVVMFloat32Type(inst->getDataType()))
+                {
+                    SLANG_RETURN_ON_FAIL(_validateFloat32Value(
+                        codeGenContext,
+                        inst->getOperand(0),
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    SLANG_RETURN_ON_FAIL(_validateFloat32Value(
+                        codeGenContext,
+                        inst->getOperand(1),
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    availableValues.add(inst);
+                    break;
+                }
+                [[fallthrough]];
             case kIROp_Sub:
             case kIROp_Mul:
             case kIROp_BitAnd:
@@ -769,7 +837,8 @@ SlangResult _validateNVVMFunction(
                     inst,
                     availableValues,
                     dominatorTree,
-                    true));
+                    true,
+                    inst->getDataType()));
                 SLANG_RETURN_ON_FAIL(_validateI32Value(
                     codeGenContext,
                     inst->getOperand(1),
@@ -820,7 +889,10 @@ SlangResult _validateNVVMFunction(
                 {
                     IRInst* basePointer = inst->getOperand(0);
                     IRInst* elementOffset = inst->getOperand(1);
-                    if (!basePointer ||
+                    auto basePointerType =
+                        basePointer ? asNVVMSupportedDevicePointerType(basePointer->getDataType())
+                                    : nullptr;
+                    if (!basePointerType ||
                         !isTypeEqual(inst->getDataType(), basePointer->getDataType()))
                     {
                         return _diagnoseUnsupportedIR(
@@ -833,7 +905,8 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree,
-                        false));
+                        false,
+                        basePointerType->getValueType()));
                     SLANG_RETURN_ON_FAIL(_validateI32Value(
                         codeGenContext,
                         elementOffset,
@@ -1355,7 +1428,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             builder.emitLoad(
                                 moduleScope.module,
                                 loweredPointer,
-                                kNVVMI32Alignment,
+                                kNVVMScalar32Alignment,
                                 loweredValue)));
                         valueMap[load] = loweredValue;
                     }
@@ -1384,21 +1457,19 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredPointer));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "signed i32 store",
+                            isNVVMFloat32Type(store->getVal()->getDataType()) ? "float32 store"
+                                                                              : "signed i32 store",
                             builder.emitStore(
                                 moduleScope.module,
                                 loweredValue,
                                 loweredPointer,
-                                kNVVMI32Alignment)));
+                                kNVVMScalar32Alignment)));
                     }
                     break;
 
                 case kIROp_Add:
                 case kIROp_Sub:
                     {
-                        const SlangNVVMIntegerBinaryOp_3 operation =
-                            inst->getOp() == kIROp_Add ? SLANG_NVVM_INTEGER_BINARY_OP_3_ADD
-                                                       : SLANG_NVVM_INTEGER_BINARY_OP_3_SUB;
                         SlangNVVMValueHandle_1 loweredLeft = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -1418,16 +1489,34 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredRight));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            inst->getOp() == kIROp_Add ? "signed i32 addition"
-                                                       : "signed i32 subtraction",
-                            builder.emitIntegerBinaryOperation(
-                                moduleScope.module,
-                                operation,
-                                loweredLeft,
-                                loweredRight,
-                                loweredValue)));
+                        if (isNVVMFloat32Type(inst->getDataType()))
+                        {
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "float32 addition",
+                                builder.emitFloatingBinary(
+                                    moduleScope.module,
+                                    SLANG_NVVM_FLOATING_BINARY_OP_ADD,
+                                    loweredLeft,
+                                    loweredRight,
+                                    loweredValue)));
+                        }
+                        else
+                        {
+                            const SlangNVVMIntegerBinaryOp_3 operation =
+                                inst->getOp() == kIROp_Add ? SLANG_NVVM_INTEGER_BINARY_OP_3_ADD
+                                                           : SLANG_NVVM_INTEGER_BINARY_OP_3_SUB;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                inst->getOp() == kIROp_Add ? "signed i32 addition"
+                                                           : "signed i32 subtraction",
+                                builder.emitIntegerBinaryOperation(
+                                    moduleScope.module,
+                                    operation,
+                                    loweredLeft,
+                                    loweredRight,
+                                    loweredValue)));
+                        }
                         valueMap[inst] = loweredValue;
                     }
                     break;

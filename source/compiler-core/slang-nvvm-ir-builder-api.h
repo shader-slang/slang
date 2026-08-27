@@ -634,7 +634,8 @@ extern "C"
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_EQUAL \
     ((SlangNVVMBuilderFeature_3)18u)
 #define SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32 ((SlangNVVMBuilderFeature_3)19u)
-#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 20u
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD ((SlangNVVMBuilderFeature_3)20u)
+#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 21u
 #define SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3 4u
 
     typedef struct SlangNVVMBuilderFeatureSet_3
@@ -682,12 +683,23 @@ extern "C"
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1* outValue);
 
-    /**
-     * Version 3 freezes V2 as its compatibility core and moves forward-growing integer
-     * operation
-     * families and semantic availability into generic callbacks and independent
-     * feature bits.
-     */
+    typedef uint32_t SlangNVVMFloatingBinaryOp_3;
+#define SLANG_NVVM_FLOATING_BINARY_OP_ADD ((SlangNVVMFloatingBinaryOp_3)0u)
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMGetFloatingPointType_3)(
+        SlangNVVMModuleHandle_1 module,
+        uint32_t bitWidth,
+        SlangNVVMTypeHandle_1* outType);
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitFloatingBinary_3)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMFloatingBinaryOp_3 operation,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
+    // Version 3 freezes V2 as its compatibility core. Generic callbacks and independent feature
+    // bits carry forward-growing operation families and semantic availability.
     typedef struct SlangNVVMBuilderAPI_V3
     {
         uint32_t structureSize;
@@ -697,11 +709,17 @@ extern "C"
         SlangNVVMEmitIntegerUnary_3 emitIntegerUnary;
         SlangNVVMEmitIntegerBinary_3 emitIntegerBinary;
         SlangNVVMEmitIntegerCompare_3 emitIntegerCompare;
+        SlangNVVMGetFloatingPointType_3 getFloatingPointType;
+        SlangNVVMEmitFloatingBinary_3 emitFloatingBinary;
     } SlangNVVMBuilderAPI_V3;
 
 #define SLANG_NVVM_BUILDER_API_V3_MIN_SIZE                  \
     (offsetof(SlangNVVMBuilderAPI_V3, emitIntegerCompare) + \
      sizeof(((SlangNVVMBuilderAPI_V3*)0)->emitIntegerCompare))
+
+#define SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_ADD_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V3, emitFloatingBinary) +   \
+     sizeof(((SlangNVVMBuilderAPI_V3*)0)->emitFloatingBinary))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V3)(
         SlangNVVMBuilderAPI_V3* outAPI);

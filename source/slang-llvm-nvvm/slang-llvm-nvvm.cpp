@@ -293,6 +293,22 @@ _getIntegerType(SlangNVVMModuleHandle_1 module, uint32_t bitWidth, SlangNVVMType
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _getFloatingPointType(
+    SlangNVVMModuleHandle_1 module,
+    uint32_t bitWidth,
+    SlangNVVMTypeHandle_1* outType)
+{
+    if (outType)
+        *outType = nullptr;
+
+    ModuleState* state = _getModule(module);
+    if (!state || !outType || bitWidth != 32)
+        return SLANG_E_INVALID_ARG;
+
+    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(llvm::Type::getFloatTy(state->context));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _getPointerType(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMTypeHandle_1 pointeeType,
@@ -878,6 +894,34 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBinaryV3(
     default:
         return SLANG_E_INVALID_ARG;
     }
+}
+
+static SlangResult SLANG_NVVM_CALL _emitFloatingBinaryV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMFloatingBinaryOp_3 operation,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmLeft = _getValue(left);
+    llvm::Value* llvmRight = _getValue(right);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!outValue || operation != SLANG_NVVM_FLOATING_BINARY_OP_ADD || !insertionBlock ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmLeft) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmRight) ||
+        llvmLeft->getType() != llvm::Type::getFloatTy(state->context) ||
+        llvmRight->getType() != llvmLeft->getType())
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    *outValue =
+        reinterpret_cast<SlangNVVMValueHandle_1>(state->builder.CreateFAdd(llvmLeft, llvmRight));
+    return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerCompareV3(
@@ -1623,6 +1667,8 @@ static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
     api.emitIntegerUnary = _emitIntegerUnaryV3;
     api.emitIntegerBinary = _emitIntegerBinaryV3;
     api.emitIntegerCompare = _emitIntegerCompareV3;
+    api.getFloatingPointType = _getFloatingPointType;
+    api.emitFloatingBinary = _emitFloatingBinaryV3;
 }
 
 } // namespace

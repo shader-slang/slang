@@ -102,6 +102,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC` | 4 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, and GPU with compute capability 7.0+ | Pass | Pass | Not applicable | Both routes launch 2,048 threads adding one to one initialized device integer | On the RTX 5090, both final values equal the launch width; the separate old-value fixture preserves its store consumer | Kernel timing not measured |
 | `tests/cuda/nvvm-unsupported-ir.slang` | 4 | None beyond `slangc`; `cuda_sm_7_0` | Not applicable | Expected stop | `emit` | E52017: barrier resolves to a void helper outside the signed-i32 helper ABI | Not applicable | — |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32AddKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Provider constructs exact LLVM `float`, AS1 pointer, unflagged `fadd`, and four-byte-aligned store | Verified LLVM and NVVM-2.0 assembly; no runtime | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32AddUsesDirectPipeline` | 2-3 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical float32 entry values, AS1 float pointer, add, and store lower through one negotiated floating family | Exact `[FloatPointer, Float, Float]` parameters, ordered add operands, type reuse, and result-store consumer checked | Fake-only; no performance measurements |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32AddDifferentialPTX` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM, `cuda_sm_7_0` | Pass | Pass | Not applicable | Exact scalar float32 addition compiles through both routes | Parameter widths `[64, 32, 32]`, token-safe `add.f32`, one global 32-bit store, and no global load agree | PTX size and timing not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32AddPtxasAccepts` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM and matching-root `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both scalar-float32-add PTX outputs assemble | Static PTX acceptance | Resource and timing measurements not collected |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32AddRuntimeMatchesNVRTC` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, and GPU with compute capability 7.0+ | Pass | Pass | Not applicable | Both routes launch exactly representable finite normal addition cases | On the RTX 5090, both routes produce `3.75`, `-7.5`, and `768` | Kernel timing not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -485,3 +491,23 @@ all 88 operation/layer wrapper names referenced above. The exact sorted 193-name
 `1f35f717b93e1cb62c3f872e99b819386ab9c5474b203256e58ee1bdb41c97b7`, so no row, selector,
 bucket, or semantic claim changes. Release remains 193/193, including real differential PTX,
 `ptxas`, and RTX 5090 runtime evidence; Debug preservation remains 10/10.
+
+Slice 31 opens the exact scalar float32 portion of Buckets 2 and 3. The final linked source graph
+has three raw entry parameters—AS1 `Ptr<float>`, `float`, `float`—followed by one floating add and
+one aligned store. One V3 feature requires the appended type and floating-binary callbacks. The x64
+table grows from the exact 448-byte core to 464 bytes; x86 retains the old 268-byte core minimum,
+uses 276 bytes as the complete appended minimum, and pads `sizeof` to 280. Exact old cores remain
+compatible without the bit; all partial advertised sizes and either null callback are rejected.
+
+The real provider admits only bit width 32 and validates LLVM-float operand type, ownership,
+function, availability, dominance, and insertion state before one unflagged `fadd`. Direct topology
+proves one cached float type, one cached AS1 float pointer, ordered parameter-1/parameter-2 operands,
+and the add-result store consumer. Float loads, half, double, and the newly reachable float
+multiply/negate/comparison operations retain deterministic pre-provider boundaries.
+
+Direct NVVM and NVRTC agree on widths `[64, 32, 32]`, `add.f32`, a global 32-bit store, and no
+global load. Matching-root CUDA 12.9 `ptxas` accepts both outputs. On the RTX 5090, both routes
+produce `3.75`, `-7.5`, and `768` for the exact finite cases. Release passes 201/201; the sorted
+LF-terminated name set has SHA-256
+`73434ac732eccaf42c9fad54ad2956b13aa5e2371e9e2e72d5fbbc2aaaf6e2e2`. Debug preservation passes
+10/10.

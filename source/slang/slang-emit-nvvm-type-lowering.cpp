@@ -12,6 +12,12 @@ bool isNVVMSignedI32Type(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Int;
 }
 
+bool isNVVMFloat32Type(IRInst* type)
+{
+    auto basicType = as<IRBasicType>(type);
+    return basicType && basicType->getBaseType() == BaseType::Float;
+}
+
 bool isNVVMBoolType(IRInst* type)
 {
     auto basicType = as<IRBasicType>(type);
@@ -39,11 +45,12 @@ IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount
     return arrayType;
 }
 
-IRPtrTypeBase* asNVVMSupportedDevicePointerType(IRInst* type)
+static IRPtrTypeBase* _asNVVMSupportedDevicePointerType(IRInst* type, BaseType valueBaseType)
 {
     auto ptrType = as<IRPtrTypeBase>(type);
-    if (!ptrType || ptrType->getOp() != kIROp_PtrType ||
-        !isNVVMSignedI32Type(ptrType->getValueType()) ||
+    auto valueType = ptrType ? as<IRBasicType>(ptrType->getValueType()) : nullptr;
+    if (!ptrType || ptrType->getOp() != kIROp_PtrType || !valueType ||
+        valueType->getBaseType() != valueBaseType ||
         ptrType->getAddressSpace() != AddressSpace::UserPointer)
     {
         return nullptr;
@@ -52,6 +59,16 @@ IRPtrTypeBase* asNVVMSupportedDevicePointerType(IRInst* type)
     const AccessQualifier access = ptrType->getAccessQualifier();
     return access == AccessQualifier::Read || access == AccessQualifier::ReadWrite ? ptrType
                                                                                    : nullptr;
+}
+
+IRPtrTypeBase* asNVVMSupportedDevicePointerType(IRInst* type)
+{
+    return _asNVVMSupportedDevicePointerType(type, BaseType::Int);
+}
+
+IRPtrTypeBase* asNVVMSupportedDeviceFloat32PointerType(IRInst* type)
+{
+    return _asNVVMSupportedDevicePointerType(type, BaseType::Float);
 }
 
 IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
@@ -116,7 +133,9 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferI32ElementPointerType(IRInst* ty
 
 bool isNVVMSupportedParameterType(IRInst* type)
 {
-    return isNVVMSignedI32Type(type) || asNVVMSupportedDevicePointerType(type) ||
+    return isNVVMSignedI32Type(type) || isNVVMFloat32Type(type) ||
+           asNVVMSupportedDevicePointerType(type) ||
+           asNVVMSupportedDeviceFloat32PointerType(type) ||
            asNVVMSupportedDeviceArrayPointerType(type) ||
            asNVVMSupportedRawRWStructuredBufferI32Type(type);
 }
@@ -230,8 +249,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
 
     const bool isVoid = as<IRVoidType>(type) != nullptr;
     const bool isI32 = isNVVMSignedI32Type(type);
+    const bool isFloat32 = isNVVMFloat32Type(type);
     const bool isBool = isNVVMBoolType(type);
     IRPtrTypeBase* devicePointer = asNVVMSupportedDevicePointerType(type);
+    IRPtrTypeBase* deviceFloat32Pointer = asNVVMSupportedDeviceFloat32PointerType(type);
     IRArrayType* arrayType = nullptr;
     IRPtrTypeBase* deviceArrayPointer = asNVVMSupportedDeviceArrayPointerType(type, &arrayType);
     IRHLSLStructuredBufferTypeBase* rawResource = asNVVMSupportedRawRWStructuredBufferI32Type(type);
@@ -241,14 +262,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
     // helper signature.
-    const bool isLegal =
-        (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-        (use == NVVMTypeUse::HelperResult && isI32) ||
-        (use == NVVMTypeUse::EntryPointParameter &&
-         (isI32 || devicePointer || deviceArrayPointer || rawResource)) ||
-        (use == NVVMTypeUse::HelperParameter && isI32) ||
-        (use == NVVMTypeUse::Value && (isI32 || isBool || devicePointer || deviceArrayPointer ||
-                                       rawResource || resourceElementPointer));
+    const bool isLegal = (use == NVVMTypeUse::EntryPointResult && isVoid) ||
+                         (use == NVVMTypeUse::HelperResult && isI32) ||
+                         (use == NVVMTypeUse::EntryPointParameter &&
+                          (isI32 || isFloat32 || devicePointer || deviceFloat32Pointer ||
+                           deviceArrayPointer || rawResource)) ||
+                         (use == NVVMTypeUse::HelperParameter && isI32) ||
+                         (use == NVVMTypeUse::Value &&
+                          (isI32 || isFloat32 || isBool || devicePointer || deviceFloat32Pointer ||
+                           deviceArrayPointer || rawResource || resourceElementPointer));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -269,11 +291,25 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             isI32 ? "signed i32 type" : "Boolean type",
             m_builder.getIntegerType(m_module, isI32 ? 32u : 1u, outType)));
     }
+    else if (isFloat32)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "float32 type",
+            m_builder.getFloatingPointType(m_module, 32u, outType)));
+    }
     else if (devicePointer)
     {
         return _lowerPointerType(
             type,
             devicePointer->getValueType(),
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            outType);
+    }
+    else if (deviceFloat32Pointer)
+    {
+        return _lowerPointerType(
+            type,
+            deviceFloat32Pointer->getValueType(),
             SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
             outType);
     }
