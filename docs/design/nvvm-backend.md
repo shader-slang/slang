@@ -909,6 +909,63 @@ floating-point, vector, or matrix multiplication; multiply-high, overflow, satur
 multiply-add, division, remainder, shifts, bitwise operations, or casts; or any new pointer,
 aggregate, storage, resource, libdevice, builtin, barrier, atomic, or wave capability.
 
+### Slice 13 signed-i32 bitwise AND
+
+Consider this example:
+
+```slang
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int x,
+    uniform int y)
+{
+    *destination = x & y;
+}
+```
+
+The front end resolves `&` as `BuiltinOperationKind::BitAnd`, and ordinary IR lowering constructs
+exact `kIROp_BitAnd`. After the established CUDA passes and `simplifyIR`, the final entry signature
+is `Func(Void, Ptr(Int,RW,UserPointer,DefaultLayout), Int, Int)`. Its body retains one canonical,
+two-operand signed-i32 `kIROp_BitAnd`; the kernel parameters are its operands, and its result feeds
+the established device-pointer store. Preflight validates both operands through the existing
+signed-i32 availability and dominance rules, then records the result in the canonical value set and
+provider-value map. It does not accept `kIROp_ConstexprBitAnd` as a fallback or reconstruct source
+syntax.
+
+The private V2 provider table appends one dedicated operation:
+
+```text
+emitIntegerBitAnd(module, left, right, outValue)
+```
+
+As with multiplication, this operation does not extend `SlangNVVMIntegerBinaryOp_2`. Exact Slice 7
+providers implement that callable only for its frozen ADD/SUB domain and reject unknown enum values.
+A dedicated terminal field therefore negotiates and dispatches bitwise AND atomically without
+widening an older callable's input contract.
+
+The complete V2 table is 280 bytes on the 64-bit build. The exact 272-byte Slice 12 prefix and every
+older minimum remain frozen and compatible for their established programs. Sizes 273 through 279
+inside the new function pointer, or a complete prefix with a null operation, are malformed;
+future-larger tables remain compatible and are clamped to the host's known 280-byte capacity. A
+bitwise-AND program presented to an exact Slice 12 provider reaches E52016 after discovery but
+before module creation or libNVVM use. The host reports `scalar-integer-bit-and=0|1` in the builder
+identity and clears output handles before dispatch and after a failed or success-without-handle
+provider call.
+
+At the LLVM boundary, the provider requires a live module, a non-null output, and a current
+unterminated insertion block belonging to that module. Both operands must be scalar LLVM integers
+of exactly the same type, have valid module, context, and function ownership for their value kind,
+and be available at the insertion point under the established same-block ordering and cross-block
+dominance rules. All validation precedes the sole mutation, `IRBuilder::CreateAnd`. LLVM integer
+types are signless; the Slang preflight boundary owns the exact signed-i32 policy.
+
+This boundary is only exact two-operand signed-i32 bitwise AND over already-supported parameters,
+constants, phis, calls, multiplication results, and other signed-i32 producers. It does not add
+bitwise OR, XOR, or NOT; shifts or logical operations; unsigned, narrow, wide, vector, matrix, or
+aggregate bitwise values; or any new ABI, pointer, storage, resource, builtin, atomic, wave, or
+libdevice capability.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -998,10 +1055,12 @@ The program advances through bounded slices:
 10. signed device-pointer element offsets;
 11. fixed device-array element addressing;
 12. signed-i32 multiplication;
-13. libdevice and floating-point policy;
-14. atomics and wave operations;
-15. resources and optimization-quality work; and
-16. advanced capabilities and production-readiness evaluation.
+13. signed-i32 bitwise AND;
+14. signed-i32 bitwise OR;
+15. libdevice and floating-point policy;
+16. atomics and wave operations;
+17. resources and optimization-quality work; and
+18. advanced capabilities and production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -1023,7 +1082,10 @@ roadmap: exact fixed signed-i32 arrays behind device entry-point pointers and th
 `IRGetElementPtr`, without claiming array values, other aggregates, shared memory, or additional
 address spaces. Slice 12 then completes the smallest remaining canonical integer-expression
 boundary: exact two-operand signed-i32 multiplication, without widening the frozen ADD/SUB ABI or
-claiming other integer, floating-point, vector, or matrix operations.
+claiming other integer, floating-point, vector, or matrix operations. Slice 13 applies the same
+dedicated-operation pattern to exact signed-i32 bitwise AND. Bitwise OR remains the next bounded
+canonical scalar operation for Slice 14; XOR, shifts, and the other richer scalar policies remain
+separate decisions.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -1191,6 +1253,20 @@ integer multiply plus the expected global i32 store, observed locally as `mul.lo
 `0` for positive, negative, and zero cases. After correcting the prior Slice 11 test to distinguish
 its frozen prefix from the now-larger full table, the complete focused NVVM prefix passed 84/84.
 
+Later on 2026-08-27, Slice 13 built the Release LLVM 14.0.6 provider and Debug host. The verified
+provider fixture emitted exactly one `and i32` whose result feeds the established address-space-1
+store, and the fake direct-route graph proved that the two scalar parameters are the exact left and
+right operands and that the bitwise-AND result is the stored value. Negotiation retained the exact
+272-byte Slice 12 prefix for multiplication programs, rejected every partial size from 273 through
+279 bytes and a null complete operation, accepted and clamped future-larger tables, and sanitized
+failed outputs. Invalid module, output, integer type, function, availability, dominance, and
+insertion-point shapes were rejected before mutation.
+
+Direct NVVM and NVRTC exposed matching `[64, 32, 32]` parameter widths and each showed `and.b32`
+plus the expected global i32 store. CUDA 12.9 `ptxas` accepted both outputs. On the RTX 5090, both
+runtime lanes produced `0x18` for `0x5a & 0x3c`, `0x12345678` for `-1 & 0x12345678`, `-4` for
+`-2 & -4`, and `0` for `0 & -1`. The final complete focused NVVM prefix passed 92/92.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -1244,6 +1320,15 @@ construction. These claims do not include other integer widths or signedness, fl
 aggregate multiplication, overflow variants, fused operations, division, remainder, shifts,
 bitwise operations, or casts.
 
+Slice 13 settles canonical two-operand `kIROp_BitAnd` lowering for signed-i32 values already
+available through the established scalar program structure. It settles the dedicated append-only
+`emitIntegerBitAnd` provider operation, exact 272-byte Slice 12 compatibility, a 280-byte complete
+x64 prefix, pre-mutation equal-integer-type and ownership/dominance validation, and the division of
+responsibility in which Slang owns signed-i32 policy while LLVM owns signless `CreateAnd`
+construction. These claims do not include `kIROp_ConstexprBitAnd`, bitwise OR/XOR/NOT, shifts,
+logical operations, other integer widths or signedness, vectors, matrices, aggregates, or new ABI
+and storage shapes.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
@@ -1252,7 +1337,7 @@ The following remain open until their named slice supplies evidence:
 - conventional shader-entry parameters and raw CUDA parameters beyond signed `i32` and device
   pointers;
 - external/indirect calls, richer helper ABI, and scalar operations beyond the established
-  signed-i32 add, subtract, multiply, and less-than subset;
+  signed-i32 add, subtract, multiply, bitwise-AND, and less-than subset;
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;

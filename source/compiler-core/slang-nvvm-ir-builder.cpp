@@ -80,6 +80,13 @@ static bool _supportsScalarIntegerMultiply(const SlangNVVMBuilderAPI_V2& api)
            api.emitIntegerMultiply;
 }
 
+// Treats the appended Slice 13 field as one coherent scalar-integer-bit-AND capability.
+static bool _supportsScalarIntegerBitAnd(const SlangNVVMBuilderAPI_V2& api)
+{
+    return api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_AND_MIN_SIZE &&
+           api.emitIntegerBitAnd;
+}
+
 // Rejects success without a required handle and never exposes a handle from a failed provider call.
 template<typename T>
 static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
@@ -177,12 +184,15 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     const bool hasPartialScalarIntegerMultiplyPrefix =
         api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_ARRAY_MIN_SIZE &&
         api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_MULTIPLY_MIN_SIZE;
+    const bool hasPartialScalarIntegerBitAndPrefix =
+        api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_MULTIPLY_MIN_SIZE &&
+        api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_AND_MIN_SIZE;
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE || hasPartialScalarPrefix ||
         hasPartialScalarControlFlowPrefix || hasPartialScalarSSAPrefix ||
         hasPartialScalarFunctionPrefix || hasPartialScalarPointerArithmeticPrefix ||
         hasPartialScalarArrayPrefix || hasPartialScalarIntegerMultiplyPrefix ||
-        api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
-        !api.serializeModuleWithDiagnostics ||
+        hasPartialScalarIntegerBitAndPrefix || api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 ||
+        !_isCompatibleV1(api.baseAPI) || !api.serializeModuleWithDiagnostics ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
          !_supportsScalarOperations(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE &&
@@ -196,7 +206,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_ARRAY_MIN_SIZE &&
          !_supportsScalarArrayAddressing(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_MULTIPLY_MIN_SIZE &&
-         !_supportsScalarIntegerMultiply(api)))
+         !_supportsScalarIntegerMultiply(api)) ||
+        (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_AND_MIN_SIZE &&
+         !_supportsScalarIntegerBitAnd(api)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -251,6 +263,11 @@ bool NVVMIRBuilder::supportsScalarIntegerMultiply() const
     return _supportsScalarIntegerMultiply(m_apiV2);
 }
 
+bool NVVMIRBuilder::supportsScalarIntegerBitAnd() const
+{
+    return _supportsScalarIntegerBitAnd(m_apiV2);
+}
+
 String NVVMIRBuilder::getVersionString() const
 {
     if (!isInitialized())
@@ -272,6 +289,7 @@ String NVVMIRBuilder::getVersionString() const
             << ";scalar-pointer-arithmetic=" << (supportsScalarPointerArithmetic() ? 1 : 0)
             << ";scalar-array-addressing=" << (supportsScalarArrayAddressing() ? 1 : 0)
             << ";scalar-integer-multiply=" << (supportsScalarIntegerMultiply() ? 1 : 0)
+            << ";scalar-integer-bit-and=" << (supportsScalarIntegerBitAnd() ? 1 : 0)
             << ";timestamp="
             << SharedLibraryUtils::getSharedLibraryTimestamp(
                    reinterpret_cast<void*>(m_api.createModule));
@@ -623,6 +641,21 @@ SlangResult NVVMIRBuilder::emitIntegerMultiply(
     if (!supportsScalarIntegerMultiply())
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result = m_apiV2.emitIntegerMultiply(module, left, right, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitIntegerBitAnd(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsScalarIntegerBitAnd())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result = m_apiV2.emitIntegerBitAnd(module, left, right, &outValue);
     return _validateHandleResult(result, outValue);
 }
 

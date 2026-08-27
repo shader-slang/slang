@@ -61,3 +61,12 @@ typedef char SlangNVVMBuilderAPIV2ScalarIntegerMultiplyCapabilityOrderCCompilePr
       SLANG_NVVM_BUILDER_API_V2_SCALAR_ARRAY_MIN_SIZE)
          ? 1
          : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarIntegerBitAndMinimumSizeCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_AND_MIN_SIZE <= sizeof(SlangNVVMBuilderAPI_V2))
+         ? 1
+         : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarIntegerBitAndCapabilityOrderCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_AND_MIN_SIZE >
+      SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_MULTIPLY_MIN_SIZE)
+         ? 1
+         : -1];
