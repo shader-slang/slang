@@ -2623,7 +2623,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitFloatingCompareV3(
           .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingCompare)];
     gFakeNVVMBuilder.scalarV3Operations.add(
         {FakeNVVMBuilderScalarFamily::FloatingCompare, uint32_t(operation)});
-    if (operation != SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL)
+    if (operation != SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL &&
+        operation != SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL)
     {
         if (outValue)
             *outValue = nullptr;
@@ -3618,6 +3619,7 @@ static const char kFloat32MultiplyKernelName[] = "float32Multiply";
 static const char kFloat32DivideKernelName[] = "float32Divide";
 static const char kFloat32NegateKernelName[] = "float32Negate";
 static const char kFloat32EqualKernelName[] = "float32Equal";
+static const char kFloat32NotEqualKernelName[] = "float32NotEqual";
 static const char kScalarReferenceCUDASource[] = R"(
 extern "C" __global__ void writeScalar(int* destination, int value)
 {
@@ -4166,9 +4168,21 @@ void computeMain(
 }
 )";
 
+static const char kDirectNVVMFloatingNotEqualSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float left,
+    uniform float right)
+{
+    *destination = left != right ? 1 : 0;
+}
+)";
+
 enum class NVVMFloat32ComparisonTestOperation
 {
     OrderedEqual,
+    UnorderedNotEqual,
 };
 
 struct NVVMFloat32ComparisonRuntimeCase
@@ -4198,6 +4212,13 @@ static const NVVMFloat32ComparisonRuntimeCase kNVVMFloat32OrderedEqualRuntimeCas
     {NAN, NAN, 0},
 };
 
+static const NVVMFloat32ComparisonRuntimeCase kNVVMFloat32UnorderedNotEqualRuntimeCases[] = {
+    {3.75f, 3.75f, 0},
+    {-8.0f, 0.5f, 1},
+    {0.0f, -0.0f, 0},
+    {NAN, NAN, 1},
+};
+
 static const NVVMFloat32ComparisonTestCase kNVVMFloat32ComparisonTestCases[] = {
     {NVVMFloat32ComparisonTestOperation::OrderedEqual,
      SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL,
@@ -4208,6 +4229,15 @@ static const NVVMFloat32ComparisonTestCase kNVVMFloat32ComparisonTestCases[] = {
      "float32-ordered-equal",
      kNVVMFloat32OrderedEqualRuntimeCases,
      SLANG_COUNT_OF(kNVVMFloat32OrderedEqualRuntimeCases)},
+    {NVVMFloat32ComparisonTestOperation::UnorderedNotEqual,
+     SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL,
+     SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL,
+     kDirectNVVMFloatingNotEqualSource,
+     kFloat32NotEqualKernelName,
+     "fcmp une",
+     "float32-unordered-not-equal",
+     kNVVMFloat32UnorderedNotEqualRuntimeCases,
+     SLANG_COUNT_OF(kNVVMFloat32UnorderedNotEqualRuntimeCases)},
 };
 
 static const NVVMFloat32ComparisonTestCase& _getNVVMFloat32ComparisonTestCase(
@@ -4329,16 +4359,6 @@ void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
     uniform int64_t left,
     uniform int64_t right)
-{
-    *destination = left != right ? 1 : 0;
-}
-)";
-static const char kDirectNVVMFloatingNotEqualSource[] = R"(
-[CUDAKernel]
-void computeMain(
-    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
-    uniform float left,
-    uniform float right)
 {
     *destination = left != right ? 1 : 0;
 }
@@ -6823,7 +6843,7 @@ struct PTXEntrySummary
     bool hasFloatMultiply32 = false;
     bool hasFloatDivide32 = false;
     bool hasFloatNegate32 = false;
-    bool hasFloatEqualityComparison32 = false;
+    bool hasFloatComparison32 = false;
     bool hasMultiply32 = false;
     bool hasBitAnd32 = false;
     bool hasBitOr32 = false;
@@ -6850,7 +6870,7 @@ static SlangResult _summarizePTXEntry(
     outSummary.hasFloatMultiply32 = false;
     outSummary.hasFloatDivide32 = false;
     outSummary.hasFloatNegate32 = false;
-    outSummary.hasFloatEqualityComparison32 = false;
+    outSummary.hasFloatComparison32 = false;
     outSummary.hasMultiply32 = false;
     outSummary.hasBitAnd32 = false;
     outSummary.hasBitOr32 = false;
@@ -6882,7 +6902,7 @@ static SlangResult _summarizePTXEntry(
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("div"), 32);
     outSummary.hasFloatNegate32 =
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("neg.f32"), 32);
-    outSummary.hasFloatEqualityComparison32 =
+    outSummary.hasFloatComparison32 =
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("setp.eq.f32"), 32) ||
         _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("setp.neu.f32"), 32);
     outSummary.hasMultiply32 = _ptxEntryHasInstruction(body.getUnownedSlice(), toSlice("mul"), 32);

@@ -150,10 +150,11 @@ NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST(nvvmSlangFloat32NegateUsesDirectPipeline, Ne
 
 #undef NVVM_FLOAT32_ARITHMETIC_DIRECT_TEST
 
-SLANG_UNIT_TEST(nvvmSlangFloat32EqualUsesDirectPipeline)
+static void _runNVVMSlangFloat32ComparisonUsesDirectPipeline(
+    NVVMFloat32ComparisonTestOperation testOperation)
 {
     const NVVMFloat32ComparisonTestCase& testCase =
-        _getNVVMFloat32ComparisonTestCase(NVVMFloat32ComparisonTestOperation::OrderedEqual);
+        _getNVVMFloat32ComparisonTestCase(testOperation);
     _resetDirectNVVMFakes();
     _enableFakeNVVMBuilderV3();
     {
@@ -220,6 +221,18 @@ SLANG_UNIT_TEST(nvvmSlangFloat32EqualUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
+
+#define NVVM_FLOAT32_COMPARISON_DIRECT_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                    \
+    {                                                        \
+        _runNVVMSlangFloat32ComparisonUsesDirectPipeline(    \
+            NVVMFloat32ComparisonTestOperation::OPERATION);  \
+    }
+
+NVVM_FLOAT32_COMPARISON_DIRECT_TEST(nvvmSlangFloat32EqualUsesDirectPipeline, OrderedEqual)
+NVVM_FLOAT32_COMPARISON_DIRECT_TEST(nvvmSlangFloat32NotEqualUsesDirectPipeline, UnorderedNotEqual)
+
+#undef NVVM_FLOAT32_COMPARISON_DIRECT_TEST
 
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
 {
@@ -339,15 +352,30 @@ NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32NegateCapabili
 
 #undef NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST
 
-SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32EqualCapability)
+static void _runNVVMSlangNegotiatesFloat32ComparisonCapability(
+    NVVMFloat32ComparisonTestOperation testOperation)
 {
     const NVVMFloat32ComparisonTestCase& testCase =
-        _getNVVMFloat32ComparisonTestCase(NVVMFloat32ComparisonTestOperation::OrderedEqual);
+        _getNVVMFloat32ComparisonTestCase(testOperation);
     _runNVVMSlangNegotiatesFloat32Capability(
         testCase.source,
         testCase.feature,
         FakeNVVMBuilderScalarFamily::FloatingCompare);
 }
+
+#define NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                        \
+    {                                                            \
+        _runNVVMSlangNegotiatesFloat32ComparisonCapability(      \
+            NVVMFloat32ComparisonTestOperation::OPERATION);      \
+    }
+
+NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32EqualCapability, OrderedEqual)
+NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
+    nvvmSlangNegotiatesFloat32NotEqualCapability,
+    UnorderedNotEqual)
+
+#undef NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32CopyCapability)
 {
@@ -2702,7 +2730,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMPointerEqualSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedIntegerNotEqualSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerNotEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingNotEqualSource, "'signed i32 value'"},
         {kDirectNVVMPointerNotEqualSource, "'signed i32 value'"},
         {kDirectNVVMUnsignedIntegerGreaterThanSource, "'entry-point parameter'"},
         {kDirectNVVMWideIntegerGreaterThanSource, "'entry-point parameter'"},

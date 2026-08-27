@@ -2146,6 +2146,43 @@ LF-terminated name set has SHA-256
 `7bdb7df316f95767ad79c76e2f802dc08504dfd06fbdfd5208a9c0eafd4ca670`. Debug preservation passes
 10/10.
 
+### Slice 38 exact scalar float32 unordered inequality
+
+Slice 38 adds `*destination = left != right ? 1 : 0` for the same two scalar Float parameters and
+raw AS1 `Ptr<int>` destination. Normal lowering produces canonical Bool `kIROp_Neq`; the existing
+closed floating-comparison classifier now maps that exact Float-operand shape to feature 26 and
+operation 1, while canonical signed-i32 `kIROp_Neq` stays on the integer comparison path. The Bool
+result continues through the established four-block zero/one, integer-phi, and aligned-store graph.
+
+`UNORDERED_NOT_EQUAL` reuses Slice 37's `emitFloatingCompare` field, so the V3 table remains 480
+bytes on x64 and 288 bytes on x86, with a 284-byte semantic suffix before x86 tail padding. A Slice
+37 provider remains valid without feature 26. The facade maps each stable operation to its exact
+feature before dispatch, and the provider applies the shared handle/type/ownership/availability/
+dominance/insertion checks before unflagged `CreateFCmpUNE`. Generic LLVM and negotiated NVVM-2.0
+text each contain exactly one `fcmp une float` and need no compatibility rewrite. Unorderedness is
+intentional: `!=` is true when either operand is NaN and is the logical complement of ordered
+equality.
+
+The second `NVVMFloat32ComparisonTestCase` row owns the new source, feature, operation, text,
+kernel, PTX, and runtime data. The equality-only provider, direct, differential-PTX, assembler, and
+runtime bodies became descriptor-driven helpers with thin registered wrappers. Consequently, seven
+new names add 185 physical lines across the five measured test/support files, from 20,503 to
+20,688, versus the 662-line first-family cost in Slice 37. The production direct emitter also
+combines equality and inequality validation/emission around the same bounded classifier, deleting
+the duplicated signed-i32 inequality block.
+
+Direct topology remains `[Pointer, Float, Float]`; parameters 1 and 2 feed one floating comparison
+whose Bool result controls the existing consumer. NVVM and NVRTC agree on `[64, 32, 32]`, a
+token-safe float32 equality/inequality predicate family, one global i32 store, and no global load,
+float arithmetic, or integer predicate. CUDA 12.9 `ptxas` accepts both outputs. On the RTX 5090,
+both routes return zero for `3.75 != 3.75` and `+0 != -0`, and one for `-8 != 0.5` and quiet
+`NaN != NaN`.
+
+The focused matrix passes 13/13 and the Release NVVM prefix passes 249/249. Its exact sorted
+LF-terminated name set has SHA-256
+`529af4d3eba39ba0aabd6ca881ca3ac66b5f30c5f272c75a54a3b5cdc15156ea`; removing the seven Slice
+38 names reproduces Slice 37's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2875,7 +2912,8 @@ The following remain open until their named slice supplies evidence:
   pointers, fixed i32 array pointers, and exact raw `RWStructuredBuffer<int>`;
 - external/indirect calls, richer helper ABI, and scalar operations beyond the established
   signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, bitwise-XOR, bitwise-NOT,
-  arithmetic-negate and the signed-i32 comparison family;
+  arithmetic-negate and comparison family, plus scalar float32 add, subtract, multiply, divide,
+  negate, ordered equality, and unordered inequality;
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;

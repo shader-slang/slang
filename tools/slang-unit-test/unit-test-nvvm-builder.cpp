@@ -99,6 +99,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
         SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_NEGATE_MIN_SIZE == floatingUnaryMinimumSize);
     SLANG_CHECK(
         SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_EQUAL_MIN_SIZE == floatingCompareMinimumSize);
+    SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_FLOATING_COMPARE_MIN_SIZE == floatingCompareMinimumSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderAPI_V3) == completeSize);
 
     gFakeNVVMBuilder.reset();
@@ -185,6 +186,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32AddAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL % 64u));
         api.structureSize = uint32_t(SLANG_NVVM_BUILDER_API_V3_MIN_SIZE);
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -359,6 +362,7 @@ static void _runNVVMIRBuilderNegotiatesFloat32BinaryAPI(
             SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE,
             SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE,
             SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL,
+            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL,
         };
         for (auto feature : floatFeatures)
             api.features.words[feature / 64u] &= ~(uint64_t(1) << (feature % 64u));
@@ -445,6 +449,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32NegateAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL % 64u));
         api.structureSize = sizeof(void*) == 8 ? 464u : 280u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -560,6 +566,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32EqualAPI)
         SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL % 64u));
         api.structureSize = sizeof(void*) == 8 ? 472u : 280u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -677,6 +685,65 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32EqualAPI)
                 right,
                 result) == SLANG_FAIL);
         SLANG_CHECK(result == nullptr);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32NotEqualAPI)
+{
+    // Slice 37 remains loadable and independently rejects the new semantic before dispatch.
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL % 64u));
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
+        SLANG_CHECK(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL));
+        SLANG_CHECK(!builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL));
+        SlangNVVMValueHandle_1 result = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitFloatingCompare(
+                _getFakeNVVMBuilderModule(),
+                SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL,
+                nullptr,
+                nullptr,
+                result) == SLANG_E_NOT_AVAILABLE);
+        SLANG_CHECK(result == nullptr);
+        SLANG_CHECK(
+            gFakeNVVMBuilder
+                .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingCompare)] ==
+            0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL % 64u));
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
+        SLANG_CHECK(!builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL));
+        SLANG_CHECK(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL));
+        SlangNVVMValueHandle_1 result = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitFloatingCompare(
+                _getFakeNVVMBuilderModule(),
+                SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL,
+                nullptr,
+                nullptr,
+                result) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(result == nullptr);
+        SLANG_CHECK(
+            gFakeNVVMBuilder
+                .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingCompare)] ==
+            1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.scalarV3Operations.getLast().operation ==
+            SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 }
@@ -3531,10 +3598,12 @@ NVVM_FLOAT32_ARITHMETIC_BUILDER_TEST(nvvmIRBuilderBuildsFloat32NegateKernel, Neg
 
 #undef NVVM_FLOAT32_ARITHMETIC_BUILDER_TEST
 
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32EqualKernel)
+static void _runNVVMIRBuilderBuildsFloat32ComparisonKernel(
+    UnitTestContext* unitTestContext,
+    NVVMFloat32ComparisonTestOperation testOperation)
 {
     const NVVMFloat32ComparisonTestCase& testCase =
-        _getNVVMFloat32ComparisonTestCase(NVVMFloat32ComparisonTestOperation::OrderedEqual);
+        _getNVVMFloat32ComparisonTestCase(testOperation);
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
     SLANG_CHECK_ABORT(builder.supportsFeature(testCase.feature));
@@ -3542,7 +3611,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32EqualKernel)
     ScopedNVVMBuilderModule scope;
     scope.builder = &builder;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createModule(toSlice("float32-ordered-equal-module"), scope.module)));
+        builder.createModule(UnownedStringSlice(testCase.diagnosticName), scope.module)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_populateFloat32ComparisonKernel(builder, scope.module, testCase)));
 
@@ -3558,8 +3627,17 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32EqualKernel)
         const UnownedStringSlice text(
             static_cast<const char*>(assembly->getBufferPointer()),
             assembly->getBufferSize());
-        SLANG_CHECK(text.indexOf(toSlice("define void @float32Equal(i32 addrspace(1)*")) >= 0);
-        SLANG_CHECK(_countOccurrences(text, toSlice("fcmp oeq float")) == 1);
+        StringBuilder signature;
+        signature << "define void @" << testCase.kernelName << "(i32 addrspace(1)*";
+        SLANG_CHECK(text.indexOf(signature.getUnownedSlice()) >= 0);
+        for (const auto& comparisonCase : kNVVMFloat32ComparisonTestCases)
+        {
+            StringBuilder instruction;
+            instruction << comparisonCase.llvmOpcode << " float";
+            SLANG_CHECK(
+                _countOccurrences(text, instruction.getUnownedSlice()) ==
+                (&comparisonCase == &testCase ? 1 : 0));
+        }
         SLANG_CHECK(_countOccurrences(text, toSlice("fcmp ")) == 1);
         SLANG_CHECK(_countOccurrences(text, toSlice("store i32")) == 2);
         SLANG_CHECK(text.indexOf(toSlice("br i1")) >= 0);
@@ -3567,6 +3645,19 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32EqualKernel)
         SLANG_CHECK(text.indexOf(toSlice("fast")) < 0);
     }
 }
+
+#define NVVM_FLOAT32_COMPARISON_BUILDER_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                     \
+    {                                                         \
+        _runNVVMIRBuilderBuildsFloat32ComparisonKernel(       \
+            unitTestContext,                                  \
+            NVVMFloat32ComparisonTestOperation::OPERATION);   \
+    }
+
+NVVM_FLOAT32_COMPARISON_BUILDER_TEST(nvvmIRBuilderBuildsFloat32EqualKernel, OrderedEqual)
+NVVM_FLOAT32_COMPARISON_BUILDER_TEST(nvvmIRBuilderBuildsFloat32NotEqualKernel, UnorderedNotEqual)
+
+#undef NVVM_FLOAT32_COMPARISON_BUILDER_TEST
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32CopyKernel)
 {

@@ -983,7 +983,7 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingCompareV3(
     llvm::Value* llvmLeft = _getValue(left);
     llvm::Value* llvmRight = _getValue(right);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!outValue || !insertionBlock || operation != SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL ||
+    if (!outValue || !insertionBlock ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmLeft) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmRight) ||
         llvmLeft->getType() != llvm::Type::getFloatTy(state->context) ||
@@ -992,9 +992,19 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingCompareV3(
         return SLANG_E_INVALID_ARG;
     }
 
-    *outValue =
-        reinterpret_cast<SlangNVVMValueHandle_1>(state->builder.CreateFCmpOEQ(llvmLeft, llvmRight));
-    return SLANG_OK;
+    switch (operation)
+    {
+    case SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL:
+        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+            state->builder.CreateFCmpOEQ(llvmLeft, llvmRight));
+        return SLANG_OK;
+    case SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL:
+        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+            state->builder.CreateFCmpUNE(llvmLeft, llvmRight));
+        return SLANG_OK;
+    default:
+        return SLANG_E_INVALID_ARG;
+    }
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerCompareV3(

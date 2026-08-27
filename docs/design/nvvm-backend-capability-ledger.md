@@ -144,6 +144,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32EqualPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32EqualRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite, signed-zero, and quiet-NaN ordered-equality cases | RTX 5090 results are `1` for `3.75 == 3.75` and `+0 == -0`, and `0` for `-8 != 0.5` and `NaN == NaN` | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32NotEqualKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Existing generic floating-compare callback constructs exact unflagged LLVM `fcmp une` whose `i1` result selects zero/one stores | Both text dialects contain one unordered float comparison, two aligned i32 stores, and no fast flag | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32NotEqualUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical Bool `kIROp_Neq` with Float operands lowers through floating-compare operation 1 while signed-i32 inequality remains unchanged | Exact Float parameter operands feed the comparison, whose Boolean result controls the existing constant/phi/i32-store graph | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32NotEqualDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 unordered inequality compiles through both routes | `[64, 32, 32]`, token-safe float32 comparison predicate, one global i32 store, no load or float arithmetic, and no integer predicate agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32NotEqualPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32NotEqualRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite, signed-zero, and quiet-NaN unordered-inequality cases | RTX 5090 results are `0` for `3.75 != 3.75` and `+0 != -0`, and `1` for `-8 != 0.5` and `NaN != NaN` | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -645,4 +651,19 @@ float32 equality predicate, one global i32 store, and no load/float arithmetic/i
 false for unequal finite values and quiet NaNs. Focused tests pass 12/12 and Release passes 242/242
 with sorted-name SHA-256
 `7bdb7df316f95767ad79c76e2f802dc08504dfd06fbdfd5208a9c0eafd4ca670`; Debug preservation passes
+10/10.
+
+Slice 38 adds unordered float32 inequality as feature 26/floating-compare operation 1 through the
+unchanged 480-byte x64/288-byte x86 V3 table. A Slice 37 provider remains valid without the bit.
+Canonical Bool `kIROp_Neq` is classified by its Float operands and becomes unflagged LLVM
+`fcmp une`; signed-i32 inequality and adjacent float/pointer comparisons remain unchanged.
+
+The second `NVVMFloat32ComparisonTestCase` row drives descriptor-based provider, direct, PTX,
+assembler, and runtime helpers. Seven names add 185 measured test/support lines, from 20,503 to
+20,688, versus Slice 37's 662-line family scaffolding. NVVM and NVRTC agree on `[64, 32, 32]`, a
+token-safe float32 comparison predicate, one global i32 store, and no load/float arithmetic/integer
+predicate; `ptxas` accepts both. RTX 5090 returns false for equal finite values and opposite signed
+zeros, and true for unequal finite values and quiet NaNs. Focused tests pass 13/13 and Release passes
+249/249 with sorted-name SHA-256
+`529af4d3eba39ba0aabd6ca881ca3ac66b5f30c5f272c75a54a3b5cdc15156ea`; Debug preservation passes
 10/10.

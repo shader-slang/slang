@@ -318,10 +318,12 @@ NVVM_FLOAT32_ARITHMETIC_DIFFERENTIAL_TEST(nvvmSlangRealFloat32NegateDifferential
 
 #undef NVVM_FLOAT32_ARITHMETIC_DIFFERENTIAL_TEST
 
-SLANG_UNIT_TEST(nvvmSlangRealFloat32EqualDifferentialPTX)
+static void _runNVVMSlangRealFloat32ComparisonDifferentialPTX(
+    UnitTestContext* unitTestContext,
+    NVVMFloat32ComparisonTestOperation testOperation)
 {
     const NVVMFloat32ComparisonTestCase& testCase =
-        _getNVVMFloat32ComparisonTestCase(NVVMFloat32ComparisonTestOperation::OrderedEqual);
+        _getNVVMFloat32ComparisonTestCase(testOperation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
     SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(testCase.feature));
@@ -373,7 +375,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32EqualDifferentialPTX)
             SLANG_COUNT_OF(kParameterWidths)));
         SLANG_CHECK(summaries[i].hasGlobalStore32);
         SLANG_CHECK(!summaries[i].hasGlobalLoad32);
-        SLANG_CHECK(summaries[i].hasFloatEqualityComparison32);
+        SLANG_CHECK(summaries[i].hasFloatComparison32);
         SLANG_CHECK(!summaries[i].hasEqualityComparison32);
         SLANG_CHECK(!summaries[i].hasSignedComparison32);
         SLANG_CHECK(!summaries[i].hasFloatAdd32);
@@ -384,6 +386,21 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32EqualDifferentialPTX)
     }
     SLANG_CHECK(_haveEqualPTXParameterWidths(summaries[0], summaries[1]));
 }
+
+#define NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                          \
+    {                                                              \
+        _runNVVMSlangRealFloat32ComparisonDifferentialPTX(         \
+            unitTestContext,                                       \
+            NVVMFloat32ComparisonTestOperation::OPERATION);        \
+    }
+
+NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST(nvvmSlangRealFloat32EqualDifferentialPTX, OrderedEqual)
+NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST(
+    nvvmSlangRealFloat32NotEqualDifferentialPTX,
+    UnorderedNotEqual)
+
+#undef NVVM_FLOAT32_COMPARISON_DIFFERENTIAL_TEST
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyDifferentialPTX)
 {
@@ -1057,12 +1074,27 @@ NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(nvvmSlangRealFloat32NegatePtxasAccepts, Negat
 
 #undef NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST
 
-SLANG_UNIT_TEST(nvvmSlangRealFloat32EqualPtxasAccepts)
+static void _runNVVMSlangRealFloat32ComparisonPtxasAccepts(
+    UnitTestContext* unitTestContext,
+    NVVMFloat32ComparisonTestOperation testOperation)
 {
     const NVVMFloat32ComparisonTestCase& testCase =
-        _getNVVMFloat32ComparisonTestCase(NVVMFloat32ComparisonTestOperation::OrderedEqual);
+        _getNVVMFloat32ComparisonTestCase(testOperation);
     _runNVVMSlangRealFloat32PtxasAccepts(unitTestContext, testCase.source, testCase.feature);
 }
+
+#define NVVM_FLOAT32_COMPARISON_PTXAS_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                   \
+    {                                                       \
+        _runNVVMSlangRealFloat32ComparisonPtxasAccepts(     \
+            unitTestContext,                                \
+            NVVMFloat32ComparisonTestOperation::OPERATION); \
+    }
+
+NVVM_FLOAT32_COMPARISON_PTXAS_TEST(nvvmSlangRealFloat32EqualPtxasAccepts, OrderedEqual)
+NVVM_FLOAT32_COMPARISON_PTXAS_TEST(nvvmSlangRealFloat32NotEqualPtxasAccepts, UnorderedNotEqual)
+
+#undef NVVM_FLOAT32_COMPARISON_PTXAS_TEST
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyPtxasAccepts)
 {
@@ -1608,10 +1640,12 @@ NVVM_FLOAT32_ARITHMETIC_RUNTIME_TEST(nvvmSlangFloat32NegateRuntimeMatchesNVRTC, 
 
 #undef NVVM_FLOAT32_ARITHMETIC_RUNTIME_TEST
 
-SLANG_UNIT_TEST(nvvmSlangFloat32EqualRuntimeMatchesNVRTC)
+static void _runNVVMSlangFloat32ComparisonRuntimeMatchesNVRTC(
+    UnitTestContext* unitTestContext,
+    NVVMFloat32ComparisonTestOperation testOperation)
 {
     const NVVMFloat32ComparisonTestCase& testCase =
-        _getNVVMFloat32ComparisonTestCase(NVVMFloat32ComparisonTestOperation::OrderedEqual);
+        _getNVVMFloat32ComparisonTestCase(testOperation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
     SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(testCase.feature));
@@ -1696,6 +1730,19 @@ SLANG_UNIT_TEST(nvvmSlangFloat32EqualRuntimeMatchesNVRTC)
         }
     }
 }
+
+#define NVVM_FLOAT32_COMPARISON_RUNTIME_TEST(NAME, OPERATION) \
+    SLANG_UNIT_TEST(NAME)                                     \
+    {                                                         \
+        _runNVVMSlangFloat32ComparisonRuntimeMatchesNVRTC(    \
+            unitTestContext,                                  \
+            NVVMFloat32ComparisonTestOperation::OPERATION);   \
+    }
+
+NVVM_FLOAT32_COMPARISON_RUNTIME_TEST(nvvmSlangFloat32EqualRuntimeMatchesNVRTC, OrderedEqual)
+NVVM_FLOAT32_COMPARISON_RUNTIME_TEST(nvvmSlangFloat32NotEqualRuntimeMatchesNVRTC, UnorderedNotEqual)
+
+#undef NVVM_FLOAT32_COMPARISON_RUNTIME_TEST
 
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyRuntimeMatchesNVRTC)
 {
