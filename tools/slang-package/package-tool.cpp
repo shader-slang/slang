@@ -6,6 +6,7 @@
 #include "core/slang-platform.h"
 #include "core/slang-process-util.h"
 #include "core/slang-string-util.h"
+#include "package-bundle.h"
 #include "package-docs.h"
 #include "package-git.h"
 #include "package-json.h"
@@ -38,9 +39,9 @@ static void _printHelp()
         "                   Re-resolve dependencies and update the lock file.\n"
         "                   --from-local uses registered local package manifests.\n"
         "                   --dry-run reports lock changes without writing them.\n"
-        "  build            Compile modules, optional host executables, and package docs.\n"
+        "  build            Compile optional bundle modules/source, host executables, and docs.\n"
         "  run [name] [args...]  Run a host executable produced by the last build.\n"
-        "  test             Run slang-test on the workspace tests directory.\n"
+        "  test             Reserved. Package testing is not implemented yet.\n"
         "  docs             Print the location of generated documentation (build/docs).\n"
         "  status           Check lock, local state, materialized packages, and checkouts.\n"
         "  validate         Validate package structure and the locked dependency closure.\n"
@@ -1022,8 +1023,9 @@ static SlangResult _deployExecutableRuntime(
     return SLANG_FAIL;
 }
 
-/// Compile every primary in the resolved package graph to a front-end `.slang-module`, preserving
-/// its import-relative path below the workspace `build/modules` directory. When requested by the
+/// Compile every primary in the resolved package graph to a front-end `.slang-module` under
+/// `build/bundle/modules`, preserving its import-relative path, and copy exported source under
+/// `build/bundle/source` when those workspace.bundle outputs are enabled. When requested by the
 /// workspace `host` section, also compile each listed executable primary to a native artifact at
 /// the build root.
 static SlangResult _build(const String& projectRoot, String& outError)
@@ -1032,13 +1034,15 @@ static SlangResult _build(const String& projectRoot, String& outError)
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
 
     List<PrimaryModule> primaryModules;
+    List<ExportedSourceFile> sourceFiles;
     List<String> warnings;
     SLANG_RETURN_ON_FAIL(validateProject(
         projectRoot,
         outError,
         &warnings,
         &primaryModules,
-        ProjectValidationMode::SourceAndDependencies));
+        ProjectValidationMode::SourceAndDependencies,
+        &sourceFiles));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
 
@@ -1062,31 +1066,52 @@ static SlangResult _build(const String& projectRoot, String& outError)
     }
 
     String buildRoot = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest));
-    String modulesRoot = Path::combine(buildRoot, "modules");
-    for (const auto& module : primaryModules)
+    String bundleRoot = Path::combine(buildRoot, "bundle");
+    String modulesRoot = Path::combine(bundleRoot, "modules");
+    String sourceRoot = Path::combine(bundleRoot, "source");
+    if (manifest.workspace.bundle.source)
     {
-        String outputPath = Path::combine(modulesRoot, module.importPath + ".slang-module");
-        if (!Path::createDirectoryRecursive(Path::getParentDirectory(outputPath)))
+        SLANG_RETURN_ON_FAIL(copyBundleSource(sourceRoot, sourceFiles, outError));
+        fprintf(stdout, "Copied %lld source file(s).\n", (long long)sourceFiles.getCount());
+    }
+    else
+    {
+        Path::removeNonEmpty(sourceRoot);
+    }
+    if (manifest.workspace.bundle.modules)
+    {
+        SLANG_RETURN_ON_FAIL(resetDirectory(modulesRoot, outError));
+        for (const auto& module : primaryModules)
         {
-            outError = String("Cannot create module output directory for: ") + outputPath;
-            return SLANG_FAIL;
-        }
+            String outputPath = Path::combine(modulesRoot, module.importPath + ".slang-module");
+            if (!Path::createDirectoryRecursive(Path::getParentDirectory(outputPath)))
+            {
+                outError = String("Cannot create module output directory for: ") + outputPath;
+                return SLANG_FAIL;
+            }
 
-        List<String> arguments;
-        arguments.add(module.sourcePath);
-        for (const auto& searchPath : searchPaths)
-        {
-            arguments.add("-I");
-            arguments.add(searchPath);
+            List<String> arguments;
+            arguments.add(module.sourcePath);
+            for (const auto& searchPath : searchPaths)
+            {
+                arguments.add("-I");
+                arguments.add(searchPath);
+            }
+            arguments.add("-o");
+            arguments.add(outputPath);
+            SLANG_RETURN_ON_FAIL(_runSiblingTool(slangcPath, arguments, outError));
+            if (!File::exists(outputPath))
+            {
+                outError = String("slangc did not produce the expected module: ") + outputPath;
+                return SLANG_FAIL;
+            }
         }
-        arguments.add("-o");
-        arguments.add(outputPath);
-        SLANG_RETURN_ON_FAIL(_runSiblingTool(slangcPath, arguments, outError));
-        if (!File::exists(outputPath))
-        {
-            outError = String("slangc did not produce the expected module: ") + outputPath;
-            return SLANG_FAIL;
-        }
+        SLANG_RETURN_ON_FAIL(writeModuleProvenance(modulesRoot, slangcPath, outError));
+        fprintf(stdout, "Built %lld module(s).\n", (long long)primaryModules.getCount());
+    }
+    else
+    {
+        Path::removeNonEmpty(modulesRoot);
     }
     if (manifest.host.executables.getCount())
     {
@@ -1121,7 +1146,6 @@ static SlangResult _build(const String& projectRoot, String& outError)
         }
         SLANG_RETURN_ON_FAIL(_deployExecutableRuntime(slangcPath, buildRoot, outError));
     }
-    fprintf(stdout, "Built %lld module(s).\n", (long long)primaryModules.getCount());
     SLANG_RETURN_ON_FAIL(buildDocumentation(projectRoot, outError));
     return SLANG_OK;
 }
@@ -1163,46 +1187,18 @@ static SlangResult _run(
     return _runStreamingSiblingTool(executablePath, executableArguments, outError);
 }
 
-/// Validate the materialized workspace and run its `tests` tree through the sibling Slang test
-/// infrastructure.
+/// Reserve `slang package test` without invoking `slang-test`. Package testing is not a
+/// slang-test prefix yet: slang-test is an internal compiler harness with extra licenses, and the
+/// package-owned test model is still undecided.
 static SlangResult _test(const String& projectRoot, String& outError)
 {
-    List<String> warnings;
-    SLANG_RETURN_ON_FAIL(validateProject(
-        projectRoot,
+    SLANG_UNUSED(projectRoot);
+    outError = "slang package test is not implemented yet.";
+    appendErrorAdvice(
         outError,
-        &warnings,
-        nullptr,
-        ProjectValidationMode::SourceAndDependencies));
-    for (const auto& warning : warnings)
-        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
-
-    String testsPath = Path::combine(projectRoot, "tests");
-    SlangPathType testsType;
-    if (SLANG_FAILED(Path::getPathType(testsPath, &testsType)) ||
-        testsType != SLANG_PATH_TYPE_DIRECTORY)
-    {
-        outError = String("Workspace tests directory does not exist: ") + testsPath;
-        return SLANG_FAIL;
-    }
-
-    String slangTestPath;
-    SLANG_RETURN_ON_FAIL(_findSiblingTool("slang-test", slangTestPath, outError));
-    String relativeTestsPath = Path::getRelativePath(Path::getCurrentPath(), testsPath);
-    if (Path::isAbsolute(relativeTestsPath))
-    {
-        outError = "Workspace tests must be on the same filesystem as the current directory.";
-        return SLANG_FAIL;
-    }
-    List<String> testArguments;
-    testArguments.add("-test-dir");
-    testArguments.add(relativeTestsPath);
-    // A prefix keeps slang-test from selecting its linked unit-test registry when this command is
-    // itself exercised by a unit test. The trailing separator still matches every file below the
-    // directory, while the directory entry that slang-test adds for an existing prefix is ignored
-    // because it has no test-file extension.
-    testArguments.add(relativeTestsPath + "/");
-    return _runStreamingSiblingTool(slangTestPath, testArguments, outError);
+        "The command is reserved until package testing has a dedicated model; it does not run "
+        "slang-test.");
+    return SLANG_FAIL;
 }
 
 /// Print the workspace documentation directory so the user can open `build/docs/index.md`.

@@ -47,12 +47,30 @@ struct Exclusion
     String reason;
 };
 
+/// Optional workspace outputs written under `workspace.build/bundle`.
+///
+/// Consider this example:
+///
+/// ```json
+/// "workspace": { "bundle": { "modules": true, "source": false } }
+/// ```
+///
+/// `slang package build` then writes `.slang-module` files under `build/bundle/modules` and skips
+/// the flattened source tree. Both flags default to true when `bundle` is omitted, so a workspace
+/// that never mentions the object still produces a complete bundle.
+struct BundleSettings
+{
+    bool modules = true;
+    bool source = true;
+};
+
 /// Root-only workspace layout from `slang-package.json`. Dependency manifests may contain these
 /// fields, but only the manifest that starts resolution controls materialization and output.
 struct WorkspaceSettings
 {
     String depsDirectory;
     String buildDirectory;
+    BundleSettings bundle;
     List<Exclusion> exclusions;
 };
 

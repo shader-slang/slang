@@ -139,7 +139,7 @@ the truncated `(0.2130, 0.7150, 0.0720)` from `v1.0.0`.
 Update the entire graph when you mean to take newer compatible releases. There is no
 package-specific update mode yet.
 
-## Build, run, test, and collect docs
+## Build, run, and collect docs
 
 ```sh
 slang package build
@@ -147,15 +147,18 @@ slang package build
 
 Build validates the materialized graph, then:
 
-- Emits a `.slang-module` for every primary in the workspace and its dependencies under
-  `build/modules/`, preserving import-relative paths (`video-preview`, `video/display`,
-  `color/convert`, `color/encoding`).
+- When `workspace.bundle.modules` is enabled (the default), emits a `.slang-module` for every
+  primary in the workspace and its dependencies under `build/bundle/modules/`, preserving
+  import-relative paths (`video-preview`, `video/display`, `color/convert`, `color/encoding`), and
+  writes `build/bundle/modules/provenance.json` naming the Slang toolchain that produced them.
+- When `workspace.bundle.source` is enabled (the default), copies exported `.slang` files into
+  `build/bundle/source/` at those same import-relative paths so the directory is one search path.
 - Compiles each name in `host.executables` to `build/<name>` and copies `slang-rt` beside it.
 - Copies Markdown from each package's `docs/` into `build/docs/<package>/` and writes
   `build/docs/index.md`.
 
-The `build/modules` tree is enough for a consumer that should not receive `deps/` source: put that
-directory on the search path.
+The `build/bundle/modules` tree is enough for a consumer that should not receive `deps/` source:
+put that directory on the search path. The matching source layout is `build/bundle/source/`.
 
 ```sh
 slang package run
@@ -166,13 +169,12 @@ binary is missing, it tells you to build first. A leading argument that matches 
 executable name selects that artifact; remaining arguments are forwarded.
 
 ```sh
-slang package test
 slang package docs
 less build/docs/index.md
 ```
 
-Test runs `slang-test` on this workspace's `tests/` tree only. `docs` prints the generated
-directory; it does not copy or regenerate files. Run `build` when the documentation should change.
+`docs` prints the generated directory; it does not copy or regenerate files. Run `build` when the
+documentation should change. `slang package test` is reserved and not implemented yet.
 
 ## Develop against a local tree
 
@@ -228,7 +230,6 @@ Git-to-Git remapping is not available yet. Overrides replace a dependency with a
 slang package fetch
 slang package status
 slang package build
-slang package test
 ```
 
 CI should not run `update`. Update is a deliberate choice to take newer tags and rewrite the

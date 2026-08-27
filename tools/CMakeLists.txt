@@ -142,6 +142,8 @@ slang_add_target(
     slang-package
     EXECUTABLE
     LINK_WITH_PRIVATE core compiler-core
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        "SLANG_PACKAGE_COMPILER_VERSION=\"${SLANG_VERSION_FULL}\""
     INSTALL
     EXPORT_SET_NAME SlangTargets
     PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
@@ -406,6 +408,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
+            "SLANG_PACKAGE_COMPILER_VERSION=\"${SLANG_VERSION_FULL}\""
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core
@@ -429,6 +432,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         slang-unit-test
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-bundle.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-docs.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-git.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-json.cpp

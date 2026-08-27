@@ -18,6 +18,16 @@ struct PrimaryModule
     String sourcePath;
 };
 
+/// One `.slang` file from a package export, keyed by its import-relative path in a flattened
+/// searchable tree. Companion files keep their path below the primary, for example
+/// `acme/noise/helper.slang`.
+struct ExportedSourceFile
+{
+    String relativePath;
+    String packageName;
+    String sourcePath;
+};
+
 enum class ProjectValidationMode
 {
     Full,
@@ -28,13 +38,15 @@ enum class ProjectValidationMode
 const char* getLicensePlaceholderText();
 
 /// Validate the workspace package and its materialized, locked dependency closure. When requested,
-/// return every primary module in the resolved graph in import-path order.
+/// return every primary module in the resolved graph in import-path order, and every exported
+/// `.slang` file for bundle source copy.
 SlangResult validateProject(
     const String& projectRoot,
     String& outError,
     List<String>* outWarnings = nullptr,
     List<PrimaryModule>* outPrimaryModules = nullptr,
-    ProjectValidationMode mode = ProjectValidationMode::Full);
+    ProjectValidationMode mode = ProjectValidationMode::Full,
+    List<ExportedSourceFile>* outSourceFiles = nullptr);
 
 } // namespace PackageTool
 } // namespace Slang

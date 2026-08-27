@@ -98,6 +98,13 @@ dependency source is materialized, and `build` contains generated workspace outp
 are `deps/` and `build/`; `slang package init` writes those defaults explicitly. The same fields in
 a dependency's manifest do not affect the enclosing workspace.
 
+`workspace.bundle` selects optional distribution outputs under `build/bundle/`. `modules` (default
+true) compiles every primary to `build/bundle/modules/` and writes `provenance.json` beside those
+artifacts. `source` (default true) copies every exported `.slang` file into
+`build/bundle/source/` using the same import-relative layout, so that directory is one compiler
+search path. Two files that would occupy the same name on a case-insensitive filesystem are an
+error. Set either flag to `false` to skip that output.
+
 The optional root `host` object requests native host executables. `executables` lists output
 filenames without directory separators; the package tool adds the platform executable suffix and
 writes each result at the root of `workspace.build`. Each name must match an exported workspace
@@ -293,16 +300,27 @@ committing a portable published resolution.
 Fetched package trees contain source only. Compilation output must be written outside these trees
 because the same source commit can be compiled against different resolved dependency graphs.
 
-`slang package build` validates the materialized package graph and compiles every primary module in
-the workspace and its resolved dependencies to a front-end `.slang-module` under
-`workspace.build/modules`, preserving its import path. For example, an exported
-`src/acme/noise.slang` becomes `build/modules/acme/noise.slang-module`, whether that source belongs
-to the workspace or a dependency. Companion files included by that primary are compiled into the
-same artifact and do not produce separate files.
+`slang package build` validates the materialized package graph. When `workspace.bundle.modules` is
+enabled, it compiles every primary module in the workspace and its resolved dependencies to a
+front-end `.slang-module` under `workspace.build/bundle/modules`, preserving its import path. For
+example, an exported `src/acme/noise.slang` becomes `build/bundle/modules/acme/noise.slang-module`,
+whether that source belongs to the workspace or a dependency. Companion files included by that
+primary are compiled into the same artifact and do not produce separate files.
 
-The resulting `build/modules` tree is sufficient for source-free consumption: place it on the
+The `.slang-module` format is not independently versioned, so those files are only useful with the
+same Slang toolchain that produced them. Build writes `build/bundle/modules/provenance.json`
+identifying that compiler (`name`, `version`, and `path`).
+
+When `workspace.bundle.source` is enabled, build also copies every exported `.slang` file into
+`build/bundle/source/` at the same import-relative paths. The resulting tree is a single search
+path: `src/acme/noise.slang` and its companion `src/acme/noise/helper.slang` become
+`build/bundle/source/acme/noise.slang` and `build/bundle/source/acme/noise/helper.slang`. A
+case-insensitive name collision across packages is an error.
+
+The `build/bundle/modules` tree is sufficient for source-free consumption: place it on the
 consumer's search path and distribute it without the materialized `deps/` source trees. Imports
-from one generated module to another resolve at the same import-relative paths used by source.
+from one generated module to another resolve at the same import-relative paths used by source. The
+`build/bundle/source` tree is the corresponding source-form search path.
 
 When `host.executables` is present, build also compiles each matching workspace primary with the
 host executable target and writes `build/<executable-name>` (plus `.exe` on Windows). The `main`
@@ -323,10 +341,9 @@ trailing arguments. With no executable name, it runs `host.default`. It does not
 fails with instructions when the manifest does not configure a host executable or when
 `slang package build` has not produced that artifact.
 
-`slang package test` validates the materialized package graph and invokes the sibling `slang-test`
-executable on the workspace's `tests/` tree. Tests can use slang-test's `$dirname` substitution to
-refer to workspace exports; for example, a test under `tests/` can add `-I $dirname/../src` to its
-test directive. The command fails if the package tool installation does not include `slang-test`.
+`slang package test` is reserved and currently reports that it is not implemented. It does not
+invoke `slang-test`. Package testing will get a dedicated model; `slang-test` remains an internal
+compiler harness and is not part of the package command surface.
 
 `slang package docs` prints the path of the generated `build/docs/` directory so you can open
 `index.md` and the copied package files. It does not copy or regenerate documentation; run

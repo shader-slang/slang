@@ -249,6 +249,15 @@ static void _collectPrimaryModules(
                            { return left.importPath < right.importPath; });
 }
 
+static void _collectExportedSourceFiles(
+    const List<ExportedSourceFile>& files,
+    List<ExportedSourceFile>& outSourceFiles)
+{
+    outSourceFiles = files;
+    outSourceFiles.sort([](const ExportedSourceFile& left, const ExportedSourceFile& right)
+                        { return left.relativePath < right.relativePath; });
+}
+
 /// Find the primary module file whose same-named directory contains `relativePath`.
 static String _findOwningModule(
     const String& relativePath,
@@ -308,6 +317,7 @@ static SlangResult _validateExport(
     const String& packageName,
     const String& exportRoot,
     List<ModuleLocation>& ioModules,
+    List<ExportedSourceFile>& ioSourceFiles,
     String& outError)
 {
     SlangPathType exportType;
@@ -356,6 +366,11 @@ static SlangResult _validateExport(
                        "' does not match expected name '" + expectedName + "': " + fullPath;
             return SLANG_FAIL;
         }
+        ExportedSourceFile sourceFile;
+        sourceFile.relativePath = _normalizePath(relativePath);
+        sourceFile.packageName = packageName;
+        sourceFile.sourcePath = fullPath;
+        ioSourceFiles.add(sourceFile);
         if (isPrimary)
             SLANG_RETURN_ON_FAIL(
                 _addModule(packageName, exportRoot, relativePath, ioModules, outError));
@@ -416,6 +431,7 @@ static SlangResult _validatePackageTree(
     const String& packageRoot,
     const Manifest& manifest,
     List<ModuleLocation>& ioModules,
+    List<ExportedSourceFile>& ioSourceFiles,
     ProjectValidationMode mode,
     String& outError)
 {
@@ -443,7 +459,8 @@ static SlangResult _validatePackageTree(
             outError = String("Package export escapes its package: ") + exportRoot;
             return SLANG_FAIL;
         }
-        SLANG_RETURN_ON_FAIL(_validateExport(manifest.name, exportRoot, ioModules, outError));
+        SLANG_RETURN_ON_FAIL(
+            _validateExport(manifest.name, exportRoot, ioModules, ioSourceFiles, outError));
     }
     return SLANG_OK;
 }
@@ -494,14 +511,22 @@ SlangResult validateProject(
     String& outError,
     List<String>* outWarnings,
     List<PrimaryModule>* outPrimaryModules,
-    ProjectValidationMode mode)
+    ProjectValidationMode mode,
+    List<ExportedSourceFile>* outSourceFiles)
 {
     Manifest rootManifest;
     SLANG_RETURN_ON_FAIL(
         readManifest(Path::combine(projectRoot, kManifestName), rootManifest, outError));
 
     List<ModuleLocation> modules;
-    SLANG_RETURN_ON_FAIL(_validatePackageTree(projectRoot, rootManifest, modules, mode, outError));
+    List<ExportedSourceFile> sourceFiles;
+    SLANG_RETURN_ON_FAIL(_validatePackageTree(
+        projectRoot,
+        rootManifest,
+        modules,
+        sourceFiles,
+        mode,
+        outError));
 
     String lockPath = Path::combine(projectRoot, kLockName);
     List<LocalPackage> localPackages;
@@ -512,6 +537,8 @@ SlangResult validateProject(
         {
             if (outPrimaryModules)
                 _collectPrimaryModules(modules, *outPrimaryModules);
+            if (outSourceFiles)
+                _collectExportedSourceFiles(sourceFiles, *outSourceFiles);
             return SLANG_OK;
         }
         outError = localPackages.getCount()
@@ -600,12 +627,19 @@ SlangResult validateProject(
             }
         }
 
-        SLANG_RETURN_ON_FAIL(
-            _validatePackageTree(packageRoots[index], manifest, modules, mode, outError));
+        SLANG_RETURN_ON_FAIL(_validatePackageTree(
+            packageRoots[index],
+            manifest,
+            modules,
+            sourceFiles,
+            mode,
+            outError));
     }
     SLANG_RETURN_ON_FAIL(requireAllLockPackagesTrusted(lock, reachable, outError));
     if (outPrimaryModules)
         _collectPrimaryModules(modules, *outPrimaryModules);
+    if (outSourceFiles)
+        _collectExportedSourceFiles(sourceFiles, *outSourceFiles);
     return SLANG_OK;
 }
 
