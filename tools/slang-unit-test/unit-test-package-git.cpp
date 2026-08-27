@@ -136,6 +136,37 @@ SLANG_UNIT_TEST(PackageGitResolvesAnnotatedTagToCommit)
     SLANG_CHECK(candidates[0].commit == result.standardOutput.trim());
 }
 
+SLANG_UNIT_TEST(PackageGitFreshCheckoutIgnoresRemoteHead)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const String repository = Path::combine(temp.path, "repository");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(repository));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
+    String sourcePath = Path::combine(repository, "content.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(sourcePath, "version 1")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+
+    String version1Commit;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(repository, version1Commit, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(sourcePath, "version 2")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+
+    String checkout = Path::combine(temp.path, "checkout");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
+        temp.path,
+        repository,
+        version1Commit,
+        version1Commit,
+        checkout,
+        false,
+        error)));
+    String checkoutCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, checkoutCommit, error)));
+    SLANG_CHECK(checkoutCommit == version1Commit);
+}
+
 SLANG_UNIT_TEST(PackageGitDirtyPredicateIncludesCommitsAndStashes)
 {
     TemporaryDirectory temp;

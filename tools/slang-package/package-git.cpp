@@ -308,7 +308,7 @@ static SlangResult _materializeRevision(
             outError);
     }
 
-    if (currentCommit.getLength())
+    if (destinationExisted && currentCommit.getLength())
     {
         bool isSafe = false;
         SLANG_RETURN_ON_FAIL(
