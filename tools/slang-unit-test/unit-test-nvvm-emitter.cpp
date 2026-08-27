@@ -441,6 +441,78 @@ SLANG_UNIT_TEST(nvvmSlangFloat32FunctionsUseDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexUsesDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMWaveLaneIndexSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.getFunctionParameterCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeResultKinds.getCount() == 2);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultKinds[0] == FakeNVVMBuilderResultTypeKind::Void);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultKinds[1] == FakeNVVMBuilderResultTypeKind::Integer);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[0] == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[1] == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.functionParameterTypeKinds.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[0] ==
+            FakeNVVMBuilderParameterTypeKind::Pointer);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicOperations[0] == SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicCallerBlockIndices[0] == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.scalarReturnValueRefs[0].kind == FakeNVVMBuilderValueKind::Intrinsic);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerCallCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.callCalleeFunctionIndices[0] == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.callCallerBlockIndices[0] == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.callArgumentCounts[0] == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.callResultTypeKinds[0] == FakeNVVMBuilderScalarTypeKind::Integer);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::Call);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storePointerValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::PointerOffset);
+        SLANG_CHECK(gFakeNVVMBuilder.pointerOffsetBaseValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.pointerOffsetBaseValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(gFakeNVVMBuilder.pointerOffsetBaseValueRefs[0].index == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.pointerOffsetElementValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::Call);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -691,6 +763,38 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesGenericScalarFunctionCapability)
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveLaneIndexCapability)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    gFakeNVVMBuilder.apiV3.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX / 64u] &=
+        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX % 64u));
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMWaveLaneIndexSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
@@ -3009,7 +3113,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedCallSource, "'helper function result type'"},
         {kDirectNVVMUnsupportedPointerHelperParameterSource, "'helper function parameter'"},
         {kDirectNVVMUnsupportedPointerHelperResultSource, "'helper function result type'"},
-        {kDirectNVVMUnsignedPointerOffsetSource, "'signed i32 value'"},
+        {kDirectNVVMUnsignedPointerOffsetSource, "'integer_constant'"},
         {kDirectNVVMUnsignedFixedArrayIndexSource, "'signed i32 value'"},
         {kDirectNVVMUnsupportedFloatArraySource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedHalfAddSource, "'entry-point parameter'"},
@@ -3018,7 +3122,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedLocalArraySource, "'var'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
-        {kDirectNVVMUnsignedMultiplySource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedMultiplySource, "'signed i32 multiplication'"},
         {kDirectNVVMWideIntegerMultiplySource, "'entry-point parameter'"},
         {kDirectNVVMFloatingMultiplySource, "'castFloatToInt'"},
         {kDirectNVVMFloatingSineSource, "'castFloatToInt'"},
@@ -3026,38 +3130,38 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMIntegerRightShiftSource, "'shr'"},
         {kDirectNVVMIntegerDivideSource, "'div'"},
         {kDirectNVVMIntegerRemainderSource, "'irem'"},
-        {kDirectNVVMUnsignedIntegerBitAndSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerBitAndSource, "'signed i32 bitwise AND'"},
         {kDirectNVVMWideIntegerBitAndSource, "'entry-point parameter'"},
-        {kDirectNVVMUnsignedIntegerBitOrSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerBitOrSource, "'signed i32 bitwise OR'"},
         {kDirectNVVMWideIntegerBitOrSource, "'entry-point parameter'"},
-        {kDirectNVVMUnsignedIntegerBitXorSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerBitXorSource, "'signed i32 bitwise XOR'"},
         {kDirectNVVMWideIntegerBitXorSource, "'entry-point parameter'"},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
-        {kDirectNVVMUnsignedIntegerBitNotSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerBitNotSource, "'signed i32 bitwise NOT'"},
         {kDirectNVVMWideIntegerBitNotSource, "'entry-point parameter'"},
-        {kDirectNVVMUnsignedIntegerNegateSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerNegateSource, "'signed i32 arithmetic negation'"},
         {kDirectNVVMWideIntegerNegateSource, "'entry-point parameter'"},
         {kDirectNVVMFloatingNegateSource, "'castFloatToInt'"},
-        {kDirectNVVMUnsignedAtomicAddSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedAtomicAddSource, "'relaxed global signed i32 atomic add'"},
         {kDirectNVVMWideAtomicAddSource, "'entry-point parameter'"},
         {kDirectNVVMFloatingAtomicAddSource, "'relaxed global signed i32 atomic add'"},
         {kDirectNVVMAtomicSubSource, "'atomicSub'"},
         {kDirectNVVMAtomicExchangeSource, "'atomicExchange'"},
         {kDirectNVVMAcquireGlobalI32AtomicAddSource, "'relaxed atomic-add memory order'"},
         {kDirectNVVMGroupSharedI32AtomicAddSource, "'device scalar pointer'"},
-        {kDirectNVVMUnsignedIntegerEqualSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerEqualSource, "'signed i32 value'"},
         {kDirectNVVMWideIntegerEqualSource, "'entry-point parameter'"},
         {kDirectNVVMPointerEqualSource, "'signed i32 value'"},
-        {kDirectNVVMUnsignedIntegerNotEqualSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerNotEqualSource, "'signed i32 value'"},
         {kDirectNVVMWideIntegerNotEqualSource, "'entry-point parameter'"},
         {kDirectNVVMPointerNotEqualSource, "'signed i32 value'"},
-        {kDirectNVVMUnsignedIntegerGreaterThanSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerGreaterThanSource, "'signed i32 value'"},
         {kDirectNVVMWideIntegerGreaterThanSource, "'entry-point parameter'"},
         {kDirectNVVMPointerGreaterThanSource, "'signed i32 value'"},
-        {kDirectNVVMUnsignedIntegerLessEqualSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerLessEqualSource, "'signed i32 value'"},
         {kDirectNVVMWideIntegerLessEqualSource, "'entry-point parameter'"},
         {kDirectNVVMPointerLessEqualSource, "'signed i32 value'"},
-        {kDirectNVVMUnsignedIntegerGreaterEqualSource, "'entry-point parameter'"},
+        {kDirectNVVMUnsignedIntegerGreaterEqualSource, "'signed i32 value'"},
         {kDirectNVVMWideIntegerGreaterEqualSource, "'entry-point parameter'"},
         {kDirectNVVMPointerGreaterEqualSource, "'signed i32 value'"},
     };

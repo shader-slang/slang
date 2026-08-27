@@ -15,6 +15,8 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsNVPTX.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
@@ -1348,6 +1350,33 @@ _emitValueReturnV3(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
     return _emitValueReturnImpl(module, value, false);
 }
 
+static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntrinsicOp_3 operation,
+    const SlangNVVMValueHandle_1* arguments,
+    size_t argumentCount,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    static_cast<void>(arguments);
+
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !insertionBlock || operation != SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX ||
+        argumentCount || !outValue)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(
+        state->module.get(),
+        llvm::Intrinsic::nvvm_read_ptx_sreg_laneid);
+    llvm::CallInst* call = state->builder.CreateCall(intrinsic);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(call);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitPointerOffset(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMValueHandle_1 basePointer,
@@ -1522,9 +1551,11 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
 // LLVM 14 made atomic alignment explicit in assembly, but LLVM 7 gives atomicrmw its natural
 // alignment and rejects the suffix. LLVM 14 also prints unary negation as `fneg`, which the
 // libNVVM NVVM-2.0 reader rejects; the older dialect expresses finite scalar negation as
-// `fsub -0.0, value`. The provider exposes exactly one shape of each rewritten operation, so
-// validate every semantic instruction before changing its spelling. Counting semantic
-// instructions and rewritten lines prevents an unrelated occurrence or future form from being
+// `fsub -0.0, value`. Finally, LLVM 14 gives the lane-id intrinsic function attributes that the
+// LLVM 7 parser does not know. Removing optimization-only attributes retains the intrinsic's
+// semantic name and type. The provider exposes exactly one shape of each rewritten operation, so
+// validate every semantic instruction or declaration before changing its spelling. Counting
+// semantic objects and rewritten lines prevents an unrelated occurrence or future form from being
 // accepted accidentally.
 static SlangResult _writeLegacyNVVMAssembly(
     ModuleState* state,
@@ -1532,8 +1563,25 @@ static SlangResult _writeLegacyNVVMAssembly(
 {
     size_t semanticAtomicCount = 0;
     size_t semanticFloatNegateCount = 0;
+    size_t semanticWaveLaneIndexDeclarationCount = 0;
     for (llvm::Function& function : *state->module)
     {
+        if (function.getIntrinsicID() == llvm::Intrinsic::nvvm_read_ptx_sreg_laneid)
+        {
+            ++semanticWaveLaneIndexDeclarationCount;
+            const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
+            if (!function.isDeclaration() || !function.getReturnType()->isIntegerTy(32) ||
+                function.arg_size() != 0 || functionAttributes.getNumAttributes() != 6 ||
+                !function.hasFnAttribute(llvm::Attribute::NoFree) ||
+                !function.hasFnAttribute(llvm::Attribute::NoSync) ||
+                !function.hasFnAttribute(llvm::Attribute::NoUnwind) ||
+                !function.hasFnAttribute(llvm::Attribute::ReadNone) ||
+                !function.hasFnAttribute(llvm::Attribute::Speculatable) ||
+                !function.hasFnAttribute(llvm::Attribute::WillReturn))
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+        }
         for (llvm::BasicBlock& block : function)
         {
             for (llvm::Instruction& instruction : block)
@@ -1575,9 +1623,13 @@ static SlangResult _writeLegacyNVVMAssembly(
     const llvm::StringRef llvm14AlignmentSuffix(", align 4");
     const llvm::StringRef floatNegateMarker(" = fneg float ");
     const llvm::StringRef legacyFloatNegateMarker(" = fsub float -0.000000e+00, ");
+    const llvm::StringRef waveLaneIndexAttributeMarker(
+        " = { nofree nosync nounwind readnone speculatable willreturn }");
+    const llvm::StringRef legacyWaveLaneIndexAttributes(" = { nounwind readnone }");
     llvm::StringRef remaining(llvm14Assembly.data(), llvm14Assembly.size());
     size_t rewrittenAtomicCount = 0;
     size_t rewrittenFloatNegateCount = 0;
+    size_t rewrittenWaveLaneIndexDeclarationCount = 0;
     while (!remaining.empty())
     {
         const size_t newlineIndex = remaining.find('\n');
@@ -1607,6 +1659,16 @@ static SlangResult _writeLegacyNVVMAssembly(
             outSerializedData.append(operand.begin(), operand.end());
             ++rewrittenFloatNegateCount;
         }
+        else if (
+            trimmedLine.startswith("attributes #") && line.endswith(waveLaneIndexAttributeMarker))
+        {
+            const llvm::StringRef prefix = line.drop_back(waveLaneIndexAttributeMarker.size());
+            outSerializedData.append(prefix.begin(), prefix.end());
+            outSerializedData.append(
+                legacyWaveLaneIndexAttributes.begin(),
+                legacyWaveLaneIndexAttributes.end());
+            ++rewrittenWaveLaneIndexDeclarationCount;
+        }
         else
         {
             outSerializedData.append(line.begin(), line.end());
@@ -1619,7 +1681,8 @@ static SlangResult _writeLegacyNVVMAssembly(
     }
 
     return rewrittenAtomicCount == semanticAtomicCount &&
-                   rewrittenFloatNegateCount == semanticFloatNegateCount
+                   rewrittenFloatNegateCount == semanticFloatNegateCount &&
+                   rewrittenWaveLaneIndexDeclarationCount == semanticWaveLaneIndexDeclarationCount
                ? SLANG_OK
                : SLANG_E_NOT_AVAILABLE;
 }
@@ -1915,6 +1978,7 @@ static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
     api.addPhiIncoming = _addPhiIncomingV3;
     api.emitCall = _emitCallV3;
     api.emitValueReturn = _emitValueReturnV3;
+    api.emitIntrinsic = _emitIntrinsicV3;
 }
 
 } // namespace

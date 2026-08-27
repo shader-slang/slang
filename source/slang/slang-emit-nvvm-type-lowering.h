@@ -12,6 +12,12 @@ struct CodeGenContext;
 /// Returns whether `type` is the canonical signed 32-bit integer accepted by direct NVVM.
 bool isNVVMSignedI32Type(IRInst* type);
 
+/// Returns whether `type` is the canonical unsigned 32-bit integer accepted by direct NVVM.
+bool isNVVMUnsignedI32Type(IRInst* type);
+
+/// Returns whether `type` is either canonical 32-bit integer representation.
+bool isNVVMInteger32Type(IRInst* type);
+
 /// Returns whether `type` is the canonical IEEE 32-bit float accepted by direct NVVM.
 bool isNVVMFloat32Type(IRInst* type);
 
@@ -21,7 +27,7 @@ bool isNVVMBoolType(IRInst* type);
 /// Returns an accepted nonempty fixed i32 array and optionally its exact element count.
 IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
 
-/// Returns an accepted CUDA device pointer to i32, including its source access qualifier.
+/// Returns an accepted CUDA device pointer to signed or unsigned i32.
 IRPtrTypeBase* asNVVMSupportedDevicePointerType(IRInst* type);
 
 /// Returns an accepted CUDA device pointer to float32, including its source access qualifier.

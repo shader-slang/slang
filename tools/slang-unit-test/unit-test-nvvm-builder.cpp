@@ -92,7 +92,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
     const uint32_t callOffset = sizeof(void*) == 8 ? 504u : 296u;
     const uint32_t valueReturnOffset = sizeof(void*) == 8 ? 512u : 300u;
     const uint32_t scalarFunctionMinimumSize = sizeof(void*) == 8 ? 520u : 304u;
-    const uint32_t completeSize = scalarFunctionMinimumSize;
+    const uint32_t intrinsicOffset = sizeof(void*) == 8 ? 520u : 304u;
+    const uint32_t intrinsicMinimumSize = sizeof(void*) == 8 ? 528u : 308u;
+    const uint32_t completeSize = intrinsicMinimumSize;
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, features) == featureOffset);
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitIntegerUnary) == unaryOffset);
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitIntegerBinary) == binaryOffset);
@@ -107,6 +109,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, addPhiIncoming) == phiIncomingOffset);
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitCall) == callOffset);
     SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitValueReturn) == valueReturnOffset);
+    SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitIntrinsic) == intrinsicOffset);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_MIN_SIZE == minimumSize);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_SCALAR_FLOAT32_ADD_MIN_SIZE == floatingMinimumSize);
     SLANG_CHECK(
@@ -121,6 +124,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_SCALAR_PHI_MIN_SIZE == phiMinimumSize);
     SLANG_CHECK(
         SLANG_NVVM_BUILDER_API_V3_GENERIC_SCALAR_FUNCTIONS_MIN_SIZE == scalarFunctionMinimumSize);
+    SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_WAVE_LANE_INDEX_MIN_SIZE == intrinsicMinimumSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderAPI_V3) == completeSize);
 
     gFakeNVVMBuilder.reset();
@@ -225,6 +229,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32AddAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX % 64u));
         api.structureSize = uint32_t(SLANG_NVVM_BUILDER_API_V3_MIN_SIZE);
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -511,6 +517,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32NegateAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX % 64u));
         api.structureSize = sizeof(void*) == 8 ? 464u : 280u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -644,6 +652,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32EqualAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX % 64u));
         api.structureSize = sizeof(void*) == 8 ? 472u : 280u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -857,6 +867,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32ConstantAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX % 64u));
         api.structureSize = sizeof(void*) == 8 ? 480u : 288u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -964,6 +976,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesScalarPhiAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX % 64u));
         api.structureSize = sizeof(void*) == 8 ? 488u : 288u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -1099,6 +1113,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesGenericScalarFunctionAPI)
         SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX % 64u));
         api.structureSize = sizeof(void*) == 8 ? 504u : 296u;
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -1266,6 +1282,113 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesGenericScalarFunctionAPI)
         gFakeNVVMBuilder.failValueReturn = true;
         SLANG_CHECK(builder.emitValueReturn(_getFakeNVVMBuilderModule(), sum) == SLANG_FAIL);
         SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesIntrinsicAPI)
+{
+    // The exact Slice 45 table remains valid without the appended intrinsic family.
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX % 64u));
+        api.structureSize = sizeof(void*) == 8 ? 520u : 304u;
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
+        SlangNVVMValueHandle_1 value = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitIntrinsic(
+                _getFakeNVVMBuilderModule(),
+                SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX,
+                nullptr,
+                0,
+                value) == SLANG_E_NOT_AVAILABLE);
+        SLANG_CHECK(value == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    const uint32_t intrinsicOffset = uint32_t(offsetof(SlangNVVMBuilderAPI_V3, emitIntrinsic));
+    for (uint32_t partialSize = intrinsicOffset;
+         partialSize < SLANG_NVVM_BUILDER_API_V3_WAVE_LANE_INDEX_MIN_SIZE;
+         ++partialSize)
+    {
+        gFakeNVVMBuilder.reset();
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        api.structureSize = partialSize;
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::initialize(api, library, builder) == SLANG_E_NO_INTERFACE);
+        SLANG_CHECK(!builder.isInitialized());
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        api.emitIntrinsic = nullptr;
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::initialize(api, library, builder) == SLANG_E_NO_INTERFACE);
+        SLANG_CHECK(!builder.isInitialized());
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            NVVMIRBuilder::initialize(_makeFakeNVVMBuilderAPIV3(), library, builder)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWaveLaneIndexKernel(
+            builder,
+            _getFakeNVVMBuilderModule(),
+            toSlice("fakeWaveLaneIndex"),
+            toSlice("fakeReadLaneIndex"))));
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicOperations[0] == SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.scalarReturnValueRefs[0].kind == FakeNVVMBuilderValueKind::Intrinsic);
+
+        SlangNVVMValueHandle_1 value = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitIntrinsic(
+                _getFakeNVVMBuilderModule(),
+                SlangNVVMIntrinsicOp_3(99),
+                nullptr,
+                0,
+                value) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(value == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 1);
+
+        gFakeNVVMBuilder.failIntrinsicAfterWrite = true;
+        value = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitIntrinsic(
+                _getFakeNVVMBuilderModule(),
+                SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX,
+                nullptr,
+                0,
+                value) == SLANG_FAIL);
+        SLANG_CHECK(value == nullptr);
+        gFakeNVVMBuilder.failIntrinsicAfterWrite = false;
+
+        gFakeNVVMBuilder.returnNullIntrinsic = true;
+        value = _getFakeNVVMBuilderFunction();
+        SLANG_CHECK(
+            builder.emitIntrinsic(
+                _getFakeNVVMBuilderModule(),
+                SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX,
+                nullptr,
+                0,
+                value) == SLANG_FAIL);
+        SLANG_CHECK(value == nullptr);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 }
@@ -4316,6 +4439,52 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32FunctionKernel)
     SLANG_CHECK(api->emitCall(scope.module, nullptr, nullptr, 0, &value) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(value == nullptr);
     SLANG_CHECK(api->emitValueReturn(scope.module, nullptr) == SLANG_E_INVALID_ARG);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveLaneIndexKernel)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("wave-lane-index-module"), scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWaveLaneIndexKernel(
+        builder,
+        scope.module,
+        toSlice("waveLaneIndex"),
+        toSlice("readWaveLaneIndex"))));
+
+    const SlangNVVMSerializationFormat_1 formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat_1 format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        SLANG_CHECK_ABORT(assembly != nullptr);
+        const UnownedStringSlice text(
+            static_cast<const char*>(assembly->getBufferPointer()),
+            assembly->getBufferSize());
+        SLANG_CHECK(text.indexOf(toSlice("define i32 @readWaveLaneIndex()")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("define void @waveLaneIndex(i32 addrspace(1)*")) >= 0);
+        SLANG_CHECK(
+            _countOccurrences(text, toSlice("call i32 @llvm.nvvm.read.ptx.sreg.laneid()")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("call i32 @readWaveLaneIndex()")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("ret i32")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("store i32")) == 1);
+    }
+
+    const SlangNVVMBuilderAPI_V3* api = builder.getAPIV3();
+    SLANG_CHECK_ABORT(api != nullptr);
+    SlangNVVMValueHandle_1 value = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        api->emitIntrinsic(scope.module, SlangNVVMIntrinsicOp_3(99), nullptr, 0, &value) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(value == nullptr);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32CopyKernel)

@@ -221,6 +221,9 @@ struct FakeNVVMBuilderArrayElementPointerStorage
 struct FakeNVVMBuilderScalarOperationStorage
 {
 };
+struct FakeNVVMBuilderIntrinsicStorage
+{
+};
 struct FakeNVVMBuilderRelaxedGlobalI32AtomicAddStorage
 {
 };
@@ -236,6 +239,7 @@ enum class FakeNVVMBuilderValueKind
     Parameter,
     Load,
     ScalarOperation,
+    Intrinsic,
     IntegerConstant,
     FloatingPointConstant,
     IntegerPhi,
@@ -341,6 +345,7 @@ struct FakeNVVMBuilderState
         emitIntegerReturnCallCount = 0;
         emitCallCallCount = 0;
         emitValueReturnCallCount = 0;
+        emitIntrinsicCallCount = 0;
         emitPointerOffsetCallCount = 0;
         emitArrayElementPointerCallCount = 0;
         getRawRWStructuredBufferI32TypeCallCount = 0;
@@ -376,6 +381,8 @@ struct FakeNVVMBuilderState
         storeAlignment = 0;
         scalarOperations.clear();
         scalarV3Operations.clear();
+        intrinsicOperations.clear();
+        intrinsicCallerBlockIndices.clear();
         integerConstantValues.clear();
         floatingPointConstantBitWidths.clear();
         floatingPointConstantBitPatterns.clear();
@@ -464,6 +471,8 @@ struct FakeNVVMBuilderState
         failIntegerReturn = false;
         failCallAfterWrite = false;
         failValueReturn = false;
+        returnNullIntrinsic = false;
+        failIntrinsicAfterWrite = false;
         failPointerOffsetAfterWrite = false;
         failArrayElementPointerAfterWrite = false;
         failRawRWStructuredBufferI32TypeAfterWrite = false;
@@ -534,6 +543,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderParameterStorage parameterStorage[64];
     FakeNVVMBuilderLoadStorage loadStorage[16];
     FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[64];
+    FakeNVVMBuilderIntrinsicStorage intrinsicStorage[8];
     FakeNVVMBuilderIntegerConstantStorage integerConstantStorage[8];
     FakeNVVMBuilderFloatingPointConstantStorage floatingPointConstantStorage[8];
     FakeNVVMBuilderIntegerPhiStorage integerPhiStorage[8];
@@ -577,6 +587,7 @@ struct FakeNVVMBuilderState
     int emitIntegerReturnCallCount = 0;
     int emitCallCallCount = 0;
     int emitValueReturnCallCount = 0;
+    int emitIntrinsicCallCount = 0;
     int emitPointerOffsetCallCount = 0;
     int emitArrayElementPointerCallCount = 0;
     int getRawRWStructuredBufferI32TypeCallCount = 0;
@@ -605,6 +616,8 @@ struct FakeNVVMBuilderState
     uint32_t storeAlignment = 0;
     List<FakeNVVMBuilderScalarOperation> scalarOperations;
     List<FakeNVVMBuilderScalarOperationKey> scalarV3Operations;
+    List<SlangNVVMIntrinsicOp_3> intrinsicOperations;
+    List<Index> intrinsicCallerBlockIndices;
     List<int64_t> integerConstantValues;
     List<uint32_t> floatingPointConstantBitWidths;
     List<uint64_t> floatingPointConstantBitPatterns;
@@ -669,6 +682,8 @@ struct FakeNVVMBuilderState
     bool failIntegerReturn = false;
     bool failCallAfterWrite = false;
     bool failValueReturn = false;
+    bool returnNullIntrinsic = false;
+    bool failIntrinsicAfterWrite = false;
     bool failPointerOffsetAfterWrite = false;
     bool failArrayElementPointerAfterWrite = false;
     bool failRawRWStructuredBufferI32TypeAfterWrite = false;
@@ -872,6 +887,25 @@ static bool _getFakeNVVMBuilderScalarOperationIndex(SlangNVVMValueHandle_1 value
     for (Index i = 0; i < gFakeNVVMBuilder.scalarOperations.getCount(); ++i)
     {
         if (value == _getFakeNVVMBuilderScalarOperation(i))
+        {
+            outIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+static SlangNVVMValueHandle_1 _getFakeNVVMBuilderIntrinsic(Index index)
+{
+    SLANG_ASSERT(index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.intrinsicStorage));
+    return reinterpret_cast<SlangNVVMValueHandle_1>(&gFakeNVVMBuilder.intrinsicStorage[index]);
+}
+
+static bool _getFakeNVVMBuilderIntrinsicIndex(SlangNVVMValueHandle_1 value, Index& outIndex)
+{
+    for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+    {
+        if (value == _getFakeNVVMBuilderIntrinsic(i))
         {
             outIndex = i;
             return true;
@@ -1133,6 +1167,11 @@ static bool _getFakeNVVMBuilderValueRef(
         outRef = {FakeNVVMBuilderValueKind::ScalarOperation, valueIndex};
         return true;
     }
+    if (_getFakeNVVMBuilderIntrinsicIndex(value, valueIndex))
+    {
+        outRef = {FakeNVVMBuilderValueKind::Intrinsic, valueIndex};
+        return true;
+    }
     if (_getFakeNVVMBuilderIntegerConstantIndex(value, valueIndex))
     {
         outRef = {FakeNVVMBuilderValueKind::IntegerConstant, valueIndex};
@@ -1282,6 +1321,11 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle_1 value)
                    FakeNVVMBuilderScalarFamily::Unary ||
                gFakeNVVMBuilder.scalarOperations[valueRef.index].key.family ==
                    FakeNVVMBuilderScalarFamily::Binary;
+    case FakeNVVMBuilderValueKind::Intrinsic:
+        return valueRef.index >= 0 &&
+               valueRef.index < gFakeNVVMBuilder.intrinsicOperations.getCount() &&
+               gFakeNVVMBuilder.intrinsicOperations[valueRef.index] ==
+                   SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX;
     case FakeNVVMBuilderValueKind::PointerOffset:
     case FakeNVVMBuilderValueKind::ArrayElementPointer:
     case FakeNVVMBuilderValueKind::RawRWStructuredBufferI32ElementPointer:
@@ -2371,6 +2415,34 @@ _fakeNVVMBuilderEmitValueReturnV3(SlangNVVMModuleHandle_1 module, SlangNVVMValue
         gFakeNVVMBuilder.failValueReturn);
 }
 
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsicV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntrinsicOp_3 operation,
+    const SlangNVVMValueHandle_1* arguments,
+    size_t argumentCount,
+    SlangNVVMValueHandle_1* outValue)
+{
+    ++gFakeNVVMBuilder.emitIntrinsicCallCount;
+    if (outValue)
+        *outValue = nullptr;
+    static_cast<void>(arguments);
+    if (module != _getFakeNVVMBuilderModule() ||
+        operation != SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX || argumentCount || !outValue ||
+        gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
+        gFakeNVVMBuilder.intrinsicOperations.getCount() >=
+            SLANG_COUNT_OF(gFakeNVVMBuilder.intrinsicStorage))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    const Index resultIndex = gFakeNVVMBuilder.intrinsicOperations.getCount();
+    gFakeNVVMBuilder.intrinsicOperations.add(operation);
+    gFakeNVVMBuilder.intrinsicCallerBlockIndices.add(gFakeNVVMBuilder.currentInsertBlockIndex);
+    if (!gFakeNVVMBuilder.returnNullIntrinsic)
+        *outValue = _getFakeNVVMBuilderIntrinsic(resultIndex);
+    return gFakeNVVMBuilder.failIntrinsicAfterWrite ? SLANG_FAIL : SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitPointerOffset(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMValueHandle_1 basePointer,
@@ -2985,6 +3057,7 @@ static SlangNVVMBuilderAPI_V3 _makeFakeNVVMBuilderAPIV3()
     api.addPhiIncoming = _fakeNVVMBuilderAddPhiIncomingV3;
     api.emitCall = _fakeNVVMBuilderEmitCallV3;
     api.emitValueReturn = _fakeNVVMBuilderEmitValueReturnV3;
+    api.emitIntrinsic = _fakeNVVMBuilderEmitIntrinsicV3;
     return api;
 }
 
@@ -4502,6 +4575,57 @@ static SlangResult _populateFloat32FunctionKernel(
     return SLANG_OK;
 }
 
+static SlangResult _populateWaveLaneIndexKernel(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module,
+    const UnownedStringSlice& kernelName,
+    const UnownedStringSlice& helperName)
+{
+    SlangNVVMTypeHandle_1 voidType = nullptr;
+    SlangNVVMTypeHandle_1 integerType = nullptr;
+    SlangNVVMTypeHandle_1 globalIntegerPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, integerType));
+    SLANG_RETURN_ON_FAIL(builder.getPointerType(
+        module,
+        integerType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        globalIntegerPointerType));
+
+    SlangNVVMTypeHandle_1 helperType = nullptr;
+    SlangNVVMValueHandle_1 helper = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(module, integerType, nullptr, 0, helperType));
+    SLANG_RETURN_ON_FAIL(builder.declareFunction(module, helperType, helperName, helper));
+
+    SlangNVVMTypeHandle_1 kernelType = nullptr;
+    SlangNVVMValueHandle_1 kernel = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        builder.getFunctionType(module, voidType, &globalIntegerPointerType, 1, kernelType));
+    SLANG_RETURN_ON_FAIL(builder.declareFunction(module, kernelType, kernelName, kernel));
+    SlangNVVMValueHandle_1 destination = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 0, destination));
+
+    SlangNVVMBlockHandle_1 helperBlock = nullptr;
+    SlangNVVMBlockHandle_1 kernelBlock = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, helper, toSlice("entry"), helperBlock));
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, kernel, toSlice("entry"), kernelBlock));
+
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, helperBlock));
+    SlangNVVMValueHandle_1 laneIndex = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        builder
+            .emitIntrinsic(module, SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX, nullptr, 0, laneIndex));
+    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, laneIndex));
+
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, kernelBlock));
+    SlangNVVMValueHandle_1 result = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.emitCall(module, helper, nullptr, 0, result));
+    SLANG_RETURN_ON_FAIL(builder.emitStore(module, result, destination, 4));
+    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
+    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, kernel));
+    return SLANG_OK;
+}
+
 static const char kDirectNVVMFloat32AddSource[] = R"(
 [CUDAKernel]
 void computeMain(
@@ -4510,6 +4634,15 @@ void computeMain(
     uniform float right)
 {
     *destination = left + right;
+}
+)";
+static const char kDirectNVVMWaveLaneIndexSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> destination)
+{
+    uint laneIndex = WaveGetLaneIndex();
+    destination[laneIndex] = laneIndex;
 }
 )";
 static const char kDirectNVVMFloat32SubtractSource[] = R"(
@@ -7158,6 +7291,48 @@ static SlangResult _runFloat32PhiKernel(
     if (cuda.cuMemcpyDtoH(&actual, destination, sizeof(actual)) != 0)
         return SLANG_FAIL;
     return FloatAsInt(actual) == FloatAsInt(expected) ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _runWaveLaneIndexKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)
+{
+    static const uint32_t kLaneCount = 32;
+    const String ptx = _getBlobText(ptxBlob);
+    if (!ptx.getLength())
+        return SLANG_E_INVALID_ARG;
+
+    CudaModule module = nullptr;
+    if (cuda.cuModuleLoadData(&module, ptx.getBuffer()) != 0 || !module)
+        return SLANG_FAIL;
+    CudaModuleGuard moduleGuard{cuda, module};
+
+    CudaFunction function = nullptr;
+    if (cuda.cuModuleGetFunction(&function, module, "computeMain") != 0 || !function)
+        return SLANG_FAIL;
+
+    CudaDevicePtr destination = 0;
+    if (cuda.cuMemAlloc(&destination, sizeof(uint32_t) * kLaneCount) != 0 || !destination)
+        return SLANG_FAIL;
+    CudaBufferGuard destinationGuard{cuda, destination};
+    if (cuda.cuMemsetD8(destination, 0xff, sizeof(uint32_t) * kLaneCount) != 0)
+        return SLANG_FAIL;
+
+    void* parameters[] = {&destination};
+    if (cuda.cuLaunchKernel(function, 1, 1, 1, kLaneCount, 1, 1, 0, nullptr, parameters, nullptr) !=
+            0 ||
+        cuda.cuCtxSynchronize() != 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    uint32_t actual[kLaneCount] = {};
+    if (cuda.cuMemcpyDtoH(actual, destination, sizeof(actual)) != 0)
+        return SLANG_FAIL;
+    for (uint32_t laneIndex = 0; laneIndex < kLaneCount; ++laneIndex)
+    {
+        if (actual[laneIndex] != laneIndex)
+            return SLANG_FAIL;
+    }
+    return SLANG_OK;
 }
 
 static SlangResult _runRelaxedGlobalI32AtomicAddKernel(

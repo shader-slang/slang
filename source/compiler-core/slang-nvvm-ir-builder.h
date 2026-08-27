@@ -267,6 +267,14 @@ public:
     /// Emits a scalar valued return in the current function.
     SlangResult emitValueReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value) const;
 
+    /// Emits one negotiated target intrinsic through the generic V3 operation family.
+    SlangResult emitIntrinsic(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMIntrinsicOp_3 operation,
+        const SlangNVVMValueHandle_1* arguments,
+        size_t argumentCount,
+        SlangNVVMValueHandle_1& outValue) const;
+
     /// Emits a signed integer less-than comparison and returns its i1 result.
     SlangResult emitIntegerSignedLessThan(
         SlangNVVMModuleHandle_1 module,

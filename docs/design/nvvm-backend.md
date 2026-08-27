@@ -2419,6 +2419,50 @@ set has SHA-256 `71658634899192b09f2d12461c25a5efb9d85c3c4f2db7c285ba35ef35d4406
 removing the seven Slice 45 names reproduces Slice 44's count and hash exactly. Debug preservation
 passes 10/10.
 
+### Slice 46 wave lane index and canonical unsigned-i32 transport
+
+Slice 46 adds a kernel that stores `WaveGetLaneIndex()` to `destination[laneIndex]` through a
+canonical `Ptr<uint, ReadWrite, Device>`. CUDA target selection produces one retained
+`Func(UInt)` helper with no parameters whose sole block terminates in exact
+`GenericAsm("_getLaneId()")`; the kernel calls that helper and uses the result for both its pointer
+offset and stored value. Direct lowering recognizes that already-selected semantic shape. It does
+not search source names, reconstruct syntax, or expose arbitrary assembly text to the provider.
+
+Canonical Slang `Int` and `UInt` remain distinct semantic types but now share LLVM's signless `i32`
+for entry/helper transport, exact calls/returns, device pointers, pointer offsets, and stores.
+Signedness-sensitive arithmetic, comparisons, atomics, and fixed-array indexing retain their
+existing signed-only classifiers. UInt constants also remain unsupported. Consequently thirteen
+negative fixtures advance from an obsolete UInt entry/value rejection to their first real
+boundary: the UInt pointer-offset case reaches its constant, while unsigned multiply, bitwise,
+negate, atomic, and comparison cases reach their signed-only operation diagnostics.
+
+Feature 34, `WAVE_LANE_INDEX`, appends one generic
+`emitIntrinsic(module, operation, arguments, count, outValue)` callback and stable operation 0.
+The x64 V3 table grows from 520 to 528 bytes and x86 from 304 to 308 bytes. Exact Slice 45 and
+earlier prefixes remain valid when they do not advertise feature 34; an advertised feature
+requires the complete callback. The wrapper rejects unknown operations, clears failed outputs,
+and leaves V2 unchanged.
+
+The LLVM 14 provider maps the operation to
+`llvm.nvvm.read.ptx.sreg.laneid`, after validating the zero-argument insertion state. LLVM 14
+prints six optimization attributes on that declaration which the LLVM-7-era NVVM 2.0 parser does
+not recognize. The audited legacy writer first verifies the exact semantic intrinsic declaration
+and attribute set, then narrows only that attribute group to `nounwind readnone`; exact semantic
+and rewritten counts must agree. Generic LLVM and negotiated NVVM text each contain one lane-id
+call, one UInt helper call/return, and one store.
+
+NVVM and NVRTC agree on the `[64]` launch ABI, one global 32-bit store, and no global load. Direct
+NVVM selects PTX `%laneid`; NVRTC flattens the three-dimensional thread ID and masks it with `31`.
+CUDA 12.9 `ptxas` accepts both, and one 32-thread RTX 5090 warp writes exactly 0 through 31 through
+both routes.
+
+The generic intrinsic/fake/runtime-family base plus seven independently registered evidence layers
+adds 531 physical lines across the five measured test/support files, from 22,837 to 23,368. The
+focused Slice 45/46 matrix passes 14/14 and the Release NVVM prefix passes 305/305. Its exact sorted
+LF-terminated name set has SHA-256
+`a5d99d25f4218d69bf938e171083e49c3826150873a58506c42e2b8bcbf98dbb`; removing the seven
+Slice 46 names reproduces Slice 45's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2543,7 +2587,9 @@ The program advances through bounded slices:
 43. exact scalar float32 constants through an append-only exact-bit V3 callback;
 44. generic scalar phis and exact float32 block-parameter SSA merging;
 45. generic scalar functions and exact float32 helper parameters, calls, results, and returns;
-46. wave operations and other advanced capabilities, then production-readiness evaluation.
+46. exact wave lane index through a generic intrinsic family and canonical unsigned-i32 transport;
+47. remaining wave operations and other advanced capabilities, then production-readiness
+    evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.

@@ -12,6 +12,17 @@ bool isNVVMSignedI32Type(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Int;
 }
 
+bool isNVVMUnsignedI32Type(IRInst* type)
+{
+    auto basicType = as<IRBasicType>(type);
+    return basicType && basicType->getBaseType() == BaseType::UInt;
+}
+
+bool isNVVMInteger32Type(IRInst* type)
+{
+    return isNVVMSignedI32Type(type) || isNVVMUnsignedI32Type(type);
+}
+
 bool isNVVMFloat32Type(IRInst* type)
 {
     auto basicType = as<IRBasicType>(type);
@@ -63,7 +74,8 @@ static IRPtrTypeBase* _asNVVMSupportedDevicePointerType(IRInst* type, BaseType v
 
 IRPtrTypeBase* asNVVMSupportedDevicePointerType(IRInst* type)
 {
-    return _asNVVMSupportedDevicePointerType(type, BaseType::Int);
+    auto pointer = _asNVVMSupportedDevicePointerType(type, BaseType::Int);
+    return pointer ? pointer : _asNVVMSupportedDevicePointerType(type, BaseType::UInt);
 }
 
 IRPtrTypeBase* asNVVMSupportedDeviceFloat32PointerType(IRInst* type)
@@ -133,7 +145,7 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferI32ElementPointerType(IRInst* ty
 
 bool isNVVMSupportedParameterType(IRInst* type)
 {
-    return isNVVMSignedI32Type(type) || isNVVMFloat32Type(type) ||
+    return isNVVMInteger32Type(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedDevicePointerType(type) ||
            asNVVMSupportedDeviceFloat32PointerType(type) ||
            asNVVMSupportedDeviceArrayPointerType(type) ||
@@ -248,7 +260,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     outType = nullptr;
 
     const bool isVoid = as<IRVoidType>(type) != nullptr;
-    const bool isI32 = isNVVMSignedI32Type(type);
+    const bool isI32 = isNVVMInteger32Type(type);
     const bool isFloat32 = isNVVMFloat32Type(type);
     const bool isBool = isNVVMBoolType(type);
     IRPtrTypeBase* devicePointer = asNVVMSupportedDevicePointerType(type);
@@ -288,7 +300,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (isI32 || isBool)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            isI32 ? "signed i32 type" : "Boolean type",
+            isI32 ? "32-bit integer type" : "Boolean type",
             m_builder.getIntegerType(m_module, isI32 ? 32u : 1u, outType)));
     }
     else if (isFloat32)

@@ -281,7 +281,7 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarIntegerSignedGreaterEqualCapability` | An exact 360-byte Slice 24 provider still compiles signed-i32 less-than-or-equal, while a signed-greater-equal program reaches E52016 after discovery but before module creation | Pass |
 | `slang-unit-test-tool/nvvmSlangRetainsOnlySelectedCUDAKernel` | CUDA-kernel pruning still removes an unselected kernel before direct emission while preserving the exact selected entry point | Pass |
 | `slang-unit-test-tool/nvvmSlangRejectsConventionalRawKernelParameters` | Only `[CUDAKernel]` receives the raw scalar ABI; a conventional parameterized compute entry reaches E52017 before builder or libNVVM program creation | Pass |
-| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | Signed-i32 left/right shifts, division, and remainder stop at `'shl'`, `'shr'`, `'div'`, and `'irem'`; logical NOT and unsigned/i64/float Neg stop at `'entry-point parameter'`; unsigned or i64 bitwise AND/OR/XOR/NOT, unsigned/wide multiplication and equality, pointer equality, void helper calls, and unsigned pointer offsets retain deterministic E52017 boundaries before builder discovery or libNVVM program creation. Float multiplication is accepted, so its old negative fixture now stops at the following unsupported `'castFloatToInt'`. The Slice 18 f32-sine case stops at the float-returning target helper's unsupported `'helper function result type'`, before provider discovery and without exercising `GenericAsm` matching | Pass |
+| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | Signed-i32 left/right shifts, division, and remainder stop at `'shl'`, `'shr'`, `'div'`, and `'irem'`; logical NOT and i64/half/double entry parameters retain their earlier boundaries. Canonical UInt transport is accepted, so unsigned pointer offset reaches its unsupported UInt constant and unsigned multiply, bitwise, negate, atomic, equality, inequality, and ordered-comparison fixtures reach their exact signed-only operation diagnostics. Wide variants, pointer comparisons, void/pointer helpers, arrays, aggregates, and storage variants retain deterministic E52017 boundaries before builder discovery or libNVVM program creation. Float multiply, negate, and sine cases reach the following unsupported `'castFloatToInt'` | Pass |
 | `slang-unit-test-tool/nvvmCompilerNegotiatesCUDADeviceLibraryOption` | The terminal naturally aligned pointer-sized `requiresCUDADeviceLibrary` storage does not reuse prior tail padding; zero means false, nonzero means true, and an older compatible options prefix leaves established libdevice-free compiles independent of a toolkit root | Pass |
 | `slang-unit-test-tool/nvvmCompilerUsesSelectedToolkitLibdevice` | Filesystem discovery carries the canonical successful decorated libNVVM candidate into compiler construction, never retries a conflicting environment root, reads exact `nvvm/libdevice/libdevice.10.bc` only on demand, and includes a coherent libdevice timestamp in compiler identity | Pass |
 | `slang-unit-test-tool/nvvmCompilerRejectsUnavailableRequestedLibdevice` | Zero demand compiles without requiring, reading, or adding libdevice; requested missing-root or missing-file/read failures stop before program creation | Pass |
@@ -806,3 +806,24 @@ store/no-load/predicate; `ptxas` accepts both, and the RTX 5090 agrees for finit
 results. Focused tests pass 14/14 and Release passes 298/298 with sorted-name SHA-256
 `71658634899192b09f2d12461c25a5efb9d85c3c4f2db7c285ba35ef35d44066`; Debug preservation passes
 10/10.
+
+Slice 46 adds canonical UInt transport plus exact `WaveGetLaneIndex()` as feature 34 through one
+appended generic intrinsic callback and operation 0. CUDA target selection produces a retained
+zero-parameter UInt helper ending in `GenericAsm("_getLaneId()")`; direct preflight recognizes only
+that exact semantic shape. Signed and unsigned canonical 32-bit values share provider `i32` for
+sign-independent parameter/helper/pointer/call/return/offset/store roles, while UInt constants and
+signedness-sensitive operations remain unsupported. The x64 V3 table grows from 520 to 528 bytes
+and x86 from 304 to 308 bytes; exact Slice 45 and older feature/table prefixes remain loadable.
+
+LLVM 14 emits `llvm.nvvm.read.ptx.sreg.laneid` with six optimization attributes. The audited NVVM
+2.0 text writer verifies that exact declaration and attribute set, then retains only LLVM-7-era
+`nounwind readnone`; semantic and rewritten counts agree. Both serialized dialects contain one
+lane intrinsic call, one UInt helper call/return, and one store. NVVM and NVRTC agree on `[64]`, a
+global 32-bit store, and no load; direct NVVM uses `%laneid`, while NVRTC flattens the thread ID and
+masks with 31. CUDA 12.9 `ptxas` accepts both, and one 32-thread RTX 5090 warp writes 0 through 31
+through each route.
+
+Seven evidence names add 531 measured test/support lines, from 22,837 to 23,368. The focused
+Slice 45/46 matrix passes 14/14 and the Release NVVM prefix passes 305/305 with sorted-name SHA-256
+`a5d99d25f4218d69bf938e171083e49c3826150873a58506c42e2b8bcbf98dbb`; removing the seven
+Slice 46 names reproduces Slice 45's count and hash exactly. Debug preservation passes 10/10.

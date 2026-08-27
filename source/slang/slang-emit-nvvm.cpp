@@ -235,6 +235,31 @@ SlangResult _validateI32Value(
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
+// Checks sign-independent transport of a canonical 32-bit integer value. Unsigned constants are
+// deliberately excluded until their exact literal contract is added; lane index is an SSA value.
+SlangResult _validateInteger32Value(
+    CodeGenContext* codeGenContext,
+    IRInst* value,
+    IRInst* consumer,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree,
+    NVVMIRFeatureSet& features)
+{
+    if (value && isNVVMSignedI32Type(value->getDataType()))
+    {
+        return _validateI32Value(
+            codeGenContext,
+            value,
+            consumer,
+            availableValues,
+            dominatorTree,
+            features);
+    }
+    if (!value || !isNVVMUnsignedI32Type(value->getDataType()))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("32-bit integer value"));
+    return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
+}
+
 // Checks that an executable operand is an available canonical float32 value.
 SlangResult _validateFloat32Value(
     CodeGenContext* codeGenContext,
@@ -275,7 +300,7 @@ SlangResult _validateScalarValue(
             dominatorTree,
             features);
     }
-    return _validateI32Value(
+    return _validateInteger32Value(
         codeGenContext,
         value,
         consumer,
@@ -418,7 +443,7 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 // Returns whether a type is an accepted canonical scalar in a helper signature.
 bool _isSupportedNVVMHelperScalarType(IRInst* type)
 {
-    return isNVVMSignedI32Type(type) || isNVVMFloat32Type(type);
+    return isNVVMInteger32Type(type) || isNVVMFloat32Type(type);
 }
 
 // Returns whether a canonical helper signature needs the generic V3 scalar-function path.
@@ -426,13 +451,13 @@ bool _usesGenericNVVMScalarFunctions(IRFunc* helper)
 {
     SLANG_RELEASE_ASSERT(helper);
     SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperScalarType(helper->getResultType()));
-    if (isNVVMFloat32Type(helper->getResultType()))
+    if (!isNVVMSignedI32Type(helper->getResultType()))
         return true;
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
         IRType* parameterType = helper->getParamType(parameterIndex);
         SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperScalarType(parameterType));
-        if (isNVVMFloat32Type(parameterType))
+        if (!isNVVMSignedI32Type(parameterType))
             return true;
     }
     return false;
@@ -858,6 +883,21 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_GenericAsm:
+                {
+                    auto genericAsm = as<IRGenericAsm>(inst);
+                    if (isEntryPoint || genericAsm != terminator ||
+                        functionBlocks.getCount() != 1 || function->getParamCount() != 0 ||
+                        genericAsm->getOperandCount() != 1 ||
+                        !isNVVMUnsignedI32Type(function->getResultType()) ||
+                        genericAsm->getAsm() != toSlice("_getLaneId()"))
+                    {
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
+                    }
+                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX);
+                }
+                break;
+
             case kIROp_GetOffsetPtr:
                 if (inst->getOperandCount() != 2 ||
                     !asNVVMSupportedDevicePointerType(inst->getDataType()))
@@ -959,7 +999,7 @@ SlangResult _validateNVVMFunction(
                     }
                     else
                     {
-                        SLANG_RETURN_ON_FAIL(_validateI32Value(
+                        SLANG_RETURN_ON_FAIL(_validateInteger32Value(
                             codeGenContext,
                             store->getVal(),
                             store,
@@ -1157,6 +1197,11 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_GenericAsm:
+                SLANG_ASSERT(inst == terminator);
+                hasHelperReturn = true;
+                break;
+
             case kIROp_GetOffsetPtr:
                 {
                     IRInst* basePointer = inst->getOperand(0);
@@ -1179,7 +1224,7 @@ SlangResult _validateNVVMFunction(
                         dominatorTree,
                         false,
                         basePointerType->getValueType()));
-                    SLANG_RETURN_ON_FAIL(_validateI32Value(
+                    SLANG_RETURN_ON_FAIL(_validateInteger32Value(
                         codeGenContext,
                         elementOffset,
                         inst,
@@ -2163,6 +2208,25 @@ SlangResult emitNVVMIRFromLinkedIR(
                                       size_t(loweredArguments.getCount()),
                                       loweredValue)));
                         valueMap[call] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_GenericAsm:
+                    {
+                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "wave lane index intrinsic",
+                            builder.emitIntrinsic(
+                                moduleScope.module,
+                                SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX,
+                                nullptr,
+                                0,
+                                loweredValue)));
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "generic scalar return",
+                            builder.emitValueReturn(moduleScope.module, loweredValue)));
                     }
                     break;
 

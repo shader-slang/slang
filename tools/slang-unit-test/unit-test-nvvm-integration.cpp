@@ -602,6 +602,71 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32FunctionDifferentialPTX)
     SLANG_CHECK(_haveEqualPTXParameterWidths(summaries[0], summaries[1]));
 }
 
+SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
+        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring wave-lane-index PTX differential because libNVVM or NVRTC was not found.");
+        SLANG_IGNORE_TEST;
+    }
+
+    PTXEntrySummary summaries[2];
+    static const SlangEmitCUDAMethod kMethods[] = {
+        SLANG_EMIT_CUDA_VIA_NVVM,
+        SLANG_EMIT_CUDA_VIA_NVRTC,
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(kMethods); ++i)
+    {
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult compileResult = _compileSlangWithPTXMethod(
+            globalSession,
+            kDirectNVVMWaveLaneIndexSource,
+            kMethods[i],
+            code,
+            diagnostics);
+        if (SLANG_FAILED(compileResult))
+        {
+            const String text = _getBlobText(diagnostics);
+            if (text.getLength())
+                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+        SLANG_CHECK_ABORT(code != nullptr);
+        const String ptx = _getBlobText(code);
+        if (kMethods[i] == SLANG_EMIT_CUDA_VIA_NVVM)
+        {
+            SLANG_CHECK(ptx.indexOf("%laneid") >= 0);
+        }
+        else
+        {
+            SLANG_CHECK(ptx.indexOf("%tid.x") >= 0);
+            SLANG_CHECK(ptx.indexOf("and.b32") >= 0);
+            SLANG_CHECK(ptx.indexOf(", 31") >= 0);
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            _summarizePTXEntry(ptx.getUnownedSlice(), toSlice("computeMain"), summaries[i])));
+        static const uint32_t kParameterWidths[] = {64};
+        SLANG_CHECK(_hasPTXParameterWidths(
+            summaries[i],
+            kParameterWidths,
+            SLANG_COUNT_OF(kParameterWidths)));
+        SLANG_CHECK(summaries[i].hasGlobalStore32);
+        SLANG_CHECK(!summaries[i].hasGlobalLoad32);
+    }
+    SLANG_CHECK(_haveEqualPTXParameterWidths(summaries[0], summaries[1]));
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1202,7 +1267,7 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarPtxasAccepts)
     }
 }
 
-static void _runNVVMSlangRealFloat32PtxasAccepts(
+static void _runNVVMSlangRealSourcePtxasAccepts(
     UnitTestContext* unitTestContext,
     const char* source,
     SlangNVVMBuilderFeature_3 feature)
@@ -1217,7 +1282,7 @@ static void _runNVVMSlangRealFloat32PtxasAccepts(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32 ptxas test because CUDA_PATH does not contain ptxas.");
+            "Ignoring direct-source ptxas test because CUDA_PATH does not contain ptxas.");
         SLANG_IGNORE_TEST;
     }
 
@@ -1229,7 +1294,7 @@ static void _runNVVMSlangRealFloat32PtxasAccepts(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32 ptxas test because libNVVM or NVRTC was not found.");
+            "Ignoring direct-source ptxas test because libNVVM or NVRTC was not found.");
         SLANG_IGNORE_TEST;
     }
 
@@ -1255,7 +1320,7 @@ static void _runNVVMSlangRealFloat32ArithmeticPtxasAccepts(
 {
     const NVVMFloat32ArithmeticTestCase& testCase =
         _getNVVMFloat32ArithmeticTestCase(testOperation);
-    _runNVVMSlangRealFloat32PtxasAccepts(unitTestContext, testCase.source, testCase.feature);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, testCase.source, testCase.feature);
 }
 
 #define NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(NAME, OPERATION) \
@@ -1280,7 +1345,7 @@ static void _runNVVMSlangRealFloat32ComparisonPtxasAccepts(
 {
     const NVVMFloat32ComparisonTestCase& testCase =
         _getNVVMFloat32ComparisonTestCase(testOperation);
-    _runNVVMSlangRealFloat32PtxasAccepts(unitTestContext, testCase.source, testCase.feature);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, testCase.source, testCase.feature);
 }
 
 #define NVVM_FLOAT32_COMPARISON_PTXAS_TEST(NAME, OPERATION) \
@@ -1304,7 +1369,7 @@ NVVM_FLOAT32_COMPARISON_PTXAS_TEST(nvvmSlangRealFloat32LessThanPtxasAccepts, Ord
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32ConstantPtxasAccepts)
 {
-    _runNVVMSlangRealFloat32PtxasAccepts(
+    _runNVVMSlangRealSourcePtxasAccepts(
         unitTestContext,
         kDirectNVVMFloat32ConstantSource,
         SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT);
@@ -1312,7 +1377,7 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32ConstantPtxasAccepts)
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32PhiPtxasAccepts)
 {
-    _runNVVMSlangRealFloat32PtxasAccepts(
+    _runNVVMSlangRealSourcePtxasAccepts(
         unitTestContext,
         kDirectNVVMFloat32PhiSource,
         SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI);
@@ -1320,10 +1385,18 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32PhiPtxasAccepts)
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32FunctionPtxasAccepts)
 {
-    _runNVVMSlangRealFloat32PtxasAccepts(
+    _runNVVMSlangRealSourcePtxasAccepts(
         unitTestContext,
         kDirectNVVMFloat32FunctionSource,
         SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMWaveLaneIndexSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyPtxasAccepts)
@@ -1763,7 +1836,7 @@ SLANG_UNIT_TEST(nvvmSlangScalarRuntimeMatchesNVRTC)
 }
 
 template<typename TExecute>
-static void _runNVVMSlangFloat32RuntimeMatchesNVRTC(
+static void _runNVVMSlangSourceRuntimeMatchesNVRTC(
     UnitTestContext* unitTestContext,
     SlangNVVMBuilderFeature_3 feature,
     const char* source,
@@ -1778,7 +1851,7 @@ static void _runNVVMSlangFloat32RuntimeMatchesNVRTC(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32 runtime test because the CUDA driver is unavailable.");
+            "Ignoring direct-source runtime test because the CUDA driver is unavailable.");
         SLANG_IGNORE_TEST;
     }
     int deviceCount = 0;
@@ -1786,7 +1859,7 @@ static void _runNVVMSlangFloat32RuntimeMatchesNVRTC(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32 runtime test because no CUDA device is available.");
+            "Ignoring direct-source runtime test because no CUDA device is available.");
         SLANG_IGNORE_TEST;
     }
 
@@ -1802,7 +1875,7 @@ static void _runNVVMSlangFloat32RuntimeMatchesNVRTC(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32 runtime test because the device is older than sm_70.");
+            "Ignoring direct-source runtime test because the device is older than sm_70.");
         SLANG_IGNORE_TEST;
     }
 
@@ -1819,7 +1892,7 @@ static void _runNVVMSlangFloat32RuntimeMatchesNVRTC(
     {
         getTestReporter()->message(
             TestMessageType::Info,
-            "Ignoring float32 runtime test because libNVVM or NVRTC was not found.");
+            "Ignoring direct-source runtime test because libNVVM or NVRTC was not found.");
         SLANG_IGNORE_TEST;
     }
 
@@ -2154,7 +2227,7 @@ SLANG_UNIT_TEST(nvvmSlangFloat32ConstantRuntimeMatchesNVRTC)
 
 SLANG_UNIT_TEST(nvvmSlangFloat32PhiRuntimeMatchesNVRTC)
 {
-    _runNVVMSlangFloat32RuntimeMatchesNVRTC(
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
         SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI,
         kDirectNVVMFloat32PhiSource,
@@ -2169,7 +2242,7 @@ SLANG_UNIT_TEST(nvvmSlangFloat32PhiRuntimeMatchesNVRTC)
 
 SLANG_UNIT_TEST(nvvmSlangFloat32FunctionRuntimeMatchesNVRTC)
 {
-    _runNVVMSlangFloat32RuntimeMatchesNVRTC(
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
         SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS,
         kDirectNVVMFloat32FunctionSource,
@@ -2180,6 +2253,16 @@ SLANG_UNIT_TEST(nvvmSlangFloat32FunctionRuntimeMatchesNVRTC)
             SLANG_RETURN_ON_FAIL(_runFloat32ArithmeticKernel(cuda, code, 2, -0.0f, -0.0f, -0.0f));
             return _runFloat32ArithmeticKernel(cuda, code, 2, 0.0f, -0.0f, 0.0f);
         });
+}
+
+SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexRuntimeMatchesNVRTC)
+{
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX,
+        kDirectNVVMWaveLaneIndexSource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        { return _runWaveLaneIndexKernel(cuda, code); });
 }
 
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyRuntimeMatchesNVRTC)
