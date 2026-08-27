@@ -129,6 +129,7 @@ is deleted right after — so check the workflow's own run list, not the PR.
 | `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                                                                |
 | `check-actionlint.yml`            | yes    | no          | Lints the workflow YAML in this directory.                                                            |
 | `check-submodules.yml`            | yes    | no          | Verifies `external/**` submodule pins are reachable.                                                  |
+| `check-cmake-binary-dir.yml`      | yes    | no          | Rejects `CMAKE_BINARY_DIR` in first-party CMake (use `slang_BINARY_DIR`).                             |
 | `check-doc-gaps.yml`              | yes    | no          | Hard-gates the generated-doc structural lint; reports the doc-gap queue as advisory. Also runs daily. |
 | `check-pr-label.yml`              | yes    | no          | Requires exactly one `pr:` classification label.                                                      |
 | `check-toc.yml`                   | yes    | no          | Checks the user-guide TOC; `/regenerate-toc` auto-fixes.                                              |
