@@ -27,9 +27,10 @@ enum class NVVMIRCapability
     RelaxedGlobalI32AtomicAdd,
     ScalarIntegerEqual,
     ScalarIntegerNotEqual,
+    ScalarIntegerSignedGreaterThan,
 };
 
-/// Checks whether linked Slang IR is in the exact direct-NVVM subset implemented through Slice 22.
+/// Checks whether linked Slang IR is in the exact direct-NVVM subset implemented through Slice 23.
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,

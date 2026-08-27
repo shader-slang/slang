@@ -134,3 +134,13 @@ typedef char SlangNVVMBuilderAPIV2ScalarIntegerNotEqualCapabilityOrderCCompilePr
       SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_EQUAL_MIN_SIZE)
          ? 1
          : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarIntegerSignedGreaterThanMinimumSizeCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_THAN_MIN_SIZE <=
+      sizeof(SlangNVVMBuilderAPI_V2))
+         ? 1
+         : -1];
+typedef char SlangNVVMBuilderAPIV2ScalarIntegerSignedGreaterThanCapabilityOrderCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_THAN_MIN_SIZE >
+      SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NOT_EQUAL_MIN_SIZE)
+         ? 1
+         : -1];

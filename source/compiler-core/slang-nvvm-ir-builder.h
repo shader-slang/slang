@@ -71,6 +71,8 @@ public:
     bool supportsScalarIntegerEqual() const;
     /// Returns whether the provider advertised the complete Slice 22 integer-inequality prefix.
     bool supportsScalarIntegerNotEqual() const;
+    /// Returns whether the provider advertised the complete Slice 23 signed-greater-than prefix.
+    bool supportsScalarIntegerSignedGreaterThan() const;
     /// Returns the provider identity that affects generated IR and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -286,6 +288,13 @@ public:
 
     /// Emits scalar integer inequality and returns an i1 value.
     SlangResult emitIntegerNotEqual(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits scalar signed-integer greater-than and returns an i1 value.
+    SlangResult emitIntegerSignedGreaterThan(
         SlangNVVMModuleHandle_1 module,
         SlangNVVMValueHandle_1 left,
         SlangNVVMValueHandle_1 right,

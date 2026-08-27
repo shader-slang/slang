@@ -1545,6 +1545,66 @@ CUDA 12.9 direct NVVM and NVRTC PTX expose matching `[64, 32, 32]` parameter wid
 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch. The provider still exports only the V1/V2
 getters and has no process-visible LLVM DLL dependency.
 
+### Slice 23 signed-i32 greater-than
+
+Consider this example:
+
+```slang
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int left,
+    uniform int right)
+{
+    *destination = left > right ? 1 : 0;
+}
+```
+
+The measured final linked Slang IR retains one exact `kIROp_Greater` with the two signed-`i32`
+parameters as operands and the canonical Boolean type as its result. The established conditional,
+integer-constant, phi, and device-store graph consumes it directly. This canonical producer is an
+intentional input shape, not an alternative spelling that an earlier phase should repair: final
+linking does not rewrite it to a signed less-than with reversed operands. Removing the exact
+consumer case restores E52017 at `cmpGT`, so direct emission owns this opcode without recognizing
+source syntax, reversing operands, or adding a fallback equivalence.
+
+The private V2 provider table appends one dedicated operation after the complete Slice 22 prefix:
+
+```text
+emitIntegerSignedGreaterThan(module, left, right, outValue)
+```
+
+The complete table is 352 bytes on x64 and 196 bytes on x86. The exact 344-byte/192-byte Slice 22
+prefix remains valid for every established program and reports
+`scalar-integer-signed-greater-than=0`; a greater-than program reaches E52016 after discovery and
+before module creation. Every byte count inside the appended function pointer and a complete table
+with a null callback are malformed. Future-larger tables are accepted and clamped, and the host
+clears stale output handles before dispatch and after failure or success without a result.
+
+At the provider boundary, greater-than uses the same established binary integer validator as
+signed less-than, equality, and inequality. Both operands must be available same-module,
+same-function scalar LLVM integers of one exact type at the current unterminated insertion point.
+Complete ownership, ordering, dominance, and type validation precedes the sole mutation. The
+selected predicate is exact LLVM `ICMP_SGT`, yielding an `i1`; Slang preflight owns the signed-i32
+restriction and canonical Boolean result. The result feeds the existing Boolean branch consumer
+without adding a Boolean parameter, storage, return, or phi ABI.
+
+This boundary does not add less-equal, greater-equal, unsigned/wide/floating-point/pointer ordered
+comparison, vectors, matrices, aggregates, resources, or new pointer and storage shapes. Unsigned,
+wide, and floating greater-than stop at their unsupported entry parameters; pointer greater-than
+reaches the exact signed-i32 operand check. All four stop before provider discovery. Provider-level
+invalid operations reject missing or terminated insertion points, null outputs, wrong or
+mismatched types, cross-module/cross-function handles, and unavailable or non-dominating values
+before mutation.
+
+CUDA 12.9 direct NVVM and NVRTC PTX expose matching `[64, 32, 32]` parameter widths, signed ordered
+32-bit comparison predicates, and the global 32-bit store. The selected toolkit's `ptxas` accepts
+both outputs. On the RTX 5090, both routes return zero for `0 > 0`, `-7 > -7`, `-7 > 7`, and
+`INT_MIN > INT_MAX`, and one for `7 > -7` and `INT_MAX > INT_MIN`. The Release focused NVVM suite
+passes 164/164; preservation passes 1/1 parser, 2/2 routing/hash, 1/1 unsupported boundary, 3/3
+sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch. The provider still exports only
+the V1/V2 getters and has no process-visible LLVM DLL dependency.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -1644,8 +1704,9 @@ The program advances through bounded slices:
 20. an isolated LLVM 7.0.1 native-bitcode feasibility experiment;
 21. signed-i32 equality;
 22. signed-i32 inequality;
-23. resources and optimization-quality work; and
-24. wave operations and other advanced capabilities, then production-readiness evaluation.
+23. signed-i32 greater-than;
+24. resources and optimization-quality work; and
+25. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -1994,6 +2055,19 @@ predicates, and a global 32-bit store. CUDA 12.9 `ptxas` accepts both outputs. R
 cases cover equal zero, equal negative, unequal signs, and unequal integer extremes on both routes.
 The focused suite passes 156/156 and the preservation matrix passes 10/10.
 
+The Slice 23 baseline measured final linked Slang IR containing exact
+`cmpGT(left, right) : Bool`, consumed by the established conditional/constant/phi/store graph.
+The pre-change direct route stopped at E52017 `cmpGT`; NVRTC accepted the source and emitted a
+signed 32-bit ordered comparison. The provider's shared binary comparison validator emits one
+verifier-valid `icmp sgt i32`, and the complete host route maps its `i1` result only to the
+already-supported Boolean branch consumer.
+
+Direct NVVM and NVRTC expose matching `[64, 32, 32]` parameters, signed 32-bit ordered predicates,
+and a global 32-bit store. CUDA 12.9 `ptxas` accepts both outputs. RTX 5090 runtime cases cover
+equal zero, equal negative, unequal signs in both directions, and both orderings of the integer
+extremes on both routes. The focused suite passes 164/164 and the preservation matrix passes
+10/10.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -2135,6 +2209,17 @@ feed established control flow, but this slice adds no Boolean ABI, storage, retu
 These claims do not include ordered comparisons, unsigned/wide/floating-point/pointer inequality,
 vectors, matrices, aggregates, resources, or new ABI and storage shapes.
 
+Slice 23 settles exact two-operand `kIROp_Greater` lowering for signed-i32 values already available
+through the established scalar program structure. It appends the dedicated
+`emitIntegerSignedGreaterThan` provider operation after the exact 344-byte Slice 22 prefix,
+yielding a 352-byte complete x64 prefix, and reuses the shared binary integer validator for type,
+ownership, availability, and dominance before exact `ICMP_SGT` construction. Slang owns the
+signed-i32 operand and canonical Boolean-result policy; LLVM owns the signless integer comparison
+and `i1` result. The measured final producer remains `kIROp_Greater`, so this consumer neither
+reverses operands nor accepts an alternative comparison spelling. These claims do not include
+less-equal, greater-equal, unsigned/wide/floating-point/pointer ordered comparisons, vectors,
+matrices, aggregates, resources, or new ABI and storage shapes.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -2145,7 +2230,7 @@ The following remain open until their named slice supplies evidence:
   pointers;
 - external/indirect calls, richer helper ABI, and scalar operations beyond the established
   signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, bitwise-XOR, bitwise-NOT,
-  arithmetic-negate, less-than, equality, and inequality subset;
+  arithmetic-negate, less-than, equality, inequality, and greater-than subset;
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;
