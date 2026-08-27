@@ -1207,6 +1207,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+
+                // Empty-type legalization preserves non-optimizable empty fields as `void` so
+                // that field indices stay stable. The field occupies no storage, but make-struct
+                // still needs a matching operand until void cleanup removes both of them.
+                if (as<IRVoidType>(fieldType))
+                {
+                    fieldVals.add(builder->getVoidValue());
+                    continue;
+                }
+
                 // Align to field alignment before reading
                 int fieldAlign = getTypeCppAlignment(fieldType, builder);
                 ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
@@ -1436,6 +1446,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+
+                // A legalized empty field has no storage, so it contributes no alignment or data.
+                if (as<IRVoidType>(fieldType))
+                    continue;
+
                 // Align to field alignment before writing
                 int fieldAlign = getTypeCppAlignment(fieldType, builder);
                 ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
