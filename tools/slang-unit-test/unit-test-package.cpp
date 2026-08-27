@@ -1335,6 +1335,16 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("is not registered")) >= 0);
 }
 
+SLANG_UNIT_TEST(PackageAppendErrorAdviceUsesNewline)
+{
+    String error = "Cannot read JSON file: /tmp/pkg/slang-package.json";
+    appendErrorAdvice(error, "Run 'slang package fetch' if packages are missing.");
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(
+            UnownedStringSlice("slang-package.json\nRun 'slang package fetch'")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice(".json Run")) < 0);
+}
+
 SLANG_UNIT_TEST(PackageToolUpdateDryRun)
 {
     TemporaryDirectory temp;

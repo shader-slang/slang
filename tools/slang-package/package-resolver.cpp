@@ -803,7 +803,11 @@ private:
         outError = String("No release tag satisfies all constraints for package '") +
                    unresolved.name + "'.";
         if (lastCandidateError.getLength() != 0)
-            outError = outError + " Last candidate failed because: " + lastCandidateError;
+        {
+            appendErrorAdvice(
+                outError,
+                String("Last candidate failed because: ") + lastCandidateError);
+        }
         return SLANG_FAIL;
     }
 };

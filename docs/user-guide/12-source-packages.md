@@ -9,7 +9,8 @@ Slang Source Packages
 The `slang package` command manages source dependencies stored in Git repositories. The short form
 `slang pkg` accepts the same commands. Package management does not change Slang's `import` syntax;
 its build command emits `.slang-module` files for the resolved graph and optional native
-executables.
+executables. A command-order walkthrough using the public `video-preview` demo is in
+[Using Source Packages](source-package-workflow).
 
 A **package** is a directory with `slang-package.json`. Its name, exports, license files, and
 dependencies apply wherever that package appears in a graph, including as a Git pin or a path

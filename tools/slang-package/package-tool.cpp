@@ -328,15 +328,14 @@ static SlangResult _validateLocalPackages(
             readLocalPackageManifest(projectRoot, localPackage, manifest, outError));
         if (SLANG_FAILED(validateLockedPackageManifest(*package, manifest, outError)))
         {
-            outError =
+            appendErrorAdvice(
+                outError,
                 isEditedLocalPackage(localPackage)
-                    ? outError +
-                          " An edit retains its published Git pin; publish a new release tag and "
-                          "run 'slang package update', or use an override for local manifest "
-                          "changes."
-                    : outError +
-                          " Align the local manifest with the selected upstream graph, or run "
-                          "'slang package update --from-local' to record local manifest changes.";
+                    ? "An edit retains its published Git pin; publish a new release tag and "
+                      "run 'slang package update', or use an override for local manifest "
+                      "changes."
+                    : "Align the local manifest with the selected upstream graph, or run "
+                      "'slang package update --from-local' to record local manifest changes.");
             return SLANG_FAIL;
         }
     }
@@ -673,9 +672,10 @@ static SlangResult _status(const String& projectRoot, String& outError)
     if (SLANG_FAILED(
             _validateMaterializedManifests(projectRoot, manifest, lock, localPackages, outError)))
     {
-        outError = outError +
-                   " Run 'slang package fetch' if packages are missing, or 'slang package update' "
-                   "if a path-package manifest changed.";
+        appendErrorAdvice(
+            outError,
+            "Run 'slang package fetch' if packages are missing, or 'slang package update' "
+            "if a path-package manifest changed.");
         return SLANG_FAIL;
     }
 

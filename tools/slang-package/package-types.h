@@ -231,6 +231,36 @@ inline SlangResult parseReleaseTag(const String& tag, SemanticVersion& outVersio
     return parseReleaseTag(tag.getUnownedSlice(), outVersion);
 }
 
+/// Append `advice` as a following line of `ioError`.
+///
+/// Path-bearing errors are written without a trailing period so the path stays copyable, for
+/// example `Cannot read JSON file: /tmp/pkg/slang-package.json`. Gluing the next sentence on the
+/// same line with a space makes `Run` look like part of the filename. A newline keeps the path
+/// intact and still lets `slang-package: error:` introduce the whole report.
+inline void appendErrorAdvice(String& ioError, const char* advice)
+{
+    if (advice)
+    {
+        while (*advice == ' ')
+            ++advice;
+    }
+    if (!advice || !*advice)
+        return;
+    if (!ioError.getLength())
+    {
+        ioError = advice;
+        return;
+    }
+    if (ioError[ioError.getLength() - 1] != '\n')
+        ioError.appendChar('\n');
+    ioError = ioError + advice;
+}
+
+inline void appendErrorAdvice(String& ioError, const String& advice)
+{
+    appendErrorAdvice(ioError, advice.getBuffer());
+}
+
 } // namespace PackageTool
 } // namespace Slang
 
