@@ -785,6 +785,15 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerSignedGreaterThan(
     return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_SGT, outValue);
 }
 
+static SlangResult SLANG_NVVM_CALL _emitIntegerSignedLessEqual(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_SLE, outValue);
+}
+
 static SlangResult SLANG_NVVM_CALL
 _emitBranch(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 targetBlock)
 {
@@ -1467,6 +1476,7 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitIntegerEqual = _emitIntegerEqual;
     api.emitIntegerNotEqual = _emitIntegerNotEqual;
     api.emitIntegerSignedGreaterThan = _emitIntegerSignedGreaterThan;
+    api.emitIntegerSignedLessEqual = _emitIntegerSignedLessEqual;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

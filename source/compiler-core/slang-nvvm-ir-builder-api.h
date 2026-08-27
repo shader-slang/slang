@@ -399,6 +399,15 @@ extern "C"
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1* outValue);
 
+    /// Emits signed less-than-or-equal for same-module scalar integer operands of identical type.
+    /// The result is i1. Both operands must be available at the current unterminated insertion
+    /// point. On failure, the output value is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerSignedLessEqual_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -460,6 +469,8 @@ extern "C"
         SlangNVVMEmitIntegerNotEqual_2 emitIntegerNotEqual;
 
         SlangNVVMEmitIntegerSignedGreaterThan_2 emitIntegerSignedGreaterThan;
+
+        SlangNVVMEmitIntegerSignedLessEqual_2 emitIntegerSignedLessEqual;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -546,6 +557,11 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_THAN_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerSignedGreaterThan) +         \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerSignedGreaterThan))
+
+    // This Slice 24 prefix is one coherent scalar-integer-signed-less-equal capability.
+#define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_LESS_EQUAL_MIN_SIZE \
+    (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerSignedLessEqual) +         \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerSignedLessEqual))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

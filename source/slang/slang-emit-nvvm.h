@@ -28,9 +28,10 @@ enum class NVVMIRCapability
     ScalarIntegerEqual,
     ScalarIntegerNotEqual,
     ScalarIntegerSignedGreaterThan,
+    ScalarIntegerSignedLessEqual,
 };
 
-/// Checks whether linked Slang IR is in the exact direct-NVVM subset implemented through Slice 23.
+/// Checks whether linked Slang IR is in the exact direct-NVVM subset implemented through Slice 24.
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
