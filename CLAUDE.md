@@ -247,6 +247,7 @@ change.)
 2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking change" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
 4. **Write the PR description in this required five-part format:**
+
    1. **Motivation** — the problem being solved, with a concrete example / motivating test case.
    2. **Proposed solution** — the approach, and why it is the principled one.
    3. **Change summary** — a table or list of the files/areas touched and what each does.

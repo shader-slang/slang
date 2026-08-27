@@ -3,8 +3,7 @@ SPDX-FileCopyrightText: The Khronos Group, Inc.
 SPDX-License-Identifier: CC-BY-4.0
 -->
 
-Slang
-=====
+# Slang
 
 ![CI Status](https://github.com/shader-slang/slang/actions/workflows/ci.yml/badge.svg?branch=master)
 ![CTS Status](https://github.com/shader-slang/slang/actions/workflows/nightly-slang-vkglcts-test.yml/badge.svg)
@@ -12,8 +11,7 @@ Slang
 Slang is a shading language that makes it easier to build and maintain large shader codebases in a modular and extensible fashion, while also maintaining the highest possible performance on modern GPUs and graphics APIs.
 Slang is based on years of collaboration between researchers at NVIDIA, Carnegie Mellon University, Stanford, MIT, UCSD and the University of Washington.
 
-Why Slang?
----------------
+## Why Slang?
 
 The Slang shading language is designed to enable real-time graphics developers to work with large-scale, high-performance shader code.
 
@@ -49,8 +47,7 @@ Slang provides a compatibility module that enables the use of most GLSL intrinsi
 Slang comes with full support of IntelliSense editing features in Visual Studio Code and Visual Studio through the Language Server Protocol.
 Full debugging capabilities are also available through RenderDoc and SPIR-V based tools.
 
-Getting Started
----------------
+## Getting Started
 
 The fastest way to get started using Slang in your own development is to use a pre-built binary package, available through GitHub [releases](https://github.com/shader-slang/slang/releases).
 Slang binaries are also included in the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) since version 1.3.296.0.
@@ -64,8 +61,7 @@ If you want to try out the Slang language without installing anything, a fast an
 
 If you would like to build Slang from source, please consult the [build instructions](docs/building.md).
 
-Documentation
--------------
+## Documentation
 
 The Slang project provides a variety of different [documentation](docs/), but most users would be well served starting with the [User's Guide](https://shader-slang.github.io/slang/user-guide/).
 
@@ -78,8 +74,7 @@ GFX is being deprecated in favor of [slang-rhi](https://github.com/shader-slang/
 
 Additionally, we recommend checking out [Vulkan Mini Examples](https://github.com/nvpro-samples/vk_mini_samples/) for more examples of using Slang's language features available on Vulkan, such as pointers and the ray tracing intrinsics.
 
-Contributing
-------------
+## Contributing
 
 If you'd like to contribute to the project, we are excited to have your input.
 The following guidelines should be observed by contributors:
@@ -91,8 +86,7 @@ The following guidelines should be observed by contributors:
 
 [Contribution guide](CONTRIBUTING.md) describes the workflow for contributors at more detail.
 
-Limitations and Support
------------------------
+## Limitations and Support
 
 ### Platform support
 
@@ -113,16 +107,16 @@ Slang can compile shader code to the following targets:
 | Direct3D 11 |    [supported](https://shader-slang.com/slang/user-guide/targets.html#direct3d-11)    |                               HLSL                               |
 | Direct3D 12 |    [supported](https://shader-slang.com/slang/user-guide/targets.html#direct3d-12)    |                               HLSL                               |
 |   Vulkan    |      [supported](https://shader-slang.com/slang/user-guide/targets.html#vulkan)       |                           SPIRV, GLSL                            |
-|    Metal    |     [experimental*](https://shader-slang.com/slang/user-guide/targets.html#metal)     |                      Metal Shading Language                      |
-|   WebGPU    |                                    experimental**                                     |                               WGSL                               |
+|    Metal    |    [experimental\*](https://shader-slang.com/slang/user-guide/targets.html#metal)     |                      Metal Shading Language                      |
+|   WebGPU    |                                   experimental\*\*                                    |                               WGSL                               |
 |    CUDA     |  [supported](https://shader-slang.com/slang/user-guide/targets.html#cuda-and-optix)   |                        C++ (compute only)                        |
 |    Optix    | [experimental](https://shader-slang.com/slang/user-guide/targets.html#cuda-and-optix) |                            C++ (WIP)                             |
 |     CPU     |  [experimental](https://shader-slang.com/slang/user-guide/targets.html#cpu-compute)   | C++ (kernel), C++ (host), standalone executable, dynamic library |
 
-> *Slang currently supports generating vertex, fragment, compute, task and mesh
+> \*Slang currently supports generating vertex, fragment, compute, task and mesh
 > shaders for Metal.
 
-> **WGSL support is still work in-progress.
+> \*\*WGSL support is still work in-progress.
 
 For greater detail, see the [Supported Compilation
 Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the
@@ -135,8 +129,7 @@ where Slang is used most heavily. Users who are looking for support on other
 platforms or APIs should coordinate with the development team via the issue
 tracker to make sure that their use cases can be supported.
 
-License
--------
+## License
 
 The Slang code itself is under the Apache 2.0 with LLVM Exception license (see [LICENSE](LICENSE)).
 
