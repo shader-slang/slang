@@ -188,11 +188,10 @@ bool _isSupportedParameterType(IRInst* type)
            _asSupportedRawRWStructuredBufferI32Type(type);
 }
 
-// Raises the required builder prefix without weakening an already stronger requirement.
-void _requireCapability(NVVMIRCapability& capability, NVVMIRCapability requiredCapability)
+// Records one independent provider semantic required by the accepted linked IR.
+void _requireFeature(NVVMIRFeatureSet& features, SlangNVVMBuilderFeature_3 requiredFeature)
 {
-    if (int(requiredCapability) > int(capability))
-        capability = requiredCapability;
+    features.words[requiredFeature / 64u] |= uint64_t(1) << (requiredFeature % 64u);
 }
 
 // Checks that an executable operand has an accepted definition that dominates its use.
@@ -221,14 +220,14 @@ SlangResult _validateI32Value(
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree,
-    NVVMIRCapability& capability)
+    NVVMIRFeatureSet& features)
 {
     if (!value || !_isI32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 value"));
 
     if (_asExecutableI32Constant(value))
     {
-        _requireCapability(capability, NVVMIRCapability::ScalarSSA);
+        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
         return SLANG_OK;
     }
 
@@ -311,7 +310,7 @@ SlangResult _validateBranchArguments(
     const HashSet<IRBlock*>& functionBlocks,
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree,
-    NVVMIRCapability& capability)
+    NVVMIRFeatureSet& features)
 {
     IRBlock* targetBlock = branch->getTargetBlock();
     SLANG_RETURN_ON_FAIL(_validateBlockTarget(codeGenContext, targetBlock, functionBlocks));
@@ -336,11 +335,11 @@ SlangResult _validateBranchArguments(
             branch,
             availableValues,
             dominatorTree,
-            capability));
+            features));
     }
 
     if (argumentCount)
-        _requireCapability(capability, NVVMIRCapability::ScalarSSA);
+        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
     return SLANG_OK;
 }
 
@@ -492,7 +491,7 @@ SlangResult _validateNVVMFunction(
     IRFunc* entryPoint,
     IRFunc* function,
     const HashSet<IRFunc*>& functionSet,
-    NVVMIRCapability& capability)
+    NVVMIRFeatureSet& features)
 {
     const bool isEntryPoint = function == entryPoint;
     IRBlock* entryBlock = function->getFirstBlock();
@@ -505,7 +504,7 @@ SlangResult _validateNVVMFunction(
     for (auto block : function->getBlocks())
         functionBlocks.add(block);
     if (functionBlocks.getCount() > 1)
-        _requireCapability(capability, NVVMIRCapability::ScalarControlFlow);
+        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
 
     RefPtr<IRDominatorTree> dominatorTree = computeDominatorTree(function);
     List<IRBlock*> bodyOrder = _getNVVMBodyOrder(function, dominatorTree);
@@ -534,9 +533,9 @@ SlangResult _validateNVVMFunction(
                              : toSlice("helper function parameter"));
         }
         if (arrayPointerType)
-            _requireCapability(capability, NVVMIRCapability::ScalarArrayAddressing);
+            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_ARRAY_ADDRESSING);
         if (rawRWStructuredBufferType)
-            _requireCapability(capability, NVVMIRCapability::RawRWStructuredBufferI32);
+            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32);
         availableValues.add(param);
         ++actualParamCount;
     }
@@ -548,7 +547,7 @@ SlangResult _validateNVVMFunction(
                          : toSlice("helper parameter count"));
     }
     if (isEntryPoint && actualParamCount)
-        _requireCapability(capability, NVVMIRCapability::ScalarMemory);
+        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
 
     // Register every accepted block parameter before checking uses because emission creates all
     // phi placeholders before any body. Ordinary values join this set in the second pass, in the
@@ -562,7 +561,7 @@ SlangResult _validateNVVMFunction(
                 if (!_isI32Type(param->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
                 availableValues.add(param);
-                _requireCapability(capability, NVVMIRCapability::ScalarSSA);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
             }
         }
 
@@ -577,18 +576,18 @@ SlangResult _validateNVVMFunction(
             case kIROp_Load:
                 if (!_isI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
-                _requireCapability(capability, NVVMIRCapability::ScalarMemory);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
                 break;
 
             case kIROp_Store:
-                _requireCapability(capability, NVVMIRCapability::ScalarMemory);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
                 break;
 
             case kIROp_Add:
             case kIROp_Sub:
                 if (inst->getOperandCount() != 2 || !_isI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 arithmetic"));
-                _requireCapability(capability, NVVMIRCapability::ScalarControlFlow);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
                 break;
 
             case kIROp_Mul:
@@ -598,7 +597,7 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("signed i32 multiplication"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerMultiply);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY);
                 break;
 
             case kIROp_BitAnd:
@@ -608,7 +607,7 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("signed i32 bitwise AND"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerBitAnd);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_AND);
                 break;
 
             case kIROp_BitOr:
@@ -616,7 +615,7 @@ SlangResult _validateNVVMFunction(
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 bitwise OR"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerBitOr);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_OR);
                 break;
 
             case kIROp_BitXor:
@@ -626,7 +625,7 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("signed i32 bitwise XOR"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerBitXor);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_XOR);
                 break;
 
             case kIROp_BitNot:
@@ -636,7 +635,7 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("signed i32 bitwise NOT"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerBitNot);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_NOT);
                 break;
 
             case kIROp_Neg:
@@ -646,7 +645,7 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("signed i32 arithmetic negation"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerNegate);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NEGATE);
                 break;
 
             case kIROp_AtomicAdd:
@@ -670,7 +669,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_Less:
                 if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 comparison"));
-                _requireCapability(capability, NVVMIRCapability::ScalarControlFlow);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
                 break;
 
             case kIROp_Eql:
@@ -678,7 +677,7 @@ SlangResult _validateNVVMFunction(
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 equality"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerEqual);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_EQUAL);
                 break;
 
             case kIROp_Neq:
@@ -686,7 +685,7 @@ SlangResult _validateNVVMFunction(
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 inequality"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerNotEqual);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NOT_EQUAL);
                 break;
 
             case kIROp_Greater:
@@ -696,7 +695,9 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("signed i32 greater-than"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerSignedGreaterThan);
+                _requireFeature(
+                    features,
+                    SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_THAN);
                 break;
 
             case kIROp_Leq:
@@ -706,7 +707,9 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("signed i32 less-than-or-equal"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerSignedLessEqual);
+                _requireFeature(
+                    features,
+                    SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_LESS_EQUAL);
                 break;
 
             case kIROp_Geq:
@@ -716,13 +719,15 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("signed i32 greater-than-or-equal"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarIntegerSignedGreaterEqual);
+                _requireFeature(
+                    features,
+                    SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_EQUAL);
                 break;
 
             case kIROp_Call:
                 if (!inst->getOperandCount() || !_isI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 call"));
-                _requireCapability(capability, NVVMIRCapability::ScalarFunctions);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
                 break;
 
             case kIROp_GetOffsetPtr:
@@ -733,7 +738,7 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("device i32 pointer offset"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarPointerArithmetic);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_POINTER_ARITHMETIC);
                 break;
 
             case kIROp_GetElementPtr:
@@ -744,7 +749,7 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("device i32 array element pointer"));
                 }
-                _requireCapability(capability, NVVMIRCapability::ScalarArrayAddressing);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_ARRAY_ADDRESSING);
                 break;
 
             case kIROp_RWStructuredBufferGetElementPtr:
@@ -755,7 +760,7 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("raw RWStructuredBuffer signed i32 element pointer"));
                 }
-                _requireCapability(capability, NVVMIRCapability::RawRWStructuredBufferI32);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32);
                 break;
 
             case kIROp_Return:
@@ -764,7 +769,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_UnconditionalBranch:
             case kIROp_Loop:
             case kIROp_IfElse:
-                _requireCapability(capability, NVVMIRCapability::ScalarControlFlow);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
                 break;
 
             default:
@@ -818,7 +823,7 @@ SlangResult _validateNVVMFunction(
                         store,
                         availableValues,
                         dominatorTree,
-                        capability));
+                        features));
                 }
                 break;
 
@@ -840,14 +845,14 @@ SlangResult _validateNVVMFunction(
                     inst,
                     availableValues,
                     dominatorTree,
-                    capability));
+                    features));
                 SLANG_RETURN_ON_FAIL(_validateI32Value(
                     codeGenContext,
                     inst->getOperand(1),
                     inst,
                     availableValues,
                     dominatorTree,
-                    capability));
+                    features));
                 availableValues.add(inst);
                 break;
 
@@ -858,7 +863,7 @@ SlangResult _validateNVVMFunction(
                     inst,
                     availableValues,
                     dominatorTree,
-                    capability));
+                    features));
                 availableValues.add(inst);
                 break;
 
@@ -869,7 +874,7 @@ SlangResult _validateNVVMFunction(
                     inst,
                     availableValues,
                     dominatorTree,
-                    capability));
+                    features));
                 availableValues.add(inst);
                 break;
 
@@ -889,8 +894,9 @@ SlangResult _validateNVVMFunction(
                     inst,
                     availableValues,
                     dominatorTree,
-                    capability));
-                _requireCapability(capability, NVVMIRCapability::RelaxedGlobalI32AtomicAdd);
+                    features));
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_RELAXED_GLOBAL_I32_ATOMIC_ADD);
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_NVVM_IR_2_0_ASSEMBLY);
                 availableValues.add(inst);
                 break;
 
@@ -922,7 +928,7 @@ SlangResult _validateNVVMFunction(
                             call,
                             availableValues,
                             dominatorTree,
-                            capability));
+                            features));
                     }
                     availableValues.add(call);
                 }
@@ -952,7 +958,7 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree,
-                        capability));
+                        features));
                     availableValues.add(inst);
                 }
                 break;
@@ -992,7 +998,7 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree,
-                        capability));
+                        features));
                     availableValues.add(inst);
                 }
                 break;
@@ -1019,7 +1025,7 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree,
-                        capability));
+                        features));
                     availableValues.add(inst);
                 }
                 break;
@@ -1050,7 +1056,7 @@ SlangResult _validateNVVMFunction(
                             returnInst,
                             availableValues,
                             dominatorTree,
-                            capability));
+                            features));
                         hasHelperReturn = true;
                     }
                 }
@@ -1068,7 +1074,7 @@ SlangResult _validateNVVMFunction(
                         functionBlocks,
                         availableValues,
                         dominatorTree,
-                        capability));
+                        features));
                 }
                 break;
 
@@ -1084,7 +1090,7 @@ SlangResult _validateNVVMFunction(
                         functionBlocks,
                         availableValues,
                         dominatorTree,
-                        capability));
+                        features));
                     SLANG_RETURN_ON_FAIL(_validateBlockTarget(
                         codeGenContext,
                         loop->getBreakBlock(),
@@ -1267,9 +1273,9 @@ SlangResult _getLoweredNVVMValue(
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
-    NVVMIRCapability& outCapability)
+    NVVMIRFeatureSet& outFeatures)
 {
-    outCapability = NVVMIRCapability::Minimal;
+    outFeatures = {};
     if (!linkedIR.module || linkedIR.entryPoints.getCount() != 1)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point count"));
 
@@ -1298,22 +1304,20 @@ SlangResult validateNVVMSupportedIR(
     SLANG_RETURN_ON_FAIL(_validateNVVMFunctionUses(codeGenContext, functions));
 
     if (functions.getCount() > 1)
-        _requireCapability(outCapability, NVVMIRCapability::ScalarFunctions);
+        _requireFeature(outFeatures, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
     for (auto function : functions)
     {
-        SLANG_RETURN_ON_FAIL(_validateNVVMFunction(
-            codeGenContext,
-            entryPoint,
-            function,
-            functionSet,
-            outCapability));
+        SLANG_RETURN_ON_FAIL(
+            _validateNVVMFunction(codeGenContext, entryPoint, function, functionSet, outFeatures));
     }
 
     // Scalar CUDA launch parameters and executable scalar operations are meaningful only for a
     // CUDA kernel. Preserve Slice 6's conventional zero-parameter empty compute entry point, but
     // do not invent a raw CUDA launch ABI for an ordinary shader entry point.
-    if (outCapability != NVVMIRCapability::Minimal &&
-        !entryPoint->findDecoration<IRCudaKernelDecoration>())
+    bool hasRequiredFeatures = false;
+    for (uint32_t i = 0; i < SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3; ++i)
+        hasRequiredFeatures = hasRequiredFeatures || outFeatures.words[i] != 0;
+    if (hasRequiredFeatures && !entryPoint->findDecoration<IRCudaKernelDecoration>())
     {
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("CUDA kernel decoration"));
     }
@@ -1627,9 +1631,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Add:
                 case kIROp_Sub:
                     {
-                        const SlangNVVMIntegerBinaryOp_2 operation =
-                            inst->getOp() == kIROp_Add ? SLANG_NVVM_INTEGER_BINARY_OP_ADD
-                                                       : SLANG_NVVM_INTEGER_BINARY_OP_SUB;
+                        const SlangNVVMIntegerBinaryOp_3 operation =
+                            inst->getOp() == kIROp_Add ? SLANG_NVVM_INTEGER_BINARY_OP_3_ADD
+                                                       : SLANG_NVVM_INTEGER_BINARY_OP_3_SUB;
                         SlangNVVMValueHandle_1 loweredLeft = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -1653,7 +1657,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             codeGenContext,
                             inst->getOp() == kIROp_Add ? "signed i32 addition"
                                                        : "signed i32 subtraction",
-                            builder.emitIntegerBinary(
+                            builder.emitIntegerBinaryOperation(
                                 moduleScope.module,
                                 operation,
                                 loweredLeft,
@@ -1687,8 +1691,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 multiplication",
-                            builder.emitIntegerMultiply(
+                            builder.emitIntegerBinaryOperation(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));
@@ -1720,8 +1725,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 bitwise AND",
-                            builder.emitIntegerBitAnd(
+                            builder.emitIntegerBinaryOperation(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_AND,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));
@@ -1753,8 +1759,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 bitwise OR",
-                            builder.emitIntegerBitOr(
+                            builder.emitIntegerBinaryOperation(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_OR,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));
@@ -1786,8 +1793,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 bitwise XOR",
-                            builder.emitIntegerBitXor(
+                            builder.emitIntegerBinaryOperation(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_XOR,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));
@@ -1810,8 +1818,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 bitwise NOT",
-                            builder.emitIntegerBitNot(
+                            builder.emitIntegerUnary(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_UNARY_OP_BIT_NOT,
                                 loweredOperand,
                                 loweredValue)));
                         valueMap[inst] = loweredValue;
@@ -1833,8 +1842,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 arithmetic negation",
-                            builder.emitIntegerNegate(
+                            builder.emitIntegerUnary(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_UNARY_OP_NEGATE,
                                 loweredOperand,
                                 loweredValue)));
                         valueMap[inst] = loweredValue;
@@ -1898,8 +1908,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 less-than comparison",
-                            builder.emitIntegerSignedLessThan(
+                            builder.emitIntegerCompare(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_THAN,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));
@@ -1931,8 +1942,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 equality comparison",
-                            builder.emitIntegerEqual(
+                            builder.emitIntegerCompare(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));
@@ -1964,8 +1976,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 inequality comparison",
-                            builder.emitIntegerNotEqual(
+                            builder.emitIntegerCompare(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));
@@ -1997,8 +2010,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 greater-than comparison",
-                            builder.emitIntegerSignedGreaterThan(
+                            builder.emitIntegerCompare(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));
@@ -2030,8 +2044,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 less-than-or-equal comparison",
-                            builder.emitIntegerSignedLessEqual(
+                            builder.emitIntegerCompare(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_EQUAL,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));
@@ -2063,8 +2078,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "signed i32 greater-than-or-equal comparison",
-                            builder.emitIntegerSignedGreaterEqual(
+                            builder.emitIntegerCompare(
                                 moduleScope.module,
+                                SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_EQUAL,
                                 loweredLeft,
                                 loweredRight,
                                 loweredValue)));

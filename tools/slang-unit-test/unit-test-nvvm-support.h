@@ -352,6 +352,9 @@ struct FakeNVVMBuilderState
         emitIntegerSignedGreaterThanCallCount = 0;
         emitIntegerSignedLessEqualCallCount = 0;
         emitIntegerSignedGreaterEqualCallCount = 0;
+        emitIntegerUnaryV3CallCount = 0;
+        emitIntegerBinaryV3CallCount = 0;
+        emitIntegerCompareV3CallCount = 0;
         integerBitWidth = 0;
         arrayElementCount = 0;
         arrayElementType = nullptr;
@@ -445,6 +448,9 @@ struct FakeNVVMBuilderState
         integerSignedGreaterEqualCallerBlockIndices.clear();
         integerSignedGreaterEqualLeftValueRefs.clear();
         integerSignedGreaterEqualRightValueRefs.clear();
+        integerUnaryV3Operations.clear();
+        integerBinaryV3Operations.clear();
+        integerCompareV3Operations.clear();
         loadPointerValueRefs.clear();
         storePointerValueRefs.clear();
         kernelFunctionIndices.clear();
@@ -462,8 +468,10 @@ struct FakeNVVMBuilderState
         SLANG_ASSERT(liveLibraryCount == 0);
         api = {};
         apiV2 = {};
+        apiV3 = {};
         omitAPISymbol = false;
         omitAPIV2Symbol = true;
+        omitAPIV3Symbol = true;
         libraryUnavailable = false;
         returnNullModule = false;
         returnNullIntegerType = false;
@@ -524,8 +532,10 @@ struct FakeNVVMBuilderState
 
     SlangNVVMBuilderAPI_V1 api = {};
     SlangNVVMBuilderAPI_V2 apiV2 = {};
+    SlangNVVMBuilderAPI_V3 apiV3 = {};
     bool omitAPISymbol = false;
     bool omitAPIV2Symbol = true;
+    bool omitAPIV3Symbol = true;
     bool libraryUnavailable = false;
     bool returnNullModule = false;
     bool returnNullIntegerType = false;
@@ -639,6 +649,9 @@ struct FakeNVVMBuilderState
     int emitIntegerSignedGreaterThanCallCount = 0;
     int emitIntegerSignedLessEqualCallCount = 0;
     int emitIntegerSignedGreaterEqualCallCount = 0;
+    int emitIntegerUnaryV3CallCount = 0;
+    int emitIntegerBinaryV3CallCount = 0;
+    int emitIntegerCompareV3CallCount = 0;
     uint32_t integerBitWidth = 0;
     uint32_t arrayElementCount = 0;
     SlangNVVMTypeHandle_1 arrayElementType = nullptr;
@@ -657,6 +670,9 @@ struct FakeNVVMBuilderState
     uint32_t loadAlignment = 0;
     uint32_t storeAlignment = 0;
     List<SlangNVVMIntegerBinaryOp_2> integerBinaryOperations;
+    List<SlangNVVMIntegerUnaryOp_3> integerUnaryV3Operations;
+    List<SlangNVVMIntegerBinaryOp_3> integerBinaryV3Operations;
+    List<SlangNVVMIntegerCompareOp_3> integerCompareV3Operations;
     List<int64_t> integerConstantValues;
     List<Index> integerPhiTargetBlockIndices;
     List<Index> integerPhiIncomingPhiIndices;
@@ -2879,6 +2895,114 @@ static SlangNVVMBuilderAPI_V2 _makeFakeNVVMBuilderAPIV2()
     return api;
 }
 
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntegerUnaryV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntegerUnaryOp_3 operation,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1* outValue)
+{
+    ++gFakeNVVMBuilder.emitIntegerUnaryV3CallCount;
+    gFakeNVVMBuilder.integerUnaryV3Operations.add(operation);
+    switch (operation)
+    {
+    case SLANG_NVVM_INTEGER_UNARY_OP_BIT_NOT:
+        return _fakeNVVMBuilderEmitIntegerBitNot(module, value, outValue);
+    case SLANG_NVVM_INTEGER_UNARY_OP_NEGATE:
+        return _fakeNVVMBuilderEmitIntegerNegate(module, value, outValue);
+    default:
+        if (outValue)
+            *outValue = nullptr;
+        return SLANG_E_INVALID_ARG;
+    }
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntegerBinaryV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntegerBinaryOp_3 operation,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    ++gFakeNVVMBuilder.emitIntegerBinaryV3CallCount;
+    gFakeNVVMBuilder.integerBinaryV3Operations.add(operation);
+    switch (operation)
+    {
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_ADD:
+        return _fakeNVVMBuilderEmitIntegerBinary(
+            module,
+            SLANG_NVVM_INTEGER_BINARY_OP_ADD,
+            left,
+            right,
+            outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_SUB:
+        return _fakeNVVMBuilderEmitIntegerBinary(
+            module,
+            SLANG_NVVM_INTEGER_BINARY_OP_SUB,
+            left,
+            right,
+            outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY:
+        return _fakeNVVMBuilderEmitIntegerMultiply(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_AND:
+        return _fakeNVVMBuilderEmitIntegerBitAnd(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_OR:
+        return _fakeNVVMBuilderEmitIntegerBitOr(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_XOR:
+        return _fakeNVVMBuilderEmitIntegerBitXor(module, left, right, outValue);
+    default:
+        if (outValue)
+            *outValue = nullptr;
+        return SLANG_E_INVALID_ARG;
+    }
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntegerCompareV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntegerCompareOp_3 operation,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    ++gFakeNVVMBuilder.emitIntegerCompareV3CallCount;
+    gFakeNVVMBuilder.integerCompareV3Operations.add(operation);
+    switch (operation)
+    {
+    case SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_THAN:
+        return _fakeNVVMBuilderEmitIntegerSignedLessThan(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL:
+        return _fakeNVVMBuilderEmitIntegerEqual(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL:
+        return _fakeNVVMBuilderEmitIntegerNotEqual(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN:
+        return _fakeNVVMBuilderEmitIntegerSignedGreaterThan(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_EQUAL:
+        return _fakeNVVMBuilderEmitIntegerSignedLessEqual(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_EQUAL:
+        return _fakeNVVMBuilderEmitIntegerSignedGreaterEqual(module, left, right, outValue);
+    default:
+        if (outValue)
+            *outValue = nullptr;
+        return SLANG_E_INVALID_ARG;
+    }
+}
+
+static SlangNVVMBuilderAPI_V3 _makeFakeNVVMBuilderAPIV3()
+{
+    SlangNVVMBuilderAPI_V3 api = {};
+    api.structureSize = uint32_t(sizeof(api));
+    api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_3;
+    api.compatibilityAPI = _makeFakeNVVMBuilderAPIV2();
+    for (SlangNVVMBuilderFeature_3 feature = 0; feature < SLANG_NVVM_BUILDER_FEATURE_COUNT_3;
+         ++feature)
+    {
+        api.features.words[feature / 64u] |= uint64_t(1) << (feature % 64u);
+    }
+    api.emitIntegerUnary = _fakeNVVMBuilderEmitIntegerUnaryV3;
+    api.emitIntegerBinary = _fakeNVVMBuilderEmitIntegerBinaryV3;
+    api.emitIntegerCompare = _fakeNVVMBuilderEmitIntegerCompareV3;
+    return api;
+}
+
 static SlangResult SLANG_NVVM_CALL _fakeGetNVVMBuilderAPI(SlangNVVMBuilderAPI_V1* outAPI)
 {
     if (!outAPI || outAPI->structureSize != sizeof(*outAPI) ||
@@ -2908,6 +3032,24 @@ static SlangResult SLANG_NVVM_CALL _fakeGetNVVMBuilderAPIV2(SlangNVVMBuilderAPI_
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _fakeGetNVVMBuilderAPIV3(SlangNVVMBuilderAPI_V3* outAPI)
+{
+    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
+        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3)
+    {
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    const uint32_t callerSize = outAPI->structureSize;
+    const uint32_t providerSize = gFakeNVVMBuilder.apiV3.structureSize;
+    uint32_t copySize = callerSize < providerSize ? callerSize : providerSize;
+    if (copySize > sizeof(gFakeNVVMBuilder.apiV3))
+        copySize = uint32_t(sizeof(gFakeNVVMBuilder.apiV3));
+    ::memcpy(outAPI, &gFakeNVVMBuilder.apiV3, copySize);
+    outAPI->structureSize = providerSize;
+    return SLANG_OK;
+}
+
 class FakeNVVMBuilderLibrary : public RefObject, public ISlangSharedLibrary
 {
 public:
@@ -2931,6 +3073,10 @@ public:
         if (!name || gFakeNVVMBuilder.omitAPISymbol)
             return nullptr;
         const UnownedStringSlice symbol(name);
+        if (!gFakeNVVMBuilder.omitAPIV3Symbol && symbol == SLANG_NVVM_BUILDER_GET_API_V3_NAME)
+        {
+            return reinterpret_cast<void*>(_fakeGetNVVMBuilderAPIV3);
+        }
         if (!gFakeNVVMBuilder.omitAPIV2Symbol && symbol == SLANG_NVVM_BUILDER_GET_API_V2_NAME)
         {
             return reinterpret_cast<void*>(_fakeGetNVVMBuilderAPIV2);
@@ -3515,11 +3661,10 @@ static SlangResult _locateRealNVVM(
 {
     outSet = new DownstreamCompilerSet;
     outCompiler = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        NVVMDownstreamCompilerUtil::locateCompilers(
-            path,
-            DefaultSharedLibraryLoader::getSingleton(),
-            outSet));
+    SLANG_RETURN_ON_FAIL(NVVMDownstreamCompilerUtil::locateCompilers(
+        path,
+        DefaultSharedLibraryLoader::getSingleton(),
+        outSet));
     outCompiler = _findNVVMCompiler(outSet);
     return outCompiler ? SLANG_OK : SLANG_FAIL;
 }
@@ -3530,11 +3675,10 @@ static SlangResult _locateRealNVRTC(
 {
     outSet = new DownstreamCompilerSet;
     outCompiler = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        NVRTCDownstreamCompilerUtil::locateCompilers(
-            String(),
-            DefaultSharedLibraryLoader::getSingleton(),
-            outSet));
+    SLANG_RETURN_ON_FAIL(NVRTCDownstreamCompilerUtil::locateCompilers(
+        String(),
+        DefaultSharedLibraryLoader::getSingleton(),
+        outSet));
     outCompiler = _findNVRTCCompiler(outSet);
     return outCompiler ? SLANG_OK : SLANG_FAIL;
 }
@@ -3548,11 +3692,10 @@ static ComPtr<IArtifact> _createNVVMIRArtifact(const char* ir = kMinimalNVVMIR)
 
 static ComPtr<IArtifact> _createNVVMBitcodeArtifact(const void* data, size_t size)
 {
-    ComPtr<IArtifact> artifact = ArtifactUtil::createArtifact(
-        ArtifactDesc::make(
-            ArtifactKind::ObjectCode,
-            ArtifactPayload::LLVMIR,
-            ArtifactStyle::Kernel));
+    ComPtr<IArtifact> artifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
+        ArtifactKind::ObjectCode,
+        ArtifactPayload::LLVMIR,
+        ArtifactStyle::Kernel));
     artifact->addRepresentationUnknown(RawBlob::create(data, size));
     return artifact;
 }
@@ -3694,10 +3837,9 @@ static RealNVVMBuilderLocation _getRealNVVMBuilderLocation(UnitTestContext* cont
 {
     RealNVVMBuilderLocation location;
     StringBuilder pathBuilder;
-    location.isExplicit = SLANG_SUCCEEDED(
-                              PlatformUtil::getEnvironmentVariable(
-                                  toSlice("SLANG_NVVM_BUILDER_PATH"),
-                                  pathBuilder)) &&
+    location.isExplicit = SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                              toSlice("SLANG_NVVM_BUILDER_PATH"),
+                              pathBuilder)) &&
                           pathBuilder.getLength();
     location.directory =
         location.isExplicit ? pathBuilder.produceString() : String(context->executableDirectory);
@@ -3750,6 +3892,7 @@ static void _requireRealNVVMBuilder(UnitTestContext* context, NVVMIRBuilder& out
     }
     if (!outBuilder.isInitialized())
         SLANG_CHECK_ABORT(outBuilder.isInitialized());
+    SLANG_CHECK_ABORT(outBuilder.getAPIV3() != nullptr);
 }
 
 static SlangResult _populateEmptyNVVMKernel(
@@ -4965,6 +5108,12 @@ static void _resetDirectNVVMFakes()
     gFakeNVVMBuilder.omitAPIV2Symbol = false;
     gFakeNVVM.reset();
     gFakeNVVM.compiledPTX = kFakeDirectPTX;
+}
+
+static void _enableFakeNVVMBuilderV3()
+{
+    gFakeNVVMBuilder.apiV3 = _makeFakeNVVMBuilderAPIV3();
+    gFakeNVVMBuilder.omitAPIV3Symbol = false;
 }
 
 static SlangResult _createSlangPTXLinkedProgram(

@@ -1805,6 +1805,47 @@ the historical per-operation fake representation. Slice 28 can now change provid
 mixing compiler/runtime ownership, and Slice 30 owns replacing that fake representation and the
 duplicated scalar runners after the generic provider surface is established.
 
+### Slice 28 generic V3 provider boundary
+
+Slice 28 freezes the complete 384-byte x64/212-byte x86 V2 table. V3 composes that immutable table
+as its compatibility core instead of copying its lifecycle, CFG, memory, atomic, and resource
+callbacks into a second spelling. Forward growth moves to three typed scalar families:
+
+```text
+emitIntegerUnary(operation, value, outValue)
+emitIntegerBinary(operation, left, right, outValue)
+emitIntegerCompare(operation, left, right, outValue)
+```
+
+The Slang-owned operation values cover the established unary NOT/negate, binary
+add/subtract/multiply/AND/OR/XOR, and signed-less/equal/not-equal/signed-greater/signed-less-equal/
+signed-greater-equal operations. LLVM enum values and objects remain provider-private. Each V3
+dispatcher calls the same validated LLVM producer retained by V2, and unknown operations clear the
+output and fail before mutation. Adding another same-shaped integer operation therefore adds an
+enum value, semantic feature mapping, provider switch case, and tests; it does not add another ABI
+field, host wrapper method, V2 minimum-prefix constant, or identity field.
+
+Four fixed 64-bit words carry semantic availability independently from table layout. Bits 0 through
+19 represent the established scalar memory, control flow, SSA, function, pointer/array addressing,
+six post-control-flow integer operation families, relaxed global-i32 atomic add, NVVM-2.0 assembly,
+five post-control-flow comparisons, and raw `RWStructuredBuffer<int>` storage. The current provider
+advertises word zero as `1048575` and the remaining words as zero. A V2 compatibility adapter
+synthesizes the same bits from each exact coherent prefix, so a hole in one V3 feature does not hide
+later independent features while every historical V2 subset retains its old behavior.
+
+The complete V3 table is 448 bytes on x64. Its x86 layout is 272 bytes because four bytes align the
+feature words after the 212-byte V2 core and four bytes pad the final 268-byte callback minimum.
+The host probes V3 first and falls back only when the V3 symbol is absent. A present V3 table with a
+bad version, incomplete frozen core, or missing generic callback fails without trying V2. Future-
+larger V3 tables are clamped to the locally understood 448/272-byte layout, unknown advertised bits
+are retained, and a requirement containing a bit the host does not understand is rejected.
+
+The direct preflight now accumulates a feature set rather than the numerically greatest historical
+slice, and scalar emission uses the three generic facade methods. The Release focused suite passes
+192/192, including the complete real direct/NVRTC PTX comparison, `ptxas`, and RTX 5090 runtime
+matrix. Debug preservation passes 10/10. The provider exports exactly the V1, V2, and V3 getters;
+PE inspection reports only operating-system dependencies and no process-visible LLVM DLL.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific

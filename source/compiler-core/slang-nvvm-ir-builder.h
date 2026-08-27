@@ -33,6 +33,12 @@ public:
         ISlangSharedLibrary* library,
         NVVMIRBuilder& outBuilder);
 
+    /// Validates the V3 table, its complete frozen V2 core, and its generic scalar callbacks.
+    static SlangResult initialize(
+        const SlangNVVMBuilderAPI_V3& api,
+        ISlangSharedLibrary* library,
+        NVVMIRBuilder& outBuilder);
+
     bool isInitialized() const { return m_api.createModule != nullptr; }
     bool supportsSerializationDiagnostics() const
     {
@@ -79,6 +85,11 @@ public:
     bool supportsScalarIntegerSignedGreaterEqual() const;
     /// Returns whether the provider advertised the complete Slice 26 raw resource prefix.
     bool supportsRawRWStructuredBufferI32() const;
+    /// Returns whether one semantic feature is present in the negotiated V3 or synthesized V2 set.
+    bool supportsFeature(SlangNVVMBuilderFeature_3 feature) const;
+    /// Returns whether every bit in a required semantic feature set is available.
+    bool supportsFeatures(const SlangNVVMBuilderFeatureSet_3& requiredFeatures) const;
+    const SlangNVVMBuilderFeatureSet_3& getSupportedFeatures() const { return m_features; }
     /// Returns the provider identity that affects generated IR and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
@@ -86,6 +97,11 @@ public:
     const SlangNVVMBuilderAPI_V2* getAPIV2() const
     {
         return supportsSerializationDiagnostics() ? &m_apiV2 : nullptr;
+    }
+    /// Returns the locally supported V3 prefix when the provider was negotiated through V3.
+    const SlangNVVMBuilderAPI_V3* getAPIV3() const
+    {
+        return m_apiV3.structureSize ? &m_apiV3 : nullptr;
     }
 
     /// Creates a module whose LLVM objects remain owned by the returned module handle.
@@ -162,6 +178,29 @@ public:
     SlangResult emitIntegerBinary(
         SlangNVVMModuleHandle_1 module,
         SlangNVVMIntegerBinaryOp_2 operation,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits one stable V3 scalar-integer unary operation, adapting to frozen V2 when necessary.
+    SlangResult emitIntegerUnary(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMIntegerUnaryOp_3 operation,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits one stable V3 scalar-integer binary operation, adapting to frozen V2 when necessary.
+    SlangResult emitIntegerBinaryOperation(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMIntegerBinaryOp_3 operation,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits one stable V3 scalar-integer comparison, adapting to frozen V2 when necessary.
+    SlangResult emitIntegerCompare(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMIntegerCompareOp_3 operation,
         SlangNVVMValueHandle_1 left,
         SlangNVVMValueHandle_1 right,
         SlangNVVMValueHandle_1& outValue) const;
@@ -359,6 +398,8 @@ public:
 private:
     SlangNVVMBuilderAPI_V1 m_api = {};
     SlangNVVMBuilderAPI_V2 m_apiV2 = {};
+    SlangNVVMBuilderAPI_V3 m_apiV3 = {};
+    SlangNVVMBuilderFeatureSet_3 m_features = {};
     ComPtr<ISlangSharedLibrary> m_library;
 };
 

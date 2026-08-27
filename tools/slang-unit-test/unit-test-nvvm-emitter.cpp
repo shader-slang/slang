@@ -2,6 +2,64 @@
 
 #include "unit-test-nvvm-support.h"
 
+SLANG_UNIT_TEST(nvvmSlangV3RoutesGenericScalarFamilies)
+{
+    enum class Family
+    {
+        Unary,
+        Binary,
+        Compare,
+    };
+    struct Case
+    {
+        const char* source;
+        Family family;
+        uint32_t operation;
+    };
+    static const Case kCases[] = {
+        {kDirectNVVMIntegerNegateSource, Family::Unary, SLANG_NVVM_INTEGER_UNARY_OP_NEGATE},
+        {kDirectNVVMIntegerMultiplySource, Family::Binary, SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY},
+        {kDirectNVVMIntegerEqualSource, Family::Compare, SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL},
+    };
+
+    for (const auto& testCase : kCases)
+    {
+        _resetDirectNVVMFakes();
+        _enableFakeNVVMBuilderV3();
+        {
+            ComPtr<slang::IGlobalSession> globalSession;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            globalSession->setSharedLibraryLoader(loader);
+
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                _compileSlangWithDirectNVVM(globalSession, testCase.source, code, diagnostics)));
+            SLANG_CHECK_ABORT(code != nullptr);
+            SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+            if (testCase.family == Family::Unary)
+            {
+                SLANG_CHECK(gFakeNVVMBuilder.emitIntegerUnaryV3CallCount == 1);
+                SLANG_CHECK(gFakeNVVMBuilder.integerUnaryV3Operations[0] == testCase.operation);
+            }
+            else if (testCase.family == Family::Binary)
+            {
+                SLANG_CHECK(gFakeNVVMBuilder.emitIntegerBinaryV3CallCount == 1);
+                SLANG_CHECK(gFakeNVVMBuilder.integerBinaryV3Operations[0] == testCase.operation);
+            }
+            else
+            {
+                SLANG_CHECK(gFakeNVVMBuilder.emitIntegerCompareV3CallCount == 1);
+                SLANG_CHECK(gFakeNVVMBuilder.integerCompareV3Operations[0] == testCase.operation);
+            }
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSlangEmptyComputeUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();

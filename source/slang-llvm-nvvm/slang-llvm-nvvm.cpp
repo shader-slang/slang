@@ -832,6 +832,82 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerSignedGreaterEqual(
     return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_SGE, outValue);
 }
 
+// Dispatches the stable V3 scalar families to the same validated producers used by frozen V2.
+static SlangResult SLANG_NVVM_CALL _emitIntegerUnaryV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntegerUnaryOp_3 operation,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    switch (operation)
+    {
+    case SLANG_NVVM_INTEGER_UNARY_OP_BIT_NOT:
+        return _emitIntegerBitNot(module, value, outValue);
+    case SLANG_NVVM_INTEGER_UNARY_OP_NEGATE:
+        return _emitIntegerNegate(module, value, outValue);
+    default:
+        return SLANG_E_INVALID_ARG;
+    }
+}
+
+static SlangResult SLANG_NVVM_CALL _emitIntegerBinaryV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntegerBinaryOp_3 operation,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    switch (operation)
+    {
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_ADD:
+        return _emitIntegerBinary(module, SLANG_NVVM_INTEGER_BINARY_OP_ADD, left, right, outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_SUB:
+        return _emitIntegerBinary(module, SLANG_NVVM_INTEGER_BINARY_OP_SUB, left, right, outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY:
+        return _emitIntegerMultiply(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_AND:
+        return _emitIntegerBitAnd(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_OR:
+        return _emitIntegerBitOr(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_XOR:
+        return _emitIntegerBitXor(module, left, right, outValue);
+    default:
+        return SLANG_E_INVALID_ARG;
+    }
+}
+
+static SlangResult SLANG_NVVM_CALL _emitIntegerCompareV3(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMIntegerCompareOp_3 operation,
+    SlangNVVMValueHandle_1 left,
+    SlangNVVMValueHandle_1 right,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    switch (operation)
+    {
+    case SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_THAN:
+        return _emitIntegerSignedLessThan(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL:
+        return _emitIntegerEqual(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL:
+        return _emitIntegerNotEqual(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN:
+        return _emitIntegerSignedGreaterThan(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_EQUAL:
+        return _emitIntegerSignedLessEqual(module, left, right, outValue);
+    case SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_EQUAL:
+        return _emitIntegerSignedGreaterEqual(module, left, right, outValue);
+    default:
+        return SLANG_E_INVALID_ARG;
+    }
+}
+
 static SlangResult SLANG_NVVM_CALL
 _emitBranch(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 targetBlock)
 {
@@ -1486,34 +1562,10 @@ static void _fillBuilderAPIV1(SlangNVVMBuilderAPI_V1& api)
     api.serializeModule = _serializeModule;
 }
 
-} // namespace
-
-extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
-slang_getNVVMBuilderAPI_V1(SlangNVVMBuilderAPI_V1* outAPI)
+// Fills the complete frozen V2 table. Both standalone V2 and V3 use this exact compatibility core.
+static void _fillBuilderAPIV2(SlangNVVMBuilderAPI_V2& api)
 {
-    if (!outAPI || outAPI->structureSize != sizeof(SlangNVVMBuilderAPI_V1) ||
-        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_1)
-    {
-        return SLANG_E_NO_INTERFACE;
-    }
-
-    SlangNVVMBuilderAPI_V1 api;
-    _fillBuilderAPIV1(api);
-    *outAPI = api;
-    return SLANG_OK;
-}
-
-extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
-slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
-{
-    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE ||
-        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2)
-    {
-        return SLANG_E_NO_INTERFACE;
-    }
-
-    const size_t callerCapacity = outAPI->structureSize;
-    SlangNVVMBuilderAPI_V2 api = {};
+    api = {};
     api.structureSize = uint32_t(sizeof(api));
     api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_2;
     _fillBuilderAPIV1(api.baseAPI);
@@ -1550,7 +1602,76 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitIntegerSignedGreaterEqual = _emitIntegerSignedGreaterEqual;
     api.getRawRWStructuredBufferI32Type = _getRawRWStructuredBufferI32Type;
     api.emitRawRWStructuredBufferI32ElementPointer = _emitRawRWStructuredBufferI32ElementPointer;
+}
 
+static void _addFeature(SlangNVVMBuilderFeatureSet_3& features, SlangNVVMBuilderFeature_3 feature)
+{
+    features.words[feature / 64u] |= uint64_t(1) << (feature % 64u);
+}
+
+static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
+{
+    api = {};
+    api.structureSize = uint32_t(sizeof(api));
+    api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_3;
+    _fillBuilderAPIV2(api.compatibilityAPI);
+    for (SlangNVVMBuilderFeature_3 feature = 0; feature < SLANG_NVVM_BUILDER_FEATURE_COUNT_3;
+         ++feature)
+    {
+        _addFeature(api.features, feature);
+    }
+    api.emitIntegerUnary = _emitIntegerUnaryV3;
+    api.emitIntegerBinary = _emitIntegerBinaryV3;
+    api.emitIntegerCompare = _emitIntegerCompareV3;
+}
+
+} // namespace
+
+extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
+slang_getNVVMBuilderAPI_V1(SlangNVVMBuilderAPI_V1* outAPI)
+{
+    if (!outAPI || outAPI->structureSize != sizeof(SlangNVVMBuilderAPI_V1) ||
+        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_1)
+    {
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    SlangNVVMBuilderAPI_V1 api;
+    _fillBuilderAPIV1(api);
+    *outAPI = api;
+    return SLANG_OK;
+}
+
+extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
+slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
+{
+    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE ||
+        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2)
+    {
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    const size_t callerCapacity = outAPI->structureSize;
+    SlangNVVMBuilderAPI_V2 api;
+    _fillBuilderAPIV2(api);
+
+    const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
+    std::memcpy(outAPI, &api, copySize);
+    return SLANG_OK;
+}
+
+extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
+slang_getNVVMBuilderAPI_V3(SlangNVVMBuilderAPI_V3* outAPI)
+{
+    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
+        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3)
+    {
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    const size_t callerCapacity = outAPI->structureSize;
+    SlangNVVMBuilderAPI_V3 api;
+    _fillBuilderAPIV3(api);
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);
     return SLANG_OK;

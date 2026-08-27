@@ -8,36 +8,14 @@ namespace Slang
 
 struct CodeGenContext;
 
-/// The smallest coherent builder prefix needed by an accepted linked-IR module.
-enum class NVVMIRCapability
-{
-    Minimal,
-    ScalarMemory,
-    ScalarControlFlow,
-    ScalarSSA,
-    ScalarFunctions,
-    ScalarPointerArithmetic,
-    ScalarArrayAddressing,
-    ScalarIntegerMultiply,
-    ScalarIntegerBitAnd,
-    ScalarIntegerBitOr,
-    ScalarIntegerBitXor,
-    ScalarIntegerBitNot,
-    ScalarIntegerNegate,
-    RelaxedGlobalI32AtomicAdd,
-    ScalarIntegerEqual,
-    ScalarIntegerNotEqual,
-    ScalarIntegerSignedGreaterThan,
-    ScalarIntegerSignedLessEqual,
-    ScalarIntegerSignedGreaterEqual,
-    RawRWStructuredBufferI32,
-};
+/// Independent builder semantics needed by an accepted linked-IR module.
+using NVVMIRFeatureSet = SlangNVVMBuilderFeatureSet_3;
 
 /// Checks whether linked Slang IR is in the exact direct-NVVM subset implemented through Slice 26.
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
-    NVVMIRCapability& outCapability);
+    NVVMIRFeatureSet& outFeatures);
 
 /// Emits verified LLVM 14 NVVM bitcode from already-validated supported IR.
 SlangResult emitNVVMIRFromLinkedIR(

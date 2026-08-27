@@ -439,3 +439,20 @@ that registers no tests. The exact sorted 188-name set has the same pre/post SHA
 its established selector and semantic claim. The final Release prefix passes 188/188 and Debug
 preservation passes 1/1 parser, 2/2 routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA
 compile/pass-through, and 1/1 runtime dispatch. No production source or provider export changes.
+
+Slice 28 changes provider-boundary mechanics without widening any capability bucket. The 384-byte
+x64/212-byte x86 V2 table is frozen and embedded as V3's compatibility core. V3 adds four 64-bit
+semantic feature words plus one generic unary, binary, and comparison callback, producing a
+448-byte x64 table and a 272-byte x86 table (268-byte terminal callback minimum). The 20 established
+feature bits replace the linear highest-slice requirement, while exact V2 prefixes synthesize the
+same semantics for old-provider fallback. Present malformed V3 tables fail; only an absent V3
+symbol permits V2 discovery.
+
+All established scalar IR now crosses the generic family facade, but the accepted Slang IR, LLVM
+construction helpers, libNVVM text, PTX classifications, and runtime expectations in every ledger
+row remain unchanged. Negotiation tests prove an independent feature hole, unknown-required-bit
+rejection, future-size clamping, malformed-present failure, all three unknown-op no-mutation paths,
+and exact V2 absence fallback. The final Release prefix passes 192/192, including real differential
+PTX, every `ptxas` lane, and the RTX 5090 runtime matrix. Debug preservation passes 1/1 parser, 2/2
+routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime
+dispatch. The provider exports only V1/V2/V3 getters and has no process-visible LLVM dependency.

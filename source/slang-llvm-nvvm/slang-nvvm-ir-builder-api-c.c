@@ -5,6 +5,12 @@
 
 typedef SlangNVVMBuilderAPI_V1 SlangNVVMBuilderAPIV1CCompileProbe;
 typedef SlangNVVMBuilderAPI_V2 SlangNVVMBuilderAPIV2CCompileProbe;
+typedef SlangNVVMBuilderAPI_V3 SlangNVVMBuilderAPIV3CCompileProbe;
+typedef char SlangNVVMBuilderAPIV3MinimumSizeCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V3_MIN_SIZE <= sizeof(SlangNVVMBuilderAPI_V3)) ? 1 : -1];
+typedef char SlangNVVMBuilderFeatureCapacityCCompileProbe
+    [((SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3 * 64u) >= SLANG_NVVM_BUILDER_FEATURE_COUNT_3) ? 1
+                                                                                             : -1];
 typedef char SlangNVVMBuilderAPIV2MinimumSizeCCompileProbe
     [(SLANG_NVVM_BUILDER_API_V2_MIN_SIZE <= sizeof(SlangNVVMBuilderAPI_V2)) ? 1 : -1];
 typedef char SlangNVVMBuilderAPIV2ScalarMinimumSizeCCompileProbe

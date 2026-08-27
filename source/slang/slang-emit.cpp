@@ -3619,88 +3619,15 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
     SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(this, linkingAndOptimizationOptions, linkedIR));
-    NVVMIRCapability requiredCapability;
-    SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requiredCapability));
+    NVVMIRFeatureSet requiredFeatures;
+    SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requiredFeatures));
 
     NVVMIRBuilder* builder = nullptr;
     String explicitBuilderPath;
     SlangResult loadResult = getSession()->getOrLoadNVVMIRBuilder(builder, &explicitBuilderPath);
-    bool supportsRequiredCapability = builder && builder->supportsSerializationDiagnostics();
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarMemory)
-        supportsRequiredCapability = builder->supportsScalarOperations();
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarControlFlow)
-        supportsRequiredCapability = builder->supportsScalarControlFlow();
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarSSA)
-        supportsRequiredCapability = builder->supportsScalarSSA();
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarFunctions)
-        supportsRequiredCapability = builder->supportsScalarFunctions();
-    if (supportsRequiredCapability &&
-        requiredCapability >= NVVMIRCapability::ScalarPointerArithmetic)
-    {
-        supportsRequiredCapability = builder->supportsScalarPointerArithmetic();
-    }
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarArrayAddressing)
-    {
-        supportsRequiredCapability = builder->supportsScalarArrayAddressing();
-    }
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarIntegerMultiply)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerMultiply();
-    }
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarIntegerBitAnd)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerBitAnd();
-    }
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarIntegerBitOr)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerBitOr();
-    }
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarIntegerBitXor)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerBitXor();
-    }
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarIntegerBitNot)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerBitNot();
-    }
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarIntegerNegate)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerNegate();
-    }
-    if (supportsRequiredCapability &&
-        requiredCapability >= NVVMIRCapability::RelaxedGlobalI32AtomicAdd)
-    {
-        supportsRequiredCapability = builder->supportsRelaxedGlobalI32AtomicAdd();
-    }
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarIntegerEqual)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerEqual();
-    }
-    if (supportsRequiredCapability && requiredCapability >= NVVMIRCapability::ScalarIntegerNotEqual)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerNotEqual();
-    }
-    if (supportsRequiredCapability &&
-        requiredCapability >= NVVMIRCapability::ScalarIntegerSignedGreaterThan)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerSignedGreaterThan();
-    }
-    if (supportsRequiredCapability &&
-        requiredCapability >= NVVMIRCapability::ScalarIntegerSignedLessEqual)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerSignedLessEqual();
-    }
-    if (supportsRequiredCapability &&
-        requiredCapability >= NVVMIRCapability::ScalarIntegerSignedGreaterEqual)
-    {
-        supportsRequiredCapability = builder->supportsScalarIntegerSignedGreaterEqual();
-    }
-    if (supportsRequiredCapability &&
-        requiredCapability >= NVVMIRCapability::RawRWStructuredBufferI32)
-    {
-        supportsRequiredCapability = builder->supportsRawRWStructuredBufferI32();
-    }
-    if (SLANG_FAILED(loadResult) || !supportsRequiredCapability)
+    const bool supportsRequiredFeatures = builder && builder->supportsSerializationDiagnostics() &&
+                                          builder->supportsFeatures(requiredFeatures);
+    if (SLANG_FAILED(loadResult) || !supportsRequiredFeatures)
     {
         StringBuilder location;
         if (explicitBuilderPath.getLength())

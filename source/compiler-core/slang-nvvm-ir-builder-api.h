@@ -6,8 +6,10 @@
 
 #define SLANG_NVVM_BUILDER_ABI_VERSION_1 1u
 #define SLANG_NVVM_BUILDER_ABI_VERSION_2 2u
+#define SLANG_NVVM_BUILDER_ABI_VERSION_3 3u
 #define SLANG_NVVM_BUILDER_GET_API_V1_NAME "slang_getNVVMBuilderAPI_V1"
 #define SLANG_NVVM_BUILDER_GET_API_V2_NAME "slang_getNVVMBuilderAPI_V2"
+#define SLANG_NVVM_BUILDER_GET_API_V3_NAME "slang_getNVVMBuilderAPI_V3"
 
 #if defined(_MSC_VER)
 #define SLANG_NVVM_CALL __stdcall
@@ -608,11 +610,110 @@ extern "C"
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);
 
+    /** Stable semantic features advertised by the V3 builder table. */
+    typedef uint32_t SlangNVVMBuilderFeature_3;
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY ((SlangNVVMBuilderFeature_3)0u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW ((SlangNVVMBuilderFeature_3)1u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA ((SlangNVVMBuilderFeature_3)2u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS ((SlangNVVMBuilderFeature_3)3u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_POINTER_ARITHMETIC ((SlangNVVMBuilderFeature_3)4u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_ARRAY_ADDRESSING ((SlangNVVMBuilderFeature_3)5u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY ((SlangNVVMBuilderFeature_3)6u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_AND ((SlangNVVMBuilderFeature_3)7u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_OR ((SlangNVVMBuilderFeature_3)8u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_XOR ((SlangNVVMBuilderFeature_3)9u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_NOT ((SlangNVVMBuilderFeature_3)10u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NEGATE ((SlangNVVMBuilderFeature_3)11u)
+#define SLANG_NVVM_BUILDER_FEATURE_RELAXED_GLOBAL_I32_ATOMIC_ADD ((SlangNVVMBuilderFeature_3)12u)
+#define SLANG_NVVM_BUILDER_FEATURE_NVVM_IR_2_0_ASSEMBLY ((SlangNVVMBuilderFeature_3)13u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_EQUAL ((SlangNVVMBuilderFeature_3)14u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NOT_EQUAL ((SlangNVVMBuilderFeature_3)15u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_THAN \
+    ((SlangNVVMBuilderFeature_3)16u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_LESS_EQUAL ((SlangNVVMBuilderFeature_3)17u)
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_EQUAL \
+    ((SlangNVVMBuilderFeature_3)18u)
+#define SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32 ((SlangNVVMBuilderFeature_3)19u)
+#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 20u
+#define SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3 4u
+
+    typedef struct SlangNVVMBuilderFeatureSet_3
+    {
+        uint64_t words[SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3];
+    } SlangNVVMBuilderFeatureSet_3;
+
+    typedef uint32_t SlangNVVMIntegerUnaryOp_3;
+#define SLANG_NVVM_INTEGER_UNARY_OP_BIT_NOT ((SlangNVVMIntegerUnaryOp_3)0u)
+#define SLANG_NVVM_INTEGER_UNARY_OP_NEGATE ((SlangNVVMIntegerUnaryOp_3)1u)
+
+    typedef uint32_t SlangNVVMIntegerBinaryOp_3;
+#define SLANG_NVVM_INTEGER_BINARY_OP_3_ADD ((SlangNVVMIntegerBinaryOp_3)0u)
+#define SLANG_NVVM_INTEGER_BINARY_OP_3_SUB ((SlangNVVMIntegerBinaryOp_3)1u)
+#define SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY ((SlangNVVMIntegerBinaryOp_3)2u)
+#define SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_AND ((SlangNVVMIntegerBinaryOp_3)3u)
+#define SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_OR ((SlangNVVMIntegerBinaryOp_3)4u)
+#define SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_XOR ((SlangNVVMIntegerBinaryOp_3)5u)
+
+    typedef uint32_t SlangNVVMIntegerCompareOp_3;
+#define SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_THAN ((SlangNVVMIntegerCompareOp_3)0u)
+#define SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL ((SlangNVVMIntegerCompareOp_3)1u)
+#define SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL ((SlangNVVMIntegerCompareOp_3)2u)
+#define SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN ((SlangNVVMIntegerCompareOp_3)3u)
+#define SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_EQUAL ((SlangNVVMIntegerCompareOp_3)4u)
+#define SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_EQUAL ((SlangNVVMIntegerCompareOp_3)5u)
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerUnary_3)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMIntegerUnaryOp_3 operation,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMValueHandle_1* outValue);
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerBinary_3)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMIntegerBinaryOp_3 operation,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntegerCompare_3)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMIntegerCompareOp_3 operation,
+        SlangNVVMValueHandle_1 left,
+        SlangNVVMValueHandle_1 right,
+        SlangNVVMValueHandle_1* outValue);
+
+    /**
+     * Version 3 freezes V2 as its compatibility core and moves forward-growing integer
+     * operation
+     * families and semantic availability into generic callbacks and independent
+     * feature bits.
+     */
+    typedef struct SlangNVVMBuilderAPI_V3
+    {
+        uint32_t structureSize;
+        uint32_t abiVersion;
+        SlangNVVMBuilderAPI_V2 compatibilityAPI;
+        SlangNVVMBuilderFeatureSet_3 features;
+        SlangNVVMEmitIntegerUnary_3 emitIntegerUnary;
+        SlangNVVMEmitIntegerBinary_3 emitIntegerBinary;
+        SlangNVVMEmitIntegerCompare_3 emitIntegerCompare;
+    } SlangNVVMBuilderAPI_V3;
+
+#define SLANG_NVVM_BUILDER_API_V3_MIN_SIZE                  \
+    (offsetof(SlangNVVMBuilderAPI_V3, emitIntegerCompare) + \
+     sizeof(((SlangNVVMBuilderAPI_V3*)0)->emitIntegerCompare))
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V3)(
+        SlangNVVMBuilderAPI_V3* outAPI);
+
     SLANG_NVVM_BUILDER_API SlangNVVMResult_1 SLANG_NVVM_CALL
     slang_getNVVMBuilderAPI_V1(SlangNVVMBuilderAPI_V1* outAPI);
 
     SLANG_NVVM_BUILDER_API SlangNVVMResult_1 SLANG_NVVM_CALL
     slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI);
+
+    SLANG_NVVM_BUILDER_API SlangNVVMResult_1 SLANG_NVVM_CALL
+    slang_getNVVMBuilderAPI_V3(SlangNVVMBuilderAPI_V3* outAPI);
 
 #ifdef __cplusplus
 }

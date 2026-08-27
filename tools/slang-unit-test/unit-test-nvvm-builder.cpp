@@ -70,6 +70,115 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidABI)
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
 }
 
+SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
+{
+    const uint32_t featureOffset = sizeof(void*) == 8 ? 392u : 224u;
+    const uint32_t unaryOffset = sizeof(void*) == 8 ? 424u : 256u;
+    const uint32_t binaryOffset = sizeof(void*) == 8 ? 432u : 260u;
+    const uint32_t compareOffset = sizeof(void*) == 8 ? 440u : 264u;
+    const uint32_t minimumSize = sizeof(void*) == 8 ? 448u : 268u;
+    const uint32_t completeSize = sizeof(void*) == 8 ? 448u : 272u;
+    SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, features) == featureOffset);
+    SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitIntegerUnary) == unaryOffset);
+    SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitIntegerBinary) == binaryOffset);
+    SLANG_CHECK(offsetof(SlangNVVMBuilderAPI_V3, emitIntegerCompare) == compareOffset);
+    SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_MIN_SIZE == minimumSize);
+    SLANG_CHECK(sizeof(SlangNVVMBuilderAPI_V3) == completeSize);
+
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY % 64u));
+
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
+        SLANG_CHECK_ABORT(builder.getAPIV3() != nullptr);
+        SLANG_CHECK_ABORT(builder.getAPIV2() != nullptr);
+        SLANG_CHECK(builder.getAPIV3()->structureSize == sizeof(SlangNVVMBuilderAPI_V3));
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=3") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("feature-words=") >= 0);
+        SLANG_CHECK(builder.supportsScalarOperations());
+        SLANG_CHECK(!builder.supportsScalarIntegerMultiply());
+        SLANG_CHECK(builder.supportsRawRWStructuredBufferI32());
+
+        SlangNVVMBuilderFeatureSet_3 requiredFeatures = {};
+        requiredFeatures.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY / 64u] |=
+            uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY % 64u);
+        SLANG_CHECK(builder.supportsFeatures(requiredFeatures));
+        requiredFeatures.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY / 64u] |=
+            uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY % 64u);
+        SLANG_CHECK(!builder.supportsFeatures(requiredFeatures));
+        requiredFeatures = {};
+        requiredFeatures.words[0] = uint64_t(1) << SLANG_NVVM_BUILDER_FEATURE_COUNT_3;
+        SLANG_CHECK(!builder.supportsFeatures(requiredFeatures));
+
+        SlangNVVMValueHandle_1 value = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitIntegerUnary(nullptr, SlangNVVMIntegerUnaryOp_3(99), nullptr, value) ==
+            SLANG_E_INVALID_ARG);
+        SLANG_CHECK(value == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerUnaryV3CallCount == 0);
+        value = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitIntegerBinaryOperation(
+                nullptr,
+                SlangNVVMIntegerBinaryOp_3(99),
+                nullptr,
+                nullptr,
+                value) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(value == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerBinaryV3CallCount == 0);
+        value = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitIntegerCompare(
+                nullptr,
+                SlangNVVMIntegerCompareOp_3(99),
+                nullptr,
+                nullptr,
+                value) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(value == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerCompareV3CallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderPrefersV3AndRejectsMalformedPresentV3)
+{
+    gFakeNVVMBuilder.reset();
+    gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+    gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+    gFakeNVVMBuilder.apiV3 = _makeFakeNVVMBuilderAPIV3();
+    gFakeNVVMBuilder.apiV3.structureSize = uint32_t(sizeof(SlangNVVMBuilderAPI_V3) + 16);
+    gFakeNVVMBuilder.omitAPIV2Symbol = false;
+    gFakeNVVMBuilder.omitAPIV3Symbol = false;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, builder)));
+        SLANG_CHECK_ABORT(builder.getAPIV3() != nullptr);
+        SLANG_CHECK(builder.getAPIV3()->structureSize == sizeof(SlangNVVMBuilderAPI_V3));
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    // A present V3 symbol is authoritative. A broken V3 deployment must not hide behind V2.
+    gFakeNVVMBuilder.reset();
+    gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+    gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+    gFakeNVVMBuilder.apiV3 = _makeFakeNVVMBuilderAPIV3();
+    gFakeNVVMBuilder.apiV3.emitIntegerCompare = nullptr;
+    gFakeNVVMBuilder.omitAPIV2Symbol = false;
+    gFakeNVVMBuilder.omitAPIV3Symbol = false;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+        SLANG_CHECK(!builder.isInitialized());
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderForwardsVersionedABI)
 {
     gFakeNVVMBuilder.reset();
@@ -4069,6 +4178,58 @@ SLANG_UNIT_TEST(nvvmIRBuilderSerializesEmptyKernel)
     SLANG_CHECK(hasEmbeddedNull);
 }
 
+SLANG_UNIT_TEST(nvvmIRBuilderRejectsUnknownV3OperationsWithoutMutation)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    const SlangNVVMBuilderAPI_V3* api = builder.getAPIV3();
+    SLANG_CHECK_ABORT(api != nullptr);
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("unknown-v3-operations"), scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _populateEmptyNVVMKernel(builder, scope.module, toSlice("unknownV3Operations"))));
+
+    ComPtr<ISlangBlob> before;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.serializeModule(scope.module, SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY, before)));
+
+    SlangNVVMValueHandle_1 output = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        api->emitIntegerUnary(scope.module, SlangNVVMIntegerUnaryOp_3(99), nullptr, &output) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(output == nullptr);
+    output = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        api->emitIntegerBinary(
+            scope.module,
+            SlangNVVMIntegerBinaryOp_3(99),
+            nullptr,
+            nullptr,
+            &output) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(output == nullptr);
+    output = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        api->emitIntegerCompare(
+            scope.module,
+            SlangNVVMIntegerCompareOp_3(99),
+            nullptr,
+            nullptr,
+            &output) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(output == nullptr);
+
+    ComPtr<ISlangBlob> after;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.serializeModule(scope.module, SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY, after)));
+    SLANG_CHECK_ABORT(before != nullptr && after != nullptr);
+    SLANG_CHECK(before->getBufferSize() == after->getBufferSize());
+    SLANG_CHECK(
+        ::memcmp(before->getBufferPointer(), after->getBufferPointer(), before->getBufferSize()) ==
+        0);
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderRealProviderPreservesShortBuffers)
 {
     NVVMIRBuilder builder;
@@ -6001,9 +6162,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRawRWStructuredBufferI32Operations)
     SLANG_CHECK(_getBlobText(afterTerminatedBlob) == complete);
 
     SLANG_CHECK(
-        complete.indexOf(
-            "define void @invalidRawRWStructuredBufferI32({ i32 addrspace(1)*, i64 } "
-            "%slangParameter0, i32 %slangParameter1, i64 %slangParameter2)") >= 0);
+        complete.indexOf("define void @invalidRawRWStructuredBufferI32({ i32 addrspace(1)*, i64 } "
+                         "%slangParameter0, i32 %slangParameter1, i64 %slangParameter2)") >= 0);
     SLANG_CHECK(_countOccurrences(complete.getUnownedSlice(), toSlice("extractvalue")) == 1);
     SLANG_CHECK(_countOccurrences(complete.getUnownedSlice(), toSlice("getelementptr i32")) == 1);
     SLANG_CHECK(complete.indexOf("getelementptr inbounds") < 0);
@@ -8896,9 +9056,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerMultiplyKernel)
 
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(
-        assembly.indexOf(
-            "define void @multiplyScalar(i32 addrspace(1)* %slangParameter0, i32 "
-            "%slangParameter1, i32 %slangParameter2)") >= 0);
+        assembly.indexOf("define void @multiplyScalar(i32 addrspace(1)* %slangParameter0, i32 "
+                         "%slangParameter1, i32 %slangParameter2)") >= 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("mul i32")) == 1);
     SLANG_CHECK(assembly.indexOf("mul i32 %slangParameter1, %slangParameter2") >= 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("store i32")) == 1);
@@ -9074,9 +9233,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerBitNotKernel)
 
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(
-        assembly.indexOf(
-            "define void @bitNotScalar(i32 addrspace(1)* %slangParameter0, i32 "
-            "%slangParameter1)") >= 0);
+        assembly.indexOf("define void @bitNotScalar(i32 addrspace(1)* %slangParameter0, i32 "
+                         "%slangParameter1)") >= 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("xor i32")) == 1);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("xor i64")) == 0);
     SLANG_CHECK(
@@ -9122,9 +9280,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerNegateKernel)
 
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(
-        assembly.indexOf(
-            "define void @negateScalar(i32 addrspace(1)* %slangParameter0, i32 "
-            "%slangParameter1)") >= 0);
+        assembly.indexOf("define void @negateScalar(i32 addrspace(1)* %slangParameter0, i32 "
+                         "%slangParameter1)") >= 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("sub i32")) == 1);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("sub i64")) == 0);
     SLANG_CHECK(assembly.indexOf("sub i32 0, %slangParameter1") >= 0);
@@ -9220,9 +9377,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerEqualKernel)
 
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(
-        assembly.indexOf(
-            "define void @equalScalar(i32 addrspace(1)* %slangParameter0, i32 "
-            "%slangParameter1, i32 %slangParameter2)") >= 0);
+        assembly.indexOf("define void @equalScalar(i32 addrspace(1)* %slangParameter0, i32 "
+                         "%slangParameter1, i32 %slangParameter2)") >= 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp eq i32")) == 1);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp eq i64")) == 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("br i1")) == 1);
@@ -9260,9 +9416,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerNotEqualKernel)
 
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(
-        assembly.indexOf(
-            "define void @notEqualScalar(i32 addrspace(1)* %slangParameter0, i32 "
-            "%slangParameter1, i32 %slangParameter2)") >= 0);
+        assembly.indexOf("define void @notEqualScalar(i32 addrspace(1)* %slangParameter0, i32 "
+                         "%slangParameter1, i32 %slangParameter2)") >= 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp ne i32")) == 1);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp ne i64")) == 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("br i1")) == 1);
@@ -9300,9 +9455,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerSignedGreaterThanKernel)
 
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(
-        assembly.indexOf(
-            "define void @greaterThanScalar(i32 addrspace(1)* %slangParameter0, i32 "
-            "%slangParameter1, i32 %slangParameter2)") >= 0);
+        assembly.indexOf("define void @greaterThanScalar(i32 addrspace(1)* %slangParameter0, i32 "
+                         "%slangParameter1, i32 %slangParameter2)") >= 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp sgt i32")) == 1);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp sgt i64")) == 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("br i1")) == 1);
@@ -9340,9 +9494,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerSignedLessEqualKernel)
 
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(
-        assembly.indexOf(
-            "define void @lessEqualScalar(i32 addrspace(1)* %slangParameter0, i32 "
-            "%slangParameter1, i32 %slangParameter2)") >= 0);
+        assembly.indexOf("define void @lessEqualScalar(i32 addrspace(1)* %slangParameter0, i32 "
+                         "%slangParameter1, i32 %slangParameter2)") >= 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp sle i32")) == 1);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp sle i64")) == 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("br i1")) == 1);
@@ -9380,9 +9533,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerSignedGreaterEqualKernel)
 
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(
-        assembly.indexOf(
-            "define void @greaterEqualScalar(i32 addrspace(1)* %slangParameter0, i32 "
-            "%slangParameter1, i32 %slangParameter2)") >= 0);
+        assembly.indexOf("define void @greaterEqualScalar(i32 addrspace(1)* %slangParameter0, i32 "
+                         "%slangParameter1, i32 %slangParameter2)") >= 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp sge i32")) == 1);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("icmp sge i64")) == 0);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("br i1")) == 1);
@@ -9589,10 +9741,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderCompilesEmptyKernel)
 SLANG_UNIT_TEST(nvvmIRBuilderCoexistsWithLLVM21)
 {
     StringBuilder childOrderBuilder;
-    if (SLANG_SUCCEEDED(
-            PlatformUtil::getEnvironmentVariable(
-                toSlice(kNVVMCoexistenceChildEnv),
-                childOrderBuilder)) &&
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            toSlice(kNVVMCoexistenceChildEnv),
+            childOrderBuilder)) &&
         childOrderBuilder.getLength())
     {
         const String childOrder = childOrderBuilder.produceString();
