@@ -24,9 +24,11 @@ enum class NVVMIRCapability
     ScalarIntegerBitXor,
     ScalarIntegerBitNot,
     ScalarIntegerNegate,
+    RelaxedGlobalI32AtomicAdd,
 };
 
-/// Checks whether linked Slang IR is in the exact signed-i32-negate subset owned by Slice 17.
+/// Checks whether linked Slang IR is in the exact relaxed-global-i32-atomic subset owned by
+/// Slice 19.
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,

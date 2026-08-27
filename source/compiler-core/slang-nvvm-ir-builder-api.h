@@ -48,6 +48,8 @@ extern "C"
     typedef uint32_t SlangNVVMSerializationFormat_1;
 #define SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY ((SlangNVVMSerializationFormat_1)0u)
 #define SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE ((SlangNVVMSerializationFormat_1)1u)
+/** LLVM assembly in the LLVM 7-era NVVM IR 2.0 dialect accepted by libNVVM. */
+#define SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY ((SlangNVVMSerializationFormat_1)2u)
 
     typedef uint32_t SlangNVVMVerificationStatus_2;
 #define SLANG_NVVM_VERIFICATION_NOT_RUN ((SlangNVVMVerificationStatus_2)0u)
@@ -360,6 +362,16 @@ extern "C"
         SlangNVVMValueHandle_1 value,
         SlangNVVMValueHandle_1* outValue);
 
+    /// Atomically adds an i32 value through a naturally aligned global-address-space pointer.
+    /// The operation is non-volatile, relaxed, and device scoped. Both operands must be available
+    /// at the current unterminated insertion point. On success, the output is the original stored
+    /// value. On failure, the output is null and no instruction is inserted.
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitRelaxedGlobalI32AtomicAdd_2)(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 pointer,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMValueHandle_1* outOriginalValue);
+
     /// Version 2 composes the immutable V1 API with atomic serialization diagnostics.
     ///
     /// The caller zero-initializes the structure and supplies its capacity in structureSize.
@@ -410,6 +422,11 @@ extern "C"
         SlangNVVMEmitIntegerBitNot_2 emitIntegerBitNot;
 
         SlangNVVMEmitIntegerNegate_2 emitIntegerNegate;
+
+        SlangNVVMEmitRelaxedGlobalI32AtomicAdd_2 emitRelaxedGlobalI32AtomicAdd;
+
+        /// Serializes only SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY.
+        SlangNVVMSerializeModuleWithDiagnostics_2 serializeNVVMIR20AssemblyWithDiagnostics;
     } SlangNVVMBuilderAPI_V2;
 
     // This Slice 3b prefix size is frozen; appending fields must not change the minimum.
@@ -475,6 +492,12 @@ extern "C"
 #define SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE \
     (offsetof(SlangNVVMBuilderAPI_V2, emitIntegerNegate) +       \
      sizeof(((SlangNVVMBuilderAPI_V2*)0)->emitIntegerNegate))
+
+    // This Slice 19 prefix is one coherent relaxed global-i32 atomic-add and NVVM IR 2.0
+    // assembly capability. The operation requires the matching libNVVM wire dialect.
+#define SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE          \
+    (offsetof(SlangNVVMBuilderAPI_V2, serializeNVVMIR20AssemblyWithDiagnostics) + \
+     sizeof(((SlangNVVMBuilderAPI_V2*)0)->serializeNVVMIR20AssemblyWithDiagnostics))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V2)(
         SlangNVVMBuilderAPI_V2* outAPI);

@@ -106,3 +106,13 @@ typedef char SlangNVVMBuilderAPIV2ScalarIntegerNegateCapabilityOrderCCompileProb
       SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE)
          ? 1
          : -1];
+typedef char SlangNVVMBuilderAPIV2RelaxedGlobalI32AtomicAddMinimumSizeCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE <=
+      sizeof(SlangNVVMBuilderAPI_V2))
+         ? 1
+         : -1];
+typedef char SlangNVVMBuilderAPIV2RelaxedGlobalI32AtomicAddCapabilityOrderCCompileProbe
+    [(SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE >
+      SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE)
+         ? 1
+         : -1];

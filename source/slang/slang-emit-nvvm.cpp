@@ -603,6 +603,24 @@ SlangResult _validateNVVMFunction(
                 _requireCapability(capability, NVVMIRCapability::ScalarIntegerNegate);
                 break;
 
+            case kIROp_AtomicAdd:
+                {
+                    if (inst->getOperandCount() != 3 || !_isI32Type(inst->getDataType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("relaxed global signed i32 atomic add"));
+                    }
+                    auto memoryOrder = _asExecutableI32Constant(inst->getOperand(2));
+                    if (!memoryOrder || memoryOrder->getValue() != kIRMemoryOrder_Relaxed)
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("relaxed atomic-add memory order"));
+                    }
+                }
+                break;
+
             case kIROp_Less:
                 if (inst->getOperandCount() != 2 || !_isBoolType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 comparison"));
@@ -744,6 +762,27 @@ SlangResult _validateNVVMFunction(
                     availableValues,
                     dominatorTree,
                     capability));
+                availableValues.add(inst);
+                break;
+
+            case kIROp_AtomicAdd:
+                // Operand two is the literal Relaxed policy validated in the shape pass, not an
+                // SSA value that the provider should receive.
+                SLANG_RETURN_ON_FAIL(_validatePointerValue(
+                    codeGenContext,
+                    inst->getOperand(0),
+                    inst,
+                    availableValues,
+                    dominatorTree,
+                    true));
+                SLANG_RETURN_ON_FAIL(_validateI32Value(
+                    codeGenContext,
+                    inst->getOperand(1),
+                    inst,
+                    availableValues,
+                    dominatorTree,
+                    capability));
+                _requireCapability(capability, NVVMIRCapability::RelaxedGlobalI32AtomicAdd);
                 availableValues.add(inst);
                 break;
 
@@ -1651,6 +1690,39 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_AtomicAdd:
+                    {
+                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(0),
+                            valueMap,
+                            i32Type,
+                            loweredPointer));
+                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(1),
+                            valueMap,
+                            i32Type,
+                            loweredValue));
+                        SlangNVVMValueHandle_1 loweredOriginalValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "relaxed global signed i32 atomic add",
+                            builder.emitRelaxedGlobalI32AtomicAdd(
+                                moduleScope.module,
+                                loweredPointer,
+                                loweredValue,
+                                loweredOriginalValue)));
+                        valueMap[inst] = loweredOriginalValue;
+                    }
+                    break;
+
                 case kIROp_Less:
                     {
                         SlangNVVMValueHandle_1 loweredLeft = nullptr;
@@ -1904,23 +1976,28 @@ SlangResult emitNVVMIRFromLinkedIR(
     {
         return _requireBuilderOperation(
             codeGenContext,
-            "verified bitcode serialization",
+            "verified LLVM IR serialization",
             SLANG_E_NOT_AVAILABLE);
     }
 
-    ComPtr<ISlangBlob> bitcode;
+    const bool useNVVMIR20Assembly = builder.supportsNVVMIR20Assembly();
+    const SlangNVVMSerializationFormat_1 serializationFormat =
+        useNVVMIR20Assembly ? SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY
+                            : SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE;
+    const char* serializationOperation = useNVVMIR20Assembly
+                                             ? "verified NVVM IR 2.0 assembly serialization"
+                                             : "verified LLVM bitcode serialization";
+
+    ComPtr<ISlangBlob> serializedIR;
     String verifierDiagnostics;
     SlangResult serializationResult = builder.serializeModule(
         moduleScope.module,
-        SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
-        bitcode,
+        serializationFormat,
+        serializedIR,
         verifierDiagnostics);
     if (SLANG_FAILED(serializationResult))
     {
-        _requireBuilderOperation(
-            codeGenContext,
-            "verified bitcode serialization",
-            serializationResult);
+        _requireBuilderOperation(codeGenContext, serializationOperation, serializationResult);
         if (verifierDiagnostics.getLength())
         {
             codeGenContext->getSink()->diagnoseRaw(
@@ -1935,19 +2012,16 @@ SlangResult emitNVVMIRFromLinkedIR(
             Severity::Note,
             verifierDiagnostics.getUnownedSlice());
     }
-    if (!bitcode || !bitcode->getBufferSize())
+    if (!serializedIR || !serializedIR->getBufferSize())
     {
-        return _requireBuilderOperation(
-            codeGenContext,
-            "verified bitcode serialization",
-            SLANG_FAIL);
+        return _requireBuilderOperation(codeGenContext, serializationOperation, SLANG_FAIL);
     }
 
-    auto artifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
-        ArtifactKind::ObjectCode,
-        ArtifactPayload::LLVMIR,
-        ArtifactStyle::Kernel));
-    artifact->addRepresentationUnknown(bitcode);
+    const ArtifactKind artifactKind =
+        useNVVMIR20Assembly ? ArtifactKind::Assembly : ArtifactKind::ObjectCode;
+    auto artifact = ArtifactUtil::createArtifact(
+        ArtifactDesc::make(artifactKind, ArtifactPayload::LLVMIR, ArtifactStyle::Kernel));
+    artifact->addRepresentationUnknown(serializedIR);
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
     outArtifact = artifact;
     return SLANG_OK;

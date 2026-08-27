@@ -115,6 +115,19 @@ static bool _supportsScalarIntegerNegate(const SlangNVVMBuilderAPI_V2& api)
            api.emitIntegerNegate;
 }
 
+// Treats the second Slice 19 field as the matching libNVVM text-wire capability.
+static bool _supportsNVVMIR20Assembly(const SlangNVVMBuilderAPI_V2& api)
+{
+    return api.structureSize >= SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE &&
+           api.serializeNVVMIR20AssemblyWithDiagnostics;
+}
+
+// Treats the appended Slice 19 fields as one coherent relaxed global-i32 atomic-add capability.
+static bool _supportsRelaxedGlobalI32AtomicAdd(const SlangNVVMBuilderAPI_V2& api)
+{
+    return _supportsNVVMIR20Assembly(api) && api.emitRelaxedGlobalI32AtomicAdd;
+}
+
 // Rejects success without a required handle and never exposes a handle from a failed provider call.
 template<typename T>
 static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
@@ -227,14 +240,18 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     const bool hasPartialScalarIntegerNegatePrefix =
         api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE &&
         api.structureSize < SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE;
+    const bool hasPartialRelaxedGlobalI32AtomicAddPrefix =
+        api.structureSize > SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE &&
+        api.structureSize < SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE;
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE || hasPartialScalarPrefix ||
         hasPartialScalarControlFlowPrefix || hasPartialScalarSSAPrefix ||
         hasPartialScalarFunctionPrefix || hasPartialScalarPointerArithmeticPrefix ||
         hasPartialScalarArrayPrefix || hasPartialScalarIntegerMultiplyPrefix ||
         hasPartialScalarIntegerBitAndPrefix || hasPartialScalarIntegerBitOrPrefix ||
         hasPartialScalarIntegerBitXorPrefix || hasPartialScalarIntegerBitNotPrefix ||
-        hasPartialScalarIntegerNegatePrefix || api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 ||
-        !_isCompatibleV1(api.baseAPI) || !api.serializeModuleWithDiagnostics ||
+        hasPartialScalarIntegerNegatePrefix || hasPartialRelaxedGlobalI32AtomicAddPrefix ||
+        api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2 || !_isCompatibleV1(api.baseAPI) ||
+        !api.serializeModuleWithDiagnostics ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE &&
          !_supportsScalarOperations(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE &&
@@ -258,7 +275,9 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE &&
          !_supportsScalarIntegerBitNot(api)) ||
         (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE &&
-         !_supportsScalarIntegerNegate(api)))
+         !_supportsScalarIntegerNegate(api)) ||
+        (api.structureSize >= SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE &&
+         !_supportsRelaxedGlobalI32AtomicAdd(api)))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -338,6 +357,16 @@ bool NVVMIRBuilder::supportsScalarIntegerNegate() const
     return _supportsScalarIntegerNegate(m_apiV2);
 }
 
+bool NVVMIRBuilder::supportsNVVMIR20Assembly() const
+{
+    return _supportsNVVMIR20Assembly(m_apiV2);
+}
+
+bool NVVMIRBuilder::supportsRelaxedGlobalI32AtomicAdd() const
+{
+    return _supportsRelaxedGlobalI32AtomicAdd(m_apiV2);
+}
+
 String NVVMIRBuilder::getVersionString() const
 {
     if (!isInitialized())
@@ -363,7 +392,10 @@ String NVVMIRBuilder::getVersionString() const
             << ";scalar-integer-bit-or=" << (supportsScalarIntegerBitOr() ? 1 : 0)
             << ";scalar-integer-bit-xor=" << (supportsScalarIntegerBitXor() ? 1 : 0)
             << ";scalar-integer-bit-not=" << (supportsScalarIntegerBitNot() ? 1 : 0)
-            << ";scalar-integer-negate=" << (supportsScalarIntegerNegate() ? 1 : 0) << ";timestamp="
+            << ";scalar-integer-negate=" << (supportsScalarIntegerNegate() ? 1 : 0)
+            << ";nvvm-ir-2.0-assembly=" << (supportsNVVMIR20Assembly() ? 1 : 0)
+            << ";relaxed-global-i32-atomic-add=" << (supportsRelaxedGlobalI32AtomicAdd() ? 1 : 0)
+            << ";timestamp="
             << SharedLibraryUtils::getSharedLibraryTimestamp(
                    reinterpret_cast<void*>(m_api.createModule));
     return builder.produceString();
@@ -790,6 +822,22 @@ SlangResult NVVMIRBuilder::emitIntegerNegate(
     return _validateHandleResult(result, outValue);
 }
 
+SlangResult NVVMIRBuilder::emitRelaxedGlobalI32AtomicAdd(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 pointer,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1& outOriginalValue) const
+{
+    outOriginalValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsRelaxedGlobalI32AtomicAdd())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_apiV2.emitRelaxedGlobalI32AtomicAdd(module, pointer, value, &outOriginalValue);
+    return _validateHandleResult(result, outOriginalValue);
+}
+
 SlangResult NVVMIRBuilder::emitReturnVoid(SlangNVVMModuleHandle_1 module) const
 {
     if (!isInitialized())
@@ -851,10 +899,19 @@ SlangResult NVVMIRBuilder::serializeModule(
     if (!supportsSerializationDiagnostics())
         return SLANG_E_NOT_AVAILABLE;
 
+    SlangNVVMSerializeModuleWithDiagnostics_2 serializeWithDiagnostics =
+        m_apiV2.serializeModuleWithDiagnostics;
+    if (format == SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY)
+    {
+        if (!supportsNVVMIR20Assembly())
+            return SLANG_E_NOT_AVAILABLE;
+        serializeWithDiagnostics = m_apiV2.serializeNVVMIR20AssemblyWithDiagnostics;
+    }
+
     size_t requiredSerializedSize = 0;
     size_t requiredDiagnosticSize = 0;
     SlangNVVMVerificationStatus_2 queryStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
-    SLANG_RETURN_ON_FAIL(m_apiV2.serializeModuleWithDiagnostics(
+    SLANG_RETURN_ON_FAIL(serializeWithDiagnostics(
         module,
         format,
         nullptr,
@@ -888,7 +945,7 @@ SlangResult NVVMIRBuilder::serializeModule(
     size_t actualSerializedSize = 0;
     size_t actualDiagnosticSize = 0;
     SlangNVVMVerificationStatus_2 writeStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
-    SLANG_RETURN_ON_FAIL(m_apiV2.serializeModuleWithDiagnostics(
+    SLANG_RETURN_ON_FAIL(serializeWithDiagnostics(
         module,
         format,
         serializedStorage.getCount() ? serializedStorage.getBuffer() : nullptr,

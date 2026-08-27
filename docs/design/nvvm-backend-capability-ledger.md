@@ -4,7 +4,8 @@ This ledger records what the direct NVVM experiment has demonstrated and where o
 programs currently stop. `Pass` means the named lane ran successfully on the local CUDA/toolchain
 configuration described in [the backend design](nvvm-backend.md). `Expected stop` means the test
 reached a deliberate, stable boundary; it is not counted as backend support. Empty measurement
-fields have not been collected yet.
+fields have not been collected yet. `Pending` describes planned evidence that has not run and does
+not establish backend support.
 
 ## Semantic capability evidence
 
@@ -15,7 +16,7 @@ fields have not been collected yet.
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmIRBuilderDifferentialScalarPTX` | 1 | LLVM 14 provider, NVRTC, libNVVM, `compute_75` | Pass | Pass | — | AS1 `i32` load/store reference kernels | Parameter widths and entry-scoped global operations agree; no runtime | PTX/resource timing not measured |
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmIRBuilderPtxasAcceptsScalarReferenceKernels` | 1 | LLVM 14 provider, CUDA `ptxas`, `sm_75` | Pass | Pass | — | Both scalar reference kernels assemble | Static PTX acceptance; no runtime | PTX/resource timing not measured |
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmIRBuilderCompilesScalarBitcodeThroughRegistry` | 1 | LLVM 14 provider, libNVVM, `compute_75` | Not applicable | Pass | — | Session-registered NVVM compiler accepts exact builder bitcode | Both entry symbols checked; no runtime | — |
-| `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangEmptyComputeUsesDirectPipeline` | 1 | In-process fake LLVM 14 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | — | Ordinary Slang linked IR lowers through verified builder bitcode and the registered NVVM compiler | Builder receives `computeMain`; exact bitcode bytes and `compute_70` options checked; no runtime | Fake-only; no performance measurements |
+| `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangEmptyComputeUsesDirectPipeline` | 1 | In-process fake LLVM 14 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | — | Ordinary Slang linked IR lowers through the provider-negotiated verified wire dialect and the registered NVVM compiler | Builder receives `computeMain`; exact NVVM-2.0 assembly bytes and `compute_70` options checked; no runtime | Fake-only; no performance measurements |
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangRealEmptyCompute` | 1 | LLVM 14.0.6 provider, CUDA 12+ libNVVM, `cuda_sm_7_0` | Not compared | Pass | — | Ordinary empty compute kernel compiles through the real direct route | PTX entry `computeMain` checked; no runtime | PTX size and compile time not measured |
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangRealEmptyComputePtxasAccepts` | 1 | LLVM 14.0.6 provider, CUDA 12+ libNVVM and `ptxas`, `cuda_sm_7_0` | Not compared | Pass | — | Real direct-route PTX assembles successfully | Static PTX acceptance; no runtime | Resource and timing measurements not collected |
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmIRBuilderBuildsScalarConditionalKernel` | 2 | LLVM 14.0.6 provider | Not applicable | Pass | Not applicable | Provider emits signed `i32` add/sub/less-than and conditional/unconditional branches | Verified LLVM assembly and bitcode; no runtime | Not measured |
@@ -71,7 +72,31 @@ fields have not been collected yet.
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmCompilerCompilesSelfContainedLibdeviceSine` | 5 | Selected CUDA 12.9 toolkit libNVVM and `nvvm/libdevice/libdevice.10.bc`, `compute_75` | Not compared | Pass | Not applicable | Explicit device-library demand resolves one compiler-level `__nv_sinf` call through toolkit-matched libdevice | PTX contains the named entry and global store with no unresolved `.extern .func` | Libdevice is 486,144 bytes, UTC `2025-05-27 09:50:51`, SHA-256 `CD2824F8DD3F862B6B9259086F49F6CB56CA2547E14C61DE889C1C0D4A7DB175` |
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmCompilerLibdeviceSinePtxasAccepts` | 5 | Selected CUDA toolkit libNVVM, libdevice, and matching-root `ptxas`, `sm_75` | Not applicable | Pass | Not applicable | Compiler-level libdevice sine PTX assembles without an unresolved libdevice external | Static PTX acceptance through `ptxas` from the same CUDA 12.9 root | Resource and timing measurements not collected |
 | `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmCompilerLibdeviceSineRuns` | 5 | Selected CUDA toolkit libNVVM/libdevice, CUDA driver, and GPU with compute capability 7.5+ | Not compared | Pass | Not applicable | The compiler-level libdevice sine kernel launches for zero, finite positive/negative, and range-reduction inputs | On the RTX 5090, inputs `0`, `0.5`, `-1.25`, and `20` match host `sinf` within `2e-6` | Kernel timing not measured |
+| `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangRealRelaxedGlobalI32AtomicAddDifferentialPTX` | 4 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM, `cuda_sm_7_0` | Pass | Pass | Not applicable | Exact canonical Relaxed signed-i32 atomic add compiles through both routes | Parameter width `[64]`, token-safe `atom.global.add.u32`, relaxed/device semantics, and the old-value store fixture agree | Synthetic wire benchmark only; kernel timing not measured |
+| `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangRealRelaxedGlobalI32AtomicAddPtxasAccepts` | 4 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM and matching-root `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both signed-i32 atomic-add PTX outputs assemble | Static PTX acceptance | Resource and timing measurements not collected |
+| `tools/slang-unit-test/unit-test-nvvm-compiler.cpp::nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC` | 4 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, and GPU with compute capability 7.0+ | Pass | Pass | Not applicable | Both routes launch 2,048 threads adding one to one initialized device integer | On the RTX 5090, both final values equal the launch width; the separate old-value fixture preserves its store consumer | Kernel timing not measured |
 | `tests/cuda/nvvm-unsupported-ir.slang` | 4 | None beyond `slangc`; `cuda_sm_7_0` | Not applicable | Expected stop | `emit` | E52017: barrier resolves to a void helper outside the signed-i32 helper ABI | Not applicable | — |
+
+## Slice 19 atomic and wire-compatibility evidence
+
+The probe measured final linked Slang IR containing exact
+`atomicAdd(destination, delta, 0)`, where the destination is the established read-write device
+`Ptr<int>`, the value and result are signed `i32`, and zero is Relaxed. CUDA 12.9 NVRTC measured
+`atom.global.add.u32` for the corresponding unsuffixed CUDA atomic; omitted PTX semantic and scope
+qualifiers encode relaxed/device behavior. The pre-change direct route stopped at E52017
+`atomicAdd`. LLVM 14 bitcode then failed at the LLVM 7 reader's atomic record, so the completed
+slice negotiates a provider-owned NVVM-2.0 text dialect while keeping old-provider bitcode intact.
+
+| Evidence | Bucket | Contract | Status |
+| --- | --- | --- | --- |
+| Provider ABI negotiation and invalid-operation matrix | 4 | Append exact `emitRelaxedGlobalI32AtomicAdd(module, pointer, value, outOriginalValue)` and `serializeNVVMIR20AssemblyWithDiagnostics` after the frozen 312-byte prefix; require the complete 328-byte x64 block and reject every partial/null shape | Pass |
+| Verified LLVM provider construction | 4 | Accept only an available same-module typed AS1 `i32*` and `i32`, then emit one `atomicrmw add` with `Align(4)`, LLVM `monotonic`, and default System sync scope; return the original value | Pass |
+| Audited wire dialect | 4 | Preserve generic LLVM 14 assembly, name parameters at construction, and remove only the semantically validated natural atomic alignment in the dedicated NVVM-2.0 writer; require semantic/rewrite counts to match | Pass |
+| Old-provider compatibility | 4 | Keep an exact 312-byte provider usable, serialize its accepted negate program as bitcode, and stop an atomic program at E52016 before module creation | Pass |
+| Fake direct pipeline and capability boundary | 4 | Validate exact `atomicAdd(destination, delta, 0)`, map its original-value result to the established store consumer, and use only the dedicated callback | Pass |
+| Negative direct boundaries | 4 | Reject other atomic opcodes, orders, value/pointee types, access qualifiers, and address spaces before provider discovery without source-name matching or load/add/store reconstruction | Pass |
+| Direct/NVRTC PTX and matching-root `ptxas` | 4 | Require token-safe global 32-bit atomic add with relaxed/device semantics from both routes and static acceptance by the selected CUDA toolkit | Pass |
+| Runtime differential | 4 | Prove a 2,048-thread increment reaches the launch count on both routes and separately preserve the returned original-value result | Pass |
 
 ## Routing and regression evidence
 
@@ -99,6 +124,8 @@ fields have not been collected yet.
 | `slang-unit-test-tool/nvvmIRBuilderRejectsInvalidIntegerBitNotOperations` | The LLVM 14 provider rejects missing/post-terminator insertion points, null outputs, non-integer operands, cross-module/cross-function values, and unavailable or non-dominating operands before mutation while preserving prior binary validation | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderNegotiatesScalarIntegerNegateAPI` | The dedicated integer-negate field leaves an exact 304-byte Slice 16 provider valid, rejects every partial size from 305 through 311 bytes and a null complete operation, accepts and clamps larger tables, forwards exact operand/result identities, reports stable capability identity, and sanitizes failed outputs | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderRejectsInvalidIntegerNegateOperations` | The LLVM 14 provider rejects missing/post-terminator insertion points, null outputs, non-integer operands, cross-module/cross-function values, and unavailable or non-dominating operands before mutation through the shared unary validator while BitNot predecessor coverage stays green | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderNegotiatesRelaxedGlobalI32AtomicAddAPI` | The coherent atomic/text suffix leaves an exact 312-byte Slice 17 provider valid, rejects every partial size from 313 through 327 bytes and either null complete operation, accepts and clamps larger tables, reports both capabilities in identity, forwards exact operands/results, and sanitizes failures | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderRejectsInvalidRelaxedGlobalI32AtomicAddOperations` | The LLVM 14 provider rejects missing/post-terminator insertion points, null outputs, non-i32/mismatched values, wrong pointer address spaces and pointees, cross-module/cross-function handles, and unavailable or non-dominating operands before mutation; raw assembly preserves LLVM 14 alignment while the dedicated dialect omits it | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarControlFlowCapability` | An exact old scalar-memory V2 provider still compiles copy/load/store, while a conditional program reaches E52016 after discovery but before module creation | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarSSACapability` | An exact Slice 7 V2 provider retains its old programs, while constant, merge-phi, and loop programs reach E52016 after discovery but before module creation | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarFunctionCapability` | An exact Slice 8 V2 provider retains the finite-loop program, while a helper program reaches E52016 after discovery but before module creation | Pass |
@@ -110,6 +137,7 @@ fields have not been collected yet.
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarIntegerBitXorCapability` | An exact Slice 14 V2 provider retains signed-i32 bitwise OR, while a signed-i32-bitwise-XOR program reaches E52016 after discovery but before module creation | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarIntegerBitNotCapability` | An exact Slice 15 V2 provider retains signed-i32 bitwise XOR, while a signed-i32-bitwise-NOT program reaches E52016 after discovery but before module creation | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarIntegerNegateCapability` | An exact Slice 16 V2 provider retains signed-i32 bitwise NOT, while a signed-i32-negate program reaches E52016 after one discovery but before module creation | Pass |
+| `slang-unit-test-tool/nvvmSlangNegotiatesRelaxedGlobalI32AtomicAddCapability` | An exact 312-byte Slice 17 provider still compiles signed-i32 negate through captured LLVM bitcode, while an atomic-add program reaches E52016 after discovery but before module creation | Pass |
 | `slang-unit-test-tool/nvvmSlangRetainsOnlySelectedCUDAKernel` | CUDA-kernel pruning still removes an unselected kernel before direct emission while preserving the exact selected entry point | Pass |
 | `slang-unit-test-tool/nvvmSlangRejectsConventionalRawKernelParameters` | Only `[CUDAKernel]` receives the raw scalar ABI; a conventional parameterized compute entry reaches E52017 before builder or libNVVM program creation | Pass |
 | `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | Signed-i32 left/right shifts, division, and remainder stop at `'shl'`, `'shr'`, `'div'`, and `'irem'`; logical NOT and unsigned/i64/float Neg stop at `'entry-point parameter'`; unsigned or i64 bitwise AND/OR/XOR/NOT, unsigned/wide/floating multiplication, void helper calls, and unsigned pointer offsets retain their established deterministic E52017 boundaries before builder discovery or libNVVM program creation. The Slice 18 f32-sine case stops at the float-returning target helper's unsupported `'helper function result type'`, before provider discovery and without exercising `GenericAsm` matching | Pass |
@@ -235,3 +263,18 @@ neither tests GenericAsm matching. The complete focused Slice 18 NVVM suite pass
 real PTX, same-root `ptxas`, and RTX 5090 runtime lanes passed; preservation passed 1/1 parser, 2/2
 routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime
 dispatch.
+
+Slice 19 extends Bucket 4 with exact canonical Relaxed signed-i32 atomic add through the established
+raw read-write device `Ptr<int>`, returning the original value. The terminal provider operation is
+deliberately exact: AS1 typed `i32`, four-byte alignment, LLVM `monotonic`, and default System sync
+scope, with no configurable policy parameters. It shares one 328-byte x64 capability block with the
+audited NVVM-2.0 text serializer; the exact 312-byte Slice 17 provider remains compatible and
+receives bitcode. Stable parameter naming and semantic removal of the LLVM-14-only atomic alignment
+spelling bridge the proven LLVM 7 text dialect. Direct and NVRTC PTX expose
+`atom.global.add.u32`; matching-root `ptxas` and RTX 5090 runtime lanes pass. Waves and all other
+atomic operations, orders, value/pointee types, access qualifiers, and address spaces remain
+unsupported. This slice adds no new pointer producer, but it does not reject an already-supported
+canonical read-write device-i32 pointer merely because that pointer is derived.
+
+The final Release NVVM prefix passed 140/140. Preservation passed 1/1 parser, 2/2 routing/hash,
+1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.

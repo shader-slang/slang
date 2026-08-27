@@ -395,6 +395,15 @@ static SlangResult SLANG_NVVM_CALL _declareFunction(
         llvm::GlobalValue::ExternalLinkage,
         llvmName,
         *state->module);
+    size_t parameterIndex = 0;
+    for (llvm::Argument& parameter : function->args())
+    {
+        // LLVM 14 prints an unnamed numeric parameter as an explicit `%0` declaration. LLVM 7
+        // accepts numeric parameter slots only when they are implicit, while accepting ordinary
+        // named parameters. Stable provider-owned names keep the typed module and its textual
+        // representation valid in both dialects without parsing a function signature later.
+        parameter.setName("slangParameter" + std::to_string(parameterIndex++));
+    }
     *outFunction = reinterpret_cast<SlangNVVMValueHandle_1>(function);
     return SLANG_OK;
 }
@@ -675,6 +684,42 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerNegate(
 
     llvm::Value* result = state->builder.CreateNeg(llvmValue);
     *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitRelaxedGlobalI32AtomicAdd(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 pointer,
+    SlangNVVMValueHandle_1 value,
+    SlangNVVMValueHandle_1* outOriginalValue)
+{
+    if (outOriginalValue)
+        *outOriginalValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmPointer = _getValue(pointer);
+    llvm::Value* llvmValue = _getValue(value);
+    llvm::PointerType* pointerType = _getLoadablePointerType(state, llvmPointer);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::Type* pointeeType = pointerType ? pointerType->getNonOpaquePointerElementType() : nullptr;
+    if (!outOriginalValue || !pointerType ||
+        pointerType->getAddressSpace() != SLANG_NVVM_ADDRESS_SPACE_GLOBAL || !pointeeType ||
+        !pointeeType->isIntegerTy(32) || !insertionBlock || !llvmValue ||
+        llvmValue->getType() != pointeeType ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* originalValue = state->builder.CreateAtomicRMW(
+        llvm::AtomicRMWInst::Add,
+        llvmPointer,
+        llvmValue,
+        llvm::Align(4),
+        llvm::AtomicOrdering::Monotonic,
+        llvm::SyncScope::System);
+    *outOriginalValue = reinterpret_cast<SlangNVVMValueHandle_1>(originalValue);
     return SLANG_OK;
 }
 
@@ -1030,10 +1075,84 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
            format == SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE;
 }
 
+// Writes the legacy LLVM textual dialect accepted by libNVVM's documented LLVM 7 reader.
+//
+// LLVM 14 made atomic alignment explicit in assembly, but LLVM 7 gives atomicrmw its natural
+// alignment and rejects the suffix. The provider currently exposes exactly one atomic shape, so
+// validate every semantic atomic before removing that one newer spelling. Counting the semantic
+// instructions and rewritten lines prevents an unrelated occurrence or future atomic form from
+// being accepted accidentally.
+static SlangResult _writeLegacyNVVMAssembly(
+    ModuleState* state,
+    llvm::SmallVectorImpl<char>& outSerializedData)
+{
+    size_t semanticAtomicCount = 0;
+    for (llvm::Function& function : *state->module)
+    {
+        for (llvm::BasicBlock& block : function)
+        {
+            for (llvm::Instruction& instruction : block)
+            {
+                auto atomic = llvm::dyn_cast<llvm::AtomicRMWInst>(&instruction);
+                if (!atomic)
+                    continue;
+
+                ++semanticAtomicCount;
+                if (atomic->getOperation() != llvm::AtomicRMWInst::Add ||
+                    !atomic->getType()->isIntegerTy(32) ||
+                    atomic->getPointerAddressSpace() != SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+                    atomic->getAlign() != llvm::Align(4) ||
+                    atomic->getOrdering() != llvm::AtomicOrdering::Monotonic ||
+                    atomic->getSyncScopeID() != llvm::SyncScope::System || atomic->isVolatile())
+                {
+                    return SLANG_E_NOT_AVAILABLE;
+                }
+            }
+        }
+    }
+
+    llvm::SmallVector<char, 0> llvm14Assembly;
+    llvm::raw_svector_ostream llvm14Output(llvm14Assembly);
+    state->module->print(llvm14Output, nullptr);
+
+    const llvm::StringRef atomicMarker(" = atomicrmw ");
+    const llvm::StringRef llvm14AlignmentSuffix(", align 4");
+    llvm::StringRef remaining(llvm14Assembly.data(), llvm14Assembly.size());
+    size_t rewrittenAtomicCount = 0;
+    while (!remaining.empty())
+    {
+        const size_t newlineIndex = remaining.find('\n');
+        const bool hasNewline = newlineIndex != llvm::StringRef::npos;
+        const llvm::StringRef line = hasNewline ? remaining.take_front(newlineIndex) : remaining;
+
+        const llvm::StringRef trimmedLine = line.ltrim();
+        if (trimmedLine.startswith("%") && trimmedLine.contains(atomicMarker))
+        {
+            if (!line.endswith(llvm14AlignmentSuffix))
+                return SLANG_E_NOT_AVAILABLE;
+            const llvm::StringRef legacyLine = line.drop_back(llvm14AlignmentSuffix.size());
+            outSerializedData.append(legacyLine.begin(), legacyLine.end());
+            ++rewrittenAtomicCount;
+        }
+        else
+        {
+            outSerializedData.append(line.begin(), line.end());
+        }
+
+        if (!hasNewline)
+            break;
+        outSerializedData.push_back('\n');
+        remaining = remaining.drop_front(newlineIndex + 1);
+    }
+
+    return rewrittenAtomicCount == semanticAtomicCount ? SLANG_OK : SLANG_E_NOT_AVAILABLE;
+}
+
 // Verifies once and materializes the one canonical byte result shared by the V1 and V2 getters.
 static SlangResult _materializeModule(
     ModuleState* state,
     SlangNVVMSerializationFormat_1 format,
+    bool useNVVMIR20Assembly,
     llvm::SmallVectorImpl<char>& outSerializedData,
     llvm::SmallVectorImpl<char>& outDiagnosticData,
     SlangNVVMVerificationStatus_2& outVerificationStatus)
@@ -1058,15 +1177,29 @@ static SlangResult _materializeModule(
     }
 
     // V1 historically verifies before rejecting an unknown serialization format.
-    if (!_isSerializationFormat(format))
+    const bool isSupportedFormat =
+        useNVVMIR20Assembly ? format == SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY
+                            : _isSerializationFormat(format);
+    if (!isSupportedFormat)
         return SLANG_E_INVALID_ARG;
 
     outDiagnosticData.clear();
-    llvm::raw_svector_ostream serializedOutput(outSerializedData);
-    if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)
+    if (useNVVMIR20Assembly)
+    {
+        const SlangResult assemblyResult = _writeLegacyNVVMAssembly(state, outSerializedData);
+        if (SLANG_FAILED(assemblyResult))
+            return assemblyResult;
+    }
+    else if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)
+    {
+        llvm::raw_svector_ostream serializedOutput(outSerializedData);
         state->module->print(serializedOutput, nullptr);
+    }
     else
+    {
+        llvm::raw_svector_ostream serializedOutput(outSerializedData);
         llvm::WriteBitcodeToFile(*state->module, serializedOutput);
+    }
     outVerificationStatus = SLANG_NVVM_VERIFICATION_VALID;
     return SLANG_OK;
 }
@@ -1082,8 +1215,13 @@ static SlangResult SLANG_NVVM_CALL _serializeModule(
     llvm::SmallVector<char, 0> serializedData;
     llvm::SmallVector<char, 0> diagnosticData;
     SlangNVVMVerificationStatus_2 verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
-    const SlangResult materializeResult =
-        _materializeModule(state, format, serializedData, diagnosticData, verificationStatus);
+    const SlangResult materializeResult = _materializeModule(
+        state,
+        format,
+        false,
+        serializedData,
+        diagnosticData,
+        verificationStatus);
     if (SLANG_FAILED(materializeResult))
         return materializeResult;
     if (verificationStatus == SLANG_NVVM_VERIFICATION_INVALID)
@@ -1096,7 +1234,7 @@ static SlangResult SLANG_NVVM_CALL _serializeModule(
         outSerializedSize);
 }
 
-static SlangResult SLANG_NVVM_CALL _serializeModuleWithDiagnostics(
+static SlangResult _serializeModuleWithDiagnosticsImpl(
     SlangNVVMModuleHandle_1 module,
     SlangNVVMSerializationFormat_1 format,
     void* serializedDestination,
@@ -1105,7 +1243,8 @@ static SlangResult SLANG_NVVM_CALL _serializeModuleWithDiagnostics(
     void* diagnosticDestination,
     size_t diagnosticDestinationSize,
     size_t* outDiagnosticSize,
-    SlangNVVMVerificationStatus_2* outVerificationStatus)
+    SlangNVVMVerificationStatus_2* outVerificationStatus,
+    bool useNVVMIR20Assembly)
 {
     if (outSerializedSize)
         *outSerializedSize = 0;
@@ -1115,7 +1254,10 @@ static SlangResult SLANG_NVVM_CALL _serializeModuleWithDiagnostics(
         *outVerificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
 
     ModuleState* state = _getModule(module);
-    if (!state || !_isSerializationFormat(format) || !outSerializedSize || !outDiagnosticSize ||
+    const bool isSupportedFormat =
+        useNVVMIR20Assembly ? format == SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY
+                            : _isSerializationFormat(format);
+    if (!state || !isSupportedFormat || !outSerializedSize || !outDiagnosticSize ||
         !outVerificationStatus || (!serializedDestination && serializedDestinationSize) ||
         (!diagnosticDestination && diagnosticDestinationSize))
     {
@@ -1125,8 +1267,13 @@ static SlangResult SLANG_NVVM_CALL _serializeModuleWithDiagnostics(
     llvm::SmallVector<char, 0> serializedData;
     llvm::SmallVector<char, 0> diagnosticData;
     SlangNVVMVerificationStatus_2 verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
-    const SlangResult materializeResult =
-        _materializeModule(state, format, serializedData, diagnosticData, verificationStatus);
+    const SlangResult materializeResult = _materializeModule(
+        state,
+        format,
+        useNVVMIR20Assembly,
+        serializedData,
+        diagnosticData,
+        verificationStatus);
     if (SLANG_FAILED(materializeResult))
         return materializeResult;
 
@@ -1148,6 +1295,54 @@ static SlangResult SLANG_NVVM_CALL _serializeModuleWithDiagnostics(
     if (diagnosticDestination && !diagnosticData.empty())
         std::memcpy(diagnosticDestination, diagnosticData.data(), diagnosticData.size());
     return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _serializeModuleWithDiagnostics(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMSerializationFormat_1 format,
+    void* serializedDestination,
+    size_t serializedDestinationSize,
+    size_t* outSerializedSize,
+    void* diagnosticDestination,
+    size_t diagnosticDestinationSize,
+    size_t* outDiagnosticSize,
+    SlangNVVMVerificationStatus_2* outVerificationStatus)
+{
+    return _serializeModuleWithDiagnosticsImpl(
+        module,
+        format,
+        serializedDestination,
+        serializedDestinationSize,
+        outSerializedSize,
+        diagnosticDestination,
+        diagnosticDestinationSize,
+        outDiagnosticSize,
+        outVerificationStatus,
+        false);
+}
+
+static SlangResult SLANG_NVVM_CALL _serializeNVVMIR20AssemblyWithDiagnostics(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMSerializationFormat_1 format,
+    void* serializedDestination,
+    size_t serializedDestinationSize,
+    size_t* outSerializedSize,
+    void* diagnosticDestination,
+    size_t diagnosticDestinationSize,
+    size_t* outDiagnosticSize,
+    SlangNVVMVerificationStatus_2* outVerificationStatus)
+{
+    return _serializeModuleWithDiagnosticsImpl(
+        module,
+        format,
+        serializedDestination,
+        serializedDestinationSize,
+        outSerializedSize,
+        diagnosticDestination,
+        diagnosticDestinationSize,
+        outDiagnosticSize,
+        outVerificationStatus,
+        true);
 }
 
 // Fills the canonical V1 table so the standalone and nested exports cannot diverge.
@@ -1229,6 +1424,8 @@ slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
     api.emitIntegerBitXor = _emitIntegerBitXor;
     api.emitIntegerBitNot = _emitIntegerBitNot;
     api.emitIntegerNegate = _emitIntegerNegate;
+    api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
+    api.serializeNVVMIR20AssemblyWithDiagnostics = _serializeNVVMIR20AssemblyWithDiagnostics;
 
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);

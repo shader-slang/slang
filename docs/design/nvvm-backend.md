@@ -1284,6 +1284,130 @@ the same CUDA 12.9 root's `ptxas` accepted it for `sm_75`, and the RTX 5090 runt
 host `sinf` within `2e-6`. Preservation passed 1/1 parser, 2/2 routing/hash, 1/1 unsupported
 boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.
 
+### Slice 19 relaxed global signed-i32 atomic add
+
+Consider this example:
+
+```slang
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> previous,
+    uniform int delta)
+{
+    int oldValue;
+    InterlockedAdd(*destination, delta, oldValue);
+    *previous = oldValue;
+}
+```
+
+The public `InterlockedAdd` wrapper force-inlines through `__atomic_add`, whose intrinsic opcode is
+canonical `kIROp_AtomicAdd`. The measured final linked Slang IR contains the exact operation
+`atomicAdd(destination, delta, 0)`: `destination` is the established read-write device `Ptr<int>`,
+`delta` and the result are signed `i32`, and the literal final operand `0` is
+`MemoryOrder::Relaxed`. The operation returns the value stored immediately before the update, and
+the example's ordinary store consumes that result through `previous`. This measured instruction is
+the semantic source of truth. Direct emission must not recognize an intrinsic name, reconstruct
+source syntax, or reinterpret a load/add/store sequence as atomic.
+
+The CUDA reference is also exact. CUDA's unsuffixed `atomicAdd` is relaxed at device scope, and the
+measured CUDA 12.9 NVRTC output uses `atom.global.add.u32`. The omitted PTX semantic and scope
+qualifiers preserve that relaxed/device contract. The `.u32` spelling does not widen the source
+boundary to unsigned Slang values; LLVM integers and this PTX addition are signless at the bit
+operation boundary while Slang preflight owns the signed-i32 restriction.
+
+The private V2 provider table appends one deliberately exact operation:
+
+```text
+emitRelaxedGlobalI32AtomicAdd(module, pointer, value, outOriginalValue)
+```
+
+This callable accepts only a same-module typed address-space-1 pointer to `i32` and a same-module
+`i32` value available at the current unterminated insertion point. It must clear the output before
+dispatch and failure, validate module/context/function ownership and availability before mutation,
+and emit one LLVM `atomicrmw add` with `Align(4)`, `AtomicOrdering::Monotonic`, and LLVM's default
+System sync-scope spelling. LLVM `monotonic` is the representation of the measured Relaxed policy;
+the default scope adds no target-specific sync-scope spelling, and libNVVM maps this form to the
+unsuffixed device-scope PTX atomic. `atomicrmw` returns the original value for the direct value map.
+The ABI intentionally carries no configurable order, alignment, address space, type, or sync
+scope.
+
+LLVM 14 bitcode is not generally backward-readable by libNVVM's LLVM 7 reader. The first
+`atomicrmw` exposed that the LLVM 14 writer uses current atomic record 59 while the older reader
+expects legacy record 38. Earlier scalar operations happened to use compatible records and did not
+prove whole-dialect compatibility. CUDA 12.9 rejects the LLVM 14 atomic bitcode with producer
+LLVM 14.0.6 / reader LLVM 7.0.1 before verification.
+
+Slice 19 therefore makes the wire dialect explicit. It appends
+`serializeNVVMIR20AssemblyWithDiagnostics` immediately after the atomic operation and treats both
+function pointers as one coherent capability. The complete V2 prefix grows from 312 to 328 bytes
+on x64 and from 176 to 184 bytes on x86. Every size inside that two-pointer suffix is malformed,
+and a full table with either null pointer is rejected. Future-larger tables remain compatible and
+are clamped. The host includes `nvvm-ir-2.0-assembly=0/1` in provider identity.
+
+This negotiation preserves old providers. A Slice 17 or earlier V2 provider continues to receive
+verified LLVM bitcode for the programs it supports. Only a complete Slice 19 provider receives the
+new `SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY` format. Generic assembly serialization
+still returns raw LLVM 14 text, including explicit atomic alignment; the direct path neither
+content-sniffs nor retries after libNVVM failure.
+
+The provider-owned compatibility writer has only two conversions demonstrated by direct libNVVM
+probes:
+
+1. Each function parameter receives a stable `slangParameterN` name when the LLVM function is
+   declared. LLVM 14 otherwise prints explicit numeric parameter declarations that the LLVM 7
+   parser rejects, while named parameters are valid in both dialects.
+2. For the negotiated writer only, the provider removes LLVM 14's terminal `, align 4` spelling
+   from `atomicrmw`. LLVM 7 gives this operation natural alignment and rejects that newer suffix.
+
+The second conversion is not an unbounded text replacement. Before printing, the provider walks
+the LLVM instructions and requires every semantic atomic to be non-volatile AS1 i32 ADD with
+alignment four, Monotonic ordering, and System sync scope. It rewrites only an instruction-result
+line ending in the exact suffix, and the rewritten line count must equal the semantic atomic count.
+Any future atomic shape or printer spelling fails with `SLANG_E_NOT_AVAILABLE`. The LLVM module,
+generic assembly, and bitcode remain unchanged.
+
+Numba provides independent production evidence for this architecture: it submits textual LLVM IR
+to libNVVM and performs version-specific normalization at that boundary. NVIDIA deprecates textual
+input, so this remains an experimental compatibility bridge rather than the production-readiness
+answer. The builder ABI keeps lowering independent of the wire encoding, allowing a later
+LLVM-7-compatible bitcode writer to replace the text serializer without changing Slang IR
+traversal.
+
+A warmed synthetic audit found no material text overhead at this boundary. Modules with 1, 100,
+and 500 empty kernels took approximately 3.1, 39, and 200 ms end-to-end through text and 3.1, 39,
+and 268 ms through LLVM 14 bitcode on this machine; serialization itself stayed below 1.5 ms for
+text and 2.8 ms for bitcode. Compilation dominates both paths, and the 500-kernel difference is
+reader-path variability rather than evidence that text is intrinsically faster.
+
+An atomic-add program presented to the exact 312-byte Slice 17 provider reaches E52016 after
+discovery but before builder-module creation. An integer-negate program on that same provider still
+compiles and the captured libNVVM input begins with LLVM bitcode magic, proving that capability
+negotiation—not atomic-content coupling—selects the wire format.
+
+This boundary is only canonical Relaxed signed-i32 atomic add through an already-supported
+read-write device-i32 pointer, including preservation of the returned original value. The primary
+proof uses the raw `Ptr<int>` entry-point ABI, but preflight does not invent an origin restriction
+for a canonical offset or array-element pointer that the direct backend already accepts. Atomic
+load/store, subtract, exchange, compare-exchange, min/max, bitwise atomics,
+increment/decrement, and reductions remain unsupported. So do Acquire, Release, AcquireRelease,
+and SeqCst orders; unsigned, narrow, wide, floating-point, vector, matrix, aggregate, and resource
+atomics; generic, shared, constant, and local storage; fences, barriers, thread builtins, and
+wave/subgroup operations. This slice adds no new pointer-construction capability. Waves remain an
+independent Bucket 8 boundary because lane semantics, convergence, intrinsic selection, and
+executable evidence do not share this atomic producer contract.
+
+The resulting LLVM module verifies before serialization. CUDA 12.9 libNVVM accepts the normalized
+assembly and produces token-safe `atom.global.add.u32`; matching-root `ptxas` accepts both direct
+and NVRTC PTX. On an RTX 5090, 2,048 threads adding one to one initialized device integer produce
+the exact launch count through both routes, and the returned-old-value fixture preserves the
+ordinary store dependency. The negative matrix rejects adjacent operations, types, orders, address
+spaces, ownership errors, and unavailable values before mutation or provider discovery as
+appropriate. The final Release NVVM prefix passed 140/140. Preservation passed 1/1 parser, 2/2
+routing/hash, 1/1 unsupported boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime
+dispatch. The provider still exports only its V1/V2 getters and has no process-visible LLVM DLL
+dependency.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -1379,9 +1503,9 @@ The program advances through bounded slices:
 16. signed-i32 bitwise NOT;
 17. signed-i32 arithmetic negation;
 18. libdevice and floating-point policy;
-19. atomics and wave operations;
+19. relaxed global signed-i32 atomic add;
 20. resources and optimization-quality work; and
-21. advanced capabilities and production-readiness evaluation.
+21. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -1410,8 +1534,11 @@ then adds exact signed-i32 bitwise NOT through a dedicated unary operation and a
 per-value integer-validation rule. Slice 17 completes the next bounded canonical scalar operation:
 wrapping signed-i32 arithmetic negation. Slice 18 then freezes the explicit downstream libdevice
 demand, same-toolkit linking, and fp32 option policy without claiming direct Slang f32 lowering.
-The established Slice 19 roadmap remains atomics and wave operations. A future bounded shift
-candidate must first settle the currently
+Slice 19 takes one bounded half of the former atomics-and-waves roadmap entry: exact canonical
+Relaxed signed-i32 atomic add through the established read-write device pointer ABI. Other atomic
+operations, orders, types, and address spaces remain later boundaries, and waves move to the
+advanced-capability track because they require independent lane, convergence, and intrinsic
+contracts. A future bounded shift candidate must first settle the currently
 inconsistent negative/oversized shift-count policy across AST folding, SCCP, LLVM, and PTX before
 promoting exact signed-i32 left shift; division, remainder, and the other richer scalar policies
 remain separate decisions.
@@ -1683,6 +1810,21 @@ CUDA 12.9 root accepted the PTX for `sm_75`. On the RTX 5090, inputs `0`, `0.5`,
 matched host `sinf` within `2e-6`. Preservation passed 1/1 parser, 2/2 routing/hash, 1/1 unsupported
 boundary, 3/3 sampler, 2/2 CUDA compile/pass-through, and 1/1 runtime dispatch.
 
+The Slice 19 baseline on 2026-08-27 measured final linked Slang IR containing exact
+`atomicAdd(destination, delta, 0)` for the established read-write device `Ptr<int>` destination;
+the literal zero is Relaxed and the signed-i32 result is the original stored value. CUDA 12.9 NVRTC
+lowered the corresponding unsuffixed CUDA atomic to `atom.global.add.u32`, whose omitted semantic
+and scope qualifiers represent the required relaxed/device behavior. The pre-change direct route
+stopped at E52017 `atomicAdd`.
+
+The LLVM 14 provider produces verifier-valid `atomicrmw add`, but CUDA 12.9 libNVVM's LLVM 7 reader
+rejects its current bitcode record. Direct probes established the exact textual compatibility
+surface: stable named parameters plus natural-alignment `atomicrmw` text verify and compile, while
+explicit numeric parameter declarations and LLVM 14's `, align 4` suffix fail. The negotiated
+NVVM-2.0 writer applies only those two conversions, and its semantic atomic count must match its
+rewritten-line count. Direct PTX contains token-safe `atom.global.add.u32`; matching-root `ptxas`
+and RTX 5090 runtime lanes pass for both discarded and consumed old-value results.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
@@ -1693,7 +1835,8 @@ empty-compute subset. Slice 7 settles the raw `[CUDAKernel]` signed-`i32`/device
 ABI, the append-only V2 scalar-control-flow prefix, and dominance and ownership preflight at both
 the Slang IR and provider boundaries. The direct route uses one session-owned builder for hashing
 and code generation, requires the V2 verifier boundary, and enters the established downstream
-continuation as an internal LLVM-bitcode kernel artifact.
+continuation as an internal LLVM-IR kernel artifact. Providers through Slice 17 supply bitcode;
+Slice 19 providers may advertise the audited NVVM-2.0 assembly wire dialect explicitly.
 
 Slice 8 settles exactly representable signed-i32 executable constants, signed-i32 block parameters
 and branch arguments lowered as LLVM phis, canonical `IRLoop` target edges, and signed-i32
@@ -1794,6 +1937,14 @@ policy and compiler-specific overrides are rejected before mutation. Direct Slan
 arithmetic, helpers, and intrinsic recognition remain outside this claim; the f32 arithmetic case
 stops at its entry-point parameter, while sine stops at its float-returning helper result.
 
+Slice 19 settles exact canonical Relaxed signed-i32 atomic add through an already-supported
+canonical read-write device-i32 pointer. Its terminal `emitRelaxedGlobalI32AtomicAdd` operation
+fixes AS1, typed `i32`, four-byte alignment, LLVM `monotonic` ordering, and default System sync
+scope rather than exporting policy knobs across the private ABI. The operation and negotiated
+NVVM-2.0 assembly writer form one complete 328-byte x64 prefix after the frozen 312-byte Slice 17
+prefix. Older providers continue to receive bitcode; full providers pass the direct-emission,
+negative, PTX, `ptxas`, and runtime evidence above.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional LLVM 14 NVVM builder module;
@@ -1807,6 +1958,9 @@ The following remain open until their named slice supplies evidence:
 - pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
   array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
   memory, and additional address spaces;
+- every other atomic operation, memory order, value type, pointer shape, and address space, plus a
+  production-compatible bitcode writer to replace the experimental text bridge;
+- wave/subgroup operations, including their lane, mask, convergence, and intrinsic contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

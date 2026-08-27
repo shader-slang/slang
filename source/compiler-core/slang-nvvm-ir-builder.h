@@ -63,7 +63,11 @@ public:
     bool supportsScalarIntegerBitNot() const;
     /// Returns whether the provider advertised the complete Slice 17 integer-negate prefix.
     bool supportsScalarIntegerNegate() const;
-    /// Returns the provider identity that affects generated bitcode and shader-cache keys.
+    /// Returns whether the provider can serialize the audited NVVM IR 2.0 text dialect.
+    bool supportsNVVMIR20Assembly() const;
+    /// Returns whether the provider advertised the complete Slice 19 atomic-add prefix.
+    bool supportsRelaxedGlobalI32AtomicAdd() const;
+    /// Returns the provider identity that affects generated IR and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
     /// Returns the locally supported V2 prefix, with `structureSize` clamped to that prefix.
@@ -261,6 +265,13 @@ public:
         SlangNVVMModuleHandle_1 module,
         SlangNVVMValueHandle_1 value,
         SlangNVVMValueHandle_1& outValue) const;
+
+    /// Emits relaxed device-scope atomic add through a naturally aligned global i32 pointer.
+    SlangResult emitRelaxedGlobalI32AtomicAdd(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 pointer,
+        SlangNVVMValueHandle_1 value,
+        SlangNVVMValueHandle_1& outOriginalValue) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;
