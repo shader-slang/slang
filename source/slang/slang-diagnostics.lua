@@ -3192,6 +3192,13 @@ warning(
     span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
 )
 
+warning(
+    "constexpr-on-callable-ignored",
+    31228,
+    "constexpr on a function or other callable declaration is not a supported Slang feature and is ignored",
+    span { loc = "modifier:Modifier", message = "constexpr modifier is ignored here" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
@@ -5279,6 +5286,18 @@ warning(
     "the explicitly requested 64-bit coverage counter width is not executable on Metal targets (`metal`, `metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so counting-mode coverage counters are capped to uint32 for this compile. Pass `-trace-coverage-counter-width 32` to make the effective width explicit; uint32 counters wrap silently at 2^32 hits per slot."
 )
 
+err(
+    "coverage-bindless-target-not-supported",
+    45116,
+    "`-trace-coverage-bindless-index` is only supported on Khronos targets (SPIR-V and GLSL): it synthesizes `__slang_coverage` as an unbounded descriptor array, which requires descriptor indexing. Omit it to use the single-buffer form, which every coverage-capable target supports."
+)
+
+err(
+    "coverage-bindless-negative-index",
+    45117,
+    "`-trace-coverage-bindless-index` requires a non-negative index, but got a negative one. A negative index selects the single-buffer form, giving one descriptor binding per shader rather than the shared array that was asked for. Pass an index of 0 or greater, or omit the option to use the single-buffer form deliberately."
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
@@ -5587,6 +5606,13 @@ err(
     55213,
     "'String' is not supported on this target",
     span { loc = "location", message = "the 'String' type and its operations are not supported when generating kernel code for this target; use 'NativeString' for a null-terminated string, or compile for a host target" }
+)
+
+err(
+    "multisampled-texture-not-supported-on-target",
+    55215,
+    "multisampled texture is not supported on this target",
+    span { loc = "location", message = "'~type:IRInst' is a multisampled texture, which is not supported by the current code generation target" }
 )
 
 err(
