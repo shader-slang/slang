@@ -2038,6 +2038,30 @@ The final Release NVVM prefix passes 221/221. Its exact sorted LF-terminated nam
 `c24e6b4e82e289c2533444b0b0c0dab6cc44064a1df02d75a79928de94c2afa8`. Debug preservation passes
 10/10.
 
+### Slice 35 exact scalar float32 division
+
+Slice 35 adds exact raw scalar `float` division by extending the Slice 34 closed mappings rather
+than adding another provider or test shape. Canonical float parameters feed one `kIROp_Div` and an
+aligned AS1 float store. Integer `kIROp_Div` deliberately remains E52017 `div`; its divide-by-zero
+and signed-overflow policies are still unsettled and are not implied by this floating capability.
+
+Feature 23 and floating operation 3 reuse the 464-byte x64/280-byte x86 V3 table and generic
+callback. Exact Slice 34 providers remain valid. The host checks the independent feature before
+dispatch, and the provider applies the established float ownership/availability/insertion contract
+before unflagged `CreateFDiv`. No reciprocal approximation or fast-math flag is introduced.
+
+One `NVVMFloat32BinaryTestCase` row and seven thin wrappers add negotiation, real-builder,
+direct-topology, capability, differential-PTX, `ptxas`, and runtime evidence. The five measured
+test/support files grow only 48 lines, from 19,512 to 19,560. LLVM and audited NVVM-2.0 text contain
+exactly one `fdiv float` and no other floating-binary opcode. NVVM and NVRTC expose `[64, 32, 32]`,
+a token-safe 32-bit division instruction, one global store, and no global load/add/sub/mul. CUDA
+12.9 `ptxas` accepts both; the RTX 5090 produces `4`, `-16`, and `-4` for exactly representable
+finite nonzero-denominator cases.
+
+The final Release NVVM prefix passes 228/228. Its exact sorted LF-terminated name set has SHA-256
+`99dec82e0909050b0dc909113dad988369dfe9b2666e5385faaec947c6c29bc7`. Debug preservation passes
+10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2149,8 +2173,9 @@ The program advances through bounded slices:
 32. exact scalar float32 device-pointer loads;
 33. exact scalar float32 subtraction through the generic floating-binary family;
 34. exact scalar float32 multiplication plus descriptor-driven floating-binary evidence;
-35. further type, memory, resource, and optimization-quality work; and
-36. wave operations and other advanced capabilities, then production-readiness evaluation.
+35. exact scalar float32 division through the generic floating-binary family;
+36. further type, memory, resource, and optimization-quality work; and
+37. wave operations and other advanced capabilities, then production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.

@@ -134,6 +134,7 @@ static void _runNVVMSlangFloat32BinaryUsesDirectPipeline(
 NVVM_FLOAT32_BINARY_DIRECT_TEST(nvvmSlangFloat32AddUsesDirectPipeline, Add)
 NVVM_FLOAT32_BINARY_DIRECT_TEST(nvvmSlangFloat32SubtractUsesDirectPipeline, Subtract)
 NVVM_FLOAT32_BINARY_DIRECT_TEST(nvvmSlangFloat32MultiplyUsesDirectPipeline, Multiply)
+NVVM_FLOAT32_BINARY_DIRECT_TEST(nvvmSlangFloat32DivideUsesDirectPipeline, Divide)
 
 #undef NVVM_FLOAT32_BINARY_DIRECT_TEST
 
@@ -237,6 +238,7 @@ static void _runNVVMSlangNegotiatesFloat32BinaryCapability(
 NVVM_FLOAT32_BINARY_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32AddCapability, Add)
 NVVM_FLOAT32_BINARY_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32SubtractCapability, Subtract)
 NVVM_FLOAT32_BINARY_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32MultiplyCapability, Multiply)
+NVVM_FLOAT32_BINARY_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32DivideCapability, Divide)
 
 #undef NVVM_FLOAT32_BINARY_CAPABILITY_TEST
 

@@ -480,7 +480,8 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
     const bool advertisesFloat32Binary =
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD) ||
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT) ||
-        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY);
+        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY) ||
+        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE);
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3 ||
         api.compatibilityAPI.structureSize != sizeof(SlangNVVMBuilderAPI_V2) ||
@@ -750,7 +751,8 @@ SlangResult NVVMIRBuilder::getFloatingPointType(
         return SLANG_E_UNINITIALIZED;
     if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD) &&
         !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY))
+        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY) &&
+        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE))
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult_1 result = m_apiV3.getFloatingPointType(module, bitWidth, &outType);
     return _validateHandleResult(result, outType);
@@ -1068,6 +1070,9 @@ SlangResult NVVMIRBuilder::emitFloatingBinary(
         break;
     case SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY:
         requiredFeature = SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY;
+        break;
+    case SLANG_NVVM_FLOATING_BINARY_OP_DIVIDE:
+        requiredFeature = SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE;
         break;
     default:
         return SLANG_E_INVALID_ARG;

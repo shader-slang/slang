@@ -126,6 +126,12 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32MultiplyPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32MultiplyRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite multiplication cases | RTX 5090 results `3`, `-4`, `-256` | Not measured |
 
+| `tools/slang-unit-test/unit-test-nvvm-builder.cpp::nvvmIRBuilderBuildsFloat32DivideKernel` | 2 | LLVM 14.0.6 provider and audited NVVM-2.0 text writer | Not applicable | Pass | Not applicable | Generic floating callback constructs exact unflagged LLVM `fdiv` and aligned store | Verified LLVM/NVVM-2.0 assembly with no other floating-binary opcode | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangFloat32DivideUsesDirectPipeline` | 2 | In-process fake V3 builder and libNVVM, `cuda_sm_7_0` | Not compared | Pass | Not applicable | Canonical float32 `kIROp_Div` lowers through floating-binary operation 3 while integer DIV remains unsupported | Exact ordered parameters and division-result store topology checked | Fake-only |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32DivideDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 division compiles through both routes | `[64, 32, 32]`, token-safe 32-bit division, store, and no load/add/sub/mul agree | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32DividePtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both outputs assemble | Static acceptance | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32DivideRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch exact finite nonzero-denominator division cases | RTX 5090 results `4`, `-16`, `-4` | Not measured |
+
 ## Slice 19 atomic and wire-compatibility evidence
 
 The probe measured final linked Slang IR containing exact
@@ -578,4 +584,17 @@ float-multiply-plus-cast fixture now reaches its next honest E52017 boundary, `c
 
 Release passes 221/221 with sorted-name SHA-256
 `c24e6b4e82e289c2533444b0b0c0dab6cc44064a1df02d75a79928de94c2afa8`; Debug preservation passes
+10/10.
+
+Slice 35 adds floating-binary DIVIDE and semantic feature 23 through the unchanged 464-byte x64/
+280-byte x86 V3 table. The closed emitter mapping, generic facade/provider/fake switches, and
+floating test descriptor each gain one enum row; no callback or copied runner is added. Canonical
+Float `kIROp_Div` lowers to unflagged `CreateFDiv`, while integer DIV retains E52017 `div`.
+
+Direct topology proves ordered parameter 1/2 operands and the division-result store consumer.
+LLVM/NVVM text has exactly one `fdiv float`; NVVM and NVRTC agree on `[64, 32, 32]`, token-safe
+32-bit division, store/no-load/add/sub/mul; CUDA 12.9 `ptxas` accepts both; and RTX 5090 results are
+`4`, `-16`, `-4`. Seven names add only 48 lines to the five measured test/support files, from
+19,512 to 19,560. Release passes 228/228 with sorted-name SHA-256
+`99dec82e0909050b0dc909113dad988369dfe9b2666e5385faaec947c6c29bc7`; Debug preservation passes
 10/10.

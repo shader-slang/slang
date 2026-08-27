@@ -637,7 +637,8 @@ extern "C"
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD ((SlangNVVMBuilderFeature_3)20u)
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT ((SlangNVVMBuilderFeature_3)21u)
 #define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY ((SlangNVVMBuilderFeature_3)22u)
-#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 23u
+#define SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE ((SlangNVVMBuilderFeature_3)23u)
+#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 24u
 #define SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3 4u
 
     typedef struct SlangNVVMBuilderFeatureSet_3
@@ -689,6 +690,7 @@ extern "C"
 #define SLANG_NVVM_FLOATING_BINARY_OP_ADD ((SlangNVVMFloatingBinaryOp_3)0u)
 #define SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT ((SlangNVVMFloatingBinaryOp_3)1u)
 #define SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY ((SlangNVVMFloatingBinaryOp_3)2u)
+#define SLANG_NVVM_FLOATING_BINARY_OP_DIVIDE ((SlangNVVMFloatingBinaryOp_3)3u)
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMGetFloatingPointType_3)(
         SlangNVVMModuleHandle_1 module,

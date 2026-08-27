@@ -106,6 +106,13 @@ bool _getNVVMFloat32BinaryInfo(IROp op, NVVMFloat32BinaryInfo& outInfo)
             "float32 multiplication",
         };
         return true;
+    case kIROp_Div:
+        outInfo = {
+            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE,
+            SLANG_NVVM_FLOATING_BINARY_OP_DIVIDE,
+            "float32 division",
+        };
+        return true;
     default:
         return false;
     }
@@ -538,6 +545,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_Add:
             case kIROp_Sub:
             case kIROp_Mul:
+            case kIROp_Div:
                 if (inst->getOperandCount() == 2 && isNVVMFloat32Type(inst->getDataType()))
                 {
                     NVVMFloat32BinaryInfo info;
@@ -545,6 +553,8 @@ SlangResult _validateNVVMFunction(
                     _requireFeature(features, info.feature);
                     break;
                 }
+                if (inst->getOp() == kIROp_Div)
+                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("div"));
                 if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
@@ -802,6 +812,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_Add:
             case kIROp_Sub:
             case kIROp_Mul:
+            case kIROp_Div:
                 if (isNVVMFloat32Type(inst->getDataType()))
                 {
                     SLANG_RETURN_ON_FAIL(_validateFloat32Value(
@@ -819,6 +830,7 @@ SlangResult _validateNVVMFunction(
                     availableValues.add(inst);
                     break;
                 }
+                SLANG_RELEASE_ASSERT(inst->getOp() != kIROp_Div);
                 [[fallthrough]];
             case kIROp_BitAnd:
             case kIROp_BitOr:
@@ -1511,6 +1523,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Add:
                 case kIROp_Sub:
                 case kIROp_Mul:
+                case kIROp_Div:
                     {
                         SlangNVVMValueHandle_1 loweredLeft = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(

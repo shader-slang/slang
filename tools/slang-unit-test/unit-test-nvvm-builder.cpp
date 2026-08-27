@@ -169,6 +169,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32AddAPI)
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT % 64u));
         api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY / 64u] &=
             ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY % 64u));
+        api.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE / 64u] &=
+            ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE % 64u));
         api.structureSize = uint32_t(SLANG_NVVM_BUILDER_API_V3_MIN_SIZE);
         NVVMIRBuilder builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
@@ -338,6 +340,7 @@ static void _runNVVMIRBuilderNegotiatesFloat32BinaryAPI(
             SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD,
             SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT,
             SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY,
+            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE,
         };
         for (auto feature : floatFeatures)
             api.features.words[feature / 64u] &= ~(uint64_t(1) << (feature % 64u));
@@ -406,6 +409,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32SubtractAPI)
 SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32MultiplyAPI)
 {
     _runNVVMIRBuilderNegotiatesFloat32BinaryAPI(NVVMFloat32BinaryTestOperation::Multiply);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesFloat32DivideAPI)
+{
+    _runNVVMIRBuilderNegotiatesFloat32BinaryAPI(NVVMFloat32BinaryTestOperation::Divide);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderPrefersV3AndRejectsMalformedPresentV3)
@@ -3173,6 +3181,7 @@ static void _runNVVMIRBuilderBuildsFloat32BinaryKernel(
 NVVM_FLOAT32_BINARY_BUILDER_TEST(nvvmIRBuilderBuildsFloat32AddKernel, Add)
 NVVM_FLOAT32_BINARY_BUILDER_TEST(nvvmIRBuilderBuildsFloat32SubtractKernel, Subtract)
 NVVM_FLOAT32_BINARY_BUILDER_TEST(nvvmIRBuilderBuildsFloat32MultiplyKernel, Multiply)
+NVVM_FLOAT32_BINARY_BUILDER_TEST(nvvmIRBuilderBuildsFloat32DivideKernel, Divide)
 
 #undef NVVM_FLOAT32_BINARY_BUILDER_TEST
 

@@ -913,7 +913,8 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingBinaryV3(
     if (!outValue || !insertionBlock ||
         (operation != SLANG_NVVM_FLOATING_BINARY_OP_ADD &&
          operation != SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT &&
-         operation != SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY) ||
+         operation != SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY &&
+         operation != SLANG_NVVM_FLOATING_BINARY_OP_DIVIDE) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmLeft) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmRight) ||
         llvmLeft->getType() != llvm::Type::getFloatTy(state->context) ||
@@ -935,6 +936,10 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingBinaryV3(
     case SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY:
         *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
             state->builder.CreateFMul(llvmLeft, llvmRight));
+        return SLANG_OK;
+    case SLANG_NVVM_FLOATING_BINARY_OP_DIVIDE:
+        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+            state->builder.CreateFDiv(llvmLeft, llvmRight));
         return SLANG_OK;
     default:
         return SLANG_E_INVALID_ARG;

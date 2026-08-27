@@ -228,6 +228,8 @@ static bool _hasNVVMFloat32BinaryPTXEvidence(
         return summary.hasFloatSubtract32;
     case NVVMFloat32BinaryTestOperation::Multiply:
         return summary.hasFloatMultiply32;
+    case NVVMFloat32BinaryTestOperation::Divide:
+        return summary.hasFloatDivide32;
     default:
         SLANG_UNEXPECTED("unknown NVVM float32 binary PTX operation");
     }
@@ -309,6 +311,7 @@ static void _runNVVMSlangRealFloat32BinaryDifferentialPTX(
 NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST(nvvmSlangRealFloat32AddDifferentialPTX, Add)
 NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST(nvvmSlangRealFloat32SubtractDifferentialPTX, Subtract)
 NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST(nvvmSlangRealFloat32MultiplyDifferentialPTX, Multiply)
+NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST(nvvmSlangRealFloat32DivideDifferentialPTX, Divide)
 
 #undef NVVM_FLOAT32_BINARY_DIFFERENTIAL_TEST
 
@@ -970,6 +973,7 @@ static void _runNVVMSlangRealFloat32BinaryPtxasAccepts(
 NVVM_FLOAT32_BINARY_PTXAS_TEST(nvvmSlangRealFloat32AddPtxasAccepts, Add)
 NVVM_FLOAT32_BINARY_PTXAS_TEST(nvvmSlangRealFloat32SubtractPtxasAccepts, Subtract)
 NVVM_FLOAT32_BINARY_PTXAS_TEST(nvvmSlangRealFloat32MultiplyPtxasAccepts, Multiply)
+NVVM_FLOAT32_BINARY_PTXAS_TEST(nvvmSlangRealFloat32DividePtxasAccepts, Divide)
 
 #undef NVVM_FLOAT32_BINARY_PTXAS_TEST
 
@@ -1510,6 +1514,7 @@ static void _runNVVMSlangFloat32BinaryRuntimeMatchesNVRTC(
 NVVM_FLOAT32_BINARY_RUNTIME_TEST(nvvmSlangFloat32AddRuntimeMatchesNVRTC, Add)
 NVVM_FLOAT32_BINARY_RUNTIME_TEST(nvvmSlangFloat32SubtractRuntimeMatchesNVRTC, Subtract)
 NVVM_FLOAT32_BINARY_RUNTIME_TEST(nvvmSlangFloat32MultiplyRuntimeMatchesNVRTC, Multiply)
+NVVM_FLOAT32_BINARY_RUNTIME_TEST(nvvmSlangFloat32DivideRuntimeMatchesNVRTC, Divide)
 
 #undef NVVM_FLOAT32_BINARY_RUNTIME_TEST
 
