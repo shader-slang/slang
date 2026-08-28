@@ -612,6 +612,26 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_CastInterfaceToTaggedUnionPtr:
         result.taggedUnion = true;
+        result.untaggedUnion = true;
+        result.tagOps = true;
+        result.tagType = true;
+        break;
+    case kIROp_AssumeAddress:
+        result.assumeAddress = true;
+        break;
+    case kIROp_UntaggedUnionType:
+    case kIROp_NoneTypeElement:
+        result.untaggedUnion = true;
+        break;
+    case kIROp_GetTagOfElementInSet:
+    case kIROp_GetTagForSuperSet:
+    case kIROp_GetTagForSubSet:
+    case kIROp_GetTagForMappedSet:
+        result.tagOps = true;
+        result.tagType = true;
+        break;
+    case kIROp_SetTagType:
+        result.tagType = true;
         break;
     case kIROp_InOutImplicitCast:
     case kIROp_OutImplicitCast:
@@ -1034,6 +1054,12 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Scan the IR module and determine which lowering/legalization passes are needed.
+    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
+    requiredLoweringPassSet = {};
+    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
+
+    if (requiredLoweringPassSet.assumeAddress)
     {
         bool validate = !isCPUTarget(targetRequest) && !isCUDATarget(targetRequest);
         SLANG_PASS(validateAndRemoveAssumeAddress, validate, sink);
@@ -1042,11 +1068,6 @@ Result linkAndOptimizeIR(
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
-
-    // Scan the IR module and determine which lowering/legalization passes are needed.
-    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
-    requiredLoweringPassSet = {};
-    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     // Debug info is added by the front-end. If the target cannot express debug info, or if the user
     // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
@@ -1699,14 +1720,17 @@ Result linkAndOptimizeIR(
             requiredLoweringPassSet.reinterpret = true;
     }
 
-    SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
+    if (requiredLoweringPassSet.untaggedUnion)
+        SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
     if (requiredLoweringPassSet.reinterpret)
         SLANG_PASS(lowerReinterpret, targetProgram, sink);
 
     SLANG_PASS(lowerSequentialIDTagCasts, codeGenContext->getLinkage(), sink);
-    SLANG_PASS(lowerTagInsts, sink);
-    SLANG_PASS(lowerTagTypes);
+    if (requiredLoweringPassSet.tagOps)
+        SLANG_PASS(lowerTagInsts, sink);
+    if (requiredLoweringPassSet.tagType)
+        SLANG_PASS(lowerTagTypes);
 
     SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
 
