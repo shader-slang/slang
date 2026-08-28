@@ -18,6 +18,12 @@ bool isNVVMUnsignedI32Type(IRInst* type);
 /// Returns whether `type` is either canonical 32-bit integer representation.
 bool isNVVMInteger32Type(IRInst* type);
 
+/// Returns whether `type` is one selected 8/16/32/64-bit integer scalar.
+bool isNVVMSupportedIntegerScalarType(
+    IRInst* type,
+    uint32_t* outBitWidth = nullptr,
+    bool* outIsSigned = nullptr);
+
 /// Returns whether `type` is the canonical IEEE 32-bit float accepted by direct NVVM.
 bool isNVVMFloat32Type(IRInst* type);
 
@@ -26,6 +32,15 @@ bool isNVVMBoolType(IRInst* type);
 
 /// Returns an exact canonical `uint3` type used by CUDA execution registers.
 IRVectorType* asNVVMSupportedUInt3Type(IRInst* type);
+
+/// Returns the bounded signed-i32x2 vector used to prove fixed-vector transport and arithmetic.
+IRVectorType* asNVVMSupportedSignedI32x2Type(IRInst* type);
+
+/// Returns whether `type` is a selected scalar or signed-i32x2 value.
+bool isNVVMSupportedNumericValueType(IRInst* type);
+
+/// Returns the natural byte alignment of one selected numeric value, or zero when unsupported.
+uint32_t getNVVMNumericValueAlignment(IRInst* type);
 
 /// Returns an accepted nonempty fixed i32 array and optionally its exact element count.
 IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
@@ -38,6 +53,9 @@ IRPtrTypeBase* asNVVMSupportedDeviceFloat32PointerType(IRInst* type);
 
 /// Returns an accepted CUDA device pointer to any established scalar value type.
 IRPtrTypeBase* asNVVMSupportedDeviceScalarPointerType(IRInst* type);
+
+/// Returns an accepted CUDA device pointer to a selected scalar or signed-i32x2 value.
+IRPtrTypeBase* asNVVMSupportedDeviceNumericPointerType(IRInst* type);
 
 /// Returns an accepted CUDA device pointer to a fixed i32 array.
 IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(

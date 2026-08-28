@@ -6535,6 +6535,101 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32CopyKernel)
     SLANG_CHECK(nvvmText.indexOf("!\"kernel\", i32 1") >= 0);
 }
 
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsVectorConstruction());
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("numeric-family-module"), scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateNumericFamilyFunction(builder, scope.module)));
+
+    const SlangNVVMSerializationFormat_1 formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat_1 format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        SLANG_CHECK_ABORT(assembly != nullptr);
+        const UnownedStringSlice text(
+            static_cast<const char*>(assembly->getBufferPointer()),
+            assembly->getBufferSize());
+        SLANG_CHECK(text.indexOf(toSlice("add i8")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("icmp slt i8")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("icmp ugt i8")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("sext i8")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("zext i8")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("sitofp i8")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fptoui float")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("add <2 x i32>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("ret <2 x i32>")) >= 0);
+    }
+
+    const SlangNVVMValueTypeDesc_4 signedI8 = {
+        SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4,
+        8,
+        1,
+        0,
+    };
+    const SlangNVVMValueTypeDesc_4 unsignedI8 = {
+        SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4,
+        8,
+        1,
+        0,
+    };
+    const SlangNVVMValueTypeDesc_4 mixedOperandTypes[] = {signedI8, unsignedI8};
+    const SlangNVVMValueOperationDesc_4 mixedSignednessAdd = {
+        uint32_t(sizeof(SlangNVVMValueOperationDesc_4)),
+        SLANG_NVVM_VALUE_OP_ADD_4,
+        signedI8,
+        mixedOperandTypes,
+        SLANG_COUNT_OF(mixedOperandTypes),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(mixedSignednessAdd));
+    SlangNVVMValueHandle_1 invalidOperands[2] = {};
+    SlangNVVMValueHandle_1 invalidResult = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitValueOperation(
+            scope.module,
+            mixedSignednessAdd,
+            invalidOperands,
+            SLANG_COUNT_OF(invalidOperands),
+            invalidResult) == SLANG_E_NOT_AVAILABLE);
+    SLANG_CHECK(invalidResult == nullptr);
+
+    const SlangNVVMValueTypeDesc_4 signedI24 = {
+        SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4,
+        24,
+        1,
+        0,
+    };
+    const SlangNVVMValueTypeDesc_4 unsupportedWidthOperandTypes[] = {signedI24, signedI24};
+    const SlangNVVMValueOperationDesc_4 unsupportedWidthAdd = {
+        uint32_t(sizeof(SlangNVVMValueOperationDesc_4)),
+        SLANG_NVVM_VALUE_OP_ADD_4,
+        signedI24,
+        unsupportedWidthOperandTypes,
+        SLANG_COUNT_OF(unsupportedWidthOperandTypes),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedWidthAdd));
+
+    const SlangNVVMValueTypeDesc_4 signedI32x2 = NVVMSemantics::kSignedI32x2;
+    const SlangNVVMValueTypeDesc_4 vectorOperandTypes[] = {signedI32x2, signedI32x2};
+    const SlangNVVMValueOperationDesc_4 unsupportedVectorMultiply = {
+        uint32_t(sizeof(SlangNVVMValueOperationDesc_4)),
+        SLANG_NVVM_VALUE_OP_MULTIPLY_4,
+        signedI32x2,
+        vectorOperandTypes,
+        SLANG_COUNT_OF(vectorOperandTypes),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedVectorMultiply));
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderRealProviderPreservesShortBuffers)
 {
     NVVMIRBuilder builder;

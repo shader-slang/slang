@@ -16,7 +16,6 @@ namespace Slang
 namespace
 {
 
-// CUDA `int` and `float` both use four-byte natural alignment in the accepted direct scalar ABI.
 static const uint32_t kNVVMScalar32Alignment = 4;
 static const IRIntegerValue kNVVMI32Min = -2147483647 - 1;
 static const IRIntegerValue kNVVMI32Max = 2147483647;
@@ -83,6 +82,31 @@ IRIntLit* _asExecutableInteger32Constant(IRInst* value)
     return intValue >= 0 && intValue <= kNVVMUInt32Max ? intLit : nullptr;
 }
 
+// Returns an executable literal in one selected integer width. Canonical UInt64 uses the signed
+// storage bits of IRIntegerValue when its high bit is set; the provider preserves that bit pattern.
+IRIntLit* _asExecutableSelectedIntegerConstant(IRInst* value)
+{
+    auto intLit = as<IRIntLit>(value);
+    uint32_t bitWidth = 0;
+    bool isSigned = false;
+    if (!intLit || !isNVVMSupportedIntegerScalarType(intLit->getDataType(), &bitWidth, &isSigned))
+    {
+        return nullptr;
+    }
+
+    const IRIntegerValue integerValue = intLit->getValue();
+    if (bitWidth == 64)
+        return intLit;
+    if (isSigned)
+    {
+        const IRIntegerValue minimum = -(IRIntegerValue(1) << (bitWidth - 1));
+        const IRIntegerValue maximum = (IRIntegerValue(1) << (bitWidth - 1)) - 1;
+        return integerValue >= minimum && integerValue <= maximum ? intLit : nullptr;
+    }
+    const IRIntegerValue maximum = (IRIntegerValue(1) << bitWidth) - 1;
+    return integerValue >= 0 && integerValue <= maximum ? intLit : nullptr;
+}
+
 // Returns a canonical executable Boolean literal.
 IRBoolLit* _asExecutableBoolConstant(IRInst* value)
 {
@@ -118,6 +142,11 @@ bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc_4& semanticT
         return semanticType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4 &&
                semanticType.bitWidth == 32 && asNVVMSupportedUInt3Type(type);
     }
+    if (semanticType.laneCount == 2)
+    {
+        return semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4 &&
+               semanticType.bitWidth == 32 && asNVVMSupportedSignedI32x2Type(type);
+    }
     if (semanticType.laneCount != 1)
         return false;
 
@@ -126,9 +155,14 @@ bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc_4& semanticT
     case SLANG_NVVM_VALUE_TYPE_BOOL_4:
         return semanticType.bitWidth == 1 && isNVVMBoolType(type);
     case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4:
-        return semanticType.bitWidth == 32 && isNVVMSignedI32Type(type);
     case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4:
-        return semanticType.bitWidth == 32 && isNVVMUnsignedI32Type(type);
+        {
+            uint32_t bitWidth = 0;
+            bool isSigned = false;
+            return isNVVMSupportedIntegerScalarType(type, &bitWidth, &isSigned) &&
+                   semanticType.bitWidth == bitWidth &&
+                   (semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4) == isSigned;
+        }
     case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4:
         return semanticType.bitWidth == 32 && isNVVMFloat32Type(type);
     default:
@@ -182,16 +216,29 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc_4& outType)
         outType = NVVMSemantics::kVoid;
     else if (asNVVMSupportedUInt3Type(type))
         outType = NVVMSemantics::kUnsignedI32x3;
+    else if (asNVVMSupportedSignedI32x2Type(type))
+        outType = NVVMSemantics::kSignedI32x2;
     else if (isNVVMBoolType(type))
         outType = NVVMSemantics::kBool;
-    else if (isNVVMSignedI32Type(type))
-        outType = NVVMSemantics::kSignedI32;
-    else if (isNVVMUnsignedI32Type(type))
-        outType = NVVMSemantics::kUnsignedI32;
-    else if (isNVVMFloat32Type(type))
-        outType = NVVMSemantics::kFloat32;
     else
-        return false;
+    {
+        uint32_t bitWidth = 0;
+        bool isSigned = false;
+        if (isNVVMSupportedIntegerScalarType(type, &bitWidth, &isSigned))
+        {
+            outType = {
+                isSigned ? SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4
+                         : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4,
+                bitWidth,
+                1,
+                0,
+            };
+        }
+        else if (isNVVMFloat32Type(type))
+            outType = NVVMSemantics::kFloat32;
+        else
+            return false;
+    }
     return true;
 }
 
@@ -244,6 +291,15 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation_4& outOperation)
     case kIROp_Geq:
         outOperation = SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4;
         return true;
+    case kIROp_IntCast:
+        outOperation = SLANG_NVVM_VALUE_OP_INTEGER_CONVERT_4;
+        return true;
+    case kIROp_CastIntToFloat:
+        outOperation = SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT_4;
+        return true;
+    case kIROp_CastFloatToInt:
+        outOperation = SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER_4;
+        return true;
     case kIROp_WaveMaskBallot:
         outOperation = SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT_4;
         return true;
@@ -252,35 +308,53 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation_4& outOperation)
     }
 }
 
-// Resolves an exact canonical Slang value operation through the single typed semantic catalog.
-const NVVMSemantics::CatalogEntry* _findNVVMValueOperation(IRInst* inst)
+struct NVVMResolvedValueOperation
 {
+    SlangNVVMValueTypeDesc_4 operandTypes[3] = {};
+    SlangNVVMValueOperationDesc_4 desc = {};
+    const NVVMSemantics::CatalogEntry* staticEntry = nullptr;
+    NVVMSemantics::V4FamilyResolution family;
+    const char* diagnosticName = nullptr;
+};
+
+// Resolves canonical Slang value operations to either a frozen exact row or one bounded V4 family.
+bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOperation)
+{
+    outOperation = {};
     if (!inst || inst->getOperandCount() > 3)
-        return nullptr;
+        return false;
 
     SlangNVVMValueOperation_4 operation = 0;
     SlangNVVMValueTypeDesc_4 resultType = {};
-    SlangNVVMValueTypeDesc_4 operandTypes[3] = {};
     if (!_getNVVMValueOperation(inst->getOp(), operation) ||
         !_getNVVMSemanticType(inst->getDataType(), resultType))
     {
-        return nullptr;
+        return false;
     }
     for (UInt i = 0; i < inst->getOperandCount(); ++i)
     {
         IRInst* operand = inst->getOperand(i);
-        if (!operand || !_getNVVMSemanticType(operand->getDataType(), operandTypes[i]))
-            return nullptr;
+        if (!operand || !_getNVVMSemanticType(operand->getDataType(), outOperation.operandTypes[i]))
+            return false;
     }
 
-    const SlangNVVMValueOperationDesc_4 desc = {
+    outOperation.desc = {
         uint32_t(sizeof(SlangNVVMValueOperationDesc_4)),
         operation,
         resultType,
-        inst->getOperandCount() ? operandTypes : nullptr,
+        inst->getOperandCount() ? outOperation.operandTypes : nullptr,
         inst->getOperandCount(),
     };
-    return NVVMSemantics::find(desc);
+    outOperation.staticEntry = NVVMSemantics::find(outOperation.desc);
+    if (outOperation.staticEntry)
+    {
+        outOperation.diagnosticName = outOperation.staticEntry->diagnosticName;
+        return true;
+    }
+    if (!NVVMSemantics::resolveV4Family(outOperation.desc, outOperation.family))
+        return false;
+    outOperation.diagnosticName = outOperation.family.diagnosticName;
+    return true;
 }
 
 // Checks that an executable operand has an accepted definition that dominates its use.
@@ -352,6 +426,25 @@ SlangResult _validateInteger32Value(
     }
     if (!value || !isNVVMUnsignedI32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("32-bit integer value"));
+    return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
+}
+
+// Checks one selected integer value, including an exact-width executable literal.
+SlangResult _validateSelectedIntegerValue(
+    CodeGenContext* codeGenContext,
+    IRInst* value,
+    IRInst* consumer,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree,
+    NVVMIRFeatureSet& features)
+{
+    if (!value || !isNVVMSupportedIntegerScalarType(value->getDataType()))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("selected integer value"));
+    if (_asExecutableSelectedIntegerConstant(value))
+    {
+        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
+        return SLANG_OK;
+    }
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
@@ -443,7 +536,36 @@ SlangResult _validateScalarValue(
             dominatorTree,
             features);
     }
-    return _validateInteger32Value(
+    if (value && isNVVMSupportedIntegerScalarType(value->getDataType()))
+    {
+        return _validateSelectedIntegerValue(
+            codeGenContext,
+            value,
+            consumer,
+            availableValues,
+            dominatorTree,
+            features);
+    }
+    return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar value"));
+}
+
+// Checks a selected scalar or the bounded signed-i32x2 vector proof.
+SlangResult _validateNumericValue(
+    CodeGenContext* codeGenContext,
+    IRInst* value,
+    IRInst* consumer,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree,
+    NVVMIRFeatureSet& features)
+{
+    if (value && asNVVMSupportedSignedI32x2Type(value->getDataType()))
+        return _validateAvailableValue(
+            codeGenContext,
+            value,
+            consumer,
+            availableValues,
+            dominatorTree);
+    return _validateScalarValue(
         codeGenContext,
         value,
         consumer,
@@ -462,14 +584,14 @@ SlangResult _validatePointerValue(
     bool requireWriteAccess,
     IRType* expectedPointeeType)
 {
-    auto scalarPtrType =
-        value ? asNVVMSupportedDeviceScalarPointerType(value->getDataType()) : nullptr;
+    auto numericPtrType =
+        value ? asNVVMSupportedDeviceNumericPointerType(value->getDataType()) : nullptr;
     auto resourceElementPtrType =
         value ? asNVVMSupportedRWStructuredBufferI32ElementPointerType(value->getDataType())
               : nullptr;
     auto sharedElementPtrType =
         value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
-    IRPtrTypeBase* devicePtrType = scalarPtrType;
+    IRPtrTypeBase* devicePtrType = numericPtrType;
     IRPtrTypeBase* acceptedPtrType = devicePtrType ? devicePtrType : sharedElementPtrType;
     if (!acceptedPtrType &&
         (!resourceElementPtrType || value->getOp() != kIROp_RWStructuredBufferGetElementPtr))
@@ -588,7 +710,8 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 // Returns whether a type is an accepted canonical scalar in a helper parameter.
 bool _isSupportedNVVMHelperParameterType(IRInst* type)
 {
-    return isNVVMInteger32Type(type) || isNVVMFloat32Type(type) || isNVVMBoolType(type);
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+           isNVVMBoolType(type);
 }
 
 // Returns whether a type is an accepted canonical value in a helper result.
@@ -840,9 +963,13 @@ SlangResult _validateNVVMFunction(
         {
             for (auto param : block->getParams())
             {
-                if (isNVVMSignedI32Type(param->getDataType()))
+                if (isNVVMSupportedIntegerScalarType(param->getDataType()))
                 {
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
+                    _requireFeature(
+                        features,
+                        isNVVMSignedI32Type(param->getDataType())
+                            ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA
+                            : SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI);
                 }
                 else if (isNVVMFloat32Type(param->getDataType()))
                 {
@@ -867,7 +994,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_Load:
                 if (isNVVMFloat32Type(inst->getDataType()))
                     _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
-                else if (!isNVVMInteger32Type(inst->getDataType()))
+                else if (!isNVVMSupportedNumericValueType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
                 break;
@@ -889,22 +1016,17 @@ SlangResult _validateNVVMFunction(
             case kIROp_BitXor:
             case kIROp_BitNot:
             case kIROp_Neg:
+            case kIROp_IntCast:
+            case kIROp_CastIntToFloat:
+            case kIROp_CastFloatToInt:
                 {
-                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
-                    if (!semantic)
-                    {
-                        const UnownedStringSlice construct =
-                            inst->getOp() == kIROp_Div      ? toSlice("div")
-                            : inst->getOp() == kIROp_Mul    ? toSlice("signed i32 multiplication")
-                            : inst->getOp() == kIROp_BitAnd ? toSlice("signed i32 bitwise AND")
-                            : inst->getOp() == kIROp_BitOr  ? toSlice("signed i32 bitwise OR")
-                            : inst->getOp() == kIROp_BitXor ? toSlice("signed i32 bitwise XOR")
-                            : inst->getOp() == kIROp_BitNot ? toSlice("signed i32 bitwise NOT")
-                            : inst->getOp() == kIROp_Neg ? toSlice("signed i32 arithmetic negation")
-                                                         : toSlice("signed i32 arithmetic");
-                        return _diagnoseUnsupportedIR(codeGenContext, construct);
-                    }
-                    _requireFeature(features, semantic->legacyFeature);
+                    NVVMResolvedValueOperation operation;
+                    if (!_resolveNVVMValueOperation(inst, operation))
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                    if (operation.staticEntry)
+                        _requireFeature(features, operation.staticEntry->legacyFeature);
                 }
                 break;
 
@@ -933,24 +1055,13 @@ SlangResult _validateNVVMFunction(
             case kIROp_Leq:
             case kIROp_Geq:
                 {
-                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
-                    if (semantic)
-                    {
-                        _requireFeature(features, semantic->legacyFeature);
-                        break;
-                    }
-                    if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
-                    {
+                    NVVMResolvedValueOperation operation;
+                    if (!_resolveNVVMValueOperation(inst, operation))
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            inst->getOp() == kIROp_Less      ? toSlice("signed i32 comparison")
-                            : inst->getOp() == kIROp_Eql     ? toSlice("signed i32 equality")
-                            : inst->getOp() == kIROp_Neq     ? toSlice("signed i32 inequality")
-                            : inst->getOp() == kIROp_Greater ? toSlice("signed i32 greater-than")
-                            : inst->getOp() == kIROp_Leq
-                                ? toSlice("signed i32 less-than-or-equal")
-                                : toSlice("signed i32 greater-than-or-equal"));
-                    }
+                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                    if (operation.staticEntry)
+                        _requireFeature(features, operation.staticEntry->legacyFeature);
                 }
                 break;
 
@@ -1005,16 +1116,16 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_WaveMaskBallot:
                 {
-                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
-                    if (!semantic)
+                    NVVMResolvedValueOperation operation;
+                    if (!_resolveNVVMValueOperation(inst, operation) || !operation.staticEntry)
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("wave-mask ballot"));
-                    _requireFeature(features, semantic->legacyFeature);
+                    _requireFeature(features, operation.staticEntry->legacyFeature);
                 }
                 break;
 
             case kIROp_GetOffsetPtr:
                 if (inst->getOperandCount() != 2 ||
-                    !asNVVMSupportedDeviceScalarPointerType(inst->getDataType()))
+                    !asNVVMSupportedDeviceNumericPointerType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -1102,26 +1213,13 @@ SlangResult _validateNVVMFunction(
                         dominatorTree,
                         true,
                         store->getVal()->getDataType()));
-                    if (isNVVMFloat32Type(store->getVal()->getDataType()))
-                    {
-                        SLANG_RETURN_ON_FAIL(_validateFloat32Value(
-                            codeGenContext,
-                            store->getVal(),
-                            store,
-                            availableValues,
-                            dominatorTree,
-                            features));
-                    }
-                    else
-                    {
-                        SLANG_RETURN_ON_FAIL(_validateInteger32Value(
-                            codeGenContext,
-                            store->getVal(),
-                            store,
-                            availableValues,
-                            dominatorTree,
-                            features));
-                    }
+                    SLANG_RETURN_ON_FAIL(_validateNumericValue(
+                        codeGenContext,
+                        store->getVal(),
+                        store,
+                        availableValues,
+                        dominatorTree,
+                        features));
                 }
                 break;
 
@@ -1129,132 +1227,36 @@ SlangResult _validateNVVMFunction(
             case kIROp_Sub:
             case kIROp_Mul:
             case kIROp_Div:
-                if (isNVVMFloat32Type(inst->getDataType()))
-                {
-                    SLANG_RETURN_ON_FAIL(_validateFloat32Value(
-                        codeGenContext,
-                        inst->getOperand(0),
-                        inst,
-                        availableValues,
-                        dominatorTree,
-                        features));
-                    SLANG_RETURN_ON_FAIL(_validateFloat32Value(
-                        codeGenContext,
-                        inst->getOperand(1),
-                        inst,
-                        availableValues,
-                        dominatorTree,
-                        features));
-                    availableValues.add(inst);
-                    break;
-                }
-                SLANG_RELEASE_ASSERT(inst->getOp() != kIROp_Div);
-                [[fallthrough]];
             case kIROp_BitAnd:
             case kIROp_BitOr:
             case kIROp_BitXor:
-                SLANG_RETURN_ON_FAIL(_validateI32Value(
-                    codeGenContext,
-                    inst->getOperand(0),
-                    inst,
-                    availableValues,
-                    dominatorTree,
-                    features));
-                SLANG_RETURN_ON_FAIL(_validateI32Value(
-                    codeGenContext,
-                    inst->getOperand(1),
-                    inst,
-                    availableValues,
-                    dominatorTree,
-                    features));
-                availableValues.add(inst);
-                break;
-
+            case kIROp_BitNot:
+            case kIROp_Neg:
             case kIROp_Less:
             case kIROp_Eql:
             case kIROp_Neq:
             case kIROp_Greater:
             case kIROp_Leq:
             case kIROp_Geq:
+            case kIROp_IntCast:
+            case kIROp_CastIntToFloat:
+            case kIROp_CastFloatToInt:
                 {
-                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
-                    if (semantic &&
-                        semantic->operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4)
+                    NVVMResolvedValueOperation operation;
+                    SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                    for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
+                         ++operandIndex)
                     {
-                        SLANG_RETURN_ON_FAIL(_validateFloat32Value(
+                        SLANG_RETURN_ON_FAIL(_validateNumericValue(
                             codeGenContext,
-                            inst->getOperand(0),
-                            inst,
-                            availableValues,
-                            dominatorTree,
-                            features));
-                        SLANG_RETURN_ON_FAIL(_validateFloat32Value(
-                            codeGenContext,
-                            inst->getOperand(1),
+                            inst->getOperand(operandIndex),
                             inst,
                             availableValues,
                             dominatorTree,
                             features));
                     }
-                    else
-                    {
-                        SLANG_RETURN_ON_FAIL(_validateI32Value(
-                            codeGenContext,
-                            inst->getOperand(0),
-                            inst,
-                            availableValues,
-                            dominatorTree,
-                            features));
-                        SLANG_RETURN_ON_FAIL(_validateI32Value(
-                            codeGenContext,
-                            inst->getOperand(1),
-                            inst,
-                            availableValues,
-                            dominatorTree,
-                            features));
-                    }
-                    SLANG_RELEASE_ASSERT(semantic);
-                    _requireFeature(features, semantic->legacyFeature);
-                    availableValues.add(inst);
-                }
-                break;
-
-            case kIROp_BitNot:
-                SLANG_RETURN_ON_FAIL(_validateI32Value(
-                    codeGenContext,
-                    inst->getOperand(0),
-                    inst,
-                    availableValues,
-                    dominatorTree,
-                    features));
-                availableValues.add(inst);
-                break;
-
-            case kIROp_Neg:
-                {
-                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
-                    SLANG_RELEASE_ASSERT(semantic);
-                    if (semantic->resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4)
-                    {
-                        SLANG_RETURN_ON_FAIL(_validateFloat32Value(
-                            codeGenContext,
-                            inst->getOperand(0),
-                            inst,
-                            availableValues,
-                            dominatorTree,
-                            features));
-                    }
-                    else
-                    {
-                        SLANG_RETURN_ON_FAIL(_validateI32Value(
-                            codeGenContext,
-                            inst->getOperand(0),
-                            inst,
-                            availableValues,
-                            dominatorTree,
-                            features));
-                    }
-                    _requireFeature(features, semantic->legacyFeature);
+                    if (operation.staticEntry)
+                        _requireFeature(features, operation.staticEntry->legacyFeature);
                     availableValues.add(inst);
                 }
                 break;
@@ -1361,7 +1363,7 @@ SlangResult _validateNVVMFunction(
                     IRInst* elementOffset = inst->getOperand(1);
                     auto basePointerType =
                         basePointer
-                            ? asNVVMSupportedDeviceScalarPointerType(basePointer->getDataType())
+                            ? asNVVMSupportedDeviceNumericPointerType(basePointer->getDataType())
                             : nullptr;
                     if (!basePointerType ||
                         !isTypeEqual(inst->getDataType(), basePointer->getDataType()))
@@ -1648,17 +1650,21 @@ SlangResult _getLoweredNVVMValue(
         return SLANG_OK;
     }
 
-    if (auto intLit = _asExecutableInteger32Constant(irValue))
+    if (auto intLit = _asExecutableSelectedIntegerConstant(irValue))
     {
         SlangNVVMTypeHandle_1 integerType = nullptr;
         IRIntegerValue integerValue = intLit->getValue();
-        if (isNVVMUnsignedI32Type(intLit->getDataType()) && integerValue > kNVVMI32Max)
-            integerValue -= IRIntegerValue(1) << 32;
+        uint32_t bitWidth = 0;
+        bool isSigned = false;
+        SLANG_RELEASE_ASSERT(
+            isNVVMSupportedIntegerScalarType(intLit->getDataType(), &bitWidth, &isSigned));
+        if (!isSigned && bitWidth < 64 && integerValue >= (IRIntegerValue(1) << (bitWidth - 1)))
+            integerValue -= IRIntegerValue(1) << bitWidth;
         SLANG_RETURN_ON_FAIL(
             typeContext.lowerType(intLit->getDataType(), NVVMTypeUse::Value, integerType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
-            "32-bit integer constant",
+            "selected integer constant",
             builder.getIntegerConstant(module, integerType, int64_t(integerValue), outValue)));
         valueMap[irValue] = outValue;
         return SLANG_OK;
@@ -1826,6 +1832,15 @@ SlangResult emitNVVMIRFromLinkedIR(
         {
             for (auto inst : block->getOrdinaryInsts())
             {
+                NVVMResolvedValueOperation valueOperation;
+                if (_resolveNVVMValueOperation(inst, valueOperation) &&
+                    !builder.supportsValueOperation(valueOperation.desc))
+                {
+                    return _requireBuilderOperation(
+                        codeGenContext,
+                        valueOperation.diagnosticName,
+                        SLANG_E_NOT_AVAILABLE);
+                }
                 auto genericAsm = as<IRGenericAsm>(inst);
                 if (!genericAsm)
                     continue;
@@ -2044,14 +2059,16 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        const uint32_t alignment =
+                            getNVVMNumericValueAlignment(load->getDataType());
+                        SLANG_RELEASE_ASSERT(alignment);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            isNVVMFloat32Type(load->getDataType()) ? "float32 load"
-                                                                   : "32-bit integer load",
+                            "numeric load",
                             builder.emitLoad(
                                 moduleScope.module,
                                 loweredPointer,
-                                kNVVMScalar32Alignment,
+                                alignment,
                                 loweredValue)));
                         valueMap[load] = loweredValue;
                     }
@@ -2080,13 +2097,12 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredPointer));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            isNVVMFloat32Type(store->getVal()->getDataType()) ? "float32 store"
-                                                                              : "signed i32 store",
+                            "numeric store",
                             builder.emitStore(
                                 moduleScope.module,
                                 loweredValue,
                                 loweredPointer,
-                                kNVVMScalar32Alignment)));
+                                getNVVMNumericValueAlignment(store->getVal()->getDataType()))));
                     }
                     break;
 
@@ -2105,10 +2121,13 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Greater:
                 case kIROp_Leq:
                 case kIROp_Geq:
+                case kIROp_IntCast:
+                case kIROp_CastIntToFloat:
+                case kIROp_CastFloatToInt:
                 case kIROp_WaveMaskBallot:
                     {
-                        const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
-                        SLANG_RELEASE_ASSERT(semantic);
+                        NVVMResolvedValueOperation operation;
+                        SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
                         SlangNVVMValueHandle_1 loweredOperands[3] = {};
                         for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
                              ++operandIndex)
@@ -2124,14 +2143,12 @@ SlangResult emitNVVMIRFromLinkedIR(
                         }
 
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        const SlangNVVMValueOperationDesc_4 operation =
-                            NVVMSemantics::getOperationDesc(*semantic);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            semantic->diagnosticName,
+                            operation.diagnosticName,
                             builder.emitValueOperation(
                                 moduleScope.module,
-                                operation,
+                                operation.desc,
                                 inst->getOperandCount() ? loweredOperands : nullptr,
                                 inst->getOperandCount(),
                                 loweredValue)));

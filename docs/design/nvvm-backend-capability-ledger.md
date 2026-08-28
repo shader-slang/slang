@@ -289,7 +289,7 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangNegotiatesScalarIntegerSignedGreaterEqualCapability` | An exact 360-byte Slice 24 provider still compiles signed-i32 less-than-or-equal, while a signed-greater-equal program reaches E52016 after discovery but before module creation | Pass |
 | `slang-unit-test-tool/nvvmSlangRetainsOnlySelectedCUDAKernel` | CUDA-kernel pruning still removes an unselected kernel before direct emission while preserving the exact selected entry point | Pass |
 | `slang-unit-test-tool/nvvmSlangRejectsConventionalRawKernelParameters` | Only `[CUDAKernel]` receives the raw scalar ABI; a conventional parameterized compute entry reaches E52017 before builder or libNVVM program creation | Pass |
-| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | Signed-i32 left/right shifts, division, and remainder stop at `'shl'`, `'shr'`, `'div'`, and `'irem'`; logical NOT and i64/half/double entry parameters retain their earlier boundaries. Canonical UInt transport is accepted, so unsigned pointer offset reaches its unsupported UInt constant and unsigned multiply, bitwise, negate, atomic, equality, inequality, and ordered-comparison fixtures reach their exact signed-only operation diagnostics. Wide variants, pointer comparisons, void/pointer helpers, arrays, aggregates, and storage variants retain deterministic E52017 boundaries before builder discovery or libNVVM program creation. Float multiply, negate, and sine cases reach the following unsupported `'castFloatToInt'` | Pass |
+| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | Integer shifts, division, and remainder stop at their canonical IR operations; logical NOT, half/double parameters, libdevice sine, pointer comparisons, void/pointer helpers, unsupported arrays/aggregates/storage, and independent atomic/resource/shared-memory variants retain deterministic E52017 boundaries before builder discovery or libNVVM program creation. Newly selected signed/unsigned widths, arithmetic, bitwise operations, negate, comparisons, and explicit conversions are no longer listed as unsupported | Pass |
 | `slang-unit-test-tool/nvvmCompilerNegotiatesCUDADeviceLibraryOption` | The terminal naturally aligned pointer-sized `requiresCUDADeviceLibrary` storage does not reuse prior tail padding; zero means false, nonzero means true, and an older compatible options prefix leaves established libdevice-free compiles independent of a toolkit root | Pass |
 | `slang-unit-test-tool/nvvmCompilerUsesSelectedToolkitLibdevice` | Filesystem discovery carries the canonical successful decorated libNVVM candidate into compiler construction, never retries a conflicting environment root, reads exact `nvvm/libdevice/libdevice.10.bc` only on demand, and includes a coherent libdevice timestamp in compiler identity | Pass |
 | `slang-unit-test-tool/nvvmCompilerRejectsUnavailableRequestedLibdevice` | Zero demand compiles without requiring, reading, or adding libdevice; requested missing-root or missing-file/read failures stop before program creation | Pass |
@@ -309,6 +309,11 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangNegotiatesCUDAExecutionCapability` | An exact V4 construction-version-1 provider is discovered but reports E52018 for required extended construction before module creation or operation emission | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage` | V4 construction version 3 preserves versions 1 and 2, rejects invalid type/address-space/alignment/name/output and duplicate-name cases without mutation, then emits exact normal and LLVM-7-compatible address-space-3 storage/GEP/load/store forms | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesSharedGlobalStorageCapability` | An exact V4 construction-version-2 provider retains Slice 66 programs but reports E52018 for shared storage before module creation | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies` | Dimensioned V4 descriptors emit signed/unsigned comparisons, signed/unsigned widening, integer/float conversions, and signed-i32x2 addition in normal and compatible assembly; mixed signedness, i24, and vector multiply remain unsupported with sanitized output | Pass |
+| `slang-unit-test-tool/nvvmSlangNegotiatesNumericFamilyCapability` | A static-catalog-only V4 provider is discovered once but reports E52018 for the mixed numeric family before module creation or libNVVM program creation | Pass |
+| `slang-unit-test-tool/nvvmSlangMixedNumericDifferentialPTX` | Raw signed/unsigned 8/16/64-bit scalars, float32, eight numeric pointers, explicit conversions, signed/unsigned branches, and signed-i32x2 load/add/store compile through both routes | Pass |
+| `slang-unit-test-tool/nvvmSlangMixedNumericPtxasAccepts` | CUDA 12.9 `ptxas` accepts direct NVVM and NVRTC PTX for the representative mixed-width/vector workload | Pass |
+| `slang-unit-test-tool/nvvmSlangMixedNumericRuntimeMatchesNVRTC` | One RTX 5090 thread exercises narrow wrapping/bitwise results, i64 arithmetic, signed/unsigned comparisons, float/integer conversions, and both int2 lanes identically through direct NVVM and NVRTC | Pass |
 
 Slice 9 extends Bucket 2 through a finite DAG of canonical direct `IRFunc`
 callees with signed-i32 parameters/results and valued returns. Complex and aggregate types, pointer
@@ -1246,3 +1251,31 @@ complete Release prefix passes 431/431 with sorted-name SHA-256
 names reproduces Slice 66's 425-name hash
 `641fcaf6a0da63e30a6146beb3e46e261d58297299aa33d180a1f86d73e4f0e5` exactly. Debug preservation
 passes 8/8.
+
+Slice 68 selects signed and unsigned integer scalars at 8, 16, 32, and 64 bits for raw ABI,
+constants, scalar helper/SSA transport, naturally aligned device memory, and the established
+wrapping arithmetic, bitwise, negate, equality, and ordered-comparison families. It also adds
+explicit integer narrowing/widening/signedness changes, float32/integer conversion, and the bounded
+signed-i32x2 device load/add/store proof. The canonical IR carries `intCast`, `castIntToFloat`, and
+`castFloatToInt`; signedness remains in the semantic descriptor after LLVM integer types become
+signless.
+
+The exact catalog remains authoritative for all legacy adapters. Parameterized V4 family
+resolution adds three conversion operation IDs but no callback, facade method, feature bit,
+construction version, or whole-signature enum. Normal and compatible provider text demonstrate
+`add i8`, signed and unsigned comparisons, `sext`, `zext`, `sitofp`, `fptoui`, and
+`add <2 x i32>`. Mixed-sign arithmetic, i24 descriptors, and vector multiplication remain exact
+negative boundaries, and an older static-only V4 provider stops before module creation.
+
+Direct NVVM and NVRTC agree on all fifteen launch-parameter widths and produce identical mixed
+results on the RTX 5090. CUDA 12.9 `ptxas` accepts both routes; a representative direct `sm_70 -v`
+assembly uses 32 registers, no barriers, 444 bytes constant memory, no stack, and no spills.
+Float64/low precision, arbitrary vectors/matrices, shifts/division/remainder, and non-i32
+resource/shared/atomic breadth remain unclaimed.
+
+Five names add 468 measured physical lines, from 29,707 to 30,175. Release passes 436/436 with
+sorted-name SHA-256 `38cc59e5a3488f84cdb4e5c26cc11f3afbb59e10dcae97036ab64c7e7148054d`;
+removing the five Slice 68 names reproduces Slice 67's hash
+`3d3e5effec15efd6d8eec74752802df83fe21ffb89e9d9037b3abf0803d25c0b` exactly. The rebuilt Debug
+host fake-provider sample passes 8/8; real-provider validation uses Release because the local LLVM
+dependency build does not provide Debug libraries.

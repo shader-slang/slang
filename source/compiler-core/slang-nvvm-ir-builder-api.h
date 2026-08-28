@@ -989,7 +989,10 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS_4 ((SlangNVVMValueOperation_4)26u)
 #define SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4 ((SlangNVVMValueOperation_4)27u)
 #define SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER_4 ((SlangNVVMValueOperation_4)28u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT_4 29u
+#define SLANG_NVVM_VALUE_OP_INTEGER_CONVERT_4 ((SlangNVVMValueOperation_4)29u)
+#define SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT_4 ((SlangNVVMValueOperation_4)30u)
+#define SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER_4 ((SlangNVVMValueOperation_4)31u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT_4 32u
 
     /**
      * Describes one complete value-operation overload. The pointed-to operand descriptors

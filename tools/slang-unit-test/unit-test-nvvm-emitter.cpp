@@ -4340,6 +4340,35 @@ SLANG_UNIT_TEST(nvvmSlangBuilderDiagnosticsStopBeforeLibNVVM)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangNegotiatesNumericFamilyCapability)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV4();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMMixedNumericSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        const String diagnosticText = _getBlobText(diagnostics);
+        SLANG_CHECK(diagnosticText.indexOf("E52018") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 {
     struct UnsupportedCase
@@ -4361,57 +4390,31 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedSharedFloatArraySource, "'device i32 array element pointer'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
-        {kDirectNVVMUnsignedMultiplySource, "'signed i32 multiplication'"},
-        {kDirectNVVMWideIntegerMultiplySource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingMultiplySource, "'castFloatToInt'"},
-        {kDirectNVVMFloatingSineSource, "'castFloatToInt'"},
+        {kDirectNVVMFloatingSineSource, "'GenericAsm'"},
         {kDirectNVVMIntegerLeftShiftSource, "'shl'"},
         {kDirectNVVMIntegerRightShiftSource, "'shr'"},
         {kDirectNVVMIntegerDivideSource, "'div'"},
         {kDirectNVVMIntegerRemainderSource, "'irem'"},
-        {kDirectNVVMUnsignedIntegerBitAndSource, "'signed i32 bitwise AND'"},
-        {kDirectNVVMWideIntegerBitAndSource, "'entry-point parameter'"},
-        {kDirectNVVMUnsignedIntegerBitOrSource, "'signed i32 bitwise OR'"},
-        {kDirectNVVMWideIntegerBitOrSource, "'entry-point parameter'"},
-        {kDirectNVVMUnsignedIntegerBitXorSource, "'signed i32 bitwise XOR'"},
-        {kDirectNVVMWideIntegerBitXorSource, "'entry-point parameter'"},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
-        {kDirectNVVMUnsignedIntegerBitNotSource, "'signed i32 bitwise NOT'"},
-        {kDirectNVVMWideIntegerBitNotSource, "'entry-point parameter'"},
-        {kDirectNVVMUnsignedIntegerNegateSource, "'signed i32 arithmetic negation'"},
-        {kDirectNVVMWideIntegerNegateSource, "'entry-point parameter'"},
-        {kDirectNVVMFloatingNegateSource, "'castFloatToInt'"},
         {kDirectNVVMUnsignedAtomicAddSource, "'relaxed global signed i32 atomic add'"},
-        {kDirectNVVMWideAtomicAddSource, "'entry-point parameter'"},
+        {kDirectNVVMWideAtomicAddSource, "'relaxed global signed i32 atomic add'"},
         {kDirectNVVMFloatingAtomicAddSource, "'relaxed global signed i32 atomic add'"},
         {kDirectNVVMAtomicSubSource, "'atomicSub'"},
         {kDirectNVVMAtomicExchangeSource, "'atomicExchange'"},
         {kDirectNVVMAcquireGlobalI32AtomicAddSource, "'relaxed atomic-add memory order'"},
         {kDirectNVVMGroupSharedI32AtomicAddSource, "'device scalar pointer'"},
-        {kDirectNVVMUnsignedIntegerEqualSource, "'signed i32 value'"},
-        {kDirectNVVMWideIntegerEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMPointerEqualSource, "'signed i32 value'"},
-        {kDirectNVVMUnsignedIntegerNotEqualSource, "'signed i32 value'"},
-        {kDirectNVVMWideIntegerNotEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMPointerNotEqualSource, "'signed i32 value'"},
-        {kDirectNVVMUnsignedIntegerGreaterThanSource, "'signed i32 value'"},
-        {kDirectNVVMWideIntegerGreaterThanSource, "'entry-point parameter'"},
-        {kDirectNVVMPointerGreaterThanSource, "'signed i32 value'"},
-        {kDirectNVVMUnsignedIntegerLessEqualSource, "'signed i32 value'"},
-        {kDirectNVVMWideIntegerLessEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMPointerLessEqualSource, "'signed i32 value'"},
-        {kDirectNVVMUnsignedIntegerGreaterEqualSource, "'signed i32 value'"},
-        {kDirectNVVMWideIntegerGreaterEqualSource, "'entry-point parameter'"},
-        {kDirectNVVMPointerGreaterEqualSource, "'signed i32 value'"},
+        {kDirectNVVMPointerEqualSource, "'cmpEQ'"},
+        {kDirectNVVMPointerNotEqualSource, "'cmpNE'"},
+        {kDirectNVVMPointerGreaterThanSource, "'cmpGT'"},
+        {kDirectNVVMPointerLessEqualSource, "'cmpLE'"},
+        {kDirectNVVMPointerGreaterEqualSource, "'cmpGE'"},
     };
 
     // The direct subset retains scalar-only helper/value policy. Adjacent aggregate, local-memory,
-    // multiply ABI variants, logical NOT/shifts/division/remainder, unsigned/wide AND/OR/XOR/NOT,
-    // unsigned/wide negate and floating-negate-plus-cast and atomic-add ABI variants,
+    // logical NOT/shifts/division/remainder, libdevice calls, and atomic-add ABI variants,
     // non-relaxed atomic-add order,
     // adjacent atomic operations, group-shared atomic add, non-i32 shared arrays,
-    // unsigned/wide equality, floating and
-    // unsigned/wide inequality and ordered comparisons, pointer comparisons, unsigned indices,
+    // pointer comparisons, unsigned indices,
     // and helper-array-pointer shapes remain deterministic before builder discovery.
     for (const auto& unsupported : kCases)
     {

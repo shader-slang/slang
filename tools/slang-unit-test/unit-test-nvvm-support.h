@@ -6078,8 +6078,165 @@ void computeMain(
 {
     *destination = left + right;
 }
-
 )";
+
+static SlangResult _populateNumericFamilyFunction(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module)
+{
+    SlangNVVMTypeHandle_1 int8Type = nullptr;
+    SlangNVVMTypeHandle_1 int16Type = nullptr;
+    SlangNVVMTypeHandle_1 int32Type = nullptr;
+    SlangNVVMTypeHandle_1 int64Type = nullptr;
+    SlangNVVMTypeHandle_1 floatType = nullptr;
+    SlangNVVMTypeHandle_1 int2Type = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 8, int8Type));
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 16, int16Type));
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, int32Type));
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 64, int64Type));
+    SLANG_RETURN_ON_FAIL(builder.getFloatingPointType(module, 32, floatType));
+    SLANG_RETURN_ON_FAIL(builder.getVectorType(module, int32Type, 2, int2Type));
+
+    const SlangNVVMTypeHandle_1 parameterTypes[] = {
+        int8Type,
+        int8Type,
+        floatType,
+        int2Type,
+        int2Type,
+    };
+    SlangNVVMTypeHandle_1 functionType = nullptr;
+    SlangNVVMValueHandle_1 function = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
+        module,
+        int2Type,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType));
+    SLANG_RETURN_ON_FAIL(
+        builder.declareFunction(module, functionType, toSlice("numericFamilies"), function));
+
+    SlangNVVMValueHandle_1 parameters[SLANG_COUNT_OF(parameterTypes)] = {};
+    for (size_t i = 0; i < SLANG_COUNT_OF(parameters); ++i)
+        SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, i, parameters[i]));
+    SlangNVVMBlockHandle_1 entryBlock = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, function, toSlice("entry"), entryBlock));
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
+
+    const SlangNVVMValueTypeDesc_4 signedI8 = {
+        SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4,
+        8,
+        1,
+        0,
+    };
+    const SlangNVVMValueTypeDesc_4 unsignedI8 = {
+        SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4,
+        8,
+        1,
+        0,
+    };
+    const SlangNVVMValueTypeDesc_4 unsignedI16 = {
+        SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4,
+        16,
+        1,
+        0,
+    };
+    const SlangNVVMValueTypeDesc_4 signedI64 = {
+        SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4,
+        64,
+        1,
+        0,
+    };
+    const SlangNVVMValueTypeDesc_4 float32 = NVVMSemantics::kFloat32;
+    const SlangNVVMValueTypeDesc_4 boolType = NVVMSemantics::kBool;
+    const SlangNVVMValueTypeDesc_4 signedI32x2 = NVVMSemantics::kSignedI32x2;
+
+    auto emitOperation = [&](SlangNVVMValueOperation_4 operation,
+                             const SlangNVVMValueTypeDesc_4& resultType,
+                             const SlangNVVMValueTypeDesc_4* operandTypes,
+                             const SlangNVVMValueHandle_1* operands,
+                             size_t operandCount,
+                             SlangNVVMValueHandle_1& outValue)
+    {
+        const SlangNVVMValueOperationDesc_4 desc = {
+            uint32_t(sizeof(SlangNVVMValueOperationDesc_4)),
+            operation,
+            resultType,
+            operandTypes,
+            operandCount,
+        };
+        return builder.emitValueOperation(module, desc, operands, operandCount, outValue);
+    };
+
+    SlangNVVMValueHandle_1 ignored = nullptr;
+    SlangNVVMValueTypeDesc_4 operandTypes[2] = {signedI8, signedI8};
+    SlangNVVMValueHandle_1 operands[2] = {parameters[0], parameters[1]};
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_ADD_4, signedI8, operandTypes, operands, 2, ignored));
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_LESS_THAN_4,
+        boolType,
+        operandTypes,
+        operands,
+        2,
+        ignored));
+    operandTypes[0] = unsignedI8;
+    operandTypes[1] = unsignedI8;
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_GREATER_THAN_4,
+        boolType,
+        operandTypes,
+        operands,
+        2,
+        ignored));
+
+    operandTypes[0] = signedI8;
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_INTEGER_CONVERT_4,
+        signedI64,
+        operandTypes,
+        operands,
+        1,
+        ignored));
+    operandTypes[0] = unsignedI8;
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_INTEGER_CONVERT_4,
+        signedI64,
+        operandTypes,
+        operands + 1,
+        1,
+        ignored));
+    operandTypes[0] = signedI8;
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT_4,
+        float32,
+        operandTypes,
+        operands,
+        1,
+        ignored));
+    operandTypes[0] = float32;
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER_4,
+        unsignedI16,
+        operandTypes,
+        parameters + 2,
+        1,
+        ignored));
+
+    operandTypes[0] = signedI32x2;
+    operandTypes[1] = signedI32x2;
+    operands[0] = parameters[3];
+    operands[1] = parameters[4];
+    SlangNVVMValueHandle_1 vectorSum = nullptr;
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_ADD_4,
+        signedI32x2,
+        operandTypes,
+        operands,
+        2,
+        vectorSum));
+    return builder.emitValueReturn(module, vectorSum);
+}
+
 static const char kDirectNVVMWaveLaneIndexSource[] = R"(
 [CUDAKernel]
 void computeMain(
@@ -7031,6 +7188,39 @@ void computeMain(
     uniform int value)
 {
     *destination = value + 1;
+}
+)";
+static const char kDirectNVVMMixedNumericSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int8_t, Access::ReadWrite, AddressSpace::Device> output8,
+    uniform Ptr<uint16_t, Access::ReadWrite, AddressSpace::Device> output16,
+    uniform Ptr<int64_t, Access::ReadWrite, AddressSpace::Device> output64,
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> output32,
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> outputFloat,
+    uniform Ptr<int2, Access::ReadWrite, AddressSpace::Device> outputVector,
+    uniform Ptr<int2, Access::Read, AddressSpace::Device> leftVector,
+    uniform Ptr<int2, Access::Read, AddressSpace::Device> rightVector,
+    uniform int8_t a,
+    uniform uint8_t b,
+    uniform int16_t c,
+    uniform uint16_t d,
+    uniform int64_t e,
+    uniform uint64_t f,
+    uniform float g)
+{
+    int index = int(cudaThreadIdx().x);
+    output8[index] = ~(a + int8_t(b));
+    output16[index] = (uint16_t(c) + d) ^ uint16_t(0x55aa);
+    output64[index] = (int64_t(f) + e) * int64_t(3);
+    int converted = int(g) + int(b);
+    if (a < int8_t(b))
+        converted += 1000;
+    if (d > uint16_t(c))
+        converted += 2000;
+    output32[index] = converted;
+    outputFloat[index] = float(c) + g;
+    outputVector[index] = leftVector[index] + rightVector[index];
 }
 )";
 static const char kDirectNVVMMergePhiSource[] = R"(
@@ -9507,6 +9697,114 @@ static SlangResult _runCUDAExecutionKernel(CudaDriverApi& cuda, ISlangBlob* ptxB
     return SLANG_OK;
 }
 
+static SlangResult _runMixedNumericKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)
+{
+    const String ptx = _getBlobText(ptxBlob);
+    if (!ptx.getLength())
+        return SLANG_E_INVALID_ARG;
+
+    CudaModule module = nullptr;
+    if (cuda.cuModuleLoadData(&module, ptx.getBuffer()) != 0 || !module)
+        return SLANG_FAIL;
+    CudaModuleGuard moduleGuard{cuda, module};
+    CudaFunction function = nullptr;
+    if (cuda.cuModuleGetFunction(&function, module, "computeMain") != 0 || !function)
+        return SLANG_FAIL;
+
+    CudaDevicePtr output8 = 0;
+    CudaDevicePtr output16 = 0;
+    CudaDevicePtr output64 = 0;
+    CudaDevicePtr output32 = 0;
+    CudaDevicePtr outputFloat = 0;
+    CudaDevicePtr outputVector = 0;
+    CudaDevicePtr leftVector = 0;
+    CudaDevicePtr rightVector = 0;
+    if (cuda.cuMemAlloc(&output8, sizeof(int8_t)) != 0 || !output8)
+        return SLANG_FAIL;
+    CudaBufferGuard output8Guard{cuda, output8};
+    if (cuda.cuMemAlloc(&output16, sizeof(uint16_t)) != 0 || !output16)
+        return SLANG_FAIL;
+    CudaBufferGuard output16Guard{cuda, output16};
+    if (cuda.cuMemAlloc(&output64, sizeof(int64_t)) != 0 || !output64)
+        return SLANG_FAIL;
+    CudaBufferGuard output64Guard{cuda, output64};
+    if (cuda.cuMemAlloc(&output32, sizeof(int32_t)) != 0 || !output32)
+        return SLANG_FAIL;
+    CudaBufferGuard output32Guard{cuda, output32};
+    if (cuda.cuMemAlloc(&outputFloat, sizeof(float)) != 0 || !outputFloat)
+        return SLANG_FAIL;
+    CudaBufferGuard outputFloatGuard{cuda, outputFloat};
+    if (cuda.cuMemAlloc(&outputVector, sizeof(int32_t) * 2) != 0 || !outputVector)
+        return SLANG_FAIL;
+    CudaBufferGuard outputVectorGuard{cuda, outputVector};
+    if (cuda.cuMemAlloc(&leftVector, sizeof(int32_t) * 2) != 0 || !leftVector)
+        return SLANG_FAIL;
+    CudaBufferGuard leftVectorGuard{cuda, leftVector};
+    if (cuda.cuMemAlloc(&rightVector, sizeof(int32_t) * 2) != 0 || !rightVector)
+        return SLANG_FAIL;
+    CudaBufferGuard rightVectorGuard{cuda, rightVector};
+
+    const int32_t leftValues[] = {1, -2};
+    const int32_t rightValues[] = {3, 7};
+    if (cuda.cuMemcpyHtoD(leftVector, leftValues, sizeof(leftValues)) != 0 ||
+        cuda.cuMemcpyHtoD(rightVector, rightValues, sizeof(rightValues)) != 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    int8_t a = -100;
+    uint8_t b = 250;
+    int16_t c = -1234;
+    uint16_t d = 60000;
+    int64_t e = -7;
+    uint64_t f = 9;
+    float g = -3.75f;
+    void* parameters[] = {
+        &output8,
+        &output16,
+        &output64,
+        &output32,
+        &outputFloat,
+        &outputVector,
+        &leftVector,
+        &rightVector,
+        &a,
+        &b,
+        &c,
+        &d,
+        &e,
+        &f,
+        &g,
+    };
+    if (cuda.cuLaunchKernel(function, 1, 1, 1, 1, 1, 1, 0, nullptr, parameters, nullptr) != 0 ||
+        cuda.cuCtxSynchronize() != 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    int8_t actual8 = 0;
+    uint16_t actual16 = 0;
+    int64_t actual64 = 0;
+    int32_t actual32 = 0;
+    float actualFloat = 0.0f;
+    int32_t actualVector[2] = {};
+    if (cuda.cuMemcpyDtoH(&actual8, output8, sizeof(actual8)) != 0 ||
+        cuda.cuMemcpyDtoH(&actual16, output16, sizeof(actual16)) != 0 ||
+        cuda.cuMemcpyDtoH(&actual64, output64, sizeof(actual64)) != 0 ||
+        cuda.cuMemcpyDtoH(&actual32, output32, sizeof(actual32)) != 0 ||
+        cuda.cuMemcpyDtoH(&actualFloat, outputFloat, sizeof(actualFloat)) != 0 ||
+        cuda.cuMemcpyDtoH(actualVector, outputVector, sizeof(actualVector)) != 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    const uint16_t expected16 = uint16_t(uint16_t(uint16_t(c) + d) ^ uint16_t(0x55aa));
+    return actual8 == int8_t(105) && actual16 == expected16 && actual64 == 6 && actual32 == 1247 &&
+                   actualFloat == -1237.75f && actualVector[0] == 4 && actualVector[1] == 5
+               ? SLANG_OK
+               : SLANG_FAIL;
+}
+
 static SlangResult _runSharedMemoryKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)
 {
     static const uint32_t kThreadCount = 64;
@@ -9805,6 +10103,7 @@ static SlangResult _getPTXScalarBitWidth(const UnownedStringSlice& text, uint32_
 {
     outBitWidth = 0;
     static const char* k8BitSpellings[] = {".b8", ".s8", ".u8"};
+    static const char* k16BitSpellings[] = {".b16", ".s16", ".u16", ".f16"};
     static const char* k32BitSpellings[] = {".b32", ".s32", ".u32", ".f32"};
     static const char* k64BitSpellings[] = {".b64", ".s64", ".u64"};
 
@@ -9822,6 +10121,14 @@ static SlangResult _getPTXScalarBitWidth(const UnownedStringSlice& text, uint32_
         if (text.indexOf(UnownedStringSlice(spelling)) >= 0)
         {
             outBitWidth = 32;
+            ++matchCount;
+        }
+    }
+    for (const char* spelling : k16BitSpellings)
+    {
+        if (text.indexOf(UnownedStringSlice(spelling)) >= 0)
+        {
+            outBitWidth = 16;
             ++matchCount;
         }
     }

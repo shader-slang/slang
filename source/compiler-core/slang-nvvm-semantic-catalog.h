@@ -21,6 +21,25 @@ enum class LegacyFamily : uint32_t
     V4WorkgroupBarrier,
 };
 
+/// Identifies a parameterized V4-only operation family outside the frozen compatibility table.
+enum class V4Family : uint32_t
+{
+    None,
+    IntegerUnary,
+    IntegerBinary,
+    IntegerCompare,
+    IntegerConvert,
+    IntegerToFloat,
+    FloatToInteger,
+    SignedI32x2Add,
+};
+
+struct V4FamilyResolution
+{
+    V4Family family = V4Family::None;
+    const char* diagnosticName = nullptr;
+};
+
 /// Describes one established semantic overload from canonical Slang values to the provider ABI.
 struct CatalogEntry
 {
@@ -65,6 +84,12 @@ inline constexpr SlangNVVMValueTypeDesc_4 kFloat32 = {
     SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4,
     32,
     1,
+    0,
+};
+inline constexpr SlangNVVMValueTypeDesc_4 kSignedI32x2 = {
+    SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4,
+    32,
+    2,
     0,
 };
 
@@ -630,6 +655,96 @@ inline const CatalogEntry* find(const SlangNVVMValueOperationDesc_4& desc)
             return &entry;
     }
     return nullptr;
+}
+
+inline bool isSelectedScalarInteger(const SlangNVVMValueTypeDesc_4& type)
+{
+    const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4 ||
+                           type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4;
+    const bool isSelectedWidth =
+        type.bitWidth == 8 || type.bitWidth == 16 || type.bitWidth == 32 || type.bitWidth == 64;
+    return isInteger && isSelectedWidth && type.laneCount == 1 && type.reserved == 0;
+}
+
+/// Resolves the bounded, dimensioned numeric families added after the frozen exact catalog.
+inline bool resolveV4Family(
+    const SlangNVVMValueOperationDesc_4& desc,
+    V4FamilyResolution& outResolution)
+{
+    outResolution = {};
+    if (desc.structureSize != sizeof(desc) || (!desc.operandTypes && desc.operandCount))
+        return false;
+
+    const bool isUnaryInteger = desc.operandCount == 1 &&
+                                isSelectedScalarInteger(desc.resultType) &&
+                                areSameType(desc.resultType, desc.operandTypes[0]);
+    if (isUnaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_BIT_NOT_4 ||
+                           desc.operation == SLANG_NVVM_VALUE_OP_NEGATE_4))
+    {
+        outResolution = {V4Family::IntegerUnary, "parameterized integer unary operation"};
+        return true;
+    }
+
+    const bool isBinaryInteger = desc.operandCount == 2 &&
+                                 isSelectedScalarInteger(desc.resultType) &&
+                                 areSameType(desc.resultType, desc.operandTypes[0]) &&
+                                 areSameType(desc.resultType, desc.operandTypes[1]);
+    if (isBinaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_ADD_4 ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT_4 ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY_4 ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_AND_4 ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR_4 ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_XOR_4))
+    {
+        outResolution = {V4Family::IntegerBinary, "parameterized integer binary operation"};
+        return true;
+    }
+
+    const bool isIntegerCompare = desc.operandCount == 2 && areSameType(desc.resultType, kBool) &&
+                                  isSelectedScalarInteger(desc.operandTypes[0]) &&
+                                  areSameType(desc.operandTypes[0], desc.operandTypes[1]);
+    if (isIntegerCompare && desc.operation >= SLANG_NVVM_VALUE_OP_EQUAL_4 &&
+        desc.operation <= SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4)
+    {
+        outResolution = {V4Family::IntegerCompare, "parameterized integer comparison"};
+        return true;
+    }
+
+    if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT_4 && desc.operandCount == 1 &&
+        isSelectedScalarInteger(desc.resultType) && isSelectedScalarInteger(desc.operandTypes[0]) &&
+        !areSameType(desc.resultType, desc.operandTypes[0]))
+    {
+        outResolution = {V4Family::IntegerConvert, "explicit integer conversion"};
+        return true;
+    }
+    if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT_4 && desc.operandCount == 1 &&
+        areSameType(desc.resultType, kFloat32) && isSelectedScalarInteger(desc.operandTypes[0]))
+    {
+        outResolution = {V4Family::IntegerToFloat, "integer-to-float32 conversion"};
+        return true;
+    }
+    if (desc.operation == SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER_4 && desc.operandCount == 1 &&
+        isSelectedScalarInteger(desc.resultType) && areSameType(desc.operandTypes[0], kFloat32))
+    {
+        outResolution = {V4Family::FloatToInteger, "float32-to-integer conversion"};
+        return true;
+    }
+
+    if (desc.operation == SLANG_NVVM_VALUE_OP_ADD_4 && desc.operandCount == 2 &&
+        areSameType(desc.resultType, kSignedI32x2) &&
+        areSameType(desc.operandTypes[0], kSignedI32x2) &&
+        areSameType(desc.operandTypes[1], kSignedI32x2))
+    {
+        outResolution = {V4Family::SignedI32x2Add, "signed i32x2 addition"};
+        return true;
+    }
+    return false;
+}
+
+inline bool isSupported(const SlangNVVMValueOperationDesc_4& desc)
+{
+    V4FamilyResolution resolution;
+    return find(desc) || resolveV4Family(desc, resolution);
 }
 
 } // namespace NVVMSemantics

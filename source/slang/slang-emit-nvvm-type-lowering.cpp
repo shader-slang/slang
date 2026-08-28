@@ -1,5 +1,6 @@
 #include "slang-emit-nvvm-type-lowering.h"
 
+#include "slang-base-type-info.h"
 #include "slang-code-gen.h"
 #include "slang-diagnostics.h"
 
@@ -23,6 +24,41 @@ bool isNVVMInteger32Type(IRInst* type)
     return isNVVMSignedI32Type(type) || isNVVMUnsignedI32Type(type);
 }
 
+bool isNVVMSupportedIntegerScalarType(IRInst* type, uint32_t* outBitWidth, bool* outIsSigned)
+{
+    if (outBitWidth)
+        *outBitWidth = 0;
+    if (outIsSigned)
+        *outIsSigned = false;
+
+    auto basicType = as<IRBasicType>(type);
+    if (!basicType)
+        return false;
+    const BaseType baseType = basicType->getBaseType();
+    switch (baseType)
+    {
+    case BaseType::Int8:
+    case BaseType::Int16:
+    case BaseType::Int:
+    case BaseType::Int64:
+    case BaseType::UInt8:
+    case BaseType::UInt16:
+    case BaseType::UInt:
+    case BaseType::UInt64:
+        break;
+    default:
+        return false;
+    }
+
+    const BaseTypeInfo& info = BaseTypeInfo::getInfo(baseType);
+    SLANG_RELEASE_ASSERT(info.flags & BaseTypeInfo::Flag::Integer);
+    if (outBitWidth)
+        *outBitWidth = uint32_t(info.sizeInBytes) * 8;
+    if (outIsSigned)
+        *outIsSigned = (info.flags & BaseTypeInfo::Flag::Signed) != 0;
+    return true;
+}
+
 bool isNVVMFloat32Type(IRInst* type)
 {
     auto basicType = as<IRBasicType>(type);
@@ -43,6 +79,34 @@ IRVectorType* asNVVMSupportedUInt3Type(IRInst* type)
                    elementCount->getValue() == 3
                ? vectorType
                : nullptr;
+}
+
+IRVectorType* asNVVMSupportedSignedI32x2Type(IRInst* type)
+{
+    auto vectorType = as<IRVectorType>(type);
+    auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
+    return vectorType && isNVVMSignedI32Type(vectorType->getElementType()) && elementCount &&
+                   elementCount->getValue() == 2
+               ? vectorType
+               : nullptr;
+}
+
+bool isNVVMSupportedNumericValueType(IRInst* type)
+{
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+           asNVVMSupportedSignedI32x2Type(type);
+}
+
+uint32_t getNVVMNumericValueAlignment(IRInst* type)
+{
+    uint32_t bitWidth = 0;
+    if (isNVVMSupportedIntegerScalarType(type, &bitWidth))
+        return bitWidth / 8;
+    if (isNVVMFloat32Type(type))
+        return 4;
+    if (asNVVMSupportedSignedI32x2Type(type))
+        return 8;
+    return 0;
 }
 
 IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount)
@@ -95,8 +159,31 @@ IRPtrTypeBase* asNVVMSupportedDeviceFloat32PointerType(IRInst* type)
 
 IRPtrTypeBase* asNVVMSupportedDeviceScalarPointerType(IRInst* type)
 {
-    auto pointer = asNVVMSupportedDevicePointerType(type);
-    return pointer ? pointer : asNVVMSupportedDeviceFloat32PointerType(type);
+    auto ptrType = as<IRPtrTypeBase>(type);
+    if (!ptrType || ptrType->getOp() != kIROp_PtrType ||
+        !(isNVVMSupportedIntegerScalarType(ptrType->getValueType()) ||
+          isNVVMFloat32Type(ptrType->getValueType())) ||
+        ptrType->getAddressSpace() != AddressSpace::UserPointer)
+    {
+        return nullptr;
+    }
+    const AccessQualifier access = ptrType->getAccessQualifier();
+    return access == AccessQualifier::Read || access == AccessQualifier::ReadWrite ? ptrType
+                                                                                   : nullptr;
+}
+
+IRPtrTypeBase* asNVVMSupportedDeviceNumericPointerType(IRInst* type)
+{
+    auto ptrType = as<IRPtrTypeBase>(type);
+    if (!ptrType || ptrType->getOp() != kIROp_PtrType ||
+        !isNVVMSupportedNumericValueType(ptrType->getValueType()) ||
+        ptrType->getAddressSpace() != AddressSpace::UserPointer)
+    {
+        return nullptr;
+    }
+    const AccessQualifier access = ptrType->getAccessQualifier();
+    return access == AccessQualifier::Read || access == AccessQualifier::ReadWrite ? ptrType
+                                                                                   : nullptr;
 }
 
 IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
@@ -204,8 +291,8 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferI32ElementPointerType(IRInst* ty
 
 bool isNVVMSupportedParameterType(IRInst* type)
 {
-    return isNVVMInteger32Type(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupportedDeviceScalarPointerType(type) ||
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+           asNVVMSupportedDeviceNumericPointerType(type) ||
            asNVVMSupportedDeviceArrayPointerType(type) ||
            asNVVMSupportedRawRWStructuredBufferI32Type(type);
 }
@@ -318,11 +405,13 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     outType = nullptr;
 
     const bool isVoid = as<IRVoidType>(type) != nullptr;
-    const bool isI32 = isNVVMInteger32Type(type);
+    uint32_t integerBitWidth = 0;
+    const bool isInteger = isNVVMSupportedIntegerScalarType(type, &integerBitWidth);
     const bool isFloat32 = isNVVMFloat32Type(type);
     const bool isBool = isNVVMBoolType(type);
     IRVectorType* uint3Type = asNVVMSupportedUInt3Type(type);
-    IRPtrTypeBase* deviceScalarPointer = asNVVMSupportedDeviceScalarPointerType(type);
+    IRVectorType* signedI32x2Type = asNVVMSupportedSignedI32x2Type(type);
+    IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedArrayType = asNVVMSupportedI32ArrayType(type);
     IRArrayType* deviceArrayType = nullptr;
     IRPtrTypeBase* deviceArrayPointer =
@@ -338,13 +427,14 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isLegal =
         (use == NVVMTypeUse::EntryPointResult && isVoid) ||
         (use == NVVMTypeUse::HelperResult &&
-         (isVoid || isI32 || isFloat32 || isBool || uint3Type)) ||
+         (isVoid || isInteger || isFloat32 || isBool || uint3Type)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
-         (isI32 || isFloat32 || deviceScalarPointer || deviceArrayPointer || rawResource)) ||
-        (use == NVVMTypeUse::HelperParameter && (isI32 || isFloat32 || isBool)) ||
+         (isInteger || isFloat32 || deviceNumericPointer || deviceArrayPointer || rawResource)) ||
+        (use == NVVMTypeUse::HelperParameter && (isInteger || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
-         (isI32 || isFloat32 || isBool || uint3Type || fixedArrayType || deviceScalarPointer ||
-          deviceArrayPointer || rawResource || resourceElementPointer || sharedElementPointer));
+         (isInteger || isFloat32 || isBool || uint3Type || signedI32x2Type || fixedArrayType ||
+          deviceNumericPointer || deviceArrayPointer || rawResource || resourceElementPointer ||
+          sharedElementPointer));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -359,11 +449,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         SLANG_RETURN_ON_FAIL(
             _requireBuilderOperation("void type", m_builder.getVoidType(m_module, outType)));
     }
-    else if (isI32 || isBool)
+    else if (isInteger || isBool)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            isI32 ? "32-bit integer type" : "Boolean type",
-            m_builder.getIntegerType(m_module, isI32 ? 32u : 1u, outType)));
+            isInteger ? "selected integer type" : "Boolean type",
+            m_builder.getIntegerType(m_module, isInteger ? integerBitWidth : 1u, outType)));
     }
     else if (isFloat32)
     {
@@ -380,15 +470,24 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             "fixed uint3 vector type",
             m_builder.getVectorType(m_module, elementType, 3, outType)));
     }
+    else if (signedI32x2Type)
+    {
+        SlangNVVMTypeHandle_1 elementType = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            lowerType(signedI32x2Type->getElementType(), NVVMTypeUse::Value, elementType));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "fixed signed-i32x2 vector type",
+            m_builder.getVectorType(m_module, elementType, 2, outType)));
+    }
     else if (fixedArrayType)
     {
         return _lowerArrayType(fixedArrayType, outType);
     }
-    else if (deviceScalarPointer)
+    else if (deviceNumericPointer)
     {
         return _lowerPointerType(
             type,
-            deviceScalarPointer->getValueType(),
+            deviceNumericPointer->getValueType(),
             SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
             outType);
     }

@@ -3337,6 +3337,78 @@ reproduces Slice 66's 425-name hash
 `641fcaf6a0da63e30a6146beb3e46e261d58297299aa33d180a1f86d73e4f0e5` exactly. The rebuilt Debug
 host passes the eight-test shared-storage preservation sample.
 
+### Slice 68: Numeric type families and explicit conversions
+
+Slice 68 replaces the emitter's Bool/i32/u32/f32 value gate with one bounded numeric policy.
+Consider this representative part of the mixed workload:
+
+```slang
+output8[index] = ~(a + int8_t(b));
+output16[index] = (uint16_t(c) + d) ^ uint16_t(0x55aa);
+output64[index] = (int64_t(f) + e) * int64_t(3);
+output32[index] = int(g) + int(b);
+outputFloat[index] = float(c) + g;
+outputVector[index] = leftVector[index] + rightVector[index];
+```
+
+The selected scalar set is exactly signed and unsigned 8-, 16-, 32-, and 64-bit integers plus the
+established float32 and Bool types. Those integers are accepted as raw entry parameters, scalar
+helper parameters/results, constants, SSA values and phis, and pointees for naturally aligned
+device loads and stores. The accepted integer operations are wrapping add, subtract, multiply,
+bitwise AND/OR/XOR/NOT, negate, equality/inequality, and ordered comparisons. Ordered comparison,
+widening, and integer/float conversion semantics use the signedness in the V4 type descriptor;
+LLVM integer types remain physically signless. Integer narrowing uses truncation, widening uses
+source-signed `sext` or `zext`, and same-width signedness conversion preserves the bits. Float32
+conversion uses the corresponding signed or unsigned LLVM conversion operation.
+
+The fixed-vector proof is deliberately narrower: one canonical signed `int2` value may flow
+through a device-pointer load, wrapping add, and store. The source producer is the ordinary linked
+IR graph `Ptr(Vector(Int, 2)) -> load -> add -> store`; the emitter neither scalarizes the vector
+nor reconstructs it from source syntax. This proves that the V4 lane-count dimension transports a
+real vector without claiming arbitrary element types, lane counts, vector constants/construction,
+comparisons, phis, helper ABI, or entry-by-value ABI.
+
+The existing V4 interface is sufficient. Three new operation IDs distinguish integer conversion,
+integer-to-float, and float-to-integer, while all arithmetic and comparison families reuse their
+existing semantic IDs. `resolveV4Family` validates the complete descriptor dimensions after the
+frozen exact catalog gets first refusal. Consequently, every old V3 adapter and exact V4 overload
+keeps its prior identity, while a new width or signedness does not add a callback, facade method,
+feature bit, or whole-signature enum. The provider maps a validated semantic descriptor to an LLVM
+type and one shared family emitter. A static-only V4 fake rejects the mixed program as E52018 after
+one discovery and before module creation, so family support remains explicitly negotiated.
+
+The Slang type-lowering context remains the only provider-type cache. Its classifier names exact
+canonical `BaseType` values rather than accepting every integer-like type, so `Char`, pointer-sized
+integers, enums, and arbitrary 24-bit provider descriptors do not enter accidentally. Natural
+memory alignment is 1, 2, 4, or 8 bytes for the selected scalars and 8 bytes for `int2`. Resource,
+array, shared-memory, and atomic boundaries remain their previously demonstrated exact i32 shapes;
+numeric breadth does not broaden those independent representations.
+
+Final linked IR retains every scalar width and pointer pointee, and contains explicit
+`intCast`, `castIntToFloat`, and `castFloatToInt` producers. Normal LLVM 14 and compatible NVVM-2.0
+assembly both contain `add i8`, signed and unsigned `icmp`, `sext`, `zext`, `sitofp`, `fptoui`, and
+`add <2 x i32>`. Direct NVVM and NVRTC agree on all fifteen launch-parameter widths. On the RTX
+5090, both routes produce the same narrow wrapping/bitwise values, 64-bit result, signed and
+unsigned comparison branches, float/integer conversions, and both vector lanes. CUDA 12.9
+`ptxas -v` accepts representative direct `sm_70` PTX and reports 32 registers, zero barriers,
+444 bytes of constant memory, zero stack bytes, and zero spills.
+
+Float64, half, bfloat, fp8, and transcendental/libdevice expansion remain policy-gated. Matrices,
+arbitrary vectors, division/remainder/shifts, saturating or overflow-decorated arithmetic, and
+non-i32 resource/shared/atomic shapes also remain explicit future work. These boundaries separate
+ordinary typed-IR mechanics from numerical-mode, ABI, and libdevice decisions rather than relying
+on what LLVM happens to accept.
+
+Five independently registered family-level names increase the five measured NVVM test/support
+files from 29,707 to 30,175 physical lines. The complete Release prefix passes 436/436 with sorted
+LF-terminated registered-name SHA-256
+`38cc59e5a3488f84cdb4e5c26cc11f3afbb59e10dcae97036ab64c7e7148054d`; removing those five names
+reproduces Slice 67's 431-name hash
+`3d3e5effec15efd6d8eec74752802df83fe21ffb89e9d9037b3abf0803d25c0b` exactly. The rebuilt Debug
+host passes the eight-test fake-provider preservation sample; real-provider, compatible-assembly,
+`ptxas`, and GPU runtime evidence is carried by the Release build because this checkout has only
+Release LLVM libraries.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -4094,16 +4166,15 @@ The following remain open until their named slice supplies evidence:
   owns LLVM 7.0.1 plus an older CMake frontend or LLVM 14.0.6 plus negotiated text;
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
-- conventional shader-entry parameters and raw CUDA parameters beyond signed `i32`, device
-  pointers, fixed i32 array pointers, and exact raw `RWStructuredBuffer<int>`;
-- external/indirect calls, richer helper ABI, and scalar operations beyond the established
-  signed-i32 add, subtract, multiply, bitwise-AND, bitwise-OR, bitwise-XOR, bitwise-NOT,
-  arithmetic-negate and comparison family, plus scalar float32 add, subtract, multiply, divide,
-  negate, ordered equality, unordered inequality, ordered greater-than, ordered less-than,
-  ordered less-than-or-equal, and ordered greater-than-or-equal;
-- pointer and aggregate addressing beyond signed-i32 scalar offsets and the exact fixed-i32 device
-  array subset, including other `IRGetElementPtr` shapes, array values, structs, globals, shared
-  memory, and additional address spaces;
+- conventional shader-entry parameters and raw CUDA parameters beyond the selected integer and
+  float32 scalars, selected numeric device pointers, fixed i32 array pointers, signed-i32x2 device
+  pointers, and exact raw `RWStructuredBuffer<int>`;
+- external/indirect calls, richer helper ABI, integer shifts/division/remainder, saturating or
+  overflow-decorated arithmetic, float64/low-precision scalar families, and general vector or
+  matrix operations beyond the bounded signed-i32x2 add proof;
+- pointer and aggregate addressing beyond signed-i32 scalar offsets on selected numeric device
+  pointers and the exact fixed-i32 device-array subset, including other `IRGetElementPtr` shapes,
+  array values, structs, general globals, additional shared-memory shapes, and address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;

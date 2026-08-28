@@ -709,6 +709,44 @@ SLANG_UNIT_TEST(nvvmSlangSharedMemoryDifferentialPTX)
         });
 }
 
+SLANG_UNIT_TEST(nvvmSlangMixedNumericDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsVectorConstruction());
+
+    static const uint32_t kParameterWidths[] = {
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        8,
+        8,
+        16,
+        16,
+        64,
+        64,
+        32,
+    };
+    _runNVVMSlangDifferentialPTX(
+        kDirectNVVMMixedNumericSource,
+        "Ignoring mixed-numeric PTX differential because libNVVM or NVRTC was not found.",
+        kParameterWidths,
+        SLANG_COUNT_OF(kParameterWidths),
+        true,
+        [](SlangEmitCUDAMethod, const String& ptx)
+        {
+            SLANG_CHECK(ptx.indexOf(".u8") >= 0);
+            SLANG_CHECK(ptx.indexOf(".u16") >= 0);
+            SLANG_CHECK(ptx.indexOf(".u64") >= 0);
+            SLANG_CHECK(ptx.indexOf("cvt") >= 0);
+        });
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1789,6 +1827,11 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarPtxasAccepts)
     }
 }
 
+// Numeric V4 families have no synthetic V3 feature bit, so this sentinel requests only the common
+// real-provider preflight performed by these integration helpers.
+static const SlangNVVMBuilderFeature_3 kNoRequiredLegacyFeature =
+    SLANG_NVVM_BUILDER_FEATURE_COUNT_3;
+
 static void _runNVVMSlangRealSourcePtxasAccepts(
     UnitTestContext* unitTestContext,
     const char* source,
@@ -1796,7 +1839,8 @@ static void _runNVVMSlangRealSourcePtxasAccepts(
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(feature));
+    if (feature != kNoRequiredLegacyFeature)
+        SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(feature));
 
     String cudaRoot;
     String ptxasPath;
@@ -1862,6 +1906,14 @@ SLANG_UNIT_TEST(nvvmSlangSharedMemoryPtxasAccepts)
         unitTestContext,
         kDirectNVVMSharedMemorySource,
         SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
+}
+
+SLANG_UNIT_TEST(nvvmSlangMixedNumericPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMMixedNumericSource,
+        kNoRequiredLegacyFeature);
 }
 
 #define NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(NAME, OPERATION) \
@@ -2521,7 +2573,8 @@ static void _runNVVMSlangSourceRuntimeMatchesNVRTC(
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(feature));
+    if (feature != kNoRequiredLegacyFeature)
+        SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(feature));
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -2953,6 +3006,16 @@ SLANG_UNIT_TEST(nvvmSlangSharedMemoryRuntimeMatchesNVRTC)
         kDirectNVVMSharedMemorySource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runSharedMemoryKernel(cuda, code); });
+}
+
+SLANG_UNIT_TEST(nvvmSlangMixedNumericRuntimeMatchesNVRTC)
+{
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        kNoRequiredLegacyFeature,
+        kDirectNVVMMixedNumericSource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        { return _runMixedNumericKernel(cuda, code); });
 }
 
 SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexRuntimeMatchesNVRTC)

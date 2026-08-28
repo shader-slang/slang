@@ -2409,7 +2409,7 @@ _isOperationSupportedV4(const SlangNVVMValueOperationDesc_4* operation, uint32_t
     {
         return SLANG_E_INVALID_ARG;
     }
-    *outSupported = Slang::NVVMSemantics::find(*operation) ? 1u : 0u;
+    *outSupported = Slang::NVVMSemantics::isSupported(*operation) ? 1u : 0u;
     return SLANG_OK;
 }
 
@@ -2572,6 +2572,174 @@ static SlangResult _emitCatalogOperationV4(
     return SLANG_E_INVALID_ARG;
 }
 
+static llvm::Type* _getV4SemanticLLVMType(ModuleState* state, const SlangNVVMValueTypeDesc_4& type)
+{
+    if (!state || type.reserved != 0)
+        return nullptr;
+
+    llvm::Type* scalarType = nullptr;
+    switch (type.kind)
+    {
+    case SLANG_NVVM_VALUE_TYPE_BOOL_4:
+        if (type.bitWidth == 1)
+            scalarType = llvm::Type::getInt1Ty(state->context);
+        break;
+    case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4:
+    case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4:
+        if (type.bitWidth == 8 || type.bitWidth == 16 || type.bitWidth == 32 || type.bitWidth == 64)
+        {
+            scalarType = llvm::IntegerType::get(state->context, type.bitWidth);
+        }
+        break;
+    case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4:
+        if (type.bitWidth == 32)
+            scalarType = llvm::Type::getFloatTy(state->context);
+        break;
+    default:
+        break;
+    }
+    if (!scalarType)
+        return nullptr;
+    if (type.laneCount == 1)
+        return scalarType;
+    if (type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4 && type.bitWidth == 32 &&
+        type.laneCount == 2)
+    {
+        return llvm::FixedVectorType::get(scalarType, 2);
+    }
+    return nullptr;
+}
+
+static SlangResult _emitV4NumericFamily(
+    SlangNVVMModuleHandle_1 module,
+    const SlangNVVMValueOperationDesc_4& operation,
+    Slang::NVVMSemantics::V4Family family,
+    const SlangNVVMValueHandle_1* operands,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::Type* resultType = _getV4SemanticLLVMType(state, operation.resultType);
+    if (!state || !insertionBlock || !resultType || !outValue)
+        return SLANG_E_INVALID_ARG;
+
+    llvm::Value* llvmOperands[2] = {};
+    for (size_t i = 0; i < operation.operandCount; ++i)
+    {
+        llvmOperands[i] = _getValue(operands[i]);
+        llvm::Type* expectedType = _getV4SemanticLLVMType(state, operation.operandTypes[i]);
+        if (!llvmOperands[i] || llvmOperands[i]->getType() != expectedType ||
+            !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmOperands[i]))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+    }
+
+    llvm::Value* result = nullptr;
+    switch (family)
+    {
+    case Slang::NVVMSemantics::V4Family::IntegerUnary:
+        result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_NOT_4
+                     ? state->builder.CreateNot(llvmOperands[0])
+                     : state->builder.CreateNeg(llvmOperands[0]);
+        break;
+    case Slang::NVVMSemantics::V4Family::IntegerBinary:
+    case Slang::NVVMSemantics::V4Family::SignedI32x2Add:
+        switch (operation.operation)
+        {
+        case SLANG_NVVM_VALUE_OP_ADD_4:
+            result = state->builder.CreateAdd(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_SUBTRACT_4:
+            result = state->builder.CreateSub(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_MULTIPLY_4:
+            result = state->builder.CreateMul(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_BIT_AND_4:
+            result = state->builder.CreateAnd(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_BIT_OR_4:
+            result = state->builder.CreateOr(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_BIT_XOR_4:
+            result = state->builder.CreateXor(llvmOperands[0], llvmOperands[1]);
+            break;
+        default:
+            return SLANG_E_INVALID_ARG;
+        }
+        break;
+    case Slang::NVVMSemantics::V4Family::IntegerCompare:
+        {
+            llvm::CmpInst::Predicate predicate = llvm::CmpInst::BAD_ICMP_PREDICATE;
+            const bool isSigned =
+                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4;
+            switch (operation.operation)
+            {
+            case SLANG_NVVM_VALUE_OP_EQUAL_4:
+                predicate = llvm::CmpInst::ICMP_EQ;
+                break;
+            case SLANG_NVVM_VALUE_OP_NOT_EQUAL_4:
+                predicate = llvm::CmpInst::ICMP_NE;
+                break;
+            case SLANG_NVVM_VALUE_OP_LESS_THAN_4:
+                predicate = isSigned ? llvm::CmpInst::ICMP_SLT : llvm::CmpInst::ICMP_ULT;
+                break;
+            case SLANG_NVVM_VALUE_OP_GREATER_THAN_4:
+                predicate = isSigned ? llvm::CmpInst::ICMP_SGT : llvm::CmpInst::ICMP_UGT;
+                break;
+            case SLANG_NVVM_VALUE_OP_LESS_EQUAL_4:
+                predicate = isSigned ? llvm::CmpInst::ICMP_SLE : llvm::CmpInst::ICMP_ULE;
+                break;
+            case SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4:
+                predicate = isSigned ? llvm::CmpInst::ICMP_SGE : llvm::CmpInst::ICMP_UGE;
+                break;
+            default:
+                return SLANG_E_INVALID_ARG;
+            }
+            result = state->builder.CreateICmp(predicate, llvmOperands[0], llvmOperands[1]);
+        }
+        break;
+    case Slang::NVVMSemantics::V4Family::IntegerConvert:
+        if (operation.resultType.bitWidth == operation.operandTypes[0].bitWidth)
+        {
+            result = llvmOperands[0];
+        }
+        else if (operation.resultType.bitWidth < operation.operandTypes[0].bitWidth)
+        {
+            result = state->builder.CreateTrunc(llvmOperands[0], resultType);
+        }
+        else if (operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4)
+        {
+            result = state->builder.CreateSExt(llvmOperands[0], resultType);
+        }
+        else
+        {
+            result = state->builder.CreateZExt(llvmOperands[0], resultType);
+        }
+        break;
+    case Slang::NVVMSemantics::V4Family::IntegerToFloat:
+        result = operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4
+                     ? state->builder.CreateSIToFP(llvmOperands[0], resultType)
+                     : state->builder.CreateUIToFP(llvmOperands[0], resultType);
+        break;
+    case Slang::NVVMSemantics::V4Family::FloatToInteger:
+        result = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4
+                     ? state->builder.CreateFPToSI(llvmOperands[0], resultType)
+                     : state->builder.CreateFPToUI(llvmOperands[0], resultType);
+        break;
+    default:
+        return SLANG_E_INVALID_ARG;
+    }
+
+    if (!result || result->getType() != resultType)
+        return SLANG_E_INVALID_ARG;
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitOperationV4(
     SlangNVVMModuleHandle_1 module,
     const SlangNVVMValueOperationDesc_4* operation,
@@ -2588,9 +2756,13 @@ static SlangResult SLANG_NVVM_CALL _emitOperationV4(
     }
 
     const Slang::NVVMSemantics::CatalogEntry* entry = Slang::NVVMSemantics::find(*operation);
-    if (!entry)
+    if (entry)
+        return _emitCatalogOperationV4(module, *entry, operands, outValue);
+
+    Slang::NVVMSemantics::V4FamilyResolution resolution;
+    if (!Slang::NVVMSemantics::resolveV4Family(*operation, resolution))
         return SLANG_E_INVALID_ARG;
-    return _emitCatalogOperationV4(module, *entry, operands, outValue);
+    return _emitV4NumericFamily(module, *operation, resolution.family, operands, outValue);
 }
 
 static void _fillBuilderFoundationAPIV4(SlangNVVMBuilderFoundationAPI_4& api)
