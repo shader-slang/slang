@@ -65,22 +65,22 @@ struct ModuleState
     llvm::IRBuilder<> builder;
 };
 
-static ModuleState* _getModule(SlangNVVMModuleHandle_1 module)
+static ModuleState* _getModule(SlangNVVMModuleHandle module)
 {
     return reinterpret_cast<ModuleState*>(module);
 }
 
-static llvm::Type* _getType(SlangNVVMTypeHandle_1 type)
+static llvm::Type* _getType(SlangNVVMTypeHandle type)
 {
     return reinterpret_cast<llvm::Type*>(type);
 }
 
-static llvm::Value* _getValue(SlangNVVMValueHandle_1 value)
+static llvm::Value* _getValue(SlangNVVMValueHandle value)
 {
     return reinterpret_cast<llvm::Value*>(value);
 }
 
-static llvm::BasicBlock* _getBlock(SlangNVVMBlockHandle_1 block)
+static llvm::BasicBlock* _getBlock(SlangNVVMBlockHandle block)
 {
     return reinterpret_cast<llvm::BasicBlock*>(block);
 }
@@ -90,7 +90,7 @@ static llvm::StringRef _getStringRef(const char* data, size_t size)
     return size ? llvm::StringRef(data, size) : llvm::StringRef();
 }
 
-static bool _isNVVMAddressSpace(SlangNVVMAddressSpace_2 addressSpace)
+static bool _isNVVMAddressSpace(SlangNVVMAddressSpace addressSpace)
 {
     return addressSpace == SLANG_NVVM_ADDRESS_SPACE_GENERIC ||
            addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
@@ -252,7 +252,7 @@ static bool _isValidAlignment(uint32_t alignment)
 }
 
 static SlangResult SLANG_NVVM_CALL
-_createModule(const char* moduleName, size_t moduleNameSize, SlangNVVMModuleHandle_1* outModule)
+_createModule(const char* moduleName, size_t moduleNameSize, SlangNVVMModuleHandle* outModule)
 {
     if (!outModule || (!moduleName && moduleNameSize))
         return SLANG_E_INVALID_ARG;
@@ -262,28 +262,28 @@ _createModule(const char* moduleName, size_t moduleNameSize, SlangNVVMModuleHand
     if (!state)
         return SLANG_E_OUT_OF_MEMORY;
 
-    *outModule = reinterpret_cast<SlangNVVMModuleHandle_1>(state);
+    *outModule = reinterpret_cast<SlangNVVMModuleHandle>(state);
     return SLANG_OK;
 }
 
-static void SLANG_NVVM_CALL _destroyModule(SlangNVVMModuleHandle_1 module)
+static void SLANG_NVVM_CALL _destroyModule(SlangNVVMModuleHandle module)
 {
     delete _getModule(module);
 }
 
 static SlangResult SLANG_NVVM_CALL
-_getVoidType(SlangNVVMModuleHandle_1 module, SlangNVVMTypeHandle_1* outType)
+_getVoidType(SlangNVVMModuleHandle module, SlangNVVMTypeHandle* outType)
 {
     ModuleState* state = _getModule(module);
     if (!state || !outType)
         return SLANG_E_INVALID_ARG;
 
-    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(llvm::Type::getVoidTy(state->context));
+    *outType = reinterpret_cast<SlangNVVMTypeHandle>(llvm::Type::getVoidTy(state->context));
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL
-_getIntegerType(SlangNVVMModuleHandle_1 module, uint32_t bitWidth, SlangNVVMTypeHandle_1* outType)
+_getIntegerType(SlangNVVMModuleHandle module, uint32_t bitWidth, SlangNVVMTypeHandle* outType)
 {
     if (outType)
         *outType = nullptr;
@@ -295,14 +295,12 @@ _getIntegerType(SlangNVVMModuleHandle_1 module, uint32_t bitWidth, SlangNVVMType
     }
 
     *outType =
-        reinterpret_cast<SlangNVVMTypeHandle_1>(llvm::IntegerType::get(state->context, bitWidth));
+        reinterpret_cast<SlangNVVMTypeHandle>(llvm::IntegerType::get(state->context, bitWidth));
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _getFloatingPointType(
-    SlangNVVMModuleHandle_1 module,
-    uint32_t bitWidth,
-    SlangNVVMTypeHandle_1* outType)
+static SlangResult SLANG_NVVM_CALL
+_getFloatingPointType(SlangNVVMModuleHandle module, uint32_t bitWidth, SlangNVVMTypeHandle* outType)
 {
     if (outType)
         *outType = nullptr;
@@ -311,15 +309,15 @@ static SlangResult SLANG_NVVM_CALL _getFloatingPointType(
     if (!state || !outType || bitWidth != 32)
         return SLANG_E_INVALID_ARG;
 
-    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(llvm::Type::getFloatTy(state->context));
+    *outType = reinterpret_cast<SlangNVVMTypeHandle>(llvm::Type::getFloatTy(state->context));
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _getPointerType(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMTypeHandle_1 pointeeType,
-    SlangNVVMAddressSpace_2 addressSpace,
-    SlangNVVMTypeHandle_1* outType)
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle pointeeType,
+    SlangNVVMAddressSpace addressSpace,
+    SlangNVVMTypeHandle* outType)
 {
     if (outType)
         *outType = nullptr;
@@ -333,16 +331,16 @@ static SlangResult SLANG_NVVM_CALL _getPointerType(
         return SLANG_E_INVALID_ARG;
     }
 
-    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(
+    *outType = reinterpret_cast<SlangNVVMTypeHandle>(
         llvm::PointerType::get(llvmPointeeType, addressSpace));
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _getArrayType(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMTypeHandle_1 elementType,
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle elementType,
     uint32_t elementCount,
-    SlangNVVMTypeHandle_1* outType)
+    SlangNVVMTypeHandle* outType)
 {
     if (outType)
         *outType = nullptr;
@@ -357,16 +355,16 @@ static SlangResult SLANG_NVVM_CALL _getArrayType(
         return SLANG_E_INVALID_ARG;
     }
 
-    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(
-        llvm::ArrayType::get(llvmElementType, elementCount));
+    *outType =
+        reinterpret_cast<SlangNVVMTypeHandle>(llvm::ArrayType::get(llvmElementType, elementCount));
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _getVectorType(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMTypeHandle_1 elementType,
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle elementType,
     uint32_t elementCount,
-    SlangNVVMTypeHandle_1* outType)
+    SlangNVVMTypeHandle* outType)
 {
     if (outType)
         *outType = nullptr;
@@ -380,7 +378,7 @@ static SlangResult SLANG_NVVM_CALL _getVectorType(
         return SLANG_E_INVALID_ARG;
     }
 
-    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(
+    *outType = reinterpret_cast<SlangNVVMTypeHandle>(
         llvm::FixedVectorType::get(llvmElementType, elementCount));
     return SLANG_OK;
 }
@@ -401,7 +399,7 @@ static llvm::StructType* _getRawRWStructuredBufferI32LLVMType(ModuleState* state
 }
 
 static SlangResult SLANG_NVVM_CALL
-_getRawRWStructuredBufferI32Type(SlangNVVMModuleHandle_1 module, SlangNVVMTypeHandle_1* outType)
+_getRawRWStructuredBufferI32Type(SlangNVVMModuleHandle module, SlangNVVMTypeHandle* outType)
 {
     if (outType)
         *outType = nullptr;
@@ -410,16 +408,16 @@ _getRawRWStructuredBufferI32Type(SlangNVVMModuleHandle_1 module, SlangNVVMTypeHa
     if (!state || !outType)
         return SLANG_E_INVALID_ARG;
 
-    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(_getRawRWStructuredBufferI32LLVMType(state));
+    *outType = reinterpret_cast<SlangNVVMTypeHandle>(_getRawRWStructuredBufferI32LLVMType(state));
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _getFunctionType(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMTypeHandle_1 resultType,
-    const SlangNVVMTypeHandle_1* parameterTypes,
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle resultType,
+    const SlangNVVMTypeHandle* parameterTypes,
     size_t parameterCount,
-    SlangNVVMTypeHandle_1* outType)
+    SlangNVVMTypeHandle* outType)
 {
     ModuleState* state = _getModule(module);
     llvm::Type* llvmResultType = _getType(resultType);
@@ -441,17 +439,17 @@ static SlangResult SLANG_NVVM_CALL _getFunctionType(
         llvmParameterTypes.push_back(parameterType);
     }
 
-    *outType = reinterpret_cast<SlangNVVMTypeHandle_1>(
+    *outType = reinterpret_cast<SlangNVVMTypeHandle>(
         llvm::FunctionType::get(llvmResultType, llvmParameterTypes, false));
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _declareFunction(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMTypeHandle_1 functionType,
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle functionType,
     const char* name,
     size_t nameSize,
-    SlangNVVMValueHandle_1* outFunction)
+    SlangNVVMValueHandle* outFunction)
 {
     ModuleState* state = _getModule(module);
     llvm::FunctionType* llvmFunctionType =
@@ -478,15 +476,15 @@ static SlangResult SLANG_NVVM_CALL _declareFunction(
         // representation valid in both dialects without parsing a function signature later.
         parameter.setName("slangParameter" + std::to_string(parameterIndex++));
     }
-    *outFunction = reinterpret_cast<SlangNVVMValueHandle_1>(function);
+    *outFunction = reinterpret_cast<SlangNVVMValueHandle>(function);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _getFunctionParameter(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 function,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle function,
     size_t parameterIndex,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -499,17 +497,17 @@ static SlangResult SLANG_NVVM_CALL _getFunctionParameter(
         return SLANG_E_INVALID_ARG;
     }
 
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(
         llvmFunction->getArg(static_cast<unsigned>(parameterIndex)));
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _createBlock(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 function,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle function,
     const char* name,
     size_t nameSize,
-    SlangNVVMBlockHandle_1* outBlock)
+    SlangNVVMBlockHandle* outBlock)
 {
     ModuleState* state = _getModule(module);
     llvm::Function* llvmFunction = llvm::dyn_cast_or_null<llvm::Function>(_getValue(function));
@@ -521,12 +519,12 @@ static SlangResult SLANG_NVVM_CALL _createBlock(
 
     llvm::BasicBlock* block =
         llvm::BasicBlock::Create(state->context, _getStringRef(name, nameSize), llvmFunction);
-    *outBlock = reinterpret_cast<SlangNVVMBlockHandle_1>(block);
+    *outBlock = reinterpret_cast<SlangNVVMBlockHandle>(block);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL
-_setInsertBlock(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 block)
+_setInsertBlock(SlangNVVMModuleHandle module, SlangNVVMBlockHandle block)
 {
     ModuleState* state = _getModule(module);
     llvm::BasicBlock* llvmBlock = _getBlock(block);
@@ -541,10 +539,10 @@ _setInsertBlock(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 block)
 }
 
 static SlangResult SLANG_NVVM_CALL _emitLoad(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 pointer,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle pointer,
     uint32_t alignment,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -563,14 +561,14 @@ static SlangResult SLANG_NVVM_CALL _emitLoad(
     llvm::Type* pointeeType = pointerType->getNonOpaquePointerElementType();
     llvm::Value* value =
         state->builder.CreateAlignedLoad(pointeeType, llvmPointer, llvm::Align(alignment));
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(value);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(value);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitStore(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 value,
-    SlangNVVMValueHandle_1 pointer,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle pointer,
     uint32_t alignment)
 {
     ModuleState* state = _getModule(module);
@@ -593,11 +591,11 @@ static SlangResult SLANG_NVVM_CALL _emitStore(
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerBinary(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMIntegerBinaryOp_2 operation,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMIntegerBinaryOp operation,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -607,7 +605,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBinary(
     llvm::Value* llvmRight = _getValue(right);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     const bool isSupportedOperation = operation == SLANG_NVVM_INTEGER_BINARY_OP_ADD ||
-                                      operation == SLANG_NVVM_INTEGER_BINARY_OP_SUB;
+                                      operation == SLANG_NVVM_INTEGER_BINARY_OP_SUBTRACT;
     if (!outValue || !isSupportedOperation || !insertionBlock ||
         !_areMatchingIntegerValues(state, insertionBlock, llvmLeft, llvmRight))
     {
@@ -617,15 +615,15 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBinary(
     llvm::Value* result = operation == SLANG_NVVM_INTEGER_BINARY_OP_ADD
                               ? state->builder.CreateAdd(llvmLeft, llvmRight)
                               : state->builder.CreateSub(llvmLeft, llvmRight);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerMultiply(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -641,15 +639,15 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerMultiply(
     }
 
     llvm::Value* result = state->builder.CreateMul(llvmLeft, llvmRight);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerBitAnd(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -665,15 +663,15 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBitAnd(
     }
 
     llvm::Value* result = state->builder.CreateAnd(llvmLeft, llvmRight);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerBitOr(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -689,15 +687,15 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBitOr(
     }
 
     llvm::Value* result = state->builder.CreateOr(llvmLeft, llvmRight);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerBitXor(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -713,14 +711,14 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBitXor(
     }
 
     llvm::Value* result = state->builder.CreateXor(llvmLeft, llvmRight);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerBitNot(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 value,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -735,14 +733,14 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBitNot(
     }
 
     llvm::Value* result = state->builder.CreateNot(llvmValue);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerNegate(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 value,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -757,15 +755,15 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerNegate(
     }
 
     llvm::Value* result = state->builder.CreateNeg(llvmValue);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitRelaxedGlobalI32AtomicAdd(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 pointer,
-    SlangNVVMValueHandle_1 value,
-    SlangNVVMValueHandle_1* outOriginalValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle pointer,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle* outOriginalValue)
 {
     if (outOriginalValue)
         *outOriginalValue = nullptr;
@@ -793,17 +791,17 @@ static SlangResult SLANG_NVVM_CALL _emitRelaxedGlobalI32AtomicAdd(
         llvm::Align(4),
         llvm::AtomicOrdering::Monotonic,
         llvm::SyncScope::System);
-    *outOriginalValue = reinterpret_cast<SlangNVVMValueHandle_1>(originalValue);
+    *outOriginalValue = reinterpret_cast<SlangNVVMValueHandle>(originalValue);
     return SLANG_OK;
 }
 
 // Emits one scalar-integer comparison after applying the shared ownership and dominance contract.
 static SlangResult _emitIntegerComparison(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
     llvm::CmpInst::Predicate predicate,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -819,70 +817,70 @@ static SlangResult _emitIntegerComparison(
     }
 
     llvm::Value* result = state->builder.CreateICmp(predicate, llvmLeft, llvmRight);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerSignedLessThan(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_SLT, outValue);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerEqual(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_EQ, outValue);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerNotEqual(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_NE, outValue);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerSignedGreaterThan(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_SGT, outValue);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerSignedLessEqual(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_SLE, outValue);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerSignedGreaterEqual(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     return _emitIntegerComparison(module, left, right, llvm::CmpInst::ICMP_SGE, outValue);
 }
 
 // Dispatches the stable V3 scalar families to the same validated producers used by frozen V2.
 static SlangResult SLANG_NVVM_CALL _emitIntegerUnaryV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMIntegerUnaryOp_3 operation,
-    SlangNVVMValueHandle_1 value,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMIntegerUnaryOp operation,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -898,27 +896,32 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerUnaryV3(
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerBinaryV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMIntegerBinaryOp_3 operation,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMIntegerBinaryOp operation,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
     switch (operation)
     {
-    case SLANG_NVVM_INTEGER_BINARY_OP_3_ADD:
+    case SLANG_NVVM_INTEGER_BINARY_OP_ADD:
         return _emitIntegerBinary(module, SLANG_NVVM_INTEGER_BINARY_OP_ADD, left, right, outValue);
-    case SLANG_NVVM_INTEGER_BINARY_OP_3_SUB:
-        return _emitIntegerBinary(module, SLANG_NVVM_INTEGER_BINARY_OP_SUB, left, right, outValue);
-    case SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY:
+    case SLANG_NVVM_INTEGER_BINARY_OP_SUBTRACT:
+        return _emitIntegerBinary(
+            module,
+            SLANG_NVVM_INTEGER_BINARY_OP_SUBTRACT,
+            left,
+            right,
+            outValue);
+    case SLANG_NVVM_INTEGER_BINARY_OP_MULTIPLY:
         return _emitIntegerMultiply(module, left, right, outValue);
-    case SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_AND:
+    case SLANG_NVVM_INTEGER_BINARY_OP_BIT_AND:
         return _emitIntegerBitAnd(module, left, right, outValue);
-    case SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_OR:
+    case SLANG_NVVM_INTEGER_BINARY_OP_BIT_OR:
         return _emitIntegerBitOr(module, left, right, outValue);
-    case SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_XOR:
+    case SLANG_NVVM_INTEGER_BINARY_OP_BIT_XOR:
         return _emitIntegerBitXor(module, left, right, outValue);
     default:
         return SLANG_E_INVALID_ARG;
@@ -926,11 +929,11 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerBinaryV3(
 }
 
 static SlangResult SLANG_NVVM_CALL _emitFloatingBinaryV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMFloatingBinaryOp_3 operation,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMFloatingBinaryOp operation,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -955,20 +958,20 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingBinaryV3(
     switch (operation)
     {
     case SLANG_NVVM_FLOATING_BINARY_OP_ADD:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
-            state->builder.CreateFAdd(llvmLeft, llvmRight));
+        *outValue =
+            reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateFAdd(llvmLeft, llvmRight));
         return SLANG_OK;
     case SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
-            state->builder.CreateFSub(llvmLeft, llvmRight));
+        *outValue =
+            reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateFSub(llvmLeft, llvmRight));
         return SLANG_OK;
     case SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
-            state->builder.CreateFMul(llvmLeft, llvmRight));
+        *outValue =
+            reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateFMul(llvmLeft, llvmRight));
         return SLANG_OK;
     case SLANG_NVVM_FLOATING_BINARY_OP_DIVIDE:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
-            state->builder.CreateFDiv(llvmLeft, llvmRight));
+        *outValue =
+            reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateFDiv(llvmLeft, llvmRight));
         return SLANG_OK;
     default:
         return SLANG_E_INVALID_ARG;
@@ -976,10 +979,10 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingBinaryV3(
 }
 
 static SlangResult SLANG_NVVM_CALL _emitFloatingUnaryV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMFloatingUnaryOp_3 operation,
-    SlangNVVMValueHandle_1 value,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMFloatingUnaryOp operation,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -994,16 +997,16 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingUnaryV3(
         return SLANG_E_INVALID_ARG;
     }
 
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(state->builder.CreateFNeg(llvmValue));
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateFNeg(llvmValue));
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitFloatingCompareV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMFloatingCompareOp_3 operation,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMFloatingCompareOp operation,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -1024,27 +1027,27 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingCompareV3(
     switch (operation)
     {
     case SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
             state->builder.CreateFCmpOEQ(llvmLeft, llvmRight));
         return SLANG_OK;
     case SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
             state->builder.CreateFCmpUNE(llvmLeft, llvmRight));
         return SLANG_OK;
     case SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_THAN:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
             state->builder.CreateFCmpOGT(llvmLeft, llvmRight));
         return SLANG_OK;
     case SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_LESS_EQUAL:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
             state->builder.CreateFCmpOLE(llvmLeft, llvmRight));
         return SLANG_OK;
     case SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_EQUAL:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
             state->builder.CreateFCmpOGE(llvmLeft, llvmRight));
         return SLANG_OK;
     case SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_LESS_THAN:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
             state->builder.CreateFCmpOLT(llvmLeft, llvmRight));
         return SLANG_OK;
     default:
@@ -1053,11 +1056,11 @@ static SlangResult SLANG_NVVM_CALL _emitFloatingCompareV3(
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerCompareV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMIntegerCompareOp_3 operation,
-    SlangNVVMValueHandle_1 left,
-    SlangNVVMValueHandle_1 right,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMIntegerCompareOp operation,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -1081,7 +1084,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerCompareV3(
 }
 
 static SlangResult SLANG_NVVM_CALL
-_emitBranch(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 targetBlock)
+_emitBranch(SlangNVVMModuleHandle module, SlangNVVMBlockHandle targetBlock)
 {
     ModuleState* state = _getModule(module);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
@@ -1097,10 +1100,10 @@ _emitBranch(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 targetBlock)
 }
 
 static SlangResult SLANG_NVVM_CALL _emitConditionalBranch(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 condition,
-    SlangNVVMBlockHandle_1 trueBlock,
-    SlangNVVMBlockHandle_1 falseBlock)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle condition,
+    SlangNVVMBlockHandle trueBlock,
+    SlangNVVMBlockHandle falseBlock)
 {
     ModuleState* state = _getModule(module);
     llvm::Value* llvmCondition = _getValue(condition);
@@ -1120,10 +1123,10 @@ static SlangResult SLANG_NVVM_CALL _emitConditionalBranch(
 }
 
 static SlangResult SLANG_NVVM_CALL _getIntegerConstant(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMTypeHandle_1 integerType,
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle integerType,
     int64_t value,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -1139,17 +1142,17 @@ static SlangResult SLANG_NVVM_CALL _getIntegerConstant(
         return SLANG_E_INVALID_ARG;
     }
 
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(
         llvm::ConstantInt::getSigned(llvmIntegerType, value));
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _getFloatingPointConstantV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMTypeHandle_1 floatingPointType,
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle floatingPointType,
     uint32_t bitWidth,
     uint64_t bitPattern,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -1164,16 +1167,16 @@ static SlangResult SLANG_NVVM_CALL _getFloatingPointConstantV3(
     }
 
     const llvm::APFloat value(llvm::APFloat::IEEEsingle(), llvm::APInt(32, uint32_t(bitPattern)));
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(
-        llvm::ConstantFP::get(llvmFloatingPointType, value));
+    *outValue =
+        reinterpret_cast<SlangNVVMValueHandle>(llvm::ConstantFP::get(llvmFloatingPointType, value));
     return SLANG_OK;
 }
 
 static SlangResult _emitPhiImpl(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMBlockHandle_1 targetBlock,
-    SlangNVVMTypeHandle_1 type,
-    SlangNVVMValueHandle_1* outValue,
+    SlangNVVMModuleHandle module,
+    SlangNVVMBlockHandle targetBlock,
+    SlangNVVMTypeHandle type,
+    SlangNVVMValueHandle* outValue,
     bool requireInteger)
 {
     if (outValue)
@@ -1194,33 +1197,33 @@ static SlangResult _emitPhiImpl(
     llvm::Instruction* firstNonPhi = llvmTargetBlock->getFirstNonPHI();
     llvm::PHINode* phi = firstNonPhi ? llvm::PHINode::Create(llvmType, 0, "", firstNonPhi)
                                      : llvm::PHINode::Create(llvmType, 0, "", llvmTargetBlock);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(phi);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(phi);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerPhi(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMBlockHandle_1 targetBlock,
-    SlangNVVMTypeHandle_1 integerType,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMBlockHandle targetBlock,
+    SlangNVVMTypeHandle integerType,
+    SlangNVVMValueHandle* outValue)
 {
     return _emitPhiImpl(module, targetBlock, integerType, outValue, true);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitPhiV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMBlockHandle_1 targetBlock,
-    SlangNVVMTypeHandle_1 type,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMBlockHandle targetBlock,
+    SlangNVVMTypeHandle type,
+    SlangNVVMValueHandle* outValue)
 {
     return _emitPhiImpl(module, targetBlock, type, outValue, false);
 }
 
 static SlangResult _addPhiIncomingImpl(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 phi,
-    SlangNVVMValueHandle_1 value,
-    SlangNVVMBlockHandle_1 predecessorBlock,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle phi,
+    SlangNVVMValueHandle value,
+    SlangNVVMBlockHandle predecessorBlock,
     bool requireInteger)
 {
     ModuleState* state = _getModule(module);
@@ -1259,19 +1262,19 @@ static SlangResult _addPhiIncomingImpl(
 }
 
 static SlangResult SLANG_NVVM_CALL _addIntegerPhiIncoming(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 phi,
-    SlangNVVMValueHandle_1 value,
-    SlangNVVMBlockHandle_1 predecessorBlock)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle phi,
+    SlangNVVMValueHandle value,
+    SlangNVVMBlockHandle predecessorBlock)
 {
     return _addPhiIncomingImpl(module, phi, value, predecessorBlock, true);
 }
 
 static SlangResult SLANG_NVVM_CALL _addPhiIncomingV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 phi,
-    SlangNVVMValueHandle_1 value,
-    SlangNVVMBlockHandle_1 predecessorBlock)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle phi,
+    SlangNVVMValueHandle value,
+    SlangNVVMBlockHandle predecessorBlock)
 {
     return _addPhiIncomingImpl(module, phi, value, predecessorBlock, false);
 }
@@ -1291,11 +1294,11 @@ static bool _isSupportedV4FunctionValueType(llvm::Type* type)
 }
 
 static SlangResult _emitCallImpl(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 callee,
-    const SlangNVVMValueHandle_1* arguments,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle callee,
+    const SlangNVVMValueHandle* arguments,
     size_t argumentCount,
-    SlangNVVMValueHandle_1* outValue,
+    SlangNVVMValueHandle* outValue,
     bool requireInteger,
     bool allowV4Types)
 {
@@ -1334,43 +1337,43 @@ static SlangResult _emitCallImpl(
     }
 
     llvm::CallInst* call = state->builder.CreateCall(llvmCallee, llvmArguments);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(call);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(call);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntegerCall(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 callee,
-    const SlangNVVMValueHandle_1* arguments,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle callee,
+    const SlangNVVMValueHandle* arguments,
     size_t argumentCount,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     return _emitCallImpl(module, callee, arguments, argumentCount, outValue, true, false);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitCallV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 callee,
-    const SlangNVVMValueHandle_1* arguments,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle callee,
+    const SlangNVVMValueHandle* arguments,
     size_t argumentCount,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     return _emitCallImpl(module, callee, arguments, argumentCount, outValue, false, false);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitCallV4(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 callee,
-    const SlangNVVMValueHandle_1* arguments,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle callee,
+    const SlangNVVMValueHandle* arguments,
     size_t argumentCount,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     return _emitCallImpl(module, callee, arguments, argumentCount, outValue, false, true);
 }
 
 static SlangResult _emitValueReturnImpl(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 value,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle value,
     bool requireInteger,
     bool allowV4Types)
 {
@@ -1392,28 +1395,28 @@ static SlangResult _emitValueReturnImpl(
 }
 
 static SlangResult SLANG_NVVM_CALL
-_emitIntegerReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
+_emitIntegerReturn(SlangNVVMModuleHandle module, SlangNVVMValueHandle value)
 {
     return _emitValueReturnImpl(module, value, true, false);
 }
 
 static SlangResult SLANG_NVVM_CALL
-_emitValueReturnV3(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
+_emitValueReturnV3(SlangNVVMModuleHandle module, SlangNVVMValueHandle value)
 {
     return _emitValueReturnImpl(module, value, false, false);
 }
 
 static SlangResult SLANG_NVVM_CALL
-_emitValueReturnV4(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
+_emitValueReturnV4(SlangNVVMModuleHandle module, SlangNVVMValueHandle value)
 {
     return _emitValueReturnImpl(module, value, false, true);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 vector,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle vector,
     uint32_t elementIndex,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -1431,18 +1434,18 @@ static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
     }
 
     llvm::Value* result = state->builder.CreateExtractElement(llvmVector, elementIndex);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMTypeHandle_1 valueType,
-    SlangNVVMAddressSpace_2 addressSpace,
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle valueType,
+    SlangNVVMAddressSpace addressSpace,
     uint32_t alignment,
     const char* name,
     size_t nameSize,
-    SlangNVVMValueHandle_1* outStorage)
+    SlangNVVMValueHandle* outStorage)
 {
     if (outStorage)
         *outStorage = nullptr;
@@ -1470,16 +1473,16 @@ static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
         llvm::GlobalVariable::NotThreadLocal,
         addressSpace);
     storage->setAlignment(llvm::Align(alignment));
-    *outStorage = reinterpret_cast<SlangNVVMValueHandle_1>(storage);
+    *outStorage = reinterpret_cast<SlangNVVMValueHandle>(storage);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMIntrinsicOp_3 operation,
-    const SlangNVVMValueHandle_1* arguments,
+    SlangNVVMModuleHandle module,
+    SlangNVVMIntrinsicOp operation,
+    const SlangNVVMValueHandle* arguments,
     size_t argumentCount,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -1595,7 +1598,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         llvm::Value* laneBit =
             state->builder.CreateShl(llvm::ConstantInt::get(int32Type, 1), laneID);
         llvm::Value* predicate = state->builder.CreateICmpEQ(firstMaskBit, laneBit);
-        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(predicate);
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(predicate);
         return SLANG_OK;
     }
     if (derivesFirstActiveLane)
@@ -1619,15 +1622,15 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
     llvm::CallInst* call = state->builder.CreateCall(intrinsic, llvmArguments);
     llvm::Value* result = extractsMatchAllPredicate ? state->builder.CreateExtractValue(call, {1})
                                                     : static_cast<llvm::Value*>(call);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitPointerOffset(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 basePointer,
-    SlangNVVMValueHandle_1 elementOffset,
-    SlangNVVMValueHandle_1* outPointer)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle basePointer,
+    SlangNVVMValueHandle elementOffset,
+    SlangNVVMValueHandle* outPointer)
 {
     if (outPointer)
         *outPointer = nullptr;
@@ -1652,15 +1655,15 @@ static SlangResult SLANG_NVVM_CALL _emitPointerOffset(
 
     // A Slang element offset does not establish LLVM's stronger inbounds provenance contract.
     llvm::Value* result = state->builder.CreateGEP(pointeeType, llvmBasePointer, llvmElementOffset);
-    *outPointer = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outPointer = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 baseArrayPointer,
-    SlangNVVMValueHandle_1 elementIndex,
-    SlangNVVMValueHandle_1* outPointer)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle baseArrayPointer,
+    SlangNVVMValueHandle elementIndex,
+    SlangNVVMValueHandle* outPointer)
 {
     if (outPointer)
         *outPointer = nullptr;
@@ -1677,8 +1680,7 @@ static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
     llvm::ArrayType* arrayType = llvm::dyn_cast_or_null<llvm::ArrayType>(pointeeType);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     if (!state || !outPointer || !insertionBlock || !pointerType || pointerType->isOpaque() ||
-        !_isNVVMAddressSpace(
-            static_cast<SlangNVVMAddressSpace_2>(pointerType->getAddressSpace())) ||
+        !_isNVVMAddressSpace(static_cast<SlangNVVMAddressSpace>(pointerType->getAddressSpace())) ||
         !arrayType || !arrayType->getNumElements() || !arrayType->isSized() || !llvmElementIndex ||
         !llvm::isa<llvm::IntegerType>(llvmElementIndex->getType()) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmBaseArrayPointer) ||
@@ -1692,15 +1694,15 @@ static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
         llvmElementIndex};
     // A Slang subscript does not establish LLVM's stronger inbounds provenance contract.
     llvm::Value* result = state->builder.CreateGEP(arrayType, llvmBaseArrayPointer, indices);
-    *outPointer = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outPointer = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitRawRWStructuredBufferI32ElementPointer(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1 buffer,
-    SlangNVVMValueHandle_1 elementIndex,
-    SlangNVVMValueHandle_1* outPointer)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle buffer,
+    SlangNVVMValueHandle elementIndex,
+    SlangNVVMValueHandle* outPointer)
 {
     if (outPointer)
         *outPointer = nullptr;
@@ -1724,11 +1726,11 @@ static SlangResult SLANG_NVVM_CALL _emitRawRWStructuredBufferI32ElementPointer(
         llvm::Type::getInt32Ty(state->context),
         dataPointer,
         llvmElementIndex);
-    *outPointer = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outPointer = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _emitReturnVoid(SlangNVVMModuleHandle_1 module)
+static SlangResult SLANG_NVVM_CALL _emitReturnVoid(SlangNVVMModuleHandle module)
 {
     ModuleState* state = _getModule(module);
     if (!state)
@@ -1747,7 +1749,7 @@ static SlangResult SLANG_NVVM_CALL _emitReturnVoid(SlangNVVMModuleHandle_1 modul
 }
 
 static SlangResult SLANG_NVVM_CALL
-_markFunctionAsKernel(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 function)
+_markFunctionAsKernel(SlangNVVMModuleHandle module, SlangNVVMValueHandle function)
 {
     ModuleState* state = _getModule(module);
     llvm::Function* llvmFunction = llvm::dyn_cast_or_null<llvm::Function>(_getValue(function));
@@ -1786,7 +1788,7 @@ static SlangResult _copySerializedData(
 }
 
 // Checks whether the provider supports the requested wire encoding.
-static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
+static bool _isSerializationFormat(SlangNVVMSerializationFormat format)
 {
     return format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY ||
            format == SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE;
@@ -2108,11 +2110,11 @@ static SlangResult _writeLegacyNVVMAssembly(
 // Verifies once and materializes the one canonical byte result shared by the V1 and V2 getters.
 static SlangResult _materializeModule(
     ModuleState* state,
-    SlangNVVMSerializationFormat_1 format,
+    SlangNVVMSerializationFormat format,
     bool useNVVMIR20Assembly,
     llvm::SmallVectorImpl<char>& outSerializedData,
     llvm::SmallVectorImpl<char>& outDiagnosticData,
-    SlangNVVMVerificationStatus_2& outVerificationStatus)
+    SlangNVVMVerificationStatus& outVerificationStatus)
 {
     outSerializedData.clear();
     outDiagnosticData.clear();
@@ -2162,8 +2164,8 @@ static SlangResult _materializeModule(
 }
 
 static SlangResult SLANG_NVVM_CALL _serializeModule(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMSerializationFormat_1 format,
+    SlangNVVMModuleHandle module,
+    SlangNVVMSerializationFormat format,
     void* destination,
     size_t destinationSize,
     size_t* outSerializedSize)
@@ -2171,7 +2173,7 @@ static SlangResult SLANG_NVVM_CALL _serializeModule(
     ModuleState* state = _getModule(module);
     llvm::SmallVector<char, 0> serializedData;
     llvm::SmallVector<char, 0> diagnosticData;
-    SlangNVVMVerificationStatus_2 verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    SlangNVVMVerificationStatus verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
     const SlangResult materializeResult = _materializeModule(
         state,
         format,
@@ -2192,15 +2194,15 @@ static SlangResult SLANG_NVVM_CALL _serializeModule(
 }
 
 static SlangResult _serializeModuleWithDiagnosticsImpl(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMSerializationFormat_1 format,
+    SlangNVVMModuleHandle module,
+    SlangNVVMSerializationFormat format,
     void* serializedDestination,
     size_t serializedDestinationSize,
     size_t* outSerializedSize,
     void* diagnosticDestination,
     size_t diagnosticDestinationSize,
     size_t* outDiagnosticSize,
-    SlangNVVMVerificationStatus_2* outVerificationStatus,
+    SlangNVVMVerificationStatus* outVerificationStatus,
     bool useNVVMIR20Assembly)
 {
     if (outSerializedSize)
@@ -2223,7 +2225,7 @@ static SlangResult _serializeModuleWithDiagnosticsImpl(
 
     llvm::SmallVector<char, 0> serializedData;
     llvm::SmallVector<char, 0> diagnosticData;
-    SlangNVVMVerificationStatus_2 verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+    SlangNVVMVerificationStatus verificationStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
     const SlangResult materializeResult = _materializeModule(
         state,
         format,
@@ -2255,15 +2257,15 @@ static SlangResult _serializeModuleWithDiagnosticsImpl(
 }
 
 static SlangResult SLANG_NVVM_CALL _serializeModuleWithDiagnostics(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMSerializationFormat_1 format,
+    SlangNVVMModuleHandle module,
+    SlangNVVMSerializationFormat format,
     void* serializedDestination,
     size_t serializedDestinationSize,
     size_t* outSerializedSize,
     void* diagnosticDestination,
     size_t diagnosticDestinationSize,
     size_t* outDiagnosticSize,
-    SlangNVVMVerificationStatus_2* outVerificationStatus)
+    SlangNVVMVerificationStatus* outVerificationStatus)
 {
     return _serializeModuleWithDiagnosticsImpl(
         module,
@@ -2279,15 +2281,15 @@ static SlangResult SLANG_NVVM_CALL _serializeModuleWithDiagnostics(
 }
 
 static SlangResult SLANG_NVVM_CALL _serializeNVVMIR20AssemblyWithDiagnostics(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMSerializationFormat_1 format,
+    SlangNVVMModuleHandle module,
+    SlangNVVMSerializationFormat format,
     void* serializedDestination,
     size_t serializedDestinationSize,
     size_t* outSerializedSize,
     void* diagnosticDestination,
     size_t diagnosticDestinationSize,
     size_t* outDiagnosticSize,
-    SlangNVVMVerificationStatus_2* outVerificationStatus)
+    SlangNVVMVerificationStatus* outVerificationStatus)
 {
     return _serializeModuleWithDiagnosticsImpl(
         module,
@@ -2302,110 +2304,12 @@ static SlangResult SLANG_NVVM_CALL _serializeNVVMIR20AssemblyWithDiagnostics(
         true);
 }
 
-// Fills the canonical V1 table so the standalone and nested exports cannot diverge.
-static void _fillBuilderAPIV1(SlangNVVMBuilderAPI_V1& api)
-{
-    api = {};
-    api.structureSize = uint32_t(sizeof(api));
-    api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_1;
-    api.llvmVersionMajor = LLVM_VERSION_MAJOR;
-    api.llvmVersionMinor = LLVM_VERSION_MINOR;
-    api.llvmVersionPatch = LLVM_VERSION_PATCH;
-    api.nvvmIRVersionMajor = 2;
-    api.nvvmIRVersionMinor = 0;
-    api.pointerModel = SLANG_NVVM_POINTER_MODEL_TYPED;
-    api.createModule = _createModule;
-    api.destroyModule = _destroyModule;
-    api.getVoidType = _getVoidType;
-    api.getFunctionType = _getFunctionType;
-    api.declareFunction = _declareFunction;
-    api.createBlock = _createBlock;
-    api.setInsertBlock = _setInsertBlock;
-    api.emitReturnVoid = _emitReturnVoid;
-    api.markFunctionAsKernel = _markFunctionAsKernel;
-    api.serializeModule = _serializeModule;
-}
-
-// Fills the complete frozen V2 table. Both standalone V2 and V3 use this exact compatibility core.
-static void _fillBuilderAPIV2(SlangNVVMBuilderAPI_V2& api)
-{
-    api = {};
-    api.structureSize = uint32_t(sizeof(api));
-    api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_2;
-    _fillBuilderAPIV1(api.baseAPI);
-    api.serializeModuleWithDiagnostics = _serializeModuleWithDiagnostics;
-    api.getIntegerType = _getIntegerType;
-    api.getPointerType = _getPointerType;
-    api.getFunctionParameter = _getFunctionParameter;
-    api.emitLoad = _emitLoad;
-    api.emitStore = _emitStore;
-    api.emitIntegerBinary = _emitIntegerBinary;
-    api.emitIntegerSignedLessThan = _emitIntegerSignedLessThan;
-    api.emitBranch = _emitBranch;
-    api.emitConditionalBranch = _emitConditionalBranch;
-    api.getIntegerConstant = _getIntegerConstant;
-    api.emitIntegerPhi = _emitIntegerPhi;
-    api.addIntegerPhiIncoming = _addIntegerPhiIncoming;
-    api.emitIntegerCall = _emitIntegerCall;
-    api.emitIntegerReturn = _emitIntegerReturn;
-    api.emitPointerOffset = _emitPointerOffset;
-    api.getArrayType = _getArrayType;
-    api.emitArrayElementPointer = _emitArrayElementPointer;
-    api.emitIntegerMultiply = _emitIntegerMultiply;
-    api.emitIntegerBitAnd = _emitIntegerBitAnd;
-    api.emitIntegerBitOr = _emitIntegerBitOr;
-    api.emitIntegerBitXor = _emitIntegerBitXor;
-    api.emitIntegerBitNot = _emitIntegerBitNot;
-    api.emitIntegerNegate = _emitIntegerNegate;
-    api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
-    api.serializeNVVMIR20AssemblyWithDiagnostics = _serializeNVVMIR20AssemblyWithDiagnostics;
-    api.emitIntegerEqual = _emitIntegerEqual;
-    api.emitIntegerNotEqual = _emitIntegerNotEqual;
-    api.emitIntegerSignedGreaterThan = _emitIntegerSignedGreaterThan;
-    api.emitIntegerSignedLessEqual = _emitIntegerSignedLessEqual;
-    api.emitIntegerSignedGreaterEqual = _emitIntegerSignedGreaterEqual;
-    api.getRawRWStructuredBufferI32Type = _getRawRWStructuredBufferI32Type;
-    api.emitRawRWStructuredBufferI32ElementPointer = _emitRawRWStructuredBufferI32ElementPointer;
-}
-
-static void _addFeature(SlangNVVMBuilderFeatureSet_3& features, SlangNVVMBuilderFeature_3 feature)
-{
-    features.words[feature / 64u] |= uint64_t(1) << (feature % 64u);
-}
-
-static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
-{
-    api = {};
-    api.structureSize = uint32_t(sizeof(api));
-    api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_3;
-    _fillBuilderAPIV2(api.compatibilityAPI);
-    for (SlangNVVMBuilderFeature_3 feature = 0; feature < SLANG_NVVM_BUILDER_FEATURE_COUNT_3;
-         ++feature)
-    {
-        _addFeature(api.features, feature);
-    }
-    api.emitIntegerUnary = _emitIntegerUnaryV3;
-    api.emitIntegerBinary = _emitIntegerBinaryV3;
-    api.emitIntegerCompare = _emitIntegerCompareV3;
-    api.getFloatingPointType = _getFloatingPointType;
-    api.emitFloatingBinary = _emitFloatingBinaryV3;
-    api.emitFloatingUnary = _emitFloatingUnaryV3;
-    api.emitFloatingCompare = _emitFloatingCompareV3;
-    api.getFloatingPointConstant = _getFloatingPointConstantV3;
-    api.emitPhi = _emitPhiV3;
-    api.addPhiIncoming = _addPhiIncomingV3;
-    api.emitCall = _emitCallV3;
-    api.emitValueReturn = _emitValueReturnV3;
-    api.emitIntrinsic = _emitIntrinsicV3;
-}
-
 static SlangResult SLANG_NVVM_CALL
-_isOperationSupportedV4(const SlangNVVMValueOperationDesc_4* operation, uint32_t* outSupported)
+_isOperationSupportedV4(const SlangNVVMValueOperationDesc* operation, uint32_t* outSupported)
 {
     if (outSupported)
         *outSupported = 0;
-    if (!operation || !outSupported || operation->structureSize != sizeof(*operation) ||
-        (!operation->operandTypes && operation->operandCount))
+    if (!operation || !outSupported || (!operation->operandTypes && operation->operandCount))
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -2414,27 +2318,27 @@ _isOperationSupportedV4(const SlangNVVMValueOperationDesc_4* operation, uint32_t
 }
 
 static bool _getExecutionRegisterIntrinsicIDs(
-    SlangNVVMValueOperation_4 operation,
+    SlangNVVMValueOperation operation,
     llvm::Intrinsic::ID (&outIntrinsicIDs)[3])
 {
     switch (operation)
     {
-    case SLANG_NVVM_VALUE_OP_THREAD_INDEX_4:
+    case SLANG_NVVM_VALUE_OP_THREAD_INDEX:
         outIntrinsicIDs[0] = llvm::Intrinsic::nvvm_read_ptx_sreg_tid_x;
         outIntrinsicIDs[1] = llvm::Intrinsic::nvvm_read_ptx_sreg_tid_y;
         outIntrinsicIDs[2] = llvm::Intrinsic::nvvm_read_ptx_sreg_tid_z;
         return true;
-    case SLANG_NVVM_VALUE_OP_BLOCK_INDEX_4:
+    case SLANG_NVVM_VALUE_OP_BLOCK_INDEX:
         outIntrinsicIDs[0] = llvm::Intrinsic::nvvm_read_ptx_sreg_ctaid_x;
         outIntrinsicIDs[1] = llvm::Intrinsic::nvvm_read_ptx_sreg_ctaid_y;
         outIntrinsicIDs[2] = llvm::Intrinsic::nvvm_read_ptx_sreg_ctaid_z;
         return true;
-    case SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS_4:
+    case SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS:
         outIntrinsicIDs[0] = llvm::Intrinsic::nvvm_read_ptx_sreg_ntid_x;
         outIntrinsicIDs[1] = llvm::Intrinsic::nvvm_read_ptx_sreg_ntid_y;
         outIntrinsicIDs[2] = llvm::Intrinsic::nvvm_read_ptx_sreg_ntid_z;
         return true;
-    case SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4:
+    case SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS:
         outIntrinsicIDs[0] = llvm::Intrinsic::nvvm_read_ptx_sreg_nctaid_x;
         outIntrinsicIDs[1] = llvm::Intrinsic::nvvm_read_ptx_sreg_nctaid_y;
         outIntrinsicIDs[2] = llvm::Intrinsic::nvvm_read_ptx_sreg_nctaid_z;
@@ -2446,8 +2350,8 @@ static bool _getExecutionRegisterIntrinsicIDs(
 
 static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID)
 {
-    for (SlangNVVMValueOperation_4 operation = SLANG_NVVM_VALUE_OP_THREAD_INDEX_4;
-         operation <= SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4;
+    for (SlangNVVMValueOperation operation = SLANG_NVVM_VALUE_OP_THREAD_INDEX;
+         operation <= SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS;
          ++operation)
     {
         llvm::Intrinsic::ID registerIntrinsics[3];
@@ -2463,9 +2367,9 @@ static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID)
 }
 
 static SlangResult _emitExecutionRegisterV4(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueOperation_4 operation,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueOperation operation,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -2487,13 +2391,13 @@ static SlangResult _emitExecutionRegisterV4(
         llvm::Value* component = state->builder.CreateCall(intrinsic);
         result = state->builder.CreateInsertElement(result, component, axis);
     }
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult _emitWorkgroupBarrierV4(
-    SlangNVVMModuleHandle_1 module,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -2509,10 +2413,10 @@ static SlangResult _emitWorkgroupBarrierV4(
 }
 
 static SlangResult _emitCatalogOperationV4(
-    SlangNVVMModuleHandle_1 module,
+    SlangNVVMModuleHandle module,
     const Slang::NVVMSemantics::CatalogEntry& entry,
-    const SlangNVVMValueHandle_1* operands,
-    SlangNVVMValueHandle_1* outValue)
+    const SlangNVVMValueHandle* operands,
+    SlangNVVMValueHandle* outValue)
 {
     using Slang::NVVMSemantics::LegacyFamily;
     switch (entry.legacyFamily)
@@ -2520,47 +2424,47 @@ static SlangResult _emitCatalogOperationV4(
     case LegacyFamily::IntegerUnary:
         return _emitIntegerUnaryV3(
             module,
-            SlangNVVMIntegerUnaryOp_3(entry.legacyOperation),
+            SlangNVVMIntegerUnaryOp(entry.legacyOperation),
             operands[0],
             outValue);
     case LegacyFamily::IntegerBinary:
         return _emitIntegerBinaryV3(
             module,
-            SlangNVVMIntegerBinaryOp_3(entry.legacyOperation),
+            SlangNVVMIntegerBinaryOp(entry.legacyOperation),
             operands[0],
             operands[1],
             outValue);
     case LegacyFamily::IntegerCompare:
         return _emitIntegerCompareV3(
             module,
-            SlangNVVMIntegerCompareOp_3(entry.legacyOperation),
+            SlangNVVMIntegerCompareOp(entry.legacyOperation),
             operands[0],
             operands[1],
             outValue);
     case LegacyFamily::FloatingUnary:
         return _emitFloatingUnaryV3(
             module,
-            SlangNVVMFloatingUnaryOp_3(entry.legacyOperation),
+            SlangNVVMFloatingUnaryOp(entry.legacyOperation),
             operands[0],
             outValue);
     case LegacyFamily::FloatingBinary:
         return _emitFloatingBinaryV3(
             module,
-            SlangNVVMFloatingBinaryOp_3(entry.legacyOperation),
+            SlangNVVMFloatingBinaryOp(entry.legacyOperation),
             operands[0],
             operands[1],
             outValue);
     case LegacyFamily::FloatingCompare:
         return _emitFloatingCompareV3(
             module,
-            SlangNVVMFloatingCompareOp_3(entry.legacyOperation),
+            SlangNVVMFloatingCompareOp(entry.legacyOperation),
             operands[0],
             operands[1],
             outValue);
     case LegacyFamily::Intrinsic:
         return _emitIntrinsicV3(
             module,
-            SlangNVVMIntrinsicOp_3(entry.legacyOperation),
+            SlangNVVMIntrinsicOp(entry.legacyOperation),
             operands,
             entry.operandCount,
             outValue);
@@ -2572,26 +2476,26 @@ static SlangResult _emitCatalogOperationV4(
     return SLANG_E_INVALID_ARG;
 }
 
-static llvm::Type* _getV4SemanticLLVMType(ModuleState* state, const SlangNVVMValueTypeDesc_4& type)
+static llvm::Type* _getV4SemanticLLVMType(ModuleState* state, const SlangNVVMValueTypeDesc& type)
 {
-    if (!state || type.reserved != 0)
+    if (!state)
         return nullptr;
 
     llvm::Type* scalarType = nullptr;
     switch (type.kind)
     {
-    case SLANG_NVVM_VALUE_TYPE_BOOL_4:
+    case SLANG_NVVM_VALUE_TYPE_BOOL:
         if (type.bitWidth == 1)
             scalarType = llvm::Type::getInt1Ty(state->context);
         break;
-    case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4:
-    case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4:
+    case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER:
+    case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER:
         if (type.bitWidth == 8 || type.bitWidth == 16 || type.bitWidth == 32 || type.bitWidth == 64)
         {
             scalarType = llvm::IntegerType::get(state->context, type.bitWidth);
         }
         break;
-    case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4:
+    case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT:
         if (type.bitWidth == 32)
             scalarType = llvm::Type::getFloatTy(state->context);
         break;
@@ -2602,7 +2506,7 @@ static llvm::Type* _getV4SemanticLLVMType(ModuleState* state, const SlangNVVMVal
         return nullptr;
     if (type.laneCount == 1)
         return scalarType;
-    if (type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4 && type.bitWidth == 32 &&
+    if (type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER && type.bitWidth == 32 &&
         type.laneCount == 2)
     {
         return llvm::FixedVectorType::get(scalarType, 2);
@@ -2611,11 +2515,11 @@ static llvm::Type* _getV4SemanticLLVMType(ModuleState* state, const SlangNVVMVal
 }
 
 static SlangResult _emitV4NumericFamily(
-    SlangNVVMModuleHandle_1 module,
-    const SlangNVVMValueOperationDesc_4& operation,
+    SlangNVVMModuleHandle module,
+    const SlangNVVMValueOperationDesc& operation,
     Slang::NVVMSemantics::V4Family family,
-    const SlangNVVMValueHandle_1* operands,
-    SlangNVVMValueHandle_1* outValue)
+    const SlangNVVMValueHandle* operands,
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
@@ -2641,7 +2545,7 @@ static SlangResult _emitV4NumericFamily(
     switch (family)
     {
     case Slang::NVVMSemantics::V4Family::IntegerUnary:
-        result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_NOT_4
+        result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_NOT
                      ? state->builder.CreateNot(llvmOperands[0])
                      : state->builder.CreateNeg(llvmOperands[0]);
         break;
@@ -2649,22 +2553,22 @@ static SlangResult _emitV4NumericFamily(
     case Slang::NVVMSemantics::V4Family::SignedI32x2Add:
         switch (operation.operation)
         {
-        case SLANG_NVVM_VALUE_OP_ADD_4:
+        case SLANG_NVVM_VALUE_OP_ADD:
             result = state->builder.CreateAdd(llvmOperands[0], llvmOperands[1]);
             break;
-        case SLANG_NVVM_VALUE_OP_SUBTRACT_4:
+        case SLANG_NVVM_VALUE_OP_SUBTRACT:
             result = state->builder.CreateSub(llvmOperands[0], llvmOperands[1]);
             break;
-        case SLANG_NVVM_VALUE_OP_MULTIPLY_4:
+        case SLANG_NVVM_VALUE_OP_MULTIPLY:
             result = state->builder.CreateMul(llvmOperands[0], llvmOperands[1]);
             break;
-        case SLANG_NVVM_VALUE_OP_BIT_AND_4:
+        case SLANG_NVVM_VALUE_OP_BIT_AND:
             result = state->builder.CreateAnd(llvmOperands[0], llvmOperands[1]);
             break;
-        case SLANG_NVVM_VALUE_OP_BIT_OR_4:
+        case SLANG_NVVM_VALUE_OP_BIT_OR:
             result = state->builder.CreateOr(llvmOperands[0], llvmOperands[1]);
             break;
-        case SLANG_NVVM_VALUE_OP_BIT_XOR_4:
+        case SLANG_NVVM_VALUE_OP_BIT_XOR:
             result = state->builder.CreateXor(llvmOperands[0], llvmOperands[1]);
             break;
         default:
@@ -2675,25 +2579,25 @@ static SlangResult _emitV4NumericFamily(
         {
             llvm::CmpInst::Predicate predicate = llvm::CmpInst::BAD_ICMP_PREDICATE;
             const bool isSigned =
-                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4;
+                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
             switch (operation.operation)
             {
-            case SLANG_NVVM_VALUE_OP_EQUAL_4:
+            case SLANG_NVVM_VALUE_OP_EQUAL:
                 predicate = llvm::CmpInst::ICMP_EQ;
                 break;
-            case SLANG_NVVM_VALUE_OP_NOT_EQUAL_4:
+            case SLANG_NVVM_VALUE_OP_NOT_EQUAL:
                 predicate = llvm::CmpInst::ICMP_NE;
                 break;
-            case SLANG_NVVM_VALUE_OP_LESS_THAN_4:
+            case SLANG_NVVM_VALUE_OP_LESS_THAN:
                 predicate = isSigned ? llvm::CmpInst::ICMP_SLT : llvm::CmpInst::ICMP_ULT;
                 break;
-            case SLANG_NVVM_VALUE_OP_GREATER_THAN_4:
+            case SLANG_NVVM_VALUE_OP_GREATER_THAN:
                 predicate = isSigned ? llvm::CmpInst::ICMP_SGT : llvm::CmpInst::ICMP_UGT;
                 break;
-            case SLANG_NVVM_VALUE_OP_LESS_EQUAL_4:
+            case SLANG_NVVM_VALUE_OP_LESS_EQUAL:
                 predicate = isSigned ? llvm::CmpInst::ICMP_SLE : llvm::CmpInst::ICMP_ULE;
                 break;
-            case SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4:
+            case SLANG_NVVM_VALUE_OP_GREATER_EQUAL:
                 predicate = isSigned ? llvm::CmpInst::ICMP_SGE : llvm::CmpInst::ICMP_UGE;
                 break;
             default:
@@ -2711,7 +2615,7 @@ static SlangResult _emitV4NumericFamily(
         {
             result = state->builder.CreateTrunc(llvmOperands[0], resultType);
         }
-        else if (operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4)
+        else if (operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER)
         {
             result = state->builder.CreateSExt(llvmOperands[0], resultType);
         }
@@ -2721,12 +2625,12 @@ static SlangResult _emitV4NumericFamily(
         }
         break;
     case Slang::NVVMSemantics::V4Family::IntegerToFloat:
-        result = operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4
+        result = operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
                      ? state->builder.CreateSIToFP(llvmOperands[0], resultType)
                      : state->builder.CreateUIToFP(llvmOperands[0], resultType);
         break;
     case Slang::NVVMSemantics::V4Family::FloatToInteger:
-        result = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4
+        result = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
                      ? state->builder.CreateFPToSI(llvmOperands[0], resultType)
                      : state->builder.CreateFPToUI(llvmOperands[0], resultType);
         break;
@@ -2736,21 +2640,21 @@ static SlangResult _emitV4NumericFamily(
 
     if (!result || result->getType() != resultType)
         return SLANG_E_INVALID_ARG;
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitOperationV4(
-    SlangNVVMModuleHandle_1 module,
-    const SlangNVVMValueOperationDesc_4* operation,
-    const SlangNVVMValueHandle_1* operands,
+    SlangNVVMModuleHandle module,
+    const SlangNVVMValueOperationDesc* operation,
+    const SlangNVVMValueHandle* operands,
     size_t operandCount,
-    SlangNVVMValueHandle_1* outValue)
+    SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
-    if (!operation || !outValue || operation->structureSize != sizeof(*operation) ||
-        operation->operandCount != operandCount || (!operands && operandCount))
+    if (!operation || !outValue || operation->operandCount != operandCount ||
+        (!operands && operandCount))
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -2764,35 +2668,25 @@ static SlangResult SLANG_NVVM_CALL _emitOperationV4(
         return SLANG_E_INVALID_ARG;
     return _emitV4NumericFamily(module, *operation, resolution.family, operands, outValue);
 }
-
-static void _fillBuilderFoundationAPIV4(SlangNVVMBuilderFoundationAPI_4& api)
+static void _fillBuilderFoundationAPI(SlangNVVMBuilderFoundationAPI& api)
 {
     api = {};
-    api.structureSize = uint32_t(sizeof(api));
-    api.interfaceVersion = SLANG_NVVM_BUILDER_FOUNDATION_INTERFACE_VERSION_4;
     api.createModule = _createModule;
     api.destroyModule = _destroyModule;
     api.serializeModuleWithDiagnostics = _serializeModuleWithDiagnostics;
     api.serializeNVVMIR20AssemblyWithDiagnostics = _serializeNVVMIR20AssemblyWithDiagnostics;
 }
 
-static void _fillBuilderConstructionAPIV4(
-    SlangNVVMBuilderConstructionAPI_4& api,
-    uint32_t interfaceVersion)
+static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
 {
     api = {};
-    api.structureSize = interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1
-                            ? SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_1_SIZE
-                        : interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2
-                            ? SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_2_SIZE
-                            : uint32_t(sizeof(api));
-    api.interfaceVersion = interfaceVersion;
     api.getVoidType = _getVoidType;
     api.getIntegerType = _getIntegerType;
     api.getFloatingPointType = _getFloatingPointType;
     api.getPointerType = _getPointerType;
     api.getFunctionType = _getFunctionType;
     api.getArrayType = _getArrayType;
+    api.getVectorType = _getVectorType;
     api.getRawRWStructuredBufferI32Type = _getRawRWStructuredBufferI32Type;
     api.declareFunction = _declareFunction;
     api.getFunctionParameter = _getFunctionParameter;
@@ -2806,96 +2700,61 @@ static void _fillBuilderConstructionAPIV4(
     api.getFloatingPointConstant = _getFloatingPointConstantV3;
     api.emitPhi = _emitPhiV3;
     api.addPhiIncoming = _addPhiIncomingV3;
-    api.emitCall = _emitCallV3;
-    api.emitValueReturn = _emitValueReturnV3;
+    api.emitCall = _emitCallV4;
+    api.emitValueReturn = _emitValueReturnV4;
     api.emitReturnVoid = _emitReturnVoid;
     api.emitPointerOffset = _emitPointerOffset;
     api.emitArrayElementPointer = _emitArrayElementPointer;
+    api.emitVectorElementExtract = _emitVectorElementExtract;
     api.emitRawRWStructuredBufferI32ElementPointer = _emitRawRWStructuredBufferI32ElementPointer;
     api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
+    api.declareGlobalStorage = _declareGlobalStorage;
     api.markFunctionAsKernel = _markFunctionAsKernel;
-    if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2 ||
-        interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4)
-    {
-        api.getVectorType = _getVectorType;
-        api.emitVectorElementExtract = _emitVectorElementExtract;
-        api.emitExtendedCall = _emitCallV4;
-        api.emitExtendedValueReturn = _emitValueReturnV4;
-    }
-    if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4)
-        api.declareGlobalStorage = _declareGlobalStorage;
 }
 
-static void _fillBuilderValueOperationsAPIV4(SlangNVVMBuilderValueOperationsAPI_4& api)
+static void _fillBuilderValueOperationsAPI(SlangNVVMBuilderValueOperationsAPI& api)
 {
     api = {};
-    api.structureSize = uint32_t(sizeof(api));
-    api.interfaceVersion = SLANG_NVVM_BUILDER_VALUE_OPERATIONS_INTERFACE_VERSION_4;
     api.isOperationSupported = _isOperationSupportedV4;
     api.emitOperation = _emitOperationV4;
 }
 
-static SlangResult SLANG_NVVM_CALL _queryBuilderInterfaceV4(
-    SlangNVVMBuilderInterfaceID_4 interfaceID,
-    uint32_t interfaceVersion,
-    const void** outInterface)
+static SlangResult SLANG_NVVM_CALL
+_queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** outInterface)
 {
     if (outInterface)
         *outInterface = nullptr;
     if (!outInterface)
         return SLANG_E_INVALID_ARG;
 
-    static SlangNVVMBuilderFoundationAPI_4 foundation = []
+    static const SlangNVVMBuilderFoundationAPI foundation = []
     {
-        SlangNVVMBuilderFoundationAPI_4 api;
-        _fillBuilderFoundationAPIV4(api);
+        SlangNVVMBuilderFoundationAPI api;
+        _fillBuilderFoundationAPI(api);
         return api;
     }();
-    static SlangNVVMBuilderConstructionAPI_4 constructionV1 = []
+    static const SlangNVVMBuilderConstructionAPI construction = []
     {
-        SlangNVVMBuilderConstructionAPI_4 api;
-        _fillBuilderConstructionAPIV4(api, SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1);
+        SlangNVVMBuilderConstructionAPI api;
+        _fillBuilderConstructionAPI(api);
         return api;
     }();
-    static SlangNVVMBuilderConstructionAPI_4 constructionV2 = []
+    static const SlangNVVMBuilderValueOperationsAPI valueOperations = []
     {
-        SlangNVVMBuilderConstructionAPI_4 api;
-        _fillBuilderConstructionAPIV4(api, SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2);
-        return api;
-    }();
-    static SlangNVVMBuilderConstructionAPI_4 constructionV3 = []
-    {
-        SlangNVVMBuilderConstructionAPI_4 api;
-        _fillBuilderConstructionAPIV4(api, SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4);
-        return api;
-    }();
-    static SlangNVVMBuilderValueOperationsAPI_4 valueOperations = []
-    {
-        SlangNVVMBuilderValueOperationsAPI_4 api;
-        _fillBuilderValueOperationsAPIV4(api);
+        SlangNVVMBuilderValueOperationsAPI api;
+        _fillBuilderValueOperationsAPI(api);
         return api;
     }();
 
     switch (interfaceID)
     {
-    case SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION_4:
-        if (interfaceVersion != SLANG_NVVM_BUILDER_FOUNDATION_INTERFACE_VERSION_4)
-            return SLANG_E_NO_INTERFACE;
+    case SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION:
         *outInterface = &foundation;
         return SLANG_OK;
-    case SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION_4:
-        if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1)
-            *outInterface = &constructionV1;
-        else if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2)
-            *outInterface = &constructionV2;
-        else if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4)
-            *outInterface = &constructionV3;
-        else
-            return SLANG_E_NO_INTERFACE;
+    case SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION:
+        *outInterface = &construction;
         return SLANG_OK;
-    case SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS_4:
-        if (interfaceVersion != SLANG_NVVM_BUILDER_VALUE_OPERATIONS_INTERFACE_VERSION_4)
-            return SLANG_E_NO_INTERFACE;
+    case SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS:
         *outInterface = &valueOperations;
         return SLANG_OK;
     default:
@@ -2903,85 +2762,26 @@ static SlangResult SLANG_NVVM_CALL _queryBuilderInterfaceV4(
     }
 }
 
-static void _fillBuilderAPIV4(SlangNVVMBuilderAPI_V4& api)
+static void _fillBuilderAPI(SlangNVVMBuilderAPI& api)
 {
     api = {};
-    api.structureSize = uint32_t(sizeof(api));
-    api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_4;
     api.llvmVersionMajor = LLVM_VERSION_MAJOR;
     api.llvmVersionMinor = LLVM_VERSION_MINOR;
     api.llvmVersionPatch = LLVM_VERSION_PATCH;
     api.nvvmIRVersionMajor = 2;
     api.nvvmIRVersionMinor = 0;
     api.pointerModel = SLANG_NVVM_POINTER_MODEL_TYPED;
-    api.queryInterface = _queryBuilderInterfaceV4;
+    api.queryInterface = _queryBuilderInterface;
 }
 
 } // namespace
 
 extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
-slang_getNVVMBuilderAPI_V1(SlangNVVMBuilderAPI_V1* outAPI)
+slang_getNVVMBuilderAPI(uint32_t abiRevision, SlangNVVMBuilderAPI* outAPI)
 {
-    if (!outAPI || outAPI->structureSize != sizeof(SlangNVVMBuilderAPI_V1) ||
-        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_1)
-    {
+    if (!outAPI || abiRevision != SLANG_NVVM_BUILDER_ABI_REVISION)
         return SLANG_E_NO_INTERFACE;
-    }
 
-    SlangNVVMBuilderAPI_V1 api;
-    _fillBuilderAPIV1(api);
-    *outAPI = api;
-    return SLANG_OK;
-}
-
-extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
-slang_getNVVMBuilderAPI_V2(SlangNVVMBuilderAPI_V2* outAPI)
-{
-    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V2_MIN_SIZE ||
-        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_2)
-    {
-        return SLANG_E_NO_INTERFACE;
-    }
-
-    const size_t callerCapacity = outAPI->structureSize;
-    SlangNVVMBuilderAPI_V2 api;
-    _fillBuilderAPIV2(api);
-
-    const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
-    std::memcpy(outAPI, &api, copySize);
-    return SLANG_OK;
-}
-
-extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
-slang_getNVVMBuilderAPI_V3(SlangNVVMBuilderAPI_V3* outAPI)
-{
-    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
-        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3)
-    {
-        return SLANG_E_NO_INTERFACE;
-    }
-
-    const size_t callerCapacity = outAPI->structureSize;
-    SlangNVVMBuilderAPI_V3 api;
-    _fillBuilderAPIV3(api);
-    const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
-    std::memcpy(outAPI, &api, copySize);
-    return SLANG_OK;
-}
-
-extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
-slang_getNVVMBuilderAPI_V4(SlangNVVMBuilderAPI_V4* outAPI)
-{
-    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V4_MIN_SIZE ||
-        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_4)
-    {
-        return SLANG_E_NO_INTERFACE;
-    }
-
-    const size_t callerCapacity = outAPI->structureSize;
-    SlangNVVMBuilderAPI_V4 api;
-    _fillBuilderAPIV4(api);
-    const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
-    std::memcpy(outAPI, &api, copySize);
+    _fillBuilderAPI(*outAPI);
     return SLANG_OK;
 }

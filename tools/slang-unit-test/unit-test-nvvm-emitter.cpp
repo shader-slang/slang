@@ -2,7 +2,7 @@
 
 #include "unit-test-nvvm-support.h"
 
-SLANG_UNIT_TEST(nvvmSlangV3RoutesGenericScalarFamilies)
+SLANG_UNIT_TEST(nvvmSlangRoutesGenericScalarFamilies)
 {
     enum class Family
     {
@@ -18,14 +18,13 @@ SLANG_UNIT_TEST(nvvmSlangV3RoutesGenericScalarFamilies)
     };
     static const Case kCases[] = {
         {kDirectNVVMIntegerNegateSource, Family::Unary, SLANG_NVVM_INTEGER_UNARY_OP_NEGATE},
-        {kDirectNVVMIntegerMultiplySource, Family::Binary, SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY},
+        {kDirectNVVMIntegerMultiplySource, Family::Binary, SLANG_NVVM_INTEGER_BINARY_OP_MULTIPLY},
         {kDirectNVVMIntegerEqualSource, Family::Compare, SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL},
     };
 
     for (const auto& testCase : kCases)
     {
         _resetDirectNVVMFakes();
-        _enableFakeNVVMBuilderV3();
         {
             ComPtr<slang::IGlobalSession> globalSession;
             SLANG_CHECK_ABORT(
@@ -75,7 +74,6 @@ static void _runNVVMSlangFloat32ArithmeticUsesDirectPipeline(
                                                    ? FakeNVVMBuilderScalarFamily::FloatingUnary
                                                    : FakeNVVMBuilderScalarFamily::FloatingBinary;
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -156,7 +154,6 @@ static void _runNVVMSlangFloat32ComparisonUsesDirectPipeline(
     const NVVMFloat32ComparisonTestCase& testCase =
         _getNVVMFloat32ComparisonTestCase(testOperation);
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -245,7 +242,6 @@ NVVM_FLOAT32_COMPARISON_DIRECT_TEST(nvvmSlangFloat32LessThanUsesDirectPipeline, 
 SLANG_UNIT_TEST(nvvmSlangFloat32ConstantUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -291,7 +287,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat32ConstantUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangFloat32PhiUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -352,7 +347,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat32PhiUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangFloat32FunctionsUseDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -444,7 +438,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat32FunctionsUseDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -516,7 +509,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangCUDAExecutionUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV4();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -539,11 +531,11 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionUsesDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.vectorElementType == _getFakeNVVMBuilderIntegerType());
         SLANG_CHECK(gFakeNVVMBuilder.vectorElementCount == 3);
         SLANG_CHECK(gFakeNVVMBuilder.executionRegisterOperations.getCount() == 4);
-        const SlangNVVMValueOperation_4 expectedOperations[] = {
-            SLANG_NVVM_VALUE_OP_THREAD_INDEX_4,
-            SLANG_NVVM_VALUE_OP_BLOCK_INDEX_4,
-            SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS_4,
-            SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4,
+        const SlangNVVMValueOperation expectedOperations[] = {
+            SLANG_NVVM_VALUE_OP_THREAD_INDEX,
+            SLANG_NVVM_VALUE_OP_BLOCK_INDEX,
+            SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS,
+            SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS,
         };
         for (Index i = 0; i < SLANG_COUNT_OF(expectedOperations); ++i)
         {
@@ -585,7 +577,6 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangSharedMemoryUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV4();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -641,7 +632,6 @@ SLANG_UNIT_TEST(nvvmSlangSharedMemoryUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangWaveLaneCountUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -713,7 +703,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveLaneCountUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtUIntUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -794,7 +783,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtUIntUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtIntUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -873,7 +861,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtIntUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtFloatUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -952,7 +939,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtFloatUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangWaveActiveMaskUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -1023,14 +1009,13 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveMaskUsesDirectPipeline)
 // Compiles one public scalar wave-read fixture and checks its canonical mask-to-operation topology.
 static void _checkPublicWaveReadDirectPipeline(
     const char* source,
-    SlangNVVMIntrinsicOp_3 waveOperation,
+    SlangNVVMIntrinsicOp waveOperation,
     Index waveArgumentCount,
     FakeNVVMBuilderValueKind entryValueKind,
     Index expectedPointerOffsetCount,
     Index expectedLoadCount)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -1211,7 +1196,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstFloatUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangWaveIsFirstLaneUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -1278,12 +1262,11 @@ SLANG_UNIT_TEST(nvvmSlangWaveIsFirstLaneUsesDirectPipeline)
 
 static void _checkPublicWavePredicateDirectPipeline(
     const char* source,
-    SlangNVVMIntrinsicOp_3 operation,
+    SlangNVVMIntrinsicOp operation,
     Index expectedBooleanParameterCount,
     Index expectedFloatParameterCount = 0)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -1404,7 +1387,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualFloatUsesDirectPipeline)
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -1456,617 +1438,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
         SLANG_CHECK(
             gFakeNVVMBuilder
                 .scalarV3FamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::FloatingUnary)] == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-static void _runNVVMSlangNegotiatesFloat32Capability(
-    const char* source,
-    SlangNVVMBuilderFeature_3 feature,
-    FakeNVVMBuilderScalarFamily family)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features.words[feature / 64u] &= ~(uint64_t(1) << (feature % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(
-            SLANG_FAILED(_compileSlangWithDirectNVVM(globalSession, source, code, diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.getFloatingPointTypeCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.scalarV3FamilyCallCounts[Index(family)] == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-static void _runNVVMSlangNegotiatesFloat32ArithmeticCapability(
-    NVVMFloat32ArithmeticTestOperation testOperation)
-{
-    const NVVMFloat32ArithmeticTestCase& testCase =
-        _getNVVMFloat32ArithmeticTestCase(testOperation);
-    const FakeNVVMBuilderScalarFamily family = testCase.operandCount == 1
-                                                   ? FakeNVVMBuilderScalarFamily::FloatingUnary
-                                                   : FakeNVVMBuilderScalarFamily::FloatingBinary;
-    _runNVVMSlangNegotiatesFloat32Capability(testCase.source, testCase.feature, family);
-}
-
-#define NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(NAME, OPERATION) \
-    SLANG_UNIT_TEST(NAME)                                        \
-    {                                                            \
-        _runNVVMSlangNegotiatesFloat32ArithmeticCapability(      \
-            NVVMFloat32ArithmeticTestOperation::OPERATION);      \
-    }
-
-NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32AddCapability, Add)
-NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32SubtractCapability, Subtract)
-NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32MultiplyCapability, Multiply)
-NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32DivideCapability, Divide)
-NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32NegateCapability, Negate)
-
-#undef NVVM_FLOAT32_ARITHMETIC_CAPABILITY_TEST
-
-static void _runNVVMSlangNegotiatesFloat32ComparisonCapability(
-    NVVMFloat32ComparisonTestOperation testOperation)
-{
-    const NVVMFloat32ComparisonTestCase& testCase =
-        _getNVVMFloat32ComparisonTestCase(testOperation);
-    _runNVVMSlangNegotiatesFloat32Capability(
-        testCase.source,
-        testCase.feature,
-        FakeNVVMBuilderScalarFamily::FloatingCompare);
-}
-
-#define NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(NAME, OPERATION) \
-    SLANG_UNIT_TEST(NAME)                                        \
-    {                                                            \
-        _runNVVMSlangNegotiatesFloat32ComparisonCapability(      \
-            NVVMFloat32ComparisonTestOperation::OPERATION);      \
-    }
-
-NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(nvvmSlangNegotiatesFloat32EqualCapability, OrderedEqual)
-NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
-    nvvmSlangNegotiatesFloat32NotEqualCapability,
-    UnorderedNotEqual)
-NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
-    nvvmSlangNegotiatesFloat32GreaterThanCapability,
-    OrderedGreaterThan)
-NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
-    nvvmSlangNegotiatesFloat32LessEqualCapability,
-    OrderedLessEqual)
-NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
-    nvvmSlangNegotiatesFloat32GreaterEqualCapability,
-    OrderedGreaterEqual)
-NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST(
-    nvvmSlangNegotiatesFloat32LessThanCapability,
-    OrderedLessThan)
-
-#undef NVVM_FLOAT32_COMPARISON_CAPABILITY_TEST
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32ConstantCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features
-        .words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMFloat32ConstantSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.getFloatingPointTypeCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.getFloatingPointConstantCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarPhiCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMFloat32PhiSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitPhiCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.addPhiIncomingCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesGenericScalarFunctionCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features
-        .words[SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMFloat32FunctionSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesCUDAExecutionCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMCUDAExecutionSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        const String diagnosticText = _getBlobText(diagnostics);
-        SLANG_CHECK(diagnosticText.indexOf("E52018") >= 0);
-        SLANG_CHECK(diagnosticText.indexOf("extended function construction") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.executionRegisterOperations.getCount() == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.workgroupBarrierCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesSharedGlobalStorageCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV4();
-    gFakeNVVMBuilder.constructionV4 = {};
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMSharedMemorySource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        const String diagnosticText = _getBlobText(diagnostics);
-        SLANG_CHECK(diagnosticText.indexOf("E52018") >= 0);
-        SLANG_CHECK(diagnosticText.indexOf("global storage construction") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.declareGlobalStorageCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveLaneIndexCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveLaneIndexSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveLaneCountCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveLaneCountSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneAtUIntCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features
-        .words[SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveReadLaneAtUIntSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneAtIntCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveReadLaneAtIntSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneAtFloatCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features
-        .words[SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveReadLaneAtFloatSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveMaskBallotCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveActiveMaskSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-// Proves that every constituent operation is required before provider module construction.
-static void _checkPublicWaveReadCapabilities(
-    const char* source,
-    SlangNVVMBuilderFeature_3 shuffleFeature)
-{
-    const SlangNVVMBuilderFeature_3 requiredFeatures[] = {
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX,
-        shuffleFeature,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT,
-    };
-    for (SlangNVVMBuilderFeature_3 missingFeature : requiredFeatures)
-    {
-        _resetDirectNVVMFakes();
-        _enableFakeNVVMBuilderV3();
-        gFakeNVVMBuilder.apiV3.features.words[missingFeature / 64u] &=
-            ~(uint64_t(1) << (missingFeature % 64u));
-        {
-            ComPtr<slang::IGlobalSession> globalSession;
-            SLANG_CHECK_ABORT(
-                slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-            globalSession->setSharedLibraryLoader(loader);
-
-            ComPtr<slang::IBlob> code;
-            ComPtr<slang::IBlob> diagnostics;
-            SLANG_CHECK(SLANG_FAILED(
-                _compileSlangWithDirectNVVM(globalSession, source, code, diagnostics)));
-            SLANG_CHECK(code == nullptr);
-            SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-            SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-            SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-            SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
-            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-        }
-        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesUnmaskedWaveReadLaneAtUIntCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMUnmaskedWaveReadLaneAtUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesUnmaskedWaveReadLaneAtIntCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMUnmaskedWaveReadLaneAtIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesUnmaskedWaveReadLaneAtFloatCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneFirstUIntCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMWaveReadLaneFirstUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneFirstIntCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMWaveReadLaneFirstIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_INT);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneFirstFloatCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMWaveReadLaneFirstFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveIsFirstLaneCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMWaveIsFirstLaneSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_IS_FIRST_LANE);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveActiveAnyTrueCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMWaveActiveAnyTrueSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveActiveAllTrueCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMWaveActiveAllTrueSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_TRUE);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveActiveAllEqualIntCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMWaveActiveAllEqualIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveActiveAllEqualUIntCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMWaveActiveAllEqualUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveActiveAllEqualFloatCapabilities)
-{
-    _checkPublicWaveReadCapabilities(
-        kDirectNVVMWaveActiveAllEqualFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_FLOAT);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32CopyCapability)
-{
-    _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV3();
-    gFakeNVVMBuilder.apiV3.features.words[SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD / 64u] &=
-        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD % 64u));
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMFloat32CopySource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.getFloatingPointTypeCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
@@ -2291,10 +1662,10 @@ SLANG_UNIT_TEST(nvvmSlangScalarMemoryAndConditionalUseDirectPipeline)
             {
                 const Index addIndex = _findFakeNVVMBuilderScalarOperation(
                     FakeNVVMBuilderScalarFamily::Binary,
-                    SLANG_NVVM_INTEGER_BINARY_OP_3_ADD);
+                    SLANG_NVVM_INTEGER_BINARY_OP_ADD);
                 const Index subIndex = _findFakeNVVMBuilderScalarOperation(
                     FakeNVVMBuilderScalarFamily::Binary,
-                    SLANG_NVVM_INTEGER_BINARY_OP_3_SUB);
+                    SLANG_NVVM_INTEGER_BINARY_OP_SUBTRACT);
                 const Index compareIndex = _findFakeNVVMBuilderScalarOperation(
                     FakeNVVMBuilderScalarFamily::Compare,
                     SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_THAN);
@@ -2437,7 +1808,7 @@ SLANG_UNIT_TEST(nvvmSlangScalarSSAUsesDirectPipeline)
                 SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[0] == 1);
                 const Index addIndex = _findFakeNVVMBuilderScalarOperation(
                     FakeNVVMBuilderScalarFamily::Binary,
-                    SLANG_NVVM_INTEGER_BINARY_OP_3_ADD);
+                    SLANG_NVVM_INTEGER_BINARY_OP_ADD);
                 SLANG_CHECK_ABORT(addIndex >= 0);
                 const FakeNVVMBuilderScalarOperation& add =
                     gFakeNVVMBuilder.scalarOperations[addIndex];
@@ -2541,7 +1912,7 @@ SLANG_UNIT_TEST(nvvmSlangScalarSSAUsesDirectPipeline)
                     if (!_isFakeNVVMBuilderScalarOperation(
                             scalarOperation.key,
                             FakeNVVMBuilderScalarFamily::Binary,
-                            SLANG_NVVM_INTEGER_BINARY_OP_3_ADD))
+                            SLANG_NVVM_INTEGER_BINARY_OP_ADD))
                         continue;
                     const FakeNVVMBuilderValueRef left = scalarOperation.operands[0];
                     const FakeNVVMBuilderValueRef right = scalarOperation.operands[1];
@@ -2693,8 +2064,8 @@ SLANG_UNIT_TEST(nvvmSlangScalarFunctionsUseDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.getPointerTypeCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.getIntegerConstantCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[0] == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerCallCallCount == 4);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerReturnCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitReturnVoidCallCount == 1);
         SLANG_CHECK(
             gFakeNVVMBuilder.scalarFamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::Binary)] ==
@@ -2750,7 +2121,7 @@ SLANG_UNIT_TEST(nvvmSlangScalarFunctionsUseDirectPipeline)
             SLANG_CHECK(_isFakeNVVMBuilderScalarOperation(
                 gFakeNVVMBuilder.scalarOperations[binaryIndex].key,
                 FakeNVVMBuilderScalarFamily::Binary,
-                SLANG_NVVM_INTEGER_BINARY_OP_3_ADD));
+                SLANG_NVVM_INTEGER_BINARY_OP_ADD));
             const Index blockIndex =
                 gFakeNVVMBuilder.scalarOperations[binaryIndex].callerBlockIndex;
             const Index functionIndex = gFakeNVVMBuilder.blockFunctionIndices[blockIndex];
@@ -2856,17 +2227,16 @@ SLANG_UNIT_TEST(nvvmSlangScalarFunctionsUseDirectPipeline)
         SLANG_CHECK(secondCallArgument.kind == FakeNVVMBuilderValueKind::Call);
         SLANG_CHECK(secondCallArgument.index == incrementTwiceFirstCall);
 
-        SLANG_CHECK(gFakeNVVMBuilder.integerReturnValueRefs.getCount() == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 2);
         bool sawIncrementReturn = false;
         bool sawIncrementTwiceReturn = false;
-        for (Index returnIndex = 0;
-             returnIndex < gFakeNVVMBuilder.integerReturnValueRefs.getCount();
+        for (Index returnIndex = 0; returnIndex < gFakeNVVMBuilder.scalarReturnValueRefs.getCount();
              ++returnIndex)
         {
-            const Index returnBlock = gFakeNVVMBuilder.integerReturnBlockIndices[returnIndex];
+            const Index returnBlock = gFakeNVVMBuilder.scalarReturnBlockIndices[returnIndex];
             const Index returnFunction = gFakeNVVMBuilder.blockFunctionIndices[returnBlock];
             const FakeNVVMBuilderValueRef returnValue =
-                gFakeNVVMBuilder.integerReturnValueRefs[returnIndex];
+                gFakeNVVMBuilder.scalarReturnValueRefs[returnIndex];
             if (returnFunction == incrementFunction)
             {
                 SLANG_CHECK(returnValue.kind == FakeNVVMBuilderValueKind::ScalarOperation);
@@ -2931,8 +2301,8 @@ SLANG_UNIT_TEST(nvvmSlangScalarFunctionsUseDirectPipeline)
         SLANG_CHECK_ABORT(code != nullptr);
         SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerCallCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerReturnCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 1);
         SLANG_CHECK(
             gFakeNVVMBuilder.scalarFamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::Binary)] ==
             1);
@@ -3510,633 +2880,6 @@ NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerSignedLessEqualUsesDirectPipeline, Signe
 NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerSignedGreaterEqualUsesDirectPipeline, SignedGreaterEqual)
 
 #undef NVVM_SCALAR_DIRECT_TEST
-SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarControlFlowCapability)
-{
-    // A provider frozen at the exact Slice 4 scalar-memory prefix can still compile scalar loads
-    // and stores through the public route.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize = uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMCopyScalarSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-
-    // The same provider cannot satisfy the append-only control-flow prefix. Capability rejection
-    // happens after discovery but before the emitter creates or mutates a module.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize = uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMChooseScalarSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarSSACapability)
-{
-    // The exact Slice 7 provider retains its published branch capability.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize =
-        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMChooseScalarSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-
-    // Each Slice 8 shape is legal Slang IR but needs the new complete builder prefix. Discovery
-    // succeeds and E52016 is emitted before module creation or libNVVM use.
-    static const char* kSources[] = {
-        kDirectNVVMIntegerConstantSource,
-        kDirectNVVMMergePhiSource,
-        kDirectNVVMFiniteLoopSource,
-    };
-    for (const char* source : kSources)
-    {
-        _resetDirectNVVMFakes();
-        gFakeNVVMBuilder.apiV2.structureSize =
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_CONTROL_FLOW_MIN_SIZE);
-        {
-            ComPtr<slang::IGlobalSession> globalSession;
-            SLANG_CHECK_ABORT(
-                slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-            globalSession->setSharedLibraryLoader(loader);
-
-            ComPtr<slang::IBlob> code;
-            ComPtr<slang::IBlob> diagnostics;
-            SLANG_CHECK(SLANG_FAILED(
-                _compileSlangWithDirectNVVM(globalSession, source, code, diagnostics)));
-            SLANG_CHECK(code == nullptr);
-            SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-            SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-            SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-        }
-        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-    }
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarFunctionCapability)
-{
-    // A provider frozen at the exact Slice 8 prefix can still compile the complete loop shape
-    // published by that slice.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize = uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_SSA_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMFiniteLoopSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-
-    // A reachable scalar helper needs the append-only Slice 9 prefix. Reject it after discovery
-    // but before module creation or libNVVM use.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize = uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_SSA_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMScalarFunctionSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarPointerArithmeticCapability)
-{
-    // A provider frozen at the exact Slice 9 prefix retains the complete scalar-function graph
-    // published by that slice.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize =
-        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_FUNCTION_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMScalarFunctionSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntegerCallCallCount == 4);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-
-    // The same provider cannot satisfy the append-only pointer-arithmetic prefix. Discovery
-    // succeeds, then E52016 is reported before module creation or libNVVM use.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize =
-        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_FUNCTION_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMPointerOffsetSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangNegotiatesScalarArrayAddressingCapability)
-{
-    // The exact Slice 10 provider retains the pointer-offset program published by that slice.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize =
-        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_POINTER_ARITHMETIC_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMPointerOffsetSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 2);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-
-    // The array program needs the coherent Slice 11 suffix. Gate after discovery but before any
-    // provider module or libNVVM program is created.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize =
-        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_POINTER_ARITHMETIC_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMFixedDeviceArraySource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-struct NVVMScalarCapabilityCase
-{
-    uint32_t frozenV2Size;
-    const char* predecessorSource;
-    const NVVMScalarTestCase* predecessorScalar;
-    bool predecessorUsesArrayAddressing;
-    bool predecessorUsesAtomic;
-};
-
-static NVVMScalarCapabilityCase _getNVVMScalarCapabilityCase(NVVMScalarTestOperation operation)
-{
-    switch (operation)
-    {
-    case NVVMScalarTestOperation::Multiply:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_ARRAY_MIN_SIZE),
-            kDirectNVVMFixedDeviceArraySource,
-            nullptr,
-            true,
-            false};
-    case NVVMScalarTestOperation::BitAnd:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_MULTIPLY_MIN_SIZE),
-            kDirectNVVMIntegerMultiplySource,
-            &_getNVVMScalarTestCase(NVVMScalarTestOperation::Multiply),
-            false,
-            false};
-    case NVVMScalarTestOperation::BitOr:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_AND_MIN_SIZE),
-            kDirectNVVMIntegerBitAndSource,
-            &_getNVVMScalarTestCase(NVVMScalarTestOperation::BitAnd),
-            false,
-            false};
-    case NVVMScalarTestOperation::BitXor:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_OR_MIN_SIZE),
-            kDirectNVVMIntegerBitOrSource,
-            &_getNVVMScalarTestCase(NVVMScalarTestOperation::BitOr),
-            false,
-            false};
-    case NVVMScalarTestOperation::BitNot:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_XOR_MIN_SIZE),
-            kDirectNVVMIntegerBitXorSource,
-            &_getNVVMScalarTestCase(NVVMScalarTestOperation::BitXor),
-            false,
-            false};
-    case NVVMScalarTestOperation::Negate:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_BIT_NOT_MIN_SIZE),
-            kDirectNVVMIntegerBitNotSource,
-            &_getNVVMScalarTestCase(NVVMScalarTestOperation::BitNot),
-            false,
-            false};
-    case NVVMScalarTestOperation::Equal:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_RELAXED_GLOBAL_I32_ATOMIC_ADD_MIN_SIZE),
-            kDirectNVVMRelaxedGlobalI32AtomicAddSource,
-            nullptr,
-            false,
-            true};
-    case NVVMScalarTestOperation::NotEqual:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_EQUAL_MIN_SIZE),
-            kDirectNVVMIntegerEqualSource,
-            &_getNVVMScalarTestCase(NVVMScalarTestOperation::Equal),
-            false,
-            false};
-    case NVVMScalarTestOperation::SignedGreaterThan:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NOT_EQUAL_MIN_SIZE),
-            kDirectNVVMIntegerNotEqualSource,
-            &_getNVVMScalarTestCase(NVVMScalarTestOperation::NotEqual),
-            false,
-            false};
-    case NVVMScalarTestOperation::SignedLessEqual:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_THAN_MIN_SIZE),
-            kDirectNVVMIntegerSignedGreaterThanSource,
-            &_getNVVMScalarTestCase(NVVMScalarTestOperation::SignedGreaterThan),
-            false,
-            false};
-    case NVVMScalarTestOperation::SignedGreaterEqual:
-        return {
-            uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_LESS_EQUAL_MIN_SIZE),
-            kDirectNVVMIntegerSignedLessEqualSource,
-            &_getNVVMScalarTestCase(NVVMScalarTestOperation::SignedLessEqual),
-            false,
-            false};
-    }
-    SLANG_UNEXPECTED("unknown NVVM scalar capability operation");
-}
-
-static void _runNVVMScalarCapabilityNegotiation(NVVMScalarTestOperation operation)
-{
-    const NVVMScalarTestCase& testCase = _getNVVMScalarTestCase(operation);
-    const NVVMScalarCapabilityCase capabilityCase = _getNVVMScalarCapabilityCase(operation);
-
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize = capabilityCase.frozenV2Size;
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            capabilityCase.predecessorSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
-        SLANG_CHECK(
-            _getFakeNVVMBuilderScalarOperationCallCount(
-                testCase.key.family,
-                testCase.key.operation) == 0);
-        if (capabilityCase.predecessorScalar)
-        {
-            SLANG_CHECK(gFakeNVVMBuilder.scalarOperations.getCount() == 1);
-            SLANG_CHECK(_isFakeNVVMBuilderScalarOperation(
-                gFakeNVVMBuilder.scalarOperations[0].key,
-                capabilityCase.predecessorScalar->key.family,
-                capabilityCase.predecessorScalar->key.operation));
-        }
-        if (capabilityCase.predecessorUsesArrayAddressing)
-            SLANG_CHECK(gFakeNVVMBuilder.emitArrayElementPointerCallCount == 2);
-        if (capabilityCase.predecessorUsesAtomic)
-            SLANG_CHECK(gFakeNVVMBuilder.emitRelaxedGlobalI32AtomicAddCallCount == 1);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize = capabilityCase.frozenV2Size;
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(
-            _compileSlangWithDirectNVVM(globalSession, testCase.source, code, diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(
-            _getFakeNVVMBuilderScalarOperationCallCount(
-                testCase.key.family,
-                testCase.key.operation) == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-#define NVVM_SCALAR_CAPABILITY_TEST(NAME, OPERATION)                             \
-    SLANG_UNIT_TEST(NAME)                                                        \
-    {                                                                            \
-        _runNVVMScalarCapabilityNegotiation(NVVMScalarTestOperation::OPERATION); \
-    }
-
-NVVM_SCALAR_CAPABILITY_TEST(nvvmSlangNegotiatesScalarIntegerMultiplyCapability, Multiply)
-NVVM_SCALAR_CAPABILITY_TEST(nvvmSlangNegotiatesScalarIntegerBitAndCapability, BitAnd)
-NVVM_SCALAR_CAPABILITY_TEST(nvvmSlangNegotiatesScalarIntegerBitOrCapability, BitOr)
-NVVM_SCALAR_CAPABILITY_TEST(nvvmSlangNegotiatesScalarIntegerBitXorCapability, BitXor)
-NVVM_SCALAR_CAPABILITY_TEST(nvvmSlangNegotiatesScalarIntegerBitNotCapability, BitNot)
-NVVM_SCALAR_CAPABILITY_TEST(nvvmSlangNegotiatesScalarIntegerNegateCapability, Negate)
-SLANG_UNIT_TEST(nvvmSlangNegotiatesRelaxedGlobalI32AtomicAddCapability)
-{
-    // The exact Slice 17 provider retains integer negate from that slice.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize =
-        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMIntegerNegateSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
-        const NVVMScalarTestCase& negateCase =
-            _getNVVMScalarTestCase(NVVMScalarTestOperation::Negate);
-        SLANG_CHECK(
-            _getFakeNVVMBuilderScalarOperationCallCount(
-                negateCase.key.family,
-                negateCase.key.operation) == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitRelaxedGlobalI32AtomicAddCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
-        SLANG_CHECK(gFakeNVVM.addedModule.getLength() == sizeof(kFakeNVVMBuilderBitcode));
-        SLANG_CHECK(
-            ::memcmp(
-                gFakeNVVM.addedModule.getBuffer(),
-                kFakeNVVMBuilderBitcode,
-                sizeof(kFakeNVVMBuilderBitcode)) == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-
-    // Relaxed global i32 atomic add needs the appended Slice 19 operation. Discovery succeeds,
-    // then E52016 is reported before module creation or libNVVM use.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize =
-        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_NEGATE_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMRelaxedGlobalI32AtomicAddSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitRelaxedGlobalI32AtomicAddCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-NVVM_SCALAR_CAPABILITY_TEST(nvvmSlangNegotiatesScalarIntegerEqualCapability, Equal)
-NVVM_SCALAR_CAPABILITY_TEST(nvvmSlangNegotiatesScalarIntegerNotEqualCapability, NotEqual)
-NVVM_SCALAR_CAPABILITY_TEST(
-    nvvmSlangNegotiatesScalarIntegerSignedGreaterThanCapability,
-    SignedGreaterThan)
-NVVM_SCALAR_CAPABILITY_TEST(
-    nvvmSlangNegotiatesScalarIntegerSignedLessEqualCapability,
-    SignedLessEqual)
-NVVM_SCALAR_CAPABILITY_TEST(
-    nvvmSlangNegotiatesScalarIntegerSignedGreaterEqualCapability,
-    SignedGreaterEqual)
-
-#undef NVVM_SCALAR_CAPABILITY_TEST
-SLANG_UNIT_TEST(nvvmSlangNegotiatesRawRWStructuredBufferI32Capability)
-{
-    // The exact Slice 25 provider retains signed-i32 greater-equal.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize =
-        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMIntegerSignedGreaterEqualSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
-        const NVVMScalarTestCase& greaterEqualCase =
-            _getNVVMScalarTestCase(NVVMScalarTestOperation::SignedGreaterEqual);
-        SLANG_CHECK(
-            _getFakeNVVMBuilderScalarOperationCallCount(
-                greaterEqualCase.key.family,
-                greaterEqualCase.key.operation) == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.getRawRWStructuredBufferI32TypeCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-
-    // The resource program needs Slice 26. Gate after discovery and before module creation.
-    _resetDirectNVVMFakes();
-    gFakeNVVMBuilder.apiV2.structureSize =
-        uint32_t(SLANG_NVVM_BUILDER_API_V2_SCALAR_INTEGER_SIGNED_GREATER_EQUAL_MIN_SIZE);
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMRawRWStructuredBufferI32StoreSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.getRawRWStructuredBufferI32TypeCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitRawRWStructuredBufferI32ElementPointerCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
 SLANG_UNIT_TEST(nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation)
 {
     static const char* kUnsupportedSources[] = {
@@ -4343,7 +3086,6 @@ SLANG_UNIT_TEST(nvvmSlangBuilderDiagnosticsStopBeforeLibNVVM)
 SLANG_UNIT_TEST(nvvmSlangNegotiatesNumericFamilyCapability)
 {
     _resetDirectNVVMFakes();
-    _enableFakeNVVMBuilderV4();
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(

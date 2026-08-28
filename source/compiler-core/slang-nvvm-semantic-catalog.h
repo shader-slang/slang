@@ -43,54 +43,48 @@ struct V4FamilyResolution
 /// Describes one established semantic overload from canonical Slang values to the provider ABI.
 struct CatalogEntry
 {
-    SlangNVVMValueOperation_4 operation;
-    SlangNVVMValueTypeDesc_4 resultType;
-    SlangNVVMValueTypeDesc_4 operandTypes[3];
+    SlangNVVMValueOperation operation;
+    SlangNVVMValueTypeDesc resultType;
+    SlangNVVMValueTypeDesc operandTypes[3];
     uint32_t operandCount;
-    SlangNVVMBuilderFeature_3 legacyFeature;
+    SlangNVVMBuilderFeature legacyFeature;
     LegacyFamily legacyFamily;
     uint32_t legacyOperation;
     const char* diagnosticName;
     const char* genericAsm;
 };
 
-inline constexpr SlangNVVMValueTypeDesc_4 kNoType = {};
-inline constexpr SlangNVVMValueTypeDesc_4 kVoid = {
-    SLANG_NVVM_VALUE_TYPE_VOID_4,
-    0,
+inline constexpr SlangNVVMValueTypeDesc kNoType = {};
+inline constexpr SlangNVVMValueTypeDesc kVoid = {
+    SLANG_NVVM_VALUE_TYPE_VOID,
     0,
     0,
 };
-inline constexpr SlangNVVMValueTypeDesc_4 kBool = {SLANG_NVVM_VALUE_TYPE_BOOL_4, 1, 1, 0};
-inline constexpr SlangNVVMValueTypeDesc_4 kSignedI32 = {
-    SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4,
+inline constexpr SlangNVVMValueTypeDesc kBool = {SLANG_NVVM_VALUE_TYPE_BOOL, 1, 1};
+inline constexpr SlangNVVMValueTypeDesc kSignedI32 = {
+    SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
     32,
     1,
-    0,
 };
-inline constexpr SlangNVVMValueTypeDesc_4 kUnsignedI32 = {
-    SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4,
+inline constexpr SlangNVVMValueTypeDesc kUnsignedI32 = {
+    SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
     32,
     1,
-    0,
 };
-inline constexpr SlangNVVMValueTypeDesc_4 kUnsignedI32x3 = {
-    SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4,
+inline constexpr SlangNVVMValueTypeDesc kUnsignedI32x3 = {
+    SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
     32,
     3,
-    0,
 };
-inline constexpr SlangNVVMValueTypeDesc_4 kFloat32 = {
-    SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4,
+inline constexpr SlangNVVMValueTypeDesc kFloat32 = {
+    SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
     32,
     1,
-    0,
 };
-inline constexpr SlangNVVMValueTypeDesc_4 kSignedI32x2 = {
-    SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4,
+inline constexpr SlangNVVMValueTypeDesc kSignedI32x2 = {
+    SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
     32,
     2,
-    0,
 };
 
 // This is the only table that maps an established typed semantic to its provider operation and,
@@ -99,73 +93,73 @@ inline constexpr SlangNVVMValueTypeDesc_4 kSignedI32x2 = {
 // the same typed rows without a spelling.
 inline constexpr CatalogEntry kCatalog[] = {
     {
-        SLANG_NVVM_VALUE_OP_ADD_4,
+        SLANG_NVVM_VALUE_OP_ADD,
         kSignedI32,
         {kSignedI32, kSignedI32, kNoType},
         2,
         SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW,
         LegacyFamily::IntegerBinary,
-        SLANG_NVVM_INTEGER_BINARY_OP_3_ADD,
+        SLANG_NVVM_INTEGER_BINARY_OP_ADD,
         "signed i32 addition",
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_SUBTRACT_4,
+        SLANG_NVVM_VALUE_OP_SUBTRACT,
         kSignedI32,
         {kSignedI32, kSignedI32, kNoType},
         2,
         SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW,
         LegacyFamily::IntegerBinary,
-        SLANG_NVVM_INTEGER_BINARY_OP_3_SUB,
+        SLANG_NVVM_INTEGER_BINARY_OP_SUBTRACT,
         "signed i32 subtraction",
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_MULTIPLY_4,
+        SLANG_NVVM_VALUE_OP_MULTIPLY,
         kSignedI32,
         {kSignedI32, kSignedI32, kNoType},
         2,
         SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY,
         LegacyFamily::IntegerBinary,
-        SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY,
+        SLANG_NVVM_INTEGER_BINARY_OP_MULTIPLY,
         "signed i32 multiplication",
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_BIT_AND_4,
+        SLANG_NVVM_VALUE_OP_BIT_AND,
         kSignedI32,
         {kSignedI32, kSignedI32, kNoType},
         2,
         SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_AND,
         LegacyFamily::IntegerBinary,
-        SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_AND,
+        SLANG_NVVM_INTEGER_BINARY_OP_BIT_AND,
         "signed i32 bitwise AND",
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_BIT_OR_4,
+        SLANG_NVVM_VALUE_OP_BIT_OR,
         kSignedI32,
         {kSignedI32, kSignedI32, kNoType},
         2,
         SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_OR,
         LegacyFamily::IntegerBinary,
-        SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_OR,
+        SLANG_NVVM_INTEGER_BINARY_OP_BIT_OR,
         "signed i32 bitwise OR",
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_BIT_XOR_4,
+        SLANG_NVVM_VALUE_OP_BIT_XOR,
         kSignedI32,
         {kSignedI32, kSignedI32, kNoType},
         2,
         SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_XOR,
         LegacyFamily::IntegerBinary,
-        SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_XOR,
+        SLANG_NVVM_INTEGER_BINARY_OP_BIT_XOR,
         "signed i32 bitwise XOR",
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_BIT_NOT_4,
+        SLANG_NVVM_VALUE_OP_BIT_NOT,
         kSignedI32,
         {kSignedI32, kNoType, kNoType},
         1,
@@ -176,7 +170,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_NEGATE_4,
+        SLANG_NVVM_VALUE_OP_NEGATE,
         kSignedI32,
         {kSignedI32, kNoType, kNoType},
         1,
@@ -187,7 +181,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_EQUAL,
         kBool,
         {kSignedI32, kSignedI32, kNoType},
         2,
@@ -198,7 +192,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_NOT_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_NOT_EQUAL,
         kBool,
         {kSignedI32, kSignedI32, kNoType},
         2,
@@ -209,7 +203,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_LESS_THAN_4,
+        SLANG_NVVM_VALUE_OP_LESS_THAN,
         kBool,
         {kSignedI32, kSignedI32, kNoType},
         2,
@@ -220,7 +214,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_GREATER_THAN_4,
+        SLANG_NVVM_VALUE_OP_GREATER_THAN,
         kBool,
         {kSignedI32, kSignedI32, kNoType},
         2,
@@ -231,7 +225,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_LESS_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_LESS_EQUAL,
         kBool,
         {kSignedI32, kSignedI32, kNoType},
         2,
@@ -242,7 +236,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_GREATER_EQUAL,
         kBool,
         {kSignedI32, kSignedI32, kNoType},
         2,
@@ -253,7 +247,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_ADD_4,
+        SLANG_NVVM_VALUE_OP_ADD,
         kFloat32,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -264,7 +258,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_SUBTRACT_4,
+        SLANG_NVVM_VALUE_OP_SUBTRACT,
         kFloat32,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -275,7 +269,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_MULTIPLY_4,
+        SLANG_NVVM_VALUE_OP_MULTIPLY,
         kFloat32,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -286,7 +280,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_DIVIDE_4,
+        SLANG_NVVM_VALUE_OP_DIVIDE,
         kFloat32,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -297,7 +291,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_NEGATE_4,
+        SLANG_NVVM_VALUE_OP_NEGATE,
         kFloat32,
         {kFloat32, kNoType, kNoType},
         1,
@@ -308,7 +302,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_EQUAL,
         kBool,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -319,7 +313,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_NOT_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_NOT_EQUAL,
         kBool,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -330,7 +324,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_LESS_THAN_4,
+        SLANG_NVVM_VALUE_OP_LESS_THAN,
         kBool,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -341,7 +335,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_GREATER_THAN_4,
+        SLANG_NVVM_VALUE_OP_GREATER_THAN,
         kBool,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -352,7 +346,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_LESS_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_LESS_EQUAL,
         kBool,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -363,7 +357,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_GREATER_EQUAL,
         kBool,
         {kFloat32, kFloat32, kNoType},
         2,
@@ -374,7 +368,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX_4,
+        SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
         kUnsignedI32,
         {kNoType, kNoType, kNoType},
         0,
@@ -385,7 +379,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "_getLaneId()",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT_4,
+        SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT,
         kUnsignedI32,
         {kNoType, kNoType, kNoType},
         0,
@@ -396,7 +390,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "(warpSize)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT_4,
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
         kUnsignedI32,
         {kUnsignedI32, kUnsignedI32, kSignedI32},
         3,
@@ -407,7 +401,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "__shfl_sync($0, $1, $2)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT_4,
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
         kSignedI32,
         {kUnsignedI32, kSignedI32, kSignedI32},
         3,
@@ -418,7 +412,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "__shfl_sync($0, $1, $2)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT_4,
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
         kFloat32,
         {kUnsignedI32, kFloat32, kSignedI32},
         3,
@@ -429,7 +423,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "__shfl_sync($0, $1, $2)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT_4,
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
         kUnsignedI32,
         {kUnsignedI32, kBool, kNoType},
         2,
@@ -440,7 +434,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST_4,
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
         kUnsignedI32,
         {kUnsignedI32, kUnsignedI32, kNoType},
         2,
@@ -451,7 +445,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "_waveReadFirst($0, $1)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST_4,
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
         kSignedI32,
         {kUnsignedI32, kSignedI32, kNoType},
         2,
@@ -462,7 +456,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "_waveReadFirst($0, $1)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST_4,
+        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
         kFloat32,
         {kUnsignedI32, kFloat32, kNoType},
         2,
@@ -473,7 +467,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "_waveReadFirst($0, $1)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE_4,
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE,
         kBool,
         {kUnsignedI32, kNoType, kNoType},
         1,
@@ -484,7 +478,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "(($0 & -$0) == (WarpMask(1) << _getLaneId()))",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE_4,
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE,
         kBool,
         {kUnsignedI32, kBool, kNoType},
         2,
@@ -495,7 +489,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "(__any_sync($0, $1) != 0)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE_4,
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE,
         kBool,
         {kUnsignedI32, kBool, kNoType},
         2,
@@ -506,7 +500,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "(__all_sync($0, $1) != 0)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
         kBool,
         {kUnsignedI32, kSignedI32, kNoType},
         2,
@@ -517,7 +511,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "_waveAllEqual($0, $1)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
         kBool,
         {kUnsignedI32, kUnsignedI32, kNoType},
         2,
@@ -528,7 +522,7 @@ inline constexpr CatalogEntry kCatalog[] = {
         "_waveAllEqual($0, $1)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL_4,
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
         kBool,
         {kUnsignedI32, kFloat32, kNoType},
         2,
@@ -539,55 +533,55 @@ inline constexpr CatalogEntry kCatalog[] = {
         "_waveAllEqual($0, $1)",
     },
     {
-        SLANG_NVVM_VALUE_OP_THREAD_INDEX_4,
+        SLANG_NVVM_VALUE_OP_THREAD_INDEX,
         kUnsignedI32x3,
         {kNoType, kNoType, kNoType},
         0,
-        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT,
         LegacyFamily::V4ExecutionRegister,
         0,
         "CUDA thread index",
         "(threadIdx)",
     },
     {
-        SLANG_NVVM_VALUE_OP_BLOCK_INDEX_4,
+        SLANG_NVVM_VALUE_OP_BLOCK_INDEX,
         kUnsignedI32x3,
         {kNoType, kNoType, kNoType},
         0,
-        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT,
         LegacyFamily::V4ExecutionRegister,
         0,
         "CUDA block index",
         "(blockIdx)",
     },
     {
-        SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS_4,
+        SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS,
         kUnsignedI32x3,
         {kNoType, kNoType, kNoType},
         0,
-        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT,
         LegacyFamily::V4ExecutionRegister,
         0,
         "CUDA block dimensions",
         "(blockDim)",
     },
     {
-        SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4,
+        SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS,
         kUnsignedI32x3,
         {kNoType, kNoType, kNoType},
         0,
-        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT,
         LegacyFamily::V4ExecutionRegister,
         0,
         "CUDA grid dimensions",
         "(gridDim)",
     },
     {
-        SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER_4,
+        SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER,
         kVoid,
         {kNoType, kNoType, kNoType},
         0,
-        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT,
         LegacyFamily::V4WorkgroupBarrier,
         0,
         "CUDA workgroup barrier",
@@ -600,16 +594,15 @@ inline constexpr size_t getCatalogCount()
     return sizeof(kCatalog) / sizeof(kCatalog[0]);
 }
 
-inline bool areSameType(const SlangNVVMValueTypeDesc_4& left, const SlangNVVMValueTypeDesc_4& right)
+inline bool areSameType(const SlangNVVMValueTypeDesc& left, const SlangNVVMValueTypeDesc& right)
 {
     return left.kind == right.kind && left.bitWidth == right.bitWidth &&
-           left.laneCount == right.laneCount && left.reserved == right.reserved;
+           left.laneCount == right.laneCount;
 }
 
-inline SlangNVVMValueOperationDesc_4 getOperationDesc(const CatalogEntry& entry)
+inline SlangNVVMValueOperationDesc getOperationDesc(const CatalogEntry& entry)
 {
     return {
-        uint32_t(sizeof(SlangNVVMValueOperationDesc_4)),
         entry.operation,
         entry.resultType,
         entry.operandCount ? entry.operandTypes : nullptr,
@@ -619,7 +612,7 @@ inline SlangNVVMValueOperationDesc_4 getOperationDesc(const CatalogEntry& entry)
 
 inline bool hasLegacyAdapter(const CatalogEntry& entry)
 {
-    return entry.legacyFeature < SLANG_NVVM_BUILDER_FEATURE_COUNT_3;
+    return entry.legacyFeature < SLANG_NVVM_BUILDER_FEATURE_COUNT;
 }
 
 /// Returns the unique established row behind one frozen V3 compatibility operation.
@@ -635,9 +628,9 @@ inline const CatalogEntry* findLegacyOperation(LegacyFamily family, uint32_t ope
 }
 
 /// Returns the one established catalog row that exactly matches a complete typed operation.
-inline const CatalogEntry* find(const SlangNVVMValueOperationDesc_4& desc)
+inline const CatalogEntry* find(const SlangNVVMValueOperationDesc& desc)
 {
-    if (desc.structureSize != sizeof(desc) || (!desc.operandTypes && desc.operandCount))
+    if (!desc.operandTypes && desc.operandCount)
         return nullptr;
 
     for (const CatalogEntry& entry : kCatalog)
@@ -657,29 +650,29 @@ inline const CatalogEntry* find(const SlangNVVMValueOperationDesc_4& desc)
     return nullptr;
 }
 
-inline bool isSelectedScalarInteger(const SlangNVVMValueTypeDesc_4& type)
+inline bool isSelectedScalarInteger(const SlangNVVMValueTypeDesc& type)
 {
-    const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4 ||
-                           type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4;
+    const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                           type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
     const bool isSelectedWidth =
         type.bitWidth == 8 || type.bitWidth == 16 || type.bitWidth == 32 || type.bitWidth == 64;
-    return isInteger && isSelectedWidth && type.laneCount == 1 && type.reserved == 0;
+    return isInteger && isSelectedWidth && type.laneCount == 1;
 }
 
 /// Resolves the bounded, dimensioned numeric families added after the frozen exact catalog.
 inline bool resolveV4Family(
-    const SlangNVVMValueOperationDesc_4& desc,
+    const SlangNVVMValueOperationDesc& desc,
     V4FamilyResolution& outResolution)
 {
     outResolution = {};
-    if (desc.structureSize != sizeof(desc) || (!desc.operandTypes && desc.operandCount))
+    if (!desc.operandTypes && desc.operandCount)
         return false;
 
     const bool isUnaryInteger = desc.operandCount == 1 &&
                                 isSelectedScalarInteger(desc.resultType) &&
                                 areSameType(desc.resultType, desc.operandTypes[0]);
-    if (isUnaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_BIT_NOT_4 ||
-                           desc.operation == SLANG_NVVM_VALUE_OP_NEGATE_4))
+    if (isUnaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_BIT_NOT ||
+                           desc.operation == SLANG_NVVM_VALUE_OP_NEGATE))
     {
         outResolution = {V4Family::IntegerUnary, "parameterized integer unary operation"};
         return true;
@@ -689,12 +682,12 @@ inline bool resolveV4Family(
                                  isSelectedScalarInteger(desc.resultType) &&
                                  areSameType(desc.resultType, desc.operandTypes[0]) &&
                                  areSameType(desc.resultType, desc.operandTypes[1]);
-    if (isBinaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_ADD_4 ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT_4 ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY_4 ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_AND_4 ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR_4 ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_XOR_4))
+    if (isBinaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_ADD ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_AND ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_XOR))
     {
         outResolution = {V4Family::IntegerBinary, "parameterized integer binary operation"};
         return true;
@@ -703,34 +696,34 @@ inline bool resolveV4Family(
     const bool isIntegerCompare = desc.operandCount == 2 && areSameType(desc.resultType, kBool) &&
                                   isSelectedScalarInteger(desc.operandTypes[0]) &&
                                   areSameType(desc.operandTypes[0], desc.operandTypes[1]);
-    if (isIntegerCompare && desc.operation >= SLANG_NVVM_VALUE_OP_EQUAL_4 &&
-        desc.operation <= SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4)
+    if (isIntegerCompare && desc.operation >= SLANG_NVVM_VALUE_OP_EQUAL &&
+        desc.operation <= SLANG_NVVM_VALUE_OP_GREATER_EQUAL)
     {
         outResolution = {V4Family::IntegerCompare, "parameterized integer comparison"};
         return true;
     }
 
-    if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT_4 && desc.operandCount == 1 &&
+    if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT && desc.operandCount == 1 &&
         isSelectedScalarInteger(desc.resultType) && isSelectedScalarInteger(desc.operandTypes[0]) &&
         !areSameType(desc.resultType, desc.operandTypes[0]))
     {
         outResolution = {V4Family::IntegerConvert, "explicit integer conversion"};
         return true;
     }
-    if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT_4 && desc.operandCount == 1 &&
+    if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT && desc.operandCount == 1 &&
         areSameType(desc.resultType, kFloat32) && isSelectedScalarInteger(desc.operandTypes[0]))
     {
         outResolution = {V4Family::IntegerToFloat, "integer-to-float32 conversion"};
         return true;
     }
-    if (desc.operation == SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER_4 && desc.operandCount == 1 &&
+    if (desc.operation == SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER && desc.operandCount == 1 &&
         isSelectedScalarInteger(desc.resultType) && areSameType(desc.operandTypes[0], kFloat32))
     {
         outResolution = {V4Family::FloatToInteger, "float32-to-integer conversion"};
         return true;
     }
 
-    if (desc.operation == SLANG_NVVM_VALUE_OP_ADD_4 && desc.operandCount == 2 &&
+    if (desc.operation == SLANG_NVVM_VALUE_OP_ADD && desc.operandCount == 2 &&
         areSameType(desc.resultType, kSignedI32x2) &&
         areSameType(desc.operandTypes[0], kSignedI32x2) &&
         areSameType(desc.operandTypes[1], kSignedI32x2))
@@ -741,7 +734,7 @@ inline bool resolveV4Family(
     return false;
 }
 
-inline bool isSupported(const SlangNVVMValueOperationDesc_4& desc)
+inline bool isSupported(const SlangNVVMValueOperationDesc& desc)
 {
     V4FamilyResolution resolution;
     return find(desc) || resolveV4Family(desc, resolution);

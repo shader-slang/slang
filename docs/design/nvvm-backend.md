@@ -921,7 +921,7 @@ The private V2 provider table appends one dedicated operation:
 emitIntegerMultiply(module, left, right, outValue)
 ```
 
-This operation does not extend `SlangNVVMIntegerBinaryOp_2`. Exact Slice 7 providers implement that
+This operation does not extend `SlangNVVMIntegerBinaryOp`. Exact Slice 7 providers implement that
 function only for its frozen ADD/SUB domain, so adding a new enum value would silently widen an old
 call contract and would still require a separately negotiated marker. The dedicated field makes
 multiplication support and dispatch one atomic append-only capability.
@@ -977,7 +977,7 @@ The private V2 provider table appends one dedicated operation:
 emitIntegerBitAnd(module, left, right, outValue)
 ```
 
-As with multiplication, this operation does not extend `SlangNVVMIntegerBinaryOp_2`. Exact Slice 7
+As with multiplication, this operation does not extend `SlangNVVMIntegerBinaryOp`. Exact Slice 7
 providers implement that callable only for its frozen ADD/SUB domain and reject unknown enum values.
 A dedicated terminal field therefore negotiates and dispatches bitwise AND atomically without
 widening an older callable's input contract.
@@ -1034,7 +1034,7 @@ The private V2 provider table appends one dedicated operation:
 emitIntegerBitOr(module, left, right, outValue)
 ```
 
-The operation does not widen either `SlangNVVMIntegerBinaryOp_2`, whose ADD/SUB domain is frozen,
+The operation does not widen either `SlangNVVMIntegerBinaryOp`, whose ADD/SUB domain is frozen,
 or the dedicated bitwise-AND callable. A dedicated terminal field negotiates and dispatches
 bitwise OR atomically while preserving the exact contracts of all earlier providers.
 
@@ -1093,7 +1093,7 @@ The private V2 provider table appends one dedicated operation:
 emitIntegerBitXor(module, left, right, outValue)
 ```
 
-The operation does not widen `SlangNVVMIntegerBinaryOp_2` or reuse the dedicated bitwise-AND or
+The operation does not widen `SlangNVVMIntegerBinaryOp` or reuse the dedicated bitwise-AND or
 bitwise-OR callables. Their published domains are frozen. A dedicated terminal field negotiates
 and dispatches bitwise XOR atomically while preserving the exact contracts of all earlier
 providers.
@@ -4159,6 +4159,22 @@ one field-zero extraction and non-`inbounds` GEP. Conventional global parameter 
 different measured ABI and remain unsupported, as do read-only buffers and non-i32 resource
 elements. The direct consumer does not flatten the launch value, reconstruct source syntax, or
 accept alternative structural spellings.
+
+### Slice 69: One exact forward-only builder ABI
+
+The host and `slang-llvm-nvvm` now share one current, unsuffixed ABI. The provider exports only
+`slang_getNVVMBuilderAPI`; the host passes `SLANG_NVVM_BUILDER_ABI_REVISION` to that entry point
+before reading any table. A revision mismatch, missing export, unsupported LLVM/NVVM metadata,
+missing subinterface, or missing callback is an authoritative failure. There is no older-export
+probe, prefix-size negotiation, interface version, or fallback.
+
+The exact root returns three provider-owned tables by identity: foundation owns module lifetime
+and verified serialization, construction owns structural IR assembly, and value operations own
+complete typed semantic descriptors. Every current callback is required during initialization,
+and the host copies the exact tables while retaining the provider library. This keeps LLVM types
+and objects shielded behind the private C ABI without maintaining historical table layouts. The
+temporary feature view is removed separately by Slice 70 so the ABI cut and capability-policy cut
+remain independently reviewable.
 
 The following remain open until their named slice supplies evidence:
 

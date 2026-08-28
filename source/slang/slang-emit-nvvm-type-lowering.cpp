@@ -338,7 +338,7 @@ SlangResult NVVMTypeLoweringContext::_reportUnsupportedType(NVVMTypeUse use) con
 
 SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     IRArrayType* type,
-    SlangNVVMTypeHandle_1& outType)
+    SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
     if (auto mappedType = m_typeMap.tryGetValue(type))
@@ -349,7 +349,7 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
 
     uint32_t elementCount = 0;
     SLANG_RELEASE_ASSERT(asNVVMSupportedI32ArrayType(type, &elementCount));
-    SlangNVVMTypeHandle_1 elementType = nullptr;
+    SlangNVVMTypeHandle elementType = nullptr;
     SLANG_RETURN_ON_FAIL(lowerType(type->getElementType(), NVVMTypeUse::Value, elementType));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         "fixed i32 array type",
@@ -361,11 +361,11 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
 SlangResult NVVMTypeLoweringContext::_lowerPointerType(
     IRType* canonicalType,
     IRType* pointeeType,
-    SlangNVVMAddressSpace_2 addressSpace,
-    SlangNVVMTypeHandle_1& outType)
+    SlangNVVMAddressSpace addressSpace,
+    SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
-    SlangNVVMTypeHandle_1 loweredPointeeType = nullptr;
+    SlangNVVMTypeHandle loweredPointeeType = nullptr;
     if (auto arrayType = as<IRArrayType>(pointeeType))
     {
         SLANG_RETURN_ON_FAIL(_lowerArrayType(arrayType, loweredPointeeType));
@@ -400,7 +400,7 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
 SlangResult NVVMTypeLoweringContext::lowerType(
     IRType* type,
     NVVMTypeUse use,
-    SlangNVVMTypeHandle_1& outType)
+    SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
 
@@ -463,7 +463,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
     else if (uint3Type)
     {
-        SlangNVVMTypeHandle_1 elementType = nullptr;
+        SlangNVVMTypeHandle elementType = nullptr;
         SLANG_RETURN_ON_FAIL(
             lowerType(uint3Type->getElementType(), NVVMTypeUse::Value, elementType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -472,7 +472,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
     else if (signedI32x2Type)
     {
-        SlangNVVMTypeHandle_1 elementType = nullptr;
+        SlangNVVMTypeHandle elementType = nullptr;
         SLANG_RETURN_ON_FAIL(
             lowerType(signedI32x2Type->getElementType(), NVVMTypeUse::Value, elementType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(

@@ -21,37 +21,14 @@ public:
         ISlangSharedLibraryLoader* loader,
         NVVMIRBuilder& outBuilder);
 
-    /// Validates an already queried API table and retains its non-null owning library.
+    /// Validates the exact current root and every required subinterface.
     static SlangResult initialize(
-        const SlangNVVMBuilderAPI_V1& api,
+        const SlangNVVMBuilderAPI& api,
         ISlangSharedLibrary* library,
         NVVMIRBuilder& outBuilder);
 
-    /// Validates the known V2 prefixes and nested V1 API, then retains its owning library.
-    static SlangResult initialize(
-        const SlangNVVMBuilderAPI_V2& api,
-        ISlangSharedLibrary* library,
-        NVVMIRBuilder& outBuilder);
-
-    /// Validates the V3 table, its complete frozen V2 core, and its generic scalar callbacks.
-    static SlangResult initialize(
-        const SlangNVVMBuilderAPI_V3& api,
-        ISlangSharedLibrary* library,
-        NVVMIRBuilder& outBuilder);
-
-    /// Validates the compact V4 root and its required queried subinterfaces.
-    static SlangResult initialize(
-        const SlangNVVMBuilderAPI_V4& api,
-        ISlangSharedLibrary* library,
-        NVVMIRBuilder& outBuilder);
-
-    bool isInitialized() const { return m_api.createModule != nullptr; }
-    bool supportsSerializationDiagnostics() const
-    {
-        return (m_apiV4.structureSize && m_foundationV4.serializeModuleWithDiagnostics) ||
-               (m_apiV2.structureSize >= SLANG_NVVM_BUILDER_API_V2_MIN_SIZE &&
-                m_apiV2.serializeModuleWithDiagnostics != nullptr);
-    }
+    bool isInitialized() const { return m_foundation.createModule != nullptr; }
+    bool supportsSerializationDiagnostics() const { return isInitialized(); }
     /// Returns whether the provider advertised the complete Slice 4 scalar-memory prefix.
     bool supportsScalarOperations() const;
     /// Returns whether the provider advertised the complete Slice 7 scalar-control-flow prefix.
@@ -92,472 +69,422 @@ public:
     bool supportsScalarIntegerSignedGreaterEqual() const;
     /// Returns whether the provider advertised the complete Slice 26 raw resource prefix.
     bool supportsRawRWStructuredBufferI32() const;
-    /// Returns whether one semantic feature is present in the negotiated V3 or synthesized V2 set.
-    bool supportsFeature(SlangNVVMBuilderFeature_3 feature) const;
+    /// Returns whether one temporary semantic feature is supported by the current value table.
+    bool supportsFeature(SlangNVVMBuilderFeature feature) const;
     /// Returns whether every bit in a required semantic feature set is available.
-    bool supportsFeatures(const SlangNVVMBuilderFeatureSet_3& requiredFeatures) const;
-    const SlangNVVMBuilderFeatureSet_3& getSupportedFeatures() const { return m_features; }
+    bool supportsFeatures(const SlangNVVMBuilderFeatureSet& requiredFeatures) const;
+    const SlangNVVMBuilderFeatureSet& getSupportedFeatures() const { return m_features; }
     /// Returns the provider identity that affects generated IR and shader-cache keys.
     String getVersionString() const;
-    const SlangNVVMBuilderAPI_V1& getAPI() const { return m_api; }
-    /// Returns the locally supported V2 prefix, with `structureSize` clamped to that prefix.
-    const SlangNVVMBuilderAPI_V2* getAPIV2() const
+    const SlangNVVMBuilderAPI& getAPI() const { return m_api; }
+    const SlangNVVMBuilderFoundationAPI* getFoundationAPI() const { return &m_foundation; }
+    const SlangNVVMBuilderConstructionAPI* getConstructionAPI() const { return &m_construction; }
+    const SlangNVVMBuilderValueOperationsAPI* getValueOperationsAPI() const
     {
-        return !m_apiV4.structureSize && supportsSerializationDiagnostics() ? &m_apiV2 : nullptr;
-    }
-    /// Returns the locally supported V3 prefix when the provider was negotiated through V3.
-    const SlangNVVMBuilderAPI_V3* getAPIV3() const
-    {
-        return m_apiV3.structureSize ? &m_apiV3 : nullptr;
-    }
-    /// Returns the locally supported V4 root when negotiated through V4.
-    const SlangNVVMBuilderAPI_V4* getAPIV4() const
-    {
-        return m_apiV4.structureSize ? &m_apiV4 : nullptr;
-    }
-    const SlangNVVMBuilderFoundationAPI_4* getFoundationAPIV4() const
-    {
-        return m_apiV4.structureSize ? &m_foundationV4 : nullptr;
-    }
-    const SlangNVVMBuilderConstructionAPI_4* getConstructionAPIV4() const
-    {
-        return m_apiV4.structureSize ? &m_constructionV4 : nullptr;
-    }
-    const SlangNVVMBuilderValueOperationsAPI_4* getValueOperationsAPIV4() const
-    {
-        return m_apiV4.structureSize ? &m_valueOperationsV4 : nullptr;
+        return &m_valueOperations;
     }
 
-    /// Returns whether the provider implements the extended V4 construction contract.
-    bool supportsExtendedConstruction() const
-    {
-        return m_apiV4.structureSize &&
-               (m_constructionV4.interfaceVersion ==
-                    SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2 ||
-                m_constructionV4.interfaceVersion ==
-                    SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4) &&
-               m_constructionV4.structureSize >= SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_2_SIZE &&
-               m_constructionV4.getVectorType && m_constructionV4.emitVectorElementExtract &&
-               m_constructionV4.emitExtendedCall && m_constructionV4.emitExtendedValueReturn;
-    }
+    bool supportsExtendedConstruction() const { return isInitialized(); }
 
-    /// Returns whether the queried V4 construction table supports fixed vectors.
+    /// Returns whether the exact construction table supports fixed vectors.
     bool supportsVectorConstruction() const { return supportsExtendedConstruction(); }
 
-    /// Returns whether construction version 3 can declare typed module-owned storage.
-    bool supportsGlobalStorage() const
-    {
-        return m_apiV4.structureSize &&
-               m_constructionV4.interfaceVersion ==
-                   SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 &&
-               m_constructionV4.structureSize >= sizeof(m_constructionV4) &&
-               m_constructionV4.declareGlobalStorage;
-    }
+    bool supportsGlobalStorage() const { return isInitialized(); }
 
-    /// Queries one complete typed V4 operation, adapting to V3/V2 when necessary.
-    bool supportsValueOperation(const SlangNVVMValueOperationDesc_4& operation) const;
+    /// Queries one complete typed operation.
+    bool supportsValueOperation(const SlangNVVMValueOperationDesc& operation) const;
 
-    /// Emits one complete typed V4 operation, adapting to V3/V2 when necessary.
+    /// Emits one complete typed operation.
     SlangResult emitValueOperation(
-        SlangNVVMModuleHandle_1 module,
-        const SlangNVVMValueOperationDesc_4& operation,
-        const SlangNVVMValueHandle_1* operands,
+        SlangNVVMModuleHandle module,
+        const SlangNVVMValueOperationDesc& operation,
+        const SlangNVVMValueHandle* operands,
         size_t operandCount,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMValueHandle& outValue) const;
 
     /// Creates a module whose LLVM objects remain owned by the returned module handle.
-    SlangResult createModule(
-        const UnownedStringSlice& moduleName,
-        SlangNVVMModuleHandle_1& outModule) const;
+    SlangResult createModule(const UnownedStringSlice& moduleName, SlangNVVMModuleHandle& outModule)
+        const;
 
     /// Destroys a module and every opaque handle created from it.
-    void destroyModule(SlangNVVMModuleHandle_1 module) const;
+    void destroyModule(SlangNVVMModuleHandle module) const;
 
     /// Gets the module's context-owned void type.
-    SlangResult getVoidType(SlangNVVMModuleHandle_1 module, SlangNVVMTypeHandle_1& outType) const;
+    SlangResult getVoidType(SlangNVVMModuleHandle module, SlangNVVMTypeHandle& outType) const;
 
     /// Gets a module-context-owned signless integer type.
     SlangResult getIntegerType(
-        SlangNVVMModuleHandle_1 module,
+        SlangNVVMModuleHandle module,
         uint32_t bitWidth,
-        SlangNVVMTypeHandle_1& outType) const;
+        SlangNVVMTypeHandle& outType) const;
 
     /// Gets the module-context-owned IEEE floating-point type used by an advertised feature.
     SlangResult getFloatingPointType(
-        SlangNVVMModuleHandle_1 module,
+        SlangNVVMModuleHandle module,
         uint32_t bitWidth,
-        SlangNVVMTypeHandle_1& outType) const;
+        SlangNVVMTypeHandle& outType) const;
 
     /// Gets a typed pointer with the requested NVVM address space.
     SlangResult getPointerType(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMTypeHandle_1 pointeeType,
-        SlangNVVMAddressSpace_2 addressSpace,
-        SlangNVVMTypeHandle_1& outType) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle pointeeType,
+        SlangNVVMAddressSpace addressSpace,
+        SlangNVVMTypeHandle& outType) const;
 
     /// Creates a non-variadic function type from module-owned type handles.
     SlangResult getFunctionType(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMTypeHandle_1 resultType,
-        const SlangNVVMTypeHandle_1* parameterTypes,
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle resultType,
+        const SlangNVVMTypeHandle* parameterTypes,
         size_t parameterCount,
-        SlangNVVMTypeHandle_1& outType) const;
+        SlangNVVMTypeHandle& outType) const;
 
     /// Declares a function in the module with the exact caller-provided name.
     SlangResult declareFunction(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMTypeHandle_1 functionType,
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle functionType,
         const UnownedStringSlice& name,
-        SlangNVVMValueHandle_1& outFunction) const;
+        SlangNVVMValueHandle& outFunction) const;
 
     /// Gets a declared function's parameter by its zero-based ABI position.
     SlangResult getFunctionParameter(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 function,
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle function,
         size_t parameterIndex,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMValueHandle& outValue) const;
 
     /// Appends a basic block to a function owned by the module.
     SlangResult createBlock(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 function,
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle function,
         const UnownedStringSlice& name,
-        SlangNVVMBlockHandle_1& outBlock) const;
+        SlangNVVMBlockHandle& outBlock) const;
 
     /// Selects a module-owned block as the destination for subsequent instructions.
-    SlangResult setInsertBlock(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 block) const;
+    SlangResult setInsertBlock(SlangNVVMModuleHandle module, SlangNVVMBlockHandle block) const;
 
     /// Emits a non-volatile aligned load into the current insertion block.
     SlangResult emitLoad(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 pointer,
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle pointer,
         uint32_t alignment,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits a non-volatile aligned store into the current insertion block.
     SlangResult emitStore(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 value,
-        SlangNVVMValueHandle_1 pointer,
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle value,
+        SlangNVVMValueHandle pointer,
         uint32_t alignment) const;
 
     /// Emits ADD or SUB for same-typed scalar integer values.
     SlangResult emitIntegerBinary(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMIntegerBinaryOp_2 operation,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMIntegerBinaryOp operation,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
-    /// Emits one stable V3 scalar-integer unary operation, adapting to frozen V2 when necessary.
+    /// Emits one scalar-integer unary operation through the current semantic table.
     SlangResult emitIntegerUnary(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMIntegerUnaryOp_3 operation,
-        SlangNVVMValueHandle_1 value,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMIntegerUnaryOp operation,
+        SlangNVVMValueHandle value,
+        SlangNVVMValueHandle& outValue) const;
 
-    /// Emits one stable V3 scalar-integer binary operation, adapting to frozen V2 when necessary.
+    /// Emits one scalar-integer binary operation through the current semantic table.
     SlangResult emitIntegerBinaryOperation(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMIntegerBinaryOp_3 operation,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMIntegerBinaryOp operation,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
-    /// Emits one stable V3 scalar-integer comparison, adapting to frozen V2 when necessary.
+    /// Emits one scalar-integer comparison through the current semantic table.
     SlangResult emitIntegerCompare(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMIntegerCompareOp_3 operation,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMIntegerCompareOp operation,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
-    /// Emits one stable V3 scalar floating-point binary operation.
+    /// Emits one scalar floating-point binary operation through the current semantic table.
     SlangResult emitFloatingBinary(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMFloatingBinaryOp_3 operation,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMFloatingBinaryOp operation,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
-    /// Emits one stable V3 scalar floating-point unary operation.
+    /// Emits one scalar floating-point unary operation through the current semantic table.
     SlangResult emitFloatingUnary(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMFloatingUnaryOp_3 operation,
-        SlangNVVMValueHandle_1 value,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMFloatingUnaryOp operation,
+        SlangNVVMValueHandle value,
+        SlangNVVMValueHandle& outValue) const;
 
-    /// Emits one stable V3 scalar floating-point comparison.
+    /// Emits one scalar floating-point comparison through the current semantic table.
     SlangResult emitFloatingCompare(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMFloatingCompareOp_3 operation,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMFloatingCompareOp operation,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Gets an exact scalar floating-point constant from its width-bounded IEEE-754 bits.
     SlangResult getFloatingPointConstant(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMTypeHandle_1 floatingPointType,
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle floatingPointType,
         uint32_t bitWidth,
         uint64_t bitPattern,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits a typed scalar phi at the start of the explicit target block.
     SlangResult emitPhi(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMBlockHandle_1 targetBlock,
-        SlangNVVMTypeHandle_1 type,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMBlockHandle targetBlock,
+        SlangNVVMTypeHandle type,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Adds one exact-typed scalar phi input from a predecessor edge.
     SlangResult addPhiIncoming(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 phi,
-        SlangNVVMValueHandle_1 value,
-        SlangNVVMBlockHandle_1 predecessorBlock) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle phi,
+        SlangNVVMValueHandle value,
+        SlangNVVMBlockHandle predecessorBlock) const;
 
-    /// Emits a direct call to a same-module typed function through V4 or its scalar V3 adapter.
+    /// Emits a direct call to a same-module typed function.
     SlangResult emitCall(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 callee,
-        const SlangNVVMValueHandle_1* arguments,
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle callee,
+        const SlangNVVMValueHandle* arguments,
         size_t argumentCount,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMValueHandle& outValue) const;
 
-    /// Emits a typed valued return in the current function through V4 or its scalar V3 adapter.
-    SlangResult emitValueReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value) const;
+    /// Emits a typed valued return in the current function.
+    SlangResult emitValueReturn(SlangNVVMModuleHandle module, SlangNVVMValueHandle value) const;
 
-    /// Emits one negotiated target intrinsic through the generic V3 operation family.
+    /// Emits one target intrinsic through the current semantic table.
     SlangResult emitIntrinsic(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMIntrinsicOp_3 operation,
-        const SlangNVVMValueHandle_1* arguments,
+        SlangNVVMModuleHandle module,
+        SlangNVVMIntrinsicOp operation,
+        const SlangNVVMValueHandle* arguments,
         size_t argumentCount,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits a signed integer less-than comparison and returns its i1 result.
     SlangResult emitIntegerSignedLessThan(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Terminates the current insertion block with an unconditional branch.
-    SlangResult emitBranch(SlangNVVMModuleHandle_1 module, SlangNVVMBlockHandle_1 targetBlock)
-        const;
+    SlangResult emitBranch(SlangNVVMModuleHandle module, SlangNVVMBlockHandle targetBlock) const;
 
     /// Terminates the current insertion block with an i1 conditional branch.
     SlangResult emitConditionalBranch(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 condition,
-        SlangNVVMBlockHandle_1 trueBlock,
-        SlangNVVMBlockHandle_1 falseBlock) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle condition,
+        SlangNVVMBlockHandle trueBlock,
+        SlangNVVMBlockHandle falseBlock) const;
 
     /// Gets an exactly representable signed integer constant of the requested type.
     SlangResult getIntegerConstant(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMTypeHandle_1 integerType,
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle integerType,
         int64_t value,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits an integer phi at the start of the explicit target block.
     SlangResult emitIntegerPhi(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMBlockHandle_1 targetBlock,
-        SlangNVVMTypeHandle_1 integerType,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMBlockHandle targetBlock,
+        SlangNVVMTypeHandle integerType,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Adds a validated integer phi input from one predecessor edge.
     SlangResult addIntegerPhiIncoming(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 phi,
-        SlangNVVMValueHandle_1 value,
-        SlangNVVMBlockHandle_1 predecessorBlock) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle phi,
+        SlangNVVMValueHandle value,
+        SlangNVVMBlockHandle predecessorBlock) const;
 
     /// Emits a direct call to an integer function and returns its integer result.
     SlangResult emitIntegerCall(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 callee,
-        const SlangNVVMValueHandle_1* arguments,
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle callee,
+        const SlangNVVMValueHandle* arguments,
         size_t argumentCount,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMValueHandle& outValue) const;
 
     /// Terminates the current insertion block with an integer return value.
-    SlangResult emitIntegerReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value)
-        const;
+    SlangResult emitIntegerReturn(SlangNVVMModuleHandle module, SlangNVVMValueHandle value) const;
 
     /// Emits a non-inbounds element offset from a typed pointer.
     SlangResult emitPointerOffset(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 basePointer,
-        SlangNVVMValueHandle_1 elementOffset,
-        SlangNVVMValueHandle_1& outPointer) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle basePointer,
+        SlangNVVMValueHandle elementOffset,
+        SlangNVVMValueHandle& outPointer) const;
 
     /// Gets a fixed, nonempty array type with the requested element type.
     SlangResult getArrayType(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMTypeHandle_1 elementType,
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle elementType,
         uint32_t elementCount,
-        SlangNVVMTypeHandle_1& outType) const;
+        SlangNVVMTypeHandle& outType) const;
 
     /// Gets a fixed-vector type through construction interface version 2.
     SlangResult getVectorType(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMTypeHandle_1 elementType,
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle elementType,
         uint32_t elementCount,
-        SlangNVVMTypeHandle_1& outType) const;
+        SlangNVVMTypeHandle& outType) const;
 
     /// Declares internal uninitialized storage with an exact provider type and NVVM address space.
     SlangResult declareGlobalStorage(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMTypeHandle_1 valueType,
-        SlangNVVMAddressSpace_2 addressSpace,
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle valueType,
+        SlangNVVMAddressSpace addressSpace,
         uint32_t alignment,
         const UnownedStringSlice& name,
-        SlangNVVMValueHandle_1& outStorage) const;
+        SlangNVVMValueHandle& outStorage) const;
 
     /// Extracts one statically selected element from a fixed vector.
     SlangResult emitVectorElementExtract(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 vector,
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle vector,
         uint32_t elementIndex,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits a non-inbounds address of one element of a typed array pointer.
     SlangResult emitArrayElementPointer(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 baseArrayPointer,
-        SlangNVVMValueHandle_1 elementIndex,
-        SlangNVVMValueHandle_1& outPointer) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle baseArrayPointer,
+        SlangNVVMValueHandle elementIndex,
+        SlangNVVMValueHandle& outPointer) const;
 
     /// Emits multiplication for same-typed scalar integer values.
     SlangResult emitIntegerMultiply(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits bitwise AND for same-typed scalar integer values.
     SlangResult emitIntegerBitAnd(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits bitwise OR for same-typed scalar integer values.
     SlangResult emitIntegerBitOr(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits bitwise XOR for same-typed scalar integer values.
     SlangResult emitIntegerBitXor(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits bitwise NOT for a scalar integer value.
     SlangResult emitIntegerBitNot(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 value,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle value,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits wrapping arithmetic negation for a scalar integer value.
     SlangResult emitIntegerNegate(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 value,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle value,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits relaxed device-scope atomic add through a naturally aligned global i32 pointer.
     SlangResult emitRelaxedGlobalI32AtomicAdd(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 pointer,
-        SlangNVVMValueHandle_1 value,
-        SlangNVVMValueHandle_1& outOriginalValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle pointer,
+        SlangNVVMValueHandle value,
+        SlangNVVMValueHandle& outOriginalValue) const;
 
     /// Emits scalar integer equality and returns an i1 value.
     SlangResult emitIntegerEqual(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits scalar integer inequality and returns an i1 value.
     SlangResult emitIntegerNotEqual(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits scalar signed-integer greater-than and returns an i1 value.
     SlangResult emitIntegerSignedGreaterThan(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits scalar signed-integer less-than-or-equal and returns an i1 value.
     SlangResult emitIntegerSignedLessEqual(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Emits scalar signed-integer greater-than-or-equal and returns an i1 value.
     SlangResult emitIntegerSignedGreaterEqual(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 left,
-        SlangNVVMValueHandle_1 right,
-        SlangNVVMValueHandle_1& outValue) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle left,
+        SlangNVVMValueHandle right,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Gets the exact raw CUDA ABI type for `RWStructuredBuffer<int>`.
     SlangResult getRawRWStructuredBufferI32Type(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMTypeHandle_1& outType) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle& outType) const;
 
     /// Emits an element pointer from an exact raw CUDA `RWStructuredBuffer<int>` value.
     SlangResult emitRawRWStructuredBufferI32ElementPointer(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 buffer,
-        SlangNVVMValueHandle_1 elementIndex,
-        SlangNVVMValueHandle_1& outPointer) const;
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle buffer,
+        SlangNVVMValueHandle elementIndex,
+        SlangNVVMValueHandle& outPointer) const;
 
     /// Terminates the current void-returning insertion block.
-    SlangResult emitReturnVoid(SlangNVVMModuleHandle_1 module) const;
+    SlangResult emitReturnVoid(SlangNVVMModuleHandle module) const;
 
     /// Adds the NVVM kernel annotation for a module-owned function.
-    SlangResult markFunctionAsKernel(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMValueHandle_1 function) const;
+    SlangResult markFunctionAsKernel(SlangNVVMModuleHandle module, SlangNVVMValueHandle function)
+        const;
 
     /// Serializes into a host-owned blob using the ABI's size-query/write protocol.
     SlangResult serializeModule(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMSerializationFormat_1 format,
+        SlangNVVMModuleHandle module,
+        SlangNVVMSerializationFormat format,
         ComPtr<ISlangBlob>& outBlob) const;
 
-    /// Serializes through V2 and copies the corresponding verifier bytes into host storage.
-    ///
-    /// Returns `SLANG_E_NOT_AVAILABLE` for a V1-only provider. LLVM verification failure returns
-    /// `SLANG_FAIL`, leaves `outBlob` null, and preserves the verifier text in `outDiagnostics`.
+    /// Serializes and copies the corresponding verifier bytes into host storage.
     SlangResult serializeModule(
-        SlangNVVMModuleHandle_1 module,
-        SlangNVVMSerializationFormat_1 format,
+        SlangNVVMModuleHandle module,
+        SlangNVVMSerializationFormat format,
         ComPtr<ISlangBlob>& outBlob,
         String& outDiagnostics) const;
 
 private:
-    SlangNVVMBuilderAPI_V1 m_api = {};
-    SlangNVVMBuilderAPI_V2 m_apiV2 = {};
-    SlangNVVMBuilderAPI_V3 m_apiV3 = {};
-    SlangNVVMBuilderAPI_V4 m_apiV4 = {};
-    SlangNVVMBuilderFoundationAPI_4 m_foundationV4 = {};
-    SlangNVVMBuilderConstructionAPI_4 m_constructionV4 = {};
-    SlangNVVMBuilderValueOperationsAPI_4 m_valueOperationsV4 = {};
-    SlangNVVMBuilderFeatureSet_3 m_features = {};
+    SlangNVVMBuilderAPI m_api = {};
+    SlangNVVMBuilderFoundationAPI m_foundation = {};
+    SlangNVVMBuilderConstructionAPI m_construction = {};
+    SlangNVVMBuilderValueOperationsAPI m_valueOperations = {};
+    SlangNVVMBuilderFeatureSet m_features = {};
     ComPtr<ISlangSharedLibrary> m_library;
 };
 

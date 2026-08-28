@@ -9,7 +9,7 @@ namespace Slang
 struct CodeGenContext;
 
 /// Independent builder semantics needed by an accepted linked-IR module.
-using NVVMIRFeatureSet = SlangNVVMBuilderFeatureSet_3;
+using NVVMIRFeatureSet = SlangNVVMBuilderFeatureSet;
 
 /// Checks whether linked Slang IR is in the exact direct-NVVM subset implemented through Slice 26.
 SlangResult validateNVVMSupportedIR(

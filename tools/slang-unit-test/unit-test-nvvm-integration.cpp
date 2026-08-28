@@ -920,7 +920,7 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveMaskDifferentialPTX)
 static void _checkUnmaskedWaveReadLaneAtDifferentialPTX(
     UnitTestContext* context,
     const char* source,
-    SlangNVVMBuilderFeature_3 shuffleFeature,
+    SlangNVVMBuilderFeature shuffleFeature,
     const char* unavailableMessage,
     const uint32_t* parameterWidths,
     Index parameterWidthCount,
@@ -1378,7 +1378,7 @@ static void _checkNVVMScalarPTXEvidence(
 static void _runNVVMSlangWaveReadLaneFirstDifferentialPTX(
     UnitTestContext* unitTestContext,
     const char* source,
-    SlangNVVMBuilderFeature_3 readFirstFeature,
+    SlangNVVMBuilderFeature readFirstFeature,
     const char* unavailableMessage,
     const uint32_t* parameterWidths,
     Index parameterWidthCount,
@@ -1505,7 +1505,7 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveIsFirstLaneDifferentialPTX)
 static void _runNVVMSlangWavePredicateDifferentialPTX(
     UnitTestContext* unitTestContext,
     const char* source,
-    SlangNVVMBuilderFeature_3 feature,
+    SlangNVVMBuilderFeature feature,
     const char* unavailableMessage,
     const UnownedStringSlice& intrinsicMnemonic,
     Index expectedSignedNotEqualCount)
@@ -1829,13 +1829,12 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarPtxasAccepts)
 
 // Numeric V4 families have no synthetic V3 feature bit, so this sentinel requests only the common
 // real-provider preflight performed by these integration helpers.
-static const SlangNVVMBuilderFeature_3 kNoRequiredLegacyFeature =
-    SLANG_NVVM_BUILDER_FEATURE_COUNT_3;
+static const SlangNVVMBuilderFeature kNoRequiredLegacyFeature = SLANG_NVVM_BUILDER_FEATURE_COUNT;
 
 static void _runNVVMSlangRealSourcePtxasAccepts(
     UnitTestContext* unitTestContext,
     const char* source,
-    SlangNVVMBuilderFeature_3 feature)
+    SlangNVVMBuilderFeature feature)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
@@ -2567,7 +2566,7 @@ SLANG_UNIT_TEST(nvvmSlangScalarRuntimeMatchesNVRTC)
 template<typename TExecute>
 static void _runNVVMSlangSourceRuntimeMatchesNVRTC(
     UnitTestContext* unitTestContext,
-    SlangNVVMBuilderFeature_3 feature,
+    SlangNVVMBuilderFeature feature,
     const char* source,
     TExecute execute)
 {

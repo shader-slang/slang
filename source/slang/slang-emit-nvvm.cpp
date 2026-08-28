@@ -24,7 +24,7 @@ static const IRIntegerValue kNVVMUInt32Max = 4294967295;
 struct ScopedNVVMModule
 {
     const NVVMIRBuilder* builder = nullptr;
-    SlangNVVMModuleHandle_1 module = nullptr;
+    SlangNVVMModuleHandle module = nullptr;
 
     ~ScopedNVVMModule()
     {
@@ -122,29 +122,29 @@ IRFloatLit* _asExecutableFloat32Constant(IRInst* value)
 }
 
 // Records one independent provider semantic required by the accepted linked IR.
-void _requireFeature(NVVMIRFeatureSet& features, SlangNVVMBuilderFeature_3 requiredFeature)
+void _requireFeature(NVVMIRFeatureSet& features, SlangNVVMBuilderFeature requiredFeature)
 {
     features.words[requiredFeature / 64u] |= uint64_t(1) << (requiredFeature % 64u);
 }
 
 // Matches one canonical Slang type against a provider-owned semantic type role.
-bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc_4& semanticType)
+bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc& semanticType)
 {
-    if (!type || semanticType.reserved != 0)
+    if (!type)
         return false;
 
-    if (semanticType.kind == SLANG_NVVM_VALUE_TYPE_VOID_4)
+    if (semanticType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
     {
         return semanticType.bitWidth == 0 && semanticType.laneCount == 0 && as<IRVoidType>(type);
     }
     if (semanticType.laneCount == 3)
     {
-        return semanticType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4 &&
+        return semanticType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER &&
                semanticType.bitWidth == 32 && asNVVMSupportedUInt3Type(type);
     }
     if (semanticType.laneCount == 2)
     {
-        return semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4 &&
+        return semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
                semanticType.bitWidth == 32 && asNVVMSupportedSignedI32x2Type(type);
     }
     if (semanticType.laneCount != 1)
@@ -152,18 +152,18 @@ bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc_4& semanticT
 
     switch (semanticType.kind)
     {
-    case SLANG_NVVM_VALUE_TYPE_BOOL_4:
+    case SLANG_NVVM_VALUE_TYPE_BOOL:
         return semanticType.bitWidth == 1 && isNVVMBoolType(type);
-    case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4:
-    case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4:
+    case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER:
+    case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER:
         {
             uint32_t bitWidth = 0;
             bool isSigned = false;
             return isNVVMSupportedIntegerScalarType(type, &bitWidth, &isSigned) &&
                    semanticType.bitWidth == bitWidth &&
-                   (semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4) == isSigned;
+                   (semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER) == isSigned;
         }
-    case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4:
+    case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT:
         return semanticType.bitWidth == 32 && isNVVMFloat32Type(type);
     default:
         return false;
@@ -210,7 +210,7 @@ const NVVMSemantics::CatalogEntry* _findNVVMGenericAsmSemantic(
 }
 
 // Converts one canonical Slang type to its stable provider semantic role.
-bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc_4& outType)
+bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
 {
     if (as<IRVoidType>(type))
         outType = NVVMSemantics::kVoid;
@@ -227,11 +227,10 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc_4& outType)
         if (isNVVMSupportedIntegerScalarType(type, &bitWidth, &isSigned))
         {
             outType = {
-                isSigned ? SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4
-                         : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4,
+                isSigned ? SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                         : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
                 bitWidth,
                 1,
-                0,
             };
         }
         else if (isNVVMFloat32Type(type))
@@ -242,66 +241,66 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc_4& outType)
     return true;
 }
 
-bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation_4& outOperation)
+bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation& outOperation)
 {
     switch (op)
     {
     case kIROp_Add:
-        outOperation = SLANG_NVVM_VALUE_OP_ADD_4;
+        outOperation = SLANG_NVVM_VALUE_OP_ADD;
         return true;
     case kIROp_Sub:
-        outOperation = SLANG_NVVM_VALUE_OP_SUBTRACT_4;
+        outOperation = SLANG_NVVM_VALUE_OP_SUBTRACT;
         return true;
     case kIROp_Mul:
-        outOperation = SLANG_NVVM_VALUE_OP_MULTIPLY_4;
+        outOperation = SLANG_NVVM_VALUE_OP_MULTIPLY;
         return true;
     case kIROp_Div:
-        outOperation = SLANG_NVVM_VALUE_OP_DIVIDE_4;
+        outOperation = SLANG_NVVM_VALUE_OP_DIVIDE;
         return true;
     case kIROp_BitAnd:
-        outOperation = SLANG_NVVM_VALUE_OP_BIT_AND_4;
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_AND;
         return true;
     case kIROp_BitOr:
-        outOperation = SLANG_NVVM_VALUE_OP_BIT_OR_4;
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_OR;
         return true;
     case kIROp_BitXor:
-        outOperation = SLANG_NVVM_VALUE_OP_BIT_XOR_4;
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_XOR;
         return true;
     case kIROp_BitNot:
-        outOperation = SLANG_NVVM_VALUE_OP_BIT_NOT_4;
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_NOT;
         return true;
     case kIROp_Neg:
-        outOperation = SLANG_NVVM_VALUE_OP_NEGATE_4;
+        outOperation = SLANG_NVVM_VALUE_OP_NEGATE;
         return true;
     case kIROp_Eql:
-        outOperation = SLANG_NVVM_VALUE_OP_EQUAL_4;
+        outOperation = SLANG_NVVM_VALUE_OP_EQUAL;
         return true;
     case kIROp_Neq:
-        outOperation = SLANG_NVVM_VALUE_OP_NOT_EQUAL_4;
+        outOperation = SLANG_NVVM_VALUE_OP_NOT_EQUAL;
         return true;
     case kIROp_Less:
-        outOperation = SLANG_NVVM_VALUE_OP_LESS_THAN_4;
+        outOperation = SLANG_NVVM_VALUE_OP_LESS_THAN;
         return true;
     case kIROp_Greater:
-        outOperation = SLANG_NVVM_VALUE_OP_GREATER_THAN_4;
+        outOperation = SLANG_NVVM_VALUE_OP_GREATER_THAN;
         return true;
     case kIROp_Leq:
-        outOperation = SLANG_NVVM_VALUE_OP_LESS_EQUAL_4;
+        outOperation = SLANG_NVVM_VALUE_OP_LESS_EQUAL;
         return true;
     case kIROp_Geq:
-        outOperation = SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4;
+        outOperation = SLANG_NVVM_VALUE_OP_GREATER_EQUAL;
         return true;
     case kIROp_IntCast:
-        outOperation = SLANG_NVVM_VALUE_OP_INTEGER_CONVERT_4;
+        outOperation = SLANG_NVVM_VALUE_OP_INTEGER_CONVERT;
         return true;
     case kIROp_CastIntToFloat:
-        outOperation = SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT_4;
+        outOperation = SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT;
         return true;
     case kIROp_CastFloatToInt:
-        outOperation = SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER_4;
+        outOperation = SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER;
         return true;
     case kIROp_WaveMaskBallot:
-        outOperation = SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT_4;
+        outOperation = SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT;
         return true;
     default:
         return false;
@@ -310,8 +309,8 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation_4& outOperation)
 
 struct NVVMResolvedValueOperation
 {
-    SlangNVVMValueTypeDesc_4 operandTypes[3] = {};
-    SlangNVVMValueOperationDesc_4 desc = {};
+    SlangNVVMValueTypeDesc operandTypes[3] = {};
+    SlangNVVMValueOperationDesc desc = {};
     const NVVMSemantics::CatalogEntry* staticEntry = nullptr;
     NVVMSemantics::V4FamilyResolution family;
     const char* diagnosticName = nullptr;
@@ -324,8 +323,8 @@ bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOpe
     if (!inst || inst->getOperandCount() > 3)
         return false;
 
-    SlangNVVMValueOperation_4 operation = 0;
-    SlangNVVMValueTypeDesc_4 resultType = {};
+    SlangNVVMValueOperation operation = 0;
+    SlangNVVMValueTypeDesc resultType = {};
     if (!_getNVVMValueOperation(inst->getOp(), operation) ||
         !_getNVVMSemanticType(inst->getDataType(), resultType))
     {
@@ -339,7 +338,6 @@ bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOpe
     }
 
     outOperation.desc = {
-        uint32_t(sizeof(SlangNVVMValueOperationDesc_4)),
         operation,
         resultType,
         inst->getOperandCount() ? outOperation.operandTypes : nullptr,
@@ -1631,17 +1629,17 @@ SlangResult _validateNVVMFunction(
     return SLANG_OK;
 }
 
-using NVVMValueMap = Dictionary<IRInst*, SlangNVVMValueHandle_1>;
+using NVVMValueMap = Dictionary<IRInst*, SlangNVVMValueHandle>;
 
 // Returns an already-lowered SSA value or materializes an exact preflighted scalar literal.
 SlangResult _getLoweredNVVMValue(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle_1 module,
+    SlangNVVMModuleHandle module,
     IRInst* irValue,
     NVVMValueMap& valueMap,
     NVVMTypeLoweringContext& typeContext,
-    SlangNVVMValueHandle_1& outValue)
+    SlangNVVMValueHandle& outValue)
 {
     outValue = nullptr;
     if (auto mappedValue = valueMap.tryGetValue(irValue))
@@ -1652,7 +1650,7 @@ SlangResult _getLoweredNVVMValue(
 
     if (auto intLit = _asExecutableSelectedIntegerConstant(irValue))
     {
-        SlangNVVMTypeHandle_1 integerType = nullptr;
+        SlangNVVMTypeHandle integerType = nullptr;
         IRIntegerValue integerValue = intLit->getValue();
         uint32_t bitWidth = 0;
         bool isSigned = false;
@@ -1672,7 +1670,7 @@ SlangResult _getLoweredNVVMValue(
 
     if (auto boolLit = _asExecutableBoolConstant(irValue))
     {
-        SlangNVVMTypeHandle_1 boolType = nullptr;
+        SlangNVVMTypeHandle boolType = nullptr;
         SLANG_RETURN_ON_FAIL(
             typeContext.lowerType(boolLit->getDataType(), NVVMTypeUse::Value, boolType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1685,7 +1683,7 @@ SlangResult _getLoweredNVVMValue(
 
     auto floatLit = _asExecutableFloat32Constant(irValue);
     SLANG_RELEASE_ASSERT(floatLit);
-    SlangNVVMTypeHandle_1 floatingPointType = nullptr;
+    SlangNVVMTypeHandle floatingPointType = nullptr;
     SLANG_RETURN_ON_FAIL(
         typeContext.lowerType(floatLit->getDataType(), NVVMTypeUse::Value, floatingPointType));
     const uint32_t bitPattern = uint32_t(FloatAsInt(float(floatLit->getValue())));
@@ -1753,7 +1751,7 @@ SlangResult validateNVVMSupportedIR(
     // CUDA kernel. Preserve Slice 6's conventional zero-parameter empty compute entry point, but
     // do not invent a raw CUDA launch ABI for an ordinary shader entry point.
     bool hasRequiredFeatures = false;
-    for (uint32_t i = 0; i < SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3; ++i)
+    for (uint32_t i = 0; i < SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT; ++i)
         hasRequiredFeatures = hasRequiredFeatures || outFeatures.words[i] != 0;
     if (hasRequiredFeatures && !entryPoint->findDecoration<IRCudaKernelDecoration>())
     {
@@ -1847,7 +1845,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 const NVVMSemantics::CatalogEntry* semantic =
                     _findNVVMGenericAsmSemantic(genericAsm, function);
                 SLANG_RELEASE_ASSERT(semantic);
-                const SlangNVVMValueOperationDesc_4 operation =
+                const SlangNVVMValueOperationDesc operation =
                     NVVMSemantics::getOperationDesc(*semantic);
                 if (!builder.supportsValueOperation(operation))
                 {
@@ -1879,9 +1877,9 @@ SlangResult emitNVVMIRFromLinkedIR(
         builder.createModule(toSlice("slang-direct-nvvm"), moduleScope.module)));
 
     NVVMTypeLoweringContext typeContext(codeGenContext, builder, moduleScope.module);
-    Dictionary<IRFunc*, SlangNVVMValueHandle_1> functionMap;
+    Dictionary<IRFunc*, SlangNVVMValueHandle> functionMap;
     NVVMValueMap valueMap;
-    Dictionary<IRBlock*, SlangNVVMBlockHandle_1> blockMap;
+    Dictionary<IRBlock*, SlangNVVMBlockHandle> blockMap;
 
     // The canonical global owns storage class, value type, extent, and name. Lower those facts once
     // before any function declaration; ordinary body uses then resolve through the shared value
@@ -1893,10 +1891,10 @@ SlangResult emitNVVMIRFromLinkedIR(
         if (!globalVar)
             continue;
 
-        SlangNVVMTypeHandle_1 loweredArrayType = nullptr;
+        SlangNVVMTypeHandle loweredArrayType = nullptr;
         SLANG_RETURN_ON_FAIL(
             typeContext.lowerType(arrayType, NVVMTypeUse::Value, loweredArrayType));
-        SlangNVVMValueHandle_1 loweredStorage = nullptr;
+        SlangNVVMValueHandle loweredStorage = nullptr;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
             "shared global storage declaration",
@@ -1915,16 +1913,16 @@ SlangResult emitNVVMIRFromLinkedIR(
     for (auto function : functions)
     {
         const bool isEntryPoint = function == entryPoint;
-        SlangNVVMTypeHandle_1 resultType = nullptr;
+        SlangNVVMTypeHandle resultType = nullptr;
         SLANG_RETURN_ON_FAIL(typeContext.lowerType(
             function->getResultType(),
             isEntryPoint ? NVVMTypeUse::EntryPointResult : NVVMTypeUse::HelperResult,
             resultType));
 
-        List<SlangNVVMTypeHandle_1> parameterTypes;
+        List<SlangNVVMTypeHandle> parameterTypes;
         for (auto param : function->getParams())
         {
-            SlangNVVMTypeHandle_1 parameterType = nullptr;
+            SlangNVVMTypeHandle parameterType = nullptr;
             SLANG_RETURN_ON_FAIL(typeContext.lowerType(
                 param->getDataType(),
                 isEntryPoint ? NVVMTypeUse::EntryPointParameter : NVVMTypeUse::HelperParameter,
@@ -1932,7 +1930,7 @@ SlangResult emitNVVMIRFromLinkedIR(
             parameterTypes.add(parameterType);
         }
 
-        SlangNVVMTypeHandle_1 functionType = nullptr;
+        SlangNVVMTypeHandle functionType = nullptr;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
             "function type",
@@ -1943,7 +1941,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 size_t(parameterTypes.getCount()),
                 functionType)));
 
-        SlangNVVMValueHandle_1 loweredFunction = nullptr;
+        SlangNVVMValueHandle loweredFunction = nullptr;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
             "function declaration",
@@ -1960,7 +1958,7 @@ SlangResult emitNVVMIRFromLinkedIR(
         size_t parameterIndex = 0;
         for (auto param : function->getParams())
         {
-            SlangNVVMValueHandle_1 parameter = nullptr;
+            SlangNVVMValueHandle parameter = nullptr;
             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                 codeGenContext,
                 "function parameter",
@@ -1988,7 +1986,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 nameBuilder << "block" << blockIndex;
             String blockName = nameBuilder.produceString();
 
-            SlangNVVMBlockHandle_1 loweredBlock = nullptr;
+            SlangNVVMBlockHandle loweredBlock = nullptr;
             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                 codeGenContext,
                 "basic-block creation",
@@ -2012,10 +2010,10 @@ SlangResult emitNVVMIRFromLinkedIR(
 
             for (auto param : block->getParams())
             {
-                SlangNVVMTypeHandle_1 parameterType = nullptr;
+                SlangNVVMTypeHandle parameterType = nullptr;
                 SLANG_RETURN_ON_FAIL(
                     typeContext.lowerType(param->getDataType(), NVVMTypeUse::Value, parameterType));
-                SlangNVVMValueHandle_1 loweredPhi = nullptr;
+                SlangNVVMValueHandle loweredPhi = nullptr;
                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                     codeGenContext,
                     isNVVMFloat32Type(param->getDataType()) ? "float32 phi" : "signed i32 phi",
@@ -2049,7 +2047,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Load:
                     {
                         auto load = cast<IRLoad>(inst);
-                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2058,7 +2056,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredPointer));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SlangNVVMValueHandle loweredValue = nullptr;
                         const uint32_t alignment =
                             getNVVMNumericValueAlignment(load->getDataType());
                         SLANG_RELEASE_ASSERT(alignment);
@@ -2077,7 +2075,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Store:
                     {
                         auto store = cast<IRStore>(inst);
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2086,7 +2084,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredValue));
-                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2128,7 +2126,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     {
                         NVVMResolvedValueOperation operation;
                         SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
-                        SlangNVVMValueHandle_1 loweredOperands[3] = {};
+                        SlangNVVMValueHandle loweredOperands[3] = {};
                         for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
                              ++operandIndex)
                         {
@@ -2142,7 +2140,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 loweredOperands[operandIndex]));
                         }
 
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             operation.diagnosticName,
@@ -2158,7 +2156,7 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_AtomicAdd:
                     {
-                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2167,7 +2165,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredPointer));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2176,7 +2174,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredValue));
-                        SlangNVVMValueHandle_1 loweredOriginalValue = nullptr;
+                        SlangNVVMValueHandle loweredOriginalValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "relaxed global signed i32 atomic add",
@@ -2194,11 +2192,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                     {
                         auto call = cast<IRCall>(inst);
                         auto callee = cast<IRFunc>(call->getOperand(0));
-                        List<SlangNVVMValueHandle_1> loweredArguments;
+                        List<SlangNVVMValueHandle> loweredArguments;
                         for (UInt argumentIndex = 0; argumentIndex < call->getArgCount();
                              ++argumentIndex)
                         {
-                            SlangNVVMValueHandle_1 loweredArgument = nullptr;
+                            SlangNVVMValueHandle loweredArgument = nullptr;
                             SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                 codeGenContext,
                                 builder,
@@ -2210,7 +2208,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredArguments.add(loweredArgument);
                         }
 
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SlangNVVMValueHandle loweredValue = nullptr;
                         const bool usesGenericFunctions = _usesGenericNVVMFunctions(callee);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
@@ -2238,7 +2236,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     {
                         auto swizzle = cast<IRSwizzle>(inst);
                         auto elementIndex = cast<IRIntLit>(swizzle->getElementIndex(0));
-                        SlangNVVMValueHandle_1 loweredBase = nullptr;
+                        SlangNVVMValueHandle loweredBase = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2247,7 +2245,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredBase));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "CUDA execution-index component",
@@ -2265,10 +2263,10 @@ SlangResult emitNVVMIRFromLinkedIR(
                         const NVVMSemantics::CatalogEntry* semantic =
                             _findNVVMGenericAsmSemantic(as<IRGenericAsm>(inst), function);
                         SLANG_RELEASE_ASSERT(semantic);
-                        List<SlangNVVMValueHandle_1> loweredArguments;
+                        List<SlangNVVMValueHandle> loweredArguments;
                         for (auto parameter : function->getParams())
                         {
-                            SlangNVVMValueHandle_1 loweredArgument = nullptr;
+                            SlangNVVMValueHandle loweredArgument = nullptr;
                             SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                 codeGenContext,
                                 builder,
@@ -2279,8 +2277,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 loweredArgument));
                             loweredArguments.add(loweredArgument);
                         }
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        const SlangNVVMValueOperationDesc_4 operation =
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        const SlangNVVMValueOperationDesc operation =
                             NVVMSemantics::getOperationDesc(*semantic);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
@@ -2294,10 +2292,10 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 loweredValue)));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            semantic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID_4
+                            semantic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID
                                 ? "void return"
                                 : "generic value return",
-                            semantic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID_4
+                            semantic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID
                                 ? builder.emitReturnVoid(moduleScope.module)
                                 : builder.emitValueReturn(moduleScope.module, loweredValue)));
                     }
@@ -2306,7 +2304,7 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_GetOffsetPtr:
                     {
-                        SlangNVVMValueHandle_1 loweredBasePointer = nullptr;
+                        SlangNVVMValueHandle loweredBasePointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2315,7 +2313,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredBasePointer));
-                        SlangNVVMValueHandle_1 loweredElementOffset = nullptr;
+                        SlangNVVMValueHandle loweredElementOffset = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2324,7 +2322,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredElementOffset));
-                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "device scalar pointer offset",
@@ -2339,7 +2337,7 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_GetElementPtr:
                     {
-                        SlangNVVMValueHandle_1 loweredBasePointer = nullptr;
+                        SlangNVVMValueHandle loweredBasePointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2348,7 +2346,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredBasePointer));
-                        SlangNVVMValueHandle_1 loweredElementIndex = nullptr;
+                        SlangNVVMValueHandle loweredElementIndex = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2357,7 +2355,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredElementIndex));
-                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             asNVVMSupportedSharedI32ArrayGlobal(inst->getOperand(0))
@@ -2374,7 +2372,7 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_RWStructuredBufferGetElementPtr:
                     {
-                        SlangNVVMValueHandle_1 loweredBuffer = nullptr;
+                        SlangNVVMValueHandle loweredBuffer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2383,7 +2381,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredBuffer));
-                        SlangNVVMValueHandle_1 loweredElementIndex = nullptr;
+                        SlangNVVMValueHandle loweredElementIndex = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2392,7 +2390,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredElementIndex));
-                        SlangNVVMValueHandle_1 loweredPointer = nullptr;
+                        SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "raw RWStructuredBuffer signed i32 element pointer",
@@ -2416,7 +2414,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     else
                     {
                         auto returnInst = cast<IRReturn>(inst);
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2452,7 +2450,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_IfElse:
                     {
                         auto ifElse = cast<IRIfElse>(inst);
-                        SlangNVVMValueHandle_1 loweredCondition = nullptr;
+                        SlangNVVMValueHandle loweredCondition = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
@@ -2495,7 +2493,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 UInt phiParameterIndex = 0;
                 for (auto param : block->getParams())
                 {
-                    SlangNVVMValueHandle_1 loweredArgument = nullptr;
+                    SlangNVVMValueHandle loweredArgument = nullptr;
                     SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                         codeGenContext,
                         builder,
@@ -2539,7 +2537,7 @@ SlangResult emitNVVMIRFromLinkedIR(
     }
 
     const bool useNVVMIR20Assembly = builder.supportsNVVMIR20Assembly();
-    const SlangNVVMSerializationFormat_1 serializationFormat =
+    const SlangNVVMSerializationFormat serializationFormat =
         useNVVMIR20Assembly ? SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY
                             : SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE;
     const char* serializationOperation = useNVVMIR20Assembly

@@ -98,18 +98,18 @@ public:
     NVVMTypeLoweringContext(
         CodeGenContext* codeGenContext,
         const NVVMIRBuilder& builder,
-        SlangNVVMModuleHandle_1 module)
+        SlangNVVMModuleHandle module)
         : m_codeGenContext(codeGenContext), m_builder(builder), m_module(module)
     {
     }
 
-    SlangResult lowerType(IRType* type, NVVMTypeUse use, SlangNVVMTypeHandle_1& outType);
+    SlangResult lowerType(IRType* type, NVVMTypeUse use, SlangNVVMTypeHandle& outType);
 
 private:
     struct PointerTypeKey
     {
         IRType* pointeeType = nullptr;
-        SlangNVVMAddressSpace_2 addressSpace = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
+        SlangNVVMAddressSpace addressSpace = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
 
         HashCode getHashCode() const
         {
@@ -123,20 +123,20 @@ private:
         }
     };
 
-    SlangResult _lowerArrayType(IRArrayType* type, SlangNVVMTypeHandle_1& outType);
+    SlangResult _lowerArrayType(IRArrayType* type, SlangNVVMTypeHandle& outType);
     SlangResult _lowerPointerType(
         IRType* canonicalType,
         IRType* pointeeType,
-        SlangNVVMAddressSpace_2 addressSpace,
-        SlangNVVMTypeHandle_1& outType);
+        SlangNVVMAddressSpace addressSpace,
+        SlangNVVMTypeHandle& outType);
     SlangResult _reportUnsupportedType(NVVMTypeUse use) const;
     SlangResult _requireBuilderOperation(const char* operation, SlangResult result) const;
 
     CodeGenContext* m_codeGenContext = nullptr;
     const NVVMIRBuilder& m_builder;
-    SlangNVVMModuleHandle_1 m_module = nullptr;
-    Dictionary<IRType*, SlangNVVMTypeHandle_1> m_typeMap;
-    Dictionary<PointerTypeKey, SlangNVVMTypeHandle_1> m_pointerRepresentationMap;
+    SlangNVVMModuleHandle m_module = nullptr;
+    Dictionary<IRType*, SlangNVVMTypeHandle> m_typeMap;
+    Dictionary<PointerTypeKey, SlangNVVMTypeHandle> m_pointerRepresentationMap;
 };
 
 } // namespace Slang
