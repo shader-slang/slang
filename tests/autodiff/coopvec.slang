@@ -155,6 +155,38 @@
 // CHECK-NEXT: 10.000000
 // CHECK-NEXT: 100.000000
 // CHECK-NEXT: 1000.000000
+// CHECK-NEXT: 2.000000
+// CHECK-NEXT: 4.000000
+// CHECK-NEXT: 6.000000
+// CHECK-NEXT: 8.000000
+// CHECK-NEXT: 2.000000
+// CHECK-NEXT: 20.000000
+// CHECK-NEXT: 200.000000
+// CHECK-NEXT: 2000.000000
+// CHECK-NEXT: 2.000000
+// CHECK-NEXT: 4.000000
+// CHECK-NEXT: 6.000000
+// CHECK-NEXT: 8.000000
+// CHECK-NEXT: 2.000000
+// CHECK-NEXT: 20.000000
+// CHECK-NEXT: 200.000000
+// CHECK-NEXT: 2000.000000
+// CHECK-NEXT: 2.000000
+// CHECK-NEXT: 4.000000
+// CHECK-NEXT: 6.000000
+// CHECK-NEXT: 8.000000
+// CHECK-NEXT: 2.000000
+// CHECK-NEXT: 20.000000
+// CHECK-NEXT: 200.000000
+// CHECK-NEXT: 2000.000000
+// CHECK-NEXT: 2.000000
+// CHECK-NEXT: 4.000000
+// CHECK-NEXT: 6.000000
+// CHECK-NEXT: 8.000000
+// CHECK-NEXT: 2.000000
+// CHECK-NEXT: 20.000000
+// CHECK-NEXT: 200.000000
+// CHECK-NEXT: 2000.000000
 
 typealias FloatCoopVec4 = CoopVec<float, 4>;
 typealias DPFloatCoopVec4 = DifferentialPair<FloatCoopVec4>;
@@ -241,7 +273,22 @@ FloatCoopVec4 testNoDiffElementUpdates(FloatCoopVec4 x, no_diff float value)
     return x + result;
 }
 
-//TEST_INPUT:ubuffer(data=[0], stride=4, count=152):out,name=outputBuffer
+// Exercises the CoopVec constructor from a vector value in reverse and forward AD.
+[Differentiable]
+FloatCoopVec4 testVectorConstructor(float4 value)
+{
+    return FloatCoopVec4(value) * FloatCoopVec4(2.0);
+}
+
+// Exercises the CoopVec constructor from an array value in reverse and forward AD.
+[Differentiable]
+FloatCoopVec4 testArrayConstructor(float a, float b, float c, float d)
+{
+    float values[4] = { a, b, c, d };
+    return FloatCoopVec4(values) * FloatCoopVec4(2.0);
+}
+
+//TEST_INPUT:ubuffer(data=[0], stride=4, count=184):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -486,5 +533,62 @@ void computeMain()
         bwd_diff(testNoDiffElementUpdates)(dx, 3.0f, dOut);
 
         dx.d.store(outputBuffer, 592);
+    }
+
+    {
+        // Vector construction should transpose the CoopVec output gradient back
+        // to the source vector lanes.
+        let value = float4(1.0, 2.0, 3.0, 4.0);
+        let dOut = FloatCoopVec4(1.0, 10.0, 100.0, 1000.0);
+        let primal = testVectorConstructor(value);
+        var dValue = diffPair(value, float4(0.0, 0.0, 0.0, 0.0));
+        bwd_diff(testVectorConstructor)(dValue, dOut);
+
+        primal.store(outputBuffer, 608);
+        outputBuffer[156] = dValue.d.x;
+        outputBuffer[157] = dValue.d.y;
+        outputBuffer[158] = dValue.d.z;
+        outputBuffer[159] = dValue.d.w;
+    }
+
+    {
+        // Array construction should transpose the CoopVec output gradient back
+        // to the array elements.
+        let dOut = FloatCoopVec4(1.0, 10.0, 100.0, 1000.0);
+        let primal = testArrayConstructor(1.0, 2.0, 3.0, 4.0);
+        var da = diffPair(1.0, 0.0);
+        var db = diffPair(2.0, 0.0);
+        var dc = diffPair(3.0, 0.0);
+        var dd = diffPair(4.0, 0.0);
+        bwd_diff(testArrayConstructor)(da, db, dc, dd, dOut);
+
+        primal.store(outputBuffer, 640);
+        outputBuffer[164] = da.d;
+        outputBuffer[165] = db.d;
+        outputBuffer[166] = dc.d;
+        outputBuffer[167] = dd.d;
+    }
+
+    {
+        // Forward-mode mirror for vector construction links vector tangents to
+        // CoopVec lanes.
+        let result = fwd_diff(testVectorConstructor)(
+            diffPair(float4(1.0, 2.0, 3.0, 4.0), float4(1.0, 10.0, 100.0, 1000.0)));
+
+        result.p.store(outputBuffer, 672);
+        result.d.store(outputBuffer, 688);
+    }
+
+    {
+        // Forward-mode mirror for array construction links scalar tangents to
+        // CoopVec lanes through the temporary array.
+        let result = fwd_diff(testArrayConstructor)(
+            diffPair(1.0, 1.0),
+            diffPair(2.0, 10.0),
+            diffPair(3.0, 100.0),
+            diffPair(4.0, 1000.0));
+
+        result.p.store(outputBuffer, 704);
+        result.d.store(outputBuffer, 720);
     }
 }
