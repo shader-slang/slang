@@ -231,6 +231,9 @@ struct FakeNVVMBuilderCallStorage
 struct FakeNVVMBuilderPointerOffsetStorage
 {
 };
+struct FakeNVVMBuilderByteOffsetPointerStorage
+{
+};
 struct FakeNVVMBuilderArrayElementPointerStorage
 {
 };
@@ -277,6 +280,7 @@ enum class FakeNVVMBuilderValueKind
     ScalarPhi,
     Call,
     PointerOffset,
+    ByteOffsetPointer,
     ArrayElementPointer,
     StructFieldPointer,
     StructFieldValue,
@@ -347,6 +351,9 @@ enum class FakeNVVMBuilderScalarTypeKind
     Integer,
     Boolean,
     Float,
+    UInt2,
+    UInt3,
+    UInt4,
     ResourceView,
     ScalarStructPointer,
 };
@@ -397,6 +404,7 @@ struct FakeNVVMBuilderState
         emitIntrinsicCallCount = 0;
         isOperationSupportedCallCount = 0;
         emitPointerOffsetCallCount = 0;
+        emitByteOffsetPointerCallCount = 0;
         emitArrayElementPointerCallCount = 0;
         emitStructFieldPointerCallCount = 0;
         emitStructFieldValueCallCount = 0;
@@ -448,6 +456,8 @@ struct FakeNVVMBuilderState
         blockFunctionIndices.clear();
         loadAlignment = 0;
         storeAlignment = 0;
+        loadAlignments.clear();
+        storeAlignments.clear();
         scalarOperations.clear();
         emittedValueOperations.clear();
         intrinsicOperations.clear();
@@ -495,6 +505,11 @@ struct FakeNVVMBuilderState
         pointerOffsetCallerBlockIndices.clear();
         pointerOffsetBaseValueRefs.clear();
         pointerOffsetElementValueRefs.clear();
+        byteOffsetPointerCallerBlockIndices.clear();
+        byteOffsetPointerBaseValueRefs.clear();
+        byteOffsetPointerOffsetValueRefs.clear();
+        byteOffsetPointerPointeeTypes.clear();
+        byteOffsetPointerTypeKinds.clear();
         arrayElementPointerCallerBlockIndices.clear();
         arrayElementPointerBaseValueRefs.clear();
         arrayElementPointerIndexValueRefs.clear();
@@ -568,6 +583,7 @@ struct FakeNVVMBuilderState
         for (auto& operandType : rejectedValueOperationOperandTypes)
             operandType = {};
         failPointerOffsetAfterWrite = false;
+        failByteOffsetPointerAfterWrite = false;
         failArrayElementPointerAfterWrite = false;
         failScalarOperationAfterWrite = {};
         failRelaxedGlobalI32AtomicAddAfterWrite = false;
@@ -648,6 +664,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderScalarPhiStorage scalarPhiStorage[8];
     FakeNVVMBuilderCallStorage callStorage[16];
     FakeNVVMBuilderPointerOffsetStorage pointerOffsetStorage[16];
+    FakeNVVMBuilderByteOffsetPointerStorage byteOffsetPointerStorage[16];
     FakeNVVMBuilderArrayElementPointerStorage arrayElementPointerStorage[16];
     FakeNVVMBuilderStructFieldPointerStorage structFieldPointerStorage[16];
     FakeNVVMBuilderStructFieldValueStorage structFieldValueStorage[16];
@@ -696,6 +713,7 @@ struct FakeNVVMBuilderState
     int emitIntrinsicCallCount = 0;
     int isOperationSupportedCallCount = 0;
     int emitPointerOffsetCallCount = 0;
+    int emitByteOffsetPointerCallCount = 0;
     int emitArrayElementPointerCallCount = 0;
     int emitStructFieldPointerCallCount = 0;
     int emitStructFieldValueCallCount = 0;
@@ -741,6 +759,8 @@ struct FakeNVVMBuilderState
     List<Index> blockFunctionIndices;
     uint32_t loadAlignment = 0;
     uint32_t storeAlignment = 0;
+    List<uint32_t> loadAlignments;
+    List<uint32_t> storeAlignments;
     List<FakeNVVMBuilderScalarOperation> scalarOperations;
     List<FakeNVVMBuilderScalarOperationKey> emittedValueOperations;
     List<SlangNVVMValueOperation> intrinsicOperations;
@@ -793,6 +813,11 @@ struct FakeNVVMBuilderState
     List<Index> pointerOffsetCallerBlockIndices;
     List<FakeNVVMBuilderValueRef> pointerOffsetBaseValueRefs;
     List<FakeNVVMBuilderValueRef> pointerOffsetElementValueRefs;
+    List<Index> byteOffsetPointerCallerBlockIndices;
+    List<FakeNVVMBuilderValueRef> byteOffsetPointerBaseValueRefs;
+    List<FakeNVVMBuilderValueRef> byteOffsetPointerOffsetValueRefs;
+    List<SlangNVVMTypeHandle> byteOffsetPointerPointeeTypes;
+    List<FakeNVVMBuilderScalarTypeKind> byteOffsetPointerTypeKinds;
     List<Index> arrayElementPointerCallerBlockIndices;
     List<FakeNVVMBuilderValueRef> arrayElementPointerBaseValueRefs;
     List<FakeNVVMBuilderValueRef> arrayElementPointerIndexValueRefs;
@@ -835,6 +860,7 @@ struct FakeNVVMBuilderState
     bool returnNullIntrinsic = false;
     bool failIntrinsicAfterWrite = false;
     bool failPointerOffsetAfterWrite = false;
+    bool failByteOffsetPointerAfterWrite = false;
     bool failArrayElementPointerAfterWrite = false;
     FakeNVVMBuilderScalarOperationKey failScalarOperationAfterWrite;
     bool failRelaxedGlobalI32AtomicAddAfterWrite = false;
@@ -1016,6 +1042,12 @@ static bool _getFakeNVVMBuilderTypeKind(
         outTypeKind = FakeNVVMBuilderScalarTypeKind::Integer;
     else if (type == _getFakeNVVMBuilderFloatType())
         outTypeKind = FakeNVVMBuilderScalarTypeKind::Float;
+    else if (type == _getFakeNVVMBuilderVectorType(2))
+        outTypeKind = FakeNVVMBuilderScalarTypeKind::UInt2;
+    else if (type == _getFakeNVVMBuilderVectorType(3))
+        outTypeKind = FakeNVVMBuilderScalarTypeKind::UInt3;
+    else if (type == _getFakeNVVMBuilderVectorType(4))
+        outTypeKind = FakeNVVMBuilderScalarTypeKind::UInt4;
     else if (type == _getFakeNVVMBuilderScalarStructPointerType())
         outTypeKind = FakeNVVMBuilderScalarTypeKind::ScalarStructPointer;
     else
@@ -1284,6 +1316,26 @@ static bool _getFakeNVVMBuilderPointerOffsetIndex(SlangNVVMValueHandle value, In
     return false;
 }
 
+static SlangNVVMValueHandle _getFakeNVVMBuilderByteOffsetPointer(Index index = 0)
+{
+    SLANG_ASSERT(index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.byteOffsetPointerStorage));
+    return reinterpret_cast<SlangNVVMValueHandle>(
+        &gFakeNVVMBuilder.byteOffsetPointerStorage[index]);
+}
+
+static bool _getFakeNVVMBuilderByteOffsetPointerIndex(SlangNVVMValueHandle value, Index& outIndex)
+{
+    for (Index i = 0; i < gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.getCount(); ++i)
+    {
+        if (value == _getFakeNVVMBuilderByteOffsetPointer(i))
+        {
+            outIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 static SlangNVVMValueHandle _getFakeNVVMBuilderArrayElementPointer(Index index = 0)
 {
     SLANG_ASSERT(index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.arrayElementPointerStorage));
@@ -1501,6 +1553,11 @@ static bool _getFakeNVVMBuilderValueRef(SlangNVVMValueHandle value, FakeNVVMBuil
         outRef = {FakeNVVMBuilderValueKind::PointerOffset, valueIndex};
         return true;
     }
+    if (_getFakeNVVMBuilderByteOffsetPointerIndex(value, valueIndex))
+    {
+        outRef = {FakeNVVMBuilderValueKind::ByteOffsetPointer, valueIndex};
+        return true;
+    }
     if (_getFakeNVVMBuilderArrayElementPointerIndex(value, valueIndex))
     {
         outRef = {FakeNVVMBuilderValueKind::ArrayElementPointer, valueIndex};
@@ -1657,6 +1714,7 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
                 gFakeNVVMBuilder.intrinsicResultTypes[valueRef.index].kind ==
                     SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
     case FakeNVVMBuilderValueKind::PointerOffset:
+    case FakeNVVMBuilderValueKind::ByteOffsetPointer:
     case FakeNVVMBuilderValueKind::ArrayElementPointer:
     case FakeNVVMBuilderValueKind::StructFieldValue:
     case FakeNVVMBuilderValueKind::ExecutionRegister:
@@ -1704,6 +1762,15 @@ static bool _isFakeNVVMBuilderIntegerVectorValue(
         return false;
     if (valueRef.kind == FakeNVVMBuilderValueKind::ExecutionRegister)
         return expectedElementCount == 3;
+    if (valueRef.kind == FakeNVVMBuilderValueKind::Load && valueRef.index >= 0 &&
+        valueRef.index < gFakeNVVMBuilder.loadResultTypeKinds.getCount())
+    {
+        const FakeNVVMBuilderScalarTypeKind expectedTypeKind =
+            expectedElementCount == 2   ? FakeNVVMBuilderScalarTypeKind::UInt2
+            : expectedElementCount == 3 ? FakeNVVMBuilderScalarTypeKind::UInt3
+                                        : FakeNVVMBuilderScalarTypeKind::UInt4;
+        return gFakeNVVMBuilder.loadResultTypeKinds[valueRef.index] == expectedTypeKind;
+    }
     if (valueRef.kind == FakeNVVMBuilderValueKind::VectorConstruct && valueRef.index >= 0 &&
         valueRef.index < gFakeNVVMBuilder.vectorConstructResultTypes.getCount())
     {
@@ -1722,6 +1789,29 @@ static bool _isFakeNVVMBuilderIntegerVectorValue(
     return valueRef.kind == FakeNVVMBuilderValueKind::Call && expectedElementCount == 3 &&
            valueRef.index >= 0 && valueRef.index < gFakeNVVMBuilder.callResultKinds.getCount() &&
            gFakeNVVMBuilder.callResultKinds[valueRef.index] == FakeNVVMBuilderResultTypeKind::UInt3;
+}
+
+static bool _isFakeNVVMBuilderFloatValue(SlangNVVMValueHandle value);
+
+static bool _isFakeNVVMBuilderValueOfTypeKind(
+    SlangNVVMValueHandle value,
+    FakeNVVMBuilderScalarTypeKind typeKind)
+{
+    switch (typeKind)
+    {
+    case FakeNVVMBuilderScalarTypeKind::Integer:
+        return _isFakeNVVMBuilderIntegerValue(value);
+    case FakeNVVMBuilderScalarTypeKind::Float:
+        return _isFakeNVVMBuilderFloatValue(value);
+    case FakeNVVMBuilderScalarTypeKind::UInt2:
+        return _isFakeNVVMBuilderIntegerVectorValue(value, 2);
+    case FakeNVVMBuilderScalarTypeKind::UInt3:
+        return _isFakeNVVMBuilderIntegerVectorValue(value, 3);
+    case FakeNVVMBuilderScalarTypeKind::UInt4:
+        return _isFakeNVVMBuilderIntegerVectorValue(value, 4);
+    default:
+        return false;
+    }
 }
 
 static bool _isFakeNVVMBuilderFloatValue(SlangNVVMValueHandle value)
@@ -1818,6 +1908,7 @@ static bool _isFakeNVVMBuilderPointerValue(SlangNVVMValueHandle value)
         return false;
 
     if (valueRef.kind == FakeNVVMBuilderValueKind::PointerOffset ||
+        valueRef.kind == FakeNVVMBuilderValueKind::ByteOffsetPointer ||
         valueRef.kind == FakeNVVMBuilderValueKind::ArrayElementPointer ||
         valueRef.kind == FakeNVVMBuilderValueKind::StructFieldPointer ||
         valueRef.kind == FakeNVVMBuilderValueKind::StructFieldValue)
@@ -1909,6 +2000,14 @@ static bool _getFakeNVVMBuilderPointerScalarTypeKind(
                _getFakeNVVMBuilderPointerScalarTypeKind(
                    gFakeNVVMBuilder.pointerOffsetBaseValueRefs[pointerRef.index],
                    outTypeKind);
+    case FakeNVVMBuilderValueKind::ByteOffsetPointer:
+        if (pointerRef.index < 0 ||
+            pointerRef.index >= gFakeNVVMBuilder.byteOffsetPointerTypeKinds.getCount())
+        {
+            return false;
+        }
+        outTypeKind = gFakeNVVMBuilder.byteOffsetPointerTypeKinds[pointerRef.index];
+        return true;
     case FakeNVVMBuilderValueKind::ArrayElementPointer:
         outTypeKind = FakeNVVMBuilderScalarTypeKind::Integer;
         return true;
@@ -2556,6 +2655,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitLoad(
 {
     ++gFakeNVVMBuilder.emitLoadCallCount;
     gFakeNVVMBuilder.loadAlignment = alignment;
+    gFakeNVVMBuilder.loadAlignments.add(alignment);
     Index pointerFunctionIndex = -1;
     size_t pointerIndex = size_t(-1);
     FakeNVVMBuilderValueRef pointerRef;
@@ -2590,6 +2690,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitStore(
 {
     ++gFakeNVVMBuilder.emitStoreCallCount;
     gFakeNVVMBuilder.storeAlignment = alignment;
+    gFakeNVVMBuilder.storeAlignments.add(alignment);
     Index pointerFunctionIndex = -1;
     size_t pointerIndex = size_t(-1);
     FakeNVVMBuilderValueRef pointerRef;
@@ -2599,9 +2700,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitStore(
         !_isFakeNVVMBuilderPointerValue(pointer) ||
         !_getFakeNVVMBuilderValueRef(pointer, pointerRef) ||
         !_getFakeNVVMBuilderPointerScalarTypeKind(pointerRef, pointerTypeKind) ||
-        (pointerTypeKind == FakeNVVMBuilderScalarTypeKind::Integer
-             ? !_isFakeNVVMBuilderIntegerValue(value)
-             : !_isFakeNVVMBuilderFloatValue(value)))
+        !_isFakeNVVMBuilderValueOfTypeKind(value, pointerTypeKind))
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -3176,6 +3275,43 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitPointerOffset(
     gFakeNVVMBuilder.pointerOffsetElementValueRefs.add(elementRef);
     *outPointer = _getFakeNVVMBuilderPointerOffset(resultIndex);
     return gFakeNVVMBuilder.failPointerOffsetAfterWrite ? SLANG_FAIL : SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitByteOffsetPointer(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle basePointer,
+    SlangNVVMValueHandle byteOffset,
+    SlangNVVMTypeHandle resultPointeeType,
+    SlangNVVMValueHandle* outPointer)
+{
+    ++gFakeNVVMBuilder.emitByteOffsetPointerCallCount;
+    if (outPointer)
+        *outPointer = nullptr;
+
+    FakeNVVMBuilderValueRef baseRef;
+    FakeNVVMBuilderValueRef offsetRef;
+    FakeNVVMBuilderScalarTypeKind resultTypeKind;
+    if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
+        !_isFakeNVVMBuilderPointerValue(basePointer) ||
+        !_getFakeNVVMBuilderValueRef(basePointer, baseRef) ||
+        !_isFakeNVVMBuilderIntegerValue(byteOffset) ||
+        !_getFakeNVVMBuilderValueRef(byteOffset, offsetRef) ||
+        !_getFakeNVVMBuilderTypeKind(resultPointeeType, resultTypeKind) || !outPointer ||
+        gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.getCount() >=
+            SLANG_COUNT_OF(gFakeNVVMBuilder.byteOffsetPointerStorage))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    const Index resultIndex = gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.getCount();
+    gFakeNVVMBuilder.byteOffsetPointerCallerBlockIndices.add(
+        gFakeNVVMBuilder.currentInsertBlockIndex);
+    gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.add(baseRef);
+    gFakeNVVMBuilder.byteOffsetPointerOffsetValueRefs.add(offsetRef);
+    gFakeNVVMBuilder.byteOffsetPointerPointeeTypes.add(resultPointeeType);
+    gFakeNVVMBuilder.byteOffsetPointerTypeKinds.add(resultTypeKind);
+    *outPointer = _getFakeNVVMBuilderByteOffsetPointer(resultIndex);
+    return gFakeNVVMBuilder.failByteOffsetPointerAfterWrite ? SLANG_FAIL : SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitArrayElementPointer(
@@ -4112,6 +4248,7 @@ static SlangNVVMBuilderConstructionAPI _makeFakeNVVMBuilderConstructionAPI()
     api.emitValueReturn = _fakeNVVMBuilderEmitValueReturn;
     api.emitReturnVoid = _fakeNVVMBuilderEmitReturnVoid;
     api.emitPointerOffset = _fakeNVVMBuilderEmitPointerOffset;
+    api.emitByteOffsetPointer = _fakeNVVMBuilderEmitByteOffsetPointer;
     api.emitArrayElementPointer = _fakeNVVMBuilderEmitArrayElementPointer;
     api.emitStructFieldPointer = _fakeNVVMBuilderEmitStructFieldPointer;
     api.emitStructFieldValue = _fakeNVVMBuilderEmitStructFieldValue;
@@ -5067,6 +5204,7 @@ static const char kSumToLimitKernelName[] = "sumToLimit";
 static const char kCallScalarKernelName[] = "callScalar";
 static const char kIncrementScalarHelperName[] = "incrementScalar";
 static const char kCopyIndexedKernelName[] = "copyIndexed";
+static const char kCopyByteOffsetKernelName[] = "copyByteOffset";
 static const char kCopyArrayElementKernelName[] = "copyArrayElement";
 static const char kMultiplyScalarKernelName[] = "multiplyScalar";
 static const char kBitAndScalarKernelName[] = "bitAndScalar";
@@ -8373,13 +8511,27 @@ void computeMain(ByteAddressBuffer source, uniform uint index)
     (*sourcePointer)[index] = 42;
 }
 )";
-static const char kDirectNVVMUnsupportedByteAddressLoadSource[] = R"(
+static const char kDirectNVVMCoreByteAddressAccessSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    ByteAddressBuffer source,
+    RWByteAddressBuffer destination,
+    uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> output,
+    uniform uint offset)
+{
+    uint4 sourceValues = source.Load4Aligned(offset, 16);
+    uint destinationValue = destination.Load(offset + 4);
+    destination.Store(offset, sourceValues.x + destinationValue);
+    output[0] = sourceValues.y;
+}
+)";
+static const char kDirectNVVMUnsupportedFloatByteAddressLoadSource[] = R"(
 [CUDAKernel]
 void computeMain(
     RWByteAddressBuffer source,
-    uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> destination)
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination)
 {
-    destination[0] = source.Load(0);
+    destination[0] = source.Load<float>(0);
 }
 )";
 static const char kDirectNVVMAggregateAndReadOnlyResourceSource[] = R"(
@@ -9477,6 +9629,101 @@ static SlangResult _buildPointerOffsetModule(
         SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE,
         outBitcode,
         outBitcodeDiagnostics));
+    return SLANG_OK;
+}
+
+static SlangResult _populateByteOffsetPointerKernel(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module)
+{
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle integerType = nullptr;
+    SlangNVVMTypeHandle uint4Type = nullptr;
+    SlangNVVMTypeHandle globalIntegerPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, integerType));
+    SLANG_RETURN_ON_FAIL(builder.getVectorType(module, integerType, 4, uint4Type));
+    SLANG_RETURN_ON_FAIL(builder.getPointerType(
+        module,
+        integerType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        globalIntegerPointerType));
+
+    const SlangNVVMTypeHandle parameterTypes[] = {
+        globalIntegerPointerType,
+        globalIntegerPointerType,
+        integerType,
+    };
+    SlangNVVMTypeHandle functionType = nullptr;
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
+        module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType));
+    SLANG_RETURN_ON_FAIL(builder.declareFunction(
+        module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice(kCopyByteOffsetKernelName),
+        function));
+
+    SlangNVVMValueHandle source = nullptr;
+    SlangNVVMValueHandle destination = nullptr;
+    SlangNVVMValueHandle byteOffset = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 0, source));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 1, destination));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 2, byteOffset));
+
+    SlangNVVMBlockHandle entryBlock = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, function, toSlice("entry"), entryBlock));
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
+
+    SlangNVVMValueHandle vectorPointer = nullptr;
+    SlangNVVMValueHandle vectorValue = nullptr;
+    SlangNVVMValueHandle firstValue = nullptr;
+    SlangNVVMValueHandle scalarPointer = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        builder.emitByteOffsetPointer(module, source, byteOffset, uint4Type, vectorPointer));
+    SLANG_RETURN_ON_FAIL(
+        builder.emitLoad(module, vectorPointer, 16, SLANG_NVVM_LOAD_FLAG_INVARIANT, vectorValue));
+    SLANG_RETURN_ON_FAIL(builder.emitVectorElementExtract(module, vectorValue, 0, firstValue));
+    SLANG_RETURN_ON_FAIL(
+        builder.emitByteOffsetPointer(module, destination, byteOffset, integerType, scalarPointer));
+    SLANG_RETURN_ON_FAIL(builder.emitStore(module, firstValue, scalarPointer, 4));
+    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
+    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
+    return SLANG_OK;
+}
+
+static SlangResult _buildByteOffsetPointerModule(
+    const NVVMIRBuilder& builder,
+    ComPtr<ISlangBlob>& outAssembly,
+    String& outAssemblyDiagnostics,
+    ComPtr<ISlangBlob>& outNVVMAssembly,
+    String& outNVVMAssemblyDiagnostics)
+{
+    outAssembly.setNull();
+    outAssemblyDiagnostics = String();
+    outNVVMAssembly.setNull();
+    outNVVMAssemblyDiagnostics = String();
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_RETURN_ON_FAIL(builder.createModule(toSlice("slang-nvvm-byte-offset"), scope.module));
+    SLANG_RETURN_ON_FAIL(_populateByteOffsetPointerKernel(builder, scope.module));
+    SLANG_RETURN_ON_FAIL(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        outAssembly,
+        outAssemblyDiagnostics));
+    SLANG_RETURN_ON_FAIL(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+        outNVVMAssembly,
+        outNVVMAssemblyDiagnostics));
     return SLANG_OK;
 }
 

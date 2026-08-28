@@ -38,10 +38,10 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
            api.emitLoad && api.emitStore && api.emitBranch && api.emitConditionalBranch &&
            api.getIntegerConstant && api.getFloatingPointConstant && api.emitPhi &&
            api.addPhiIncoming && api.emitCall && api.emitValueReturn && api.emitReturnVoid &&
-           api.emitPointerOffset && api.emitArrayElementPointer && api.emitStructFieldPointer &&
-           api.emitStructFieldValue && api.emitVectorConstruct && api.emitVectorElementExtract &&
-           api.emitRelaxedGlobalI32AtomicAdd && api.declareGlobalStorage &&
-           api.markFunctionAsKernel;
+           api.emitPointerOffset && api.emitByteOffsetPointer && api.emitArrayElementPointer &&
+           api.emitStructFieldPointer && api.emitStructFieldValue && api.emitVectorConstruct &&
+           api.emitVectorElementExtract && api.emitRelaxedGlobalI32AtomicAdd &&
+           api.declareGlobalStorage && api.markFunctionAsKernel;
 }
 
 static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI& api)
@@ -705,6 +705,22 @@ SlangResult NVVMIRBuilder::emitPointerOffset(
         return SLANG_E_UNINITIALIZED;
     const SlangNVVMResult result =
         m_construction.emitPointerOffset(module, basePointer, elementOffset, &outPointer);
+    return _validateHandleResult(result, outPointer);
+}
+
+SlangResult NVVMIRBuilder::emitByteOffsetPointer(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle basePointer,
+    SlangNVVMValueHandle byteOffset,
+    SlangNVVMTypeHandle resultPointeeType,
+    SlangNVVMValueHandle& outPointer) const
+{
+    outPointer = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    const SlangNVVMResult result =
+        m_construction
+            .emitByteOffsetPointer(module, basePointer, byteOffset, resultPointeeType, &outPointer);
     return _validateHandleResult(result, outPointer);
 }
 

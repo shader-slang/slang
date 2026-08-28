@@ -1567,6 +1567,48 @@ static SlangResult SLANG_NVVM_CALL _emitPointerOffset(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitByteOffsetPointer(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle basePointer,
+    SlangNVVMValueHandle byteOffset,
+    SlangNVVMTypeHandle resultPointeeType,
+    SlangNVVMValueHandle* outPointer)
+{
+    if (outPointer)
+        *outPointer = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmBasePointer = _getValue(basePointer);
+    llvm::Value* llvmByteOffset = _getValue(byteOffset);
+    llvm::Type* llvmResultPointeeType = _getType(resultPointeeType);
+    llvm::PointerType* basePointerType =
+        llvmBasePointer ? llvm::dyn_cast<llvm::PointerType>(llvmBasePointer->getType()) : nullptr;
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !outPointer || !insertionBlock || !basePointerType ||
+        basePointerType->isOpaque() || !_isNVVMAddressSpace(basePointerType->getAddressSpace()) ||
+        !llvmByteOffset || !llvm::isa<llvm::IntegerType>(llvmByteOffset->getType()) ||
+        !llvmResultPointeeType || &llvmResultPointeeType->getContext() != &state->context ||
+        !llvm::PointerType::isLoadableOrStorableType(llvmResultPointeeType) ||
+        !llvmResultPointeeType->isSized() ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmBasePointer) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmByteOffset))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    const unsigned addressSpace = basePointerType->getAddressSpace();
+    llvm::Type* byteType = llvm::Type::getInt8Ty(state->context);
+    llvm::PointerType* bytePointerType = llvm::PointerType::get(byteType, addressSpace);
+    llvm::Value* byteBasePointer = state->builder.CreateBitCast(llvmBasePointer, bytePointerType);
+    // A Slang byte offset does not establish LLVM's stronger inbounds provenance contract.
+    llvm::Value* byteAddress = state->builder.CreateGEP(byteType, byteBasePointer, llvmByteOffset);
+    llvm::PointerType* resultPointerType =
+        llvm::PointerType::get(llvmResultPointeeType, addressSpace);
+    llvm::Value* result = state->builder.CreateBitCast(byteAddress, resultPointerType);
+    *outPointer = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle baseArrayPointer,
@@ -2666,6 +2708,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitValueReturn = _emitValueReturn;
     api.emitReturnVoid = _emitReturnVoid;
     api.emitPointerOffset = _emitPointerOffset;
+    api.emitByteOffsetPointer = _emitByteOffsetPointer;
     api.emitArrayElementPointer = _emitArrayElementPointer;
     api.emitStructFieldPointer = _emitStructFieldPointer;
     api.emitStructFieldValue = _emitStructFieldValue;

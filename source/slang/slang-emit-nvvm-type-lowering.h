@@ -39,6 +39,9 @@ IRVectorType* asNVVMSupportedI32VectorType(
 /// Returns whether `type` is a selected scalar or established fixed integer vector.
 bool isNVVMSupportedNumericValueType(IRInst* type);
 
+/// Returns whether `type` is a core unsigned 32-bit byte-address scalar or vector value.
+bool isNVVMSupportedCoreByteAddressValueType(IRInst* type);
+
 /// Returns an exact nonempty struct whose fields are all selected scalar values.
 IRStructType* asNVVMSupportedScalarStructType(IRInst* type);
 

@@ -3389,7 +3389,7 @@ SLANG_UNIT_TEST(nvvmSlangReadOnlyByteAddressDataPointerIsInvariant)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-SLANG_UNIT_TEST(nvvmSlangRejectsDirectByteAddressLoadBeforeProviderMutation)
+SLANG_UNIT_TEST(nvvmSlangCoreByteAddressAccessUsesGenericByteOffsets)
 {
     _resetDirectNVVMFakes();
     {
@@ -3403,12 +3403,62 @@ SLANG_UNIT_TEST(nvvmSlangRejectsDirectByteAddressLoadBeforeProviderMutation)
         ComPtr<slang::IBlob> diagnostics;
         const SlangResult result = _compileSlangWithDirectNVVM(
             globalSession,
-            kDirectNVVMUnsupportedByteAddressLoadSource,
+            kDirectNVVMCoreByteAddressAccessSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitByteOffsetPointerCallCount == 3);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.byteOffsetPointerPointeeTypes[0] == _getFakeNVVMBuilderVectorType(4));
+        SLANG_CHECK(
+            gFakeNVVMBuilder.byteOffsetPointerPointeeTypes[1] == _getFakeNVVMBuilderIntegerType());
+        SLANG_CHECK(
+            gFakeNVVMBuilder.byteOffsetPointerPointeeTypes[2] == _getFakeNVVMBuilderIntegerType());
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.loadFlags[0] == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+        SLANG_CHECK(gFakeNVVMBuilder.loadFlags[1] == SLANG_NVVM_LOAD_FLAG_NONE);
+        // Generic byte-address legalization currently canonicalizes this source overload to the
+        // two-operand load form, whose remaining contract is four-byte alignment.
+        SLANG_CHECK(gFakeNVVMBuilder.loadAlignments[0] == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.loadAlignments[1] == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignments[0] == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignments[1] == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRejectsFloatByteAddressLoadBeforeProviderMutation)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMUnsupportedFloatByteAddressLoadSource,
             code,
             diagnostics);
         SLANG_CHECK(SLANG_FAILED(result));
         SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("byteAddressBufferLoad") >= 0);
+        SLANG_CHECK(_getBlobText(diagnostics).indexOf("core byte-address buffer access") >= 0);
         SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);

@@ -279,6 +279,14 @@ public:
         SlangNVVMValueHandle elementOffset,
         SlangNVVMValueHandle& outPointer) const;
 
+    /// Emits a non-inbounds byte offset and returns a pointer to `resultPointeeType`.
+    SlangResult emitByteOffsetPointer(
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle basePointer,
+        SlangNVVMValueHandle byteOffset,
+        SlangNVVMTypeHandle resultPointeeType,
+        SlangNVVMValueHandle& outPointer) const;
+
     /// Gets a fixed, nonempty array type with the requested element type.
     SlangResult getArrayType(
         SlangNVVMModuleHandle module,

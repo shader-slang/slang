@@ -4576,7 +4576,8 @@ comes from the producer view, not from reconstructing pointer qualifiers. The sh
 classifier now forwards through `getUntypedBufferPtr`, so a load rooted in a read-only
 `ByteAddressBuffer` receives the established invariant-load flag and emits `ld.global.nc.u32`.
 Direct preflight also rejects a store whose root is immutable before builder discovery. Direct
-`ByteAddressBuffer.Load/Store` instructions remain a separate E52017 byte-offset/alignment boundary.
+`ByteAddressBuffer.Load/Store` instructions remained a separate E52017 byte-offset/alignment
+boundary at the end of Slice 82.
 
 The existing buffer-pointer fixture passes its original CUDA/NVRTC lane, direct-libNVVM GPU
 comparison, and direct PTX check 3/3 with `11, 21, 31, 41, 102, 202, 302, 402`. Direct PTX contains
@@ -4584,6 +4585,49 @@ the 48-byte conventional parameter block, pointer loads at byte offsets 0, 16, a
 global loads, and two scalar global stores. CUDA 12.9 `ptxas -arch=sm_70` accepts that module and a
 separate read-only byte-address probe. Release host and isolated-provider builds pass, and the
 complete NVVM unit prefix passes 351/351.
+
+### Slice 83: Generic byte-address loads and stores
+
+Core `ByteAddressBuffer` and `RWByteAddressBuffer` accesses now compose from the raw-view
+representation instead of adding resource-specific provider callbacks. Exact forward-only builder
+ABI revision 8 adds one generic construction operation,
+`emitByteOffsetPointer(module, basePointer, byteOffset, resultPointeeType, outPointer)`. The LLVM
+provider preserves the base address space, casts to the corresponding `i8*`, applies a non-inbounds
+byte GEP, and casts to the requested typed pointer. This single operation covers scalar and vector
+pointees without recovering byte offsets from element arithmetic or encoding Slang resource kinds
+in the provider.
+
+The direct emitter accepts canonical unsigned `uint`, `uint2`, `uint3`, and `uint4` loads from
+read-only or read-write byte-address views and stores to read-write views. It extracts field zero of
+the established `{ uint addrspace(1)*, i64 }` view, applies the byte offset, and uses the ordinary
+typed load or store operation. Read-only loads receive `!invariant.load`; read-write loads do not.
+An omitted or zero alignment uses four bytes, while a retained positive power-of-two literal is
+forwarded exactly. The generic byte-address legalization used by the existing shader currently
+canonicalizes its aligned source overloads to two-operand loads, so those particular linked-IR
+loads carry only the four-byte contract.
+
+Consider this excerpt from `tests/compute/byte-address-buffer.slang`:
+
+```slang
+uint3 triple = inputBuffer.Load3(0);
+uint4 alignedQuad = inputBuffer.Load4Aligned(16, 16);
+outputBuffer.Store(val * 4, tmp);
+```
+
+The first two values remain canonical byte-address loads whose result type determines the typed
+pointer produced after the byte GEP. The store uses the same path with the read-write source view.
+The file's `void test(uint)` helper also exposed a pre-existing contract mismatch: helper signature
+preflight already admitted `void`, but return validation and emission still treated every helper
+return as a scalar. Void helpers now validate the canonical `void` literal and emit `ret void` at
+the shared helper-return boundary.
+
+The existing shader passes direct runtime comparison with both read-only and read-write input
+views plus its direct PTX lane 3/3, producing the established four output values. Direct PTX uses
+non-coherent global reads for the read-only view and a global scalar store; CUDA 12.9
+`ptxas -arch=sm_70` accepts both variants. Float, signed, narrow/wide, aggregate, matrix, status,
+atomic, and runtime-alignment byte-address accesses remain outside this core family and fail before
+provider discovery. Release host and isolated-provider builds pass, and the complete NVVM unit
+prefix passes 353/353.
 
 The following remain open until their named slice supplies evidence:
 

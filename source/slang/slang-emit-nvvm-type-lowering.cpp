@@ -102,6 +102,15 @@ bool isNVVMSupportedNumericValueType(IRInst* type)
            asNVVMSupportedI32VectorType(type);
 }
 
+bool isNVVMSupportedCoreByteAddressValueType(IRInst* type)
+{
+    if (isNVVMUnsignedI32Type(type))
+        return true;
+
+    bool isSigned = false;
+    return asNVVMSupportedI32VectorType(type, &isSigned) && !isSigned;
+}
+
 IRStructType* asNVVMSupportedScalarStructType(IRInst* type)
 {
     auto structType = as<IRStructType>(type);

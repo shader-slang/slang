@@ -222,6 +222,80 @@ bool _getNVVMRawBufferDataPointer(IRInst* inst, NVVMRawBufferDataPointer& outPoi
     return true;
 }
 
+struct NVVMByteAddressAccess
+{
+    IRInst* buffer = nullptr;
+    IRInst* byteOffset = nullptr;
+    IRInst* value = nullptr;
+    IRType* valueType = nullptr;
+    NVVMRawBufferType bufferType;
+    uint32_t alignment = 0;
+    bool isStore = false;
+};
+
+// Resolves the canonical core UInt/UInt2-4 byte-address load and store family. A zero or omitted
+// alignment carries the ordinary four-byte contract; an explicit alignment is a power-of-two
+// promise that can be forwarded unchanged to LLVM.
+bool _getNVVMByteAddressAccess(IRInst* inst, NVVMByteAddressAccess& outAccess)
+{
+    outAccess = {};
+    if (!inst)
+        return false;
+
+    const bool isLoad = inst->getOp() == kIROp_ByteAddressBufferLoad;
+    const bool isStore = inst->getOp() == kIROp_ByteAddressBufferStore;
+    if ((!isLoad && !isStore) ||
+        (isLoad && inst->getOperandCount() != 2 && inst->getOperandCount() != 3) ||
+        (isStore && inst->getOperandCount() != 4))
+    {
+        return false;
+    }
+
+    IRInst* buffer = inst->getOperand(0);
+    IRInst* byteOffset = inst->getOperand(1);
+    IRInst* alignmentOperand =
+        isLoad && inst->getOperandCount() == 2 ? nullptr : inst->getOperand(2);
+    IRInst* value = isStore ? inst->getOperand(3) : nullptr;
+    IRType* valueType = isStore && value ? value->getDataType() : inst->getDataType();
+    NVVMRawBufferType bufferType;
+    if (!buffer || !byteOffset || !isNVVMUnsignedI32Type(byteOffset->getDataType()) || !valueType ||
+        !isNVVMSupportedCoreByteAddressValueType(valueType) ||
+        !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
+        bufferType.kind != NVVMRawBufferKind::ByteAddress ||
+        (isStore && (bufferType.access != NVVMBufferAccess::ReadWrite ||
+                     !as<IRVoidType>(inst->getDataType()))))
+    {
+        return false;
+    }
+
+    uint32_t alignment = kNVVMScalar32Alignment;
+    if (alignmentOperand)
+    {
+        auto alignmentLiteral = as<IRIntLit>(alignmentOperand);
+        if (!alignmentLiteral || !isNVVMUnsignedI32Type(alignmentLiteral->getDataType()) ||
+            alignmentLiteral->getValue() < 0 || alignmentLiteral->getValue() > UINT32_MAX)
+        {
+            return false;
+        }
+        const uint32_t literalAlignment = uint32_t(alignmentLiteral->getValue());
+        if (literalAlignment)
+        {
+            if (literalAlignment & (literalAlignment - 1))
+                return false;
+            alignment = literalAlignment;
+        }
+    }
+
+    outAccess.buffer = buffer;
+    outAccess.byteOffset = byteOffset;
+    outAccess.value = value;
+    outAccess.valueType = valueType;
+    outAccess.bufferType = bufferType;
+    outAccess.alignment = alignment;
+    outAccess.isStore = isStore;
+    return true;
+}
+
 struct NVVMRawBufferElementPointer
 {
     IRInst* base = nullptr;
@@ -1059,6 +1133,24 @@ SlangResult _validateSelectedIntegerValue(
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
+// Checks a canonical UInt value, including its operation-defined 32-bit literal form.
+SlangResult _validateUnsignedI32Value(
+    CodeGenContext* codeGenContext,
+    IRInst* value,
+    IRInst* consumer,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree,
+    UnownedStringSlice diagnosticRole)
+{
+    if (!value || !isNVVMUnsignedI32Type(value->getDataType()))
+        return _diagnoseUnsupportedIR(codeGenContext, diagnosticRole);
+    if (_asExecutableInteger32Constant(value))
+    {
+        return SLANG_OK;
+    }
+    return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
+}
+
 // Checks a canonical UInt wave mask, including its operation-defined 32-bit literal form.
 SlangResult _validateWaveMaskValue(
     CodeGenContext* codeGenContext,
@@ -1067,13 +1159,13 @@ SlangResult _validateWaveMaskValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (!value || !isNVVMUnsignedI32Type(value->getDataType()))
-        return _diagnoseUnsupportedIR(codeGenContext, toSlice("wave mask value"));
-    if (_asExecutableInteger32Constant(value))
-    {
-        return SLANG_OK;
-    }
-    return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
+    return _validateUnsignedI32Value(
+        codeGenContext,
+        value,
+        consumer,
+        availableValues,
+        dominatorTree,
+        toSlice("wave mask value"));
 }
 
 // Checks transport of a canonical Boolean value or materializes its literal through i1.
@@ -1778,6 +1870,19 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_ByteAddressBufferLoad:
+            case kIROp_ByteAddressBufferStore:
+                {
+                    NVVMByteAddressAccess access;
+                    if (!_getNVVMByteAddressAccess(inst, access))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("core byte-address buffer access"));
+                    }
+                }
+                break;
+
             case kIROp_FieldExtract:
                 {
                     NVVMStructField field;
@@ -2200,6 +2305,40 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_ByteAddressBufferLoad:
+            case kIROp_ByteAddressBufferStore:
+                {
+                    NVVMByteAddressAccess access;
+                    SLANG_RELEASE_ASSERT(_getNVVMByteAddressAccess(inst, access));
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        access.buffer,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    SLANG_RETURN_ON_FAIL(_validateUnsignedI32Value(
+                        codeGenContext,
+                        access.byteOffset,
+                        inst,
+                        availableValues,
+                        dominatorTree,
+                        toSlice("byte-address offset")));
+                    if (access.isStore)
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateNumericValue(
+                            codeGenContext,
+                            access.value,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                    }
+                    else
+                    {
+                        availableValues.add(inst);
+                    }
+                }
+                break;
+
             case kIROp_RWStructuredBufferGetElementPtr:
                 {
                     IRInst* buffer = inst->getOperand(0);
@@ -2253,7 +2392,16 @@ SlangResult _validateNVVMFunction(
                                 codeGenContext,
                                 toSlice("helper return type"));
                         }
-                        if (isNVVMBoolType(returnInst->getVal()->getDataType()))
+                        if (as<IRVoidType>(function->getResultType()))
+                        {
+                            if (returnInst->getVal()->getOp() != kIROp_VoidLit)
+                            {
+                                return _diagnoseUnsupportedIR(
+                                    codeGenContext,
+                                    toSlice("void helper return"));
+                            }
+                        }
+                        else if (isNVVMBoolType(returnInst->getVal()->getDataType()))
                         {
                             SLANG_RETURN_ON_FAIL(_validateBooleanValue(
                                 codeGenContext,
@@ -3544,6 +3692,97 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_ByteAddressBufferLoad:
+                case kIROp_ByteAddressBufferStore:
+                    {
+                        NVVMByteAddressAccess access;
+                        SLANG_RELEASE_ASSERT(_getNVVMByteAddressAccess(inst, access));
+
+                        SlangNVVMValueHandle loweredBuffer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            access.buffer,
+                            valueMap,
+                            typeContext,
+                            loweredBuffer));
+                        SlangNVVMValueHandle loweredDataPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw byte-address buffer data pointer",
+                            builder.emitStructFieldValue(
+                                moduleScope.module,
+                                loweredBuffer,
+                                0,
+                                loweredDataPointer)));
+
+                        SlangNVVMValueHandle loweredByteOffset = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            access.byteOffset,
+                            valueMap,
+                            typeContext,
+                            loweredByteOffset));
+                        SlangNVVMTypeHandle loweredValueType = nullptr;
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            access.valueType,
+                            NVVMTypeUse::Value,
+                            loweredValueType));
+                        SlangNVVMValueHandle loweredValuePointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw byte-address buffer byte offset",
+                            builder.emitByteOffsetPointer(
+                                moduleScope.module,
+                                loweredDataPointer,
+                                loweredByteOffset,
+                                loweredValueType,
+                                loweredValuePointer)));
+
+                        if (access.isStore)
+                        {
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                access.value,
+                                valueMap,
+                                typeContext,
+                                loweredValue));
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "raw byte-address buffer store",
+                                builder.emitStore(
+                                    moduleScope.module,
+                                    loweredValue,
+                                    loweredValuePointer,
+                                    access.alignment)));
+                        }
+                        else
+                        {
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            const SlangNVVMLoadFlags flags =
+                                access.bufferType.access == NVVMBufferAccess::ReadOnly
+                                    ? SLANG_NVVM_LOAD_FLAG_INVARIANT
+                                    : SLANG_NVVM_LOAD_FLAG_NONE;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "raw byte-address buffer load",
+                                builder.emitLoad(
+                                    moduleScope.module,
+                                    loweredValuePointer,
+                                    access.alignment,
+                                    flags,
+                                    loweredValue)));
+                            valueMap[inst] = loweredValue;
+                        }
+                    }
+                    break;
+
                 case kIROp_RWStructuredBufferGetElementPtr:
                     {
                         SlangNVVMValueHandle loweredBuffer = nullptr;
@@ -3587,7 +3826,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     break;
 
                 case kIROp_Return:
-                    if (function == entryPoint)
+                    if (function == entryPoint || as<IRVoidType>(function->getResultType()))
                     {
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,

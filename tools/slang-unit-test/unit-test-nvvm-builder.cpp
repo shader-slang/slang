@@ -122,8 +122,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->getStructType != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->declareGlobalStorage != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
+        SLANG_CHECK(builder.getConstructionAPI()->emitByteOffsetPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=7") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=8") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -195,6 +196,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderRequiresCompleteCurrentInterfaces)
 
     _resetDirectNVVMFakes();
     gFakeNVVMBuilder.construction.emitVectorConstruct = nullptr;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+    }
+
+    _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.construction.emitByteOffsetPointer = nullptr;
     {
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
         NVVMIRBuilder builder;
@@ -3866,7 +3875,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarFunctionOperations)
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("ret void")) == 1);
 }
 
-SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerOffsetOperations)
+SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerAddressingOperations)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
@@ -3991,12 +4000,26 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerOffsetOperations)
             builder.emitPointerOffset(targetModule, base, offset, rejected) == SLANG_E_INVALID_ARG);
         SLANG_CHECK(rejected == nullptr);
     };
+    auto expectRejectedByteOffset = [&](SlangNVVMModuleHandle targetModule,
+                                        SlangNVVMValueHandle base,
+                                        SlangNVVMValueHandle offset,
+                                        SlangNVVMTypeHandle pointeeType)
+    {
+        SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitByteOffsetPointer(targetModule, base, offset, pointeeType, rejected) ==
+            SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejected == nullptr);
+    };
 
     // No insertion point and module ownership failures must be rejected before any instruction is
     // created or a function is inferred from the values.
     expectRejectedOffset(module.module, destination, index);
     expectRejectedOffset(nullptr, destination, index);
     expectRejectedOffset(foreignModule.module, destination, index);
+    expectRejectedByteOffset(module.module, destination, index, integerType);
+    expectRejectedByteOffset(nullptr, destination, index, integerType);
+    expectRejectedByteOffset(foreignModule.module, destination, index, integerType);
 
     SlangNVVMBlockHandle entryBlock = nullptr;
     SlangNVVMBlockHandle producerBlock = nullptr;
@@ -4038,6 +4061,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerOffsetOperations)
     SLANG_CHECK(
         builder.getConstructionAPI()
             ->emitPointerOffset(module.module, destination, index, nullptr) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(
+        builder.getConstructionAPI()
+            ->emitByteOffsetPointer(module.module, destination, index, integerType, nullptr) ==
+        SLANG_E_INVALID_ARG);
     expectRejectedOffset(module.module, index, index);
     expectRejectedOffset(module.module, destination, source);
     expectRejectedOffset(module.module, foreignPointer, index);
@@ -4046,6 +4073,16 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerOffsetOperations)
     expectRejectedOffset(module.module, destination, otherIndex);
     expectRejectedOffset(module.module, producerPointer, index);
     expectRejectedOffset(module.module, destination, producerInteger);
+    expectRejectedByteOffset(module.module, index, index, integerType);
+    expectRejectedByteOffset(module.module, destination, source, integerType);
+    expectRejectedByteOffset(module.module, foreignPointer, index, integerType);
+    expectRejectedByteOffset(module.module, destination, foreignIndex, integerType);
+    expectRejectedByteOffset(module.module, otherDestination, index, integerType);
+    expectRejectedByteOffset(module.module, destination, otherIndex, integerType);
+    expectRejectedByteOffset(module.module, producerPointer, index, integerType);
+    expectRejectedByteOffset(module.module, destination, producerInteger, integerType);
+    expectRejectedByteOffset(module.module, destination, index, foreignIntegerType);
+    expectRejectedByteOffset(module.module, destination, index, voidType);
 
     SlangNVVMValueHandle consumerPointer = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -4055,6 +4092,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerOffsetOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, mergeBlock)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
     expectRejectedOffset(module.module, destination, index);
+    expectRejectedByteOffset(module.module, destination, index, integerType);
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, otherBlock)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
@@ -5390,6 +5428,44 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsPointerOffsetKernel)
     SLANG_CHECK(
         ::memcmp(bitcodeBlob->getBufferPointer(), kBitcodeMagic, SLANG_COUNT_OF(kBitcodeMagic)) ==
         0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsByteOffsetPointerKernel)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.isInitialized());
+
+    ComPtr<ISlangBlob> assemblyBlob;
+    ComPtr<ISlangBlob> nvvmAssemblyBlob;
+    String assemblyDiagnostics = "stale assembly diagnostics";
+    String nvvmAssemblyDiagnostics = "stale NVVM assembly diagnostics";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_buildByteOffsetPointerModule(
+        builder,
+        assemblyBlob,
+        assemblyDiagnostics,
+        nvvmAssemblyBlob,
+        nvvmAssemblyDiagnostics)));
+    SLANG_CHECK_ABORT(assemblyBlob != nullptr);
+    SLANG_CHECK_ABORT(nvvmAssemblyBlob != nullptr);
+    SLANG_CHECK(assemblyDiagnostics.getLength() == 0);
+    SLANG_CHECK(nvvmAssemblyDiagnostics.getLength() == 0);
+
+    const String assembly = _getBlobText(assemblyBlob);
+    const String nvvmAssembly = _getBlobText(nvvmAssemblyBlob);
+    SLANG_CHECK(assembly.indexOf("define void @copyByteOffset(i32 addrspace(1)*") >= 0);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("to i8 addrspace(1)*")) == 2);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("getelementptr i8")) == 2);
+    SLANG_CHECK(assembly.indexOf("getelementptr inbounds") < 0);
+    SLANG_CHECK(assembly.indexOf("to <4 x i32> addrspace(1)*") >= 0);
+    SLANG_CHECK(assembly.indexOf("load <4 x i32>") >= 0);
+    SLANG_CHECK(assembly.indexOf("!invariant.load") >= 0);
+    SLANG_CHECK(assembly.indexOf("store i32") >= 0);
+    SLANG_CHECK(assembly.indexOf("align 16") >= 0);
+    SLANG_CHECK(assembly.indexOf("align 4") >= 0);
+    SLANG_CHECK(assembly.indexOf("addrspacecast") < 0);
+    SLANG_CHECK(nvvmAssembly.indexOf("getelementptr i8") >= 0);
+    SLANG_CHECK(nvvmAssembly.indexOf("i32 addrspace(1)*") >= 0);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsArrayElementKernel)

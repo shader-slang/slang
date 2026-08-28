@@ -27,6 +27,7 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/cuda/param-block-alignment.slang` | NVRTC + direct NVVM runtime | Pass | A scalar uniform, flat scalar parameter block, resource view, and folded layout queries produce identical results; direct PTX passes `ptxas` |
 | `tests/cuda/cuda-kernel-param-layout.slang` | NVRTC + direct NVVM runtime | Pass | A flat by-value scalar struct, read-only and read-write float resource views, and scalar count produce `11, 12, 13, 14`; direct PTX preserves the launch layout and passes `ptxas` |
 | `tests/cuda/get-buffer-ptr.slang` | NVRTC + direct NVVM runtime | Pass | Structured and byte-address data-pointer extraction composes through generic field extraction and scalar pointer offsets; all eight values agree and direct PTX passes `ptxas` |
+| `tests/compute/byte-address-buffer.slang` | CUDA/NVRTC + direct NVVM runtime | Pass | Core UInt/UInt2-4 byte-address loads and UInt store pass for read-only and read-write inputs; direct PTX passes `ptxas` |
 
 Slices 69 and 70 consolidated the implementation onto one exact forward-only builder ABI and one
 typed-descriptor capability system. Older rows below retain the interface names that described the
@@ -347,7 +348,9 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangRawBufferDataPointersUseGenericPipeline` | Three structured/byte-address views expose field zero, three ordinary scalar pointer offsets feed two loads and one store, and no fixed-array or resource-specific provider operation is used | Pass |
 | `slang-unit-test-tool/nvvmSlangReadOnlyByteAddressDataPointerIsInvariant` | A read-only byte-address producer retains immutable-root semantics through its ordinary pointer result, producing one invariant load and one mutable destination store | Pass |
 | `slang-unit-test-tool/nvvmSlangRejectsReadOnlyByteAddressDataPointerStoreBeforeProviderMutation` | A store rooted in a read-only byte-address producer reaches E52017 before builder discovery or mutation even though the canonical escaped pointer type is ordinarily read-write-qualified | Pass |
-| `slang-unit-test-tool/nvvmSlangRejectsDirectByteAddressLoadBeforeProviderMutation` | Direct byte-address load keeps its distinct byte-offset/alignment operation boundary and reaches E52017 before builder discovery or mutation | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderBuildsByteOffsetPointerKernel` | Exact ABI revision 8 applies generic typed byte offsets to scalar and vector pointees, preserves address space and alignment, and emits verified normal and NVVM-2.0 assembly | Pass |
+| `slang-unit-test-tool/nvvmSlangCoreByteAddressAccessUsesGenericByteOffsets` | Read-only UInt4 and mutable UInt loads plus one UInt store use three generic byte-offset pointers; immutable flags and canonical alignment reach the fake provider exactly | Pass |
+| `slang-unit-test-tool/nvvmSlangRejectsFloatByteAddressLoadBeforeProviderMutation` | Float byte-address loading remains outside the core unsigned family and reaches E52017 before builder discovery or mutation | Pass |
 
 Slice 9 extends Bucket 2 through a finite DAG of canonical direct `IRFunc`
 callees with signed-i32 parameters/results and valued returns. Complex and aggregate types, pointer

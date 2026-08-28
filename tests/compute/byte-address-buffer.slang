@@ -14,8 +14,11 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -DRWBAB
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv -entry computeMain -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 // Confirm cross-compilation of `ByteAddressBuffer` and `RWByteAddressBuffer`.
 
@@ -104,3 +107,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint val = uint(tid);
     test(val);
 }
+
+// The read-only direct lane preserves invariant input loads as non-coherent global reads and
+// writes the four scalar results through the reconstructed RWByteAddressBuffer data pointer.
+// NVVM: .visible .const .align 8 .b8 SLANG_globalParams[32]
+// NVVM: .visible .entry computeMain()
+// NVVM: ld.global.nc.u32
+// NVVM: st.global.u32
