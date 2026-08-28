@@ -4545,6 +4545,46 @@ the signed `int2` entry exercises the same-width semantic conversion and lets NV
 unused y lane. CUDA 12.9 `ptxas` accepts both modules for `sm_70`; Release host and standalone
 provider builds pass; and the complete NVVM unit prefix passes 347/347.
 
+### Slice 82: Generic raw-buffer data pointers
+
+Exact default-layout structured buffers and byte-address buffers now share one raw CUDA view
+contract. A structured view selects its scalar element from the canonical resource type; a
+byte-address view selects `uint`. Read-only and read-write forms preserve distinct semantic access,
+while all four lower through the existing generic `{ T addrspace(1)*, i64 }` provider struct.
+
+Consider this example from `tests/cuda/get-buffer-ptr.slang`:
+
+```slang
+let sptr = __getStructuredBufferPtr(inputBuffer);
+outputBuffer[tid.x] = (*sptr)[tid.x] + 1;
+
+let bptr = __getByteAddressBufferPtr(inputBytes);
+outputBuffer[tid.x + 4] = int((*bptr)[tid.x]) + 2;
+```
+
+The linked IR keeps `getStructuredBufferPtr` and `getUntypedBufferPtr`, each followed by an
+ordinary unsized-array `getElementPtr`. Direct lowering extracts field zero of the resource view
+with generic struct-value extraction, represents the escaped array pointer physically as the
+existing global scalar pointer, and indexes it with the generic pointer-offset operation. An
+initial attempt to use fixed-array addressing was rejected by the provider because field zero is
+already a scalar pointer; that rejection confirmed that no LLVM unsized-array value or
+resource-specific builder operation belongs at this boundary. Builder ABI revision 7 is unchanged.
+
+Both core intrinsic overloads return the canonical ordinary read-write-qualified
+`Ptr<UnsizedArray<T>>`, including when the source resource is read-only. Resource access therefore
+comes from the producer view, not from reconstructing pointer qualifiers. The shared immutable-root
+classifier now forwards through `getUntypedBufferPtr`, so a load rooted in a read-only
+`ByteAddressBuffer` receives the established invariant-load flag and emits `ld.global.nc.u32`.
+Direct preflight also rejects a store whose root is immutable before builder discovery. Direct
+`ByteAddressBuffer.Load/Store` instructions remain a separate E52017 byte-offset/alignment boundary.
+
+The existing buffer-pointer fixture passes its original CUDA/NVRTC lane, direct-libNVVM GPU
+comparison, and direct PTX check 3/3 with `11, 21, 31, 41, 102, 202, 302, 402`. Direct PTX contains
+the 48-byte conventional parameter block, pointer loads at byte offsets 0, 16, and 32, two scalar
+global loads, and two scalar global stores. CUDA 12.9 `ptxas -arch=sm_70` accepts that module and a
+separate read-only byte-address probe. Release host and isolated-provider builds pass, and the
+complete NVVM unit prefix passes 351/351.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4553,11 +4593,12 @@ The following remain open until their named slice supplies evidence:
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
   global parameter fields beyond selected integer/float32 scalars, flat selected-scalar parameter
-  blocks and constant buffers, selected-scalar read-write structured buffers, and storage-only
-  sampler/unsized-sampler-array placeholders, and raw CUDA parameters beyond selected integer and
-  float32 scalars, flat selected-scalar by-value structs, selected numeric device pointers, fixed
-  i32 array pointers, signed-i32x2 device pointers, and selected-scalar raw read-only/read-write
-  structured buffers;
+  blocks and constant buffers, selected-scalar read-only/read-write structured buffers,
+  read-only/read-write byte-address buffers, and storage-only sampler/unsized-sampler-array
+  placeholders, and raw CUDA parameters beyond selected integer and float32 scalars, flat
+  selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
+  signed-i32x2 device pointers, and selected-scalar raw read-only/read-write structured and
+  byte-address buffers;
 - external/indirect calls, richer helper ABI, calling conventions and function attributes beyond
   no-inline, integer shifts/division/remainder, saturating or overflow-decorated arithmetic,
   float64/low-precision scalar families, and vector or matrix operations beyond bounded
@@ -4565,8 +4606,10 @@ The following remain open until their named slice supplies evidence:
   same-lane integer conversion;
 - pointer and runtime aggregate addressing beyond signed-i32 scalar offsets on selected numeric
   device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a flat
-  by-value entry struct, including other `IRGetElementPtr` shapes, array values, mutable structs,
-  general globals, additional shared-memory shapes, and address spaces;
+  by-value entry struct, plus direct scalar indexing of canonical structured/byte-address data
+  pointers, including other `IRGetElementPtr` shapes, pointer escape through helpers or SSA,
+  array values, mutable structs, general globals, additional shared-memory shapes, and address
+  spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;

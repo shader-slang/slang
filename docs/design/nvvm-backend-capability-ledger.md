@@ -26,6 +26,7 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/cuda/sampler-comparison-state-unused.slang` | CUDA source + NVRTC PTX + direct NVVM PTX | Pass | Multi-field sampler/resource storage has one shared 40-byte ABI; direct PTX passes `ptxas` |
 | `tests/cuda/param-block-alignment.slang` | NVRTC + direct NVVM runtime | Pass | A scalar uniform, flat scalar parameter block, resource view, and folded layout queries produce identical results; direct PTX passes `ptxas` |
 | `tests/cuda/cuda-kernel-param-layout.slang` | NVRTC + direct NVVM runtime | Pass | A flat by-value scalar struct, read-only and read-write float resource views, and scalar count produce `11, 12, 13, 14`; direct PTX preserves the launch layout and passes `ptxas` |
+| `tests/cuda/get-buffer-ptr.slang` | NVRTC + direct NVVM runtime | Pass | Structured and byte-address data-pointer extraction composes through generic field extraction and scalar pointer offsets; all eight values agree and direct PTX passes `ptxas` |
 
 Slices 69 and 70 consolidated the implementation onto one exact forward-only builder ABI and one
 typed-descriptor capability system. Older rows below retain the interface names that described the
@@ -343,6 +344,10 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangMixedNumericDifferentialPTX` | Raw signed/unsigned 8/16/64-bit scalars, float32, eight numeric pointers, explicit conversions, signed/unsigned branches, and signed-i32x2 load/add/store compile through both routes | Pass |
 | `slang-unit-test-tool/nvvmSlangMixedNumericPtxasAccepts` | CUDA 12.9 `ptxas` accepts direct NVVM and NVRTC PTX for the representative mixed-width/vector workload | Pass |
 | `slang-unit-test-tool/nvvmSlangMixedNumericRuntimeMatchesNVRTC` | One RTX 5090 thread exercises narrow wrapping/bitwise results, i64 arithmetic, signed/unsigned comparisons, float/integer conversions, and both int2 lanes identically through direct NVVM and NVRTC | Pass |
+| `slang-unit-test-tool/nvvmSlangRawBufferDataPointersUseGenericPipeline` | Three structured/byte-address views expose field zero, three ordinary scalar pointer offsets feed two loads and one store, and no fixed-array or resource-specific provider operation is used | Pass |
+| `slang-unit-test-tool/nvvmSlangReadOnlyByteAddressDataPointerIsInvariant` | A read-only byte-address producer retains immutable-root semantics through its ordinary pointer result, producing one invariant load and one mutable destination store | Pass |
+| `slang-unit-test-tool/nvvmSlangRejectsReadOnlyByteAddressDataPointerStoreBeforeProviderMutation` | A store rooted in a read-only byte-address producer reaches E52017 before builder discovery or mutation even though the canonical escaped pointer type is ordinarily read-write-qualified | Pass |
+| `slang-unit-test-tool/nvvmSlangRejectsDirectByteAddressLoadBeforeProviderMutation` | Direct byte-address load keeps its distinct byte-offset/alignment operation boundary and reaches E52017 before builder discovery or mutation | Pass |
 
 Slice 9 extends Bucket 2 through a finite DAG of canonical direct `IRFunc`
 callees with signed-i32 parameters/results and valued returns. Complex and aggregate types, pointer
@@ -1474,3 +1479,26 @@ direct PTX checks for the unsigned and signed two-lane entries. The unsigned mod
 `%ctaid`, `%ntid`, and `%tid` in both x and y; both modules retain immutable global loads and global
 stores. CUDA 12.9 `ptxas -arch=sm_70` accepts both. Release host and isolated-provider builds pass,
 and the complete NVVM prefix passes 347/347.
+
+Slice 82 consolidates exact default-layout structured and byte-address resource views under one
+raw-buffer descriptor. Structured resources select an admitted scalar `T`; byte-address resources
+select `uint`; read-only and read-write access remains attached to the source view. All four use the
+existing unpacked global-pointer/count provider struct, so builder ABI revision 7 is unchanged.
+
+The canonical `getStructuredBufferPtr` and `getUntypedBufferPtr` producers return ordinary
+read-write-qualified pointers to unsized arrays. Direct lowering does not infer resource access
+from that pointer spelling: it validates the exact producer/resource/element relation, extracts
+view field zero with generic struct-value extraction, represents the result physically as the
+existing scalar global pointer, and lowers its direct `getElementPtr` consumer with generic pointer
+offsetting. Fixed-array GEP correctly rejected that scalar base during development and is not used.
+
+The shared immutable-location classifier now forwards through `getUntypedBufferPtr`. A read-only
+byte-address load consequently receives invariant metadata and emits `ld.global.nc.u32`, while a
+store rooted in the same read-only resource stops before provider discovery. Direct
+`ByteAddressBuffer.Load/Store` remain a separate E52017 operation family.
+
+`tests/cuda/get-buffer-ptr.slang` passes all three registered lanes with
+`11, 21, 31, 41, 102, 202, 302, 402`. Direct PTX contains the 48-byte global parameter block,
+loads view pointers at byte offsets 0, 16, and 32, then performs two global scalar loads and two
+stores. CUDA 12.9 `ptxas -arch=sm_70` accepts that module and a separate read-only probe. Release
+host and isolated-provider builds pass, and the complete NVVM prefix passes 351/351.

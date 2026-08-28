@@ -75,18 +75,45 @@ IRGlobalVar* asNVVMSupportedSharedI32ArrayGlobal(
 /// Returns the canonical shared-address-space pointer produced for one i32 array element.
 IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type);
 
-/// Describes which operations a canonical raw structured-buffer view permits.
-enum class NVVMStructuredBufferAccess
+/// Describes which operations a canonical raw buffer view permits.
+enum class NVVMBufferAccess
 {
     ReadOnly,
     ReadWrite,
 };
 
-/// Returns an exact raw CUDA structured-buffer view for a selected scalar `T`.
-IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawStructuredBufferType(
-    IRInst* type,
-    IRType** outElementType = nullptr,
-    NVVMStructuredBufferAccess* outAccess = nullptr);
+/// Identifies which canonical source family owns a raw buffer view.
+enum class NVVMRawBufferKind
+{
+    Structured,
+    ByteAddress,
+};
+
+/// Describes one exact raw CUDA buffer view and its physical scalar element.
+struct NVVMRawBufferType
+{
+    IRType* canonicalType = nullptr;
+    IRType* structuredElementType = nullptr;
+    NVVMRawBufferKind kind = NVVMRawBufferKind::Structured;
+    NVVMBufferAccess access = NVVMBufferAccess::ReadOnly;
+};
+
+/// Resolves an exact structured or byte-address raw CUDA buffer view.
+bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType);
+
+/// Returns whether `elementType` is the physical scalar selected by `bufferType`.
+bool isNVVMRawBufferElementType(const NVVMRawBufferType& bufferType, IRType* elementType);
+
+/// Describes the exact pointer-to-unsized-array spelling produced for raw buffer data.
+struct NVVMBufferDataPointerType
+{
+    IRPtrTypeBase* pointerType = nullptr;
+    IRUnsizedArrayType* arrayType = nullptr;
+    IRType* elementType = nullptr;
+};
+
+/// Resolves an exact selected-scalar raw-buffer data pointer.
+bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerType& outType);
 
 /// Returns an accepted storage-only CUDA sampler placeholder.
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type);
@@ -153,9 +180,7 @@ private:
 
     SlangResult _lowerArrayType(IRArrayType* type, SlangNVVMTypeHandle& outType);
     SlangResult _lowerStructType(IRStructType* type, SlangNVVMTypeHandle& outType);
-    SlangResult _lowerRawStructuredBufferType(
-        IRHLSLStructuredBufferTypeBase* type,
-        SlangNVVMTypeHandle& outType);
+    SlangResult _lowerRawBufferType(const NVVMRawBufferType& type, SlangNVVMTypeHandle& outType);
     SlangResult _lowerScalarParameterGroupType(
         IRParameterGroupType* type,
         IRStructType* elementType,

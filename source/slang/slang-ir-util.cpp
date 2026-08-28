@@ -3113,6 +3113,7 @@ bool isPointerToImmutableLocation(IRInst* loc)
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
+    case kIROp_GetUntypedBufferPtr:
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
         return isPointerToImmutableLocation(loc->getOperand(0));

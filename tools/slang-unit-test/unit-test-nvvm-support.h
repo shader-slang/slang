@@ -8341,6 +8341,47 @@ void computeMain(RWStructuredBuffer<double> destination, uniform int index)
     destination[index] = 42.0;
 }
 )";
+static const char kDirectNVVMRawBufferDataPointerSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    RWStructuredBuffer<int> structuredSource,
+    RWByteAddressBuffer byteSource,
+    RWStructuredBuffer<int> destination,
+    uniform uint index)
+{
+    let structuredPointer = __getStructuredBufferPtr(structuredSource);
+    let bytePointer = __getByteAddressBufferPtr(byteSource);
+    destination[index] = (*structuredPointer)[index] + int((*bytePointer)[index]);
+}
+)";
+static const char kDirectNVVMReadOnlyByteAddressDataPointerSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    ByteAddressBuffer source,
+    RWStructuredBuffer<uint> destination,
+    uniform uint index)
+{
+    let sourcePointer = __getByteAddressBufferPtr(source);
+    destination[index] = (*sourcePointer)[index];
+}
+)";
+static const char kDirectNVVMReadOnlyByteAddressStoreSource[] = R"(
+[CUDAKernel]
+void computeMain(ByteAddressBuffer source, uniform uint index)
+{
+    let sourcePointer = __getByteAddressBufferPtr(source);
+    (*sourcePointer)[index] = 42;
+}
+)";
+static const char kDirectNVVMUnsupportedByteAddressLoadSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    RWByteAddressBuffer source,
+    uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> destination)
+{
+    destination[0] = source.Load(0);
+}
+)";
 static const char kDirectNVVMAggregateAndReadOnlyResourceSource[] = R"(
 struct Padding
 {

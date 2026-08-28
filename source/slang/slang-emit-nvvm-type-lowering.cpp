@@ -299,34 +299,74 @@ static bool _isNVVMSupportedResourceElementType(IRInst* type)
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type);
 }
 
-IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawStructuredBufferType(
-    IRInst* type,
-    IRType** outElementType,
-    NVVMStructuredBufferAccess* outAccess)
+bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType)
 {
-    if (outElementType)
-        *outElementType = nullptr;
-    if (outAccess)
-        *outAccess = NVVMStructuredBufferAccess::ReadOnly;
+    outType = {};
 
     auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-    if (!bufferType ||
-        (bufferType->getOp() != kIROp_HLSLStructuredBufferType &&
-         bufferType->getOp() != kIROp_HLSLRWStructuredBufferType) ||
-        bufferType->getOperandCount() != 3 ||
-        !_isNVVMSupportedResourceElementType(bufferType->getElementType()))
+    if (bufferType &&
+        (bufferType->getOp() == kIROp_HLSLStructuredBufferType ||
+         bufferType->getOp() == kIROp_HLSLRWStructuredBufferType) &&
+        bufferType->getOperandCount() == 3 &&
+        _isNVVMSupportedResourceElementType(bufferType->getElementType()))
     {
-        return nullptr;
+        IRType* dataLayout = bufferType->getDataLayout();
+        if (!dataLayout || dataLayout->getOp() != kIROp_DefaultBufferLayoutType)
+            return false;
+        outType.canonicalType = bufferType;
+        outType.structuredElementType = bufferType->getElementType();
+        outType.kind = NVVMRawBufferKind::Structured;
+        outType.access = bufferType->getOp() == kIROp_HLSLRWStructuredBufferType
+                             ? NVVMBufferAccess::ReadWrite
+                             : NVVMBufferAccess::ReadOnly;
+        return true;
     }
 
-    IRType* dataLayout = bufferType->getDataLayout();
-    if (!dataLayout || dataLayout->getOp() != kIROp_DefaultBufferLayoutType)
-        return nullptr;
-    if (outElementType)
-        *outElementType = bufferType->getElementType();
-    if (outAccess && bufferType->getOp() == kIROp_HLSLRWStructuredBufferType)
-        *outAccess = NVVMStructuredBufferAccess::ReadWrite;
-    return bufferType;
+    auto byteAddressType = as<IRByteAddressBufferTypeBase>(type);
+    if (!byteAddressType || byteAddressType->getOperandCount() != 0 ||
+        (byteAddressType->getOp() != kIROp_HLSLByteAddressBufferType &&
+         byteAddressType->getOp() != kIROp_HLSLRWByteAddressBufferType))
+    {
+        return false;
+    }
+
+    outType.canonicalType = byteAddressType;
+    outType.kind = NVVMRawBufferKind::ByteAddress;
+    outType.access = byteAddressType->getOp() == kIROp_HLSLRWByteAddressBufferType
+                         ? NVVMBufferAccess::ReadWrite
+                         : NVVMBufferAccess::ReadOnly;
+    return true;
+}
+
+bool isNVVMRawBufferElementType(const NVVMRawBufferType& bufferType, IRType* elementType)
+{
+    return bufferType.kind == NVVMRawBufferKind::ByteAddress
+               ? isNVVMUnsignedI32Type(elementType)
+               : isTypeEqual(bufferType.structuredElementType, elementType);
+}
+
+bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerType& outType)
+{
+    outType = {};
+    auto pointerType = as<IRPtrTypeBase>(type);
+    auto arrayType = pointerType ? as<IRUnsizedArrayType>(pointerType->getValueType()) : nullptr;
+    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    if (!pointerType || pointerType->getOp() != kIROp_PtrType ||
+        pointerType->getOperandCount() != 4 || !arrayType || arrayType->getOperandCount() != 1 ||
+        !_isNVVMSupportedResourceElementType(arrayType->getElementType()) ||
+        pointerType->getAddressSpace() != AddressSpace::UserPointer || !dataLayout ||
+        dataLayout->getOp() != kIROp_DefaultBufferLayoutType)
+    {
+        return false;
+    }
+
+    if (pointerType->getAccessQualifier() != AccessQualifier::ReadWrite)
+        return false;
+
+    outType.pointerType = pointerType;
+    outType.arrayType = arrayType;
+    outType.elementType = arrayType->getElementType();
+    return true;
 }
 
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type)
@@ -366,9 +406,10 @@ IRParameterGroupType* asNVVMSupportedScalarParameterGroupType(
 
 bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type)
 {
+    NVVMRawBufferType rawBufferType;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedScalarParameterGroupType(type) ||
-           asNVVMSupportedRawStructuredBufferType(type) ||
+           getNVVMSupportedRawBufferType(type, rawBufferType) ||
            asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type);
 }
@@ -390,10 +431,11 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
 
 bool isNVVMSupportedParameterType(IRInst* type)
 {
+    NVVMRawBufferType rawBufferType;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedScalarStructType(type) || asNVVMSupportedDeviceNumericPointerType(type) ||
            asNVVMSupportedDeviceArrayPointerType(type) ||
-           asNVVMSupportedRawStructuredBufferType(type);
+           getNVVMSupportedRawBufferType(type, rawBufferType);
 }
 
 SlangResult NVVMTypeLoweringContext::_requireBuilderOperation(
@@ -512,19 +554,28 @@ SlangResult NVVMTypeLoweringContext::_lowerUnsizedSamplerArrayStorageType(
     return SLANG_OK;
 }
 
-SlangResult NVVMTypeLoweringContext::_lowerRawStructuredBufferType(
-    IRHLSLStructuredBufferTypeBase* type,
+SlangResult NVVMTypeLoweringContext::_lowerRawBufferType(
+    const NVVMRawBufferType& type,
     SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
-    IRType* elementType = nullptr;
-    SLANG_RELEASE_ASSERT(asNVVMSupportedRawStructuredBufferType(type, &elementType));
+    SLANG_RELEASE_ASSERT(type.canonicalType);
 
     SlangNVVMTypeHandle loweredElementType = nullptr;
-    SLANG_RETURN_ON_FAIL(lowerType(elementType, NVVMTypeUse::Value, loweredElementType));
+    if (type.kind == NVVMRawBufferKind::ByteAddress)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "raw byte-address-buffer element type",
+            m_builder.getIntegerType(m_module, 32, loweredElementType)));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(
+            lowerType(type.structuredElementType, NVVMTypeUse::Value, loweredElementType));
+    }
     SlangNVVMTypeHandle dataPointerType = nullptr;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        "raw RWStructuredBuffer data-pointer type",
+        "raw buffer data-pointer type",
         m_builder.getPointerType(
             m_module,
             loweredElementType,
@@ -532,13 +583,13 @@ SlangResult NVVMTypeLoweringContext::_lowerRawStructuredBufferType(
             dataPointerType)));
     SlangNVVMTypeHandle countType = nullptr;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        "raw RWStructuredBuffer count type",
+        "raw buffer count type",
         m_builder.getIntegerType(m_module, 64, countType)));
     const SlangNVVMTypeHandle fieldTypes[] = {dataPointerType, countType};
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        "raw RWStructuredBuffer view type",
+        "raw buffer view type",
         m_builder.getStructType(m_module, fieldTypes, SLANG_COUNT_OF(fieldTypes), outType)));
-    m_typeMap[type] = outType;
+    m_typeMap[type.canonicalType] = outType;
     return SLANG_OK;
 }
 
@@ -636,7 +687,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRArrayType* deviceArrayType = nullptr;
     IRPtrTypeBase* deviceArrayPointer =
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
-    IRHLSLStructuredBufferTypeBase* rawResource = asNVVMSupportedRawStructuredBufferType(type);
+    NVVMRawBufferType rawBufferType;
+    const bool isRawBuffer = getNVVMSupportedRawBufferType(type, rawBufferType);
+    NVVMBufferDataPointerType bufferDataPointerType;
+    const bool isBufferDataPointer =
+        getNVVMSupportedBufferDataPointerType(type, bufferDataPointerType);
     IRStructType* parameterGroupElementType = nullptr;
     IRParameterGroupType* parameterGroup =
         asNVVMSupportedScalarParameterGroupType(type, &parameterGroupElementType);
@@ -656,14 +711,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
          (isVoid || isInteger || isFloat32 || isBool || isExecutionVector)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
-          deviceArrayPointer || rawResource)) ||
+          deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter && (isInteger || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloat32 || isBool || integerVectorType || scalarStructType ||
-          fixedArrayType || deviceNumericPointer || deviceArrayPointer || rawResource ||
-          parameterGroup || resourceElementPointer || sharedElementPointer)) ||
+          fixedArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
+          isBufferDataPointer || parameterGroup || resourceElementPointer ||
+          sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
-         (isInteger || isFloat32 || structType || rawResource || parameterGroup || samplerStorage ||
+         (isInteger || isFloat32 || structType || isRawBuffer || parameterGroup || samplerStorage ||
           unsizedSamplerArrayStorage));
     if (!isLegal)
         return _reportUnsupportedType(use);
@@ -744,9 +800,17 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     {
         return _lowerPointerType(type, deviceArrayType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL, outType);
     }
-    else if (rawResource)
+    else if (isRawBuffer)
     {
-        return _lowerRawStructuredBufferType(rawResource, outType);
+        return _lowerRawBufferType(rawBufferType, outType);
+    }
+    else if (isBufferDataPointer)
+    {
+        return _lowerPointerType(
+            type,
+            bufferDataPointerType.elementType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            outType);
     }
     else if (parameterGroup)
     {
