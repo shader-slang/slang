@@ -161,8 +161,9 @@ void ReplayContext::destroySingleton()
         // so a concurrent destroySingleton() sees null and does not drain or
         // delete the same context a second time.
         //
-        // Teardown is single-threaded: the context's own maps take no locks, so
-        // concurrent use of one context is already outside this code's model.
+        // Teardown is single-threaded, so the map mutations it triggers (e.g.
+        // unregisterProxy, which self-locks m_mutex) run uncontended; concurrent
+        // use of one context is already outside this code's model.
         // Only the caller that actually claims the instance may touch
         // s_contextDraining; guarding the write on `toDelete` keeps a stray
         // concurrent no-op caller from clobbering the owner's draining pointer
@@ -249,16 +250,18 @@ ReplayContext::~ReplayContext()
 
 void ReplayContext::ensureInitialized()
 {
-    // Guard against re-entry and multiple initialization
-    if (m_initialized)
-        return;
-    m_initialized = true;
-
-    // Now it's safe to use file system operations (CharEncoding is initialized)
-    if (m_mode == Mode::Idle && isRecordLayerRequested())
-    {
-        setMode(Mode::Record);
-    }
+    // Deferred out of the constructor because CharEncoding (used by the file I/O
+    // that setMode(Record) triggers) may not be initialized at static-init time.
+    // call_once so the resolution is thread-safe on the mutex-free idle fast path.
+    std::call_once(
+        m_initFlag,
+        [this]()
+        {
+            if (m_mode == Mode::Idle && isRecordLayerRequested())
+            {
+                setMode(Mode::Record);
+            }
+        });
 }
 
 void ReplayContext::reset()
