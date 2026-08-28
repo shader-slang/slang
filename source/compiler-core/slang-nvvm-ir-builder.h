@@ -310,6 +310,14 @@ public:
         const UnownedStringSlice& name,
         SlangNVVMValueHandle& outStorage) const;
 
+    /// Constructs a fixed vector from its complete ordered scalar element sequence.
+    SlangResult emitVectorConstruct(
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle vectorType,
+        const SlangNVVMValueHandle* elements,
+        size_t elementCount,
+        SlangNVVMValueHandle& outValue) const;
+
     /// Extracts one statically selected element from a fixed vector.
     SlangResult emitVectorElementExtract(
         SlangNVVMModuleHandle module,

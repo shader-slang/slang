@@ -214,7 +214,11 @@ bool _getNVVMCUDAExecutionGlobalOperation(IRInst* inst, SlangNVVMValueOperation&
     auto globalParam = as<IRGlobalParam>(inst);
     auto targetIntrinsic =
         globalParam ? globalParam->findDecoration<IRTargetIntrinsicDecoration>() : nullptr;
-    if (!globalParam || !targetIntrinsic || !asNVVMSupportedUInt3Type(globalParam->getDataType()))
+    bool isSigned = false;
+    uint32_t elementCount = 0;
+    if (!globalParam || !targetIntrinsic ||
+        !asNVVMSupportedI32VectorType(globalParam->getDataType(), &isSigned, &elementCount) ||
+        isSigned || elementCount != 3)
         return false;
 
     const UnownedStringSlice definition = targetIntrinsic->getDefinition();
@@ -240,11 +244,16 @@ SlangNVVMValueOperationDesc _getNVVMCUDAExecutionGlobalOperationDesc(
 
 IRIntLit* _asExecutableInteger32Constant(IRInst* value);
 
-// Recognizes either canonical spelling produced for one CUDA execution-vector component.
-bool _getNVVMCUDAExecutionVectorElement(IRInst* inst, IRInst*& outBase, uint32_t& outElementIndex)
+struct NVVMVectorElement
 {
-    outBase = nullptr;
-    outElementIndex = 0;
+    IRInst* base = nullptr;
+    uint32_t index = 0;
+};
+
+// Resolves an exact constant-index scalar read from one accepted integer vector.
+bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
+{
+    outElement = {};
 
     IRInst* base = nullptr;
     IRIntLit* elementIndex = nullptr;
@@ -265,15 +274,100 @@ bool _getNVVMCUDAExecutionVectorElement(IRInst* inst, IRInst*& outBase, uint32_t
         return false;
     }
 
-    if (!isNVVMUnsignedI32Type(inst->getDataType()) ||
-        !asNVVMSupportedUInt3Type(base->getDataType()) || !elementIndex ||
-        elementIndex->getValue() < 0 || elementIndex->getValue() >= 3)
+    uint32_t baseElementCount = 0;
+    auto baseType = asNVVMSupportedI32VectorType(
+        base ? base->getDataType() : nullptr,
+        nullptr,
+        &baseElementCount);
+    if (!baseType || !isTypeEqual(inst->getDataType(), baseType->getElementType()) ||
+        !elementIndex || elementIndex->getValue() < 0 ||
+        elementIndex->getValue() >= baseElementCount)
     {
         return false;
     }
 
-    outBase = base;
-    outElementIndex = uint32_t(elementIndex->getValue());
+    outElement.base = base;
+    outElement.index = uint32_t(elementIndex->getValue());
+    return true;
+}
+
+struct NVVMVectorConstructElement
+{
+    IRInst* value = nullptr;
+    NVVMVectorElement extracted;
+};
+
+struct NVVMVectorConstruction
+{
+    IRVectorType* resultType = nullptr;
+    NVVMVectorConstructElement elements[4];
+    uint32_t elementCount = 0;
+};
+
+// Resolves the canonical flat constructor, scalar splat, or multi-lane swizzle of one accepted
+// integer vector. Every output lane retains its exact scalar value or base/index source.
+bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstruction)
+{
+    outConstruction = {};
+    uint32_t elementCount = 0;
+    auto resultType =
+        asNVVMSupportedI32VectorType(inst ? inst->getDataType() : nullptr, nullptr, &elementCount);
+    if (!resultType)
+        return false;
+
+    if (inst->getOp() == kIROp_MakeVector)
+    {
+        if (inst->getOperandCount() != elementCount)
+            return false;
+        for (uint32_t i = 0; i < elementCount; ++i)
+        {
+            IRInst* element = inst->getOperand(i);
+            if (!element || !isTypeEqual(element->getDataType(), resultType->getElementType()))
+                return false;
+            outConstruction.elements[i].value = element;
+        }
+    }
+    else if (inst->getOp() == kIROp_MakeVectorFromScalar)
+    {
+        if (inst->getOperandCount() != 1 || !inst->getOperand(0) ||
+            !isTypeEqual(inst->getOperand(0)->getDataType(), resultType->getElementType()))
+        {
+            return false;
+        }
+        for (uint32_t i = 0; i < elementCount; ++i)
+            outConstruction.elements[i].value = inst->getOperand(0);
+    }
+    else if (auto swizzle = as<IRSwizzle>(inst))
+    {
+        IRInst* base = swizzle->getBase();
+        uint32_t baseElementCount = 0;
+        auto baseType = asNVVMSupportedI32VectorType(
+            base ? base->getDataType() : nullptr,
+            nullptr,
+            &baseElementCount);
+        if (!baseType || swizzle->getElementCount() != elementCount ||
+            !isTypeEqual(baseType->getElementType(), resultType->getElementType()))
+        {
+            return false;
+        }
+        for (uint32_t i = 0; i < elementCount; ++i)
+        {
+            auto index = _asExecutableInteger32Constant(swizzle->getElementIndex(i));
+            if (!index || index->getValue() < 0 || index->getValue() >= baseElementCount)
+                return false;
+            outConstruction.elements[i].extracted = {
+                base,
+                uint32_t(index->getValue()),
+            };
+        }
+    }
+    else
+    {
+        return false;
+    }
+
+    outConstruction.resultType = resultType;
+    outConstruction.elementCount = elementCount;
     return true;
 }
 
@@ -387,15 +481,14 @@ bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc& semanticTyp
     {
         return semanticType.bitWidth == 0 && semanticType.laneCount == 0 && as<IRVoidType>(type);
     }
-    if (semanticType.laneCount == 3)
+    if (semanticType.laneCount >= 2 && semanticType.laneCount <= 4)
     {
-        return semanticType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER &&
-               semanticType.bitWidth == 32 && asNVVMSupportedUInt3Type(type);
-    }
-    if (semanticType.laneCount == 2)
-    {
-        return semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
-               semanticType.bitWidth == 32 && asNVVMSupportedSignedI32x2Type(type);
+        bool isSigned = false;
+        uint32_t elementCount = 0;
+        return semanticType.bitWidth == 32 &&
+               asNVVMSupportedI32VectorType(type, &isSigned, &elementCount) &&
+               semanticType.laneCount == elementCount &&
+               (semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER) == isSigned;
     }
     if (semanticType.laneCount != 1)
         return false;
@@ -620,10 +713,18 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
 {
     if (as<IRVoidType>(type))
         outType = NVVMSemantics::kVoid;
-    else if (asNVVMSupportedUInt3Type(type))
-        outType = NVVMSemantics::kUnsignedI32x3;
-    else if (asNVVMSupportedSignedI32x2Type(type))
-        outType = NVVMSemantics::kSignedI32x2;
+    else if (asNVVMSupportedI32VectorType(type))
+    {
+        bool isSigned = false;
+        uint32_t elementCount = 0;
+        SLANG_RELEASE_ASSERT(asNVVMSupportedI32VectorType(type, &isSigned, &elementCount));
+        outType = {
+            isSigned ? SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                     : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+            32,
+            elementCount,
+        };
+    }
     else if (isNVVMBoolType(type))
         outType = NVVMSemantics::kBool;
     else
@@ -981,8 +1082,7 @@ SlangResult _validateNumericValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (value && (asNVVMSupportedSignedI32x2Type(value->getDataType()) ||
-                  asNVVMSupportedUInt3Type(value->getDataType())))
+    if (value && asNVVMSupportedI32VectorType(value->getDataType()))
         return _validateAvailableValue(
             codeGenContext,
             value,
@@ -1145,8 +1245,11 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
 // Returns whether a type is an accepted canonical value in a helper result.
 bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
-    return as<IRVoidType>(type) || asNVVMSupportedUInt3Type(type) ||
-           _isSupportedNVVMHelperParameterType(type);
+    bool isSigned = false;
+    uint32_t elementCount = 0;
+    const bool isExecutionVector = asNVVMSupportedI32VectorType(type, &isSigned, &elementCount) &&
+                                   !isSigned && elementCount == 3;
+    return as<IRVoidType>(type) || isExecutionVector || _isSupportedNVVMHelperParameterType(type);
 }
 
 // Returns whether a canonical helper signature needs the generic construction path.
@@ -1479,16 +1582,19 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_MakeVector:
+            case kIROp_MakeVectorFromScalar:
             case kIROp_Swizzle:
             case kIROp_GetElement:
                 {
-                    IRInst* base = nullptr;
-                    uint32_t elementIndex = 0;
-                    if (!_getNVVMCUDAExecutionVectorElement(inst, base, elementIndex))
+                    NVVMVectorElement element;
+                    NVVMVectorConstruction construction;
+                    if (!_getNVVMVectorElement(inst, element) &&
+                        !_getNVVMVectorConstruction(inst, construction))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("CUDA execution-index component"));
+                            toSlice("32-bit integer vector operation"));
                     }
                 }
                 break;
@@ -1741,19 +1847,48 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_MakeVector:
+            case kIROp_MakeVectorFromScalar:
             case kIROp_Swizzle:
             case kIROp_GetElement:
                 {
-                    IRInst* base = nullptr;
-                    uint32_t elementIndex = 0;
-                    SLANG_RELEASE_ASSERT(
-                        _getNVVMCUDAExecutionVectorElement(inst, base, elementIndex));
-                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
-                        codeGenContext,
-                        base,
-                        inst,
-                        availableValues,
-                        dominatorTree));
+                    NVVMVectorElement element;
+                    NVVMVectorConstruction construction;
+                    if (_getNVVMVectorElement(inst, element))
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                            codeGenContext,
+                            element.base,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                    }
+                    else
+                    {
+                        SLANG_RELEASE_ASSERT(_getNVVMVectorConstruction(inst, construction));
+                        for (uint32_t i = 0; i < construction.elementCount; ++i)
+                        {
+                            const NVVMVectorConstructElement& source = construction.elements[i];
+                            if (source.value)
+                            {
+                                SLANG_RETURN_ON_FAIL(_validateSelectedIntegerValue(
+                                    codeGenContext,
+                                    source.value,
+                                    inst,
+                                    availableValues,
+                                    dominatorTree));
+                            }
+                            else
+                            {
+                                SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                                    codeGenContext,
+                                    source.extracted.base,
+                                    inst,
+                                    availableValues,
+                                    dominatorTree));
+                            }
+                        }
+                    }
                     availableValues.add(inst);
                 }
                 break;
@@ -2912,30 +3047,88 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_MakeVector:
+                case kIROp_MakeVectorFromScalar:
                 case kIROp_Swizzle:
                 case kIROp_GetElement:
                     {
-                        IRInst* base = nullptr;
-                        uint32_t elementIndex = 0;
-                        SLANG_RELEASE_ASSERT(
-                            _getNVVMCUDAExecutionVectorElement(inst, base, elementIndex));
-                        SlangNVVMValueHandle loweredBase = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            base,
-                            valueMap,
-                            typeContext,
-                            loweredBase));
+                        NVVMVectorElement element;
+                        NVVMVectorConstruction construction;
+                        if (_getNVVMVectorElement(inst, element))
+                        {
+                            SlangNVVMValueHandle loweredBase = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                element.base,
+                                valueMap,
+                                typeContext,
+                                loweredBase));
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "integer vector element extraction",
+                                builder.emitVectorElementExtract(
+                                    moduleScope.module,
+                                    loweredBase,
+                                    element.index,
+                                    loweredValue)));
+                            valueMap[inst] = loweredValue;
+                            break;
+                        }
+
+                        SLANG_RELEASE_ASSERT(_getNVVMVectorConstruction(inst, construction));
+                        SlangNVVMValueHandle loweredElements[4] = {};
+                        for (uint32_t i = 0; i < construction.elementCount; ++i)
+                        {
+                            const NVVMVectorConstructElement& source = construction.elements[i];
+                            if (source.value)
+                            {
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    source.value,
+                                    valueMap,
+                                    typeContext,
+                                    loweredElements[i]));
+                            }
+                            else
+                            {
+                                SlangNVVMValueHandle loweredBase = nullptr;
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    source.extracted.base,
+                                    valueMap,
+                                    typeContext,
+                                    loweredBase));
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "integer vector swizzle extraction",
+                                    builder.emitVectorElementExtract(
+                                        moduleScope.module,
+                                        loweredBase,
+                                        source.extracted.index,
+                                        loweredElements[i])));
+                            }
+                        }
+                        SlangNVVMTypeHandle loweredResultType = nullptr;
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            construction.resultType,
+                            NVVMTypeUse::Value,
+                            loweredResultType));
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "CUDA execution-index component",
-                            builder.emitVectorElementExtract(
+                            "integer vector construction",
+                            builder.emitVectorConstruct(
                                 moduleScope.module,
-                                loweredBase,
-                                elementIndex,
+                                loweredResultType,
+                                loweredElements,
+                                construction.elementCount,
                                 loweredValue)));
                         valueMap[inst] = loweredValue;
                     }

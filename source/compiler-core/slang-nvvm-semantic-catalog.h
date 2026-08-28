@@ -546,7 +546,8 @@ inline bool resolveValueOperationFamily(
     }
 
     if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT && desc.operandCount == 1 &&
-        isSelectedScalarInteger(desc.resultType) && isSelectedScalarInteger(desc.operandTypes[0]) &&
+        isSelectedIntegerValue(desc.resultType) && isSelectedIntegerValue(desc.operandTypes[0]) &&
+        desc.resultType.laneCount == desc.operandTypes[0].laneCount &&
         !areSameType(desc.resultType, desc.operandTypes[0]))
     {
         outResolution = {ValueOperationFamily::IntegerConvert, "explicit integer conversion"};

@@ -1313,6 +1313,46 @@ static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitVectorConstruct(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle vectorType,
+    const SlangNVVMValueHandle* elements,
+    size_t elementCount,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    auto llvmVectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(_getType(vectorType));
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !outValue || !insertionBlock || !llvmVectorType ||
+        &llvmVectorType->getContext() != &state->context ||
+        elementCount != llvmVectorType->getNumElements() || (!elements && elementCount))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::SmallVector<llvm::Value*, 4> llvmElements;
+    llvmElements.reserve(elementCount);
+    for (size_t i = 0; i < elementCount; ++i)
+    {
+        llvm::Value* element = _getValue(elements[i]);
+        if (!element || element->getType() != llvmVectorType->getElementType() ||
+            !_isValueUsableAtInsertionPoint(state, insertionBlock, element))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+        llvmElements.push_back(element);
+    }
+
+    llvm::Value* result = llvm::UndefValue::get(llvmVectorType);
+    for (size_t i = 0; i < elementCount; ++i)
+        result = state->builder.CreateInsertElement(result, llvmElements[i], uint64_t(i));
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle valueType,
@@ -2629,6 +2669,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitArrayElementPointer = _emitArrayElementPointer;
     api.emitStructFieldPointer = _emitStructFieldPointer;
     api.emitStructFieldValue = _emitStructFieldValue;
+    api.emitVectorConstruct = _emitVectorConstruct;
     api.emitVectorElementExtract = _emitVectorElementExtract;
     api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
     api.declareGlobalStorage = _declareGlobalStorage;

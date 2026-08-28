@@ -30,11 +30,11 @@ bool isNVVMFloat32Type(IRInst* type);
 /// Returns whether `type` is the canonical Boolean result produced by an accepted comparison.
 bool isNVVMBoolType(IRInst* type);
 
-/// Returns an exact canonical `uint3` type used by CUDA execution registers.
-IRVectorType* asNVVMSupportedUInt3Type(IRInst* type);
-
-/// Returns the bounded signed-i32x2 vector used to prove fixed-vector transport and arithmetic.
-IRVectorType* asNVVMSupportedSignedI32x2Type(IRInst* type);
+/// Returns an exact two- through four-lane signed/unsigned 32-bit integer vector.
+IRVectorType* asNVVMSupportedI32VectorType(
+    IRInst* type,
+    bool* outIsSigned = nullptr,
+    uint32_t* outElementCount = nullptr);
 
 /// Returns whether `type` is a selected scalar or established fixed integer vector.
 bool isNVVMSupportedNumericValueType(IRInst* type);

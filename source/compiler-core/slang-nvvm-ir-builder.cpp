@@ -39,7 +39,7 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
            api.getIntegerConstant && api.getFloatingPointConstant && api.emitPhi &&
            api.addPhiIncoming && api.emitCall && api.emitValueReturn && api.emitReturnVoid &&
            api.emitPointerOffset && api.emitArrayElementPointer && api.emitStructFieldPointer &&
-           api.emitStructFieldValue && api.emitVectorElementExtract &&
+           api.emitStructFieldValue && api.emitVectorConstruct && api.emitVectorElementExtract &&
            api.emitRelaxedGlobalI32AtomicAdd && api.declareGlobalStorage &&
            api.markFunctionAsKernel;
 }
@@ -772,6 +772,21 @@ SlangResult NVVMIRBuilder::declareGlobalStorage(
         size_t(name.getLength()),
         &outStorage);
     return _validateHandleResult(result, outStorage);
+}
+
+SlangResult NVVMIRBuilder::emitVectorConstruct(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle vectorType,
+    const SlangNVVMValueHandle* elements,
+    size_t elementCount,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    const SlangNVVMResult result =
+        m_construction.emitVectorConstruct(module, vectorType, elements, elementCount, &outValue);
+    return _validateHandleResult(result, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitVectorElementExtract(

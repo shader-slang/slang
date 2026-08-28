@@ -71,30 +71,35 @@ bool isNVVMBoolType(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Bool;
 }
 
-IRVectorType* asNVVMSupportedUInt3Type(IRInst* type)
+IRVectorType* asNVVMSupportedI32VectorType(
+    IRInst* type,
+    bool* outIsSigned,
+    uint32_t* outElementCount)
 {
-    auto vectorType = as<IRVectorType>(type);
-    auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
-    return vectorType && isNVVMUnsignedI32Type(vectorType->getElementType()) && elementCount &&
-                   elementCount->getValue() == 3
-               ? vectorType
-               : nullptr;
-}
+    if (outIsSigned)
+        *outIsSigned = false;
+    if (outElementCount)
+        *outElementCount = 0;
 
-IRVectorType* asNVVMSupportedSignedI32x2Type(IRInst* type)
-{
     auto vectorType = as<IRVectorType>(type);
     auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
-    return vectorType && isNVVMSignedI32Type(vectorType->getElementType()) && elementCount &&
-                   elementCount->getValue() == 2
-               ? vectorType
-               : nullptr;
+    const bool isSigned = vectorType && isNVVMSignedI32Type(vectorType->getElementType());
+    if (!vectorType || (!isSigned && !isNVVMUnsignedI32Type(vectorType->getElementType())) ||
+        !elementCount || elementCount->getValue() < 2 || elementCount->getValue() > 4)
+    {
+        return nullptr;
+    }
+    if (outIsSigned)
+        *outIsSigned = isSigned;
+    if (outElementCount)
+        *outElementCount = uint32_t(elementCount->getValue());
+    return vectorType;
 }
 
 bool isNVVMSupportedNumericValueType(IRInst* type)
 {
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupportedSignedI32x2Type(type) || asNVVMSupportedUInt3Type(type);
+           asNVVMSupportedI32VectorType(type);
 }
 
 IRStructType* asNVVMSupportedScalarStructType(IRInst* type)
@@ -123,8 +128,9 @@ uint32_t getNVVMNumericValueAlignment(IRInst* type)
         return bitWidth / 8;
     if (isNVVMFloat32Type(type))
         return 4;
-    if (asNVVMSupportedSignedI32x2Type(type))
-        return 8;
+    uint32_t elementCount = 0;
+    if (asNVVMSupportedI32VectorType(type, nullptr, &elementCount))
+        return elementCount == 2 ? 8 : 16;
     return 0;
 }
 
@@ -194,8 +200,17 @@ IRPtrTypeBase* asNVVMSupportedDeviceScalarPointerType(IRInst* type)
 IRPtrTypeBase* asNVVMSupportedDeviceNumericPointerType(IRInst* type)
 {
     auto ptrType = as<IRPtrTypeBase>(type);
+    bool vectorIsSigned = false;
+    uint32_t vectorElementCount = 0;
+    const bool isEstablishedVectorPointer = ptrType &&
+                                            asNVVMSupportedI32VectorType(
+                                                ptrType->getValueType(),
+                                                &vectorIsSigned,
+                                                &vectorElementCount) &&
+                                            vectorIsSigned && vectorElementCount == 2;
     if (!ptrType || ptrType->getOp() != kIROp_PtrType ||
-        !isNVVMSupportedNumericValueType(ptrType->getValueType()) ||
+        !(isNVVMSupportedIntegerScalarType(ptrType->getValueType()) ||
+          isNVVMFloat32Type(ptrType->getValueType()) || isEstablishedVectorPointer) ||
         ptrType->getAddressSpace() != AddressSpace::UserPointer)
     {
         return nullptr;
@@ -609,8 +624,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isInteger = isNVVMSupportedIntegerScalarType(type, &integerBitWidth);
     const bool isFloat32 = isNVVMFloat32Type(type);
     const bool isBool = isNVVMBoolType(type);
-    IRVectorType* uint3Type = asNVVMSupportedUInt3Type(type);
-    IRVectorType* signedI32x2Type = asNVVMSupportedSignedI32x2Type(type);
+    bool vectorIsSigned = false;
+    uint32_t vectorElementCount = 0;
+    IRVectorType* integerVectorType =
+        asNVVMSupportedI32VectorType(type, &vectorIsSigned, &vectorElementCount);
+    const bool isExecutionVector = integerVectorType && !vectorIsSigned && vectorElementCount == 3;
     IRStructType* structType = as<IRStructType>(type);
     IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
@@ -635,13 +653,13 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isLegal =
         (use == NVVMTypeUse::EntryPointResult && isVoid) ||
         (use == NVVMTypeUse::HelperResult &&
-         (isVoid || isInteger || isFloat32 || isBool || uint3Type)) ||
+         (isVoid || isInteger || isFloat32 || isBool || isExecutionVector)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
           deviceArrayPointer || rawResource)) ||
         (use == NVVMTypeUse::HelperParameter && (isInteger || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
-         (isInteger || isFloat32 || isBool || uint3Type || signedI32x2Type || scalarStructType ||
+         (isInteger || isFloat32 || isBool || integerVectorType || scalarStructType ||
           fixedArrayType || deviceNumericPointer || deviceArrayPointer || rawResource ||
           parameterGroup || resourceElementPointer || sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
@@ -697,23 +715,14 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             "float32 type",
             m_builder.getFloatingPointType(m_module, 32u, outType)));
     }
-    else if (uint3Type)
+    else if (integerVectorType)
     {
         SlangNVVMTypeHandle elementType = nullptr;
         SLANG_RETURN_ON_FAIL(
-            lowerType(uint3Type->getElementType(), NVVMTypeUse::Value, elementType));
+            lowerType(integerVectorType->getElementType(), NVVMTypeUse::Value, elementType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "fixed uint3 vector type",
-            m_builder.getVectorType(m_module, elementType, 3, outType)));
-    }
-    else if (signedI32x2Type)
-    {
-        SlangNVVMTypeHandle elementType = nullptr;
-        SLANG_RETURN_ON_FAIL(
-            lowerType(signedI32x2Type->getElementType(), NVVMTypeUse::Value, elementType));
-        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "fixed signed-i32x2 vector type",
-            m_builder.getVectorType(m_module, elementType, 2, outType)));
+            "fixed 32-bit integer vector type",
+            m_builder.getVectorType(m_module, elementType, vectorElementCount, outType)));
     }
     else if (fixedArrayType)
     {

@@ -4523,6 +4523,28 @@ uses `ld.global.nc.f32` for the read-only input, and stores through the output v
 `ptxas` accepts the module for `sm_70`; Release host and standalone-provider builds pass; and the
 complete NVVM unit prefix passes 344/344.
 
+### Slice 81: Generic 32-bit integer-vector construction and extraction
+
+Signed and unsigned 32-bit integer vectors with two through four lanes are now ordinary direct
+NVVM values. One common classifier carries exact semantic signedness and lane count while LLVM's
+physical type remains signless. Canonical flat constructors, scalar splats, constant-index scalar
+extractions, and multi-lane swizzles lower through a generic construct/extract pair. Established
+wrapping integer operations apply elementwise, and integer conversion is accepted only between
+selected integer values with the same lane count.
+
+Exact forward-only builder ABI revision 7 adds `emitVectorConstruct`. The provider validates the
+fixed-vector result type, exact lane count, scalar element types, and insertion-point availability
+before mutating the module, then inserts every lane into LLVM `undef`. The same operation serves
+all admitted Slang vector producers; no CUDA execution-ID callback or producer-specific
+look-through crosses the boundary. Value support does not broaden device/resource vector storage,
+helper signatures, vector phis, dynamic indexing, comparisons, or Boolean/float vector families.
+
+The existing `dispatch-thread-id-extraction.slang` fixture passes its CUDA-source lane and two new
+direct-libNVVM PTX lanes 3/3. The unsigned `uint2` entry reads both x/y execution dimensions, while
+the signed `int2` entry exercises the same-width semantic conversion and lets NVVM remove its
+unused y lane. CUDA 12.9 `ptxas` accepts both modules for `sm_70`; Release host and standalone
+provider builds pass; and the complete NVVM unit prefix passes 347/347.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4538,8 +4560,9 @@ The following remain open until their named slice supplies evidence:
   structured buffers;
 - external/indirect calls, richer helper ABI, calling conventions and function attributes beyond
   no-inline, integer shifts/division/remainder, saturating or overflow-decorated arithmetic,
-  float64/low-precision scalar families, and general vector or matrix operations beyond the
-  bounded signed-i32x2 add proof;
+  float64/low-precision scalar families, and vector or matrix operations beyond bounded
+  signed/unsigned i32x2-i32x4 construction, extraction, established wrapping arithmetic, and
+  same-lane integer conversion;
 - pointer and runtime aggregate addressing beyond signed-i32 scalar offsets on selected numeric
   device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a flat
   by-value entry struct, including other `IRGetElementPtr` shapes, array values, mutable structs,

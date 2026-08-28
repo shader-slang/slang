@@ -1454,3 +1454,23 @@ direct PTX checking, and reflection 4/4 with `11, 12, 13, 14`. Direct PTX expose
 16-byte aggregate parameter, two aligned 16-byte resource views, `ld.global.nc.f32`, and the
 read-write global store. CUDA 12.9 `ptxas` accepts the module for `sm_70`. Release host and isolated
 provider builds pass, and the complete NVVM prefix passes 344/344.
+
+Slice 81 replaces the historical unsigned-i32x3 and signed-i32x2 value special cases with one
+exact signed/unsigned 32-bit integer-vector family for two through four lanes. Canonical
+`makeVector`, scalar splat, constant extraction, and swizzle graphs use generic construction and
+extraction; established wrapping operations and same-lane integer conversions preserve semantic
+signedness over LLVM's signless physical vector type. Dynamic indexing, vector phis/comparisons,
+Boolean/float vector values, richer helper ABI, and broader vector memory roles remain unclaimed.
+
+Exact ABI revision 7 adds one generic vector constructor. Real and fake providers reject null,
+foreign, count-mismatched, element-mismatched, or unavailable values before mutation. Normal LLVM
+14 and LLVM 7-compatible assembly contain two-lane `insertelement`/`extractelement` graphs rooted
+in `undef`; no execution-semantic operation is present. The focused fake emitter records the
+ordinary uint3 arithmetic, exact x/y extracts, one signed-i32x2 construction, and the subsequent
+same-lane conversion. A dynamic-index control stops before provider discovery.
+
+`tests/cuda/dispatch-thread-id-extraction.slang` now passes 3/3: its existing CUDA-source check and
+direct PTX checks for the unsigned and signed two-lane entries. The unsigned module reads
+`%ctaid`, `%ntid`, and `%tid` in both x and y; both modules retain immutable global loads and global
+stores. CUDA 12.9 `ptxas -arch=sm_70` accepts both. Release host and isolated-provider builds pass,
+and the complete NVVM prefix passes 347/347.
