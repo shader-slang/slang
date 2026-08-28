@@ -27515,6 +27515,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
                 T.kind == DescriptorKind.UniformTexelBuffer ||
                 T.kind == DescriptorKind.StorageTexelBuffer)
                 return (uint64_t)this < (uint64_t)other;
+            break;
         default:
             break;
         }
@@ -27537,6 +27538,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
                 T.kind == DescriptorKind.UniformTexelBuffer ||
                 T.kind == DescriptorKind.StorageTexelBuffer)
                 return (uint64_t)this <= (uint64_t)other;
+            break;
         default:
             break;
         }
