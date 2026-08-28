@@ -85,7 +85,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
 {
     const uint32_t rootSize = sizeof(void*) == 8 ? 40u : 36u;
     const uint32_t foundationSize = sizeof(void*) == 8 ? 40u : 24u;
-    const uint32_t constructionSize = sizeof(void*) == 8 ? 224u : 116u;
+    const uint32_t constructionV1Size = sizeof(void*) == 8 ? 224u : 116u;
+    const uint32_t constructionSize = sizeof(void*) == 8 ? 256u : 132u;
     const uint32_t valueOperationsSize = sizeof(void*) == 8 ? 24u : 16u;
     const uint32_t operationDescSize = sizeof(void*) == 8 ? 40u : 32u;
     SLANG_CHECK(sizeof(SlangNVVMValueTypeDesc_4) == 16u);
@@ -93,28 +94,35 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
     SLANG_CHECK(sizeof(SlangNVVMBuilderAPI_V4) == rootSize);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V4_MIN_SIZE == rootSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderFoundationAPI_4) == foundationSize);
+    SLANG_CHECK(SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_1_SIZE == constructionV1Size);
     SLANG_CHECK(sizeof(SlangNVVMBuilderConstructionAPI_4) == constructionSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderValueOperationsAPI_4) == valueOperationsSize);
 
-    SLANG_CHECK(NVVMSemantics::getCatalogCount() == 40);
+    SLANG_CHECK(NVVMSemantics::getCatalogCount() == 45);
     size_t genericAsmSemanticCount = 0;
     for (const NVVMSemantics::CatalogEntry& semantic : NVVMSemantics::kCatalog)
     {
         const SlangNVVMValueOperationDesc_4 operation = NVVMSemantics::getOperationDesc(semantic);
         SLANG_CHECK(NVVMSemantics::find(operation) == &semantic);
-        SLANG_CHECK(
-            NVVMSemantics::findLegacyOperation(semantic.legacyFamily, semantic.legacyOperation) ==
-            &semantic);
+        if (NVVMSemantics::hasLegacyAdapter(semantic))
+        {
+            SLANG_CHECK(
+                NVVMSemantics::findLegacyOperation(
+                    semantic.legacyFamily,
+                    semantic.legacyOperation) == &semantic);
+        }
         genericAsmSemanticCount += semantic.genericAsm ? 1 : 0;
 
         SlangNVVMValueOperationDesc_4 malformedOperation = operation;
         ++malformedOperation.resultType.bitWidth;
         SLANG_CHECK(NVVMSemantics::find(malformedOperation) == nullptr);
     }
-    SLANG_CHECK(genericAsmSemanticCount == 14);
+    SLANG_CHECK(genericAsmSemanticCount == 19);
 
     gFakeNVVMBuilder.reset();
     gFakeNVVMBuilder.foundationV4 = _makeFakeNVVMBuilderFoundationAPIV4();
+    gFakeNVVMBuilder.constructionV4V1 = _makeFakeNVVMBuilderConstructionAPIV4(
+        SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1);
     gFakeNVVMBuilder.constructionV4 = _makeFakeNVVMBuilderConstructionAPIV4();
     gFakeNVVMBuilder.valueOperationsV4 = _makeFakeNVVMBuilderValueOperationsAPIV4();
     const SlangNVVMBuilderAPI_V4 apiV4 = _makeFakeNVVMBuilderAPIV4();
@@ -125,6 +133,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
             SLANG_NVVM_BUILDER_VALUE_OPERATIONS_INTERFACE_VERSION_4 + 1,
             &unsupportedInterface) == SLANG_E_NO_INTERFACE);
     SLANG_CHECK(unsupportedInterface == nullptr);
+    const void* constructionV1 = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(apiV4.queryInterface(
+        SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION_4,
+        SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1,
+        &constructionV1)));
+    SLANG_CHECK(constructionV1 == &gFakeNVVMBuilder.constructionV4V1);
     {
         ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
         NVVMIRBuilder builder;
@@ -134,9 +148,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
         SLANG_CHECK(builder.getAPIV2() == nullptr);
         SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=4") >= 0);
         SLANG_CHECK(builder.getVersionString().indexOf("foundation-api-version=1") >= 0);
-        SLANG_CHECK(builder.getVersionString().indexOf("construction-api-version=1") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("construction-api-version=2") >= 0);
         SLANG_CHECK(builder.getVersionString().indexOf("value-api-version=1") >= 0);
         SLANG_CHECK(builder.supportsScalarOperations());
+        SLANG_CHECK(builder.supportsExtendedConstruction());
         SLANG_CHECK(builder.supportsScalarIntegerMultiply());
         SLANG_CHECK(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_FLOAT));
 
@@ -234,6 +249,30 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
         SLANG_CHECK(!builder.isInitialized());
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    for (Index callbackIndex = 0; callbackIndex < 4; ++callbackIndex)
+    {
+        gFakeNVVMBuilder.reset();
+        gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
+        gFakeNVVMBuilder.apiV2 = _makeFakeNVVMBuilderAPIV2();
+        gFakeNVVMBuilder.omitAPIV2Symbol = false;
+        _enableFakeNVVMBuilderV3();
+        _enableFakeNVVMBuilderV4();
+        if (callbackIndex == 0)
+            gFakeNVVMBuilder.constructionV4.getVectorType = nullptr;
+        else if (callbackIndex == 1)
+            gFakeNVVMBuilder.constructionV4.emitVectorElementExtract = nullptr;
+        else if (callbackIndex == 2)
+            gFakeNVVMBuilder.constructionV4.emitExtendedCall = nullptr;
+        else
+            gFakeNVVMBuilder.constructionV4.emitExtendedValueReturn = nullptr;
+
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+        SLANG_CHECK(!builder.isInitialized());
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    }
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
@@ -4960,6 +4999,246 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsUnknownV3OperationsWithoutMutation)
     SLANG_CHECK(
         ::memcmp(before->getBufferPointer(), after->getBufferPointer(), before->getBufferSize()) ==
         0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsVectorConstruction());
+
+    ScopedNVVMBuilderModule scope;
+    ScopedNVVMBuilderModule foreignScope;
+    scope.builder = &builder;
+    foreignScope.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("cuda-execution-operations"), scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("cuda-execution-operations-foreign"), foreignScope.module)));
+
+    SlangNVVMTypeHandle_1 voidType = nullptr;
+    SlangNVVMTypeHandle_1 i32Type = nullptr;
+    SlangNVVMTypeHandle_1 uint3Type = nullptr;
+    SlangNVVMTypeHandle_1 foreignI32Type = nullptr;
+    SlangNVVMTypeHandle_1 foreignUInt3Type = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(
+        foreignScope.module,
+        32,
+        foreignI32Type)));
+
+    SlangNVVMTypeHandle_1 rejectedType = reinterpret_cast<SlangNVVMTypeHandle_1>(uintptr_t(1));
+    SLANG_CHECK(builder.getVectorType(nullptr, i32Type, 3, rejectedType) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedType == nullptr);
+    rejectedType = reinterpret_cast<SlangNVVMTypeHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.getVectorType(scope.module, foreignI32Type, 3, rejectedType) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedType == nullptr);
+    rejectedType = reinterpret_cast<SlangNVVMTypeHandle_1>(uintptr_t(1));
+    SLANG_CHECK(builder.getVectorType(scope.module, i32Type, 1, rejectedType) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedType == nullptr);
+    rejectedType = reinterpret_cast<SlangNVVMTypeHandle_1>(uintptr_t(1));
+    SLANG_CHECK(builder.getVectorType(scope.module, i32Type, 5, rejectedType) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedType == nullptr);
+    SLANG_CHECK(
+        builder.getConstructionAPIV4()->getVectorType(scope.module, i32Type, 3, nullptr) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getVectorType(scope.module, i32Type, 3, uint3Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVectorType(
+        foreignScope.module,
+        foreignI32Type,
+        3,
+        foreignUInt3Type)));
+
+    const SlangNVVMTypeHandle_1 parameterTypes[] = {i32Type};
+    SlangNVVMTypeHandle_1 functionType = nullptr;
+    SlangNVVMValueHandle_1 function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        scope.module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        scope.module,
+        functionType,
+        toSlice("cudaExecutionOperations"),
+        function)));
+    SlangNVVMValueHandle_1 scalarParameter = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionParameter(scope.module, function, 0, scalarParameter)));
+    SlangNVVMBlockHandle_1 entryBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(scope.module, function, toSlice("entry"), entryBlock)));
+
+    SlangNVVMTypeHandle_1 foreignVoidType = nullptr;
+    SlangNVVMTypeHandle_1 foreignFunctionType = nullptr;
+    SlangNVVMValueHandle_1 foreignFunction = nullptr;
+    SlangNVVMValueHandle_1 foreignVector = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getVoidType(foreignScope.module, foreignVoidType)));
+    const SlangNVVMTypeHandle_1 foreignParameterTypes[] = {foreignUInt3Type};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        foreignScope.module,
+        foreignVoidType,
+        foreignParameterTypes,
+        SLANG_COUNT_OF(foreignParameterTypes),
+        foreignFunctionType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        foreignScope.module,
+        foreignFunctionType,
+        toSlice("foreignCUDAExecutionOperations"),
+        foreignFunction)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionParameter(
+        foreignScope.module,
+        foreignFunction,
+        0,
+        foreignVector)));
+
+    const SlangNVVMValueOperation_4 executionOperations[] = {
+        SLANG_NVVM_VALUE_OP_THREAD_INDEX_4,
+        SLANG_NVVM_VALUE_OP_BLOCK_INDEX_4,
+        SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS_4,
+        SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4,
+    };
+    auto getOperation = [](SlangNVVMValueOperation_4 operation)
+    {
+        for (const NVVMSemantics::CatalogEntry& entry : NVVMSemantics::kCatalog)
+        {
+            if (entry.operation == operation)
+                return NVVMSemantics::getOperationDesc(entry);
+        }
+        SLANG_UNEXPECTED("missing CUDA execution catalog operation");
+    };
+    const SlangNVVMValueOperationDesc_4 barrierOperation =
+        getOperation(SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER_4);
+
+    SlangNVVMValueHandle_1 rejectedValue =
+        reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitValueOperation(
+            scope.module,
+            getOperation(SLANG_NVVM_VALUE_OP_THREAD_INDEX_4),
+            nullptr,
+            0,
+            rejectedValue) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedValue == nullptr);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, entryBlock)));
+    SLANG_CHECK(
+        builder.getValueOperationsAPIV4()->emitOperation(
+            scope.module,
+            &barrierOperation,
+            nullptr,
+            0,
+            nullptr) == SLANG_E_INVALID_ARG);
+
+    rejectedValue = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitVectorElementExtract(scope.module, nullptr, 0, rejectedValue) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedValue == nullptr);
+    rejectedValue = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitVectorElementExtract(scope.module, scalarParameter, 0, rejectedValue) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedValue == nullptr);
+    rejectedValue = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitVectorElementExtract(scope.module, foreignVector, 0, rejectedValue) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedValue == nullptr);
+
+    for (SlangNVVMValueOperation_4 executionOperation : executionOperations)
+    {
+        SlangNVVMValueHandle_1 vector = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueOperation(
+            scope.module,
+            getOperation(executionOperation),
+            nullptr,
+            0,
+            vector)));
+        for (uint32_t axis = 0; axis < 3; ++axis)
+        {
+            SlangNVVMValueHandle_1 component = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitVectorElementExtract(scope.module, vector, axis, component)));
+        }
+        rejectedValue = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitVectorElementExtract(scope.module, vector, 3, rejectedValue) ==
+            SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejectedValue == nullptr);
+    }
+
+    SlangNVVMValueHandle_1 barrierValue =
+        reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueOperation(
+        scope.module,
+        barrierOperation,
+        nullptr,
+        0,
+        barrierValue)));
+    SLANG_CHECK(barrierValue == nullptr);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
+
+    for (SlangNVVMValueOperation_4 executionOperation : executionOperations)
+    {
+        rejectedValue = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitValueOperation(
+                scope.module,
+                getOperation(executionOperation),
+                nullptr,
+                0,
+                rejectedValue) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejectedValue == nullptr);
+    }
+    barrierValue = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitValueOperation(scope.module, barrierOperation, nullptr, 0, barrierValue) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(barrierValue == nullptr);
+
+    const SlangNVVMSerializationFormat_1 formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    static const char* kIntrinsicNames[] = {
+        "llvm.nvvm.read.ptx.sreg.tid.",
+        "llvm.nvvm.read.ptx.sreg.ctaid.",
+        "llvm.nvvm.read.ptx.sreg.ntid.",
+        "llvm.nvvm.read.ptx.sreg.nctaid.",
+    };
+    for (SlangNVVMSerializationFormat_1 format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        SLANG_CHECK_ABORT(assembly != nullptr);
+        const String text = _getBlobText(assembly);
+        for (const char* intrinsicName : kIntrinsicNames)
+        {
+            SLANG_CHECK(
+                _countOccurrences(text.getUnownedSlice(), UnownedStringSlice(intrinsicName)) == 6);
+        }
+        SLANG_CHECK(
+            _countOccurrences(text.getUnownedSlice(), toSlice("call void @llvm.nvvm.barrier0()")) ==
+            1);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("extractelement")) == 12);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("ret void")) == 1);
+        if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)
+        {
+            SLANG_CHECK(text.indexOf("= { nounwind readnone speculatable }") >= 0);
+        }
+        else
+        {
+            SLANG_CHECK(text.indexOf("= { nounwind readnone speculatable }") < 0);
+        }
+    }
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)

@@ -24,6 +24,9 @@ bool isNVVMFloat32Type(IRInst* type);
 /// Returns whether `type` is the canonical Boolean result produced by an accepted comparison.
 bool isNVVMBoolType(IRInst* type);
 
+/// Returns an exact canonical `uint3` type used by CUDA execution registers.
+IRVectorType* asNVVMSupportedUInt3Type(IRInst* type);
+
 /// Returns an accepted nonempty fixed i32 array and optionally its exact element count.
 IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
 

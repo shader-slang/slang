@@ -932,7 +932,8 @@ extern "C"
 #define SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS_4 ((SlangNVVMBuilderInterfaceID_4)2u)
 
 #define SLANG_NVVM_BUILDER_FOUNDATION_INTERFACE_VERSION_4 1u
-#define SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 1u
+#define SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1 1u
+#define SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 2u
 #define SLANG_NVVM_BUILDER_VALUE_OPERATIONS_INTERFACE_VERSION_4 1u
 
     /** Semantic value categories used by V4 operation signatures. */
@@ -982,7 +983,12 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE_4 ((SlangNVVMValueOperation_4)21u)
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE_4 ((SlangNVVMValueOperation_4)22u)
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL_4 ((SlangNVVMValueOperation_4)23u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT_4 24u
+#define SLANG_NVVM_VALUE_OP_THREAD_INDEX_4 ((SlangNVVMValueOperation_4)24u)
+#define SLANG_NVVM_VALUE_OP_BLOCK_INDEX_4 ((SlangNVVMValueOperation_4)25u)
+#define SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS_4 ((SlangNVVMValueOperation_4)26u)
+#define SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4 ((SlangNVVMValueOperation_4)27u)
+#define SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER_4 ((SlangNVVMValueOperation_4)28u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT_4 29u
 
     /**
      * Describes one complete value-operation overload. The pointed-to operand descriptors
@@ -1075,7 +1081,26 @@ extern "C"
         SlangNVVMResult_1(SLANG_NVVM_CALL* markFunctionAsKernel)(
             SlangNVVMModuleHandle_1 module,
             SlangNVVMValueHandle_1 function);
+
+        /** V4 construction interface version 2 begins here. */
+        SlangNVVMResult_1(SLANG_NVVM_CALL* getVectorType)(
+            SlangNVVMModuleHandle_1 module,
+            SlangNVVMTypeHandle_1 elementType,
+            uint32_t elementCount,
+            SlangNVVMTypeHandle_1* outType);
+        SlangNVVMResult_1(SLANG_NVVM_CALL* emitVectorElementExtract)(
+            SlangNVVMModuleHandle_1 module,
+            SlangNVVMValueHandle_1 vector,
+            uint32_t elementIndex,
+            SlangNVVMValueHandle_1* outValue);
+        /** Emits calls whose result may be a fixed vector or void. */
+        SlangNVVMEmitCall_3 emitExtendedCall;
+        /** Emits valued returns whose operand may be a fixed vector. */
+        SlangNVVMEmitValueReturn_3 emitExtendedValueReturn;
     } SlangNVVMBuilderConstructionAPI_4;
+
+#define SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_1_SIZE \
+    ((uint32_t)offsetof(SlangNVVMBuilderConstructionAPI_4, getVectorType))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMIsValueOperationSupported_4)(
         const SlangNVVMValueOperationDesc_4* operation,

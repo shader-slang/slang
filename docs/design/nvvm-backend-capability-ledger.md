@@ -191,6 +191,10 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32FunctionDifferentialPTX` | 2 | LLVM 14.0.6 provider, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Exact scalar float32 helper call compiles through both routes | `[64, 32, 32]`, Float add, one global 32-bit store, and no load or Float predicate agree | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangRealFloat32FunctionPtxasAccepts` | 2 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both Float-helper outputs assemble | Static acceptance | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangFloat32FunctionRuntimeMatchesNVRTC` | 2 | CUDA driver/GPU compute 7.0+ | Pass | Pass | Not applicable | Both routes launch finite and signed-zero additions through the typed callable runtime harness | RTX 5090 results agree for finite values and preserve exact `-0 + -0` and `+0 + -0` bits | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangCUDAExecutionUsesDirectPipeline` | 2-3 | V4 fake provider and fake libNVVM | Not compared | Pass | Not applicable | Four canonical UInt3 execution helpers, twelve scalar extracts, and one void group-sync helper lower through typed V4 operations | Exact helper/call/operation/extract/store topology; no runtime | Fake-only; not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangCUDAExecutionDifferentialPTX` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Both routes emit all `tid`, `ctaid`, `ntid`, and `nctaid` x/y/z components plus a group barrier | Matching `[64, 64]` ABI and complete special-register/barrier inventory | Not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangCUDAExecutionPtxasAccepts` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 `ptxas` | Pass | Pass | Not applicable | Both execution-family PTX outputs assemble | Static PTX acceptance | Resource and timing measurements not collected |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangCUDAExecutionRuntimeMatchesNVRTC` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, RTX 5090 | Pass | Pass | Not applicable | A 288-invocation multi-block launch records all twelve execution components after group synchronization | Every thread/block coordinate occurs exactly once and all block/grid dimensions agree | Kernel timing not measured |
 
 ## Slice 19 atomic and wire-compatibility evidence
 
@@ -293,10 +297,12 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/invalidCUDAEmissionMethodIsDiagnosed` | An unknown integer supplied through the public target-option API reaches E52015 | Pass |
 | `slang-unit-test-tool/nvvmSlangBuilderIdentityAffectsHashAndIsSessionCached` | Builder availability changes the direct-NVVM shader hash, and hash/codegen reuse one session load result | Pass |
 | `slang-unit-test-tool/nvvmSlangBuilderDiagnosticsStopBeforeLibNVVM` | Invalid builder verification emits E52018, preserves verifier text, destroys the module, and creates no libNVVM program | Pass |
-| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | A retained barrier call emits E52017 before builder-module or libNVVM-program creation | Pass |
+| `slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission` | The canonical barrier helper is accepted, but a conventional compute entry retaining that helper stops at the established `'CUDA kernel decoration'` boundary before builder-module or libNVVM-program creation | Pass |
 | `slang-unit-test-tool/nvvmSlangMissingBuilderDoesNotFallback` | An unavailable builder emits E52016 and never falls back to NVRTC | Pass |
 | `tests/cuda/sampler-comparison-state-unused.slang` | Established default PTX and explicit NVRTC lanes produce accepted PTX | Pass |
 | `tests/cuda/cuda-compile.cu` | Explicit `-pass-through nvrtc` retains precedence even with `-emit-cuda-via-nvvm` | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations` | V4 construction version 2 preserves version 1, validates vector construction/extraction and all execution/barrier operations before mutation, and emits exact normal and LLVM-7-compatible intrinsic forms | Pass |
+| `slang-unit-test-tool/nvvmSlangNegotiatesCUDAExecutionCapability` | An exact V4 construction-version-1 provider is discovered but reports E52018 for required extended construction before module creation or operation emission | Pass |
 
 Slice 9 extends Bucket 2 through a finite DAG of canonical direct `IRFunc`
 callees with signed-i32 parameters/results and valued returns. Complex and aggregate types, pointer
@@ -1198,3 +1204,20 @@ matrix passes 120/120 and Release passes 418/418 with sorted-name SHA-256
 names reproduces Slice 62's 411-name hash
 `bea39cafc76c97ab6cb2d31fcc12aa42f41fe9d3d4d324ca296e115cd5d4d3a4` exactly. Debug preservation
 passes 10/10.
+
+Slice 66 adds four canonical zero-parameter UInt3 execution operations and one canonical
+zero-parameter Void group barrier through typed V4 catalog rows. Construction interface version 2
+appends vector construction/extraction and extended call/return callbacks while its inherited
+scalar callbacks and exact version-1 table remain frozen. The provider maps whole-vector semantics
+to all twelve `tid`, `ctaid`, `ntid`, and `nctaid` components and maps synchronization to
+`llvm.nvvm.barrier0`; the LLVM-7-compatible writer audits and normalizes only the differing
+special-register declaration attributes.
+
+Direct NVVM and NVRTC both expose all twelve special registers plus `bar.sync`, and CUDA 12.9
+`ptxas` accepts both. A `3 x 2 x 2` grid of `4 x 3 x 2` blocks records all 288 unique coordinate
+tuples with exact block/grid dimensions through both routes on an RTX 5090. The complete Release
+prefix passes 425/425 with sorted-name SHA-256
+`641fcaf6a0da63e30a6146beb3e46e261d58297299aa33d180a1f86d73e4f0e5`; removing the six Slice 66
+names reproduces Slice 65's 419-name hash
+`c634caa999f2b191c85b37cc7885d39462bcef55406ef64dc04bd1a1d02590c9` exactly. Debug preservation
+passes 11/11.

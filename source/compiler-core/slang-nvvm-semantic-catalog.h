@@ -7,7 +7,7 @@ namespace Slang
 namespace NVVMSemantics
 {
 
-/// Identifies the frozen V3 callback family used only by the compatibility adapter.
+/// Identifies the provider lowering family and, where present, its frozen V3 adapter family.
 enum class LegacyFamily : uint32_t
 {
     IntegerUnary,
@@ -17,6 +17,8 @@ enum class LegacyFamily : uint32_t
     FloatingBinary,
     FloatingCompare,
     Intrinsic,
+    V4ExecutionRegister,
+    V4WorkgroupBarrier,
 };
 
 /// Describes one established semantic overload from canonical Slang values to the provider ABI.
@@ -34,6 +36,12 @@ struct CatalogEntry
 };
 
 inline constexpr SlangNVVMValueTypeDesc_4 kNoType = {};
+inline constexpr SlangNVVMValueTypeDesc_4 kVoid = {
+    SLANG_NVVM_VALUE_TYPE_VOID_4,
+    0,
+    0,
+    0,
+};
 inline constexpr SlangNVVMValueTypeDesc_4 kBool = {SLANG_NVVM_VALUE_TYPE_BOOL_4, 1, 1, 0};
 inline constexpr SlangNVVMValueTypeDesc_4 kSignedI32 = {
     SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4,
@@ -47,6 +55,12 @@ inline constexpr SlangNVVMValueTypeDesc_4 kUnsignedI32 = {
     1,
     0,
 };
+inline constexpr SlangNVVMValueTypeDesc_4 kUnsignedI32x3 = {
+    SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4,
+    32,
+    3,
+    0,
+};
 inline constexpr SlangNVVMValueTypeDesc_4 kFloat32 = {
     SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4,
     32,
@@ -54,9 +68,10 @@ inline constexpr SlangNVVMValueTypeDesc_4 kFloat32 = {
     0,
 };
 
-// This is the only table that maps an established typed semantic to its frozen V3 compatibility
-// operation. GenericAsm spellings are present only for semantics produced through that canonical
-// CUDA helper shape; ordinary IR operations select the same typed rows without a spelling.
+// This is the only table that maps an established typed semantic to its provider operation and,
+// where one exists, its frozen V3 compatibility operation. GenericAsm spellings are present only
+// for semantics produced through that canonical CUDA helper shape; ordinary IR operations select
+// the same typed rows without a spelling.
 inline constexpr CatalogEntry kCatalog[] = {
     {
         SLANG_NVVM_VALUE_OP_ADD_4,
@@ -498,6 +513,61 @@ inline constexpr CatalogEntry kCatalog[] = {
         "float32 wave-mask all-equal intrinsic",
         "_waveAllEqual($0, $1)",
     },
+    {
+        SLANG_NVVM_VALUE_OP_THREAD_INDEX_4,
+        kUnsignedI32x3,
+        {kNoType, kNoType, kNoType},
+        0,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        LegacyFamily::V4ExecutionRegister,
+        0,
+        "CUDA thread index",
+        "(threadIdx)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_BLOCK_INDEX_4,
+        kUnsignedI32x3,
+        {kNoType, kNoType, kNoType},
+        0,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        LegacyFamily::V4ExecutionRegister,
+        0,
+        "CUDA block index",
+        "(blockIdx)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS_4,
+        kUnsignedI32x3,
+        {kNoType, kNoType, kNoType},
+        0,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        LegacyFamily::V4ExecutionRegister,
+        0,
+        "CUDA block dimensions",
+        "(blockDim)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4,
+        kUnsignedI32x3,
+        {kNoType, kNoType, kNoType},
+        0,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        LegacyFamily::V4ExecutionRegister,
+        0,
+        "CUDA grid dimensions",
+        "(gridDim)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER_4,
+        kVoid,
+        {kNoType, kNoType, kNoType},
+        0,
+        SLANG_NVVM_BUILDER_FEATURE_COUNT_3,
+        LegacyFamily::V4WorkgroupBarrier,
+        0,
+        "CUDA workgroup barrier",
+        "__syncthreads()",
+    },
 };
 
 inline constexpr size_t getCatalogCount()
@@ -522,12 +592,18 @@ inline SlangNVVMValueOperationDesc_4 getOperationDesc(const CatalogEntry& entry)
     };
 }
 
+inline bool hasLegacyAdapter(const CatalogEntry& entry)
+{
+    return entry.legacyFeature < SLANG_NVVM_BUILDER_FEATURE_COUNT_3;
+}
+
 /// Returns the unique established row behind one frozen V3 compatibility operation.
 inline const CatalogEntry* findLegacyOperation(LegacyFamily family, uint32_t operation)
 {
     for (const CatalogEntry& entry : kCatalog)
     {
-        if (entry.legacyFamily == family && entry.legacyOperation == operation)
+        if (hasLegacyAdapter(entry) && entry.legacyFamily == family &&
+            entry.legacyOperation == operation)
             return &entry;
     }
     return nullptr;

@@ -35,6 +35,16 @@ bool isNVVMBoolType(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Bool;
 }
 
+IRVectorType* asNVVMSupportedUInt3Type(IRInst* type)
+{
+    auto vectorType = as<IRVectorType>(type);
+    auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
+    return vectorType && isNVVMUnsignedI32Type(vectorType->getElementType()) && elementCount &&
+                   elementCount->getValue() == 3
+               ? vectorType
+               : nullptr;
+}
+
 IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount)
 {
     if (outElementCount)
@@ -268,6 +278,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isI32 = isNVVMInteger32Type(type);
     const bool isFloat32 = isNVVMFloat32Type(type);
     const bool isBool = isNVVMBoolType(type);
+    IRVectorType* uint3Type = asNVVMSupportedUInt3Type(type);
     IRPtrTypeBase* deviceScalarPointer = asNVVMSupportedDeviceScalarPointerType(type);
     IRArrayType* arrayType = nullptr;
     IRPtrTypeBase* deviceArrayPointer = asNVVMSupportedDeviceArrayPointerType(type, &arrayType);
@@ -280,12 +291,12 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // helper signature.
     const bool isLegal =
         (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-        (use == NVVMTypeUse::HelperResult && (isI32 || isFloat32 || isBool)) ||
+        (use == NVVMTypeUse::HelperResult && (isVoid || isI32 || isFloat32 || isBool || uint3Type)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isI32 || isFloat32 || deviceScalarPointer || deviceArrayPointer || rawResource)) ||
         (use == NVVMTypeUse::HelperParameter && (isI32 || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
-         (isI32 || isFloat32 || isBool || deviceScalarPointer || deviceArrayPointer ||
+         (isI32 || isFloat32 || isBool || uint3Type || deviceScalarPointer || deviceArrayPointer ||
           rawResource || resourceElementPointer));
     if (!isLegal)
         return _reportUnsupportedType(use);
@@ -312,6 +323,14 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             "float32 type",
             m_builder.getFloatingPointType(m_module, 32u, outType)));
+    }
+    else if (uint3Type)
+    {
+        SlangNVVMTypeHandle_1 elementType = nullptr;
+        SLANG_RETURN_ON_FAIL(lowerType(uint3Type->getElementType(), NVVMTypeUse::Value, elementType));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "fixed uint3 vector type",
+            m_builder.getVectorType(m_module, elementType, 3, outType)));
     }
     else if (deviceScalarPointer)
     {

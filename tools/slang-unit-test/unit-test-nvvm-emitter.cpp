@@ -513,6 +513,74 @@ SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangCUDAExecutionUsesDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV4();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMCUDAExecutionSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.getVectorTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.vectorElementType == _getFakeNVVMBuilderIntegerType());
+        SLANG_CHECK(gFakeNVVMBuilder.vectorElementCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.executionRegisterOperations.getCount() == 4);
+        const SlangNVVMValueOperation_4 expectedOperations[] = {
+            SLANG_NVVM_VALUE_OP_THREAD_INDEX_4,
+            SLANG_NVVM_VALUE_OP_BLOCK_INDEX_4,
+            SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS_4,
+            SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4,
+        };
+        for (Index i = 0; i < SLANG_COUNT_OF(expectedOperations); ++i)
+        {
+            SLANG_CHECK(gFakeNVVMBuilder.executionRegisterOperations[i] == expectedOperations[i]);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.scalarReturnValueRefs[i].kind ==
+                FakeNVVMBuilderValueKind::ExecutionRegister);
+            SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs[i].index == i);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.workgroupBarrierCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 5);
+        SLANG_CHECK(gFakeNVVMBuilder.callResultKinds.getCount() == 5);
+        for (Index i = 0; i < 4; ++i)
+            SLANG_CHECK(gFakeNVVMBuilder.callResultKinds[i] == FakeNVVMBuilderResultTypeKind::UInt3);
+        SLANG_CHECK(gFakeNVVMBuilder.callResultKinds[4] == FakeNVVMBuilderResultTypeKind::Void);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount == 12);
+        SLANG_CHECK(gFakeNVVMBuilder.vectorElementBaseValueRefs.getCount() == 12);
+        for (Index i = 0; i < 12; ++i)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.vectorElementBaseValueRefs[i].kind ==
+                FakeNVVMBuilderValueKind::Call);
+            SLANG_CHECK(gFakeNVVMBuilder.vectorElementBaseValueRefs[i].index == i / 3);
+            SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[i] == uint32_t(i % 3));
+            SLANG_CHECK(
+                gFakeNVVMBuilder.storeValueRefs[i].kind == FakeNVVMBuilderValueKind::VectorElement);
+            SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[i].index == i);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 12);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitReturnVoidCallCount == 2);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangWaveLaneCountUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -1526,6 +1594,39 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesGenericScalarFunctionCapability)
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesCUDAExecutionCapability)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMCUDAExecutionSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        const String diagnosticText = _getBlobText(diagnostics);
+        SLANG_CHECK(diagnosticText.indexOf("E52018") >= 0);
+        SLANG_CHECK(diagnosticText.indexOf("extended function construction") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.executionRegisterOperations.getCount() == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.workgroupBarrierCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
@@ -4159,7 +4260,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         const char* expectedConstruct;
     };
     static const UnsupportedCase kCases[] = {
-        {kDirectNVVMUnsupportedCallSource, "'helper function result type'"},
+        {kDirectNVVMUnsupportedCallSource, "'CUDA kernel decoration'"},
         {kDirectNVVMUnsupportedPointerHelperParameterSource, "'helper function parameter'"},
         {kDirectNVVMUnsupportedPointerHelperResultSource, "'helper function result type'"},
         {kDirectNVVMUnsignedPointerOffsetSource, "'integer_constant'"},

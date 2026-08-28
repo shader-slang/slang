@@ -103,10 +103,23 @@ void _requireFeature(NVVMIRFeatureSet& features, SlangNVVMBuilderFeature_3 requi
     features.words[requiredFeature / 64u] |= uint64_t(1) << (requiredFeature % 64u);
 }
 
-// Matches one canonical Slang scalar type against a provider-owned semantic type role.
+// Matches one canonical Slang type against a provider-owned semantic type role.
 bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc_4& semanticType)
 {
-    if (!type || semanticType.laneCount != 1 || semanticType.reserved != 0)
+    if (!type || semanticType.reserved != 0)
+        return false;
+
+    if (semanticType.kind == SLANG_NVVM_VALUE_TYPE_VOID_4)
+    {
+        return semanticType.bitWidth == 0 && semanticType.laneCount == 0 &&
+               as<IRVoidType>(type);
+    }
+    if (semanticType.laneCount == 3)
+    {
+        return semanticType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4 &&
+               semanticType.bitWidth == 32 && asNVVMSupportedUInt3Type(type);
+    }
+    if (semanticType.laneCount != 1)
         return false;
 
     switch (semanticType.kind)
@@ -163,10 +176,14 @@ const NVVMSemantics::CatalogEntry* _findNVVMGenericAsmSemantic(
     return nullptr;
 }
 
-// Converts one canonical Slang scalar type to its stable provider semantic role.
+// Converts one canonical Slang type to its stable provider semantic role.
 bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc_4& outType)
 {
-    if (isNVVMBoolType(type))
+    if (as<IRVoidType>(type))
+        outType = NVVMSemantics::kVoid;
+    else if (asNVVMSupportedUInt3Type(type))
+        outType = NVVMSemantics::kUnsignedI32x3;
+    else if (isNVVMBoolType(type))
         outType = NVVMSemantics::kBool;
     else if (isNVVMSignedI32Type(type))
         outType = NVVMSemantics::kSignedI32;
@@ -565,14 +582,15 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     return isNVVMInteger32Type(type) || isNVVMFloat32Type(type) || isNVVMBoolType(type);
 }
 
-// Returns whether a type is an accepted canonical scalar in a helper result.
+// Returns whether a type is an accepted canonical value in a helper result.
 bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
-    return _isSupportedNVVMHelperParameterType(type);
+    return as<IRVoidType>(type) || asNVVMSupportedUInt3Type(type) ||
+           _isSupportedNVVMHelperParameterType(type);
 }
 
-// Returns whether a canonical helper signature needs the generic V3 scalar-function path.
-bool _usesGenericNVVMScalarFunctions(IRFunc* helper)
+// Returns whether a canonical helper signature needs the generic construction path.
+bool _usesGenericNVVMFunctions(IRFunc* helper)
 {
     SLANG_RELEASE_ASSERT(helper);
     SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperResultType(helper->getResultType()));
@@ -922,12 +940,30 @@ SlangResult _validateNVVMFunction(
                     auto callee =
                         call && call->getOperandCount() ? as<IRFunc>(call->getOperand(0)) : nullptr;
                     if (!callee || !_isSupportedNVVMHelperResultType(inst->getDataType()))
-                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar call"));
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("value call"));
                     _requireFeature(
                         features,
-                        _usesGenericNVVMScalarFunctions(callee)
+                        _usesGenericNVVMFunctions(callee)
                             ? SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS
                             : SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
+                }
+                break;
+
+            case kIROp_Swizzle:
+                {
+                    auto swizzle = as<IRSwizzle>(inst);
+                    auto elementIndex = swizzle && swizzle->getElementCount() == 1
+                                            ? _asExecutableI32Constant(swizzle->getElementIndex(0))
+                                            : nullptr;
+                    if (!swizzle || !isNVVMUnsignedI32Type(swizzle->getDataType()) ||
+                        !asNVVMSupportedUInt3Type(swizzle->getBase()->getDataType()) ||
+                        !elementIndex || elementIndex->getValue() < 0 ||
+                        elementIndex->getValue() >= 3)
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("CUDA execution-index component"));
+                    }
                 }
                 break;
 
@@ -942,7 +978,8 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                     }
-                    _requireFeature(features, semantic->legacyFeature);
+                    if (NVVMSemantics::hasLegacyAdapter(*semantic))
+                        _requireFeature(features, semantic->legacyFeature);
                 }
                 break;
 
@@ -1256,7 +1293,21 @@ SlangResult _validateNVVMFunction(
                             dominatorTree,
                             features));
                     }
-                    availableValues.add(call);
+                    if (!as<IRVoidType>(call->getDataType()))
+                        availableValues.add(call);
+                }
+                break;
+
+            case kIROp_Swizzle:
+                {
+                    auto swizzle = cast<IRSwizzle>(inst);
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        swizzle->getBase(),
+                        swizzle,
+                        availableValues,
+                        dominatorTree));
+                    availableValues.add(swizzle);
                 }
                 break;
 
@@ -1650,7 +1701,7 @@ SlangResult validateNVVMSupportedIR(
             continue;
         _requireFeature(
             outFeatures,
-            _usesGenericNVVMScalarFunctions(function)
+            _usesGenericNVVMFunctions(function)
                 ? SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS
                 : SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
     }
@@ -1715,6 +1766,44 @@ SlangResult emitNVVMIRFromLinkedIR(
     HashSet<IRFunc*> functionSet;
     SLANG_RETURN_ON_FAIL(
         _collectNVVMFunctions(codeGenContext, linkedIR, entryPoint, functions, functionSet));
+
+    // Extended helper signatures and typed GenericAsm semantics are provider capabilities rather
+    // than legacy feature bits. Checking them before module creation preserves preflight's
+    // no-provider-mutation failure boundary.
+    for (auto function : functions)
+    {
+        if (function != entryPoint &&
+            (as<IRVoidType>(function->getResultType()) ||
+             asNVVMSupportedUInt3Type(function->getResultType())) &&
+            !builder.supportsExtendedConstruction())
+        {
+            return _requireBuilderOperation(
+                codeGenContext,
+                "extended function construction",
+                SLANG_E_NOT_AVAILABLE);
+        }
+        for (auto block : function->getBlocks())
+        {
+            for (auto inst : block->getOrdinaryInsts())
+            {
+                auto genericAsm = as<IRGenericAsm>(inst);
+                if (!genericAsm)
+                    continue;
+                const NVVMSemantics::CatalogEntry* semantic =
+                    _findNVVMGenericAsmSemantic(genericAsm, function);
+                SLANG_RELEASE_ASSERT(semantic);
+                const SlangNVVMValueOperationDesc_4 operation =
+                    NVVMSemantics::getOperationDesc(*semantic);
+                if (!builder.supportsValueOperation(operation))
+                {
+                    return _requireBuilderOperation(
+                        codeGenContext,
+                        semantic->diagnosticName,
+                        SLANG_E_NOT_AVAILABLE);
+                }
+            }
+        }
+    }
 
     ScopedNVVMModule moduleScope;
     moduleScope.builder = &builder;
@@ -2027,12 +2116,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                         }
 
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        const bool usesGenericScalarFunctions =
-                            _usesGenericNVVMScalarFunctions(callee);
+                        const bool usesGenericFunctions = _usesGenericNVVMFunctions(callee);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            usesGenericScalarFunctions ? "generic scalar call" : "signed i32 call",
-                            usesGenericScalarFunctions
+                            usesGenericFunctions ? "generic value call" : "signed i32 call",
+                            usesGenericFunctions
                                 ? builder.emitCall(
                                       moduleScope.module,
                                       functionMap.getValue(callee),
@@ -2048,6 +2136,32 @@ SlangResult emitNVVMIRFromLinkedIR(
                                       size_t(loweredArguments.getCount()),
                                       loweredValue)));
                         valueMap[call] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_Swizzle:
+                    {
+                        auto swizzle = cast<IRSwizzle>(inst);
+                        auto elementIndex = cast<IRIntLit>(swizzle->getElementIndex(0));
+                        SlangNVVMValueHandle_1 loweredBase = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            swizzle->getBase(),
+                            valueMap,
+                            typeContext,
+                            loweredBase));
+                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "CUDA execution-index component",
+                            builder.emitVectorElementExtract(
+                                moduleScope.module,
+                                loweredBase,
+                                uint32_t(elementIndex->getValue()),
+                                loweredValue)));
+                        valueMap[swizzle] = loweredValue;
                     }
                     break;
 
@@ -2085,8 +2199,12 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 loweredValue)));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "generic scalar return",
-                            builder.emitValueReturn(moduleScope.module, loweredValue)));
+                            semantic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID_4
+                                ? "void return"
+                                : "generic value return",
+                            semantic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID_4
+                                ? builder.emitReturnVoid(moduleScope.module)
+                                : builder.emitValueReturn(moduleScope.module, loweredValue)));
                     }
                     break;
 
@@ -2212,9 +2330,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredValue));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            _usesGenericNVVMScalarFunctions(function) ? "generic scalar return"
-                                                                      : "signed i32 return",
-                            _usesGenericNVVMScalarFunctions(function)
+                            _usesGenericNVVMFunctions(function) ? "generic value return"
+                                                                : "signed i32 return",
+                            _usesGenericNVVMFunctions(function)
                                 ? builder.emitValueReturn(moduleScope.module, loweredValue)
                                 : builder.emitIntegerReturn(moduleScope.module, loweredValue)));
                     }

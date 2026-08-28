@@ -128,6 +128,19 @@ public:
         return m_apiV4.structureSize ? &m_valueOperationsV4 : nullptr;
     }
 
+    /// Returns whether the provider implements the extended V4 construction contract.
+    bool supportsExtendedConstruction() const
+    {
+        return m_apiV4.structureSize &&
+               m_constructionV4.interfaceVersion ==
+                   SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 &&
+               m_constructionV4.getVectorType && m_constructionV4.emitVectorElementExtract &&
+               m_constructionV4.emitExtendedCall && m_constructionV4.emitExtendedValueReturn;
+    }
+
+    /// Returns whether the queried V4 construction table supports fixed vectors.
+    bool supportsVectorConstruction() const { return supportsExtendedConstruction(); }
+
     /// Queries one complete typed V4 operation, adapting to V3/V2 when necessary.
     bool supportsValueOperation(const SlangNVVMValueOperationDesc_4& operation) const;
 
@@ -291,7 +304,7 @@ public:
         SlangNVVMValueHandle_1 value,
         SlangNVVMBlockHandle_1 predecessorBlock) const;
 
-    /// Emits a direct call to a same-module scalar function.
+    /// Emits a direct call to a same-module typed function through V4 or its scalar V3 adapter.
     SlangResult emitCall(
         SlangNVVMModuleHandle_1 module,
         SlangNVVMValueHandle_1 callee,
@@ -299,7 +312,7 @@ public:
         size_t argumentCount,
         SlangNVVMValueHandle_1& outValue) const;
 
-    /// Emits a scalar valued return in the current function.
+    /// Emits a typed valued return in the current function through V4 or its scalar V3 adapter.
     SlangResult emitValueReturn(SlangNVVMModuleHandle_1 module, SlangNVVMValueHandle_1 value) const;
 
     /// Emits one negotiated target intrinsic through the generic V3 operation family.
@@ -374,6 +387,20 @@ public:
         SlangNVVMTypeHandle_1 elementType,
         uint32_t elementCount,
         SlangNVVMTypeHandle_1& outType) const;
+
+    /// Gets a fixed-vector type through construction interface version 2.
+    SlangResult getVectorType(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 elementType,
+        uint32_t elementCount,
+        SlangNVVMTypeHandle_1& outType) const;
+
+    /// Extracts one statically selected element from a fixed vector.
+    SlangResult emitVectorElementExtract(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMValueHandle_1 vector,
+        uint32_t elementIndex,
+        SlangNVVMValueHandle_1& outValue) const;
 
     /// Emits a non-inbounds address of one element of a typed array pointer.
     SlangResult emitArrayElementPointer(

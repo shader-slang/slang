@@ -3211,6 +3211,72 @@ passes 419/419, including compatible assembly, `ptxas`, and runtime lanes; the f
 catalog and family sample passes 12/12, and the Debug preservation sample passes all 11 selected
 tests with unrelated graphics API detection disabled.
 
+### Slice 66: Core CUDA execution and synchronization
+
+Slice 66 adds the first V4-only semantics as one execution family. Consider this kernel:
+
+```slang
+[CUDAKernel]
+void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> output)
+{
+    uint3 thread = cudaThreadIdx();
+    uint3 block = cudaBlockIdx();
+    uint3 blockSize = cudaBlockDim();
+    uint3 gridSize = cudaGridDim();
+    GroupMemoryBarrierWithGroupSync();
+    // Store selected components.
+}
+```
+
+CUDA lowering produces four zero-parameter `uint3` helpers whose bodies are exact canonical
+`GenericAsm` spellings `(threadIdx)`, `(blockIdx)`, `(blockDim)`, and `(gridDim)`. The established
+barrier produces a zero-parameter `void` helper with exact spelling `__syncthreads()`. Scalar source
+component reads remain ordinary one-component `kIROp_Swizzle` instructions. These are intentional
+producer forms, not alternate spellings repaired by emission: preflight accepts only those exact
+helper signatures/spellings and exact constant swizzle indices 0 through 2.
+
+The catalog carries one typed zero-operand operation for each whole `uint3` semantic and one typed
+zero-operand `void` barrier operation. It does not add V3 feature bits, callbacks, or one operation
+per axis. V4 construction interface version 2 appends fixed-vector type construction, constant
+element extraction, and extended call/valued-return callbacks while keeping the exact version-1
+prefix queryable. The inherited call and valued-return callbacks retain their frozen scalar
+contract in both versions; only the appended callbacks transport fixed vectors or void. A host asks
+for version 2 first and falls back to version 1 only on exact `SLANG_E_NO_INTERFACE`. A discovered
+version-1 provider therefore still supports all Slice 65 programs but rejects execution helpers as
+E52018 before module creation.
+
+The provider maps the four semantic rows to the twelve LLVM NVVM special-register intrinsics:
+`tid.{x,y,z}`, `ctaid.{x,y,z}`, `ntid.{x,y,z}`, and `nctaid.{x,y,z}`. It assembles each result as
+one `<3 x i32>` and returns it through the generic V4 function path. The barrier maps to the
+zero-argument convergent `llvm.nvvm.barrier0` intrinsic and returns no value. Operation descriptor,
+insertion point, output, ownership, vector shape, and extraction index are all validated before
+mutation.
+
+The audited NVVM-2.0 text writer exposed a real LLVM-version distinction. LLVM 14 gives lane-id and
+warp-size declarations six optimization attributes, but gives these twelve execution-register
+declarations only `nounwind readnone speculatable`; the barrier has exactly `convergent nounwind`.
+The writer now validates both special-register sets independently, removes only the LLVM-7-unknown
+optimization attributes from their shared declaration groups, and leaves the convergent barrier
+unchanged. Semantic declaration and rewrite counts must still agree.
+
+The differential workload launches a `3 x 2 x 2` grid of `4 x 3 x 2` blocks. Because unsigned
+arithmetic is deliberately still outside the direct subset, each of the 288 invocations uses the
+already-supported signed relaxed atomic add to reserve one output record, synchronizes, and stores
+all twelve register components. Host validation treats records as an unordered set and proves every
+thread/block coordinate occurs exactly once with the expected block and grid dimensions. CUDA 12.9
+direct NVVM and NVRTC PTX both expose all twelve special registers plus `bar.sync`; `ptxas` accepts
+both, and both execute with identical results on the RTX 5090. This does not claim unsigned
+arithmetic, shared storage, fences, or barriers beyond the canonical group-sync helper.
+
+Six independently registered family-level names increase the five measured NVVM test/support
+files from 28,396 to 29,241 physical lines. The complete Release NVVM prefix passes 425/425 with
+sorted LF-terminated registered-name SHA-256
+`641fcaf6a0da63e30a6146beb3e46e261d58297299aa33d180a1f86d73e4f0e5`; removing those six names
+reproduces Slice 65's 419-name hash
+`c634caa999f2b191c85b37cc7885d39462bcef55406ef64dc04bd1a1d02590c9` exactly. The rebuilt Debug
+host passes the 11-test preservation sample, and the final post-format V4 ABI check passes with the
+Release provider.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific

@@ -26272,6 +26272,17 @@ uint3 cudaBlockDim()
     }
 }
 
+[__readNone]
+[NonUniformReturn]
+[require(cuda)]
+uint3 cudaGridDim()
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "(gridDim)";
+    }
+}
+
 //
 // Workgroup cooperation
 //

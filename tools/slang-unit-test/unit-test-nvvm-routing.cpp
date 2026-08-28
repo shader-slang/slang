@@ -172,7 +172,7 @@ SLANG_UNIT_TEST(cudaEmissionMethodLinkOptionsAffectRoutingAndHash)
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(code == nullptr);
     SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("E52017")) != -1);
-    SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("'helper function result type'")) != -1);
+    SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("'CUDA kernel decoration'")) != -1);
 }
 
 SLANG_UNIT_TEST(invalidCUDAEmissionMethodIsDiagnosed)

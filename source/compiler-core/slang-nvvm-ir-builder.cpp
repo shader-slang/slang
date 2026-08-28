@@ -602,8 +602,11 @@ static bool _hasRequiredFoundationV4(const SlangNVVMBuilderFoundationAPI_4& api)
 
 static bool _hasRequiredConstructionV4(const SlangNVVMBuilderConstructionAPI_4& api)
 {
-    return api.structureSize >= sizeof(api) &&
-           api.interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 &&
+    const bool hasV1 = api.structureSize >= SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_1_SIZE &&
+                       (api.interfaceVersion ==
+                            SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1 ||
+                        api.interfaceVersion ==
+                            SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4) &&
            api.getVoidType && api.getIntegerType && api.getFloatingPointType &&
            api.getPointerType && api.getFunctionType && api.getArrayType &&
            api.getRawRWStructuredBufferI32Type && api.declareFunction && api.getFunctionParameter &&
@@ -613,6 +616,11 @@ static bool _hasRequiredConstructionV4(const SlangNVVMBuilderConstructionAPI_4& 
            api.emitValueReturn && api.emitReturnVoid && api.emitPointerOffset &&
            api.emitArrayElementPointer && api.emitRawRWStructuredBufferI32ElementPointer &&
            api.emitRelaxedGlobalI32AtomicAdd && api.markFunctionAsKernel;
+    if (!hasV1)
+        return false;
+    return api.interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1 ||
+           (api.structureSize >= sizeof(api) && api.getVectorType &&
+            api.emitVectorElementExtract && api.emitExtendedCall && api.emitExtendedValueReturn);
 }
 
 static bool _hasRequiredValueOperationsV4(const SlangNVVMBuilderValueOperationsAPI_4& api)
@@ -627,7 +635,8 @@ static SlangResult _queryInterfaceV4(
     const SlangNVVMBuilderAPI_V4& api,
     SlangNVVMBuilderInterfaceID_4 interfaceID,
     uint32_t interfaceVersion,
-    T& outInterface)
+    T& outInterface,
+    size_t minimumSize = sizeof(T))
 {
     outInterface = {};
     const void* providerInterface = nullptr;
@@ -636,10 +645,11 @@ static SlangResult _queryInterfaceV4(
         return SLANG_E_NO_INTERFACE;
 
     const T* table = static_cast<const T*>(providerInterface);
-    if (table->structureSize < sizeof(T))
+    if (table->structureSize < minimumSize)
         return SLANG_E_NO_INTERFACE;
-    std::memcpy(&outInterface, table, sizeof(T));
-    outInterface.structureSize = uint32_t(sizeof(T));
+    const size_t retainedSize = table->structureSize < sizeof(T) ? table->structureSize : sizeof(T);
+    std::memcpy(&outInterface, table, retainedSize);
+    outInterface.structureSize = uint32_t(retainedSize);
     return SLANG_OK;
 }
 
@@ -668,11 +678,21 @@ static SlangResult _queryInterfaceV4(
         SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION_4,
         SLANG_NVVM_BUILDER_FOUNDATION_INTERFACE_VERSION_4,
         foundation));
-    SLANG_RETURN_ON_FAIL(_queryInterfaceV4(
+    SlangResult constructionResult = _queryInterfaceV4(
         api,
         SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION_4,
         SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4,
-        construction));
+        construction);
+    if (constructionResult == SLANG_E_NO_INTERFACE)
+    {
+        constructionResult = _queryInterfaceV4(
+            api,
+            SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION_4,
+            SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1,
+            construction,
+            SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_1_SIZE);
+    }
+    SLANG_RETURN_ON_FAIL(constructionResult);
     SLANG_RETURN_ON_FAIL(_queryInterfaceV4(
         api,
         SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS_4,
@@ -919,7 +939,8 @@ bool NVVMIRBuilder::supportsValueOperation(const SlangNVVMValueOperationDesc_4& 
     }
 
     const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::find(operation);
-    return entry && supportsFeature(entry->legacyFeature);
+    return entry && NVVMSemantics::hasLegacyAdapter(*entry) &&
+           supportsFeature(entry->legacyFeature);
 }
 
 SlangResult NVVMIRBuilder::emitValueOperation(
@@ -945,12 +966,20 @@ SlangResult NVVMIRBuilder::emitValueOperation(
         const SlangNVVMResult_1 result =
             m_valueOperationsV4
                 .emitOperation(module, &operation, operands, operandCount, &outValue);
+        if (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID_4)
+        {
+            if (SLANG_FAILED(result))
+                return result;
+            return !outValue ? SLANG_OK : SLANG_FAIL;
+        }
         return _validateHandleResult(result, outValue);
     }
 
     const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::find(operation);
     if (!entry)
         return SLANG_E_INVALID_ARG;
+    if (!NVVMSemantics::hasLegacyAdapter(*entry))
+        return SLANG_E_NOT_AVAILABLE;
     switch (entry->legacyFamily)
     {
     case NVVMSemantics::LegacyFamily::IntegerUnary:
@@ -987,6 +1016,9 @@ SlangResult NVVMIRBuilder::emitValueOperation(
             outValue);
     case NVVMSemantics::LegacyFamily::Intrinsic:
         return emitIntrinsic(module, entry->legacyOperation, operands, operandCount, outValue);
+    case NVVMSemantics::LegacyFamily::V4ExecutionRegister:
+    case NVVMSemantics::LegacyFamily::V4WorkgroupBarrier:
+        return SLANG_E_NOT_AVAILABLE;
     }
     return SLANG_E_INVALID_ARG;
 }
@@ -1597,10 +1629,26 @@ SlangResult NVVMIRBuilder::emitCall(
         return SLANG_E_UNINITIALIZED;
     if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS))
         return SLANG_E_NOT_AVAILABLE;
-    const SlangNVVMResult_1 result =
-        m_apiV4.structureSize
-            ? m_constructionV4.emitCall(module, callee, arguments, argumentCount, &outValue)
-            : m_apiV3.emitCall(module, callee, arguments, argumentCount, &outValue);
+    const SlangNVVMResult_1 result = m_apiV4.structureSize
+                                         ? (supportsExtendedConstruction()
+                                                ? m_constructionV4.emitExtendedCall(
+                                                      module,
+                                                      callee,
+                                                      arguments,
+                                                      argumentCount,
+                                                      &outValue)
+                                                : m_constructionV4.emitCall(
+                                                      module,
+                                                      callee,
+                                                      arguments,
+                                                      argumentCount,
+                                                      &outValue))
+                                         : m_apiV3.emitCall(
+                                               module,
+                                               callee,
+                                               arguments,
+                                               argumentCount,
+                                               &outValue);
     return _validateHandleResult(result, outValue);
 }
 
@@ -1612,8 +1660,11 @@ SlangResult NVVMIRBuilder::emitValueReturn(
         return SLANG_E_UNINITIALIZED;
     if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS))
         return SLANG_E_NOT_AVAILABLE;
-    return m_apiV4.structureSize ? m_constructionV4.emitValueReturn(module, value)
-                                 : m_apiV3.emitValueReturn(module, value);
+    return m_apiV4.structureSize
+               ? (supportsExtendedConstruction()
+                      ? m_constructionV4.emitExtendedValueReturn(module, value)
+                      : m_constructionV4.emitValueReturn(module, value))
+               : m_apiV3.emitValueReturn(module, value);
 }
 
 SlangResult NVVMIRBuilder::emitIntrinsic(
@@ -1797,6 +1848,38 @@ SlangResult NVVMIRBuilder::getArrayType(
     const SlangNVVMResult_1 result =
         m_apiV2.getArrayType(module, elementType, elementCount, &outType);
     return _validateHandleResult(result, outType);
+}
+
+SlangResult NVVMIRBuilder::getVectorType(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1 elementType,
+    uint32_t elementCount,
+    SlangNVVMTypeHandle_1& outType) const
+{
+    outType = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsVectorConstruction())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_constructionV4.getVectorType(module, elementType, elementCount, &outType);
+    return _validateHandleResult(result, outType);
+}
+
+SlangResult NVVMIRBuilder::emitVectorElementExtract(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMValueHandle_1 vector,
+    uint32_t elementIndex,
+    SlangNVVMValueHandle_1& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsVectorConstruction())
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangNVVMResult_1 result =
+        m_constructionV4.emitVectorElementExtract(module, vector, elementIndex, &outValue);
+    return _validateHandleResult(result, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitArrayElementPointer(
