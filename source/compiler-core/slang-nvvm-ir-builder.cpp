@@ -34,13 +34,14 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
     return api.getVoidType && api.getIntegerType && api.getFloatingPointType &&
            api.getPointerType && api.getFunctionType && api.getArrayType && api.getVectorType &&
            api.getStructType && api.declareFunction && api.getFunctionParameter &&
-           api.createBlock && api.setInsertBlock && api.emitLoad && api.emitStore &&
-           api.emitBranch && api.emitConditionalBranch && api.getIntegerConstant &&
-           api.getFloatingPointConstant && api.emitPhi && api.addPhiIncoming && api.emitCall &&
-           api.emitValueReturn && api.emitReturnVoid && api.emitPointerOffset &&
-           api.emitArrayElementPointer && api.emitStructFieldPointer && api.emitStructFieldValue &&
-           api.emitVectorElementExtract && api.emitRelaxedGlobalI32AtomicAdd &&
-           api.declareGlobalStorage && api.markFunctionAsKernel;
+           api.setFunctionParameterAttributes && api.createBlock && api.setInsertBlock &&
+           api.emitLoad && api.emitStore && api.emitBranch && api.emitConditionalBranch &&
+           api.getIntegerConstant && api.getFloatingPointConstant && api.emitPhi &&
+           api.addPhiIncoming && api.emitCall && api.emitValueReturn && api.emitReturnVoid &&
+           api.emitPointerOffset && api.emitArrayElementPointer && api.emitStructFieldPointer &&
+           api.emitStructFieldValue && api.emitVectorElementExtract &&
+           api.emitRelaxedGlobalI32AtomicAdd && api.declareGlobalStorage &&
+           api.markFunctionAsKernel;
 }
 
 static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI& api)
@@ -293,6 +294,25 @@ SlangResult NVVMIRBuilder::getFunctionParameter(
     const SlangNVVMResult result =
         m_construction.getFunctionParameter(module, function, parameterIndex, &outValue);
     return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::setFunctionParameterAttributes(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle function,
+    size_t parameterIndex,
+    SlangNVVMParameterFlags flags,
+    SlangNVVMTypeHandle pointeeType,
+    uint32_t alignment) const
+{
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    return m_construction.setFunctionParameterAttributes(
+        module,
+        function,
+        parameterIndex,
+        flags,
+        pointeeType,
+        alignment);
 }
 
 SlangResult NVVMIRBuilder::createBlock(

@@ -39,6 +39,9 @@ IRVectorType* asNVVMSupportedSignedI32x2Type(IRInst* type);
 /// Returns whether `type` is a selected scalar or established fixed integer vector.
 bool isNVVMSupportedNumericValueType(IRInst* type);
 
+/// Returns an exact nonempty struct whose fields are all selected scalar values.
+IRStructType* asNVVMSupportedScalarStructType(IRInst* type);
+
 /// Returns the natural byte alignment of one selected numeric value, or zero when unsupported.
 uint32_t getNVVMNumericValueAlignment(IRInst* type);
 
@@ -72,10 +75,18 @@ IRGlobalVar* asNVVMSupportedSharedI32ArrayGlobal(
 /// Returns the canonical shared-address-space pointer produced for one i32 array element.
 IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type);
 
-/// Returns an exact raw CUDA `RWStructuredBuffer<T, DefaultLayout>` for a selected scalar `T`.
-IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferType(
+/// Describes which operations a canonical raw structured-buffer view permits.
+enum class NVVMStructuredBufferAccess
+{
+    ReadOnly,
+    ReadWrite,
+};
+
+/// Returns an exact raw CUDA structured-buffer view for a selected scalar `T`.
+IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawStructuredBufferType(
     IRInst* type,
-    IRType** outElementType = nullptr);
+    IRType** outElementType = nullptr,
+    NVVMStructuredBufferAccess* outAccess = nullptr);
 
 /// Returns an accepted storage-only CUDA sampler placeholder.
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type);
@@ -142,7 +153,7 @@ private:
 
     SlangResult _lowerArrayType(IRArrayType* type, SlangNVVMTypeHandle& outType);
     SlangResult _lowerStructType(IRStructType* type, SlangNVVMTypeHandle& outType);
-    SlangResult _lowerRawRWStructuredBufferType(
+    SlangResult _lowerRawStructuredBufferType(
         IRHLSLStructuredBufferTypeBase* type,
         SlangNVVMTypeHandle& outType);
     SlangResult _lowerScalarParameterGroupType(
@@ -164,6 +175,7 @@ private:
     const NVVMIRBuilder& m_builder;
     SlangNVVMModuleHandle m_module = nullptr;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_typeMap;
+    Dictionary<IRType*, SlangNVVMTypeHandle> m_entryParameterRepresentationMap;
     Dictionary<PointerTypeKey, SlangNVVMTypeHandle> m_pointerRepresentationMap;
 };
 

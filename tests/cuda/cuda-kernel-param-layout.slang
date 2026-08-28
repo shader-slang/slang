@@ -7,6 +7,8 @@
 // still have the trailing padding at the end of their layouts, unlike the entry point parameter struct
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST:SIMPLE(filecheck=CHECK_NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 //TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry computeMain -target cuda -no-codegen
 
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4):name=input
@@ -52,3 +54,11 @@ void computeMain(
 // REFLECT: "binding": {"kind": "uniform", "offset": 32, "size": 16
 // REFLECT: "name": "count",
 // REFLECT: "binding": {"kind": "uniform", "offset": 48, "size": 4
+
+// CHECK_NVVM: .visible .entry computeMain(
+// CHECK_NVVM-NEXT: {{[ \t]*}}.param .align 8 .b8 {{.*}}[16],
+// CHECK_NVVM-NEXT: {{[ \t]*}}.param .align 8 .b8 {{.*}}[16],
+// CHECK_NVVM-NEXT: {{[ \t]*}}.param .align 8 .b8 {{.*}}[16],
+// CHECK_NVVM-NEXT: {{[ \t]*}}.param .u32
+// CHECK_NVVM: ld.global.nc.f32
+// CHECK_NVVM: st.global.f32

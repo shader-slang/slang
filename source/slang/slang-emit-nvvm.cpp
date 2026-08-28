@@ -89,6 +89,11 @@ bool _findNVVMStructField(
 // conventional CUDA parameter block.
 bool _isNVVMConventionalGlobalStorageType(const NVVMConventionalGlobalParams& params, IRInst* inst)
 {
+    // A raw CUDA kernel can retain by-value struct declarations without having a collected global
+    // parameter block. In that case there are no conventional-global storage types to recognize.
+    if (!params.elementType)
+        return false;
+
     if (inst == params.elementType)
         return true;
     for (auto field : params.elementType->getFields())
@@ -105,7 +110,7 @@ bool _isNVVMConventionalGlobalStorageType(const NVVMConventionalGlobalParams& pa
     return false;
 }
 
-struct NVVMStructFieldAddress
+struct NVVMStructField
 {
     IRStructField* field = nullptr;
     uint32_t fieldIndex = 0;
@@ -113,7 +118,7 @@ struct NVVMStructFieldAddress
 
 // Resolves the two aggregate-address shapes with executable representations: a field in the
 // collected CUDA parameter block, or a selected scalar in a loaded parameter group.
-bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructFieldAddress& outAddress)
+bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& outAddress)
 {
     outAddress = {};
     if (!fieldAddress)
@@ -154,10 +159,52 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructFieldAdd
         // Sampler fields are ABI storage only. They intentionally have no executable value form.
         return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
                asNVVMSupportedScalarParameterGroupType(fieldType) ||
-               asNVVMSupportedRawRWStructuredBufferType(fieldType);
+               asNVVMSupportedRawStructuredBufferType(fieldType);
     }
 
     return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType);
+}
+
+// Resolves one scalar field extraction by canonical struct key and verifies its result type.
+bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructField& outField)
+{
+    outField = {};
+    auto structType = fieldExtract
+                          ? asNVVMSupportedScalarStructType(fieldExtract->getBase()->getDataType())
+                          : nullptr;
+    if (!structType || !_findNVVMStructField(
+                           structType,
+                           fieldExtract->getField(),
+                           outField.field,
+                           outField.fieldIndex))
+    {
+        return false;
+    }
+    return isTypeEqual(outField.field->getFieldType(), fieldExtract->getDataType());
+}
+
+// Gets the natural CUDA alignment carried by one physical LLVM `byval` entry parameter.
+bool _getNVVMByValueParameterAlignment(
+    CodeGenContext* codeGenContext,
+    IRType* type,
+    uint32_t& outAlignment)
+{
+    outAlignment = 0;
+    if (!codeGenContext || !asNVVMSupportedScalarStructType(type))
+        return false;
+
+    IRSizeAndAlignment layout;
+    if (SLANG_FAILED(getSizeAndAlignment(
+            codeGenContext->getTargetReq(),
+            IRTypeLayoutRules::getCUDA(),
+            type,
+            &layout)) ||
+        layout.alignment <= 0 || layout.alignment > UINT32_MAX)
+    {
+        return false;
+    }
+    outAlignment = uint32_t(layout.alignment);
+    return true;
 }
 
 // Maps a canonical global produced by CUDA varying legalization to its semantic provider operation.
@@ -962,7 +1009,7 @@ SlangResult _validatePointerValue(
     auto sharedElementPtrType =
         value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
     auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
-    NVVMStructFieldAddress fieldAddress;
+    NVVMStructField fieldAddress;
     if (!fieldPtrType || value->getOp() != kIROp_FieldAddress ||
         !_getNVVMStructFieldAddress(as<IRFieldAddress>(value), fieldAddress))
     {
@@ -1308,6 +1355,16 @@ SlangResult _validateNVVMFunction(
                 isEntryPoint ? toSlice("entry-point parameter")
                              : toSlice("helper function parameter"));
         }
+        if (isEntryPoint && asNVVMSupportedScalarStructType(param->getDataType()))
+        {
+            uint32_t alignment = 0;
+            if (!_getNVVMByValueParameterAlignment(codeGenContext, param->getDataType(), alignment))
+            {
+                return _diagnoseUnsupportedIR(
+                    codeGenContext,
+                    toSlice("entry-point parameter layout"));
+            }
+        }
         availableValues.add(param);
         ++actualParamCount;
     }
@@ -1346,7 +1403,7 @@ SlangResult _validateNVVMFunction(
             {
             case kIROp_Load:
                 if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
-                    !asNVVMSupportedRawRWStructuredBufferType(inst->getDataType()) &&
+                    !asNVVMSupportedRawStructuredBufferType(inst->getDataType()) &&
                     !asNVVMSupportedScalarParameterGroupType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 break;
@@ -1495,9 +1552,31 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_StructuredBufferLoad:
+                if (inst->getOperandCount() != 2 ||
+                    !isNVVMSupportedNumericValueType(inst->getDataType()))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("raw StructuredBuffer scalar load"));
+                }
+                break;
+
+            case kIROp_FieldExtract:
+                {
+                    NVVMStructField field;
+                    if (!_getNVVMStructFieldValue(as<IRFieldExtract>(inst), field))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("scalar struct field value"));
+                    }
+                }
+                break;
+
             case kIROp_FieldAddress:
                 {
-                    NVVMStructFieldAddress fieldAddress;
+                    NVVMStructField fieldAddress;
                     if (!_getNVVMStructFieldAddress(as<IRFieldAddress>(inst), fieldAddress))
                     {
                         return _diagnoseUnsupportedIR(
@@ -1792,17 +1871,74 @@ SlangResult _validateNVVMFunction(
                 availableValues.add(inst);
                 break;
 
+            case kIROp_FieldExtract:
+                {
+                    auto fieldExtract = cast<IRFieldExtract>(inst);
+                    auto parameter = as<IRParam>(fieldExtract->getBase());
+                    if (!isEntryPoint || !parameter || parameter->getParent() != entryBlock)
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("scalar struct field base"));
+                    }
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        parameter,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                }
+                availableValues.add(inst);
+                break;
+
+            case kIROp_StructuredBufferLoad:
+                {
+                    IRInst* buffer = inst->getOperand(0);
+                    IRInst* elementIndex = inst->getOperand(1);
+                    IRType* bufferElementType = nullptr;
+                    NVVMStructuredBufferAccess bufferAccess = NVVMStructuredBufferAccess::ReadWrite;
+                    if (!buffer ||
+                        !asNVVMSupportedRawStructuredBufferType(
+                            buffer->getDataType(),
+                            &bufferElementType,
+                            &bufferAccess) ||
+                        bufferAccess != NVVMStructuredBufferAccess::ReadOnly ||
+                        !isTypeEqual(bufferElementType, inst->getDataType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("raw StructuredBuffer scalar relation"));
+                    }
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        buffer,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    SLANG_RETURN_ON_FAIL(_validateInteger32Value(
+                        codeGenContext,
+                        elementIndex,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    availableValues.add(inst);
+                }
+                break;
+
             case kIROp_RWStructuredBufferGetElementPtr:
                 {
                     IRInst* buffer = inst->getOperand(0);
                     IRInst* elementIndex = inst->getOperand(1);
                     IRType* bufferElementType = nullptr;
+                    NVVMStructuredBufferAccess bufferAccess = NVVMStructuredBufferAccess::ReadOnly;
                     auto resultPointerType =
                         asNVVMSupportedRWStructuredBufferElementPointerType(inst->getDataType());
                     if (!buffer ||
-                        !asNVVMSupportedRawRWStructuredBufferType(
+                        !asNVVMSupportedRawStructuredBufferType(
                             buffer->getDataType(),
-                            &bufferElementType) ||
+                            &bufferElementType,
+                            &bufferAccess) ||
+                        bufferAccess != NVVMStructuredBufferAccess::ReadWrite ||
                         !resultPointerType ||
                         !isTypeEqual(bufferElementType, resultPointerType->getValueType()))
                     {
@@ -2247,10 +2383,18 @@ SlangResult validateNVVMSupportedIR(
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("CUDA kernel decoration"));
     }
 
+    HashSet<IRInst*> entryParameterStructTypes;
+    for (auto parameter : entryPoint->getParams())
+    {
+        if (asNVVMSupportedScalarStructType(parameter->getDataType()))
+            entryParameterStructTypes.add(parameter->getDataType());
+    }
+
     // Linking can retain module-scope types, layouts, capabilities, and constants needed to spell
     // the reachable functions. IRStructKey is also layout-only identity retained for raw CUDA
-    // parameter layouts. Reject every other semantic global so this emitter cannot silently drop a
-    // function, parameter, initializer, or storage object.
+    // parameter layouts. A selected-scalar struct used by the entry point is its canonical by-value
+    // parameter type, not an unrelated dropped global. Reject every other semantic global so this
+    // emitter cannot silently drop a function, parameter, initializer, or storage object.
     for (auto globalInst : linkedIR.module->getGlobalInsts())
     {
         if (auto globalFunction = as<IRFunc>(globalInst))
@@ -2287,6 +2431,8 @@ SlangResult validateNVVMSupportedIR(
         {
             continue;
         }
+        if (entryParameterStructTypes.contains(globalInst))
+            continue;
         if (_isNVVMConventionalGlobalStorageType(conventionalGlobalParams, globalInst))
             continue;
         return _diagnoseUnsupportedIR(
@@ -2444,6 +2590,37 @@ SlangResult emitNVVMIRFromLinkedIR(
                 flags,
                 _getNVVMFunctionName(function, entryPoint),
                 loweredFunction)));
+        if (isEntryPoint)
+        {
+            size_t parameterIndex = 0;
+            for (auto parameter : function->getParams())
+            {
+                if (asNVVMSupportedScalarStructType(parameter->getDataType()))
+                {
+                    SlangNVVMTypeHandle aggregateType = nullptr;
+                    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                        parameter->getDataType(),
+                        NVVMTypeUse::Value,
+                        aggregateType));
+                    uint32_t alignment = 0;
+                    SLANG_RELEASE_ASSERT(_getNVVMByValueParameterAlignment(
+                        codeGenContext,
+                        parameter->getDataType(),
+                        alignment));
+                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                        codeGenContext,
+                        "by-value aggregate parameter attributes",
+                        builder.setFunctionParameterAttributes(
+                            moduleScope.module,
+                            loweredFunction,
+                            parameterIndex,
+                            SLANG_NVVM_PARAMETER_FLAG_BY_VALUE,
+                            aggregateType,
+                            alignment)));
+                }
+                ++parameterIndex;
+            }
+        }
         functionMap[function] = loweredFunction;
     }
 
@@ -2552,7 +2729,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredPointer));
                         SlangNVVMValueHandle loweredValue = nullptr;
                         uint32_t alignment = getNVVMNumericValueAlignment(load->getDataType());
-                        if (asNVVMSupportedRawRWStructuredBufferType(load->getDataType()) ||
+                        if (asNVVMSupportedRawStructuredBufferType(load->getDataType()) ||
                             asNVVMSupportedScalarParameterGroupType(load->getDataType()))
                         {
                             alignment = kNVVMPointerAlignment;
@@ -2879,7 +3056,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_FieldAddress:
                     {
                         auto fieldAddress = cast<IRFieldAddress>(inst);
-                        NVVMStructFieldAddress resolvedAddress;
+                        NVVMStructField resolvedAddress;
                         SLANG_RELEASE_ASSERT(
                             _getNVVMStructFieldAddress(fieldAddress, resolvedAddress));
                         SlangNVVMValueHandle loweredBasePointer = nullptr;
@@ -2901,6 +3078,101 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 resolvedAddress.fieldIndex,
                                 loweredPointer)));
                         valueMap[inst] = loweredPointer;
+                    }
+                    break;
+
+                case kIROp_FieldExtract:
+                    {
+                        auto fieldExtract = cast<IRFieldExtract>(inst);
+                        NVVMStructField resolvedField;
+                        SLANG_RELEASE_ASSERT(_getNVVMStructFieldValue(fieldExtract, resolvedField));
+                        SlangNVVMValueHandle loweredBase = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            fieldExtract->getBase(),
+                            valueMap,
+                            typeContext,
+                            loweredBase));
+                        SlangNVVMValueHandle loweredFieldPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "by-value aggregate field pointer",
+                            builder.emitStructFieldPointer(
+                                moduleScope.module,
+                                loweredBase,
+                                resolvedField.fieldIndex,
+                                loweredFieldPointer)));
+                        const uint32_t alignment =
+                            getNVVMNumericValueAlignment(fieldExtract->getDataType());
+                        SLANG_RELEASE_ASSERT(alignment);
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "by-value aggregate field load",
+                            builder.emitLoad(
+                                moduleScope.module,
+                                loweredFieldPointer,
+                                alignment,
+                                SLANG_NVVM_LOAD_FLAG_INVARIANT,
+                                loweredValue)));
+                        valueMap[inst] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_StructuredBufferLoad:
+                    {
+                        SlangNVVMValueHandle loweredBuffer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(0),
+                            valueMap,
+                            typeContext,
+                            loweredBuffer));
+                        SlangNVVMValueHandle loweredDataPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw StructuredBuffer data pointer",
+                            builder.emitStructFieldValue(
+                                moduleScope.module,
+                                loweredBuffer,
+                                0,
+                                loweredDataPointer)));
+                        SlangNVVMValueHandle loweredElementIndex = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            inst->getOperand(1),
+                            valueMap,
+                            typeContext,
+                            loweredElementIndex));
+                        SlangNVVMValueHandle loweredElementPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw StructuredBuffer scalar element pointer",
+                            builder.emitPointerOffset(
+                                moduleScope.module,
+                                loweredDataPointer,
+                                loweredElementIndex,
+                                loweredElementPointer)));
+                        const uint32_t alignment =
+                            getNVVMNumericValueAlignment(inst->getDataType());
+                        SLANG_RELEASE_ASSERT(alignment);
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw StructuredBuffer scalar load",
+                            builder.emitLoad(
+                                moduleScope.module,
+                                loweredElementPointer,
+                                alignment,
+                                SLANG_NVVM_LOAD_FLAG_INVARIANT,
+                                loweredValue)));
+                        valueMap[inst] = loweredValue;
                     }
                     break;
 

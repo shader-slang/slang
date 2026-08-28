@@ -510,6 +510,49 @@ static SlangResult SLANG_NVVM_CALL _getFunctionParameter(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _setFunctionParameterAttributes(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle function,
+    size_t parameterIndex,
+    SlangNVVMParameterFlags flags,
+    SlangNVVMTypeHandle pointeeType,
+    uint32_t alignment)
+{
+    ModuleState* state = _getModule(module);
+    llvm::Function* llvmFunction = llvm::dyn_cast_or_null<llvm::Function>(_getValue(function));
+    llvm::Type* llvmPointeeType = _getType(pointeeType);
+    if (!state || !llvmFunction || llvmFunction->getParent() != state->module.get() ||
+        parameterIndex >= llvmFunction->arg_size() || (flags & ~SLANG_NVVM_PARAMETER_FLAG_BY_VALUE))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    if (flags == SLANG_NVVM_PARAMETER_FLAG_NONE)
+        return !pointeeType && !alignment ? SLANG_OK : SLANG_E_INVALID_ARG;
+
+    llvm::Argument* argument = llvmFunction->getArg(static_cast<unsigned>(parameterIndex));
+    auto pointerType = llvm::dyn_cast<llvm::PointerType>(argument->getType());
+    if (flags != SLANG_NVVM_PARAMETER_FLAG_BY_VALUE || !llvmPointeeType ||
+        &llvmPointeeType->getContext() != &state->context || !llvmPointeeType->isSized() ||
+        !pointerType || pointerType->isOpaque() ||
+        pointerType->getPointerElementType() != llvmPointeeType || !alignment ||
+        !llvm::isPowerOf2_32(alignment) || alignment > llvm::Value::MaximumAlignment ||
+        llvmFunction->getAttributes()
+                .getParamAttrs(static_cast<unsigned>(parameterIndex))
+                .getNumAttributes() != 0)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvmFunction->addParamAttr(
+        static_cast<unsigned>(parameterIndex),
+        llvm::Attribute::getWithByValType(state->context, llvmPointeeType));
+    llvmFunction->addParamAttr(
+        static_cast<unsigned>(parameterIndex),
+        llvm::Attribute::getWithAlignment(state->context, llvm::Align(alignment)));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _createBlock(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle function,
@@ -1669,9 +1712,27 @@ static SlangResult _writeLegacyNVVMAssembly(
     size_t semanticAtomicCount = 0;
     size_t semanticFloatNegateCount = 0;
     size_t semanticCountTrailingZerosDeclarationCount = 0;
+    size_t semanticByValueParameterCount = 0;
     llvm::SmallVector<llvm::AttributeSet, 2> semanticLegacyIntrinsicAttributeSets;
     for (llvm::Function& function : *state->module)
     {
+        for (llvm::Argument& argument : function.args())
+        {
+            if (!argument.hasByValAttr())
+                continue;
+            auto pointerType = llvm::dyn_cast<llvm::PointerType>(argument.getType());
+            llvm::Type* byValueType = argument.getParamByValType();
+            const llvm::MaybeAlign alignment = argument.getParamAlign();
+            if (!pointerType || pointerType->isOpaque() || !byValueType ||
+                pointerType->getPointerElementType() != byValueType || !byValueType->isSized() ||
+                !alignment ||
+                function.getAttributes().getParamAttrs(argument.getArgNo()).getNumAttributes() != 2)
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+            ++semanticByValueParameterCount;
+        }
+
         const llvm::Intrinsic::ID intrinsicID = function.getIntrinsicID();
         const bool isExecutionRegister = _isExecutionRegisterIntrinsic(intrinsicID);
         if (intrinsicID == llvm::Intrinsic::nvvm_read_ptx_sreg_laneid ||
@@ -1876,6 +1937,7 @@ static SlangResult _writeLegacyNVVMAssembly(
     size_t rewrittenFloatNegateCount = 0;
     size_t rewrittenLegacyIntrinsicAttributeSetCount = 0;
     size_t rewrittenCountTrailingZerosDeclarationCount = 0;
+    size_t rewrittenByValueParameterCount = 0;
     while (!remaining.empty())
     {
         const size_t newlineIndex = remaining.find('\n');
@@ -1936,6 +1998,35 @@ static SlangResult _writeLegacyNVVMAssembly(
             outSerializedData.append(suffix.begin(), suffix.end());
             ++rewrittenCountTrailingZerosDeclarationCount;
         }
+        else if (line.contains("byval("))
+        {
+            const llvm::StringRef marker("byval(");
+            size_t copiedEnd = 0;
+            size_t markerIndex = line.find(marker);
+            while (markerIndex != llvm::StringRef::npos)
+            {
+                outSerializedData.append(line.begin() + copiedEnd, line.begin() + markerIndex);
+                outSerializedData.append(marker.begin(), marker.begin() + 5);
+
+                size_t cursor = markerIndex + marker.size();
+                size_t depth = 1;
+                while (cursor < line.size() && depth)
+                {
+                    if (line[cursor] == '(')
+                        ++depth;
+                    else if (line[cursor] == ')')
+                        --depth;
+                    ++cursor;
+                }
+                if (depth)
+                    return SLANG_E_NOT_AVAILABLE;
+
+                copiedEnd = cursor;
+                markerIndex = line.find(marker, copiedEnd);
+                ++rewrittenByValueParameterCount;
+            }
+            outSerializedData.append(line.begin() + copiedEnd, line.end());
+        }
         else
         {
             outSerializedData.append(line.begin(), line.end());
@@ -1952,7 +2043,8 @@ static SlangResult _writeLegacyNVVMAssembly(
                    rewrittenLegacyIntrinsicAttributeSetCount ==
                        semanticLegacyIntrinsicAttributeSets.size() &&
                    rewrittenCountTrailingZerosDeclarationCount ==
-                       semanticCountTrailingZerosDeclarationCount
+                       semanticCountTrailingZerosDeclarationCount &&
+                   rewrittenByValueParameterCount == semanticByValueParameterCount
                ? SLANG_OK
                : SLANG_E_NOT_AVAILABLE;
 }
@@ -2519,6 +2611,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.getStructType = _getStructType;
     api.declareFunction = _declareFunction;
     api.getFunctionParameter = _getFunctionParameter;
+    api.setFunctionParameterAttributes = _setFunctionParameterAttributes;
     api.createBlock = _createBlock;
     api.setInsertBlock = _setInsertBlock;
     api.emitLoad = _emitLoad;

@@ -123,7 +123,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->declareGlobalStorage != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=5") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=6") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -179,6 +179,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderRequiresCompleteCurrentInterfaces)
 
     _resetDirectNVVMFakes();
     gFakeNVVMBuilder.construction.emitCall = nullptr;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+    }
+
+    _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.construction.setFunctionParameterAttributes = nullptr;
     {
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
         NVVMIRBuilder builder;
@@ -329,6 +337,146 @@ SLANG_UNIT_TEST(nvvmIRBuilderPreservesFunctionContracts)
         SLANG_CHECK(text.indexOf("invalidLinkage") < 0);
         SLANG_CHECK(text.indexOf("invalidFlags") < 0);
     }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderPreservesByValueParameterContracts)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("by-value-parameters"), scope.module)));
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle int64Type = nullptr;
+    SlangNVVMTypeHandle int16Type = nullptr;
+    SlangNVVMTypeHandle aggregateType = nullptr;
+    SlangNVVMTypeHandle aggregatePointerType = nullptr;
+    SlangNVVMTypeHandle functionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 64, int64Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 16, int16Type)));
+    const SlangNVVMTypeHandle fieldTypes[] = {int64Type, int16Type};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder
+            .getStructType(scope.module, fieldTypes, SLANG_COUNT_OF(fieldTypes), aggregateType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        scope.module,
+        aggregateType,
+        SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+        aggregatePointerType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionType(scope.module, voidType, &aggregatePointerType, 1, functionType)));
+
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        scope.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("byValueKernel"),
+        function)));
+
+    SLANG_CHECK(
+        builder.setFunctionParameterAttributes(
+            scope.module,
+            function,
+            1,
+            SLANG_NVVM_PARAMETER_FLAG_BY_VALUE,
+            aggregateType,
+            8) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(
+        builder.setFunctionParameterAttributes(
+            scope.module,
+            function,
+            0,
+            SlangNVVMParameterFlags(SLANG_NVVM_PARAMETER_FLAG_BY_VALUE << 1),
+            aggregateType,
+            8) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(
+        builder.setFunctionParameterAttributes(
+            scope.module,
+            function,
+            0,
+            SLANG_NVVM_PARAMETER_FLAG_NONE,
+            aggregateType,
+            8) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(
+        builder.setFunctionParameterAttributes(
+            scope.module,
+            function,
+            0,
+            SLANG_NVVM_PARAMETER_FLAG_BY_VALUE,
+            int64Type,
+            8) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(
+        builder.setFunctionParameterAttributes(
+            scope.module,
+            function,
+            0,
+            SLANG_NVVM_PARAMETER_FLAG_BY_VALUE,
+            aggregateType,
+            3) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setFunctionParameterAttributes(
+        scope.module,
+        function,
+        0,
+        SLANG_NVVM_PARAMETER_FLAG_BY_VALUE,
+        aggregateType,
+        8)));
+    SLANG_CHECK(
+        builder.setFunctionParameterAttributes(
+            scope.module,
+            function,
+            0,
+            SLANG_NVVM_PARAMETER_FLAG_BY_VALUE,
+            aggregateType,
+            8) == SLANG_E_INVALID_ARG);
+
+    SlangNVVMValueHandle parameter = nullptr;
+    SlangNVVMValueHandle firstFieldPointer = nullptr;
+    SlangNVVMValueHandle firstField = nullptr;
+    SlangNVVMBlockHandle entryBlock = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, parameter)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitStructFieldPointer(scope.module, parameter, 0, firstFieldPointer)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitLoad(
+        scope.module,
+        firstFieldPointer,
+        8,
+        SLANG_NVVM_LOAD_FLAG_INVARIANT,
+        firstField)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
+
+    ComPtr<ISlangBlob> llvmAssembly;
+    ComPtr<ISlangBlob> nvvmAssembly;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        llvmAssembly)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+        nvvmAssembly)));
+    const String llvmText = _getBlobText(llvmAssembly);
+    const String nvvmText = _getBlobText(nvvmAssembly);
+    SLANG_CHECK(
+        llvmText.indexOf("{ i64, i16 }* byval({ i64, i16 }) align 8 %slangParameter0") >= 0);
+    SLANG_CHECK(nvvmText.indexOf("{ i64, i16 }* byval align 8 %slangParameter0") >= 0);
+    SLANG_CHECK(nvvmText.indexOf("byval(") < 0);
+    SLANG_CHECK(
+        nvvmText.indexOf(
+            "getelementptr inbounds { i64, i16 }, { i64, i16 }* %slangParameter0, i32 0, i32 0") >=
+        0);
+    SLANG_CHECK(nvvmText.indexOf("load i64") >= 0);
+    SLANG_CHECK(nvvmText.indexOf("!invariant.load") >= 0);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderRejectsUnknownOperationsWithoutMutation)

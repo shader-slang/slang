@@ -333,6 +333,7 @@ enum class FakeNVVMBuilderParameterTypeKind
     Float,
     FloatPointer,
     ArrayPointer,
+    ScalarStructPointer,
     IntegerResourceView,
     FloatResourceView,
 };
@@ -374,6 +375,7 @@ struct FakeNVVMBuilderState
         getStructTypeCallCount = 0;
         getPointerTypeCallCount = 0;
         getFunctionParameterCallCount = 0;
+        setFunctionParameterAttributesCallCount = 0;
         emitLoadCallCount = 0;
         emitStoreCallCount = 0;
         emitBranchCallCount = 0;
@@ -432,6 +434,11 @@ struct FakeNVVMBuilderState
         functionNames.clear();
         functionLinkages.clear();
         functionFlags.clear();
+        parameterAttributeFunctionIndices.clear();
+        parameterAttributeIndices.clear();
+        parameterAttributeFlags.clear();
+        parameterAttributePointeeTypes.clear();
+        parameterAttributeAlignments.clear();
         functionTypeIndices.clear();
         blockFunctionIndices.clear();
         loadAlignment = 0;
@@ -661,6 +668,7 @@ struct FakeNVVMBuilderState
     int getStructTypeCallCount = 0;
     int getPointerTypeCallCount = 0;
     int getFunctionParameterCallCount = 0;
+    int setFunctionParameterAttributesCallCount = 0;
     int emitLoadCallCount = 0;
     int emitStoreCallCount = 0;
     int emitBranchCallCount = 0;
@@ -713,6 +721,11 @@ struct FakeNVVMBuilderState
     List<String> functionNames;
     List<SlangNVVMLinkage> functionLinkages;
     List<SlangNVVMFunctionFlags> functionFlags;
+    List<Index> parameterAttributeFunctionIndices;
+    List<size_t> parameterAttributeIndices;
+    List<SlangNVVMParameterFlags> parameterAttributeFlags;
+    List<SlangNVVMTypeHandle> parameterAttributePointeeTypes;
+    List<uint32_t> parameterAttributeAlignments;
     List<Index> functionTypeIndices;
     List<Index> blockFunctionIndices;
     uint32_t loadAlignment = 0;
@@ -1739,7 +1752,8 @@ static bool _isFakeNVVMBuilderPointerValue(SlangNVVMValueHandle value)
     FakeNVVMBuilderParameterTypeKind parameterTypeKind;
     return _getFakeNVVMBuilderParameterTypeKind(valueRef, parameterTypeKind) &&
            (parameterTypeKind == FakeNVVMBuilderParameterTypeKind::Pointer ||
-            parameterTypeKind == FakeNVVMBuilderParameterTypeKind::FloatPointer);
+            parameterTypeKind == FakeNVVMBuilderParameterTypeKind::FloatPointer ||
+            parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ScalarStructPointer);
 }
 
 static bool _getFakeNVVMBuilderResourceViewElementTypeKind(
@@ -2010,6 +2024,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
             parameterTypes[i] != _getFakeNVVMBuilderPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderFloatPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderArrayPointerType() &&
+            parameterTypes[i] != _getFakeNVVMBuilderScalarStructPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderResourceViewType() &&
             parameterTypes[i] !=
                 _getFakeNVVMBuilderResourceViewType(FakeNVVMBuilderScalarTypeKind::Float))
@@ -2032,6 +2047,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
                 ? FakeNVVMBuilderParameterTypeKind::FloatPointer
             : parameterTypes[i] == _getFakeNVVMBuilderArrayPointerType()
                 ? FakeNVVMBuilderParameterTypeKind::ArrayPointer
+            : parameterTypes[i] == _getFakeNVVMBuilderScalarStructPointerType()
+                ? FakeNVVMBuilderParameterTypeKind::ScalarStructPointer
             : parameterTypes[i] == _getFakeNVVMBuilderResourceViewType()
                 ? FakeNVVMBuilderParameterTypeKind::IntegerResourceView
                 : FakeNVVMBuilderParameterTypeKind::FloatResourceView;
@@ -2393,6 +2410,60 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionParameter(
     }
     gFakeNVVMBuilder.functionParameterIndices.add(parameterIndex);
     *outValue = _getFakeNVVMBuilderFunctionParameter(functionIndex, Index(parameterIndex));
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderSetFunctionParameterAttributes(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle function,
+    size_t parameterIndex,
+    SlangNVVMParameterFlags flags,
+    SlangNVVMTypeHandle pointeeType,
+    uint32_t alignment)
+{
+    ++gFakeNVVMBuilder.setFunctionParameterAttributesCallCount;
+    Index functionIndex = -1;
+    if (module != _getFakeNVVMBuilderModule() ||
+        !_getFakeNVVMBuilderFunctionIndex(function, functionIndex) ||
+        functionIndex >= gFakeNVVMBuilder.functionTypeIndices.getCount() ||
+        (flags & ~SLANG_NVVM_PARAMETER_FLAG_BY_VALUE))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    if (flags == SLANG_NVVM_PARAMETER_FLAG_NONE)
+        return !pointeeType && !alignment ? SLANG_OK : SLANG_E_INVALID_ARG;
+
+    const Index functionTypeIndex = gFakeNVVMBuilder.functionTypeIndices[functionIndex];
+    if (parameterIndex >= gFakeNVVMBuilder.functionTypeParameterCounts[functionTypeIndex])
+        return SLANG_E_INVALID_ARG;
+    const Index parameterTypeIndex =
+        gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionTypeIndex] + parameterIndex;
+    if (flags != SLANG_NVVM_PARAMETER_FLAG_BY_VALUE ||
+        gFakeNVVMBuilder.functionParameterTypeKinds[parameterTypeIndex] !=
+            FakeNVVMBuilderParameterTypeKind::ScalarStructPointer ||
+        pointeeType != _getFakeNVVMBuilderScalarStructType() || !alignment ||
+        (alignment & (alignment - 1)))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    for (Index attributeIndex = 0;
+         attributeIndex < gFakeNVVMBuilder.parameterAttributeFunctionIndices.getCount();
+         ++attributeIndex)
+    {
+        if (gFakeNVVMBuilder.parameterAttributeFunctionIndices[attributeIndex] == functionIndex &&
+            gFakeNVVMBuilder.parameterAttributeIndices[attributeIndex] == parameterIndex)
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+    }
+
+    gFakeNVVMBuilder.parameterAttributeFunctionIndices.add(functionIndex);
+    gFakeNVVMBuilder.parameterAttributeIndices.add(parameterIndex);
+    gFakeNVVMBuilder.parameterAttributeFlags.add(flags);
+    gFakeNVVMBuilder.parameterAttributePointeeTypes.add(pointeeType);
+    gFakeNVVMBuilder.parameterAttributeAlignments.add(alignment);
     return SLANG_OK;
 }
 
@@ -3082,6 +3153,16 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitStructFieldPointer(
         fieldIndex < uint32_t(gFakeNVVMBuilder.structFieldTypes.getCount()))
     {
         fieldType = gFakeNVVMBuilder.structFieldTypes[fieldIndex];
+    }
+    else if (baseRef.kind == FakeNVVMBuilderValueKind::Parameter)
+    {
+        FakeNVVMBuilderParameterTypeKind parameterTypeKind;
+        if (_getFakeNVVMBuilderParameterTypeKind(baseRef, parameterTypeKind) &&
+            parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ScalarStructPointer &&
+            fieldIndex < uint32_t(gFakeNVVMBuilder.scalarStructFieldTypes.getCount()))
+        {
+            fieldType = gFakeNVVMBuilder.scalarStructFieldTypes[fieldIndex];
+        }
     }
     else if (
         baseRef.kind == FakeNVVMBuilderValueKind::Load && baseRef.index >= 0 &&
@@ -3883,6 +3964,7 @@ static SlangNVVMBuilderConstructionAPI _makeFakeNVVMBuilderConstructionAPI()
     api.getStructType = _fakeNVVMBuilderGetStructType;
     api.declareFunction = _fakeNVVMBuilderDeclareFunction;
     api.getFunctionParameter = _fakeNVVMBuilderGetFunctionParameter;
+    api.setFunctionParameterAttributes = _fakeNVVMBuilderSetFunctionParameterAttributes;
     api.createBlock = _fakeNVVMBuilderCreateBlock;
     api.setInsertBlock = _fakeNVVMBuilderSetInsertBlock;
     api.emitLoad = _fakeNVVMBuilderEmitLoad;
@@ -8104,14 +8186,37 @@ void computeMain(RWStructuredBuffer<double> destination, uniform int index)
     destination[index] = 42.0;
 }
 )";
-static const char kDirectNVVMRawStructuredBufferI32LoadSource[] = R"(
+static const char kDirectNVVMAggregateAndReadOnlyResourceSource[] = R"(
+struct Padding
+{
+    uint64_t big;
+    uint16_t little;
+};
+
 [CUDAKernel]
 void computeMain(
-    RWStructuredBuffer<int> destination,
-    StructuredBuffer<int> source,
-    uniform int index)
+    uniform Padding padding,
+    RWStructuredBuffer<float> destination,
+    StructuredBuffer<float> source,
+    uniform uint index)
 {
-    destination[0] = source[index];
+    destination[index] = source[index] + float(padding.big) + float(padding.little);
+}
+)";
+static const char kDirectNVVMUnsupportedNestedAggregateParameterSource[] = R"(
+struct Inner
+{
+    uint value;
+};
+
+struct Outer
+{
+    Inner inner;
+};
+
+[CUDAKernel]
+void computeMain(uniform Outer value)
+{
 }
 )";
 static const char kDirectNVVMRawRWStructuredBufferI32AtomicAddSource[] = R"(

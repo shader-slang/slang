@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 5u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 6u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -69,6 +69,12 @@ extern "C"
     typedef uint32_t SlangNVVMFunctionFlags;
 #define SLANG_NVVM_FUNCTION_FLAG_NONE ((SlangNVVMFunctionFlags)0u)
 #define SLANG_NVVM_FUNCTION_FLAG_NO_INLINE ((SlangNVVMFunctionFlags)1u << 0)
+
+    /** Independent ABI properties of one physical function parameter. */
+    typedef uint32_t SlangNVVMParameterFlags;
+#define SLANG_NVVM_PARAMETER_FLAG_NONE ((SlangNVVMParameterFlags)0u)
+/** The pointer parameter carries a caller-owned copy of `pointeeType`. */
+#define SLANG_NVVM_PARAMETER_FLAG_BY_VALUE ((SlangNVVMParameterFlags)1u << 0)
 
     /** Independent semantic properties of one non-volatile load. */
     typedef uint32_t SlangNVVMLoadFlags;
@@ -223,6 +229,13 @@ extern "C"
             SlangNVVMValueHandle function,
             size_t parameterIndex,
             SlangNVVMValueHandle* outValue);
+        SlangNVVMResult(SLANG_NVVM_CALL* setFunctionParameterAttributes)(
+            SlangNVVMModuleHandle module,
+            SlangNVVMValueHandle function,
+            size_t parameterIndex,
+            SlangNVVMParameterFlags flags,
+            SlangNVVMTypeHandle pointeeType,
+            uint32_t alignment);
         SlangNVVMResult(SLANG_NVVM_CALL* createBlock)(
             SlangNVVMModuleHandle module,
             SlangNVVMValueHandle function,

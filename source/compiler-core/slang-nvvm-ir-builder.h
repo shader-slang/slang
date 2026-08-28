@@ -102,6 +102,15 @@ public:
         size_t parameterIndex,
         SlangNVVMValueHandle& outValue) const;
 
+    /// Sets validated ABI properties on one physical function parameter.
+    SlangResult setFunctionParameterAttributes(
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle function,
+        size_t parameterIndex,
+        SlangNVVMParameterFlags flags,
+        SlangNVVMTypeHandle pointeeType,
+        uint32_t alignment) const;
+
     /// Appends a basic block to a function owned by the module.
     SlangResult createBlock(
         SlangNVVMModuleHandle module,

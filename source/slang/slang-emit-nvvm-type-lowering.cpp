@@ -97,6 +97,25 @@ bool isNVVMSupportedNumericValueType(IRInst* type)
            asNVVMSupportedSignedI32x2Type(type) || asNVVMSupportedUInt3Type(type);
 }
 
+IRStructType* asNVVMSupportedScalarStructType(IRInst* type)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return nullptr;
+
+    bool hasField = false;
+    for (auto field : structType->getFields())
+    {
+        if (!isNVVMSupportedIntegerScalarType(field->getFieldType()) &&
+            !isNVVMFloat32Type(field->getFieldType()))
+        {
+            return nullptr;
+        }
+        hasField = true;
+    }
+    return hasField ? structType : nullptr;
+}
+
 uint32_t getNVVMNumericValueAlignment(IRInst* type)
 {
     uint32_t bitWidth = 0;
@@ -265,15 +284,20 @@ static bool _isNVVMSupportedResourceElementType(IRInst* type)
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type);
 }
 
-IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferType(
+IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawStructuredBufferType(
     IRInst* type,
-    IRType** outElementType)
+    IRType** outElementType,
+    NVVMStructuredBufferAccess* outAccess)
 {
     if (outElementType)
         *outElementType = nullptr;
+    if (outAccess)
+        *outAccess = NVVMStructuredBufferAccess::ReadOnly;
 
     auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-    if (!bufferType || bufferType->getOp() != kIROp_HLSLRWStructuredBufferType ||
+    if (!bufferType ||
+        (bufferType->getOp() != kIROp_HLSLStructuredBufferType &&
+         bufferType->getOp() != kIROp_HLSLRWStructuredBufferType) ||
         bufferType->getOperandCount() != 3 ||
         !_isNVVMSupportedResourceElementType(bufferType->getElementType()))
     {
@@ -285,6 +309,8 @@ IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferType(
         return nullptr;
     if (outElementType)
         *outElementType = bufferType->getElementType();
+    if (outAccess && bufferType->getOp() == kIROp_HLSLRWStructuredBufferType)
+        *outAccess = NVVMStructuredBufferAccess::ReadWrite;
     return bufferType;
 }
 
@@ -314,21 +340,8 @@ IRParameterGroupType* asNVVMSupportedScalarParameterGroupType(
         return nullptr;
     }
 
-    auto elementType = as<IRStructType>(parameterGroupType->getElementType());
+    auto elementType = asNVVMSupportedScalarStructType(parameterGroupType->getElementType());
     if (!elementType)
-        return nullptr;
-
-    bool hasField = false;
-    for (auto field : elementType->getFields())
-    {
-        if (!isNVVMSupportedIntegerScalarType(field->getFieldType()) &&
-            !isNVVMFloat32Type(field->getFieldType()))
-        {
-            return nullptr;
-        }
-        hasField = true;
-    }
-    if (!hasField)
         return nullptr;
 
     if (outElementType)
@@ -340,7 +353,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type)
 {
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedScalarParameterGroupType(type) ||
-           asNVVMSupportedRawRWStructuredBufferType(type) ||
+           asNVVMSupportedRawStructuredBufferType(type) ||
            asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type);
 }
@@ -363,9 +376,9 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
 bool isNVVMSupportedParameterType(IRInst* type)
 {
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupportedDeviceNumericPointerType(type) ||
+           asNVVMSupportedScalarStructType(type) || asNVVMSupportedDeviceNumericPointerType(type) ||
            asNVVMSupportedDeviceArrayPointerType(type) ||
-           asNVVMSupportedRawRWStructuredBufferType(type);
+           asNVVMSupportedRawStructuredBufferType(type);
 }
 
 SlangResult NVVMTypeLoweringContext::_requireBuilderOperation(
@@ -484,13 +497,13 @@ SlangResult NVVMTypeLoweringContext::_lowerUnsizedSamplerArrayStorageType(
     return SLANG_OK;
 }
 
-SlangResult NVVMTypeLoweringContext::_lowerRawRWStructuredBufferType(
+SlangResult NVVMTypeLoweringContext::_lowerRawStructuredBufferType(
     IRHLSLStructuredBufferTypeBase* type,
     SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
     IRType* elementType = nullptr;
-    SLANG_RELEASE_ASSERT(asNVVMSupportedRawRWStructuredBufferType(type, &elementType));
+    SLANG_RELEASE_ASSERT(asNVVMSupportedRawStructuredBufferType(type, &elementType));
 
     SlangNVVMTypeHandle loweredElementType = nullptr;
     SLANG_RETURN_ON_FAIL(lowerType(elementType, NVVMTypeUse::Value, loweredElementType));
@@ -599,12 +612,13 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRVectorType* uint3Type = asNVVMSupportedUInt3Type(type);
     IRVectorType* signedI32x2Type = asNVVMSupportedSignedI32x2Type(type);
     IRStructType* structType = as<IRStructType>(type);
+    IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedArrayType = asNVVMSupportedI32ArrayType(type);
     IRArrayType* deviceArrayType = nullptr;
     IRPtrTypeBase* deviceArrayPointer =
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
-    IRHLSLStructuredBufferTypeBase* rawResource = asNVVMSupportedRawRWStructuredBufferType(type);
+    IRHLSLStructuredBufferTypeBase* rawResource = asNVVMSupportedRawStructuredBufferType(type);
     IRStructType* parameterGroupElementType = nullptr;
     IRParameterGroupType* parameterGroup =
         asNVVMSupportedScalarParameterGroupType(type, &parameterGroupElementType);
@@ -623,17 +637,42 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         (use == NVVMTypeUse::HelperResult &&
          (isVoid || isInteger || isFloat32 || isBool || uint3Type)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
-         (isInteger || isFloat32 || deviceNumericPointer || deviceArrayPointer || rawResource)) ||
+         (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
+          deviceArrayPointer || rawResource)) ||
         (use == NVVMTypeUse::HelperParameter && (isInteger || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
-         (isInteger || isFloat32 || isBool || uint3Type || signedI32x2Type || fixedArrayType ||
-          deviceNumericPointer || deviceArrayPointer || rawResource || parameterGroup ||
-          resourceElementPointer || sharedElementPointer)) ||
+         (isInteger || isFloat32 || isBool || uint3Type || signedI32x2Type || scalarStructType ||
+          fixedArrayType || deviceNumericPointer || deviceArrayPointer || rawResource ||
+          parameterGroup || resourceElementPointer || sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
          (isInteger || isFloat32 || structType || rawResource || parameterGroup || samplerStorage ||
           unsizedSamplerArrayStorage));
     if (!isLegal)
         return _reportUnsupportedType(use);
+
+    // NVPTX represents an aggregate kernel parameter as a generic pointer carrying `byval`, while
+    // the same canonical Slang struct remains a first-class LLVM struct in ordinary value roles.
+    // Keep this physical ABI representation separate from the canonical value-type cache.
+    if (use == NVVMTypeUse::EntryPointParameter && scalarStructType)
+    {
+        if (auto mappedType = m_entryParameterRepresentationMap.tryGetValue(type))
+        {
+            outType = *mappedType;
+            return SLANG_OK;
+        }
+
+        SlangNVVMTypeHandle aggregateType = nullptr;
+        SLANG_RETURN_ON_FAIL(lowerType(type, NVVMTypeUse::Value, aggregateType));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "by-value aggregate parameter type",
+            m_builder.getPointerType(
+                m_module,
+                aggregateType,
+                SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+                outType)));
+        m_entryParameterRepresentationMap[type] = outType;
+        return SLANG_OK;
+    }
 
     if (auto mappedType = m_typeMap.tryGetValue(type))
     {
@@ -698,7 +737,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
     else if (rawResource)
     {
-        return _lowerRawRWStructuredBufferType(rawResource, outType);
+        return _lowerRawStructuredBufferType(rawResource, outType);
     }
     else if (parameterGroup)
     {

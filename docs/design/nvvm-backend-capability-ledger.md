@@ -25,6 +25,7 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/cuda/wave-lane-index-multidim.slang` | NVRTC + direct NVVM + Vulkan runtime | Pass | A two-dimensional group combines `SV_GroupIndex`, float resource stores, and wave operations with identical comparison output; direct PTX passes `ptxas` |
 | `tests/cuda/sampler-comparison-state-unused.slang` | CUDA source + NVRTC PTX + direct NVVM PTX | Pass | Multi-field sampler/resource storage has one shared 40-byte ABI; direct PTX passes `ptxas` |
 | `tests/cuda/param-block-alignment.slang` | NVRTC + direct NVVM runtime | Pass | A scalar uniform, flat scalar parameter block, resource view, and folded layout queries produce identical results; direct PTX passes `ptxas` |
+| `tests/cuda/cuda-kernel-param-layout.slang` | NVRTC + direct NVVM runtime | Pass | A flat by-value scalar struct, read-only and read-write float resource views, and scalar count produce `11, 12, 13, 14`; direct PTX preserves the launch layout and passes `ptxas` |
 
 Slices 69 and 70 consolidated the implementation onto one exact forward-only builder ABI and one
 typed-descriptor capability system. Older rows below retain the interface names that described the
@@ -1433,3 +1434,23 @@ An audit corrected five existing static direct-PTX lanes to request whole-target
 CUDA/NVRTC and produce false-positive direct coverage. All audited lanes pass against actual
 direct output. Release host and standalone-provider builds pass, the complete NVVM prefix passes
 342/342, and the combined unit/file-backed run passes 354/354.
+
+Slice 80 admits nonempty flat entry structs containing selected integer/float32 fields and exact
+default-layout read-only structured-buffer views. The physical aggregate kernel parameter is a
+generic typed pointer carrying `byval` and natural CUDA alignment; keyed field reads use generic
+struct GEP and invariant load operations. Read-only and read-write resource types retain distinct
+semantic access while sharing the generic pointer/count LLVM representation. The read-only load is
+composed from struct-value extraction, pointer offset, and invariant load, with no resource-shaped
+builder callback.
+
+Exact ABI revision 6 adds the generic parameter-attribute setter. The provider validates LLVM 14
+typed `byval(T)` and rewrites only that type payload to LLVM 7's `byval` spelling for libNVVM. The
+fake boundary records the aggregate pointer role, by-value pointee/alignment, keyed field indices,
+resource data extraction, offsetting, and immutable loads. Nested aggregate parameters and
+unsupported resource element/atomic shapes stop before provider discovery.
+
+The existing CUDA parameter-layout fixture passes CUDA/NVRTC, direct-libNVVM GPU comparison,
+direct PTX checking, and reflection 4/4 with `11, 12, 13, 14`. Direct PTX exposes one aligned
+16-byte aggregate parameter, two aligned 16-byte resource views, `ld.global.nc.f32`, and the
+read-write global store. CUDA 12.9 `ptxas` accepts the module for `sm_70`. Release host and isolated
+provider builds pass, and the complete NVVM prefix passes 344/344.

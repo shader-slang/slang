@@ -4493,6 +4493,36 @@ the real direct module places helpers differently. Release host and standalone-p
 pass, the complete NVVM prefix passes 342/342, and the combined unit/file-backed run passes
 354/354.
 
+### Slice 80: Flat aggregate and read-only structured-buffer parameters
+
+Raw CUDA entry points now accept a nonempty struct whose fields are selected integer or float32
+scalars. The canonical struct remains an ordinary LLVM aggregate in value roles, while its physical
+kernel-parameter role is a generic pointer with LLVM `byval` and the natural CUDA alignment. Exact
+builder ABI revision 6 adds one generic parameter-attribute operation; it validates the function,
+parameter index, typed pointee, flags, and power-of-two alignment before mutation. LLVM 14's typed
+`byval(T)` assembly is validated and normalized to LLVM 7's `byval` spelling for libNVVM.
+
+Field extraction resolves the canonical `IRStructKey` to its actual field index and loads through
+the by-value pointer with invariant metadata. The direct validator retains only exact scalar struct
+types used by the selected entry point. This matters for raw `[CUDAKernel]` input: it legitimately
+has no compiler-collected conventional global block, so conventional-storage classification first
+checks whether that optional block exists. Nested structs, arrays, matrices, aggregate helpers,
+aggregate construction, and aggregate mutation remain pre-provider E52017 boundaries.
+
+The raw structured-buffer classifier now covers exact default-layout `StructuredBuffer<T>` and
+`RWStructuredBuffer<T>` views for selected scalar `T`. Both use the existing generic
+`{ T addrspace(1)*, i64 }` representation, but the classifier preserves read-only versus read-write
+access. `IRStructuredBufferLoad` is legal only for the read-only form and composes field-zero value
+extraction, pointer offset, and an invariant aligned load; writable element addressing remains
+restricted to the read-write form. No resource-specific builder callback was added.
+
+`tests/cuda/cuda-kernel-param-layout.slang` passes CUDA/NVRTC, direct-libNVVM GPU comparison,
+direct PTX checking, and reflection 4/4 with values `11, 12, 13, 14`. Direct PTX declares the
+`Padding` argument as `.param .align 8 .b8 [16]`, both resource views as 16-byte aligned parameters,
+uses `ld.global.nc.f32` for the read-only input, and stores through the output view. CUDA 12.9
+`ptxas` accepts the module for `sm_70`; Release host and standalone-provider builds pass; and the
+complete NVVM unit prefix passes 344/344.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4502,17 +4532,18 @@ The following remain open until their named slice supplies evidence:
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
   global parameter fields beyond selected integer/float32 scalars, flat selected-scalar parameter
   blocks and constant buffers, selected-scalar read-write structured buffers, and storage-only
-  sampler/unsized-sampler-array placeholders, and raw CUDA parameters beyond the selected integer
-  and float32 scalars, selected numeric device pointers, fixed i32 array pointers, signed-i32x2
-  device pointers, and selected-scalar raw read-write structured buffers;
+  sampler/unsized-sampler-array placeholders, and raw CUDA parameters beyond selected integer and
+  float32 scalars, flat selected-scalar by-value structs, selected numeric device pointers, fixed
+  i32 array pointers, signed-i32x2 device pointers, and selected-scalar raw read-only/read-write
+  structured buffers;
 - external/indirect calls, richer helper ABI, calling conventions and function attributes beyond
   no-inline, integer shifts/division/remainder, saturating or overflow-decorated arithmetic,
   float64/low-precision scalar families, and general vector or matrix operations beyond the
   bounded signed-i32x2 add proof;
 - pointer and runtime aggregate addressing beyond signed-i32 scalar offsets on selected numeric
-  device pointers and the exact fixed-i32 device-array subset, including other `IRGetElementPtr`
-  shapes, array values, structs, general globals, additional shared-memory shapes, and address
-  spaces;
+  device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a flat
+  by-value entry struct, including other `IRGetElementPtr` shapes, array values, mutable structs,
+  general globals, additional shared-memory shapes, and address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
