@@ -5643,6 +5643,16 @@ err(
     span { loc = "location", message = "intrinsic operation '~operation' is not supported for the current target." }
 )
 
+-- 55204 above is "this operation has no lowering for the target at all"; 55216 below is
+-- "the operation exists but this operand type (e.g. a matrix, or a vector of an element type
+-- with no prelude helper to decompose to) is unsupported". Pick 55216 when the type is the reason.
+err(
+    "unsupported-type-for-target-intrinsic",
+    55216,
+    "unsupported type for intrinsic operation",
+    span { loc = "location", message = "intrinsic operation '~operation' does not support operand type '~type:IRInst' on the current target." }
+)
+
 err(
     "unsupported-specialization-constant-for-num-threads",
     55205,
