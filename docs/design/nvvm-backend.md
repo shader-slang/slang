@@ -3004,6 +3004,45 @@ names reproduces Slice 60's 397-name hash
 `d5daef5d6db4caa82e5dd8039a8b0f5e095d13cdb819a81f7ea69a30ab873b0d` exactly. Debug preservation
 passes 10/10.
 
+### Slice 62 unsigned-i32 load admission and wave-active-all-equal
+
+Slice 62 adds feature 47 `WAVE_MASK_ALL_EQUAL_UINT` and intrinsic operation 13 through the generic
+callback. CUDA specializes public `WaveActiveAllEqual(uintValue)` to
+`WaveMaskAllEqual(WaveGetActiveMask(), uintValue)`; final linked IR retains the exact
+`Func(Bool, UInt, UInt)` helper ending in `_waveAllEqual($0, $1)`. Complete assembly and signature
+matching distinguishes it from the signed row before the facade independently negotiates the new
+feature. V3 remains 528/308 bytes, and an exact Slice 61 provider remains valid with feature 47
+clear.
+
+This source graph exposed one inconsistent preflight boundary before reaching that helper. A load
+from `Ptr<uint, Read, Device>` has canonical UInt pointee and result types. Device scalar pointer
+classification, ordinary values, helper parameters, entry parameters, and the provider already
+accept both Int and UInt as distinct Slang types mapped to LLVM's signless i32. Only the load
+preflight admitted Float separately and then required signed Int. It now admits the established
+32-bit integer classification while retaining the exact pointer-pointee/result identity,
+ownership, availability, and dominance checks. No cast, alternate UInt representation, or
+overload-specific bypass is introduced.
+
+The provider shares the Slice 61 native implementation because PTX match-all is bitwise b32 and
+LLVM integers are signless. It validates two i32 operands before mutation, calls
+`llvm.nvvm.match.all.sync.i32p(i32, i32) -> {i32, i1}`, and returns only aggregate element 1. The
+matching mask stays provider-private. The signed and unsigned real-provider assembly rows share
+one parameterized verifier but retain independent semantic feature, operation, source, and helper
+signatures.
+
+NVVM and NVRTC agree on a `[64, 64]` entry with one 32-bit global load, two
+`vote.sync.ballot.b32` instructions, one `match.all.sync.b32`, and one global 32-bit store. CUDA
+12.9 `ptxas` accepts both. On an RTX 5090, distinct unsigned lane values make all 32 lanes store
+zero, while uniform `23` makes all lanes store one through both routes.
+
+Seven names add 126 measured lines across the five test/support files, from 27,669 to 27,795. The
+complete Slice 46-62 wave/ABI matrix passes 113/113 and the Release NVVM prefix passes 411/411. Its
+exact sorted LF-terminated name set has SHA-256
+`bea39cafc76c97ab6cb2d31fcc12aa42f41fe9d3d4d324ca296e115cd5d4d3a4`; removing the seven Slice 62
+names reproduces Slice 61's 404-name hash
+`40f3eba7cfb2602716a16b54d942cf09e34e9f2171835889a1dea43cb1e10d0a` exactly. Debug preservation
+passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -3762,8 +3801,8 @@ The following remain open until their named slice supplies evidence:
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
   read-lane-at, public unmasked UInt/Int/Float read-lane-at, active-mask ballot, and public
-  UInt/Int/Float read-lane-first, is-first-lane, any/all-true, and signed-i32 all-equal, including
-  other scalar types, other votes, reductions, and their convergence contracts;
+  UInt/Int/Float read-lane-first, is-first-lane, any/all-true, and signed/unsigned-i32 all-equal,
+  including other scalar types, other votes, reductions, and their convergence contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

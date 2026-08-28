@@ -1429,6 +1429,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
         break;
     case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT:
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_UINT:
         intrinsicID = llvm::Intrinsic::nvvm_match_all_sync_i32p;
         expectedArgumentCount = 2;
         extractsMatchAllPredicate = true;

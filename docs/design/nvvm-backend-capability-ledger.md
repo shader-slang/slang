@@ -1149,3 +1149,27 @@ matrix passes 106/106 and Release passes 404/404 with sorted-name SHA-256
 names reproduces Slice 60's 397-name hash
 `d5daef5d6db4caa82e5dd8039a8b0f5e095d13cdb819a81f7ea69a30ab873b0d` exactly. Debug preservation
 passes 10/10.
+
+Slice 62 adds public unsigned-i32 `WaveActiveAllEqual(value)` through feature 47/intrinsic
+operation 13 at the canonical masked-helper boundary. Exact assembly plus
+`Func(Bool, UInt, UInt)` matching distinguishes `_waveAllEqual(mask, value)` from the signed row.
+V3 stays 528/308 bytes, and exact Slice 61 providers remain loadable with feature 47 clear.
+
+The source entry's canonical `Ptr<uint, Read, Device>` load exposed the only inconsistent scalar
+type gate: pointer, value, parameter, and provider roles already accept UInt as signless LLVM i32,
+but load preflight accepted only signed i32. The load now uses the common 32-bit integer
+classification while retaining exact pointee/result identity and all ownership, availability, and
+dominance validation. No coercion or alternate representation is added.
+
+The provider reuses `llvm.nvvm.match.all.sync.i32p` because its operands and PTX b32 semantics are
+sign-independent, while the facade retains independent source-semantic negotiation. NVVM and
+NVRTC agree on `[64, 64]`, one global 32-bit load/store pair, two synchronized ballots, and one
+`match.all.sync.b32`. CUDA 12.9 `ptxas` accepts both. On an RTX 5090, distinct unsigned lane values
+produce zero in every lane and uniform `23` produces one through both routes.
+
+Seven names add 126 measured lines, from 27,669 to 27,795. The complete Slice 46-62 wave/ABI
+matrix passes 113/113 and Release passes 411/411 with sorted-name SHA-256
+`bea39cafc76c97ab6cb2d31fcc12aa42f41fe9d3d4d324ca296e115cd5d4d3a4`; removing the seven Slice 62
+names reproduces Slice 61's 404-name hash
+`40f3eba7cfb2602716a16b54d942cf09e34e9f2171835889a1dea43cb1e10d0a` exactly. Debug preservation
+passes 10/10.

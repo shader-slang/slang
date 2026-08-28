@@ -117,6 +117,7 @@ struct NVVMGenericAsmIntrinsicInfo
         BoolUInt,
         BoolUIntBool,
         BoolUIntInt,
+        BoolUIntUInt,
         UIntUIntUInt,
         IntUIntInt,
         FloatUIntFloat,
@@ -226,6 +227,13 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(
             "signed-i32 wave-mask all-equal intrinsic",
             NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntInt,
         },
+        {
+            "_waveAllEqual($0, $1)",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_UINT,
+            "unsigned-i32 wave-mask all-equal intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntUInt,
+        },
     };
     if (!genericAsm)
         return nullptr;
@@ -261,6 +269,10 @@ bool _isNVVMGenericAsmIntrinsicHelper(
         return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 2 &&
                isNVVMUnsignedI32Type(function->getParamType(0)) &&
                isNVVMSignedI32Type(function->getParamType(1));
+    case NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntUInt:
+        return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 2 &&
+               isNVVMUnsignedI32Type(function->getParamType(0)) &&
+               isNVVMUnsignedI32Type(function->getParamType(1));
     case NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUInt:
         return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 2 &&
                isNVVMUnsignedI32Type(function->getParamType(0)) &&
@@ -962,7 +974,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_Load:
                 if (isNVVMFloat32Type(inst->getDataType()))
                     _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
-                else if (!isNVVMSignedI32Type(inst->getDataType()))
+                else if (!isNVVMInteger32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
                 break;
@@ -2083,7 +2095,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             isNVVMFloat32Type(load->getDataType()) ? "float32 load"
-                                                                   : "signed i32 load",
+                                                                   : "32-bit integer load",
                             builder.emitLoad(
                                 moduleScope.module,
                                 loweredPointer,

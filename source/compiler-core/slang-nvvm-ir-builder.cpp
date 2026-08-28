@@ -525,6 +525,8 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_TRUE);
     const bool advertisesWaveMaskAllEqualInt =
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT);
+    const bool advertisesWaveMaskAllEqualUInt =
+        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT);
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3 ||
         api.compatibilityAPI.structureSize != sizeof(SlangNVVMBuilderAPI_V2) ||
@@ -552,7 +554,7 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
           advertisesWaveMaskBallot || advertisesWaveReadLaneFirstUInt ||
           advertisesWaveReadLaneFirstInt || advertisesWaveReadLaneFirstFloat ||
           advertisesWaveMaskIsFirstLane || advertisesWaveMaskAnyTrue || advertisesWaveMaskAllTrue ||
-          advertisesWaveMaskAllEqualInt) &&
+          advertisesWaveMaskAllEqualInt || advertisesWaveMaskAllEqualUInt) &&
          (api.structureSize < SLANG_NVVM_BUILDER_API_V3_WAVE_LANE_INDEX_MIN_SIZE ||
           !api.emitIntrinsic)))
     {
@@ -1345,6 +1347,9 @@ SlangResult NVVMIRBuilder::emitIntrinsic(
         break;
     case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT:
         requiredFeature = SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT;
+        break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_UINT:
+        requiredFeature = SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT;
         break;
     default:
         return SLANG_E_INVALID_ARG;

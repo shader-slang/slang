@@ -151,6 +151,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_WAVE_MASK_ANY_TRUE_MIN_SIZE == intrinsicMinimumSize);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_WAVE_MASK_ALL_TRUE_MIN_SIZE == intrinsicMinimumSize);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_WAVE_MASK_ALL_EQUAL_INT_MIN_SIZE == intrinsicMinimumSize);
+    SLANG_CHECK(
+        SLANG_NVVM_BUILDER_API_V3_WAVE_MASK_ALL_EQUAL_UINT_MIN_SIZE == intrinsicMinimumSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderAPI_V3) == completeSize);
 
     gFakeNVVMBuilder.reset();
@@ -2181,6 +2183,17 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesWaveMaskAllEqualIntOperation)
         SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT,
         toSlice("fakeWaveActiveAllEqualInt"),
         toSlice("fakeWaveMaskAllEqualInt"),
+        false);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesWaveMaskAllEqualUIntOperation)
+{
+    _checkNVVMIRBuilderNegotiatesWaveMaskPredicateOperation(
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_UINT,
+        toSlice("fakeWaveActiveAllEqualUInt"),
+        toSlice("fakeWaveMaskAllEqualUInt"),
         false);
 }
 
@@ -5759,23 +5772,28 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllTrueKernel)
         toSlice("llvm.nvvm.vote.all.sync"));
 }
 
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualIntKernel)
+static void _checkNVVMIRBuilderBuildsWaveMaskAllEqualKernel(
+    UnitTestContext* unitTestContext,
+    SlangNVVMBuilderFeature_3 feature,
+    SlangNVVMIntrinsicOp_3 operation,
+    const UnownedStringSlice& moduleName,
+    const UnownedStringSlice& kernelName,
+    const UnownedStringSlice& helperName)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
-    SLANG_CHECK_ABORT(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT));
+    SLANG_CHECK_ABORT(builder.supportsFeature(feature));
     SLANG_CHECK_ABORT(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT));
 
     ScopedNVVMBuilderModule scope;
     scope.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createModule(toSlice("wave-mask-all-equal-int-module"), scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(moduleName, scope.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWavePredicateIntrinsicKernel(
         builder,
         scope.module,
-        toSlice("waveActiveAllEqualInt"),
-        toSlice("waveMaskAllEqualInt"),
-        SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT,
+        kernelName,
+        helperName,
+        operation,
         false)));
 
     const SlangNVVMSerializationFormat_1 formats[] = {
@@ -5790,7 +5808,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualIntKernel)
         const UnownedStringSlice text(
             static_cast<const char*>(assembly->getBufferPointer()),
             assembly->getBufferSize());
-        SLANG_CHECK(text.indexOf(toSlice("define i1 @waveMaskAllEqualInt(i32")) >= 0);
+        StringBuilder helperDefinition;
+        helperDefinition << "define i1 @" << helperName << "(i32";
+        StringBuilder helperCall;
+        helperCall << "call i1 @" << helperName;
+        SLANG_CHECK(text.indexOf(helperDefinition.getUnownedSlice()) >= 0);
         SLANG_CHECK(
             _countOccurrences(
                 text,
@@ -5798,7 +5820,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualIntKernel)
         SLANG_CHECK(_countOccurrences(text, toSlice("extractvalue { i32, i1 }")) == 1);
         SLANG_CHECK(_countOccurrences(text, toSlice(", 1")) >= 1);
         SLANG_CHECK(_countOccurrences(text, toSlice("ret i1")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("call i1 @waveMaskAllEqualInt")) == 1);
+        SLANG_CHECK(_countOccurrences(text, helperCall.getUnownedSlice()) == 1);
         SLANG_CHECK(_countOccurrences(text, toSlice("call i32 @llvm.nvvm.vote.ballot.sync")) == 1);
         SLANG_CHECK(_countOccurrences(text, toSlice("store i32")) == 1);
         SLANG_CHECK(
@@ -5806,6 +5828,28 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualIntKernel)
                 text,
                 toSlice("declare { i32, i1 } @llvm.nvvm.match.all.sync.i32p(i32, i32)")) == 1);
     }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualIntKernel)
+{
+    _checkNVVMIRBuilderBuildsWaveMaskAllEqualKernel(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT,
+        toSlice("wave-mask-all-equal-int-module"),
+        toSlice("waveActiveAllEqualInt"),
+        toSlice("waveMaskAllEqualInt"));
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualUIntKernel)
+{
+    _checkNVVMIRBuilderBuildsWaveMaskAllEqualKernel(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_UINT,
+        toSlice("wave-mask-all-equal-uint-module"),
+        toSlice("waveActiveAllEqualUInt"),
+        toSlice("waveMaskAllEqualUInt"));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsFloat32CopyKernel)
