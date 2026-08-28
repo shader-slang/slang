@@ -130,6 +130,49 @@ IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     return ptrType;
 }
 
+IRGlobalVar* asNVVMSupportedSharedI32ArrayGlobal(
+    IRInst* inst,
+    IRArrayType** outArrayType,
+    uint32_t* outElementCount)
+{
+    if (outArrayType)
+        *outArrayType = nullptr;
+    if (outElementCount)
+        *outElementCount = 0;
+
+    auto globalVar = as<IRGlobalVar>(inst);
+    auto ptrType = globalVar ? globalVar->getDataType() : nullptr;
+    IRArrayType* arrayType = nullptr;
+    uint32_t elementCount = 0;
+    if (!globalVar || !as<IRGroupSharedRate>(globalVar->getRate()) || globalVar->getFirstBlock() ||
+        !ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 1 ||
+        !(arrayType = asNVVMSupportedI32ArrayType(ptrType->getValueType(), &elementCount)))
+    {
+        return nullptr;
+    }
+
+    if (outArrayType)
+        *outArrayType = arrayType;
+    if (outElementCount)
+        *outElementCount = elementCount;
+    return globalVar;
+}
+
+IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type)
+{
+    auto ptrType = as<IRPtrTypeBase>(type);
+    IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
+    if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
+        !isNVVMSignedI32Type(ptrType->getValueType()) ||
+        ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        ptrType->getAddressSpace() != AddressSpace::GroupShared || !dataLayout ||
+        dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
+    {
+        return nullptr;
+    }
+    return ptrType;
+}
+
 IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferI32Type(IRInst* type)
 {
     auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
@@ -280,24 +323,28 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isBool = isNVVMBoolType(type);
     IRVectorType* uint3Type = asNVVMSupportedUInt3Type(type);
     IRPtrTypeBase* deviceScalarPointer = asNVVMSupportedDeviceScalarPointerType(type);
-    IRArrayType* arrayType = nullptr;
-    IRPtrTypeBase* deviceArrayPointer = asNVVMSupportedDeviceArrayPointerType(type, &arrayType);
+    IRArrayType* fixedArrayType = asNVVMSupportedI32ArrayType(type);
+    IRArrayType* deviceArrayType = nullptr;
+    IRPtrTypeBase* deviceArrayPointer =
+        asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
     IRHLSLStructuredBufferTypeBase* rawResource = asNVVMSupportedRawRWStructuredBufferI32Type(type);
     IRPtrTypeBase* resourceElementPointer =
         asNVVMSupportedRWStructuredBufferI32ElementPointerType(type);
+    IRPtrTypeBase* sharedElementPointer = asNVVMSupportedSharedI32ElementPointerType(type);
 
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
     // helper signature.
     const bool isLegal =
         (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-        (use == NVVMTypeUse::HelperResult && (isVoid || isI32 || isFloat32 || isBool || uint3Type)) ||
+        (use == NVVMTypeUse::HelperResult &&
+         (isVoid || isI32 || isFloat32 || isBool || uint3Type)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isI32 || isFloat32 || deviceScalarPointer || deviceArrayPointer || rawResource)) ||
         (use == NVVMTypeUse::HelperParameter && (isI32 || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
-         (isI32 || isFloat32 || isBool || uint3Type || deviceScalarPointer || deviceArrayPointer ||
-          rawResource || resourceElementPointer));
+         (isI32 || isFloat32 || isBool || uint3Type || fixedArrayType || deviceScalarPointer ||
+          deviceArrayPointer || rawResource || resourceElementPointer || sharedElementPointer));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -327,10 +374,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (uint3Type)
     {
         SlangNVVMTypeHandle_1 elementType = nullptr;
-        SLANG_RETURN_ON_FAIL(lowerType(uint3Type->getElementType(), NVVMTypeUse::Value, elementType));
+        SLANG_RETURN_ON_FAIL(
+            lowerType(uint3Type->getElementType(), NVVMTypeUse::Value, elementType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             "fixed uint3 vector type",
             m_builder.getVectorType(m_module, elementType, 3, outType)));
+    }
+    else if (fixedArrayType)
+    {
+        return _lowerArrayType(fixedArrayType, outType);
     }
     else if (deviceScalarPointer)
     {
@@ -342,13 +394,21 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
     else if (deviceArrayPointer)
     {
-        return _lowerPointerType(type, arrayType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL, outType);
+        return _lowerPointerType(type, deviceArrayType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL, outType);
     }
     else if (rawResource)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             "raw RWStructuredBuffer signed i32 type",
             m_builder.getRawRWStructuredBufferI32Type(m_module, outType)));
+    }
+    else if (sharedElementPointer)
+    {
+        return _lowerPointerType(
+            type,
+            sharedElementPointer->getValueType(),
+            SLANG_NVVM_ADDRESS_SPACE_SHARED,
+            outType);
     }
     else
     {

@@ -195,6 +195,10 @@ not establish backend support.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangCUDAExecutionDifferentialPTX` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Both routes emit all `tid`, `ctaid`, `ntid`, and `nctaid` x/y/z components plus a group barrier | Matching `[64, 64]` ABI and complete special-register/barrier inventory | Not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangCUDAExecutionPtxasAccepts` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 `ptxas` | Pass | Pass | Not applicable | Both execution-family PTX outputs assemble | Static PTX acceptance | Resource and timing measurements not collected |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangCUDAExecutionRuntimeMatchesNVRTC` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, RTX 5090 | Pass | Pass | Not applicable | A 288-invocation multi-block launch records all twelve execution components after group synchronization | Every thread/block coordinate occurs exactly once and all block/grid dimensions agree | Kernel timing not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangSharedMemoryUsesDirectPipeline` | 3-4 | V4 construction-version-3 fake provider and fake libNVVM | Not compared | Pass | Not applicable | One canonical module-owned `groupshared int[64]` lowers through generic fixed-array, global-storage, GEP, load/store, atomic, and barrier operations | Exact address-space-3 storage and two element-pointer relations; no runtime | Fake-only; not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangSharedMemoryDifferentialPTX` | 3-4 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Both routes compile the 64-element shared-memory reverse-read workload | Matching `[64, 64]` ABI, 256-byte shared object, shared load/store, global atomic, and group barrier inventory | PTX size/timing not measured |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangSharedMemoryPtxasAccepts` | 3-4 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both shared-memory outputs assemble | Static acceptance; direct `sm_70 -v` probe reports 14 registers, one barrier, 256 bytes shared memory, and no stack or spills | Compile time reported as 0.000 ms |
+| `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangSharedMemoryRuntimeMatchesNVRTC` | 3-4 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, RTX 5090 | Pass | Pass | Not applicable | One 64-thread block writes, synchronizes, and reverse-reads peer slots across two warps | All 64 results equal `(63 - ticket) * 3 + 1` through both routes | Kernel timing not measured |
 
 ## Slice 19 atomic and wire-compatibility evidence
 
@@ -303,6 +307,8 @@ same canonical graph through LLVM `icmp eq`.
 | `tests/cuda/cuda-compile.cu` | Explicit `-pass-through nvrtc` retains precedence even with `-emit-cuda-via-nvvm` | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations` | V4 construction version 2 preserves version 1, validates vector construction/extraction and all execution/barrier operations before mutation, and emits exact normal and LLVM-7-compatible intrinsic forms | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesCUDAExecutionCapability` | An exact V4 construction-version-1 provider is discovered but reports E52018 for required extended construction before module creation or operation emission | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage` | V4 construction version 3 preserves versions 1 and 2, rejects invalid type/address-space/alignment/name/output and duplicate-name cases without mutation, then emits exact normal and LLVM-7-compatible address-space-3 storage/GEP/load/store forms | Pass |
+| `slang-unit-test-tool/nvvmSlangNegotiatesSharedGlobalStorageCapability` | An exact V4 construction-version-2 provider retains Slice 66 programs but reports E52018 for shared storage before module creation | Pass |
 
 Slice 9 extends Bucket 2 through a finite DAG of canonical direct `IRFunc`
 callees with signed-i32 parameters/results and valued returns. Complex and aggregate types, pointer
@@ -1221,3 +1227,22 @@ prefix passes 425/425 with sorted-name SHA-256
 names reproduces Slice 65's 419-name hash
 `c634caa999f2b191c85b37cc7885d39462bcef55406ef64dc04bd1a1d02590c9` exactly. Debug preservation
 passes 11/11.
+
+Slice 67 adds the exact linked-IR shape for `groupshared int[64]`: a module-owned `IRGlobalVar`
+with `GroupShared` rate and fixed-array pointer type, consumed by ordinary shared-address-space
+element pointers, loads, and stores. V4 construction version 3 appends one generic typed global
+storage declaration; the existing fixed-array, pointer, GEP, load, and store surface expresses the
+rest without shared-specific callbacks. Versions 1 and 2 remain frozen and queryable.
+
+One 64-thread block uses signed atomic tickets to write every shared slot, synchronizes, and reads
+the reverse slot. Direct NVVM and NVRTC produce identical 64-element results on an RTX 5090, and
+CUDA 12.9 `ptxas` accepts both. A separate direct `sm_70 -v` assembly reports 14 registers, one
+barrier, 256 bytes of shared memory, and no stack or spills. Unsupported global-storage shapes and
+the adjacent floating-point shared-element relation stop before provider discovery.
+
+Six names increase the five measured test/support files from 29,241 to 29,707 physical lines. The
+complete Release prefix passes 431/431 with sorted-name SHA-256
+`3d3e5effec15efd6d8eec74752802df83fe21ffb89e9d9037b3abf0803d25c0b`; removing the six Slice 67
+names reproduces Slice 66's 425-name hash
+`641fcaf6a0da63e30a6146beb3e46e261d58297299aa33d180a1f86d73e4f0e5` exactly. Debug preservation
+passes 8/8.

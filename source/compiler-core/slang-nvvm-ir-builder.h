@@ -132,14 +132,27 @@ public:
     bool supportsExtendedConstruction() const
     {
         return m_apiV4.structureSize &&
-               m_constructionV4.interfaceVersion ==
-                   SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 &&
+               (m_constructionV4.interfaceVersion ==
+                    SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2 ||
+                m_constructionV4.interfaceVersion ==
+                    SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4) &&
+               m_constructionV4.structureSize >= SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_2_SIZE &&
                m_constructionV4.getVectorType && m_constructionV4.emitVectorElementExtract &&
                m_constructionV4.emitExtendedCall && m_constructionV4.emitExtendedValueReturn;
     }
 
     /// Returns whether the queried V4 construction table supports fixed vectors.
     bool supportsVectorConstruction() const { return supportsExtendedConstruction(); }
+
+    /// Returns whether construction version 3 can declare typed module-owned storage.
+    bool supportsGlobalStorage() const
+    {
+        return m_apiV4.structureSize &&
+               m_constructionV4.interfaceVersion ==
+                   SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 &&
+               m_constructionV4.structureSize >= sizeof(m_constructionV4) &&
+               m_constructionV4.declareGlobalStorage;
+    }
 
     /// Queries one complete typed V4 operation, adapting to V3/V2 when necessary.
     bool supportsValueOperation(const SlangNVVMValueOperationDesc_4& operation) const;
@@ -394,6 +407,15 @@ public:
         SlangNVVMTypeHandle_1 elementType,
         uint32_t elementCount,
         SlangNVVMTypeHandle_1& outType) const;
+
+    /// Declares internal uninitialized storage with an exact provider type and NVVM address space.
+    SlangResult declareGlobalStorage(
+        SlangNVVMModuleHandle_1 module,
+        SlangNVVMTypeHandle_1 valueType,
+        SlangNVVMAddressSpace_2 addressSpace,
+        uint32_t alignment,
+        const UnownedStringSlice& name,
+        SlangNVVMValueHandle_1& outStorage) const;
 
     /// Extracts one statically selected element from a fixed vector.
     SlangResult emitVectorElementExtract(

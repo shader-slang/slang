@@ -557,7 +557,8 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionUsesDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 5);
         SLANG_CHECK(gFakeNVVMBuilder.callResultKinds.getCount() == 5);
         for (Index i = 0; i < 4; ++i)
-            SLANG_CHECK(gFakeNVVMBuilder.callResultKinds[i] == FakeNVVMBuilderResultTypeKind::UInt3);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.callResultKinds[i] == FakeNVVMBuilderResultTypeKind::UInt3);
         SLANG_CHECK(gFakeNVVMBuilder.callResultKinds[4] == FakeNVVMBuilderResultTypeKind::Void);
 
         SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount == 12);
@@ -576,6 +577,62 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionUsesDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 12);
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 4);
         SLANG_CHECK(gFakeNVVMBuilder.emitReturnVoidCallCount == 2);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangSharedMemoryUsesDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV4();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMSharedMemorySource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareGlobalStorageCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.getArrayTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.arrayElementType == _getFakeNVVMBuilderIntegerType());
+        SLANG_CHECK(gFakeNVVMBuilder.arrayElementCount == 64);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageValueType == _getFakeNVVMBuilderArrayType());
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageAddressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageAlignment == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageNames.getCount() == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageNames[0].indexOf("sharedValues") >= 0);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitArrayElementPointerCallCount == 2);
+        for (Index i = 0; i < 2; ++i)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.arrayElementPointerBaseValueRefs[i].kind ==
+                FakeNVVMBuilderValueKind::GlobalStorage);
+            SLANG_CHECK(gFakeNVVMBuilder.arrayElementPointerBaseValueRefs[i].index == 0);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.emitRelaxedGlobalI32AtomicAddCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.workgroupBarrierCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 2);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storePointerValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::ArrayElementPointer);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.loadPointerValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::ArrayElementPointer);
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
@@ -1627,6 +1684,37 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesCUDAExecutionCapability)
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.executionRegisterOperations.getCount() == 0);
         SLANG_CHECK(gFakeNVVMBuilder.workgroupBarrierCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesSharedGlobalStorageCapability)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV4();
+    gFakeNVVMBuilder.constructionV4 = {};
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMSharedMemorySource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        const String diagnosticText = _getBlobText(diagnostics);
+        SLANG_CHECK(diagnosticText.indexOf("E52018") >= 0);
+        SLANG_CHECK(diagnosticText.indexOf("global storage construction") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.declareGlobalStorageCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
@@ -4270,6 +4358,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedDoubleAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedNestedArraySource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedLocalArraySource, "'var'"},
+        {kDirectNVVMUnsupportedSharedFloatArraySource, "'device i32 array element pointer'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
         {kDirectNVVMUnsignedMultiplySource, "'signed i32 multiplication'"},
@@ -4320,7 +4409,8 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     // multiply ABI variants, logical NOT/shifts/division/remainder, unsigned/wide AND/OR/XOR/NOT,
     // unsigned/wide negate and floating-negate-plus-cast and atomic-add ABI variants,
     // non-relaxed atomic-add order,
-    // adjacent atomic operations, group-shared atomic add, unsigned/wide equality, floating and
+    // adjacent atomic operations, group-shared atomic add, non-i32 shared arrays,
+    // unsigned/wide equality, floating and
     // unsigned/wide inequality and ordered comparisons, pointer comparisons, unsigned indices,
     // and helper-array-pointer shapes remain deterministic before builder discovery.
     for (const auto& unsupported : kCases)

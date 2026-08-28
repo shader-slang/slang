@@ -86,7 +86,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
     const uint32_t rootSize = sizeof(void*) == 8 ? 40u : 36u;
     const uint32_t foundationSize = sizeof(void*) == 8 ? 40u : 24u;
     const uint32_t constructionV1Size = sizeof(void*) == 8 ? 224u : 116u;
-    const uint32_t constructionSize = sizeof(void*) == 8 ? 256u : 132u;
+    const uint32_t constructionV2Size = sizeof(void*) == 8 ? 256u : 132u;
+    const uint32_t constructionSize = sizeof(void*) == 8 ? 264u : 136u;
     const uint32_t valueOperationsSize = sizeof(void*) == 8 ? 24u : 16u;
     const uint32_t operationDescSize = sizeof(void*) == 8 ? 40u : 32u;
     SLANG_CHECK(sizeof(SlangNVVMValueTypeDesc_4) == 16u);
@@ -95,6 +96,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V4_MIN_SIZE == rootSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderFoundationAPI_4) == foundationSize);
     SLANG_CHECK(SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_1_SIZE == constructionV1Size);
+    SLANG_CHECK(SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_2_SIZE == constructionV2Size);
     SLANG_CHECK(sizeof(SlangNVVMBuilderConstructionAPI_4) == constructionSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderValueOperationsAPI_4) == valueOperationsSize);
 
@@ -123,6 +125,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
     gFakeNVVMBuilder.foundationV4 = _makeFakeNVVMBuilderFoundationAPIV4();
     gFakeNVVMBuilder.constructionV4V1 = _makeFakeNVVMBuilderConstructionAPIV4(
         SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1);
+    gFakeNVVMBuilder.constructionV4V2 = _makeFakeNVVMBuilderConstructionAPIV4(
+        SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2);
     gFakeNVVMBuilder.constructionV4 = _makeFakeNVVMBuilderConstructionAPIV4();
     gFakeNVVMBuilder.valueOperationsV4 = _makeFakeNVVMBuilderValueOperationsAPIV4();
     const SlangNVVMBuilderAPI_V4 apiV4 = _makeFakeNVVMBuilderAPIV4();
@@ -139,6 +143,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
         SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1,
         &constructionV1)));
     SLANG_CHECK(constructionV1 == &gFakeNVVMBuilder.constructionV4V1);
+    const void* constructionV2 = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(apiV4.queryInterface(
+        SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION_4,
+        SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2,
+        &constructionV2)));
+    SLANG_CHECK(constructionV2 == &gFakeNVVMBuilder.constructionV4V2);
     {
         ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
         NVVMIRBuilder builder;
@@ -148,10 +158,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
         SLANG_CHECK(builder.getAPIV2() == nullptr);
         SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=4") >= 0);
         SLANG_CHECK(builder.getVersionString().indexOf("foundation-api-version=1") >= 0);
-        SLANG_CHECK(builder.getVersionString().indexOf("construction-api-version=2") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("construction-api-version=3") >= 0);
         SLANG_CHECK(builder.getVersionString().indexOf("value-api-version=1") >= 0);
         SLANG_CHECK(builder.supportsScalarOperations());
         SLANG_CHECK(builder.supportsExtendedConstruction());
+        SLANG_CHECK(builder.supportsGlobalStorage());
         SLANG_CHECK(builder.supportsScalarIntegerMultiply());
         SLANG_CHECK(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_FLOAT));
 
@@ -218,6 +229,26 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 
+    // Construction version 2 remains a complete discoverable prefix: it retains fixed-vector
+    // execution support but deliberately has no module-storage declaration capability.
+    gFakeNVVMBuilder.reset();
+    gFakeNVVMBuilder.foundationV4 = _makeFakeNVVMBuilderFoundationAPIV4();
+    gFakeNVVMBuilder.constructionV4V1 = _makeFakeNVVMBuilderConstructionAPIV4(
+        SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1);
+    gFakeNVVMBuilder.constructionV4V2 = _makeFakeNVVMBuilderConstructionAPIV4(
+        SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2);
+    gFakeNVVMBuilder.valueOperationsV4 = _makeFakeNVVMBuilderValueOperationsAPIV4();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            NVVMIRBuilder::initialize(_makeFakeNVVMBuilderAPIV4(), library, builder)));
+        SLANG_CHECK(builder.supportsExtendedConstruction());
+        SLANG_CHECK(!builder.supportsGlobalStorage());
+        SLANG_CHECK(builder.getVersionString().indexOf("construction-api-version=2") >= 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
     // V4 is preferred when present. A malformed V4 interface is authoritative and cannot silently
     // fall back to an otherwise valid V3 export.
     gFakeNVVMBuilder.reset();
@@ -250,7 +281,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 
-    for (Index callbackIndex = 0; callbackIndex < 4; ++callbackIndex)
+    for (Index callbackIndex = 0; callbackIndex < 5; ++callbackIndex)
     {
         gFakeNVVMBuilder.reset();
         gFakeNVVMBuilder.api = _makeFakeNVVMBuilderAPI();
@@ -264,8 +295,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
             gFakeNVVMBuilder.constructionV4.emitVectorElementExtract = nullptr;
         else if (callbackIndex == 2)
             gFakeNVVMBuilder.constructionV4.emitExtendedCall = nullptr;
-        else
+        else if (callbackIndex == 3)
             gFakeNVVMBuilder.constructionV4.emitExtendedValueReturn = nullptr;
+        else
+            gFakeNVVMBuilder.constructionV4.declareGlobalStorage = nullptr;
 
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
         NVVMIRBuilder builder;
@@ -5011,8 +5044,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     ScopedNVVMBuilderModule foreignScope;
     scope.builder = &builder;
     foreignScope.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createModule(toSlice("cuda-execution-operations"), scope.module)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("cuda-execution-operations"), scope.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.createModule(toSlice("cuda-execution-operations-foreign"), foreignScope.module)));
 
@@ -5023,10 +5056,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     SlangNVVMTypeHandle_1 foreignUInt3Type = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32Type)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(
-        foreignScope.module,
-        32,
-        foreignI32Type)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getIntegerType(foreignScope.module, 32, foreignI32Type)));
 
     SlangNVVMTypeHandle_1 rejectedType = reinterpret_cast<SlangNVVMTypeHandle_1>(uintptr_t(1));
     SLANG_CHECK(builder.getVectorType(nullptr, i32Type, 3, rejectedType) == SLANG_E_INVALID_ARG);
@@ -5037,21 +5068,19 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedType == nullptr);
     rejectedType = reinterpret_cast<SlangNVVMTypeHandle_1>(uintptr_t(1));
-    SLANG_CHECK(builder.getVectorType(scope.module, i32Type, 1, rejectedType) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(
+        builder.getVectorType(scope.module, i32Type, 1, rejectedType) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedType == nullptr);
     rejectedType = reinterpret_cast<SlangNVVMTypeHandle_1>(uintptr_t(1));
-    SLANG_CHECK(builder.getVectorType(scope.module, i32Type, 5, rejectedType) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(
+        builder.getVectorType(scope.module, i32Type, 5, rejectedType) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedType == nullptr);
     SLANG_CHECK(
         builder.getConstructionAPIV4()->getVectorType(scope.module, i32Type, 3, nullptr) ==
         SLANG_E_INVALID_ARG);
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getVectorType(scope.module, i32Type, 3, uint3Type)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVectorType(
-        foreignScope.module,
-        foreignI32Type,
-        3,
-        foreignUInt3Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVectorType(scope.module, i32Type, 3, uint3Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getVectorType(foreignScope.module, foreignI32Type, 3, foreignUInt3Type)));
 
     const SlangNVVMTypeHandle_1 parameterTypes[] = {i32Type};
     SlangNVVMTypeHandle_1 functionType = nullptr;
@@ -5068,18 +5097,17 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         toSlice("cudaExecutionOperations"),
         function)));
     SlangNVVMValueHandle_1 scalarParameter = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.getFunctionParameter(scope.module, function, 0, scalarParameter)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, scalarParameter)));
     SlangNVVMBlockHandle_1 entryBlock = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createBlock(scope.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), entryBlock)));
 
     SlangNVVMTypeHandle_1 foreignVoidType = nullptr;
     SlangNVVMTypeHandle_1 foreignFunctionType = nullptr;
     SlangNVVMValueHandle_1 foreignFunction = nullptr;
     SlangNVVMValueHandle_1 foreignVector = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getVoidType(foreignScope.module, foreignVoidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(foreignScope.module, foreignVoidType)));
     const SlangNVVMTypeHandle_1 foreignParameterTypes[] = {foreignUInt3Type};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
         foreignScope.module,
@@ -5092,11 +5120,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         foreignFunctionType,
         toSlice("foreignCUDAExecutionOperations"),
         foreignFunction)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionParameter(
-        foreignScope.module,
-        foreignFunction,
-        0,
-        foreignVector)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionParameter(foreignScope.module, foreignFunction, 0, foreignVector)));
 
     const SlangNVVMValueOperation_4 executionOperations[] = {
         SLANG_NVVM_VALUE_OP_THREAD_INDEX_4,
@@ -5116,8 +5141,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     const SlangNVVMValueOperationDesc_4 barrierOperation =
         getOperation(SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER_4);
 
-    SlangNVVMValueHandle_1 rejectedValue =
-        reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SlangNVVMValueHandle_1 rejectedValue = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
     SLANG_CHECK(
         builder.emitValueOperation(
             scope.module,
@@ -5128,12 +5152,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     SLANG_CHECK(rejectedValue == nullptr);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, entryBlock)));
     SLANG_CHECK(
-        builder.getValueOperationsAPIV4()->emitOperation(
-            scope.module,
-            &barrierOperation,
-            nullptr,
-            0,
-            nullptr) == SLANG_E_INVALID_ARG);
+        builder.getValueOperationsAPIV4()
+            ->emitOperation(scope.module, &barrierOperation, nullptr, 0, nullptr) ==
+        SLANG_E_INVALID_ARG);
 
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
     SLANG_CHECK(
@@ -5173,14 +5194,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         SLANG_CHECK(rejectedValue == nullptr);
     }
 
-    SlangNVVMValueHandle_1 barrierValue =
-        reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueOperation(
-        scope.module,
-        barrierOperation,
-        nullptr,
-        0,
-        barrierValue)));
+    SlangNVVMValueHandle_1 barrierValue = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(scope.module, barrierOperation, nullptr, 0, barrierValue)));
     SLANG_CHECK(barrierValue == nullptr);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
@@ -5216,8 +5232,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     for (SlangNVVMSerializationFormat_1 format : formats)
     {
         ComPtr<ISlangBlob> assembly;
-        SLANG_CHECK_ABORT(
-            SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
         SLANG_CHECK_ABORT(assembly != nullptr);
         const String text = _getBlobText(assembly);
         for (const char* intrinsicName : kIntrinsicNames)
@@ -5238,6 +5253,142 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         {
             SLANG_CHECK(text.indexOf("= { nounwind readnone speculatable }") < 0);
         }
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsGlobalStorage());
+
+    ScopedNVVMBuilderModule scope;
+    ScopedNVVMBuilderModule foreignScope;
+    scope.builder = &builder;
+    foreignScope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("shared-global-storage"), scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("shared-global-storage-foreign"), foreignScope.module)));
+
+    SlangNVVMTypeHandle_1 voidType = nullptr;
+    SlangNVVMTypeHandle_1 i32Type = nullptr;
+    SlangNVVMTypeHandle_1 arrayType = nullptr;
+    SlangNVVMTypeHandle_1 foreignI32Type = nullptr;
+    SlangNVVMTypeHandle_1 foreignArrayType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getArrayType(scope.module, i32Type, 64, arrayType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getIntegerType(foreignScope.module, 32, foreignI32Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getArrayType(foreignScope.module, foreignI32Type, 64, foreignArrayType)));
+
+    SlangNVVMValueHandle_1 rejected = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.declareGlobalStorage(
+            nullptr,
+            arrayType,
+            SLANG_NVVM_ADDRESS_SPACE_SHARED,
+            4,
+            toSlice("rejectedNullModule"),
+            rejected) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejected == nullptr);
+    rejected = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.declareGlobalStorage(
+            scope.module,
+            foreignArrayType,
+            SLANG_NVVM_ADDRESS_SPACE_SHARED,
+            4,
+            toSlice("rejectedForeignType"),
+            rejected) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejected == nullptr);
+    rejected = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.declareGlobalStorage(
+            scope.module,
+            arrayType,
+            SlangNVVMAddressSpace_2(2),
+            4,
+            toSlice("rejectedAddressSpace"),
+            rejected) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejected == nullptr);
+    rejected = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.declareGlobalStorage(
+            scope.module,
+            arrayType,
+            SLANG_NVVM_ADDRESS_SPACE_SHARED,
+            3,
+            toSlice("rejectedAlignment"),
+            rejected) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejected == nullptr);
+
+    SlangNVVMValueHandle_1 storage = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareGlobalStorage(
+        scope.module,
+        arrayType,
+        SLANG_NVVM_ADDRESS_SPACE_SHARED,
+        4,
+        toSlice("sharedValues"),
+        storage)));
+    rejected = reinterpret_cast<SlangNVVMValueHandle_1>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.declareGlobalStorage(
+            scope.module,
+            arrayType,
+            SLANG_NVVM_ADDRESS_SPACE_SHARED,
+            4,
+            toSlice("sharedValues"),
+            rejected) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejected == nullptr);
+
+    SlangNVVMTypeHandle_1 functionType = nullptr;
+    SlangNVVMValueHandle_1 function = nullptr;
+    SlangNVVMBlockHandle_1 entryBlock = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionType(scope.module, voidType, nullptr, 0, functionType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        scope.module,
+        functionType,
+        toSlice("sharedGlobalStorage"),
+        function)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, entryBlock)));
+    SlangNVVMValueHandle_1 index = nullptr;
+    SlangNVVMValueHandle_1 elementPointer = nullptr;
+    SlangNVVMValueHandle_1 loaded = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerConstant(scope.module, i32Type, 7, index)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitArrayElementPointer(scope.module, storage, index, elementPointer)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(scope.module, index, elementPointer, 4)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitLoad(scope.module, elementPointer, 4, loaded)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
+
+    const SlangNVVMSerializationFormat_1 formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat_1 format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        const String text = _getBlobText(assembly);
+        SLANG_CHECK(
+            text.indexOf(
+                "@sharedValues = internal addrspace(3) global [64 x i32] undef, align 4") >= 0);
+        SLANG_CHECK(text.indexOf("rejectedNullModule") < 0);
+        SLANG_CHECK(text.indexOf("rejectedForeignType") < 0);
+        SLANG_CHECK(text.indexOf("rejectedAddressSpace") < 0);
+        SLANG_CHECK(text.indexOf("rejectedAlignment") < 0);
+        // LLVM folds this constant-index address to a constant expression and prints it once at
+        // each load/store use in both dialects.
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("getelementptr")) == 2);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("store i32 7")) == 1);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("load i32")) == 1);
     }
 }
 

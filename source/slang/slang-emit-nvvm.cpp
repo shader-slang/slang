@@ -111,8 +111,7 @@ bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc_4& semanticT
 
     if (semanticType.kind == SLANG_NVVM_VALUE_TYPE_VOID_4)
     {
-        return semanticType.bitWidth == 0 && semanticType.laneCount == 0 &&
-               as<IRVoidType>(type);
+        return semanticType.bitWidth == 0 && semanticType.laneCount == 0 && as<IRVoidType>(type);
     }
     if (semanticType.laneCount == 3)
     {
@@ -292,6 +291,13 @@ SlangResult _validateAvailableValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
+    // Canonical module-owned shared storage exists before every function body and therefore does
+    // not participate in instruction dominance. All other executable values remain SSA-ordered.
+    if (value && consumer && value->getModule() == consumer->getModule() &&
+        asNVVMSupportedSharedI32ArrayGlobal(value))
+    {
+        return SLANG_OK;
+    }
     if (value && consumer && dominatorTree && availableValues.contains(value) &&
         dominatorTree->dominates(value, consumer))
     {
@@ -446,7 +452,7 @@ SlangResult _validateScalarValue(
         features);
 }
 
-// Checks an available device pointer and enforces the source access qualifier for stores.
+// Checks an available scalar pointer and enforces the source access qualifier for stores.
 SlangResult _validatePointerValue(
     CodeGenContext* codeGenContext,
     IRInst* value,
@@ -461,12 +467,15 @@ SlangResult _validatePointerValue(
     auto resourceElementPtrType =
         value ? asNVVMSupportedRWStructuredBufferI32ElementPointerType(value->getDataType())
               : nullptr;
+    auto sharedElementPtrType =
+        value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
     IRPtrTypeBase* devicePtrType = scalarPtrType;
-    if (!devicePtrType &&
+    IRPtrTypeBase* acceptedPtrType = devicePtrType ? devicePtrType : sharedElementPtrType;
+    if (!acceptedPtrType &&
         (!resourceElementPtrType || value->getOp() != kIROp_RWStructuredBufferGetElementPtr))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
     IRType* actualPointeeType =
-        devicePtrType ? devicePtrType->getValueType() : resourceElementPtrType->getValueType();
+        acceptedPtrType ? acceptedPtrType->getValueType() : resourceElementPtrType->getValueType();
     if (!expectedPointeeType || !isTypeEqual(actualPointeeType, expectedPointeeType))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device pointer pointee type"));
     if (resourceElementPtrType && consumer->getOp() != kIROp_Store)
@@ -475,8 +484,8 @@ SlangResult _validatePointerValue(
             codeGenContext,
             toSlice("raw RWStructuredBuffer signed i32 store consumer"));
     }
-    if (requireWriteAccess && devicePtrType &&
-        devicePtrType->getAccessQualifier() != AccessQualifier::ReadWrite)
+    if (requireWriteAccess && acceptedPtrType &&
+        acceptedPtrType->getAccessQualifier() != AccessQualifier::ReadWrite)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("read-only pointer store"));
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
@@ -720,9 +729,11 @@ SlangResult _validateNVVMFunctionUses(
     return SLANG_OK;
 }
 
-// Checks that every accepted function has a distinct canonical symbol before provider discovery.
-SlangResult _validateNVVMFunctionNames(
+// Checks that every emitted function and storage object has a distinct canonical symbol before
+// provider discovery.
+SlangResult _validateNVVMSymbolNames(
     CodeGenContext* codeGenContext,
+    IRModule* module,
     IRFunc* entryPoint,
     const List<IRFunc*>& functions)
 {
@@ -732,6 +743,15 @@ SlangResult _validateNVVMFunctionNames(
         UnownedStringSlice name = _getNVVMFunctionName(function, entryPoint);
         if (!name.getLength() || !names.add(String(name)))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("function name"));
+    }
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto globalVar = asNVVMSupportedSharedI32ArrayGlobal(globalInst);
+        if (!globalVar)
+            continue;
+        const UnownedStringSlice name = getMangledName(globalVar);
+        if (!name.getLength() || !names.add(String(name)))
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("global storage name"));
     }
     return SLANG_OK;
 }
@@ -1005,7 +1025,8 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_GetElementPtr:
                 if (inst->getOperandCount() != 2 ||
-                    !asNVVMSupportedDevicePointerType(inst->getDataType()))
+                    (!asNVVMSupportedDevicePointerType(inst->getDataType()) &&
+                     !asNVVMSupportedSharedI32ElementPointerType(inst->getDataType())))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
@@ -1377,15 +1398,25 @@ SlangResult _validateNVVMFunction(
                                                              basePointer->getDataType(),
                                                              &arrayType)
                                                        : nullptr;
+                    IRArrayType* sharedArrayType = nullptr;
+                    auto sharedGlobal =
+                        asNVVMSupportedSharedI32ArrayGlobal(basePointer, &sharedArrayType);
                     auto resultPointerType = asNVVMSupportedDevicePointerType(inst->getDataType());
-                    if (!basePointerType || !resultPointerType || !arrayType ||
-                        basePointerType->getAddressSpace() !=
-                            resultPointerType->getAddressSpace() ||
-                        basePointerType->getAccessQualifier() !=
-                            resultPointerType->getAccessQualifier() ||
-                        !isTypeEqual(
-                            arrayType->getElementType(),
-                            resultPointerType->getValueType()))
+                    auto sharedResultPointerType =
+                        asNVVMSupportedSharedI32ElementPointerType(inst->getDataType());
+                    const bool isDeviceArrayElement =
+                        basePointerType && resultPointerType && arrayType &&
+                        basePointerType->getAddressSpace() ==
+                            resultPointerType->getAddressSpace() &&
+                        basePointerType->getAccessQualifier() ==
+                            resultPointerType->getAccessQualifier() &&
+                        isTypeEqual(arrayType->getElementType(), resultPointerType->getValueType());
+                    const bool isSharedArrayElement = sharedGlobal && sharedArrayType &&
+                                                      sharedResultPointerType &&
+                                                      isTypeEqual(
+                                                          sharedArrayType->getElementType(),
+                                                          sharedResultPointerType->getValueType());
+                    if (!isDeviceArrayElement && !isSharedArrayElement)
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -1692,7 +1723,8 @@ SlangResult validateNVVMSupportedIR(
     HashSet<IRFunc*> functionSet;
     SLANG_RETURN_ON_FAIL(
         _collectNVVMFunctions(codeGenContext, linkedIR, entryPoint, functions, functionSet));
-    SLANG_RETURN_ON_FAIL(_validateNVVMFunctionNames(codeGenContext, entryPoint, functions));
+    SLANG_RETURN_ON_FAIL(
+        _validateNVVMSymbolNames(codeGenContext, linkedIR.module, entryPoint, functions));
     SLANG_RETURN_ON_FAIL(_validateNVVMFunctionUses(codeGenContext, functions));
 
     for (auto function : functions)
@@ -1731,6 +1763,14 @@ SlangResult validateNVVMSupportedIR(
         if (auto globalFunction = as<IRFunc>(globalInst))
         {
             if (functionSet.contains(globalFunction))
+                continue;
+            return _diagnoseUnsupportedIR(
+                codeGenContext,
+                UnownedStringSlice(getIROpInfo(globalInst->getOp()).name));
+        }
+        if (as<IRGlobalVar>(globalInst))
+        {
+            if (asNVVMSupportedSharedI32ArrayGlobal(globalInst))
                 continue;
             return _diagnoseUnsupportedIR(
                 codeGenContext,
@@ -1805,6 +1845,17 @@ SlangResult emitNVVMIRFromLinkedIR(
         }
     }
 
+    bool needsGlobalStorage = false;
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+        needsGlobalStorage = needsGlobalStorage || asNVVMSupportedSharedI32ArrayGlobal(globalInst);
+    if (needsGlobalStorage && !builder.supportsGlobalStorage())
+    {
+        return _requireBuilderOperation(
+            codeGenContext,
+            "global storage construction",
+            SLANG_E_NOT_AVAILABLE);
+    }
+
     ScopedNVVMModule moduleScope;
     moduleScope.builder = &builder;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1816,6 +1867,33 @@ SlangResult emitNVVMIRFromLinkedIR(
     Dictionary<IRFunc*, SlangNVVMValueHandle_1> functionMap;
     NVVMValueMap valueMap;
     Dictionary<IRBlock*, SlangNVVMBlockHandle_1> blockMap;
+
+    // The canonical global owns storage class, value type, extent, and name. Lower those facts once
+    // before any function declaration; ordinary body uses then resolve through the shared value
+    // map.
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        IRArrayType* arrayType = nullptr;
+        auto globalVar = asNVVMSupportedSharedI32ArrayGlobal(globalInst, &arrayType);
+        if (!globalVar)
+            continue;
+
+        SlangNVVMTypeHandle_1 loweredArrayType = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            typeContext.lowerType(arrayType, NVVMTypeUse::Value, loweredArrayType));
+        SlangNVVMValueHandle_1 loweredStorage = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "shared global storage declaration",
+            builder.declareGlobalStorage(
+                moduleScope.module,
+                loweredArrayType,
+                SLANG_NVVM_ADDRESS_SPACE_SHARED,
+                kNVVMScalar32Alignment,
+                getMangledName(globalVar),
+                loweredStorage)));
+        valueMap[globalVar] = loweredStorage;
+    }
 
     // Every function is declared before any body is emitted. A call can therefore target a helper
     // that appears later in linked-IR order without turning physical order into a legality rule.
@@ -2265,7 +2343,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle_1 loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "device i32 array element pointer",
+                            asNVVMSupportedSharedI32ArrayGlobal(inst->getOperand(0))
+                                ? "shared i32 array element pointer"
+                                : "device i32 array element pointer",
                             builder.emitArrayElementPointer(
                                 moduleScope.module,
                                 loweredBasePointer,

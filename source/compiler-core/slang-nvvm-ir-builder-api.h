@@ -933,7 +933,8 @@ extern "C"
 
 #define SLANG_NVVM_BUILDER_FOUNDATION_INTERFACE_VERSION_4 1u
 #define SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1 1u
-#define SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 2u
+#define SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2 2u
+#define SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 3u
 #define SLANG_NVVM_BUILDER_VALUE_OPERATIONS_INTERFACE_VERSION_4 1u
 
     /** Semantic value categories used by V4 operation signatures. */
@@ -1097,10 +1098,22 @@ extern "C"
         SlangNVVMEmitCall_3 emitExtendedCall;
         /** Emits valued returns whose operand may be a fixed vector. */
         SlangNVVMEmitValueReturn_3 emitExtendedValueReturn;
+
+        /** V4 construction interface version 3 begins here. */
+        SlangNVVMResult_1(SLANG_NVVM_CALL* declareGlobalStorage)(
+            SlangNVVMModuleHandle_1 module,
+            SlangNVVMTypeHandle_1 valueType,
+            SlangNVVMAddressSpace_2 addressSpace,
+            uint32_t alignment,
+            const char* name,
+            size_t nameSize,
+            SlangNVVMValueHandle_1* outStorage);
     } SlangNVVMBuilderConstructionAPI_4;
 
 #define SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_1_SIZE \
     ((uint32_t)offsetof(SlangNVVMBuilderConstructionAPI_4, getVectorType))
+#define SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_2_SIZE \
+    ((uint32_t)offsetof(SlangNVVMBuilderConstructionAPI_4, declareGlobalStorage))
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMIsValueOperationSupported_4)(
         const SlangNVVMValueOperationDesc_4* operation,

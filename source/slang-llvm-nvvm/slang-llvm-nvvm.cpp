@@ -14,6 +14,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
@@ -1285,8 +1286,7 @@ static bool _isSupportedV4FunctionValueType(llvm::Type* type)
     if (_isSupportedScalarFunctionType(type, false))
         return true;
     auto vectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(type);
-    return vectorType && vectorType->getNumElements() >= 2 &&
-           vectorType->getNumElements() <= 4 &&
+    return vectorType && vectorType->getNumElements() >= 2 && vectorType->getNumElements() <= 4 &&
            _isSupportedScalarFunctionType(vectorType->getElementType(), false);
 }
 
@@ -1325,8 +1325,7 @@ static SlangResult _emitCallImpl(
         llvm::Value* argument = _getValue(arguments[i]);
         if (!(allowV4Types ? _isSupportedV4FunctionValueType(parameterType)
                            : _isSupportedScalarFunctionType(parameterType, requireInteger)) ||
-            !argument ||
-            argument->getType() != parameterType ||
+            !argument || argument->getType() != parameterType ||
             !_isValueUsableAtInsertionPoint(state, insertionBlock, argument))
         {
             return SLANG_E_INVALID_ARG;
@@ -1433,6 +1432,45 @@ static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
 
     llvm::Value* result = state->builder.CreateExtractElement(llvmVector, elementIndex);
     *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
+    SlangNVVMModuleHandle_1 module,
+    SlangNVVMTypeHandle_1 valueType,
+    SlangNVVMAddressSpace_2 addressSpace,
+    uint32_t alignment,
+    const char* name,
+    size_t nameSize,
+    SlangNVVMValueHandle_1* outStorage)
+{
+    if (outStorage)
+        *outStorage = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Type* llvmValueType = _getType(valueType);
+    const llvm::StringRef llvmName = _getStringRef(name, nameSize);
+    if (!state || !llvmValueType || &llvmValueType->getContext() != &state->context ||
+        !llvm::PointerType::isLoadableOrStorableType(llvmValueType) || !llvmValueType->isSized() ||
+        !_isNVVMAddressSpace(addressSpace) || !alignment || !llvm::isPowerOf2_32(alignment) ||
+        alignment > llvm::Value::MaximumAlignment || !name || !nameSize ||
+        state->module->getNamedValue(llvmName) || !outStorage)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::GlobalVariable* storage = new llvm::GlobalVariable(
+        *state->module,
+        llvmValueType,
+        false,
+        llvm::GlobalValue::InternalLinkage,
+        llvm::UndefValue::get(llvmValueType),
+        llvmName,
+        nullptr,
+        llvm::GlobalVariable::NotThreadLocal,
+        addressSpace);
+    storage->setAlignment(llvm::Align(alignment));
+    *outStorage = reinterpret_cast<SlangNVVMValueHandle_1>(storage);
     return SLANG_OK;
 }
 
@@ -1794,10 +1832,9 @@ static SlangResult _writeLegacyNVVMAssembly(
                 !function.hasFnAttribute(llvm::Attribute::NoUnwind) ||
                 !function.hasFnAttribute(llvm::Attribute::ReadNone) ||
                 !function.hasFnAttribute(llvm::Attribute::Speculatable) ||
-                (!isExecutionRegister &&
-                 (!function.hasFnAttribute(llvm::Attribute::NoFree) ||
-                  !function.hasFnAttribute(llvm::Attribute::NoSync) ||
-                  !function.hasFnAttribute(llvm::Attribute::WillReturn))))
+                (!isExecutionRegister && (!function.hasFnAttribute(llvm::Attribute::NoFree) ||
+                                          !function.hasFnAttribute(llvm::Attribute::NoSync) ||
+                                          !function.hasFnAttribute(llvm::Attribute::WillReturn))))
             {
                 return SLANG_E_NOT_AVAILABLE;
             }
@@ -2025,8 +2062,7 @@ static SlangResult _writeLegacyNVVMAssembly(
                 line.endswith(llvm14SpecialRegisterAttributeMarker)
                     ? llvm14SpecialRegisterAttributeMarker
                     : llvm14ExecutionRegisterAttributeMarker;
-            const llvm::StringRef prefix =
-                line.drop_back(attributeMarker.size());
+            const llvm::StringRef prefix = line.drop_back(attributeMarker.size());
             outSerializedData.append(prefix.begin(), prefix.end());
             outSerializedData.append(
                 legacySpecialRegisterAttributes.begin(),
@@ -2412,7 +2448,7 @@ static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID)
 {
     for (SlangNVVMValueOperation_4 operation = SLANG_NVVM_VALUE_OP_THREAD_INDEX_4;
          operation <= SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS_4;
-        ++operation)
+         ++operation)
     {
         llvm::Intrinsic::ID registerIntrinsics[3];
         if (!_getExecutionRegisterIntrinsicIDs(operation, registerIntrinsics))
@@ -2575,6 +2611,8 @@ static void _fillBuilderConstructionAPIV4(
     api = {};
     api.structureSize = interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1
                             ? SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_1_SIZE
+                        : interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2
+                            ? SLANG_NVVM_BUILDER_CONSTRUCTION_API_V4_2_SIZE
                             : uint32_t(sizeof(api));
     api.interfaceVersion = interfaceVersion;
     api.getVoidType = _getVoidType;
@@ -2604,13 +2642,16 @@ static void _fillBuilderConstructionAPIV4(
     api.emitRawRWStructuredBufferI32ElementPointer = _emitRawRWStructuredBufferI32ElementPointer;
     api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
     api.markFunctionAsKernel = _markFunctionAsKernel;
-    if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4)
+    if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2 ||
+        interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4)
     {
         api.getVectorType = _getVectorType;
         api.emitVectorElementExtract = _emitVectorElementExtract;
         api.emitExtendedCall = _emitCallV4;
         api.emitExtendedValueReturn = _emitValueReturnV4;
     }
+    if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4)
+        api.declareGlobalStorage = _declareGlobalStorage;
 }
 
 static void _fillBuilderValueOperationsAPIV4(SlangNVVMBuilderValueOperationsAPI_4& api)
@@ -2641,12 +2682,16 @@ static SlangResult SLANG_NVVM_CALL _queryBuilderInterfaceV4(
     static SlangNVVMBuilderConstructionAPI_4 constructionV1 = []
     {
         SlangNVVMBuilderConstructionAPI_4 api;
-        _fillBuilderConstructionAPIV4(
-            api,
-            SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1);
+        _fillBuilderConstructionAPIV4(api, SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1);
         return api;
     }();
     static SlangNVVMBuilderConstructionAPI_4 constructionV2 = []
+    {
+        SlangNVVMBuilderConstructionAPI_4 api;
+        _fillBuilderConstructionAPIV4(api, SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2);
+        return api;
+    }();
+    static SlangNVVMBuilderConstructionAPI_4 constructionV3 = []
     {
         SlangNVVMBuilderConstructionAPI_4 api;
         _fillBuilderConstructionAPIV4(api, SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4);
@@ -2669,8 +2714,10 @@ static SlangResult SLANG_NVVM_CALL _queryBuilderInterfaceV4(
     case SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION_4:
         if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_1)
             *outInterface = &constructionV1;
-        else if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4)
+        else if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4_2)
             *outInterface = &constructionV2;
+        else if (interfaceVersion == SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4)
+            *outInterface = &constructionV3;
         else
             return SLANG_E_NO_INTERFACE;
         return SLANG_OK;

@@ -3277,6 +3277,66 @@ reproduces Slice 65's 419-name hash
 host passes the 11-test preservation sample, and the final post-format V4 ABI check passes with the
 Release provider.
 
+### Slice 67: Shared storage and aggregate addressing
+
+Slice 67 adds one canonical static shared-memory shape. Consider this kernel:
+
+```slang
+groupshared int sharedValues[64];
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> counter,
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
+{
+    int ticket;
+    InterlockedAdd(*counter, 1, ticket);
+    sharedValues[ticket] = ticket * 3 + 1;
+    GroupMemoryBarrierWithGroupSync();
+    destination[ticket] = sharedValues[63 - ticket];
+}
+```
+
+The linked IR owns this storage explicitly. One module-level `IRGlobalVar` has `GroupShared` rate
+and canonical `Ptr(Array(Int, 64))` type. Its uses are ordinary `IRGetElementPtr`, `IRStore`, and
+`IRLoad` instructions; each element pointer is a read-write shared-address-space pointer with
+scalar-buffer layout. The emitter accepts that exact producer shape and no alternative. In
+particular, all other `IRGlobalVar` shapes are rejected before provider discovery, and an adjacent
+`groupshared float[64]` fixture stops at its non-i32 element-pointer relation. The emitter does not
+walk operands to rediscover a storage class or reconstruct an aggregate type from its uses.
+
+V4 construction interface version 3 appends one generic operation,
+`declareGlobalStorage(module, valueType, addressSpace, alignment, name, nameSize, outStorage)`. The
+existing fixed-array type, pointer type, array-element address, load, and store operations already
+express the rest of the canonical graph. The provider validates a sized loadable type, known NVVM
+address space, power-of-two alignment, nonempty unique name, output pointer, and module/context
+ownership before mutation. It then creates one internal, nonconstant, `undef`-initialized LLVM
+global in address space 3 with the exact requested alignment. Construction versions 1 and 2 remain
+queryable unchanged; a version-2 provider retains Slice 66 programs and rejects shared storage as
+E52018 before module creation.
+
+The workload deliberately uses the established signed relaxed-atomic ticket instead of converting
+`cudaThreadIdx().x` from UInt to Int. That canonical numeric cast is Slice 68's boundary. A single
+64-thread block is larger than one warp: every ticket writes its own slot, the group barrier makes
+peer writes visible, and every ticket reads slot `63 - ticket`. Host validation therefore expects
+`destination[ticket] == (63 - ticket) * 3 + 1`; a same-thread or warp-local implementation cannot
+satisfy the complete result.
+
+Direct NVVM and NVRTC expose matching two-pointer ABIs, shared storage, two shared-address
+operations, and one group barrier. CUDA 12.9 `ptxas -v` accepts the direct PTX for `sm_70` and
+reports 14 registers, one barrier, 256 bytes of shared memory, zero stack bytes, and zero spills.
+Both routes produce identical results for all 64 invocations on the RTX 5090. This slice does not
+claim floating-point or nested shared arrays, shared structs, dynamic shared memory, shared
+atomics, general globals, aggregate values/copies, or address-space conversions.
+
+Six independently registered names increase the five measured NVVM test/support files from
+29,241 to 29,707 physical lines. The complete Release NVVM prefix passes 431/431 with sorted
+LF-terminated registered-name SHA-256
+`3d3e5effec15efd6d8eec74752802df83fe21ffb89e9d9037b3abf0803d25c0b`; removing those six names
+reproduces Slice 66's 425-name hash
+`641fcaf6a0da63e30a6146beb3e46e261d58297299aa33d180a1f86d73e4f0e5` exactly. The rebuilt Debug
+host passes the eight-test shared-storage preservation sample.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific

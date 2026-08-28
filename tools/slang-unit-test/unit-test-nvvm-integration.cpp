@@ -686,6 +686,29 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionDifferentialPTX)
         });
 }
 
+SLANG_UNIT_TEST(nvvmSlangSharedMemoryDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsGlobalStorage());
+
+    static const uint32_t kParameterWidths[] = {64, 64};
+    _runNVVMSlangDifferentialPTX(
+        kDirectNVVMSharedMemorySource,
+        "Ignoring shared-memory PTX differential because libNVVM or NVRTC was not found.",
+        kParameterWidths,
+        SLANG_COUNT_OF(kParameterWidths),
+        false,
+        [](SlangEmitCUDAMethod, const String& ptx)
+        {
+            SLANG_CHECK(ptx.indexOf(".shared .align 4") >= 0);
+            SLANG_CHECK(ptx.indexOf("[256]") >= 0);
+            SLANG_CHECK(ptx.indexOf("st.shared") >= 0);
+            SLANG_CHECK(ptx.indexOf("ld.shared") >= 0);
+            SLANG_CHECK(ptx.indexOf("bar.sync") >= 0);
+        });
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1830,6 +1853,17 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionPtxasAccepts)
         SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
 }
 
+SLANG_UNIT_TEST(nvvmSlangSharedMemoryPtxasAccepts)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsGlobalStorage());
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMSharedMemorySource,
+        SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
+}
+
 #define NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(NAME, OPERATION) \
     SLANG_UNIT_TEST(NAME)                                   \
     {                                                       \
@@ -2906,6 +2940,19 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionRuntimeMatchesNVRTC)
         kDirectNVVMCUDAExecutionRuntimeSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runCUDAExecutionKernel(cuda, code); });
+}
+
+SLANG_UNIT_TEST(nvvmSlangSharedMemoryRuntimeMatchesNVRTC)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsGlobalStorage());
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS,
+        kDirectNVVMSharedMemorySource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        { return _runSharedMemoryKernel(cuda, code); });
 }
 
 SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexRuntimeMatchesNVRTC)

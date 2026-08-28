@@ -45,6 +45,15 @@ IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     IRArrayType** outArrayType = nullptr,
     uint32_t* outElementCount = nullptr);
 
+/// Returns the exact canonical uninitialized `groupshared` fixed-i32-array global.
+IRGlobalVar* asNVVMSupportedSharedI32ArrayGlobal(
+    IRInst* inst,
+    IRArrayType** outArrayType = nullptr,
+    uint32_t* outElementCount = nullptr);
+
+/// Returns the canonical shared-address-space pointer produced for one i32 array element.
+IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type);
+
 /// Returns the exact raw CUDA `RWStructuredBuffer<int, DefaultLayout>` launch-value type.
 IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferI32Type(IRInst* type);
 
