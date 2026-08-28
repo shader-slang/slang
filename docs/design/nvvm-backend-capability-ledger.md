@@ -1173,3 +1173,28 @@ matrix passes 113/113 and Release passes 411/411 with sorted-name SHA-256
 names reproduces Slice 61's 404-name hash
 `40f3eba7cfb2602716a16b54d942cf09e34e9f2171835889a1dea43cb1e10d0a` exactly. Debug preservation
 passes 10/10.
+
+Slice 63 adds public Float `WaveActiveAllEqual(value)` through feature 48/intrinsic operation 14
+at the canonical masked-helper boundary. Exact assembly plus `Func(Bool, UInt, Float)` matching
+preserves the semantic Float through the emitter and facade. V3 stays 528/308 bytes, and exact
+Slice 62 providers remain loadable with feature 48 clear.
+
+LLVM 7 and the provider LLVM expose only integer match-all intrinsics, and NVRTC emits
+`match.all.sync.b32` for the Float CUDA template. After validating the i32 mask and f32 value
+without mutation, the provider creates one `bitcast float to i32`, calls the established aggregate
+i32 match-all intrinsic, and exposes only its Bool predicate. The ordinary bitcast requires no
+new callback, type role, legacy text rewrite, or duplicate intrinsic audit.
+
+The predicate fixture now uses an explicit Boolean/Integer/Float payload kind, and one
+real-provider verifier asserts the shared graph plus a Float-only bitcast. NVVM and NVRTC agree on
+`[64, 64]`, one global 32-bit load/store pair, two synchronized ballots, and one
+`match.all.sync.b32`. CUDA 12.9 `ptxas` accepts both. On an RTX 5090, distinct ordinary Float lane
+values produce zero in every lane and uniform `3.25` produces one through both routes; NaN and
+encoded-equality policy remain outside this row.
+
+Seven names add 155 measured lines, from 27,795 to 27,950. The complete Slice 46-63 wave/ABI
+matrix passes 120/120 and Release passes 418/418 with sorted-name SHA-256
+`33720ee2997610b2d1823858e1e80641d44efce3d6b09b37d0271c70ec54c929`; removing the seven Slice 63
+names reproduces Slice 62's 411-name hash
+`bea39cafc76c97ab6cb2d31fcc12aa42f41fe9d3d4d324ca296e115cd5d4d3a4` exactly. Debug preservation
+passes 10/10.

@@ -1154,7 +1154,8 @@ SLANG_UNIT_TEST(nvvmSlangWaveIsFirstLaneUsesDirectPipeline)
 static void _checkPublicWavePredicateDirectPipeline(
     const char* source,
     SlangNVVMIntrinsicOp_3 operation,
-    Index expectedBooleanParameterCount)
+    Index expectedBooleanParameterCount,
+    Index expectedFloatParameterCount = 0)
 {
     _resetDirectNVVMFakes();
     _enableFakeNVVMBuilderV3();
@@ -1200,13 +1201,17 @@ static void _checkPublicWavePredicateDirectPipeline(
             gFakeNVVMBuilder.intrinsicArgumentValueRefs[argumentOffset + 1].kind ==
             FakeNVVMBuilderValueKind::Parameter);
         Index booleanParameterCount = 0;
+        Index floatParameterCount = 0;
         for (FakeNVVMBuilderParameterTypeKind parameterKind :
              gFakeNVVMBuilder.functionParameterTypeKinds)
         {
             if (parameterKind == FakeNVVMBuilderParameterTypeKind::Boolean)
                 ++booleanParameterCount;
+            else if (parameterKind == FakeNVVMBuilderParameterTypeKind::Float)
+                ++floatParameterCount;
         }
         SLANG_CHECK(booleanParameterCount == expectedBooleanParameterCount);
+        SLANG_CHECK(floatParameterCount == expectedFloatParameterCount);
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 4);
         SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 4);
         Index booleanCallCount = 0;
@@ -1260,6 +1265,15 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualUIntUsesDirectPipeline)
         kDirectNVVMWaveActiveAllEqualUIntSource,
         SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_UINT,
         0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualFloatUsesDirectPipeline)
+{
+    _checkPublicWavePredicateDirectPipeline(
+        kDirectNVVMWaveActiveAllEqualFloatSource,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_FLOAT,
+        0,
+        2);
 }
 
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
@@ -1827,6 +1841,13 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveActiveAllEqualUIntCapabilities)
     _checkPublicWaveReadCapabilities(
         kDirectNVVMWaveActiveAllEqualUIntSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveActiveAllEqualFloatCapabilities)
+{
+    _checkPublicWaveReadCapabilities(
+        kDirectNVVMWaveActiveAllEqualFloatSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_FLOAT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32CopyCapability)

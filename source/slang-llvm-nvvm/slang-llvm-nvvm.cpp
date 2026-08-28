@@ -1377,6 +1377,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
     bool derivesFirstActiveLane = false;
     bool derivesFirstLanePredicate = false;
     bool extractsMatchAllPredicate = false;
+    bool bitcastsMatchAllFloatValue = false;
     switch (operation)
     {
     case SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX:
@@ -1434,6 +1435,13 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         expectedArgumentCount = 2;
         extractsMatchAllPredicate = true;
         break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_FLOAT:
+        intrinsicID = llvm::Intrinsic::nvvm_match_all_sync_i32p;
+        expectedArgumentCount = 2;
+        expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
+        extractsMatchAllPredicate = true;
+        bitcastsMatchAllFloatValue = true;
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }
@@ -1452,6 +1460,8 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         }
         llvmArguments.push_back(argument);
     }
+    if (bitcastsMatchAllFloatValue)
+        llvmArguments[1] = state->builder.CreateBitCast(llvmArguments[1], int32Type);
     if (derivesFirstLanePredicate)
     {
         llvm::Function* laneIDIntrinsic = llvm::Intrinsic::getDeclaration(
