@@ -115,6 +115,7 @@ struct NVVMGenericAsmIntrinsicInfo
     {
         UIntNoArguments,
         BoolUInt,
+        BoolUIntBool,
         UIntUIntUInt,
         IntUIntInt,
         FloatUIntFloat,
@@ -203,6 +204,13 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(
             "wave-mask is-first-lane intrinsic",
             NVVMGenericAsmIntrinsicInfo::Signature::BoolUInt,
         },
+        {
+            "(__any_sync($0, $1) != 0)",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ANY_TRUE,
+            "wave-mask any-true intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntBool,
+        },
     };
     if (!genericAsm)
         return nullptr;
@@ -230,6 +238,10 @@ bool _isNVVMGenericAsmIntrinsicHelper(
     case NVVMGenericAsmIntrinsicInfo::Signature::BoolUInt:
         return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 1 &&
                isNVVMUnsignedI32Type(function->getParamType(0));
+    case NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntBool:
+        return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 2 &&
+               isNVVMUnsignedI32Type(function->getParamType(0)) &&
+               isNVVMBoolType(function->getParamType(1));
     case NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUInt:
         return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 2 &&
                isNVVMUnsignedI32Type(function->getParamType(0)) &&
@@ -502,6 +514,16 @@ SlangResult _validateScalarValue(
     IRDominatorTree* dominatorTree,
     NVVMIRFeatureSet& features)
 {
+    if (value && isNVVMBoolType(value->getDataType()))
+    {
+        return _validateBooleanValue(
+            codeGenContext,
+            value,
+            consumer,
+            availableValues,
+            dominatorTree,
+            features);
+    }
     if (value && isNVVMFloat32Type(value->getDataType()))
     {
         return _validateFloat32Value(
@@ -654,13 +676,13 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 // Returns whether a type is an accepted canonical scalar in a helper parameter.
 bool _isSupportedNVVMHelperParameterType(IRInst* type)
 {
-    return isNVVMInteger32Type(type) || isNVVMFloat32Type(type);
+    return isNVVMInteger32Type(type) || isNVVMFloat32Type(type) || isNVVMBoolType(type);
 }
 
 // Returns whether a type is an accepted canonical scalar in a helper result.
 bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
-    return _isSupportedNVVMHelperParameterType(type) || isNVVMBoolType(type);
+    return _isSupportedNVVMHelperParameterType(type);
 }
 
 // Returns whether a canonical helper signature needs the generic V3 scalar-function path.

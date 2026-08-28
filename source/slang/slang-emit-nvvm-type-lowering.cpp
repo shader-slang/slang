@@ -283,7 +283,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         (use == NVVMTypeUse::HelperResult && (isI32 || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isI32 || isFloat32 || deviceScalarPointer || deviceArrayPointer || rawResource)) ||
-        (use == NVVMTypeUse::HelperParameter && (isI32 || isFloat32)) ||
+        (use == NVVMTypeUse::HelperParameter && (isI32 || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
          (isI32 || isFloat32 || isBool || deviceScalarPointer || deviceArrayPointer ||
           rawResource || resourceElementPointer));

@@ -148,6 +148,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV3Features)
     SLANG_CHECK(
         SLANG_NVVM_BUILDER_API_V3_WAVE_READ_LANE_FIRST_FLOAT_MIN_SIZE == intrinsicMinimumSize);
     SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_WAVE_MASK_IS_FIRST_LANE_MIN_SIZE == intrinsicMinimumSize);
+    SLANG_CHECK(SLANG_NVVM_BUILDER_API_V3_WAVE_MASK_ANY_TRUE_MIN_SIZE == intrinsicMinimumSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderAPI_V3) == completeSize);
 
     gFakeNVVMBuilder.reset();
@@ -2039,6 +2040,91 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesWaveMaskIsFirstLaneOperation)
             FakeNVVMBuilderValueKind::Parameter);
         SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentValueRefs[0].functionIndex == 0);
         SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentValueRefs[0].index == 0);
+        const Index ballotArgumentOffset = gFakeNVVMBuilder.intrinsicArgumentOffsets[1];
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicArgumentValueRefs[ballotArgumentOffset].kind ==
+            FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicArgumentValueRefs[ballotArgumentOffset + 1].kind ==
+            FakeNVVMBuilderValueKind::Call);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.callResultTypeKinds[0] == FakeNVVMBuilderScalarTypeKind::Boolean);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::Intrinsic);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesWaveMaskAnyTrueOperation)
+{
+    // The exact Slice 58 feature set remains valid without masked any-true support.
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        SlangNVVMBuilderAPI_V3 api = _makeFakeNVVMBuilderAPIV3();
+        _clearNVVMBuilderFeaturesFrom(api, SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(api, library, builder)));
+        SLANG_CHECK(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT));
+        SLANG_CHECK(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_IS_FIRST_LANE));
+        SLANG_CHECK(!builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE));
+        SlangNVVMValueHandle_1 value = _getFakeNVVMBuilderFunction();
+        const SlangNVVMValueHandle_1 arguments[] = {
+            _getFakeNVVMBuilderIntegerConstant(0),
+            _getFakeNVVMBuilderIntegerConstant(1),
+        };
+        SLANG_CHECK(
+            builder.emitIntrinsic(
+                _getFakeNVVMBuilderModule(),
+                SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ANY_TRUE,
+                arguments,
+                SLANG_COUNT_OF(arguments),
+                value) == SLANG_E_NOT_AVAILABLE);
+        SLANG_CHECK(value == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    gFakeNVVMBuilder.reset();
+    {
+        ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+        NVVMIRBuilder builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            NVVMIRBuilder::initialize(_makeFakeNVVMBuilderAPIV3(), library, builder)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWaveActiveAnyTrueKernel(
+            builder,
+            _getFakeNVVMBuilderModule(),
+            toSlice("fakeWaveActiveAnyTrue"),
+            toSlice("fakeWaveMaskAnyTrue"))));
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultKinds[0] == FakeNVVMBuilderResultTypeKind::Boolean);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[0] == 2);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[0] ==
+            FakeNVVMBuilderParameterTypeKind::Integer);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[1] ==
+            FakeNVVMBuilderParameterTypeKind::Boolean);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 2);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicOperations[0] == SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ANY_TRUE);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicOperations[1] == SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[0] == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[1] == 2);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicArgumentValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentValueRefs[0].functionIndex == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentValueRefs[0].index == 0);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicArgumentValueRefs[1].kind ==
+            FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentValueRefs[1].functionIndex == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentValueRefs[1].index == 1);
         const Index ballotArgumentOffset = gFakeNVVMBuilder.intrinsicArgumentOffsets[1];
         SLANG_CHECK(
             gFakeNVVMBuilder.intrinsicArgumentValueRefs[ballotArgumentOffset].kind ==
@@ -5548,6 +5634,47 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskIsFirstLaneKernel)
         SLANG_CHECK(_countOccurrences(text, toSlice("call i1 @waveMaskIsFirstLane")) == 1);
         SLANG_CHECK(_countOccurrences(text, toSlice("call i32 @llvm.nvvm.vote.ballot.sync")) == 1);
         SLANG_CHECK(_countOccurrences(text, toSlice("store i32")) == 1);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAnyTrueKernel)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE));
+    SLANG_CHECK_ABORT(builder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT));
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("wave-mask-any-true-module"), scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWaveActiveAnyTrueKernel(
+        builder,
+        scope.module,
+        toSlice("waveActiveAnyTrue"),
+        toSlice("waveMaskAnyTrue"))));
+
+    const SlangNVVMSerializationFormat_1 formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat_1 format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        SLANG_CHECK_ABORT(assembly != nullptr);
+        const UnownedStringSlice text(
+            static_cast<const char*>(assembly->getBufferPointer()),
+            assembly->getBufferSize());
+        SLANG_CHECK(text.indexOf(toSlice("define i1 @waveMaskAnyTrue(i32")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice(", i1")) >= 0);
+        SLANG_CHECK(_countOccurrences(text, toSlice("call i1 @llvm.nvvm.vote.any.sync(i32")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("ret i1")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("call i1 @waveMaskAnyTrue")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("call i32 @llvm.nvvm.vote.ballot.sync")) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("store i32")) == 1);
+        SLANG_CHECK(
+            _countOccurrences(text, toSlice("declare i1 @llvm.nvvm.vote.any.sync(i32, i1)")) == 1);
     }
 }
 

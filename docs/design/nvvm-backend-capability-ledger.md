@@ -1079,3 +1079,25 @@ Seven names add 349 measured lines, from 26,633 to 26,982. The complete Slice 46
 passes 85/85 and Release passes 383/383 with sorted-name SHA-256
 `ddb9139c2d89bafd5be199f9d299f3c85b6ca8cca82146b9466ddbaf7fb84335`; removing the seven Slice 58
 names reproduces Slice 57's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 59 adds public `WaveActiveAnyTrue(condition)` through feature 44/intrinsic operation 10 at the
+canonical masked-helper boundary. Exact assembly plus `Func(Bool, UInt, Bool)` matching
+distinguishes `WaveMaskAnyTrue(mask, condition)`. Direct helper signatures and calls now preserve
+Bool parameters as native i1; Bool entry-point parameters and block phis remain unsupported. V3
+stays 528/308 bytes, and exact Slice 58 providers remain loadable with feature 44 clear.
+
+The provider validates i32 mask plus i1 condition before mutation and calls the exact
+`llvm.nvvm.vote.any.sync(i32, i1) -> i1` intrinsic. LLVM 7 and the provider LLVM use compatible
+declarations and semantic attributes, so the legacy writer audits the declaration but adds no
+callback, text marker, normalization, or compatibility rewrite.
+
+NVVM and NVRTC agree on `[64, 64]`, one global 32-bit load/store pair, two synchronized ballots,
+one synchronized any-vote, and signed inequality. CUDA 12.9 `ptxas` accepts both. With only lane
+seven's input nonzero, every lane of one RTX 5090 warp stores one through both routes.
+
+Seven names add 368 measured lines, from 26,982 to 27,350. The complete Slice 46-59 wave matrix
+passes 92/92 and Release passes 390/390 with sorted-name SHA-256
+`eaa8420ddbba56d34cb047211d872acd6ad2dc0dcdd0209059e307e9879e3186`; removing the seven Slice 59
+names reproduces Slice 58's 383-name hash
+`ddb9139c2d89bafd5be199f9d299f3c85b6ca8cca82146b9466ddbaf7fb84335` exactly. Debug preservation
+passes 10/10.

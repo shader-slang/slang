@@ -1417,6 +1417,11 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         expectedArgumentCount = 1;
         derivesFirstLanePredicate = true;
         break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ANY_TRUE:
+        intrinsicID = llvm::Intrinsic::nvvm_vote_any_sync;
+        expectedArgumentCount = 2;
+        expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }
@@ -1650,7 +1655,7 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
 // that the LLVM 7 parser does not know. Removing optimization-only attributes retains each
 // intrinsic's semantic name and type. LLVM may share one numbered attribute group between several
 // declarations, so count unique validated semantic attribute sets. LLVM 14's scalar shuffle and
-// synchronized-ballot declarations already use the LLVM-7-compatible
+// synchronized-vote declarations already use the LLVM-7-compatible
 // convergent/inaccessible-memory/nounwind set, but validate their exact signatures and attributes
 // before serializing the mixed dialect. Generic count-trailing-zeros has the same LLVM 14-only
 // optimization attributes as the special-register declarations plus an `immarg` parameter marker;
@@ -1721,11 +1726,16 @@ static SlangResult _writeLegacyNVVMAssembly(
                 ++argumentIndex;
             }
         }
-        else if (intrinsicID == llvm::Intrinsic::nvvm_vote_ballot_sync)
+        else if (
+            intrinsicID == llvm::Intrinsic::nvvm_vote_ballot_sync ||
+            intrinsicID == llvm::Intrinsic::nvvm_vote_any_sync)
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
             llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
-            if (!function.isDeclaration() || function.getReturnType() != int32Type ||
+            llvm::Type* expectedResultType = intrinsicID == llvm::Intrinsic::nvvm_vote_ballot_sync
+                                                 ? int32Type
+                                                 : llvm::Type::getInt1Ty(state->context);
+            if (!function.isDeclaration() || function.getReturnType() != expectedResultType ||
                 function.arg_size() != 2 || functionAttributes.getNumAttributes() != 3 ||
                 !function.hasFnAttribute(llvm::Attribute::Convergent) ||
                 !function.hasFnAttribute(llvm::Attribute::InaccessibleMemOnly) ||
