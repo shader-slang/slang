@@ -14,11 +14,20 @@
 // (so an alignment attribute is emitted) plus a higher-numbered resource kind.
 // `struct S` here has `Uniform` size 48 aligned to 16 (from the `float4`) plus two
 // existential-parameter sizes, so its `structTypeLayout` carries three size attrs
-// and one alignment attr. The check below pins the operand order: the three size
-// operands must come first, contiguously, and the alignment operand must follow
+// and one alignment attr. The `structTypeLayout` check further down pins the operand order: the
+// three size operands must come first, contiguously, and the alignment operand must follow
 // them — the exact ordering the interleaving bug violated.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry main -dump-ir -o -
+
+// slang-test puts the compiler's exit status on the first line of the buffer FileCheck reads,
+// ahead of the captured output — so this must stay the first directive of the prefix. The checks
+// below all match `-dump-ir` output, which is complete before the output artifact is written, so
+// a failure in that write (or any later emit-time diagnostic) would leave every pattern matched
+// and the test green. The exit status has to be pinned separately.
+// No `-g` here, so the dump carries no echoed copy of this file and the plain `0` is safe; see
+// subscript-accessor.slang for the spelling required when source is embedded.
+//CHECK: result code = 0
 
 interface ILight
 {
