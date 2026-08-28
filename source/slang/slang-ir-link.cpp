@@ -543,6 +543,15 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_IntrinsicOpDecoration:
         case kIROp_NonCopyableTypeDecoration:
         case kIROp_DynamicDispatchWitnessDecoration:
+        // This decoration records that an entry point requires the SPIR-V
+        // `Shader64BitIndexingEXT` execution mode. Like `LayoutDecoration`, it is not present on
+        // the "best" (original) definition of the function: it is introduced by the `TargetProgram`
+        // layout IR module (see `createIRModuleForLayout`), which is a separate link input that
+        // carries per-entry-point information onto the linked function. We therefore have to copy
+        // it here from that non-"best" definition, exactly as we do for `LayoutDecoration`;
+        // otherwise the execution mode (and its owning capability/extension) would be dropped and
+        // the emitted SPIR-V would be missing it.
+        case kIROp_Shader64BitIndexingDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
                 cloneInst(context, builder, decoration);
@@ -1233,13 +1242,29 @@ IRFunc* specializeIRForEntryPoint(
     {
         if (!nameOverride.getLength())
             nameOverride = getUnownedStringSliceText(entryPoint->getName());
+
+        // The `IREntryPointDecoration` we are about to build records the owning module's name as
+        // its third operand. Most entry points can supply that name directly, but an entry point
+        // that was created for a precompiled (`-r`) module is a dummy: it is built by
+        // `EntryPoint::createDummyForDeserialize` (and the pass-through variant) with an empty
+        // `DeclRef<FuncDecl>()`, so `EntryPoint::getModule()` — which resolves the module from that
+        // decl-ref — returns null. A dummy entry legitimately has no `FuncDecl` and hence no owning
+        // module, and other consumers already tolerate it by gating on `getFuncDeclRef()`
+        // (parameter binding and layout), so we correspondingly fall back to an empty module name
+        // here rather than dereferencing null. The operand is purely informational and has no
+        // downstream reader for a freshly-constructed decoration. Reproducible via
+        // `tests/bugs/link-time-constant-array-size-main.slang` (the `-r` cell); whether a dummy
+        // entry point should be asked for its module at all is tracked in shader-slang/slang#12778.
+        auto entryPointModule = entryPoint->getModule();
+        UnownedStringSlice moduleName = entryPointModule
+                                            ? UnownedStringSlice(entryPointModule->getName())
+                                            : UnownedStringSlice();
         IRInst* operands[] = {
             context->builder->getIntValue(
                 context->builder->getIntType(),
                 entryPoint->getProfile().raw),
             context->builder->getStringValue(nameOverride),
-            context->builder->getStringValue(
-                UnownedStringSlice(entryPoint->getModule()->getName()))};
+            context->builder->getStringValue(moduleName)};
         context->builder->addDecoration(clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
     }
 
