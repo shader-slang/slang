@@ -744,6 +744,17 @@ struct CUDALayoutRules : CLayoutRules
         IRType* type,
         IRSizeAndAlignment* outSizeAndAlignment) override
     {
+        if (as<IRUnsizedArrayType>(type))
+        {
+            // Consider `SamplerComparisonState samplers[]` in a CUDA global-parameter block.
+            // CUDA source emits this as `Array<SamplerComparisonState>`, whose storage is a
+            // pointer plus a `size_t` count rather than a trailing flexible array. The AST CUDA
+            // layout rule and CUDA prelude both therefore give every unsized array this fixed
+            // 16-byte representation.
+            *outSizeAndAlignment = IRSizeAndAlignment(16, 8);
+            return SLANG_OK;
+        }
+
         auto vectorType = as<IRVectorType>(type);
         auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
         if (vectorType && vectorType->getElementType()->getOp() == kIROp_HalfType && elementCount &&

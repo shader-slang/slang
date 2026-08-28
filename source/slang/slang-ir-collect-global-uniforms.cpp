@@ -2,6 +2,7 @@
 #include "slang-ir-collect-global-uniforms.h"
 
 #include "slang-ir-insts.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -190,7 +191,7 @@ struct CollectGlobalUniformParametersContext
         // Create ordered field list - for CUDA, put unsized arrays last
         List<IRStructFieldLayoutAttr*> orderedFields;
 
-        if (target == CodeGenTarget::CUDASource)
+        if (isCUDATarget(target))
         {
             // For CUDA: separate regular and unsized array fields
             List<IRStructFieldLayoutAttr*> regularFields;

@@ -288,6 +288,25 @@ IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferType(
     return bufferType;
 }
 
+IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type)
+{
+    return as<IRSamplerStateTypeBase>(type);
+}
+
+IRUnsizedArrayType* asNVVMSupportedUnsizedSamplerArrayStorageType(IRInst* type)
+{
+    auto arrayType = as<IRUnsizedArrayType>(type);
+    return arrayType && asNVVMSupportedSamplerStorageType(arrayType->getElementType()) ? arrayType
+                                                                                       : nullptr;
+}
+
+bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type)
+{
+    return asNVVMSupportedRawRWStructuredBufferType(type) ||
+           asNVVMSupportedSamplerStorageType(type) ||
+           asNVVMSupportedUnsizedSamplerArrayStorageType(type);
+}
+
 IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
 {
     auto ptrType = as<IRPtrTypeBase>(type);
@@ -344,6 +363,9 @@ SlangResult NVVMTypeLoweringContext::_reportUnsupportedType(NVVMTypeUse use) con
         break;
     case NVVMTypeUse::Value:
         break;
+    case NVVMTypeUse::Storage:
+        construct = "conventional global storage field type";
+        break;
     }
     m_codeGenContext->getSink()->diagnose(
         Diagnostics::NvvmUnsupportedIr{.construct = String(construct)});
@@ -381,7 +403,7 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
     for (auto field : type->getFields())
     {
         SlangNVVMTypeHandle fieldType = nullptr;
-        SLANG_RETURN_ON_FAIL(lowerType(field->getFieldType(), NVVMTypeUse::Value, fieldType));
+        SLANG_RETURN_ON_FAIL(lowerType(field->getFieldType(), NVVMTypeUse::Storage, fieldType));
         fieldTypes.add(fieldType);
     }
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -391,6 +413,35 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
             fieldTypes.getCount() ? fieldTypes.getBuffer() : nullptr,
             size_t(fieldTypes.getCount()),
             outType)));
+    m_typeMap[type] = outType;
+    return SLANG_OK;
+}
+
+SlangResult NVVMTypeLoweringContext::_lowerUnsizedSamplerArrayStorageType(
+    IRUnsizedArrayType* type,
+    SlangNVVMTypeHandle& outType)
+{
+    outType = nullptr;
+    SLANG_RELEASE_ASSERT(asNVVMSupportedUnsizedSamplerArrayStorageType(type));
+
+    SlangNVVMTypeHandle elementType = nullptr;
+    SLANG_RETURN_ON_FAIL(lowerType(type->getElementType(), NVVMTypeUse::Storage, elementType));
+    SlangNVVMTypeHandle dataPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        "unsized CUDA sampler-array data-pointer type",
+        m_builder.getPointerType(
+            m_module,
+            elementType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            dataPointerType)));
+    SlangNVVMTypeHandle countType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        "unsized CUDA sampler-array count type",
+        m_builder.getIntegerType(m_module, 64, countType)));
+    const SlangNVVMTypeHandle fieldTypes[] = {dataPointerType, countType};
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        "unsized CUDA sampler-array storage type",
+        m_builder.getStructType(m_module, fieldTypes, SLANG_COUNT_OF(fieldTypes), outType)));
     m_typeMap[type] = outType;
     return SLANG_OK;
 }
@@ -485,6 +536,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRPtrTypeBase* deviceArrayPointer =
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
     IRHLSLStructuredBufferTypeBase* rawResource = asNVVMSupportedRawRWStructuredBufferType(type);
+    IRSamplerStateTypeBase* samplerStorage = asNVVMSupportedSamplerStorageType(type);
+    IRUnsizedArrayType* unsizedSamplerArrayStorage =
+        asNVVMSupportedUnsizedSamplerArrayStorageType(type);
     IRPtrTypeBase* resourceElementPointer =
         asNVVMSupportedRWStructuredBufferElementPointerType(type);
     IRPtrTypeBase* sharedElementPointer = asNVVMSupportedSharedI32ElementPointerType(type);
@@ -502,7 +556,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloat32 || isBool || uint3Type || signedI32x2Type || fixedArrayType ||
           deviceNumericPointer || deviceArrayPointer || rawResource || resourceElementPointer ||
-          sharedElementPointer || structType));
+          sharedElementPointer)) ||
+        (use == NVVMTypeUse::Storage &&
+         (structType || rawResource || samplerStorage || unsizedSamplerArrayStorage));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -570,6 +626,16 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (rawResource)
     {
         return _lowerRawRWStructuredBufferType(rawResource, outType);
+    }
+    else if (samplerStorage)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "CUDA sampler placeholder storage type",
+            m_builder.getIntegerType(m_module, 64, outType)));
+    }
+    else if (unsizedSamplerArrayStorage)
+    {
+        return _lowerUnsizedSamplerArrayStorageType(unsizedSamplerArrayStorage, outType);
     }
     else if (sharedElementPointer)
     {

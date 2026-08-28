@@ -1341,3 +1341,22 @@ stores, and CUDA 12.9 `ptxas` accepts it for `sm_70`. Release host and standalon
 pass, as does the full NVVM prefix at 336/336. Builder ABI revision 3 is unchanged. The next
 measured conventional boundary is the multi-field global-parameter graph in
 `sampler-comparison-state-unused.slang`.
+
+Slice 75 generalizes the compiler-synthesized conventional CUDA global block from one resource to
+multiple supported fields. Selected-scalar read-write structured buffers are executable; sampler
+placeholders and unsized arrays of sampler placeholders are storage-only. Field addressing maps an
+IR struct key to its actual collected field index and separately requires an exact supported
+resource pointee, so preserving sampler ABI bytes does not claim sampler operations.
+
+The CUDA collector's existing unsized-array-last rule now uses `isCUDATarget` instead of matching
+only CUDASource, giving direct PTX the same field order as CUDA/NVRTC. Shared IR CUDA layout now
+models an unsized array as the prelude's fixed pointer-plus-count `Array<T>` representation: size
+16, alignment 8. The direct storage role lowers a sampler slot to opaque i64 and its unsized array
+to `{ i64 addrspace(1)*, i64 }` through the existing generic builder surface. ABI revision 3 is
+unchanged.
+
+The existing sampler fixture passes 4/4 and emits a 40-byte constant block with the used float
+resource at byte offset 8. A two-resource CUDA/NVVM GPU comparison passes 2/2 with
+`11, 21, 31, 41`, while a fixed sampler array remains E52017 before provider discovery. CUDA 12.9
+`ptxas` accepts the sampler PTX for `sm_70`; Release host and standalone provider builds pass; and
+the complete NVVM prefix passes 337/337.

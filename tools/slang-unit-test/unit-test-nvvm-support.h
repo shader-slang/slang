@@ -1863,11 +1863,24 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetStructType(
     const bool isFloatResourceView = fieldCount == 2 &&
                                      fieldTypes[0] == _getFakeNVVMBuilderFloatPointerType() &&
                                      fieldTypes[1] == _getFakeNVVMBuilderIntegerType();
-    FakeNVVMBuilderScalarTypeKind globalResourceElementTypeKind;
-    const bool isGlobalParams = fieldCount == 1 && _getFakeNVVMBuilderResourceViewElementTypeKind(
-                                                       fieldTypes[0],
-                                                       globalResourceElementTypeKind);
     const bool isResourceView = isIntegerResourceView || isFloatResourceView;
+    bool isGlobalParams = fieldCount != 0 && !isResourceView;
+    bool hasGlobalResource = false;
+    for (size_t i = 0; isGlobalParams && i < fieldCount; ++i)
+    {
+        FakeNVVMBuilderScalarTypeKind globalResourceElementTypeKind;
+        if (_getFakeNVVMBuilderResourceViewElementTypeKind(
+                fieldTypes[i],
+                globalResourceElementTypeKind))
+        {
+            hasGlobalResource = true;
+        }
+        else if (fieldTypes[i] != _getFakeNVVMBuilderIntegerType())
+        {
+            isGlobalParams = false;
+        }
+    }
+    isGlobalParams = isGlobalParams && hasGlobalResource;
     if (!isResourceView && !isGlobalParams)
         return SLANG_E_INVALID_ARG;
     if (isGlobalParams)
@@ -6365,6 +6378,27 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int index = int(dispatchThreadID.x);
     outputBuffer[index] = 42;
+}
+)";
+static const char kDirectNVVMConventionalSamplerStorageSource[] = R"(
+SamplerComparisonState comparisonSampler;
+SamplerComparisonState comparisonSamplers[];
+RWStructuredBuffer<float> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    outputBuffer[0] = 1.0f;
+}
+)";
+static const char kDirectNVVMUnsupportedFixedSamplerArrayStorageSource[] = R"(
+SamplerComparisonState comparisonSamplers[2];
+RWStructuredBuffer<float> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    outputBuffer[0] = 1.0f;
 }
 )";
 static const char kDirectNVVMMultidimensionalWaveSource[] = R"(

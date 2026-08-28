@@ -734,6 +734,63 @@ SLANG_UNIT_TEST(nvvmSlangConventionalComputeUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangConventionalSamplerStorageUsesDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult compileResult = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMConventionalSamplerStorageSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(compileResult))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        // The CUDA collector moves the unsized array after all fixed-size fields. The provider
+        // therefore sees sampler storage, the used float resource, and the pointer-plus-count
+        // array in exact CUDA ABI order.
+        SLANG_CHECK(gFakeNVVMBuilder.getStructTypeCallCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.structFieldTypes.getCount() == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.structFieldTypes[0] == _getFakeNVVMBuilderIntegerType());
+        SLANG_CHECK(
+            gFakeNVVMBuilder.structFieldTypes[1] ==
+            _getFakeNVVMBuilderResourceViewType(FakeNVVMBuilderScalarTypeKind::Float));
+        SLANG_CHECK(
+            gFakeNVVMBuilder.structFieldTypes[2] ==
+            _getFakeNVVMBuilderResourceViewType(FakeNVVMBuilderScalarTypeKind::Integer));
+        SLANG_CHECK(gFakeNVVMBuilder.declareGlobalStorageCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageAlignment == 8);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageNames[0] == "SLANG_globalParams");
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.structFieldPointerIndices[0] == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.loadResultTypeKinds[0] == FakeNVVMBuilderScalarTypeKind::ResourceView);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangMultidimensionalWaveUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -3412,6 +3469,8 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
         {kDirectNVVMUnsupportedCUDAAggregateLayoutSource, "'GenericAsm'"},
+        {kDirectNVVMUnsupportedFixedSamplerArrayStorageSource,
+         "'conventional global parameter field address'"},
         {kDirectNVVMFloatingSineSource, "'GenericAsm'"},
         {kDirectNVVMIntegerLeftShiftSource, "'shl'"},
         {kDirectNVVMIntegerRightShiftSource, "'shr'"},

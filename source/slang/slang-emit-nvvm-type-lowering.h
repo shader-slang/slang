@@ -77,6 +77,15 @@ IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferType(
     IRInst* type,
     IRType** outElementType = nullptr);
 
+/// Returns an accepted storage-only CUDA sampler placeholder.
+IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type);
+
+/// Returns an accepted storage-only unsized CUDA sampler array.
+IRUnsizedArrayType* asNVVMSupportedUnsizedSamplerArrayStorageType(IRInst* type);
+
+/// Returns whether `type` is one field admitted in the conventional CUDA parameter block.
+bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type);
+
 /// Returns the canonical pointer produced by selected-scalar structured-buffer element addressing.
 IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type);
 
@@ -91,6 +100,7 @@ enum class NVVMTypeUse
     EntryPointParameter,
     HelperParameter,
     Value,
+    Storage,
 };
 
 /// Maps canonical linked-IR types to module-owned provider handles and caches each representation.
@@ -129,6 +139,9 @@ private:
     SlangResult _lowerStructType(IRStructType* type, SlangNVVMTypeHandle& outType);
     SlangResult _lowerRawRWStructuredBufferType(
         IRHLSLStructuredBufferTypeBase* type,
+        SlangNVVMTypeHandle& outType);
+    SlangResult _lowerUnsizedSamplerArrayStorageType(
+        IRUnsizedArrayType* type,
         SlangNVVMTypeHandle& outType);
     SlangResult _lowerPointerType(
         IRType* canonicalType,

@@ -4338,6 +4338,34 @@ Aggregate, array, matrix, pointer, resource, and offset queries remain outside t
 remaining measured conventional-shader boundary is the multi-field global-parameter graph in
 `sampler-comparison-state-unused.slang`.
 
+### Slice 75: Multi-field conventional CUDA parameter storage
+
+The conventional CUDA global block is no longer limited to one resource at field zero. Direct
+preflight recognizes a nonempty compiler-synthesized block whose fields are selected-scalar
+`RWStructuredBuffer` views, CUDA sampler placeholders, or unsized arrays of sampler placeholders.
+Executable `get_field_addr` remains narrower: it resolves the semantic field key to the actual
+collected struct index, requires exact pointee identity, and accepts only an established resource
+view. Sampler fields are therefore ABI storage, not executable sampler support.
+
+The global collector already moved CUDA unsized arrays after fixed-size fields, but keyed the rule
+only to `CodeGenTarget::CUDASource`. Direct PTX consequently received a different field order from
+CUDA/NVRTC. The collector now uses `isCUDATarget`, so both routes produce sampler, resource, then
+unsized array for the representative fixture. The shared IR CUDA layout also now mirrors the AST
+CUDA rule and `slang-cuda-prelude.h`: `Array<T>` is a pointer plus `size_t`, with size 16 and
+alignment 8, rather than an indeterminate trailing array.
+
+NVVM type lowering has an explicit storage role. A sampler placeholder occupies an opaque i64
+slot, while an unsized sampler array becomes `{ i64 addrspace(1)*, i64 }`; neither type is legal in
+the ordinary value role. These use existing generic integer, pointer, struct, and field operations,
+so builder ABI revision 3 and the real provider interface are unchanged.
+
+`tests/cuda/sampler-comparison-state-unused.slang` now passes all four CUDA/CUDA-PTX/direct lanes.
+Direct PTX contains `SLANG_globalParams[40]`, loads the output data pointer from byte offset 8, and
+stores float `1.0`. The renamed multi-resource regression runs both CUDA/NVRTC and direct libNVVM
+on the GPU and produces `11, 21, 31, 41`. CUDA 12.9 `ptxas` accepts the sampler PTX for `sm_70`;
+Release host and standalone provider builds pass; and the complete NVVM prefix passes 337/337.
+A fixed sampler array remains an exact E52017 boundary before provider discovery.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4345,10 +4373,10 @@ The following remain open until their named slice supplies evidence:
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
-  global parameter blocks beyond one exact selected-scalar resource field, and raw CUDA parameters
-  beyond the selected integer and float32 scalars, selected numeric device pointers, fixed i32
-  array pointers, signed-i32x2 device pointers, and selected-scalar raw read-write structured
-  buffers;
+  global parameter fields beyond selected-scalar read-write structured buffers and storage-only
+  sampler/unsized-sampler-array placeholders, and raw CUDA parameters beyond the selected integer
+  and float32 scalars, selected numeric device pointers, fixed i32 array pointers, signed-i32x2
+  device pointers, and selected-scalar raw read-write structured buffers;
 - external/indirect calls, richer helper ABI, integer shifts/division/remainder, saturating or
   overflow-decorated arithmetic, float64/low-precision scalar families, and general vector or
   matrix operations beyond the bounded signed-i32x2 add proof;
