@@ -30,6 +30,7 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/compute/byte-address-buffer.slang` | CUDA/NVRTC + direct NVVM runtime | Pass | Core UInt/UInt2-4 byte-address loads and UInt store pass for read-only and read-write inputs; direct PTX passes `ptxas` |
 | `tests/compute/byte-address-buffer-aligned.slang` | CUDA/NVRTC + direct NVVM runtime | Pass | Float/Float4 aligned and scalarized byte-address copies pass; direct PTX exposes four Float loads/stores and passes `ptxas` |
 | `tests/compute/byte-address-buffer-singlearg-float3-11592.slang` | CPU + direct NVVM runtime | Pass | A Float3 constant round-trips through a byte buffer into typed Float output; direct PTX passes `ptxas` |
+| `tests/compute/byte-address-buffer-64bit.slang` | CPU + direct NVVM runtime | Pass | UInt widens and adds as UInt64 before byte storage; direct PTX lowers the four-byte-aligned wide store to two ordered UInt stores and passes `ptxas` |
 
 Slices 69 and 70 consolidated the implementation onto one exact forward-only builder ABI and one
 typed-descriptor capability system. Older rows below retain the interface names that described the
@@ -353,7 +354,8 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmIRBuilderBuildsByteOffsetPointerKernel` | Exact ABI revision 8 applies generic typed byte offsets to scalar and vector pointees, preserves address space and alignment, and emits verified normal and NVVM-2.0 assembly | Pass |
 | `slang-unit-test-tool/nvvmSlangCoreByteAddressAccessUsesGenericByteOffsets` | Read-only UInt4 and mutable UInt loads plus one UInt store use three generic byte-offset pointers; immutable flags and canonical alignment reach the fake provider exactly | Pass |
 | `slang-unit-test-tool/nvvmSlangFloatVectorByteAddressAccessUsesGenericOperations` | Float4 construction/extraction and exact Int/Float/Float4 byte pointers compose through generic vector and memory callbacks with scalar/vector identity preserved | Pass |
-| `slang-unit-test-tool/nvvmSlangRejectsWideByteAddressLoadBeforeProviderMutation` | UInt64 byte-address loading remains outside the selected 32-bit numeric family and reaches E52017 before builder discovery or mutation | Pass |
+| `slang-unit-test-tool/nvvmSlangWideIntegerByteAddressAccessUsesGenericOperations` | Read-only Int64 and mutable UInt64 loads plus matching wide stores use four generic byte-offset pointers, exact explicit-eight/default-four-byte alignment, and the correct invariant policy | Pass |
+| `slang-unit-test-tool/nvvmSlangRejectsAggregateByteAddressAccessBeforeProviderMutation` | An array-bearing aggregate byte access remains outside the selected scalar/vector family and reaches E52017 before builder discovery or mutation | Pass |
 
 Slice 9 extends Bucket 2 through a finite DAG of canonical direct `IRFunc`
 callees with signed-i32 parameters/results and valued returns. Complex and aggregate types, pointer

@@ -233,8 +233,8 @@ struct NVVMByteAddressAccess
     bool isStore = false;
 };
 
-// Resolves the canonical 32-bit numeric scalar/vector byte-address load and store family. A zero or
-// omitted alignment carries the ordinary four-byte contract; an explicit alignment is a
+// Resolves the canonical selected numeric scalar/vector byte-address load and store family. A zero
+// or omitted alignment carries the ordinary four-byte contract; an explicit alignment is a
 // power-of-two promise that can be forwarded unchanged to LLVM.
 bool _getNVVMByteAddressAccess(IRInst* inst, NVVMByteAddressAccess& outAccess)
 {
@@ -259,7 +259,7 @@ bool _getNVVMByteAddressAccess(IRInst* inst, NVVMByteAddressAccess& outAccess)
     IRType* valueType = isStore && value ? value->getDataType() : inst->getDataType();
     NVVMRawBufferType bufferType;
     if (!buffer || !byteOffset || !isNVVMUnsignedI32Type(byteOffset->getDataType()) || !valueType ||
-        !isNVVMSupported32BitNumericValueType(valueType) ||
+        !isNVVMSupportedByteAddressValueType(valueType) ||
         !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
         bufferType.kind != NVVMRawBufferKind::ByteAddress ||
         (isStore && (bufferType.access != NVVMBufferAccess::ReadWrite ||

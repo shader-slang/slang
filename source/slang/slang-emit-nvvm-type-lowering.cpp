@@ -118,9 +118,12 @@ bool isNVVMSupportedNumericValueType(IRInst* type)
            asNVVMSupported32BitNumericVectorType(type);
 }
 
-bool isNVVMSupported32BitNumericValueType(IRInst* type)
+bool isNVVMSupportedByteAddressValueType(IRInst* type)
 {
-    return isNVVMInteger32Type(type) || isNVVMFloat32Type(type) ||
+    uint32_t integerBitWidth = 0;
+    const bool isWideInteger =
+        isNVVMSupportedIntegerScalarType(type, &integerBitWidth) && integerBitWidth == 64;
+    return isWideInteger || isNVVMInteger32Type(type) || isNVVMFloat32Type(type) ||
            asNVVMSupported32BitNumericVectorType(type);
 }
 

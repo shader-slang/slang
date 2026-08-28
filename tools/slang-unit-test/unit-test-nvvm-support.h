@@ -8630,14 +8630,30 @@ void computeMain(
     destination[0] = wide.x;
 }
 )";
-static const char kDirectNVVMUnsupportedWideByteAddressLoadSource[] = R"(
+static const char kDirectNVVMWideIntegerByteAddressAccessSource[] = R"(
 [CUDAKernel]
 void computeMain(
-    RWByteAddressBuffer source,
-    uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> destination)
+    ByteAddressBuffer readOnlySource,
+    RWByteAddressBuffer readWriteSource,
+    uniform Ptr<uint64_t, Access::ReadWrite, AddressSpace::Device> destination)
 {
-    uint64_t value = source.Load<uint64_t>(0);
-    destination[0] = uint(value);
+    int64_t signedValue = readOnlySource.LoadAligned<int64_t>(0, 8);
+    uint64_t unsignedValue = readWriteSource.Load<uint64_t>(8);
+    readWriteSource.Store<int64_t>(16, signedValue, 8);
+    readWriteSource.Store<uint64_t>(24, unsignedValue);
+    destination[0] = unsignedValue;
+}
+)";
+static const char kDirectNVVMUnsupportedAggregateByteAddressAccessSource[] = R"(
+struct Block
+{
+    float4 values[2];
+};
+
+[CUDAKernel]
+void computeMain(RWByteAddressBuffer source)
+{
+    source.Store(0, source.LoadAligned<Block>(0));
 }
 )";
 static const char kDirectNVVMAggregateAndReadOnlyResourceSource[] = R"(

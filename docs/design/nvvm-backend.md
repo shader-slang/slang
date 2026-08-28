@@ -4666,8 +4666,35 @@ direct PTX lane, 4/4 together. The aligned fixture now allocates the full 48 byt
 operations touch. Its optimized PTX retains four `ld.global.f32` and four `st.global.f32`
 instructions. The Float3 shader returns `2.0, 3.0, 4.0`; PTX exposes their exact IEEE-754 constants,
 raw-buffer stores, and typed Float output. CUDA 12.9.86 `ptxas -arch=sm_70` accepts both modules.
-UInt64 byte access remains a focused E52017 control before provider discovery. Final build and unit
 The Release host and isolated-provider builds pass, and the complete NVVM prefix passes 354/354.
+
+### Slice 85: Wide integer byte-address access
+
+The core byte-address value boundary now composes Slice 84's exact 32-bit numeric scalar/vector
+family with exact Int64 and UInt64 scalars. Slice 68 already established wide integer values,
+conversions, wrapping arithmetic, and physical i64 types, while Slice 83's byte-offset pointer and
+load/store operations are pointee-type generic. This slice therefore changes only the semantic
+classifier and adds no facade callback, provider operation, ABI revision, feature flag, or
+compatible-text rewrite.
+
+A plain byte access continues to carry a four-byte alignment contract even when its pointee is i64.
+That alignment is valid for LLVM and does not claim the runtime byte offset is naturally aligned to
+eight bytes. Explicit nonzero power-of-two alignment remains forwarded unchanged. Read-only buffer
+roots produce invariant wide loads; read-write roots remain ordinary.
+
+The focused fake fixture crosses read-only Int64 and read-write UInt64 loads with signed and
+unsigned wide stores. It observes four exact generic byte-offset pointer operations, two loads with
+the respective invariant/ordinary flags, and matching explicit-eight/default-four-byte alignments
+on the two byte-buffer stores. An additional device-pointer store retains the loaded UInt64 value.
+An array-bearing aggregate remains a deterministic E52017 control before builder discovery or
+mutation.
+
+The existing `tests/compute/byte-address-buffer-64bit.slang` now passes direct-libNVVM runtime and
+PTX lanes 2/2. Its final graph loads UInt, widens to UInt64, adds one, and stores the wide result.
+Final PTX preserves `add.s64`; because the source store only promises four-byte alignment, libNVVM
+lowers it to two ordered `st.global.u32` instructions separated by `shr.u64`. CUDA 12.9.86
+`ptxas -arch=sm_70` accepts the module. The Release host and isolated-provider builds pass, four
+focused byte-address units pass 4/4, and the complete NVVM prefix passes 355/355.
 
 The following remain open until their named slice supplies evidence:
 
