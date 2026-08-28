@@ -135,6 +135,12 @@ All three should now print `v1.1.0`. Convert's tighter encoding range (`>=1.1.0`
 publisher retraction of `1.0.0` agree: the shared leaf is `color-encoding@v1.1.0`, once, in the
 lock.
 
+Before changing checkouts, update validates the workspace package. After materializing the
+selection, it validates every reachable package's manifest, licenses, exports, and module layout,
+and checks module import uniqueness across the graph. The new lock and successful resolution
+report are written only after those checks pass. Fetch performs the same pre- and
+post-materialization validation while reproducing the existing lock.
+
 `v1.1.0` of the preview prints full-precision luma weights `(0.2126, 0.7152, 0.0722)` instead of
 the truncated `(0.2130, 0.7150, 0.0720)` from `v1.0.0`.
 

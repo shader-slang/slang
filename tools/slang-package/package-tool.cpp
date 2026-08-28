@@ -571,18 +571,13 @@ static SlangResult _fetch(const String& projectRoot, bool allowClean, String& ou
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
     SLANG_RETURN_ON_FAIL(
         _materialize(projectRoot, manifest, lock, &lock, localPackages, allowClean, outError));
     List<String> warnings;
-    SLANG_RETURN_ON_FAIL(_validateMaterializedManifests(
-        projectRoot,
-        manifest,
-        lock,
-        localPackages,
-        outError,
-        false,
-        &warnings));
+    SLANG_RETURN_ON_FAIL(
+        validateResolvedProject(projectRoot, manifest, lock, localPackages, outError, &warnings));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, manifest, lock, localPackages, outError));
@@ -608,6 +603,7 @@ static SlangResult _update(
         outError = "update --from-local requires a registered local package.";
         return SLANG_FAIL;
     }
+    SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
 
     LockFile previousLock;
     LockFile* previousLockPtr = nullptr;
@@ -655,13 +651,13 @@ static SlangResult _update(
             resolveDependencies(projectRoot, manifest, lock, outError, &warnings, &report));
     }
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
-    for (const auto& warning : warnings)
-        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     String reportText =
         formatResolveReport(manifest, previousLockPtr, lock, report, dryRun, minimal);
-    fprintf(stdout, "%s", reportText.getBuffer());
     if (dryRun)
     {
+        for (const auto& warning : warnings)
+            fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+        fprintf(stdout, "%s", reportText.getBuffer());
         fprintf(stdout, "Dry run: lock and dependency checkouts were not modified.\n");
         return SLANG_OK;
     }
@@ -675,9 +671,12 @@ static SlangResult _update(
         allowClean,
         outError));
     SLANG_RETURN_ON_FAIL(
-        _validateMaterializedManifests(projectRoot, manifest, lock, localPackages, outError));
+        validateResolvedProject(projectRoot, manifest, lock, localPackages, outError, &warnings));
     SLANG_RETURN_ON_FAIL(writeLockFile(lockPath, lock, outError));
     SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, manifest, lock, localPackages, outError));
+    for (const auto& warning : warnings)
+        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+    fprintf(stdout, "%s", reportText.getBuffer());
     if (fromLocal)
     {
         fprintf(
@@ -1068,13 +1067,8 @@ static SlangResult _build(const String& projectRoot, String& outError)
     List<PrimaryModule> primaryModules;
     List<ExportedSourceFile> sourceFiles;
     List<String> warnings;
-    SLANG_RETURN_ON_FAIL(validateProject(
-        projectRoot,
-        outError,
-        &warnings,
-        &primaryModules,
-        ProjectValidationMode::SourceAndDependencies,
-        &sourceFiles));
+    SLANG_RETURN_ON_FAIL(
+        validateProject(projectRoot, outError, &warnings, &primaryModules, &sourceFiles));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
 

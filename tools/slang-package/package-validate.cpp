@@ -295,11 +295,24 @@ static SlangResult _addModule(
     String fullPath = Path::combine(exportRoot, relativePath);
     for (const auto& existing : ioModules)
     {
-        if (existing.canonicalImport == canonicalImport)
+        if (existing.canonicalImport.getUnownedSlice().caseInsensitiveEquals(
+                canonicalImport.getUnownedSlice()))
         {
-            outError = String("Module '") + canonicalImport + "' is exported by both package '" +
-                       existing.packageName + "' (" + existing.path + ") and package '" +
-                       packageName + "' (" + fullPath + ").";
+            if (existing.canonicalImport == canonicalImport)
+            {
+                outError = String("Module '") + canonicalImport +
+                           "' is exported by both package '" + existing.packageName + "' (" +
+                           existing.path + ") and package '" + packageName + "' (" + fullPath +
+                           ").";
+            }
+            else
+            {
+                outError = String("Module '") + canonicalImport + "' conflicts with module '" +
+                           existing.canonicalImport +
+                           "' on a case-insensitive filesystem; they are exported by package '" +
+                           existing.packageName + "' (" + existing.path + ") and package '" +
+                           packageName + "' (" + fullPath + ").";
+            }
             return SLANG_FAIL;
         }
     }
@@ -432,11 +445,9 @@ static SlangResult _validatePackageTree(
     const Manifest& manifest,
     List<ModuleLocation>& ioModules,
     List<ExportedSourceFile>& ioSourceFiles,
-    ProjectValidationMode mode,
     String& outError)
 {
-    if (mode == ProjectValidationMode::Full)
-        SLANG_RETURN_ON_FAIL(_validateLicenseFiles(packageRoot, manifest, outError));
+    SLANG_RETURN_ON_FAIL(_validateLicenseFiles(packageRoot, manifest, outError));
     if (manifest.exports.getCount() == 0)
     {
         outError =
@@ -499,53 +510,38 @@ static SlangResult _readMaterializedManifest(
     if (SLANG_FAILED(
             readManifest(Path::combine(outPackageRoot, kManifestName), outManifest, outError)))
     {
-        outError = String("Cannot validate materialized package '") + package.name +
+        outError = String("Cannot validate materialized package manifest '") + package.name +
                    "'. Run 'slang package fetch'. " + outError;
         return SLANG_FAIL;
     }
     return validateLockedPackageManifest(package, outManifest, outError);
 }
 
-SlangResult validateProject(
+SlangResult validatePackageTree(
+    const String& packageRoot,
+    const Manifest& manifest,
+    String& outError)
+{
+    List<ModuleLocation> modules;
+    List<ExportedSourceFile> sourceFiles;
+    return _validatePackageTree(packageRoot, manifest, modules, sourceFiles, outError);
+}
+
+SlangResult validateResolvedProject(
     const String& projectRoot,
+    const Manifest& rootManifest,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages,
     String& outError,
     List<String>* outWarnings,
     List<PrimaryModule>* outPrimaryModules,
-    ProjectValidationMode mode,
     List<ExportedSourceFile>* outSourceFiles)
 {
-    Manifest rootManifest;
-    SLANG_RETURN_ON_FAIL(
-        readManifest(Path::combine(projectRoot, kManifestName), rootManifest, outError));
-
     List<ModuleLocation> modules;
     List<ExportedSourceFile> sourceFiles;
     SLANG_RETURN_ON_FAIL(
-        _validatePackageTree(projectRoot, rootManifest, modules, sourceFiles, mode, outError));
+        _validatePackageTree(projectRoot, rootManifest, modules, sourceFiles, outError));
 
-    String lockPath = Path::combine(projectRoot, kLockName);
-    List<LocalPackage> localPackages;
-    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    if (!File::exists(lockPath))
-    {
-        if (rootManifest.dependencies.getCount() == 0 && localPackages.getCount() == 0)
-        {
-            if (outPrimaryModules)
-                _collectPrimaryModules(modules, *outPrimaryModules);
-            if (outSourceFiles)
-                _collectExportedSourceFiles(sourceFiles, *outSourceFiles);
-            List<ToolchainConstraint> toolchainConstraints;
-            addSlangToolchainConstraint(rootManifest, toolchainConstraints);
-            return selectSlangToolchain(toolchainConstraints, outError);
-        }
-        outError = localPackages.getCount()
-                       ? "Registered local packages require slang-package-lock.json."
-                       : "Package dependencies require slang-package-lock.json.";
-        return SLANG_FAIL;
-    }
-
-    LockFile lock;
-    SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
     List<Manifest> packageManifests;
     packageManifests.setCount(lock.packages.getCount());
     List<String> packageRoots;
@@ -624,13 +620,8 @@ SlangResult validateProject(
             }
         }
 
-        SLANG_RETURN_ON_FAIL(_validatePackageTree(
-            packageRoots[index],
-            manifest,
-            modules,
-            sourceFiles,
-            mode,
-            outError));
+        SLANG_RETURN_ON_FAIL(
+            _validatePackageTree(packageRoots[index], manifest, modules, sourceFiles, outError));
     }
     SLANG_RETURN_ON_FAIL(requireAllLockPackagesTrusted(lock, reachable, outError));
     if (outPrimaryModules)
@@ -653,6 +644,44 @@ SlangResult validateProject(
         }
     }
     return selectSlangToolchain(toolchainConstraints, outError);
+}
+
+SlangResult validateProject(
+    const String& projectRoot,
+    String& outError,
+    List<String>* outWarnings,
+    List<PrimaryModule>* outPrimaryModules,
+    List<ExportedSourceFile>* outSourceFiles)
+{
+    Manifest rootManifest;
+    SLANG_RETURN_ON_FAIL(
+        readManifest(Path::combine(projectRoot, kManifestName), rootManifest, outError));
+
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    String lockPath = Path::combine(projectRoot, kLockName);
+    LockFile lock;
+    if (File::exists(lockPath))
+    {
+        SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
+    }
+    else if (rootManifest.dependencies.getCount() || localPackages.getCount())
+    {
+        outError = localPackages.getCount()
+                       ? "Registered local packages require slang-package-lock.json."
+                       : "Package dependencies require slang-package-lock.json.";
+        return SLANG_FAIL;
+    }
+
+    return validateResolvedProject(
+        projectRoot,
+        rootManifest,
+        lock,
+        localPackages,
+        outError,
+        outWarnings,
+        outPrimaryModules,
+        outSourceFiles);
 }
 
 } // namespace PackageTool

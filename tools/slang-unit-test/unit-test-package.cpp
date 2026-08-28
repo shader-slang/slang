@@ -670,6 +670,8 @@ SLANG_UNIT_TEST(PackageToolBuild)
     String error;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
     Manifest manifest;
     String manifestPath = Path::combine(temp.path, "slang-package.json");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
@@ -733,6 +735,8 @@ SLANG_UNIT_TEST(PackageToolBundleFlags)
     String error;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
     Manifest manifest;
     String manifestPath = Path::combine(temp.path, "slang-package.json");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
@@ -753,7 +757,7 @@ SLANG_UNIT_TEST(PackageToolBundleFlags)
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/bundle/source/library.slang")));
 }
 
-SLANG_UNIT_TEST(PackageToolBundleCaseConflict)
+SLANG_UNIT_TEST(PackageToolUpdateRejectsBundleCaseConflict)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
@@ -761,6 +765,8 @@ SLANG_UNIT_TEST(PackageToolBundleCaseConflict)
     String error;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
 
     String leftRoot = Path::combine(temp.path, "vendor/left");
     String rightRoot = Path::combine(temp.path, "vendor/right");
@@ -811,12 +817,10 @@ SLANG_UNIT_TEST(PackageToolBundleCaseConflict)
         "public int getValue() { return 0; }\n")));
 
     const char* updateArguments[] = {"slang-package", "update"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    const char* buildArguments[] = {"slang-package", "build"};
     SLANG_CHECK(SLANG_FAILED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("case-insensitive")) >= 0);
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "slang-package-lock.json")));
 }
 
 SLANG_UNIT_TEST(PackageToolRun)
@@ -827,6 +831,8 @@ SLANG_UNIT_TEST(PackageToolRun)
     String error;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
     Manifest manifest;
     String manifestPath = Path::combine(temp.path, "slang-package.json");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
@@ -881,6 +887,8 @@ SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
     String error;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
     Manifest manifest;
     String manifestPath = Path::combine(temp.path, "slang-package.json");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
@@ -927,6 +935,8 @@ SLANG_UNIT_TEST(PackageToolExecutableRequiresWorkspaceSource)
     String error;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
 
     String dependencyRoot = Path::combine(temp.path, "vendor/tool");
     SLANG_CHECK_ABORT(Path::createDirectoryRecursive(dependencyRoot));
@@ -1789,6 +1799,62 @@ SLANG_UNIT_TEST(PackageValidateStructureAndLicense)
         SLANG_COUNT_OF(validateArguments),
         validateArguments,
         error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Companion")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageCommandsValidateDependencyModuleLayout)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    String dependencyRoot = Path::combine(temp.path, "vendor/noise");
+    Manifest noise;
+    noise.name = "noise";
+    noise.exports.add("src");
+    noise.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(dependencyRoot));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(dependencyRoot, "slang-package.json"), noise, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(dependencyRoot, "LICENSE"), "Noise license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(dependencyRoot, "src/noise.slang"), "module noise;\n")));
+    String companionPath = Path::combine(dependencyRoot, "src/noise/helper.slang");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(companionPath, "module helper;\n")));
+
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    Manifest root;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency dependency;
+    dependency.name = "noise";
+    dependency.path = "vendor/noise";
+    dependency.as = "1.0.0";
+    root.dependencies.add(dependency);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* updateArguments[] = {"slang-package", "update", "--minimal"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Companion")) >= 0);
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "slang-package-lock.json")));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(companionPath, "implementing noise;\n")));
+    error = String();
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "slang-package-lock.json")));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(companionPath, "module helper;\n")));
+    const char* fetchArguments[] = {"slang-package", "fetch"};
+    error = String();
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Companion")) >= 0);
 }
 

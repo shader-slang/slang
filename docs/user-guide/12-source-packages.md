@@ -264,6 +264,22 @@ root and are not added to compiler sessions automatically.
 through `slang-package-lock.json`. It validates each manifest and license file, requires all source
 exports to exist, and rejects module import paths exported by more than one package.
 
+The same validation is part of commands that establish or consume a dependency graph:
+
+- `fetch` validates the workspace package before changing dependency checkouts, then validates the
+  complete reachable graph after materialization.
+- `update` validates the workspace package before solving, then validates the complete selected
+  graph after materialization and before writing the new lock. It does not validate the old graph
+  first, so a broken old dependency cannot prevent an update to a fixed release.
+- `update --dry-run` validates the workspace package and every manifest read by the solver. It
+  cannot validate source files from remote candidates because it does not materialize them.
+- `build` performs the same full graph validation before compiling anything.
+
+Successful `fetch`, `update`, and `build` therefore require the workspace package and every
+reachable dependency to conform to the closed manifest schema, license and export rules, module
+layout, and graph-wide module import uniqueness. Validation covers the whole reachable graph, not
+only changed lock rows, because an unchanged package can conflict with a newly selected module.
+
 `slang package status` checks the root manifest against the lock, verifies registered edits and
 overrides, validates the materialized manifests, and checks that tool-owned Git checkouts remain at
 their locked commits without changed files or stashes. It prints the registered local package
