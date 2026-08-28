@@ -314,12 +314,14 @@ SlangResult NVVMIRBuilder::emitLoad(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle pointer,
     uint32_t alignment,
+    SlangNVVMLoadFlags flags,
     SlangNVVMValueHandle& outValue) const
 {
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    const SlangNVVMResult result = m_construction.emitLoad(module, pointer, alignment, &outValue);
+    const SlangNVVMResult result =
+        m_construction.emitLoad(module, pointer, alignment, flags, &outValue);
     return _validateHandleResult(result, outValue);
 }
 

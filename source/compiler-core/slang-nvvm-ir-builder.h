@@ -110,11 +110,12 @@ public:
     /// Selects a module-owned block as the destination for subsequent instructions.
     SlangResult setInsertBlock(SlangNVVMModuleHandle module, SlangNVVMBlockHandle block) const;
 
-    /// Emits a non-volatile aligned load into the current insertion block.
+    /// Emits a non-volatile aligned load with explicit memory semantics.
     SlangResult emitLoad(
         SlangNVVMModuleHandle module,
         SlangNVVMValueHandle pointer,
         uint32_t alignment,
+        SlangNVVMLoadFlags flags,
         SlangNVVMValueHandle& outValue) const;
 
     /// Emits a non-volatile aligned store into the current insertion block.

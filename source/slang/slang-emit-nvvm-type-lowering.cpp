@@ -300,17 +300,22 @@ IRUnsizedArrayType* asNVVMSupportedUnsizedSamplerArrayStorageType(IRInst* type)
                                                                                        : nullptr;
 }
 
-IRParameterBlockType* asNVVMSupportedScalarParameterBlockType(
+IRParameterGroupType* asNVVMSupportedScalarParameterGroupType(
     IRInst* type,
     IRStructType** outElementType)
 {
     if (outElementType)
         *outElementType = nullptr;
 
-    auto parameterBlockType = as<IRParameterBlockType>(type);
-    auto elementType =
-        parameterBlockType ? as<IRStructType>(parameterBlockType->getElementType()) : nullptr;
-    if (!parameterBlockType || !elementType)
+    auto parameterGroupType = as<IRParameterGroupType>(type);
+    if (!parameterGroupType || (parameterGroupType->getOp() != kIROp_ParameterBlockType &&
+                                parameterGroupType->getOp() != kIROp_ConstantBufferType))
+    {
+        return nullptr;
+    }
+
+    auto elementType = as<IRStructType>(parameterGroupType->getElementType());
+    if (!elementType)
         return nullptr;
 
     bool hasField = false;
@@ -328,13 +333,13 @@ IRParameterBlockType* asNVVMSupportedScalarParameterBlockType(
 
     if (outElementType)
         *outElementType = elementType;
-    return parameterBlockType;
+    return parameterGroupType;
 }
 
 bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type)
 {
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupportedScalarParameterBlockType(type) ||
+           asNVVMSupportedScalarParameterGroupType(type) ||
            asNVVMSupportedRawRWStructuredBufferType(type) ||
            asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type);
@@ -509,8 +514,8 @@ SlangResult NVVMTypeLoweringContext::_lowerRawRWStructuredBufferType(
     return SLANG_OK;
 }
 
-SlangResult NVVMTypeLoweringContext::_lowerScalarParameterBlockType(
-    IRParameterBlockType* type,
+SlangResult NVVMTypeLoweringContext::_lowerScalarParameterGroupType(
+    IRParameterGroupType* type,
     IRStructType* elementType,
     SlangNVVMTypeHandle& outType)
 {
@@ -528,7 +533,7 @@ SlangResult NVVMTypeLoweringContext::_lowerScalarParameterBlockType(
     else
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "scalar parameter-block pointer type",
+            "scalar parameter-group pointer type",
             m_builder.getPointerType(
                 m_module,
                 loweredElementType,
@@ -600,9 +605,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRPtrTypeBase* deviceArrayPointer =
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
     IRHLSLStructuredBufferTypeBase* rawResource = asNVVMSupportedRawRWStructuredBufferType(type);
-    IRStructType* parameterBlockElementType = nullptr;
-    IRParameterBlockType* parameterBlock =
-        asNVVMSupportedScalarParameterBlockType(type, &parameterBlockElementType);
+    IRStructType* parameterGroupElementType = nullptr;
+    IRParameterGroupType* parameterGroup =
+        asNVVMSupportedScalarParameterGroupType(type, &parameterGroupElementType);
     IRSamplerStateTypeBase* samplerStorage = asNVVMSupportedSamplerStorageType(type);
     IRUnsizedArrayType* unsizedSamplerArrayStorage =
         asNVVMSupportedUnsizedSamplerArrayStorageType(type);
@@ -622,10 +627,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         (use == NVVMTypeUse::HelperParameter && (isInteger || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloat32 || isBool || uint3Type || signedI32x2Type || fixedArrayType ||
-          deviceNumericPointer || deviceArrayPointer || rawResource || parameterBlock ||
+          deviceNumericPointer || deviceArrayPointer || rawResource || parameterGroup ||
           resourceElementPointer || sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
-         (isInteger || isFloat32 || structType || rawResource || parameterBlock || samplerStorage ||
+         (isInteger || isFloat32 || structType || rawResource || parameterGroup || samplerStorage ||
           unsizedSamplerArrayStorage));
     if (!isLegal)
         return _reportUnsupportedType(use);
@@ -695,9 +700,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     {
         return _lowerRawRWStructuredBufferType(rawResource, outType);
     }
-    else if (parameterBlock)
+    else if (parameterGroup)
     {
-        return _lowerScalarParameterBlockType(parameterBlock, parameterBlockElementType, outType);
+        return _lowerScalarParameterGroupType(parameterGroup, parameterGroupElementType, outType);
     }
     else if (samplerStorage)
     {

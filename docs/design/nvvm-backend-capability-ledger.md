@@ -1397,3 +1397,21 @@ The existing `param-block-alignment.slang` comparison passes CUDA/NVRTC and dire
 with `0, 8, 16, 8, 0, 0, 0, 0`. Direct PTX contains the 32-byte constant block, loads at byte
 offsets 0, 8, and 16, and the inner global scalar read. CUDA 12.9 `ptxas` accepts it for `sm_70`.
 The Release host and isolated provider builds pass, and the complete NVVM prefix passes 339/339.
+
+Slice 78 generalizes the flat scalar `ParameterBlock<T>` representation to an exact parameter-group
+family shared with `ConstantBuffer<T>`. Both lower to an address-space-1 pointer to the generic
+unpacked scalar element struct and reuse exact keyed field addressing. Nested element shapes remain
+E52017 before builder discovery.
+
+Exact builder ABI revision 4 adds load flags to the single generic `emitLoad` construction
+operation. The real provider maps the invariant bit to LLVM `!invariant.load` metadata and rejects
+unknown bits; no CUDA `ldg` intrinsic or group-specific callback crosses the ABI. Direct emission
+reuses `isPointerToImmutableLocation(getRootAddr(ptr))`, the same canonical semantic classifier as
+CUDA-source lowering, while ordinary mutable device-pointer loads remain untagged.
+
+The existing constant-buffer test passes CUDA-source and direct PTX 2/2. Direct PTX contains the
+eight-byte conventional block, `ld.const.u64`, and `ld.global.nc.u32`. The 3D wave shader passes
+CUDA/NVRTC, direct libNVVM, and Vulkan 3/3. CUDA 12.9 `ptxas` accepts both new direct modules for
+`sm_70`; Release host and standalone-provider builds pass; and the complete NVVM prefix passes
+340/340. `noinline.slang` is not registered: its probe compiles, but direct emission does not yet
+preserve `IRNoInlineDecoration`, so retained unoptimized helpers would be false semantic evidence.

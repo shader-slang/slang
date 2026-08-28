@@ -544,6 +544,7 @@ static SlangResult SLANG_NVVM_CALL _emitLoad(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle pointer,
     uint32_t alignment,
+    SlangNVVMLoadFlags flags,
     SlangNVVMValueHandle* outValue)
 {
     if (outValue)
@@ -555,14 +556,21 @@ static SlangResult SLANG_NVVM_CALL _emitLoad(
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     if (!pointerType || !insertionBlock ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer) ||
-        !_isValidAlignment(alignment) || !outValue)
+        !_isValidAlignment(alignment) ||
+        (flags & ~SLANG_NVVM_LOAD_FLAG_INVARIANT) != SLANG_NVVM_LOAD_FLAG_NONE || !outValue)
     {
         return SLANG_E_INVALID_ARG;
     }
 
     llvm::Type* pointeeType = pointerType->getNonOpaquePointerElementType();
-    llvm::Value* value =
+    llvm::LoadInst* value =
         state->builder.CreateAlignedLoad(pointeeType, llvmPointer, llvm::Align(alignment));
+    if (flags & SLANG_NVVM_LOAD_FLAG_INVARIANT)
+    {
+        value->setMetadata(
+            llvm::LLVMContext::MD_invariant_load,
+            llvm::MDNode::get(state->context, {}));
+    }
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(value);
     return SLANG_OK;
 }

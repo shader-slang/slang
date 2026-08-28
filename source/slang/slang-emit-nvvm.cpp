@@ -93,11 +93,11 @@ bool _isNVVMConventionalGlobalStorageType(const NVVMConventionalGlobalParams& pa
         return true;
     for (auto field : params.elementType->getFields())
     {
-        IRStructType* parameterBlockElementType = nullptr;
-        if (asNVVMSupportedScalarParameterBlockType(
+        IRStructType* parameterGroupElementType = nullptr;
+        if (asNVVMSupportedScalarParameterGroupType(
                 field->getFieldType(),
-                &parameterBlockElementType) &&
-            inst == parameterBlockElementType)
+                &parameterGroupElementType) &&
+            inst == parameterGroupElementType)
         {
             return true;
         }
@@ -112,7 +112,7 @@ struct NVVMStructFieldAddress
 };
 
 // Resolves the two aggregate-address shapes with executable representations: a field in the
-// collected CUDA parameter block, or a selected scalar in a loaded scalar ParameterBlock.
+// collected CUDA parameter block, or a selected scalar in a loaded parameter group.
 bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructFieldAddress& outAddress)
 {
     outAddress = {};
@@ -127,13 +127,12 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructFieldAdd
     {
         structType = globalParams.elementType;
     }
-    else if (!asNVVMSupportedScalarParameterBlockType(
+    else if (!asNVVMSupportedScalarParameterGroupType(
                  fieldAddress->getBase()->getDataType(),
                  &structType))
     {
         return false;
     }
-
     if (!_findNVVMStructField(
             structType,
             fieldAddress->getField(),
@@ -154,7 +153,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructFieldAdd
     {
         // Sampler fields are ABI storage only. They intentionally have no executable value form.
         return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
-               asNVVMSupportedScalarParameterBlockType(fieldType) ||
+               asNVVMSupportedScalarParameterGroupType(fieldType) ||
                asNVVMSupportedRawRWStructuredBufferType(fieldType);
     }
 
@@ -1341,7 +1340,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_Load:
                 if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
                     !asNVVMSupportedRawRWStructuredBufferType(inst->getDataType()) &&
-                    !asNVVMSupportedScalarParameterBlockType(inst->getDataType()))
+                    !asNVVMSupportedScalarParameterGroupType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 break;
 
@@ -2538,11 +2537,15 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredValue = nullptr;
                         uint32_t alignment = getNVVMNumericValueAlignment(load->getDataType());
                         if (asNVVMSupportedRawRWStructuredBufferType(load->getDataType()) ||
-                            asNVVMSupportedScalarParameterBlockType(load->getDataType()))
+                            asNVVMSupportedScalarParameterGroupType(load->getDataType()))
                         {
                             alignment = kNVVMPointerAlignment;
                         }
                         SLANG_RELEASE_ASSERT(alignment);
+                        const SlangNVVMLoadFlags loadFlags =
+                            isPointerToImmutableLocation(getRootAddr(load->getPtr()))
+                                ? SLANG_NVVM_LOAD_FLAG_INVARIANT
+                                : SLANG_NVVM_LOAD_FLAG_NONE;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "value load",
@@ -2550,6 +2553,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 loweredPointer,
                                 alignment,
+                                loadFlags,
                                 loweredValue)));
                         valueMap[load] = loweredValue;
                     }

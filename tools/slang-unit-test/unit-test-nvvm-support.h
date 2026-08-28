@@ -457,6 +457,7 @@ struct FakeNVVMBuilderState
         scalarPhiIncomingPredecessorBlockIndices.clear();
         functionParameterIndices.clear();
         loadPointerParameterIndices.clear();
+        loadFlags.clear();
         storePointerFunctionIndices.clear();
         storePointerParameterIndices.clear();
         storeValueKinds.clear();
@@ -740,6 +741,7 @@ struct FakeNVVMBuilderState
     List<Index> scalarPhiIncomingPredecessorBlockIndices;
     List<size_t> functionParameterIndices;
     List<size_t> loadPointerParameterIndices;
+    List<SlangNVVMLoadFlags> loadFlags;
     List<Index> storePointerFunctionIndices;
     List<size_t> storePointerParameterIndices;
     List<FakeNVVMBuilderValueKind> storeValueKinds;
@@ -2389,6 +2391,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitLoad(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle pointer,
     uint32_t alignment,
+    SlangNVVMLoadFlags flags,
     SlangNVVMValueHandle* outValue)
 {
     ++gFakeNVVMBuilder.emitLoadCallCount;
@@ -2397,7 +2400,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitLoad(
     size_t pointerIndex = size_t(-1);
     FakeNVVMBuilderValueRef pointerRef;
     if (module != _getFakeNVVMBuilderModule() || !_isFakeNVVMBuilderPointerValue(pointer) ||
-        !_getFakeNVVMBuilderValueRef(pointer, pointerRef) || !outValue ||
+        !_getFakeNVVMBuilderValueRef(pointer, pointerRef) ||
+        (flags & ~SLANG_NVVM_LOAD_FLAG_INVARIANT) != SLANG_NVVM_LOAD_FLAG_NONE || !outValue ||
         gFakeNVVMBuilder.loadResultTypeKinds.getCount() >=
             SLANG_COUNT_OF(gFakeNVVMBuilder.loadStorage))
     {
@@ -2412,6 +2416,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitLoad(
     const Index resultIndex = gFakeNVVMBuilder.loadResultTypeKinds.getCount();
     gFakeNVVMBuilder.loadPointerParameterIndices.add(pointerIndex);
     gFakeNVVMBuilder.loadPointerValueRefs.add(pointerRef);
+    gFakeNVVMBuilder.loadFlags.add(flags);
     gFakeNVVMBuilder.loadResultTypeKinds.add(resultTypeKind);
     *outValue = _getFakeNVVMBuilderLoad(resultIndex);
     return SLANG_OK;
@@ -4938,7 +4943,7 @@ static SlangResult _populateScalarReferenceKernels(
         SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 1, source));
         SLANG_RETURN_ON_FAIL(builder.createBlock(module, function, toSlice("entry"), entryBlock));
         SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
-        SLANG_RETURN_ON_FAIL(builder.emitLoad(module, source, 4, value));
+        SLANG_RETURN_ON_FAIL(builder.emitLoad(module, source, 4, SLANG_NVVM_LOAD_FLAG_NONE, value));
         SLANG_RETURN_ON_FAIL(builder.emitStore(module, value, destination, 4));
         SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
         SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
@@ -5200,7 +5205,7 @@ static SlangResult _populateFloat32CopyKernel(
     SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, function, 1, source));
     SLANG_RETURN_ON_FAIL(builder.createBlock(module, function, toSlice("entry"), entryBlock));
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
-    SLANG_RETURN_ON_FAIL(builder.emitLoad(module, source, 4, value));
+    SLANG_RETURN_ON_FAIL(builder.emitLoad(module, source, 4, SLANG_NVVM_LOAD_FLAG_NONE, value));
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, value, destination, 4));
     SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
     SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
@@ -5807,7 +5812,8 @@ static SlangResult _populateWaveReadLaneAtLoadedScalarKernel(
     SlangNVVMValueHandle sourcePointer = nullptr;
     SLANG_RETURN_ON_FAIL(builder.emitPointerOffset(module, source, laneIndexResult, sourcePointer));
     SlangNVVMValueHandle sourceValue = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitLoad(module, sourcePointer, 4, sourceValue));
+    SLANG_RETURN_ON_FAIL(
+        builder.emitLoad(module, sourcePointer, 4, SLANG_NVVM_LOAD_FLAG_NONE, sourceValue));
     SlangNVVMValueHandle kernelReadLaneArguments[] = {mask, sourceValue, sourceLane};
     SlangNVVMValueHandle storedValue = nullptr;
     SLANG_RETURN_ON_FAIL(builder.emitCall(
@@ -6534,6 +6540,22 @@ void computeMain()
     outputBuffer[5] = block.dummy;
 }
 )";
+static const char kDirectNVVMConventionalScalarConstantBufferSource[] = R"(
+struct Params
+{
+    uint value;
+    float scale;
+};
+
+ConstantBuffer<Params> params;
+RWStructuredBuffer<uint> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    outputBuffer[0] = params.value;
+}
+)";
 static const char kDirectNVVMUnsupportedNestedParameterBlockSource[] = R"(
 struct Inner
 {
@@ -6552,6 +6574,26 @@ RWStructuredBuffer<uint> outputBuffer;
 void computeMain()
 {
     outputBuffer[0] = block.inner.value;
+}
+)";
+static const char kDirectNVVMUnsupportedNestedConstantBufferSource[] = R"(
+struct Inner
+{
+    uint value;
+};
+
+struct Params
+{
+    Inner inner;
+};
+
+ConstantBuffer<Params> params;
+RWStructuredBuffer<uint> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    outputBuffer[0] = params.inner.value;
 }
 )";
 static const char kDirectNVVMConventionalSamplerStorageSource[] = R"(
@@ -8893,7 +8935,8 @@ static SlangResult _populatePointerOffsetKernel(
     SlangNVVMValueHandle value = nullptr;
     SLANG_RETURN_ON_FAIL(builder.emitPointerOffset(module, destination, index, destinationElement));
     SLANG_RETURN_ON_FAIL(builder.emitPointerOffset(module, source, index, sourceElement));
-    SLANG_RETURN_ON_FAIL(builder.emitLoad(module, sourceElement, 4, value));
+    SLANG_RETURN_ON_FAIL(
+        builder.emitLoad(module, sourceElement, 4, SLANG_NVVM_LOAD_FLAG_NONE, value));
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, value, destinationElement, 4));
     SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
     SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
@@ -8982,7 +9025,8 @@ static SlangResult _populateArrayElementKernel(
     SLANG_RETURN_ON_FAIL(
         builder.emitArrayElementPointer(module, destination, index, destinationElement));
     SLANG_RETURN_ON_FAIL(builder.emitArrayElementPointer(module, source, index, sourceElement));
-    SLANG_RETURN_ON_FAIL(builder.emitLoad(module, sourceElement, 4, value));
+    SLANG_RETURN_ON_FAIL(
+        builder.emitLoad(module, sourceElement, 4, SLANG_NVVM_LOAD_FLAG_NONE, value));
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, value, destinationElement, 4));
     SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
     SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));

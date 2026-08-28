@@ -123,7 +123,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->declareGlobalStorage != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=3") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=4") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -684,7 +684,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitArrayElementPointer(scope.module, storage, index, elementPointer)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(scope.module, index, elementPointer, 4)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitLoad(scope.module, elementPointer, 4, loaded)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitLoad(scope.module, elementPointer, 4, SLANG_NVVM_LOAD_FLAG_NONE, loaded)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
 
@@ -831,7 +832,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsConventionalGlobalParameterStorage)
     SlangNVVMValueHandle value = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitStructFieldPointer(module.module, globalParameters, 0, fieldPointer)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitLoad(module.module, fieldPointer, 8, buffer)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitLoad(module.module, fieldPointer, 8, SLANG_NVVM_LOAD_FLAG_NONE, buffer)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getIntegerConstant(module.module, integerType, 0, index)));
     SlangNVVMValueHandle dataPointer = nullptr;
@@ -2519,8 +2521,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarOperations)
     // A declared function has no insertion block yet. Both operations must fail without mutation.
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitLoad(firstModule.module, firstDestination, 4, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
+        builder.emitLoad(
+            firstModule.module,
+            firstDestination,
+            4,
+            SLANG_NVVM_LOAD_FLAG_NONE,
+            rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     SLANG_CHECK(
         builder.emitStore(firstModule.module, firstValue, firstDestination, 4) ==
@@ -2531,26 +2537,52 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarOperations)
         builder.createBlock(firstModule.module, firstFunction, toSlice("entry"), firstBlock)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(firstModule.module, firstBlock)));
     SLANG_CHECK(
-        scalarAPI->emitLoad(firstModule.module, firstDestination, 4, nullptr) ==
-        SLANG_E_INVALID_ARG);
+        scalarAPI->emitLoad(
+            firstModule.module,
+            firstDestination,
+            4,
+            SLANG_NVVM_LOAD_FLAG_NONE,
+            nullptr) == SLANG_E_INVALID_ARG);
 
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitLoad(firstModule.module, firstValue, 4, rejectedValue) == SLANG_E_INVALID_ARG);
+        builder.emitLoad(
+            firstModule.module,
+            firstDestination,
+            4,
+            SlangNVVMLoadFlags(2u),
+            rejectedValue) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedValue == nullptr);
+
+    rejectedValue = firstFunction;
+    SLANG_CHECK(
+        builder.emitLoad(
+            firstModule.module,
+            firstValue,
+            4,
+            SLANG_NVVM_LOAD_FLAG_NONE,
+            rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitLoad(firstModule.module, secondDestination, 4, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
+        builder.emitLoad(
+            firstModule.module,
+            secondDestination,
+            4,
+            SLANG_NVVM_LOAD_FLAG_NONE,
+            rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     static const uint32_t kInvalidAlignments[] = {0u, 3u};
     for (uint32_t invalidAlignment : kInvalidAlignments)
     {
         rejectedValue = firstFunction;
         SLANG_CHECK(
-            builder
-                .emitLoad(firstModule.module, firstDestination, invalidAlignment, rejectedValue) ==
-            SLANG_E_INVALID_ARG);
+            builder.emitLoad(
+                firstModule.module,
+                firstDestination,
+                invalidAlignment,
+                SLANG_NVVM_LOAD_FLAG_NONE,
+                rejectedValue) == SLANG_E_INVALID_ARG);
         SLANG_CHECK(rejectedValue == nullptr);
         SLANG_CHECK(
             builder.emitStore(firstModule.module, firstValue, firstDestination, invalidAlignment) ==
@@ -2574,8 +2606,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(firstModule.module)));
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitLoad(firstModule.module, firstDestination, 4, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
+        builder.emitLoad(
+            firstModule.module,
+            firstDestination,
+            4,
+            SLANG_NVVM_LOAD_FLAG_NONE,
+            rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     SLANG_CHECK(
         builder.emitStore(firstModule.module, firstValue, firstDestination, 4) ==
@@ -2834,8 +2870,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     SLANG_CHECK(
         builder.emitStore(firstModule.module, secondX, firstDestination, 4) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(
-        builder.emitLoad(firstModule.module, secondDestination, 4, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
+        builder.emitLoad(
+            firstModule.module,
+            secondDestination,
+            4,
+            SLANG_NVVM_LOAD_FLAG_NONE,
+            rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     SLANG_CHECK(
         builder.emitConditionalBranch(firstModule.module, firstX, trueBlock, falseBlock) ==
@@ -3773,14 +3813,23 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
 
     SlangNVVMValueHandle destinationElement = nullptr;
     SlangNVVMValueHandle sourceElement = nullptr;
-    SlangNVVMValueHandle value = nullptr;
+    SlangNVVMValueHandle ordinaryValue = nullptr;
+    SlangNVVMValueHandle invariantValue = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitArrayElementPointer(module.module, destination, index, destinationElement)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitArrayElementPointer(module.module, source, index, sourceElement)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitLoad(module.module, sourceElement, 4, value)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder
+            .emitLoad(module.module, sourceElement, 4, SLANG_NVVM_LOAD_FLAG_NONE, ordinaryValue)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitLoad(
+        module.module,
+        sourceElement,
+        4,
+        SLANG_NVVM_LOAD_FLAG_INVARIANT,
+        invariantValue)));
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitStore(module.module, value, destinationElement, 4)));
+        SLANG_SUCCEEDED(builder.emitStore(module.module, invariantValue, destinationElement, 4)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(module.module, mergeBlock)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, mergeBlock)));
@@ -3805,7 +3854,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
         _countOccurrences(assembly.getUnownedSlice(), toSlice("i32 0, i32 %slangParameter3")) == 2);
     SLANG_CHECK(assembly.indexOf("getelementptr inbounds") < 0);
     SLANG_CHECK(assembly.indexOf("addrspacecast") < 0);
-    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("load i32")) == 1);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("load i32")) == 2);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("!invariant.load")) == 1);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("store i32")) == 1);
 }
 

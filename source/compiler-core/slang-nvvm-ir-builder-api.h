@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 3u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 4u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -64,6 +64,12 @@ extern "C"
     typedef uint32_t SlangNVVMGlobalLinkage;
 #define SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL ((SlangNVVMGlobalLinkage)0u)
 #define SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL ((SlangNVVMGlobalLinkage)1u)
+
+    /** Independent semantic properties of one non-volatile load. */
+    typedef uint32_t SlangNVVMLoadFlags;
+#define SLANG_NVVM_LOAD_FLAG_NONE ((SlangNVVMLoadFlags)0u)
+/** The referenced memory does not change for the duration of the executing program. */
+#define SLANG_NVVM_LOAD_FLAG_INVARIANT ((SlangNVVMLoadFlags)1u << 0)
 
     typedef uint32_t SlangNVVMBuilderInterfaceID;
 #define SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION ((SlangNVVMBuilderInterfaceID)0u)
@@ -223,6 +229,7 @@ extern "C"
             SlangNVVMModuleHandle module,
             SlangNVVMValueHandle pointer,
             uint32_t alignment,
+            SlangNVVMLoadFlags flags,
             SlangNVVMValueHandle* outValue);
         SlangNVVMResult(SLANG_NVVM_CALL* emitStore)(
             SlangNVVMModuleHandle module,

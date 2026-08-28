@@ -4432,6 +4432,37 @@ then performs the inner global scalar load. CUDA 12.9 `ptxas` accepts it for `sm
 builder ABI remains revision 3; no operation names a Slang uniform or parameter block. The full
 Release NVVM prefix passes 339/339.
 
+### Slice 78: Flat constant buffers and immutable-load semantics
+
+The flat scalar parameter-block representation is now a common parameter-group representation.
+An exact `ParameterBlock<T>` or `ConstantBuffer<T>` is accepted when `T` is a nonempty struct of
+selected integer/float32 fields; both lower to an address-space-1 pointer to the same generic
+unpacked element struct. The canonical Slang types remain separate map keys even when LLVM reuses
+the structural pointer type. Nested structs, arrays, matrices, resources, and opaque element fields
+remain exact E52017 boundaries before provider discovery.
+
+Builder ABI revision 4 adds `SlangNVVMLoadFlags` to the existing `emitLoad` callback. The only
+current semantic bit is `SLANG_NVVM_LOAD_FLAG_INVARIANT`; unknown bits fail without mutation. The
+LLVM provider still constructs an ordinary aligned, non-volatile load and attaches
+`!invariant.load` when requested. This is a generic memory-access property rather than a new
+callback or semantic operation named for CUDA `__ldg`, a constant buffer, or a parameter block.
+
+Direct emission uses the existing shared `isPointerToImmutableLocation(getRootAddr(ptr))`
+classification that drives CUDA-source immutable-load lowering. This keeps constant-buffer,
+parameter-block, read-only-resource, access-qualifier, and OptiX SBT policy in one source of truth.
+LLVM's NVPTX backend lowers an invariant load from address space 1 to `ld.global.nc`; immutable
+loads from the compiler-synthesized address-space-4 conventional block remain `ld.const`.
+Ordinary mutable device-pointer reads remain untagged.
+
+`tests/cuda/constant-buffer-ldg.slang` now runs both its CUDA-source check and a direct PTX check.
+The latter declares `SLANG_globalParams[8]`, loads the group pointer with `ld.const.u64`, and reads
+the scalar with `ld.global.nc.u32`. The 3D multidimensional wave shader passes CUDA/NVRTC, direct
+libNVVM, and Vulkan 3/3. CUDA 12.9 `ptxas` accepts both new direct modules for `sm_70`. A probe of
+`noinline.slang` exposed a semantic gap rather than a supported corpus case: direct emission does
+not yet preserve `IRNoInlineDecoration`, so no lane was registered merely because its unoptimized
+helper functions happen to remain. Release host and standalone-provider builds pass, and the
+complete NVVM prefix passes 340/340.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4440,13 +4471,14 @@ The following remain open until their named slice supplies evidence:
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
   global parameter fields beyond selected integer/float32 scalars, flat selected-scalar parameter
-  blocks, selected-scalar read-write structured buffers, and storage-only
+  blocks and constant buffers, selected-scalar read-write structured buffers, and storage-only
   sampler/unsized-sampler-array placeholders, and raw CUDA parameters beyond the selected integer
   and float32 scalars, selected numeric device pointers, fixed i32 array pointers, signed-i32x2
   device pointers, and selected-scalar raw read-write structured buffers;
 - external/indirect calls, richer helper ABI, integer shifts/division/remainder, saturating or
-  overflow-decorated arithmetic, float64/low-precision scalar families, and general vector or
-  matrix operations beyond the bounded signed-i32x2 add proof;
+  overflow-decorated arithmetic, function attributes including no-inline, float64/low-precision
+  scalar families, and general vector or matrix operations beyond the bounded signed-i32x2 add
+  proof;
 - pointer and runtime aggregate addressing beyond signed-i32 scalar offsets on selected numeric
   device pointers and the exact fixed-i32 device-array subset, including other `IRGetElementPtr`
   shapes, array values, structs, general globals, additional shared-memory shapes, and address
