@@ -719,7 +719,6 @@ Sets the target CPU for the LLVM target, enabling the extensions and features of
 Sets a comma-separates list of architecture-specific features for the LLVM targets. 
 
 
-
 <a id="cuda-noinline-threshold"></a>
 ### -cuda-noinline-threshold
 
