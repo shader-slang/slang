@@ -18386,16 +18386,32 @@ struct ArgsWithDirectionInfo
     ParamPassingMode thisArgDirection;
 };
 
+// Applies a resolved primal specialization to the dummy arguments used to validate its derivative.
+static void specializeImaginaryArgumentTypes(
+    ASTBuilder* astBuilder,
+    ArgsWithDirectionInfo& args,
+    DeclRef<FunctionDeclBase> funcDeclRef)
+{
+    SubstitutionSet substitutions(funcDeclRef);
+    for (auto arg : args.args)
+        arg->type.type = substituteType(substitutions, astBuilder, arg->type.type);
+    if (args.thisArg)
+        args.thisArg->type.type =
+            substituteType(substitutions, astBuilder, args.thisArg->type.type);
+}
+
 template<typename TDerivativeAttr>
 void checkDerivativeAttributeImpl(
     SemanticsVisitor* visitor,
-    Decl* funcDecl,
+    DeclRef<FunctionDeclBase> funcDeclRef,
     TDerivativeAttr* attr,
     const List<Expr*>& imaginaryArguments,
     const List<ParamPassingMode>& expectedParamDirections,
     Expr* expectedThisArg,
-    ParamPassingMode expectedThisArgDirection)
+    ParamPassingMode expectedThisArgDirection,
+    bool shouldResolveGenericArguments)
 {
+    auto funcDecl = funcDeclRef.getDecl();
     if (isInterfaceRequirement(funcDecl))
     {
         visitor->getSink()->diagnose(
@@ -18412,7 +18428,8 @@ void checkDerivativeAttributeImpl(
     // If this is a generic, we want to wrap the call to the derivative method
     // with the generic parameters of the source.
     //
-    if (as<GenericDecl>(funcDecl->parentDecl) && !as<GenericAppExpr>(attr->funcExpr))
+    if (shouldResolveGenericArguments && as<GenericDecl>(funcDecl->parentDecl) &&
+        !as<GenericAppExpr>(attr->funcExpr))
     {
         auto genericDecl = as<GenericDecl>(funcDecl->parentDecl);
         auto substArgs = getDefaultSubstitutionArgs(ctx.getASTBuilder(), visitor, genericDecl);
@@ -18620,12 +18637,6 @@ void checkDerivativeAttributeImpl(
 
             if (!derivativeFuncIsStatic)
             {
-                auto defaultFuncDeclRef = createDefaultSubstitutionsIfNeeded(
-                    visitor->getASTBuilder(),
-                    visitor,
-                    makeDeclRef(funcDecl));
-
-                DeclRef<FunctionDeclBase> funcDeclRef = defaultFuncDeclRef.as<FunctionDeclBase>();
                 auto funcThisType = getTypeForThisExpr(visitor, funcDeclRef);
                 DeclRef<FunctionDeclBase> calleeFuncDeclRef =
                     calleeDeclRef->declRef.template as<FunctionDeclBase>();
@@ -18655,7 +18666,8 @@ void checkDerivativeAttributeImpl(
             auto derivativeNextGeneric = visitor->findNextOuterGeneric(
                 visitor->getOuterGenericOrSelf(calleeDeclRef->declRef.getDecl()));
 
-            if ((!originalNextGeneric) != (!derivativeNextGeneric))
+            if (shouldResolveGenericArguments &&
+                ((!originalNextGeneric) != (!derivativeNextGeneric)))
             {
                 // Diagnostic for when one is generic and the other is not.
                 visitor->getSink()->diagnose(
@@ -18664,7 +18676,7 @@ void checkDerivativeAttributeImpl(
                 return;
             }
 
-            if (originalNextGeneric != derivativeNextGeneric)
+            if (shouldResolveGenericArguments && originalNextGeneric != derivativeNextGeneric)
             {
                 // If the two generic containers are not the same, but are compatible, we can
                 // unify them.
@@ -18718,6 +18730,33 @@ error:;
     visitor->getSink()->diagnose(Diagnostics::CustomDerivativeSignatureMismatch{
         .expectedSignature = builder.produceString(),
         .attr = attr->loc});
+}
+
+// Checks a forward-placement derivative using the primal's ordinary generic context.
+template<typename TDerivativeAttr>
+void checkDerivativeAttributeImpl(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* funcDecl,
+    TDerivativeAttr* attr,
+    const List<Expr*>& imaginaryArguments,
+    const List<ParamPassingMode>& expectedParamDirections,
+    Expr* expectedThisArg,
+    ParamPassingMode expectedThisArgDirection)
+{
+    auto funcDeclRef = createDefaultSubstitutionsIfNeeded(
+                           visitor->getASTBuilder(),
+                           visitor,
+                           funcDecl->getDefaultDeclRef())
+                           .as<FunctionDeclBase>();
+    checkDerivativeAttributeImpl(
+        visitor,
+        funcDeclRef,
+        attr,
+        imaginaryArguments,
+        expectedParamDirections,
+        expectedThisArg,
+        expectedThisArgDirection,
+        true);
 }
 
 template<typename TDerivativeAttr>
@@ -18979,6 +19018,14 @@ static void checkDerivativeAttribute(
     FunctionDeclBase* funcDecl,
     ForwardDerivativeAttribute* attr);
 
+// Checks an inverse-placement derivative against the primal specialization selected from its
+// signature, and emits a conditional extension for that specialization.
+static void checkDerivativeAttribute(
+    SemanticsVisitor* visitor,
+    DeclRef<FunctionDeclBase> primalDeclRef,
+    FunctionDeclBase* derivativeFuncDecl,
+    ForwardDerivativeAttribute* attr);
+
 static void checkDerivativeAttribute(
     SemanticsVisitor* visitor,
     FunctionDeclBase* funcDecl,
@@ -19113,12 +19160,27 @@ void checkDerivativeOfAttributeImpl(
     derivativeOfAttr->funcExpr = calleeDeclRefExpr;
     auto derivativeAttr = astBuilder->create<TDerivativeAttr>();
     derivativeAttr->loc = derivativeOfAttr->loc;
-    auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
-    auto declRef = makeDeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl));
+    DeclRef<Decl> declRef;
+    if constexpr (std::is_same_v<TDerivativeAttr, ForwardDerivativeAttribute>)
+    {
+        // Higher-order overload resolution expressed the selected primal specialization in the
+        // derivative's generic context. Form the corresponding specialized reference to the
+        // derivative itself instead of rebuilding an application from the primal's raw generic
+        // declaration.
+        declRef = createDefaultSubstitutionsIfNeeded(
+            astBuilder,
+            visitor,
+            funcDecl->getDefaultDeclRef());
+    }
+    else
+    {
+        auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
+        declRef = makeDeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl));
 
-    // If both the derivative and the original function are defined in the same outer generic
-    // aggregate type, we want to form a full declref with default arguments.
-    declRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, declRef);
+        // If both the derivative and the original function are defined in the same outer generic
+        // aggregate type, we want to form a full declref with default arguments.
+        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, declRef);
+    }
 
     auto declRefExpr = visitor->ConstructDeclRefExpr(
         declRef,
@@ -19129,7 +19191,18 @@ void checkDerivativeOfAttributeImpl(
     declRefExpr->type.type = nullptr;
     derivativeAttr->args.add(declRefExpr);
     derivativeAttr->funcExpr = declRefExpr;
-    checkDerivativeAttribute(visitor, calleeFunc, derivativeAttr);
+    if constexpr (std::is_same_v<TDerivativeAttr, ForwardDerivativeAttribute>)
+    {
+        checkDerivativeAttribute(
+            visitor,
+            calleeDeclRef.as<FunctionDeclBase>(),
+            funcDecl,
+            derivativeAttr);
+    }
+    else
+    {
+        checkDerivativeAttribute(visitor, calleeFunc, derivativeAttr);
+    }
     derivativeOfAttr->backDeclRef = derivativeAttr->funcExpr;
     derivativeAttr->funcExpr = nullptr;
     visitor->getShared()->registerAssociatedDecl(calleeDeclRef.getDecl(), assocKind, funcDecl);
@@ -19138,7 +19211,8 @@ void checkDerivativeOfAttributeImpl(
 
 static void translateFwdDerivativeAttributeToAD2(
     SemanticsVisitor* visitor,
-    FunctionDeclBase* funcDecl,
+    FunctionDeclBase* extensionContextFuncDecl,
+    DeclRef<FunctionDeclBase> primalDeclRef,
     ForwardDerivativeAttribute* attr)
 {
     //
@@ -19151,16 +19225,14 @@ static void translateFwdDerivativeAttributeToAD2(
     //
     auto astBuilder = visitor->getASTBuilder();
     auto fwdDiffExtension = astBuilder->create<ExtensionDecl>();
-    auto funcDeclRef = funcDecl->getDefaultDeclRef();
-    funcDeclRef = createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), visitor, funcDeclRef);
-    auto funcAsType = DeclRefType::create(astBuilder, funcDeclRef);
+    auto funcAsType = DeclRefType::create(astBuilder, primalDeclRef);
     auto userDefinedFwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef.as<CallableDecl>();
     auto visibility = getMoreRestrictiveVisibility(
-        getDeclVisibility(funcDecl),
+        getDeclVisibility(primalDeclRef.getDecl()),
         getDeclVisibility(userDefinedFwdDiffFunc.getDecl()));
     auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
 
-    fwdDiffExtension->parentDecl = funcDecl;
+    fwdDiffExtension->parentDecl = extensionContextFuncDecl;
     fwdDiffExtension->loc = attr->loc;
     fwdDiffExtension->nameAndLoc.loc = attr->loc;
     visitor->addVisibilityModifier(fwdDiffExtension, synthesizedVisibility.extensionVisibility);
@@ -19203,8 +19275,21 @@ static void translateFwdDerivativeAttributeToAD2(
         outermostFwdDiffDecl = outermostFwdDiffDecl->parentDecl;
     }
 
-    getModuleDecl(funcDecl)->addMember(outermostFwdDiffDecl);
+    getModuleDecl(extensionContextFuncDecl)->addMember(outermostFwdDiffDecl);
     // End AD 2.0 translation
+}
+
+static void translateFwdDerivativeAttributeToAD2(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* funcDecl,
+    ForwardDerivativeAttribute* attr)
+{
+    auto funcDeclRef = createDefaultSubstitutionsIfNeeded(
+                           getCurrentASTBuilder(),
+                           visitor,
+                           funcDecl->getDefaultDeclRef())
+                           .as<FunctionDeclBase>();
+    translateFwdDerivativeAttributeToAD2(visitor, funcDecl, funcDeclRef, attr);
 }
 
 static void translateBwdDerivativeAttributeToAD2(
@@ -19308,6 +19393,46 @@ static void translateBwdDerivativeAttributeToAD2(
         true,
         synthesizedVisibility.memberVisibility,
         attr->loc);
+}
+
+static void checkDerivativeAttribute(
+    SemanticsVisitor* visitor,
+    DeclRef<FunctionDeclBase> primalDeclRef,
+    FunctionDeclBase* derivativeFuncDecl,
+    ForwardDerivativeAttribute* attr)
+{
+    if (!attr->funcExpr)
+        return;
+    if (attr->funcExpr->type.type)
+        return;
+
+    ArgsWithDirectionInfo imaginaryArguments =
+        getImaginaryArgsToForwardDerivative(visitor, primalDeclRef.getDecl(), attr->loc);
+    specializeImaginaryArgumentTypes(
+        visitor->getASTBuilder(),
+        imaginaryArguments,
+        primalDeclRef);
+    checkDerivativeAttributeImpl(
+        visitor,
+        primalDeclRef,
+        attr,
+        imaginaryArguments.args,
+        imaginaryArguments.directions,
+        imaginaryArguments.thisArg,
+        imaginaryArguments.thisArgDirection,
+        false);
+
+    if (!as<DeclRefExpr>(attr->funcExpr))
+    {
+        // If the funcExpr did not resolve to a declRefExpr, we can't do anything.
+        return;
+    }
+
+    translateFwdDerivativeAttributeToAD2(
+        visitor,
+        derivativeFuncDecl,
+        primalDeclRef,
+        attr);
 }
 
 static void checkDerivativeAttribute(
