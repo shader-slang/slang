@@ -233,9 +233,9 @@ struct NVVMByteAddressAccess
     bool isStore = false;
 };
 
-// Resolves the canonical core UInt/UInt2-4 byte-address load and store family. A zero or omitted
-// alignment carries the ordinary four-byte contract; an explicit alignment is a power-of-two
-// promise that can be forwarded unchanged to LLVM.
+// Resolves the canonical 32-bit numeric scalar/vector byte-address load and store family. A zero or
+// omitted alignment carries the ordinary four-byte contract; an explicit alignment is a
+// power-of-two promise that can be forwarded unchanged to LLVM.
 bool _getNVVMByteAddressAccess(IRInst* inst, NVVMByteAddressAccess& outAccess)
 {
     outAccess = {};
@@ -259,7 +259,7 @@ bool _getNVVMByteAddressAccess(IRInst* inst, NVVMByteAddressAccess& outAccess)
     IRType* valueType = isStore && value ? value->getDataType() : inst->getDataType();
     NVVMRawBufferType bufferType;
     if (!buffer || !byteOffset || !isNVVMUnsignedI32Type(byteOffset->getDataType()) || !valueType ||
-        !isNVVMSupportedCoreByteAddressValueType(valueType) ||
+        !isNVVMSupported32BitNumericValueType(valueType) ||
         !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
         bufferType.kind != NVVMRawBufferKind::ByteAddress ||
         (isStore && (bufferType.access != NVVMBufferAccess::ReadWrite ||
@@ -400,7 +400,7 @@ struct NVVMVectorElement
     uint32_t index = 0;
 };
 
-// Resolves an exact constant-index scalar read from one accepted integer vector.
+// Resolves an exact constant-index scalar read from one accepted 32-bit numeric vector.
 bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
 {
     outElement = {};
@@ -425,9 +425,8 @@ bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
     }
 
     uint32_t baseElementCount = 0;
-    auto baseType = asNVVMSupportedI32VectorType(
+    auto baseType = asNVVMSupported32BitNumericVectorType(
         base ? base->getDataType() : nullptr,
-        nullptr,
         &baseElementCount);
     if (!baseType || !isTypeEqual(inst->getDataType(), baseType->getElementType()) ||
         !elementIndex || elementIndex->getValue() < 0 ||
@@ -455,13 +454,13 @@ struct NVVMVectorConstruction
 };
 
 // Resolves the canonical flat constructor, scalar splat, or multi-lane swizzle of one accepted
-// integer vector. Every output lane retains its exact scalar value or base/index source.
+// numeric vector. Every output lane retains its exact scalar value or base/index source.
 bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstruction)
 {
     outConstruction = {};
     uint32_t elementCount = 0;
     auto resultType =
-        asNVVMSupportedI32VectorType(inst ? inst->getDataType() : nullptr, nullptr, &elementCount);
+        asNVVMSupported32BitNumericVectorType(inst ? inst->getDataType() : nullptr, &elementCount);
     if (!resultType)
         return false;
 
@@ -491,9 +490,8 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
     {
         IRInst* base = swizzle->getBase();
         uint32_t baseElementCount = 0;
-        auto baseType = asNVVMSupportedI32VectorType(
+        auto baseType = asNVVMSupported32BitNumericVectorType(
             base ? base->getDataType() : nullptr,
-            nullptr,
             &baseElementCount);
         if (!baseType || swizzle->getElementCount() != elementCount ||
             !isTypeEqual(baseType->getElementType(), resultType->getElementType()))
@@ -1242,7 +1240,7 @@ SlangResult _validateScalarValue(
     return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar value"));
 }
 
-// Checks a selected scalar or one of the fixed integer-vector roles admitted by preflight.
+// Checks a selected scalar or one of the fixed numeric-vector roles admitted by preflight.
 SlangResult _validateNumericValue(
     CodeGenContext* codeGenContext,
     IRInst* value,
@@ -1250,7 +1248,7 @@ SlangResult _validateNumericValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (value && asNVVMSupportedI32VectorType(value->getDataType()))
+    if (value && asNVVMSupported32BitNumericVectorType(value->getDataType()))
         return _validateAvailableValue(
             codeGenContext,
             value,
@@ -1771,7 +1769,7 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("32-bit integer vector operation"));
+                            toSlice("32-bit numeric vector operation"));
                     }
                 }
                 break;
@@ -2086,7 +2084,7 @@ SlangResult _validateNVVMFunction(
                             const NVVMVectorConstructElement& source = construction.elements[i];
                             if (source.value)
                             {
-                                SLANG_RETURN_ON_FAIL(_validateSelectedIntegerValue(
+                                SLANG_RETURN_ON_FAIL(_validateScalarValue(
                                     codeGenContext,
                                     source.value,
                                     inst,
@@ -3353,7 +3351,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             SlangNVVMValueHandle loweredValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                "integer vector element extraction",
+                                "numeric vector element extraction",
                                 builder.emitVectorElementExtract(
                                     moduleScope.module,
                                     loweredBase,
@@ -3392,7 +3390,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     loweredBase));
                                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                     codeGenContext,
-                                    "integer vector swizzle extraction",
+                                    "numeric vector swizzle extraction",
                                     builder.emitVectorElementExtract(
                                         moduleScope.module,
                                         loweredBase,
@@ -3408,7 +3406,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "integer vector construction",
+                            "numeric vector construction",
                             builder.emitVectorConstruct(
                                 moduleScope.module,
                                 loweredResultType,

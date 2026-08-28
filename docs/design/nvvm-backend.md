@@ -4597,7 +4597,8 @@ byte GEP, and casts to the requested typed pointer. This single operation covers
 pointees without recovering byte offsets from element arithmetic or encoding Slang resource kinds
 in the provider.
 
-The direct emitter accepts canonical unsigned `uint`, `uint2`, `uint3`, and `uint4` loads from
+At the end of Slice 83, the direct emitter accepted canonical unsigned `uint`, `uint2`, `uint3`,
+and `uint4` loads from
 read-only or read-write byte-address views and stores to read-write views. It extracts field zero of
 the established `{ uint addrspace(1)*, i64 }` view, applies the byte offset, and uses the ordinary
 typed load or store operation. Read-only loads receive `!invariant.load`; read-write loads do not.
@@ -4626,8 +4627,47 @@ views plus its direct PTX lane 3/3, producing the established four output values
 non-coherent global reads for the read-only view and a global scalar store; CUDA 12.9
 `ptxas -arch=sm_70` accepts both variants. Float, signed, narrow/wide, aggregate, matrix, status,
 atomic, and runtime-alignment byte-address accesses remain outside this core family and fail before
-provider discovery. Release host and isolated-provider builds pass, and the complete NVVM unit
-prefix passes 353/353.
+provider discovery at that slice boundary. Release host and isolated-provider builds pass, and the
+complete NVVM unit prefix passes 353/353.
+
+### Slice 84: Selected numeric vectors and Float byte-address access
+
+The ordinary vector value boundary now accepts exact two- through four-lane vectors whose element
+is canonical Int, UInt, or Float. One selected 32-bit numeric-vector classifier owns that mapping;
+the narrower integer classifier remains only where signedness or integer operation semantics are
+actually required. Canonical flat construction, scalar splat, constant extraction, and swizzle all
+reuse ABI revision 8's existing generic vector constructor/extractor. The real LLVM provider was
+already element-type generic, so this slice changes no facade callback, provider code, ABI
+revision, or compatible-text rewrite.
+
+Core byte-address access uses the same selected numeric boundary. Exact Int, UInt, and Float
+scalars or two- through four-lane vectors select the requested pointee after Slice 83's generic byte
+GEP, then reuse the ordinary aligned load/store operations. Resource access still solely controls
+invariant-load policy. Aggregate, matrix, Boolean, narrow, 64-bit, status, atomic, and runtime
+alignment shapes remain pre-provider boundaries.
+
+Consider the alignment-4 operation in
+`tests/compute/byte-address-buffer-aligned.slang`:
+
+```slang
+buffer0.StoreAligned(32, buffer0.LoadAligned<float4>(8, 4));
+```
+
+Target legalization emits four canonical Float byte loads, one Float4 constructor, and a Float4
+store. The opposite wide-load/scalar-store case produces constant Float4 extractions and four Float
+stores. The focused fake trace crosses the uses so optimization cannot erase either value boundary:
+it observes one Float4 construction, five Float extracts, two Float4 byte pointers, eight Float
+byte pointers, two signed-i32 byte pointers, and the exact resulting loads/stores. Fake vector
+identity now includes both element kind and lane count; an extracted Float lane therefore cannot
+accidentally satisfy an integer consumer.
+
+The existing aligned shader and the Float3 regression each pass a direct-libNVVM GPU lane and a
+direct PTX lane, 4/4 together. The aligned fixture now allocates the full 48 bytes its pre-existing
+operations touch. Its optimized PTX retains four `ld.global.f32` and four `st.global.f32`
+instructions. The Float3 shader returns `2.0, 3.0, 4.0`; PTX exposes their exact IEEE-754 constants,
+raw-buffer stores, and typed Float output. CUDA 12.9.86 `ptxas -arch=sm_70` accepts both modules.
+UInt64 byte access remains a focused E52017 control before provider discovery. Final build and unit
+The Release host and isolated-provider builds pass, and the complete NVVM prefix passes 354/354.
 
 The following remain open until their named slice supplies evidence:
 
@@ -4646,8 +4686,8 @@ The following remain open until their named slice supplies evidence:
 - external/indirect calls, richer helper ABI, calling conventions and function attributes beyond
   no-inline, integer shifts/division/remainder, saturating or overflow-decorated arithmetic,
   float64/low-precision scalar families, and vector or matrix operations beyond bounded
-  signed/unsigned i32x2-i32x4 construction, extraction, established wrapping arithmetic, and
-  same-lane integer conversion;
+  signed/unsigned i32x2-i32x4 plus Float2-Float4 construction/extraction, established integer
+  wrapping arithmetic, and same-lane integer conversion;
 - pointer and runtime aggregate addressing beyond signed-i32 scalar offsets on selected numeric
   device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a flat
   by-value entry struct, plus direct scalar indexing of canonical structured/byte-address data

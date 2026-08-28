@@ -30,17 +30,22 @@ bool isNVVMFloat32Type(IRInst* type);
 /// Returns whether `type` is the canonical Boolean result produced by an accepted comparison.
 bool isNVVMBoolType(IRInst* type);
 
+/// Returns an exact two- through four-lane 32-bit Int, UInt, or Float vector.
+IRVectorType* asNVVMSupported32BitNumericVectorType(
+    IRInst* type,
+    uint32_t* outElementCount = nullptr);
+
 /// Returns an exact two- through four-lane signed/unsigned 32-bit integer vector.
 IRVectorType* asNVVMSupportedI32VectorType(
     IRInst* type,
     bool* outIsSigned = nullptr,
     uint32_t* outElementCount = nullptr);
 
-/// Returns whether `type` is a selected scalar or established fixed integer vector.
+/// Returns whether `type` is a selected scalar or established fixed numeric vector.
 bool isNVVMSupportedNumericValueType(IRInst* type);
 
-/// Returns whether `type` is a core unsigned 32-bit byte-address scalar or vector value.
-bool isNVVMSupportedCoreByteAddressValueType(IRInst* type);
+/// Returns whether `type` is an exact 32-bit Int, UInt, or Float scalar or vector value.
+bool isNVVMSupported32BitNumericValueType(IRInst* type);
 
 /// Returns an exact nonempty struct whose fields are all selected scalar values.
 IRStructType* asNVVMSupportedScalarStructType(IRInst* type);

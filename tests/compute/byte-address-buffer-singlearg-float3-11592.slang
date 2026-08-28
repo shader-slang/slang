@@ -1,4 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST:SIMPLE(filecheck=CHECK_NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 // Regression for https://github.com/shader-slang/slang/issues/11545.
 //
@@ -31,3 +33,15 @@ void computeMain()
     // CHECK: 4.0
     outputBuffer[2] = v.z;
 }
+
+// The optimizer forwards the three Float constants into the byte-buffer writes. Their exact
+// IEEE-754 bit patterns reach scratch, while the typed output resource receives Float stores.
+// CHECK_NVVM: .visible .const .align 8 .b8 SLANG_globalParams[32]
+// CHECK_NVVM: .visible .entry computeMain()
+// CHECK_NVVM-DAG: mov.u32 {{.*}}, 1073741824
+// CHECK_NVVM-DAG: mov.u32 {{.*}}, 1077936128
+// CHECK_NVVM-DAG: mov.u32 {{.*}}, 1082130432
+// CHECK_NVVM-DAG: st.global.u32
+// CHECK_NVVM-DAG: st.global.u32
+// CHECK_NVVM-DAG: st.global.u32
+// CHECK_NVVM-DAG: st.global.f32
