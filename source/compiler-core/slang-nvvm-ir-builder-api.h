@@ -7,9 +7,11 @@
 #define SLANG_NVVM_BUILDER_ABI_VERSION_1 1u
 #define SLANG_NVVM_BUILDER_ABI_VERSION_2 2u
 #define SLANG_NVVM_BUILDER_ABI_VERSION_3 3u
+#define SLANG_NVVM_BUILDER_ABI_VERSION_4 4u
 #define SLANG_NVVM_BUILDER_GET_API_V1_NAME "slang_getNVVMBuilderAPI_V1"
 #define SLANG_NVVM_BUILDER_GET_API_V2_NAME "slang_getNVVMBuilderAPI_V2"
 #define SLANG_NVVM_BUILDER_GET_API_V3_NAME "slang_getNVVMBuilderAPI_V3"
+#define SLANG_NVVM_BUILDER_GET_API_V4_NAME "slang_getNVVMBuilderAPI_V4"
 
 #if defined(_MSC_VER)
 #define SLANG_NVVM_CALL __stdcall
@@ -923,6 +925,205 @@ extern "C"
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V3)(
         SlangNVVMBuilderAPI_V3* outAPI);
 
+    /** Stable identifiers for independently versioned V4 builder subinterfaces. */
+    typedef uint32_t SlangNVVMBuilderInterfaceID_4;
+#define SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION_4 ((SlangNVVMBuilderInterfaceID_4)0u)
+#define SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION_4 ((SlangNVVMBuilderInterfaceID_4)1u)
+#define SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS_4 ((SlangNVVMBuilderInterfaceID_4)2u)
+
+#define SLANG_NVVM_BUILDER_FOUNDATION_INTERFACE_VERSION_4 1u
+#define SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4 1u
+#define SLANG_NVVM_BUILDER_VALUE_OPERATIONS_INTERFACE_VERSION_4 1u
+
+    /** Semantic value categories used by V4 operation signatures. */
+    typedef uint32_t SlangNVVMValueTypeKind_4;
+#define SLANG_NVVM_VALUE_TYPE_VOID_4 ((SlangNVVMValueTypeKind_4)0u)
+#define SLANG_NVVM_VALUE_TYPE_BOOL_4 ((SlangNVVMValueTypeKind_4)1u)
+#define SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4 ((SlangNVVMValueTypeKind_4)2u)
+#define SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4 ((SlangNVVMValueTypeKind_4)3u)
+#define SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4 ((SlangNVVMValueTypeKind_4)4u)
+
+    /**
+     * Describes one scalar or fixed-vector semantic value type without exposing an LLVM
+     * type.
+     * `laneCount` is one for a scalar. Void uses zero bit width and zero lanes.
+ */
+    typedef struct SlangNVVMValueTypeDesc_4
+    {
+        SlangNVVMValueTypeKind_4 kind;
+        uint32_t bitWidth;
+        uint32_t laneCount;
+        uint32_t reserved;
+    } SlangNVVMValueTypeDesc_4;
+
+    /** Stable semantic value operations accepted by the generic V4 value interface. */
+    typedef uint32_t SlangNVVMValueOperation_4;
+#define SLANG_NVVM_VALUE_OP_ADD_4 ((SlangNVVMValueOperation_4)0u)
+#define SLANG_NVVM_VALUE_OP_SUBTRACT_4 ((SlangNVVMValueOperation_4)1u)
+#define SLANG_NVVM_VALUE_OP_MULTIPLY_4 ((SlangNVVMValueOperation_4)2u)
+#define SLANG_NVVM_VALUE_OP_DIVIDE_4 ((SlangNVVMValueOperation_4)3u)
+#define SLANG_NVVM_VALUE_OP_BIT_AND_4 ((SlangNVVMValueOperation_4)4u)
+#define SLANG_NVVM_VALUE_OP_BIT_OR_4 ((SlangNVVMValueOperation_4)5u)
+#define SLANG_NVVM_VALUE_OP_BIT_XOR_4 ((SlangNVVMValueOperation_4)6u)
+#define SLANG_NVVM_VALUE_OP_BIT_NOT_4 ((SlangNVVMValueOperation_4)7u)
+#define SLANG_NVVM_VALUE_OP_NEGATE_4 ((SlangNVVMValueOperation_4)8u)
+#define SLANG_NVVM_VALUE_OP_EQUAL_4 ((SlangNVVMValueOperation_4)9u)
+#define SLANG_NVVM_VALUE_OP_NOT_EQUAL_4 ((SlangNVVMValueOperation_4)10u)
+#define SLANG_NVVM_VALUE_OP_LESS_THAN_4 ((SlangNVVMValueOperation_4)11u)
+#define SLANG_NVVM_VALUE_OP_GREATER_THAN_4 ((SlangNVVMValueOperation_4)12u)
+#define SLANG_NVVM_VALUE_OP_LESS_EQUAL_4 ((SlangNVVMValueOperation_4)13u)
+#define SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4 ((SlangNVVMValueOperation_4)14u)
+#define SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX_4 ((SlangNVVMValueOperation_4)15u)
+#define SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT_4 ((SlangNVVMValueOperation_4)16u)
+#define SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT_4 ((SlangNVVMValueOperation_4)17u)
+#define SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT_4 ((SlangNVVMValueOperation_4)18u)
+#define SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST_4 ((SlangNVVMValueOperation_4)19u)
+#define SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE_4 ((SlangNVVMValueOperation_4)20u)
+#define SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE_4 ((SlangNVVMValueOperation_4)21u)
+#define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE_4 ((SlangNVVMValueOperation_4)22u)
+#define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL_4 ((SlangNVVMValueOperation_4)23u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT_4 24u
+
+    /**
+     * Describes one complete value-operation overload. The pointed-to operand descriptors
+     * are read
+     * only for the duration of a support or emission call.
+     */
+    typedef struct SlangNVVMValueOperationDesc_4
+    {
+        uint32_t structureSize;
+        SlangNVVMValueOperation_4 operation;
+        SlangNVVMValueTypeDesc_4 resultType;
+        const SlangNVVMValueTypeDesc_4* operandTypes;
+        size_t operandCount;
+    } SlangNVVMValueOperationDesc_4;
+
+    /** Owns module lifetime and verified serialization, independent of IR construction growth. */
+    typedef struct SlangNVVMBuilderFoundationAPI_4
+    {
+        uint32_t structureSize;
+        uint32_t interfaceVersion;
+
+        SlangNVVMResult_1(SLANG_NVVM_CALL* createModule)(
+            const char* moduleName,
+            size_t moduleNameSize,
+            SlangNVVMModuleHandle_1* outModule);
+        void(SLANG_NVVM_CALL* destroyModule)(SlangNVVMModuleHandle_1 module);
+        SlangNVVMSerializeModuleWithDiagnostics_2 serializeModuleWithDiagnostics;
+        SlangNVVMSerializeModuleWithDiagnostics_2 serializeNVVMIR20AssemblyWithDiagnostics;
+    } SlangNVVMBuilderFoundationAPI_4;
+
+    /**
+     * Owns structural IR construction whose argument and ownership shapes are not repeated
+     * scalar
+     * overloads. This first interface version freezes the complete Slice 63
+     * structural surface.
+     */
+    typedef struct SlangNVVMBuilderConstructionAPI_4
+    {
+        uint32_t structureSize;
+        uint32_t interfaceVersion;
+
+        SlangNVVMResult_1(SLANG_NVVM_CALL* getVoidType)(
+            SlangNVVMModuleHandle_1 module,
+            SlangNVVMTypeHandle_1* outType);
+        SlangNVVMGetIntegerType_2 getIntegerType;
+        SlangNVVMGetFloatingPointType_3 getFloatingPointType;
+        SlangNVVMGetPointerType_2 getPointerType;
+        SlangNVVMResult_1(SLANG_NVVM_CALL* getFunctionType)(
+            SlangNVVMModuleHandle_1 module,
+            SlangNVVMTypeHandle_1 resultType,
+            const SlangNVVMTypeHandle_1* parameterTypes,
+            size_t parameterCount,
+            SlangNVVMTypeHandle_1* outType);
+        SlangNVVMGetArrayType_2 getArrayType;
+        SlangNVVMGetRawRWStructuredBufferI32Type_2 getRawRWStructuredBufferI32Type;
+
+        SlangNVVMResult_1(SLANG_NVVM_CALL* declareFunction)(
+            SlangNVVMModuleHandle_1 module,
+            SlangNVVMTypeHandle_1 functionType,
+            const char* name,
+            size_t nameSize,
+            SlangNVVMValueHandle_1* outFunction);
+        SlangNVVMGetFunctionParameter_2 getFunctionParameter;
+        SlangNVVMResult_1(SLANG_NVVM_CALL* createBlock)(
+            SlangNVVMModuleHandle_1 module,
+            SlangNVVMValueHandle_1 function,
+            const char* name,
+            size_t nameSize,
+            SlangNVVMBlockHandle_1* outBlock);
+        SlangNVVMResult_1(SLANG_NVVM_CALL* setInsertBlock)(
+            SlangNVVMModuleHandle_1 module,
+            SlangNVVMBlockHandle_1 block);
+
+        SlangNVVMEmitLoad_2 emitLoad;
+        SlangNVVMEmitStore_2 emitStore;
+        SlangNVVMEmitBranch_2 emitBranch;
+        SlangNVVMEmitConditionalBranch_2 emitConditionalBranch;
+        SlangNVVMGetIntegerConstant_2 getIntegerConstant;
+        SlangNVVMGetFloatingPointConstant_3 getFloatingPointConstant;
+        SlangNVVMEmitPhi_3 emitPhi;
+        SlangNVVMAddPhiIncoming_3 addPhiIncoming;
+        SlangNVVMEmitCall_3 emitCall;
+        SlangNVVMEmitValueReturn_3 emitValueReturn;
+        SlangNVVMResult_1(SLANG_NVVM_CALL* emitReturnVoid)(SlangNVVMModuleHandle_1 module);
+        SlangNVVMEmitPointerOffset_2 emitPointerOffset;
+        SlangNVVMEmitArrayElementPointer_2 emitArrayElementPointer;
+        SlangNVVMEmitRawRWStructuredBufferI32ElementPointer_2
+            emitRawRWStructuredBufferI32ElementPointer;
+        SlangNVVMEmitRelaxedGlobalI32AtomicAdd_2 emitRelaxedGlobalI32AtomicAdd;
+        SlangNVVMResult_1(SLANG_NVVM_CALL* markFunctionAsKernel)(
+            SlangNVVMModuleHandle_1 module,
+            SlangNVVMValueHandle_1 function);
+    } SlangNVVMBuilderConstructionAPI_4;
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMIsValueOperationSupported_4)(
+        const SlangNVVMValueOperationDesc_4* operation,
+        uint32_t* outSupported);
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitValueOperation_4)(
+        SlangNVVMModuleHandle_1 module,
+        const SlangNVVMValueOperationDesc_4* operation,
+        const SlangNVVMValueHandle_1* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle_1* outValue);
+
+    /** Negotiates and emits repeated scalar and target-intrinsic semantics by typed signature. */
+    typedef struct SlangNVVMBuilderValueOperationsAPI_4
+    {
+        uint32_t structureSize;
+        uint32_t interfaceVersion;
+        SlangNVVMIsValueOperationSupported_4 isOperationSupported;
+        SlangNVVMEmitValueOperation_4 emitOperation;
+    } SlangNVVMBuilderValueOperationsAPI_4;
+
+    /** Returns an immutable provider-owned table that lives as long as the loaded provider. */
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMQueryBuilderInterface_4)(
+        SlangNVVMBuilderInterfaceID_4 interfaceID,
+        uint32_t interfaceVersion,
+        const void** outInterface);
+
+    /** Compact V4 root. New semantic families do not append fields to this structure. */
+    typedef struct SlangNVVMBuilderAPI_V4
+    {
+        uint32_t structureSize;
+        uint32_t abiVersion;
+        uint32_t llvmVersionMajor;
+        uint32_t llvmVersionMinor;
+        uint32_t llvmVersionPatch;
+        uint32_t nvvmIRVersionMajor;
+        uint32_t nvvmIRVersionMinor;
+        uint32_t pointerModel;
+        SlangNVVMQueryBuilderInterface_4 queryInterface;
+    } SlangNVVMBuilderAPI_V4;
+
+#define SLANG_NVVM_BUILDER_API_V4_MIN_SIZE              \
+    (offsetof(SlangNVVMBuilderAPI_V4, queryInterface) + \
+     sizeof(((SlangNVVMBuilderAPI_V4*)0)->queryInterface))
+
+    typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V4)(
+        SlangNVVMBuilderAPI_V4* outAPI);
+
     SLANG_NVVM_BUILDER_API SlangNVVMResult_1 SLANG_NVVM_CALL
     slang_getNVVMBuilderAPI_V1(SlangNVVMBuilderAPI_V1* outAPI);
 
@@ -931,6 +1132,9 @@ extern "C"
 
     SLANG_NVVM_BUILDER_API SlangNVVMResult_1 SLANG_NVVM_CALL
     slang_getNVVMBuilderAPI_V3(SlangNVVMBuilderAPI_V3* outAPI);
+
+    SLANG_NVVM_BUILDER_API SlangNVVMResult_1 SLANG_NVVM_CALL
+    slang_getNVVMBuilderAPI_V4(SlangNVVMBuilderAPI_V4* outAPI);
 
 #ifdef __cplusplus
 }

@@ -4,3 +4,4 @@ EXPORTS
     slang_getNVVMBuilderAPI_V1
     slang_getNVVMBuilderAPI_V2
     slang_getNVVMBuilderAPI_V3
+    slang_getNVVMBuilderAPI_V4

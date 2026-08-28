@@ -39,11 +39,18 @@ public:
         ISlangSharedLibrary* library,
         NVVMIRBuilder& outBuilder);
 
+    /// Validates the compact V4 root and its required queried subinterfaces.
+    static SlangResult initialize(
+        const SlangNVVMBuilderAPI_V4& api,
+        ISlangSharedLibrary* library,
+        NVVMIRBuilder& outBuilder);
+
     bool isInitialized() const { return m_api.createModule != nullptr; }
     bool supportsSerializationDiagnostics() const
     {
-        return m_apiV2.structureSize >= SLANG_NVVM_BUILDER_API_V2_MIN_SIZE &&
-               m_apiV2.serializeModuleWithDiagnostics != nullptr;
+        return (m_apiV4.structureSize && m_foundationV4.serializeModuleWithDiagnostics) ||
+               (m_apiV2.structureSize >= SLANG_NVVM_BUILDER_API_V2_MIN_SIZE &&
+                m_apiV2.serializeModuleWithDiagnostics != nullptr);
     }
     /// Returns whether the provider advertised the complete Slice 4 scalar-memory prefix.
     bool supportsScalarOperations() const;
@@ -96,13 +103,41 @@ public:
     /// Returns the locally supported V2 prefix, with `structureSize` clamped to that prefix.
     const SlangNVVMBuilderAPI_V2* getAPIV2() const
     {
-        return supportsSerializationDiagnostics() ? &m_apiV2 : nullptr;
+        return !m_apiV4.structureSize && supportsSerializationDiagnostics() ? &m_apiV2 : nullptr;
     }
     /// Returns the locally supported V3 prefix when the provider was negotiated through V3.
     const SlangNVVMBuilderAPI_V3* getAPIV3() const
     {
         return m_apiV3.structureSize ? &m_apiV3 : nullptr;
     }
+    /// Returns the locally supported V4 root when negotiated through V4.
+    const SlangNVVMBuilderAPI_V4* getAPIV4() const
+    {
+        return m_apiV4.structureSize ? &m_apiV4 : nullptr;
+    }
+    const SlangNVVMBuilderFoundationAPI_4* getFoundationAPIV4() const
+    {
+        return m_apiV4.structureSize ? &m_foundationV4 : nullptr;
+    }
+    const SlangNVVMBuilderConstructionAPI_4* getConstructionAPIV4() const
+    {
+        return m_apiV4.structureSize ? &m_constructionV4 : nullptr;
+    }
+    const SlangNVVMBuilderValueOperationsAPI_4* getValueOperationsAPIV4() const
+    {
+        return m_apiV4.structureSize ? &m_valueOperationsV4 : nullptr;
+    }
+
+    /// Queries one complete typed V4 operation, adapting to V3/V2 when necessary.
+    bool supportsValueOperation(const SlangNVVMValueOperationDesc_4& operation) const;
+
+    /// Emits one complete typed V4 operation, adapting to V3/V2 when necessary.
+    SlangResult emitValueOperation(
+        SlangNVVMModuleHandle_1 module,
+        const SlangNVVMValueOperationDesc_4& operation,
+        const SlangNVVMValueHandle_1* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle_1& outValue) const;
 
     /// Creates a module whose LLVM objects remain owned by the returned module handle.
     SlangResult createModule(
@@ -469,6 +504,10 @@ private:
     SlangNVVMBuilderAPI_V1 m_api = {};
     SlangNVVMBuilderAPI_V2 m_apiV2 = {};
     SlangNVVMBuilderAPI_V3 m_apiV3 = {};
+    SlangNVVMBuilderAPI_V4 m_apiV4 = {};
+    SlangNVVMBuilderFoundationAPI_4 m_foundationV4 = {};
+    SlangNVVMBuilderConstructionAPI_4 m_constructionV4 = {};
+    SlangNVVMBuilderValueOperationsAPI_4 m_valueOperationsV4 = {};
     SlangNVVMBuilderFeatureSet_3 m_features = {};
     ComPtr<ISlangSharedLibrary> m_library;
 };

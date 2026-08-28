@@ -3080,6 +3080,93 @@ names reproduces Slice 62's 411-name hash
 `bea39cafc76c97ab6cb2d31fcc12aa42f41fe9d3d4d324ca296e115cd5d4d3a4` exactly. Debug preservation
 passes 10/10.
 
+### Post-Slice-63 prototype acceleration roadmap
+
+The first 63 slices established strong vertical evidence, but the last wave overloads exposed an
+unacceptable marginal cost. One same-shaped overload currently adds or touches a V3 feature ID, a
+provider operation ID, a feature-to-operation mapping, a complete-signature enum case, provider and
+fake dispatch, and several bespoke test paths. The V3 table also embeds all of V2, and the facade
+retains a wrapper for each historical callback. Continuing that pattern would make the private ABI,
+emitter, and already 27,950-line NVVM test/support surface grow faster than the capability set.
+
+V3 is therefore frozen after Slice 63. V4 will remain an opaque, Slang-owned semantic boundary, but
+its root will contain only version/LLVM/NVVM metadata and a query function for independently
+versioned interfaces. The first queried interfaces separate:
+
+- foundation concerns: module lifetime and verified serialization;
+- structural construction: types, functions, blocks, memory, control flow, SSA, calls, addressing,
+  kernel marking, and the already settled resource/atomic boundaries; and
+- repeated value semantics: operation support and emission described by stable result/operand type
+  roles rather than LLVM objects or enums such as `BoolUIntFloat`.
+
+V4 does not embed V3. The host prefers V4 and uses an explicit V3 adapter only when the V4 export is
+absent; a present malformed higher generation remains authoritative failure. This preserves binary
+compatibility while ensuring new operations and overloads do not add root fields or legacy feature
+bits. Structural actions retain typed APIs where their argument and ownership shapes genuinely
+differ. Repeated scalar, comparison, conversion, and target-intrinsic semantics use typed operation
+descriptors. This is not a second serialized IR and does not expose LLVM opcodes or types.
+
+Slices also become larger. A slice now owns either one architecture boundary plus its complete
+migration and regression evidence, or one coherent capability family culminating in a
+representative workload. The next bounded slices are:
+
+64. introduce the V4 query-root architecture, full provider/facade/fake parity for the established
+    418-test surface, V4-first loading, and tested V3 fallback;
+65. make one declarative typed semantic catalog authoritative and consolidate family tests while
+    preserving the exact registered-name regression ledger;
+66. add the complete ordinary CUDA execution-index/dimension bundle, and synchronization if its
+    independent representation audit passes, with a multi-block runtime workload;
+67. add canonical static shared storage and the aggregate addressing needed by a synchronized
+    block-level workload; and
+68. broaden numeric types, conversions, and fixed vectors through the generic V4 descriptors, with
+    the exact bundle selected by a prevalence and policy audit.
+
+Additional wave intrinsics and advanced NVIDIA features no longer take priority merely because
+they resemble the most recent work. Core execution, memory/address-space composition, and numeric
+breadth unlock more representative CUDA programs and therefore come first. Each completed slice
+still carries its plan, durable design/ledger evidence, formatting, focused and preservation tests,
+real-provider verification, `ptxas`, and runtime parity where the capability is executable.
+
+### Slice 64: V4 query-root builder architecture
+
+Slice 64 freezes V3 and introduces `slang_getNVVMBuilderAPI_V4`. The V4 root is 40 bytes on x64
+and 36 bytes on x86; it contains only ABI and LLVM/NVVM metadata plus one query callback. The
+callback takes a semantic interface family and an explicit requested version, so an old host can
+continue to request a frozen table after a provider learns a newer version. A provider returns
+`SLANG_E_NO_INTERFACE` without an output table for an unknown family or unsupported version.
+
+The first frozen subinterfaces are foundation (40/24 bytes on x64/x86), construction (224/116),
+and value operations (24/16). The foundation table owns module lifetime and both serialization
+forms. The construction table owns actions whose argument or ownership shapes genuinely differ,
+including types, functions, blocks, memory, control flow, SSA, calls, addressing, atomics,
+resources, and kernel marking. The value table has only `isOperationSupported` and
+`emitOperation`. Its 16-byte semantic type descriptor records Boolean/signed-integer/
+unsigned-integer/floating-point kind, bit width, and lane count without exposing LLVM. Its
+40/32-byte operation descriptor supplies one of 24 semantic operation IDs plus the complete result
+and operand signature. Consequently, the three established all-equal overloads share one operation
+ID and differ only by their typed signatures.
+
+The loader resolves V4 first and treats a present malformed V4 export as authoritative failure.
+When V4 is absent it still accepts the immutable V3, V2, and V1 exports. Queried tables are
+provider-owned for the library lifetime, but the host validates and copies each understood prefix.
+The production facade currently synthesizes the established V3 feature view from V4 support so the
+unchanged emitter can migrate without a second lowering policy; Slice 65 will replace that temporary
+compatibility catalog with one declarative source of truth. A bundled feature is advertised only
+when every operation it promises is supported—for example, scalar control flow requires signed-i32
+add, subtract, and less-than as well as the structural callbacks.
+
+The provider DLL exports V1 through V4. Exact layout, query-version rejection, V4-first loading,
+malformed-authoritative behavior, V3 fallback, typed overload support, unknown-operation
+no-mutation, and direct real-provider validation are covered by the builder tests. The registered
+Release NVVM surface grows by one test to 419 names. Its sorted LF-terminated name set has SHA-256
+`c634caa999f2b191c85b37cc7885d39462bcef55406ef64dc04bd1a1d02590c9`; removing the V4 architecture
+test reproduces Slice 63's 418-name hash
+`33720ee2997610b2d1823858e1e80641d44efce3d6b09b37d0271c70ec54c929`. Release passes 419/419,
+including compatible assembly, CUDA 12.9 `ptxas`, and RTX/NVRTC runtime parity. A focused Debug
+preservation sample passes 10/10 with unrelated graphics API detection disabled. The five NVVM
+test/support files grow by 558 measured lines, from 27,950 to 28,508; consolidation is deliberately
+the next slice rather than mixed into the ABI migration.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -3213,8 +3300,22 @@ The program advances through bounded slices:
 52. public unmasked UInt wave-read-lane-at through composition of active mask and masked shuffle;
 53. public unmasked Int wave-read-lane-at plus parameterized composition evidence;
 54. thin public unmasked Float wave-read-lane-at composition evidence;
-55. remaining wave operations and other advanced capabilities, then production-readiness
-    evaluation.
+55. public unsigned-i32 wave-read-lane-first composition;
+56. public signed-i32 wave-read-lane-first composition;
+57. public float32 wave-read-lane-first composition;
+58. public wave-is-first-lane and Boolean helper results;
+59. public wave-active-any-true and Boolean helper parameters;
+60. public wave-active-all-true through the shared vote family;
+61. public signed-i32 wave-active-all-equal and native aggregate adaptation;
+62. unsigned-i32 load admission and public wave-active-all-equal;
+63. float32 wave-active-all-equal and provider-private b32 adaptation;
+64. the V4 query-root builder architecture and full established-capability parity;
+65. declarative semantic catalogs and consolidated family tests;
+66. the core CUDA execution-index/dimension bundle and audited synchronization;
+67. shared memory and aggregate addressing through a representative block workload;
+68. prioritized numeric widths, conversions, and fixed-vector breadth; and
+69. further capability work selected from measured workload blockers, followed by
+    production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.

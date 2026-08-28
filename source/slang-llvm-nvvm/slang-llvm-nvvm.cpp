@@ -2256,6 +2256,454 @@ static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
     api.emitIntrinsic = _emitIntrinsicV3;
 }
 
+static bool _isValueTypeV4(
+    const SlangNVVMValueTypeDesc_4& type,
+    SlangNVVMValueTypeKind_4 kind,
+    uint32_t bitWidth)
+{
+    return type.kind == kind && type.bitWidth == bitWidth && type.laneCount == 1 &&
+           type.reserved == 0;
+}
+
+static bool _isSameValueTypeV4(
+    const SlangNVVMValueTypeDesc_4& left,
+    const SlangNVVMValueTypeDesc_4& right)
+{
+    return left.kind == right.kind && left.bitWidth == right.bitWidth &&
+           left.laneCount == right.laneCount && left.reserved == right.reserved;
+}
+
+static bool _isBoolV4(const SlangNVVMValueTypeDesc_4& type)
+{
+    return _isValueTypeV4(type, SLANG_NVVM_VALUE_TYPE_BOOL_4, 1);
+}
+
+static bool _isSignedI32V4(const SlangNVVMValueTypeDesc_4& type)
+{
+    return _isValueTypeV4(type, SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4, 32);
+}
+
+static bool _isUnsignedI32V4(const SlangNVVMValueTypeDesc_4& type)
+{
+    return _isValueTypeV4(type, SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4, 32);
+}
+
+static bool _isFloat32V4(const SlangNVVMValueTypeDesc_4& type)
+{
+    return _isValueTypeV4(type, SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4, 32);
+}
+
+static bool _isEstablishedWavePayloadV4(const SlangNVVMValueTypeDesc_4& type)
+{
+    return _isSignedI32V4(type) || _isUnsignedI32V4(type) || _isFloat32V4(type);
+}
+
+// Validates one complete semantic overload without consulting or exposing LLVM types.
+static bool _isValueOperationSupportedV4(const SlangNVVMValueOperationDesc_4& desc)
+{
+    if (desc.structureSize != sizeof(desc) || (!desc.operandTypes && desc.operandCount))
+        return false;
+
+    const SlangNVVMValueTypeDesc_4* operands = desc.operandTypes;
+    switch (desc.operation)
+    {
+    case SLANG_NVVM_VALUE_OP_ADD_4:
+    case SLANG_NVVM_VALUE_OP_SUBTRACT_4:
+    case SLANG_NVVM_VALUE_OP_MULTIPLY_4:
+        return desc.operandCount == 2 &&
+               (_isSignedI32V4(desc.resultType) || _isFloat32V4(desc.resultType)) &&
+               _isSameValueTypeV4(desc.resultType, operands[0]) &&
+               _isSameValueTypeV4(desc.resultType, operands[1]);
+    case SLANG_NVVM_VALUE_OP_DIVIDE_4:
+        return desc.operandCount == 2 && _isFloat32V4(desc.resultType) &&
+               _isFloat32V4(operands[0]) && _isFloat32V4(operands[1]);
+    case SLANG_NVVM_VALUE_OP_BIT_AND_4:
+    case SLANG_NVVM_VALUE_OP_BIT_OR_4:
+    case SLANG_NVVM_VALUE_OP_BIT_XOR_4:
+        return desc.operandCount == 2 && _isSignedI32V4(desc.resultType) &&
+               _isSignedI32V4(operands[0]) && _isSignedI32V4(operands[1]);
+    case SLANG_NVVM_VALUE_OP_BIT_NOT_4:
+        return desc.operandCount == 1 && _isSignedI32V4(desc.resultType) &&
+               _isSignedI32V4(operands[0]);
+    case SLANG_NVVM_VALUE_OP_NEGATE_4:
+        return desc.operandCount == 1 &&
+               (_isSignedI32V4(desc.resultType) || _isFloat32V4(desc.resultType)) &&
+               _isSameValueTypeV4(desc.resultType, operands[0]);
+    case SLANG_NVVM_VALUE_OP_EQUAL_4:
+    case SLANG_NVVM_VALUE_OP_NOT_EQUAL_4:
+    case SLANG_NVVM_VALUE_OP_LESS_THAN_4:
+    case SLANG_NVVM_VALUE_OP_GREATER_THAN_4:
+    case SLANG_NVVM_VALUE_OP_LESS_EQUAL_4:
+    case SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4:
+        return desc.operandCount == 2 && _isBoolV4(desc.resultType) &&
+               (_isSignedI32V4(operands[0]) || _isFloat32V4(operands[0])) &&
+               _isSameValueTypeV4(operands[0], operands[1]);
+    case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX_4:
+    case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT_4:
+        return desc.operandCount == 0 && _isUnsignedI32V4(desc.resultType);
+    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT_4:
+        return desc.operandCount == 3 && _isEstablishedWavePayloadV4(desc.resultType) &&
+               _isUnsignedI32V4(operands[0]) && _isSameValueTypeV4(desc.resultType, operands[1]) &&
+               _isSignedI32V4(operands[2]);
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT_4:
+        return desc.operandCount == 2 && _isUnsignedI32V4(desc.resultType) &&
+               _isUnsignedI32V4(operands[0]) && _isBoolV4(operands[1]);
+    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST_4:
+        return desc.operandCount == 2 && _isEstablishedWavePayloadV4(desc.resultType) &&
+               _isUnsignedI32V4(operands[0]) && _isSameValueTypeV4(desc.resultType, operands[1]);
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE_4:
+        return desc.operandCount == 1 && _isBoolV4(desc.resultType) &&
+               _isUnsignedI32V4(operands[0]);
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE_4:
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE_4:
+        return desc.operandCount == 2 && _isBoolV4(desc.resultType) &&
+               _isUnsignedI32V4(operands[0]) && _isBoolV4(operands[1]);
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL_4:
+        return desc.operandCount == 2 && _isBoolV4(desc.resultType) &&
+               _isUnsignedI32V4(operands[0]) && _isEstablishedWavePayloadV4(operands[1]);
+    default:
+        return false;
+    }
+}
+
+static SlangResult SLANG_NVVM_CALL
+_isOperationSupportedV4(const SlangNVVMValueOperationDesc_4* operation, uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!operation || !outSupported || operation->structureSize != sizeof(*operation) ||
+        (!operation->operandTypes && operation->operandCount))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+    *outSupported = _isValueOperationSupportedV4(*operation) ? 1u : 0u;
+    return SLANG_OK;
+}
+
+static SlangResult _emitScalarOperationV4(
+    SlangNVVMModuleHandle_1 module,
+    const SlangNVVMValueOperationDesc_4& desc,
+    const SlangNVVMValueHandle_1* operands,
+    SlangNVVMValueHandle_1* outValue)
+{
+    const bool isFloat = _isFloat32V4(desc.operandTypes[0]);
+    switch (desc.operation)
+    {
+    case SLANG_NVVM_VALUE_OP_ADD_4:
+        return isFloat ? _emitFloatingBinaryV3(
+                             module,
+                             SLANG_NVVM_FLOATING_BINARY_OP_ADD,
+                             operands[0],
+                             operands[1],
+                             outValue)
+                       : _emitIntegerBinaryV3(
+                             module,
+                             SLANG_NVVM_INTEGER_BINARY_OP_3_ADD,
+                             operands[0],
+                             operands[1],
+                             outValue);
+    case SLANG_NVVM_VALUE_OP_SUBTRACT_4:
+        return isFloat ? _emitFloatingBinaryV3(
+                             module,
+                             SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT,
+                             operands[0],
+                             operands[1],
+                             outValue)
+                       : _emitIntegerBinaryV3(
+                             module,
+                             SLANG_NVVM_INTEGER_BINARY_OP_3_SUB,
+                             operands[0],
+                             operands[1],
+                             outValue);
+    case SLANG_NVVM_VALUE_OP_MULTIPLY_4:
+        return isFloat ? _emitFloatingBinaryV3(
+                             module,
+                             SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY,
+                             operands[0],
+                             operands[1],
+                             outValue)
+                       : _emitIntegerBinaryV3(
+                             module,
+                             SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY,
+                             operands[0],
+                             operands[1],
+                             outValue);
+    case SLANG_NVVM_VALUE_OP_DIVIDE_4:
+        return _emitFloatingBinaryV3(
+            module,
+            SLANG_NVVM_FLOATING_BINARY_OP_DIVIDE,
+            operands[0],
+            operands[1],
+            outValue);
+    case SLANG_NVVM_VALUE_OP_BIT_AND_4:
+    case SLANG_NVVM_VALUE_OP_BIT_OR_4:
+    case SLANG_NVVM_VALUE_OP_BIT_XOR_4:
+        {
+            const SlangNVVMIntegerBinaryOp_3 operation =
+                desc.operation == SLANG_NVVM_VALUE_OP_BIT_AND_4
+                    ? SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_AND
+                : desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR_4
+                    ? SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_OR
+                    : SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_XOR;
+            return _emitIntegerBinaryV3(module, operation, operands[0], operands[1], outValue);
+        }
+    case SLANG_NVVM_VALUE_OP_BIT_NOT_4:
+        return _emitIntegerUnaryV3(
+            module,
+            SLANG_NVVM_INTEGER_UNARY_OP_BIT_NOT,
+            operands[0],
+            outValue);
+    case SLANG_NVVM_VALUE_OP_NEGATE_4:
+        return isFloat ? _emitFloatingUnaryV3(
+                             module,
+                             SLANG_NVVM_FLOATING_UNARY_OP_NEGATE,
+                             operands[0],
+                             outValue)
+                       : _emitIntegerUnaryV3(
+                             module,
+                             SLANG_NVVM_INTEGER_UNARY_OP_NEGATE,
+                             operands[0],
+                             outValue);
+    default:
+        break;
+    }
+
+    if (isFloat)
+    {
+        SlangNVVMFloatingCompareOp_3 operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL;
+        switch (desc.operation)
+        {
+        case SLANG_NVVM_VALUE_OP_EQUAL_4:
+            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL;
+            break;
+        case SLANG_NVVM_VALUE_OP_NOT_EQUAL_4:
+            operation = SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL;
+            break;
+        case SLANG_NVVM_VALUE_OP_LESS_THAN_4:
+            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_LESS_THAN;
+            break;
+        case SLANG_NVVM_VALUE_OP_GREATER_THAN_4:
+            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_THAN;
+            break;
+        case SLANG_NVVM_VALUE_OP_LESS_EQUAL_4:
+            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_LESS_EQUAL;
+            break;
+        case SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4:
+            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_EQUAL;
+            break;
+        default:
+            return SLANG_E_INVALID_ARG;
+        }
+        return _emitFloatingCompareV3(module, operation, operands[0], operands[1], outValue);
+    }
+
+    SlangNVVMIntegerCompareOp_3 operation = SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL;
+    switch (desc.operation)
+    {
+    case SLANG_NVVM_VALUE_OP_EQUAL_4:
+        operation = SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL;
+        break;
+    case SLANG_NVVM_VALUE_OP_NOT_EQUAL_4:
+        operation = SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL;
+        break;
+    case SLANG_NVVM_VALUE_OP_LESS_THAN_4:
+        operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_THAN;
+        break;
+    case SLANG_NVVM_VALUE_OP_GREATER_THAN_4:
+        operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN;
+        break;
+    case SLANG_NVVM_VALUE_OP_LESS_EQUAL_4:
+        operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_EQUAL;
+        break;
+    case SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4:
+        operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_EQUAL;
+        break;
+    default:
+        return SLANG_E_INVALID_ARG;
+    }
+    return _emitIntegerCompareV3(module, operation, operands[0], operands[1], outValue);
+}
+
+static SlangNVVMIntrinsicOp_3 _getIntrinsicOperationV3(const SlangNVVMValueOperationDesc_4& desc)
+{
+    switch (desc.operation)
+    {
+    case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX_4:
+        return SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX;
+    case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT_4:
+        return SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_COUNT;
+    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT_4:
+        return _isFloat32V4(desc.resultType)       ? SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_FLOAT
+               : _isUnsignedI32V4(desc.resultType) ? SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT
+                                                   : SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT;
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT_4:
+        return SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT;
+    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST_4:
+        return _isFloat32V4(desc.resultType) ? SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT
+               : _isUnsignedI32V4(desc.resultType)
+                   ? SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT
+                   : SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_INT;
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE_4:
+        return SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_IS_FIRST_LANE;
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE_4:
+        return SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ANY_TRUE;
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE_4:
+        return SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_TRUE;
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL_4:
+        return _isFloat32V4(desc.operandTypes[1])
+                   ? SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_FLOAT
+               : _isUnsignedI32V4(desc.operandTypes[1])
+                   ? SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_UINT
+                   : SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT;
+    default:
+        return ~SlangNVVMIntrinsicOp_3(0);
+    }
+}
+
+static SlangResult SLANG_NVVM_CALL _emitOperationV4(
+    SlangNVVMModuleHandle_1 module,
+    const SlangNVVMValueOperationDesc_4* operation,
+    const SlangNVVMValueHandle_1* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle_1* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    if (!operation || !outValue || operation->structureSize != sizeof(*operation) ||
+        operation->operandCount != operandCount || (!operands && operandCount) ||
+        !_isValueOperationSupportedV4(*operation))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    if (operation->operation < SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX_4)
+        return _emitScalarOperationV4(module, *operation, operands, outValue);
+
+    const SlangNVVMIntrinsicOp_3 intrinsicOperation = _getIntrinsicOperationV3(*operation);
+    if (intrinsicOperation == ~SlangNVVMIntrinsicOp_3(0))
+        return SLANG_E_INVALID_ARG;
+    return _emitIntrinsicV3(module, intrinsicOperation, operands, operandCount, outValue);
+}
+
+static void _fillBuilderFoundationAPIV4(SlangNVVMBuilderFoundationAPI_4& api)
+{
+    api = {};
+    api.structureSize = uint32_t(sizeof(api));
+    api.interfaceVersion = SLANG_NVVM_BUILDER_FOUNDATION_INTERFACE_VERSION_4;
+    api.createModule = _createModule;
+    api.destroyModule = _destroyModule;
+    api.serializeModuleWithDiagnostics = _serializeModuleWithDiagnostics;
+    api.serializeNVVMIR20AssemblyWithDiagnostics = _serializeNVVMIR20AssemblyWithDiagnostics;
+}
+
+static void _fillBuilderConstructionAPIV4(SlangNVVMBuilderConstructionAPI_4& api)
+{
+    api = {};
+    api.structureSize = uint32_t(sizeof(api));
+    api.interfaceVersion = SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4;
+    api.getVoidType = _getVoidType;
+    api.getIntegerType = _getIntegerType;
+    api.getFloatingPointType = _getFloatingPointType;
+    api.getPointerType = _getPointerType;
+    api.getFunctionType = _getFunctionType;
+    api.getArrayType = _getArrayType;
+    api.getRawRWStructuredBufferI32Type = _getRawRWStructuredBufferI32Type;
+    api.declareFunction = _declareFunction;
+    api.getFunctionParameter = _getFunctionParameter;
+    api.createBlock = _createBlock;
+    api.setInsertBlock = _setInsertBlock;
+    api.emitLoad = _emitLoad;
+    api.emitStore = _emitStore;
+    api.emitBranch = _emitBranch;
+    api.emitConditionalBranch = _emitConditionalBranch;
+    api.getIntegerConstant = _getIntegerConstant;
+    api.getFloatingPointConstant = _getFloatingPointConstantV3;
+    api.emitPhi = _emitPhiV3;
+    api.addPhiIncoming = _addPhiIncomingV3;
+    api.emitCall = _emitCallV3;
+    api.emitValueReturn = _emitValueReturnV3;
+    api.emitReturnVoid = _emitReturnVoid;
+    api.emitPointerOffset = _emitPointerOffset;
+    api.emitArrayElementPointer = _emitArrayElementPointer;
+    api.emitRawRWStructuredBufferI32ElementPointer = _emitRawRWStructuredBufferI32ElementPointer;
+    api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
+    api.markFunctionAsKernel = _markFunctionAsKernel;
+}
+
+static void _fillBuilderValueOperationsAPIV4(SlangNVVMBuilderValueOperationsAPI_4& api)
+{
+    api = {};
+    api.structureSize = uint32_t(sizeof(api));
+    api.interfaceVersion = SLANG_NVVM_BUILDER_VALUE_OPERATIONS_INTERFACE_VERSION_4;
+    api.isOperationSupported = _isOperationSupportedV4;
+    api.emitOperation = _emitOperationV4;
+}
+
+static SlangResult SLANG_NVVM_CALL _queryBuilderInterfaceV4(
+    SlangNVVMBuilderInterfaceID_4 interfaceID,
+    uint32_t interfaceVersion,
+    const void** outInterface)
+{
+    if (outInterface)
+        *outInterface = nullptr;
+    if (!outInterface)
+        return SLANG_E_INVALID_ARG;
+
+    static SlangNVVMBuilderFoundationAPI_4 foundation = []
+    {
+        SlangNVVMBuilderFoundationAPI_4 api;
+        _fillBuilderFoundationAPIV4(api);
+        return api;
+    }();
+    static SlangNVVMBuilderConstructionAPI_4 construction = []
+    {
+        SlangNVVMBuilderConstructionAPI_4 api;
+        _fillBuilderConstructionAPIV4(api);
+        return api;
+    }();
+    static SlangNVVMBuilderValueOperationsAPI_4 valueOperations = []
+    {
+        SlangNVVMBuilderValueOperationsAPI_4 api;
+        _fillBuilderValueOperationsAPIV4(api);
+        return api;
+    }();
+
+    switch (interfaceID)
+    {
+    case SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION_4:
+        if (interfaceVersion != SLANG_NVVM_BUILDER_FOUNDATION_INTERFACE_VERSION_4)
+            return SLANG_E_NO_INTERFACE;
+        *outInterface = &foundation;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION_4:
+        if (interfaceVersion != SLANG_NVVM_BUILDER_CONSTRUCTION_INTERFACE_VERSION_4)
+            return SLANG_E_NO_INTERFACE;
+        *outInterface = &construction;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS_4:
+        if (interfaceVersion != SLANG_NVVM_BUILDER_VALUE_OPERATIONS_INTERFACE_VERSION_4)
+            return SLANG_E_NO_INTERFACE;
+        *outInterface = &valueOperations;
+        return SLANG_OK;
+    default:
+        return SLANG_E_NO_INTERFACE;
+    }
+}
+
+static void _fillBuilderAPIV4(SlangNVVMBuilderAPI_V4& api)
+{
+    api = {};
+    api.structureSize = uint32_t(sizeof(api));
+    api.abiVersion = SLANG_NVVM_BUILDER_ABI_VERSION_4;
+    api.llvmVersionMajor = LLVM_VERSION_MAJOR;
+    api.llvmVersionMinor = LLVM_VERSION_MINOR;
+    api.llvmVersionPatch = LLVM_VERSION_PATCH;
+    api.nvvmIRVersionMajor = 2;
+    api.nvvmIRVersionMinor = 0;
+    api.pointerModel = SLANG_NVVM_POINTER_MODEL_TYPED;
+    api.queryInterface = _queryBuilderInterfaceV4;
+}
+
 } // namespace
 
 extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
@@ -2303,6 +2751,23 @@ slang_getNVVMBuilderAPI_V3(SlangNVVMBuilderAPI_V3* outAPI)
     const size_t callerCapacity = outAPI->structureSize;
     SlangNVVMBuilderAPI_V3 api;
     _fillBuilderAPIV3(api);
+    const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
+    std::memcpy(outAPI, &api, copySize);
+    return SLANG_OK;
+}
+
+extern "C" SLANG_NVVM_BUILDER_API SlangResult SLANG_NVVM_CALL
+slang_getNVVMBuilderAPI_V4(SlangNVVMBuilderAPI_V4* outAPI)
+{
+    if (!outAPI || outAPI->structureSize < SLANG_NVVM_BUILDER_API_V4_MIN_SIZE ||
+        outAPI->abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_4)
+    {
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    const size_t callerCapacity = outAPI->structureSize;
+    SlangNVVMBuilderAPI_V4 api;
+    _fillBuilderAPIV4(api);
     const size_t copySize = callerCapacity < sizeof(api) ? callerCapacity : sizeof(api);
     std::memcpy(outAPI, &api, copySize);
     return SLANG_OK;
