@@ -4395,6 +4395,43 @@ literal stores for the six measured values, and no helper functions. CUDA 12.9 `
 for `sm_70`. The Release host and isolated provider builds pass, and the complete NVVM prefix
 passes 338/338. Builder ABI revision 3 is unchanged.
 
+### Slice 77: Conventional scalar uniforms and flat parameter blocks
+
+The conventional CUDA global block now admits selected integer and float32 scalar uniforms plus a
+nonempty `ParameterBlock<T>` when `T` is a flat struct of selected integer/float32 fields. A
+parameter block lowers structurally to a global-address-space pointer to the unpacked element
+struct. For example, `param-block-alignment.slang` produces this 32-byte constant-memory ABI:
+
+```llvm
+@SLANG_globalParams = addrspace(4) global {
+    i32,
+    { i32 } addrspace(1)*,
+    { i32 addrspace(1)*, i64 }
+} undef, align 8
+```
+
+One keyed field resolver owns both address layers. It maps the exact field key to the actual index
+in the compiler-synthesized outer block, or to the exact index in a supported parameter-block
+element struct, and verifies the field-address pointee type. Scalar, parameter-block-pointer, and
+resource-view loads use the existing generic provider load operation with natural scalar or
+pointer alignment. Parameter-block fields are immutable, sampler placeholders remain
+storage-only, and nested structs, arrays, matrices, resources, and opaque fields inside a
+parameter block remain E52017 boundaries before provider discovery.
+
+Value-form layout folding can leave `TestGlobalParams.$init(0, null)` as an unused call. Generic DCE
+rightly treats arbitrary pointer arguments conservatively. The direct preparation pass removes
+only an unused aggregate-returning callee that is marked as both a synthesized constructor and
+read-none and whose otherwise non-value arguments are literal null pointers. This uses the
+producer's effect contract and does not widen the runtime emitter to local aggregate construction;
+every broader call remains untouched.
+
+`tests/cuda/param-block-alignment.slang` now passes CUDA/NVRTC and direct libNVVM on the GPU with
+`0, 8, 16, 8, 0, 0, 0, 0`. Direct PTX declares `SLANG_globalParams[32]`, reads the scalar at byte
+offset 0, reads the block pointer at byte offset 8, reads the resource pointer at byte offset 16,
+then performs the inner global scalar load. CUDA 12.9 `ptxas` accepts it for `sm_70`. The generic
+builder ABI remains revision 3; no operation names a Slang uniform or parameter block. The full
+Release NVVM prefix passes 339/339.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4402,7 +4439,8 @@ The following remain open until their named slice supplies evidence:
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
-  global parameter fields beyond selected-scalar read-write structured buffers and storage-only
+  global parameter fields beyond selected integer/float32 scalars, flat selected-scalar parameter
+  blocks, selected-scalar read-write structured buffers, and storage-only
   sampler/unsized-sampler-array placeholders, and raw CUDA parameters beyond the selected integer
   and float32 scalars, selected numeric device pointers, fixed i32 array pointers, signed-i32x2
   device pointers, and selected-scalar raw read-write structured buffers;

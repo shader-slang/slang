@@ -20,10 +20,11 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/cuda/nvvm-mixed-numeric.slang` | Direct NVVM PTX | Pass | Narrow/wide integer, float32, and fixed-vector workload emits the expected typed global stores |
 | `tests/cuda/nvvm-unsupported-ir.slang` | Direct NVVM diagnostic | Expected stop | Exact `CUDA kernel decoration` boundary for executable conventional compute |
 | `tests/cuda/compile-to-cuda.slang` | NVRTC + direct NVVM runtime | Pass | Ordinary `SV_DispatchThreadID`, one conventional `RWStructuredBuffer<int>`, host-populated `SLANG_globalParams`, and zero-parameter kernel produce identical results |
-| `tests/cuda/nvvm-conventional-global-unsupported.slang` | Direct NVVM diagnostic | Expected stop | Exact one-field conventional parameter-block boundary before provider discovery |
-| `tests/cuda/cuda-layout.slang` | Direct NVVM probe | Expected stop | `GenericAsm` after conventional entry/global lowering |
+| `tests/cuda/cuda-layout.slang` | NVRTC + direct NVVM runtime | Pass | All 28 scalar/vector CUDA layout queries agree; direct PTX passes `ptxas` |
+| `tests/cuda/cuda-array-layout.slang` | NVRTC + direct NVVM runtime | Pass | Aggregate/array/matrix/pointer layout queries fold before runtime emission and produce identical results; direct PTX passes `ptxas` |
 | `tests/cuda/wave-lane-index-multidim.slang` | NVRTC + direct NVVM + Vulkan runtime | Pass | A two-dimensional group combines `SV_GroupIndex`, float resource stores, and wave operations with identical comparison output; direct PTX passes `ptxas` |
-| `tests/cuda/sampler-comparison-state-unused.slang` | Direct NVVM probe | Expected stop | Conventional field address in a multi-field sampler/resource parameter block |
+| `tests/cuda/sampler-comparison-state-unused.slang` | CUDA source + NVRTC PTX + direct NVVM PTX | Pass | Multi-field sampler/resource storage has one shared 40-byte ABI; direct PTX passes `ptxas` |
+| `tests/cuda/param-block-alignment.slang` | NVRTC + direct NVVM runtime | Pass | A scalar uniform, flat scalar parameter block, resource view, and folded layout queries produce identical results; direct PTX passes `ptxas` |
 
 Slices 69 and 70 consolidated the implementation onto one exact forward-only builder ABI and one
 typed-descriptor capability system. Older rows below retain the interface names that described the
@@ -1378,3 +1379,21 @@ The existing `cuda-array-layout.slang` comparison passes both CUDA/NVRTC and dir
 `48, 0, 16, 20, 44, 4, 0, 0`. Direct PTX contains six literal global stores and no helper
 definitions, and CUDA 12.9 `ptxas` accepts it for `sm_70`. Builder ABI revision 3 is unchanged.
 The Release host and isolated provider builds pass, and the complete NVVM prefix passes 338/338.
+
+Slice 77 adds selected integer/float32 scalar fields and nonempty flat selected-scalar
+`ParameterBlock<T>` fields to the compiler-synthesized conventional CUDA global block. A parameter
+block is structurally an address-space-1 pointer to its unpacked element struct. Exact keyed field
+addressing composes across the address-space-4 outer block and the loaded parameter-block pointer;
+ordinary generic loads recover the scalar, pointer, and resource-view values. ABI revision 3 is
+unchanged.
+
+The fake provider observes outer `{ i32, { i32 } addrspace(1)*, resource-view }` storage, keyed
+indices 2/0/1 for resource/scalar/block, inner index 0, pointer-aligned outer loads, and a naturally
+aligned inner scalar load. An element containing a nested struct remains E52017 before provider
+discovery. Layout folding removes the exact dead synthesized read-none zero initializer only when
+its non-value inputs are null pointer literals; no runtime aggregate construction is admitted.
+
+The existing `param-block-alignment.slang` comparison passes CUDA/NVRTC and direct libNVVM 2/2
+with `0, 8, 16, 8, 0, 0, 0, 0`. Direct PTX contains the 32-byte constant block, loads at byte
+offsets 0, 8, and 16, and the inner global scalar read. CUDA 12.9 `ptxas` accepts it for `sm_70`.
+The Release host and isolated provider builds pass, and the complete NVVM prefix passes 339/339.

@@ -23,7 +23,7 @@ static const uint32_t kNVVMScalar32Alignment = 4;
 static const IRIntegerValue kNVVMI32Min = -2147483647 - 1;
 static const IRIntegerValue kNVVMI32Max = 2147483647;
 static const IRIntegerValue kNVVMUInt32Max = 4294967295;
-static const uint32_t kNVVMRawRWStructuredBufferAlignment = 8;
+static const uint32_t kNVVMPointerAlignment = 8;
 
 struct NVVMConventionalGlobalParams
 {
@@ -61,10 +61,10 @@ bool _getNVVMConventionalGlobalParams(IRInst* inst, NVVMConventionalGlobalParams
     return true;
 }
 
-// Finds a field by semantic key and returns its actual ABI position. The collector deliberately
-// moves CUDA unsized arrays to the end, so source declaration order must never be inferred here.
-bool _findNVVMConventionalGlobalField(
-    const NVVMConventionalGlobalParams& params,
+// Finds a field by semantic key and returns its actual ABI position. The global collector can move
+// CUDA fields, so every aggregate address uses key identity instead of source declaration order.
+bool _findNVVMStructField(
+    IRStructType* structType,
     IRInst* key,
     IRStructField*& outField,
     uint32_t& outFieldIndex)
@@ -72,7 +72,7 @@ bool _findNVVMConventionalGlobalField(
     outField = nullptr;
     outFieldIndex = 0;
     uint32_t fieldIndex = 0;
-    for (auto field : params.elementType->getFields())
+    for (auto field : structType->getFields())
     {
         if (field->getKey() == key)
         {
@@ -83,6 +83,82 @@ bool _findNVVMConventionalGlobalField(
         ++fieldIndex;
     }
     return false;
+}
+
+// Returns whether a retained struct declaration is an exact storage type owned by the accepted
+// conventional CUDA parameter block.
+bool _isNVVMConventionalGlobalStorageType(const NVVMConventionalGlobalParams& params, IRInst* inst)
+{
+    if (inst == params.elementType)
+        return true;
+    for (auto field : params.elementType->getFields())
+    {
+        IRStructType* parameterBlockElementType = nullptr;
+        if (asNVVMSupportedScalarParameterBlockType(
+                field->getFieldType(),
+                &parameterBlockElementType) &&
+            inst == parameterBlockElementType)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+struct NVVMStructFieldAddress
+{
+    IRStructField* field = nullptr;
+    uint32_t fieldIndex = 0;
+};
+
+// Resolves the two aggregate-address shapes with executable representations: a field in the
+// collected CUDA parameter block, or a selected scalar in a loaded scalar ParameterBlock.
+bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructFieldAddress& outAddress)
+{
+    outAddress = {};
+    if (!fieldAddress)
+        return false;
+
+    IRStructType* structType = nullptr;
+    NVVMConventionalGlobalParams globalParams;
+    const bool isConventionalGlobal =
+        _getNVVMConventionalGlobalParams(fieldAddress->getBase(), globalParams);
+    if (isConventionalGlobal)
+    {
+        structType = globalParams.elementType;
+    }
+    else if (!asNVVMSupportedScalarParameterBlockType(
+                 fieldAddress->getBase()->getDataType(),
+                 &structType))
+    {
+        return false;
+    }
+
+    if (!_findNVVMStructField(
+            structType,
+            fieldAddress->getField(),
+            outAddress.field,
+            outAddress.fieldIndex))
+    {
+        return false;
+    }
+
+    auto pointerType = as<IRPtrTypeBase>(fieldAddress->getDataType());
+    if (!pointerType || !isTypeEqual(outAddress.field->getFieldType(), pointerType->getValueType()))
+    {
+        return false;
+    }
+
+    IRType* fieldType = outAddress.field->getFieldType();
+    if (isConventionalGlobal)
+    {
+        // Sampler fields are ABI storage only. They intentionally have no executable value form.
+        return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
+               asNVVMSupportedScalarParameterBlockType(fieldType) ||
+               asNVVMSupportedRawRWStructuredBufferType(fieldType);
+    }
+
+    return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType);
 }
 
 // Maps a canonical global produced by CUDA varying legalization to its semantic provider operation.
@@ -887,8 +963,9 @@ SlangResult _validatePointerValue(
     auto sharedElementPtrType =
         value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
     auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
+    NVVMStructFieldAddress fieldAddress;
     if (!fieldPtrType || value->getOp() != kIROp_FieldAddress ||
-        !asNVVMSupportedRawRWStructuredBufferType(fieldPtrType->getValueType()))
+        !_getNVVMStructFieldAddress(as<IRFieldAddress>(value), fieldAddress))
     {
         fieldPtrType = nullptr;
     }
@@ -908,6 +985,12 @@ SlangResult _validatePointerValue(
         return _diagnoseUnsupportedIR(
             codeGenContext,
             toSlice("raw RWStructuredBuffer scalar load or store consumer"));
+    }
+    if (fieldPtrType && (consumer->getOp() != kIROp_Load || requireWriteAccess))
+    {
+        return _diagnoseUnsupportedIR(
+            codeGenContext,
+            toSlice("read-only conventional parameter field load"));
     }
     if (requireWriteAccess && acceptedPtrType->getAccessQualifier() != AccessQualifier::ReadWrite)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("read-only pointer store"));
@@ -1257,7 +1340,8 @@ SlangResult _validateNVVMFunction(
             {
             case kIROp_Load:
                 if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
-                    !asNVVMSupportedRawRWStructuredBufferType(inst->getDataType()))
+                    !asNVVMSupportedRawRWStructuredBufferType(inst->getDataType()) &&
+                    !asNVVMSupportedScalarParameterBlockType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 break;
 
@@ -1407,22 +1491,8 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_FieldAddress:
                 {
-                    auto fieldAddress = as<IRFieldAddress>(inst);
-                    NVVMConventionalGlobalParams globalParams;
-                    IRStructField* field = nullptr;
-                    uint32_t fieldIndex = 0;
-                    auto pointerType =
-                        fieldAddress ? as<IRPtrTypeBase>(fieldAddress->getDataType()) : nullptr;
-                    if (!fieldAddress ||
-                        !_getNVVMConventionalGlobalParams(fieldAddress->getBase(), globalParams) ||
-                        !_findNVVMConventionalGlobalField(
-                            globalParams,
-                            fieldAddress->getField(),
-                            field,
-                            fieldIndex) ||
-                        !pointerType ||
-                        !isTypeEqual(field->getFieldType(), pointerType->getValueType()) ||
-                        !asNVVMSupportedRawRWStructuredBufferType(pointerType->getValueType()))
+                    NVVMStructFieldAddress fieldAddress;
+                    if (!_getNVVMStructFieldAddress(as<IRFieldAddress>(inst), fieldAddress))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -2041,6 +2111,58 @@ SlangResult foldNVVMCompileTimeLayoutQueries(CodeGenContext* codeGenContext, Lin
     IRDeadCodeEliminationOptions options;
     options.keepLayoutsAlive = true;
     eliminateDeadCode(linkedIR.module, options);
+
+    // A value-form query can be the only consumer of an aggregate initializer. For example,
+    // `__offsetOf(gp, gp.block)` leaves the zero-initializing `TestGlobalParams.$init(0, null)`
+    // call dead after the query is folded. The initializer is marked read-none, but generic DCE
+    // conservatively retains it because a pointer-typed argument might normally expose writable
+    // memory. A literal null default cannot expose storage, so this exact dead call has no
+    // observable effect and can be removed without lowering its temporary aggregate construction.
+    List<IRCall*> deadAggregateCalls;
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        auto function = as<IRFunc>(globalInst);
+        if (!function)
+            continue;
+        for (auto block : function->getBlocks())
+        {
+            for (auto inst : block->getOrdinaryInsts())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call || call->hasUses() || !as<IRStructType>(call->getDataType()))
+                    continue;
+
+                auto callee = getResolvedInstForDecorations(call->getCallee());
+                auto constructor =
+                    callee ? callee->findDecoration<IRConstructorDecoration>() : nullptr;
+                if (!callee || !callee->findDecoration<IRReadNoneDecoration>() || !constructor ||
+                    !constructor->getSynthesizedStatus())
+                    continue;
+
+                bool hasOnlySideEffectFreeArguments = true;
+                for (UInt i = 0; i < call->getArgCount(); ++i)
+                {
+                    auto argument = call->getArg(i);
+                    if (isValueType(argument->getDataType()))
+                        continue;
+                    auto pointerLiteral = as<IRPtrLit>(argument);
+                    if (!pointerLiteral || pointerLiteral->getValue())
+                    {
+                        hasOnlySideEffectFreeArguments = false;
+                        break;
+                    }
+                }
+                if (hasOnlySideEffectFreeArguments)
+                    deadAggregateCalls.add(call);
+            }
+        }
+    }
+    for (auto call : deadAggregateCalls)
+        call->removeAndDeallocate();
+    if (deadAggregateCalls.getCount())
+    {
+        eliminateDeadCode(linkedIR.module, options);
+    }
     return SLANG_OK;
 }
 
@@ -2159,7 +2281,7 @@ SlangResult validateNVVMSupportedIR(
         {
             continue;
         }
-        if (globalInst == conventionalGlobalParams.elementType)
+        if (_isNVVMConventionalGlobalStorageType(conventionalGlobalParams, globalInst))
             continue;
         return _diagnoseUnsupportedIR(
             codeGenContext,
@@ -2235,7 +2357,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     loweredStructType,
                     SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL,
                     SLANG_NVVM_ADDRESS_SPACE_CONSTANT,
-                    kNVVMRawRWStructuredBufferAlignment,
+                    kNVVMPointerAlignment,
                     toSlice("SLANG_globalParams"),
                     loweredStorage)));
             valueMap[globalParams.globalParam] = loweredStorage;
@@ -2414,10 +2536,12 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        const uint32_t alignment =
-                            asNVVMSupportedRawRWStructuredBufferType(load->getDataType())
-                                ? kNVVMRawRWStructuredBufferAlignment
-                                : getNVVMNumericValueAlignment(load->getDataType());
+                        uint32_t alignment = getNVVMNumericValueAlignment(load->getDataType());
+                        if (asNVVMSupportedRawRWStructuredBufferType(load->getDataType()) ||
+                            asNVVMSupportedScalarParameterBlockType(load->getDataType()))
+                        {
+                            alignment = kNVVMPointerAlignment;
+                        }
                         SLANG_RELEASE_ASSERT(alignment);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
@@ -2735,17 +2859,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_FieldAddress:
                     {
                         auto fieldAddress = cast<IRFieldAddress>(inst);
-                        NVVMConventionalGlobalParams globalParams;
-                        SLANG_RELEASE_ASSERT(_getNVVMConventionalGlobalParams(
-                            fieldAddress->getBase(),
-                            globalParams));
-                        IRStructField* field = nullptr;
-                        uint32_t fieldIndex = 0;
-                        SLANG_RELEASE_ASSERT(_findNVVMConventionalGlobalField(
-                            globalParams,
-                            fieldAddress->getField(),
-                            field,
-                            fieldIndex));
+                        NVVMStructFieldAddress resolvedAddress;
+                        SLANG_RELEASE_ASSERT(
+                            _getNVVMStructFieldAddress(fieldAddress, resolvedAddress));
                         SlangNVVMValueHandle loweredBasePointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -2762,7 +2878,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             builder.emitStructFieldPointer(
                                 moduleScope.module,
                                 loweredBasePointer,
-                                fieldIndex,
+                                resolvedAddress.fieldIndex,
                                 loweredPointer)));
                         valueMap[inst] = loweredPointer;
                     }

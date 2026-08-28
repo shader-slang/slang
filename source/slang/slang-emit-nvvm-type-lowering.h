@@ -83,6 +83,11 @@ IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type);
 /// Returns an accepted storage-only unsized CUDA sampler array.
 IRUnsizedArrayType* asNVVMSupportedUnsizedSamplerArrayStorageType(IRInst* type);
 
+/// Returns a parameter block whose nonempty element struct contains only selected scalar fields.
+IRParameterBlockType* asNVVMSupportedScalarParameterBlockType(
+    IRInst* type,
+    IRStructType** outElementType = nullptr);
+
 /// Returns whether `type` is one field admitted in the conventional CUDA parameter block.
 bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type);
 
@@ -139,6 +144,10 @@ private:
     SlangResult _lowerStructType(IRStructType* type, SlangNVVMTypeHandle& outType);
     SlangResult _lowerRawRWStructuredBufferType(
         IRHLSLStructuredBufferTypeBase* type,
+        SlangNVVMTypeHandle& outType);
+    SlangResult _lowerScalarParameterBlockType(
+        IRParameterBlockType* type,
+        IRStructType* elementType,
         SlangNVVMTypeHandle& outType);
     SlangResult _lowerUnsizedSamplerArrayStorageType(
         IRUnsizedArrayType* type,
