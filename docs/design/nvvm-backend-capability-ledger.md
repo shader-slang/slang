@@ -975,3 +975,23 @@ Five names raise the measured files from 25,753 to 25,874 lines. The complete Sl
 matrix passes 52/52 and Release passes 350/350 with sorted-name SHA-256
 `003afec34f28ad32e84961b91f1c87fff1fa006f1da535cb10ab00d29cc727c7`; removing the five Slice 53
 names reproduces Slice 52's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 54 adds public unmasked Float `WaveReadLaneAt()` as a thin third composition row. The entry
+loads one Float value and passes it with lane and synthesized mask to the public helper; that helper
+routes the mask through the active-mask identity and into the established Float masked shuffle.
+Features 35, 38, and 39 are independently required before module construction. V3 remains 528/308
+bytes and no production/provider file changes.
+
+The Slice 53 direct/capability/PTX runners need no new field or branch. The Float row supplies
+operation 4, feature 38, loaded value origin, two pointer offsets, one load, `[64, 64, 32]`, and
+expected global load. Exact five-function/three-intrinsic/four-call mask flow remains common to all
+three scalar rows.
+
+NVVM and NVRTC each emit exactly one ballot and one shuffle in the entry plus one
+`ld.global.f32`/`st.global.f32` pair. CUDA 12.9 `ptxas` accepts both, and one RTX 5090 warp selects
+source lanes 0 and 7 bit-exactly through both routes.
+
+Five names add 83 measured lines, from 25,874 to 25,957. The complete Slice 46-54 wave matrix
+passes 57/57 and Release passes 355/355 with sorted-name SHA-256
+`492d3838278e789e6b0ebabc8798653ba6fdccefc90dbe946b46f8d224453f9e`; removing the five Slice 54
+names reproduces Slice 53's count and hash exactly. Debug preservation passes 10/10.

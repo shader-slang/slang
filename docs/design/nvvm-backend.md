@@ -2700,6 +2700,30 @@ LF-terminated name set has SHA-256
 `003afec34f28ad32e84961b91f1c87fff1fa006f1da535cb10ab00d29cc727c7`; removing the five Slice 53
 names reproduces Slice 52's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 54 thin public Float wave-read row
+
+Slice 54 completes the public scalar wrapper trio with Float. The final graph is the established
+five-function composition: one entry ballot is threaded into the public Float helper, which routes
+the mask through the active-mask identity and calls the existing Float masked-shuffle helper. The
+entry supplies one loaded Float source value. Features 35, 38, and 39 are each required before
+provider module creation, with no production, provider, ABI, or LLVM wrapper changes.
+
+Float fits the Slice 53 direct/capability/PTX runners without another field or branch. Its thin
+direct row selects Float operation 4, loaded value origin, two pointer offsets, and one load; its
+capability row selects feature 38; and its PTX row supplies `[64, 64, 32]` plus the expected global
+load. The same runner continues to assert exact ballot-to-public-helper and active-mask-to-shuffle
+flow for UInt, Int, and Float.
+
+NVVM and NVRTC each emit exactly one ballot and one shuffle in the entry, with one
+`ld.global.f32`/`st.global.f32` pair. CUDA 12.9 `ptxas` accepts both. One RTX 5090 warp selects
+source lanes 0 and 7 bit-exactly through both routes.
+
+Five new names add only 83 measured lines, from 25,874 to 25,957. The complete Slice 46-54 wave
+matrix passes 57/57 and the Release NVVM prefix passes 355/355. Its exact sorted LF-terminated name
+set has SHA-256 `492d3838278e789e6b0ebabc8798653ba6fdccefc90dbe946b46f8d224453f9e`;
+removing the five Slice 54 names reproduces Slice 53's count and hash exactly. Debug preservation
+passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2832,7 +2856,8 @@ The program advances through bounded slices:
 51. canonical active wave mask through synchronized ballot and repaired synthesized helper types;
 52. public unmasked UInt wave-read-lane-at through composition of active mask and masked shuffle;
 53. public unmasked Int wave-read-lane-at plus parameterized composition evidence;
-54. remaining wave operations and other advanced capabilities, then production-readiness
+54. thin public unmasked Float wave-read-lane-at composition evidence;
+55. remaining wave operations and other advanced capabilities, then production-readiness
     evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
@@ -3456,8 +3481,8 @@ The following remain open until their named slice supplies evidence:
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
-  read-lane-at, public unmasked UInt/Int read-lane-at, and active-mask ballot, including other
-  scalar types, votes, reductions, and their convergence contracts;
+  read-lane-at, public unmasked UInt/Int/Float read-lane-at, and active-mask ballot, including
+  other scalar types, votes, reductions, and their convergence contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

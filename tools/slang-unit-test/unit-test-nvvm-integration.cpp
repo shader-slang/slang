@@ -892,6 +892,20 @@ SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtIntDifferentialPTX)
         true);
 }
 
+SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtFloatDifferentialPTX)
+{
+    static const uint32_t kParameterWidths[] = {64, 64, 32};
+    _checkUnmaskedWaveReadLaneAtDifferentialPTX(
+        unitTestContext,
+        kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT,
+        "Ignoring unmasked Float wave-read-lane-at PTX differential because libNVVM or NVRTC was "
+        "not found.",
+        kParameterWidths,
+        SLANG_COUNT_OF(kParameterWidths),
+        true);
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1677,6 +1691,14 @@ SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtIntPtxasAccepts)
     _runNVVMSlangRealSourcePtxasAccepts(
         unitTestContext,
         kDirectNVVMUnmaskedWaveReadLaneAtIntSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtFloatPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT);
 }
 
@@ -2628,6 +2650,19 @@ SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtIntRuntimeMatchesNVRTC)
         {
             SLANG_RETURN_ON_FAIL(_runUnmaskedWaveReadLaneAtIntKernel(cuda, code, 0));
             return _runUnmaskedWaveReadLaneAtIntKernel(cuda, code, 7);
+        });
+}
+
+SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtFloatRuntimeMatchesNVRTC)
+{
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT,
+        kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        {
+            SLANG_RETURN_ON_FAIL(_runUnmaskedWaveReadLaneAtFloatKernel(cuda, code, 0));
+            return _runUnmaskedWaveReadLaneAtFloatKernel(cuda, code, 7);
         });
 }
 
