@@ -1374,6 +1374,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
     llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
     llvm::Type* expectedArgumentTypes[] = {int32Type, int32Type, int32Type};
     bool appendsShuffleClamp = false;
+    bool derivesFirstActiveLane = false;
     switch (operation)
     {
     case SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX:
@@ -1399,6 +1400,11 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         expectedArgumentCount = 2;
         expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
         break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT:
+        intrinsicID = llvm::Intrinsic::nvvm_shfl_sync_idx_i32;
+        expectedArgumentCount = 2;
+        derivesFirstActiveLane = true;
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }
@@ -1417,7 +1423,19 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         }
         llvmArguments.push_back(argument);
     }
-    if (appendsShuffleClamp)
+    if (derivesFirstActiveLane)
+    {
+        llvm::Function* countTrailingZeros = llvm::Intrinsic::getDeclaration(
+            state->module.get(),
+            llvm::Intrinsic::cttz,
+            {int32Type});
+        llvm::Value* firstActiveLane = state->builder.CreateCall(
+            countTrailingZeros,
+            {llvmArguments[0], llvm::ConstantInt::getTrue(state->context)});
+        llvmArguments.push_back(firstActiveLane);
+        llvmArguments.push_back(llvm::ConstantInt::get(int32Type, 31));
+    }
+    else if (appendsShuffleClamp)
     {
         llvmArguments.push_back(llvm::ConstantInt::get(int32Type, 31));
     }
@@ -1608,14 +1626,18 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
 // declarations, so count unique validated semantic attribute sets. LLVM 14's scalar shuffle and
 // synchronized-ballot declarations already use the LLVM-7-compatible
 // convergent/inaccessible-memory/nounwind set, but validate their exact signatures and attributes
-// before serializing the mixed dialect. The provider exposes exactly one shape of each operation;
-// validate every semantic instruction or declaration before changing its spelling.
+// before serializing the mixed dialect. Generic count-trailing-zeros has the same LLVM 14-only
+// optimization attributes as the special-register declarations plus an `immarg` parameter marker;
+// LLVM 7 already understands the intrinsic's signature and semantics once those newer attributes
+// are removed. The provider exposes exactly one shape of each operation; validate every semantic
+// instruction or declaration before changing its spelling.
 static SlangResult _writeLegacyNVVMAssembly(
     ModuleState* state,
     llvm::SmallVectorImpl<char>& outSerializedData)
 {
     size_t semanticAtomicCount = 0;
     size_t semanticFloatNegateCount = 0;
+    size_t semanticCountTrailingZerosDeclarationCount = 0;
     llvm::SmallVector<llvm::AttributeSet, 2> semanticLegacyIntrinsicAttributeSets;
     for (llvm::Function& function : *state->module)
     {
@@ -1692,6 +1714,43 @@ static SlangResult _writeLegacyNVVMAssembly(
                 return SLANG_E_NOT_AVAILABLE;
             }
         }
+        else if (intrinsicID == llvm::Intrinsic::cttz)
+        {
+            const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
+            llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
+            if (!function.isDeclaration() || function.getReturnType() != int32Type ||
+                function.arg_size() != 2 || functionAttributes.getNumAttributes() != 6 ||
+                !function.hasFnAttribute(llvm::Attribute::NoFree) ||
+                !function.hasFnAttribute(llvm::Attribute::NoSync) ||
+                !function.hasFnAttribute(llvm::Attribute::NoUnwind) ||
+                !function.hasFnAttribute(llvm::Attribute::ReadNone) ||
+                !function.hasFnAttribute(llvm::Attribute::Speculatable) ||
+                !function.hasFnAttribute(llvm::Attribute::WillReturn) ||
+                function.getAttributes().getParamAttrs(0).getNumAttributes() != 0 ||
+                function.getAttributes().getParamAttrs(1).getNumAttributes() != 1 ||
+                !function.hasParamAttribute(1, llvm::Attribute::ImmArg))
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+            auto argument = function.arg_begin();
+            if (argument->getType() != int32Type ||
+                (++argument)->getType() != llvm::Type::getInt1Ty(state->context))
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+            bool hasAttributeSet = false;
+            for (const llvm::AttributeSet& attributeSet : semanticLegacyIntrinsicAttributeSets)
+            {
+                if (attributeSet == functionAttributes)
+                {
+                    hasAttributeSet = true;
+                    break;
+                }
+            }
+            if (!hasAttributeSet)
+                semanticLegacyIntrinsicAttributeSets.push_back(functionAttributes);
+            ++semanticCountTrailingZerosDeclarationCount;
+        }
         for (llvm::BasicBlock& block : function)
         {
             for (llvm::Instruction& instruction : block)
@@ -1736,10 +1795,13 @@ static SlangResult _writeLegacyNVVMAssembly(
     const llvm::StringRef llvm14SpecialRegisterAttributeMarker(
         " = { nofree nosync nounwind readnone speculatable willreturn }");
     const llvm::StringRef legacySpecialRegisterAttributes(" = { nounwind readnone }");
+    const llvm::StringRef countTrailingZerosDeclarationMarker("@llvm.cttz.i32(i32, i1 immarg)");
+    const llvm::StringRef legacyCountTrailingZerosDeclaration("@llvm.cttz.i32(i32, i1)");
     llvm::StringRef remaining(llvm14Assembly.data(), llvm14Assembly.size());
     size_t rewrittenAtomicCount = 0;
     size_t rewrittenFloatNegateCount = 0;
     size_t rewrittenLegacyIntrinsicAttributeSetCount = 0;
+    size_t rewrittenCountTrailingZerosDeclarationCount = 0;
     while (!remaining.empty())
     {
         const size_t newlineIndex = remaining.find('\n');
@@ -1781,6 +1843,21 @@ static SlangResult _writeLegacyNVVMAssembly(
                 legacySpecialRegisterAttributes.end());
             ++rewrittenLegacyIntrinsicAttributeSetCount;
         }
+        else if (trimmedLine.startswith("declare i32 @llvm.cttz.i32("))
+        {
+            const size_t markerIndex = line.find(countTrailingZerosDeclarationMarker);
+            if (markerIndex == llvm::StringRef::npos)
+                return SLANG_E_NOT_AVAILABLE;
+            const llvm::StringRef prefix = line.take_front(markerIndex);
+            const llvm::StringRef suffix =
+                line.drop_front(markerIndex + countTrailingZerosDeclarationMarker.size());
+            outSerializedData.append(prefix.begin(), prefix.end());
+            outSerializedData.append(
+                legacyCountTrailingZerosDeclaration.begin(),
+                legacyCountTrailingZerosDeclaration.end());
+            outSerializedData.append(suffix.begin(), suffix.end());
+            ++rewrittenCountTrailingZerosDeclarationCount;
+        }
         else
         {
             outSerializedData.append(line.begin(), line.end());
@@ -1795,7 +1872,9 @@ static SlangResult _writeLegacyNVVMAssembly(
     return rewrittenAtomicCount == semanticAtomicCount &&
                    rewrittenFloatNegateCount == semanticFloatNegateCount &&
                    rewrittenLegacyIntrinsicAttributeSetCount ==
-                       semanticLegacyIntrinsicAttributeSets.size()
+                       semanticLegacyIntrinsicAttributeSets.size() &&
+                   rewrittenCountTrailingZerosDeclarationCount ==
+                       semanticCountTrailingZerosDeclarationCount
                ? SLANG_OK
                : SLANG_E_NOT_AVAILABLE;
 }

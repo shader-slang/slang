@@ -1353,7 +1353,9 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle_1 value)
                 gFakeNVVMBuilder.intrinsicOperations[valueRef.index] ==
                     SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT ||
                 gFakeNVVMBuilder.intrinsicOperations[valueRef.index] ==
-                    SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT);
+                    SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT ||
+                gFakeNVVMBuilder.intrinsicOperations[valueRef.index] ==
+                    SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT);
     case FakeNVVMBuilderValueKind::PointerOffset:
     case FakeNVVMBuilderValueKind::ArrayElementPointer:
     case FakeNVVMBuilderValueKind::RawRWStructuredBufferI32ElementPointer:
@@ -2512,6 +2514,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsicV3(
         expectedArgumentCount = 3;
         break;
     case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT:
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT:
         expectedArgumentCount = 2;
         break;
     default:
@@ -2535,6 +2538,12 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsicV3(
     if (operation == SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT &&
         (!_isFakeNVVMBuilderIntegerValue(arguments[0]) ||
          !_isFakeNVVMBuilderBooleanValue(arguments[1])))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+    if (operation == SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT &&
+        (!_isFakeNVVMBuilderIntegerValue(arguments[0]) ||
+         !_isFakeNVVMBuilderIntegerValue(arguments[1])))
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -5116,6 +5125,91 @@ static SlangResult _populateWaveActiveMaskKernel(
     return SLANG_OK;
 }
 
+static SlangResult _populateWaveReadLaneFirstUIntKernel(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module,
+    const UnownedStringSlice& kernelName,
+    const UnownedStringSlice& readFirstHelperName)
+{
+    SlangNVVMTypeHandle_1 voidType = nullptr;
+    SlangNVVMTypeHandle_1 integerType = nullptr;
+    SlangNVVMTypeHandle_1 globalIntegerPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, integerType));
+    SLANG_RETURN_ON_FAIL(builder.getPointerType(
+        module,
+        integerType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        globalIntegerPointerType));
+
+    SlangNVVMTypeHandle_1 helperParameterTypes[] = {integerType, integerType};
+    SlangNVVMTypeHandle_1 helperType = nullptr;
+    SlangNVVMValueHandle_1 helper = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
+        module,
+        integerType,
+        helperParameterTypes,
+        SLANG_COUNT_OF(helperParameterTypes),
+        helperType));
+    SLANG_RETURN_ON_FAIL(builder.declareFunction(module, helperType, readFirstHelperName, helper));
+
+    SlangNVVMTypeHandle_1 kernelParameterTypes[] = {
+        globalIntegerPointerType,
+        integerType,
+        integerType};
+    SlangNVVMTypeHandle_1 kernelType = nullptr;
+    SlangNVVMValueHandle_1 kernel = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
+        module,
+        voidType,
+        kernelParameterTypes,
+        SLANG_COUNT_OF(kernelParameterTypes),
+        kernelType));
+    SLANG_RETURN_ON_FAIL(builder.declareFunction(module, kernelType, kernelName, kernel));
+
+    SlangNVVMValueHandle_1 destination = nullptr;
+    SlangNVVMValueHandle_1 mask = nullptr;
+    SlangNVVMValueHandle_1 value = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 0, destination));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 1, mask));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 2, value));
+
+    SlangNVVMBlockHandle_1 helperBlock = nullptr;
+    SlangNVVMBlockHandle_1 kernelBlock = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, helper, toSlice("entry"), helperBlock));
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, kernel, toSlice("entry"), kernelBlock));
+
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, helperBlock));
+    SlangNVVMValueHandle_1 helperArguments[2] = {};
+    for (Index i = 0; i < SLANG_COUNT_OF(helperArguments); ++i)
+    {
+        SLANG_RETURN_ON_FAIL(
+            builder.getFunctionParameter(module, helper, size_t(i), helperArguments[i]));
+    }
+    SlangNVVMValueHandle_1 firstValue = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.emitIntrinsic(
+        module,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT,
+        helperArguments,
+        SLANG_COUNT_OF(helperArguments),
+        firstValue));
+    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, firstValue));
+
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, kernelBlock));
+    SlangNVVMValueHandle_1 kernelArguments[] = {mask, value};
+    SlangNVVMValueHandle_1 storedValue = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.emitCall(
+        module,
+        helper,
+        kernelArguments,
+        SLANG_COUNT_OF(kernelArguments),
+        storedValue));
+    SLANG_RETURN_ON_FAIL(builder.emitStore(module, storedValue, destination, 4));
+    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
+    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, kernel));
+    return SLANG_OK;
+}
+
 static const char kDirectNVVMFloat32AddSource[] = R"(
 [CUDAKernel]
 void computeMain(
@@ -5187,6 +5281,15 @@ void computeMain(
 {
     uint laneIndex = WaveGetLaneIndex();
     destination[laneIndex] = WaveGetActiveMask();
+}
+)";
+static const char kDirectNVVMWaveReadLaneFirstUIntSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> destination)
+{
+    uint laneIndex = WaveGetLaneIndex();
+    destination[laneIndex] = WaveReadLaneFirst(laneIndex);
 }
 )";
 static const char kDirectNVVMUnmaskedWaveReadLaneAtUIntSource[] = R"(
@@ -7874,6 +7977,7 @@ enum class WaveScalar32Expected
     LaneIndex,
     LaneCount,
     ActiveMask,
+    UIntFirstLane,
     UIntSourceLane,
     UnmaskedUIntSourceLane,
     IntSourceLane,
@@ -7976,6 +8080,8 @@ static SlangResult _runWaveScalar32Kernel(
             expected = kLaneCount;
         else if (expectedKind == WaveScalar32Expected::ActiveMask)
             expected = ~uint32_t(0);
+        else if (expectedKind == WaveScalar32Expected::UIntFirstLane)
+            expected = 0;
         else if (
             expectedKind == WaveScalar32Expected::UIntSourceLane ||
             expectedKind == WaveScalar32Expected::UnmaskedUIntSourceLane)
@@ -8007,6 +8113,11 @@ static SlangResult _runWaveLaneCountKernel(CudaDriverApi& cuda, ISlangBlob* ptxB
 static SlangResult _runWaveActiveMaskKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)
 {
     return _runWaveScalar32Kernel(cuda, ptxBlob, WaveScalar32Expected::ActiveMask);
+}
+
+static SlangResult _runWaveReadLaneFirstUIntKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)
+{
+    return _runWaveScalar32Kernel(cuda, ptxBlob, WaveScalar32Expected::UIntFirstLane);
 }
 
 static SlangResult _runWaveReadLaneAtUIntKernel(

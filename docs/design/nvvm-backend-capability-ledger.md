@@ -995,3 +995,28 @@ Five names add 83 measured lines, from 25,874 to 25,957. The complete Slice 46-5
 passes 57/57 and Release passes 355/355 with sorted-name SHA-256
 `492d3838278e789e6b0ebabc8798653ba6fdccefc90dbe946b46f8d224453f9e`; removing the five Slice 54
 names reproduces Slice 53's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 55 adds public UInt `WaveReadLaneFirst()` as feature 40/intrinsic operation 6. CUDA source
+selection composes the public wrapper from `WaveGetActiveMask()` and the exact
+`WaveMaskReadLaneFirst(mask, value)` helper, whose canonical UInt terminator is
+`GenericAsm("_waveReadFirst($0, $1)")`. Complete assembly text and function-signature matching
+select the new semantic, while active-mask synthesis remains the only producer of its mask. V3
+remains 528/308 bytes, and exact Slice 54 providers remain loadable with feature 40 clear.
+
+The provider validates `(i32 mask, i32 value)` before mutation, emits
+`llvm.cttz.i32(mask, true)` to derive the first participating lane, and feeds that result to the
+established `llvm.nvvm.shfl.sync.idx.i32(mask, value, lane, 31)`. LLVM 14 gives `cttz` six newer
+optimization attributes and an `immarg` marker that LLVM 7 rejects. The legacy writer validates
+the exact declaration, parameter attributes, and types, then removes only the newer attributes and
+marker. The nonzero-mask contract follows synchronized-shuffle participation and matches NVRTC's
+branch-free CUDA-prelude implementation.
+
+NVVM and NVRTC agree on `[64]`, one global 32-bit store, no load, and exactly one ballot plus one
+shuffle in the entry. NVVM lowers `cttz` to a `popc` sequence; NVRTC uses `brev` plus
+`bfind.shiftamt`. CUDA 12.9 `ptxas` accepts both, and one full RTX 5090 warp reads lane zero's UInt
+value in every lane through both routes.
+
+Seven names add 347 measured lines, from 25,957 to 26,304. The complete Slice 46-55 wave matrix
+passes 64/64 and Release passes 362/362 with sorted-name SHA-256
+`652de9ad6905f2e885264851e4245cdc88e9119414a920111ee081b557ff786f`; removing the seven Slice 55
+names reproduces Slice 54's count and hash exactly. Debug preservation passes 10/10.

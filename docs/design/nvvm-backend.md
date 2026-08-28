@@ -2724,6 +2724,51 @@ set has SHA-256 `492d3838278e789e6b0ebabc8798653ba6fdccefc90dbe946b46f8d224453f9
 removing the five Slice 54 names reproduces Slice 53's count and hash exactly. Debug preservation
 passes 10/10.
 
+### Slice 55 public UInt wave-read-lane-first
+
+Slice 55 adds feature 40 `WAVE_READ_LANE_FIRST_UINT` and intrinsic operation 6 through the
+unchanged generic callback. CUDA defines public UInt `WaveReadLaneFirst(value)` by composing
+`WaveGetActiveMask()` with `WaveMaskReadLaneFirst(mask, value)`. After active-mask synthesis, the
+entry produces one ballot and passes its result to the public helper, which routes the mask through
+the active-mask identity before calling the exact UInt masked helper. That helper ends in
+`GenericAsm("_waveReadFirst($0, $1)")` with canonical `Func(UInt, UInt, UInt)` shape. Direct
+preflight matches the complete text/signature descriptor and forwards the two existing semantic
+parameters; it does not match function names or bypass the source-owned composition. V3 remains
+528 bytes on x64 and 308 bytes on x86, and an exact Slice 54 provider remains valid with feature
+40 clear.
+
+The CUDA prelude defines the target semantic as `__ffs(mask) - 1` followed by synchronized indexed
+shuffle. The provider validates two available i32 values before module mutation, emits overloaded
+`llvm.cttz.i32(mask, true)`, and passes that lane to
+`llvm.nvvm.shfl.sync.idx.i32(mask, value, lane, 31)`. The `true` zero-undefined flag is deliberate:
+an executing lane must participate in the synchronized shuffle mask, and the public path supplies
+its nonzero active mask. This slice neither invents nor tests behavior for an invalid zero mask.
+
+LLVM 7 and LLVM 14 have the same `cttz` signature, but LLVM 14 prints the declaration with the six
+newer nofree/nosync/willreturn optimization attributes and marks its Boolean flag `immarg`.
+libNVVM's LLVM 7 reader reports a parse error at that marker. The legacy writer validates the exact
+function result, arguments, function attributes, empty first-parameter attributes, and one
+second-parameter `immarg`; it then removes only the newer function attribute set and marker. Its
+semantic and rewritten counts must agree, retaining the narrow audited text-bridge policy.
+
+The existing public-wave direct runner now takes the operation arity, allowing the two-argument
+read-first composition to share its five-function, three-intrinsic, four-call, active-mask-flow,
+pointer, load, and store assertions with the established three-argument lane-at rows. Capability
+evidence independently removes lane index feature 34, ballot feature 39, and read-first feature 40
+before provider module creation.
+
+NVVM and NVRTC agree on the `[64]` launch ABI, one 32-bit global store, no global load, and exactly
+one `vote.sync.ballot.b32` plus one `shfl.sync.idx.b32` in the entry. NVVM lowers `cttz` to a
+`popc.b32` sequence, while NVRTC emits `brev.b32` and `bfind.shiftamt.u32`; runtime parity proves
+the two first-lane mechanisms select lane zero for the full participating warp. CUDA 12.9 `ptxas`
+accepts both, and all 32 RTX 5090 lanes store zero through each route.
+
+Seven independently registered evidence names add 347 physical lines across the five measured
+test/support files, from 25,957 to 26,304. The complete Slice 46-55 wave matrix passes 64/64 and
+the Release NVVM prefix passes 362/362. Its exact sorted LF-terminated name set has SHA-256
+`652de9ad6905f2e885264851e4245cdc88e9119414a920111ee081b557ff786f`; removing the seven Slice 55
+names reproduces Slice 54's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -3481,8 +3526,9 @@ The following remain open until their named slice supplies evidence:
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
-  read-lane-at, public unmasked UInt/Int/Float read-lane-at, and active-mask ballot, including
-  other scalar types, votes, reductions, and their convergence contracts;
+  read-lane-at, public unmasked UInt/Int/Float read-lane-at, active-mask ballot, and public UInt
+  read-lane-first, including other scalar types, votes, reductions, and their convergence
+  contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

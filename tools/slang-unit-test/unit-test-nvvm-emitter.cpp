@@ -895,10 +895,11 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveMaskUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-// Compiles one public scalar wave-read fixture and checks its canonical mask-to-shuffle topology.
-static void _checkUnmaskedWaveReadLaneAtDirectPipeline(
+// Compiles one public scalar wave-read fixture and checks its canonical mask-to-operation topology.
+static void _checkPublicWaveReadDirectPipeline(
     const char* source,
-    SlangNVVMIntrinsicOp_3 shuffleOperation,
+    SlangNVVMIntrinsicOp_3 waveOperation,
+    Index waveArgumentCount,
     FakeNVVMBuilderValueKind entryValueKind,
     Index expectedPointerOffsetCount,
     Index expectedLoadCount)
@@ -924,24 +925,25 @@ static void _checkUnmaskedWaveReadLaneAtDirectPipeline(
         SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 3);
         SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 3);
         Index ballotIntrinsicIndex = -1;
-        Index shuffleIntrinsicIndex = -1;
+        Index waveIntrinsicIndex = -1;
         for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
         {
             if (gFakeNVVMBuilder.intrinsicOperations[i] == SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT)
                 ballotIntrinsicIndex = i;
-            else if (gFakeNVVMBuilder.intrinsicOperations[i] == shuffleOperation)
-                shuffleIntrinsicIndex = i;
+            else if (gFakeNVVMBuilder.intrinsicOperations[i] == waveOperation)
+                waveIntrinsicIndex = i;
         }
         SLANG_CHECK_ABORT(ballotIntrinsicIndex >= 0);
-        SLANG_CHECK_ABORT(shuffleIntrinsicIndex >= 0);
+        SLANG_CHECK_ABORT(waveIntrinsicIndex >= 0);
         SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[ballotIntrinsicIndex] == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[shuffleIntrinsicIndex] == 3);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicArgumentCounts[waveIntrinsicIndex] == waveArgumentCount);
 
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 4);
         SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 4);
         Index publicCallIndex = -1;
         Index activeMaskCallIndex = -1;
-        Index maskedShuffleCallIndex = -1;
+        Index maskedWaveCallIndex = -1;
         for (Index callIndex = 0; callIndex < gFakeNVVMBuilder.callArgumentCounts.getCount();
              ++callIndex)
         {
@@ -951,53 +953,59 @@ static void _checkUnmaskedWaveReadLaneAtDirectPipeline(
             {
                 activeMaskCallIndex = callIndex;
             }
-            else if (argumentCount == 3)
+            else if (argumentCount == waveArgumentCount)
             {
-                const FakeNVVMBuilderValueRef& thirdArgument =
-                    gFakeNVVMBuilder.callArgumentValueRefs[argumentOffset + 2];
-                if (thirdArgument.kind == FakeNVVMBuilderValueKind::Intrinsic)
+                const FakeNVVMBuilderValueRef& lastArgument =
+                    gFakeNVVMBuilder.callArgumentValueRefs[argumentOffset + waveArgumentCount - 1];
+                if (lastArgument.kind == FakeNVVMBuilderValueKind::Intrinsic)
                     publicCallIndex = callIndex;
                 else
-                    maskedShuffleCallIndex = callIndex;
+                    maskedWaveCallIndex = callIndex;
             }
         }
         SLANG_CHECK_ABORT(publicCallIndex >= 0);
         SLANG_CHECK_ABORT(activeMaskCallIndex >= 0);
-        SLANG_CHECK_ABORT(maskedShuffleCallIndex >= 0);
+        SLANG_CHECK_ABORT(maskedWaveCallIndex >= 0);
 
         const Index publicArgumentOffset = gFakeNVVMBuilder.callArgumentOffsets[publicCallIndex];
         SLANG_CHECK(
             gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + 0].kind ==
             entryValueKind);
         SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + 1].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
+            gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + waveArgumentCount - 1]
+                .kind == FakeNVVMBuilderValueKind::Intrinsic);
         SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + 2].kind ==
-            FakeNVVMBuilderValueKind::Intrinsic);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + 2].index ==
-            ballotIntrinsicIndex);
+            gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + waveArgumentCount - 1]
+                .index == ballotIntrinsicIndex);
+        if (waveArgumentCount == 3)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + 1].kind ==
+                FakeNVVMBuilderValueKind::Parameter);
+        }
 
         const Index activeMaskArgumentOffset =
             gFakeNVVMBuilder.callArgumentOffsets[activeMaskCallIndex];
         SLANG_CHECK(
             gFakeNVVMBuilder.callArgumentValueRefs[activeMaskArgumentOffset].kind ==
             FakeNVVMBuilderValueKind::Parameter);
-        const Index maskedShuffleArgumentOffset =
-            gFakeNVVMBuilder.callArgumentOffsets[maskedShuffleCallIndex];
+        const Index maskedWaveArgumentOffset =
+            gFakeNVVMBuilder.callArgumentOffsets[maskedWaveCallIndex];
         SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[maskedShuffleArgumentOffset + 0].kind ==
+            gFakeNVVMBuilder.callArgumentValueRefs[maskedWaveArgumentOffset + 0].kind ==
             FakeNVVMBuilderValueKind::Call);
         SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[maskedShuffleArgumentOffset + 0].index ==
+            gFakeNVVMBuilder.callArgumentValueRefs[maskedWaveArgumentOffset + 0].index ==
             activeMaskCallIndex);
         SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[maskedShuffleArgumentOffset + 1].kind ==
+            gFakeNVVMBuilder.callArgumentValueRefs[maskedWaveArgumentOffset + 1].kind ==
             FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[maskedShuffleArgumentOffset + 2].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
+        if (waveArgumentCount == 3)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.callArgumentValueRefs[maskedWaveArgumentOffset + 2].kind ==
+                FakeNVVMBuilderValueKind::Parameter);
+        }
         SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == expectedPointerOffsetCount);
         SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == expectedLoadCount);
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
@@ -1011,9 +1019,10 @@ static void _checkUnmaskedWaveReadLaneAtDirectPipeline(
 
 SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtUIntUsesDirectPipeline)
 {
-    _checkUnmaskedWaveReadLaneAtDirectPipeline(
+    _checkPublicWaveReadDirectPipeline(
         kDirectNVVMUnmaskedWaveReadLaneAtUIntSource,
         SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT,
+        3,
         FakeNVVMBuilderValueKind::Call,
         1,
         0);
@@ -1021,9 +1030,10 @@ SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtUIntUsesDirectPipeline)
 
 SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtIntUsesDirectPipeline)
 {
-    _checkUnmaskedWaveReadLaneAtDirectPipeline(
+    _checkPublicWaveReadDirectPipeline(
         kDirectNVVMUnmaskedWaveReadLaneAtIntSource,
         SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT,
+        3,
         FakeNVVMBuilderValueKind::Load,
         2,
         1);
@@ -1031,12 +1041,24 @@ SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtIntUsesDirectPipeline)
 
 SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtFloatUsesDirectPipeline)
 {
-    _checkUnmaskedWaveReadLaneAtDirectPipeline(
+    _checkPublicWaveReadDirectPipeline(
         kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
         SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_FLOAT,
+        3,
         FakeNVVMBuilderValueKind::Load,
         2,
         1);
+}
+
+SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstUIntUsesDirectPipeline)
+{
+    _checkPublicWaveReadDirectPipeline(
+        kDirectNVVMWaveReadLaneFirstUIntSource,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT,
+        2,
+        FakeNVVMBuilderValueKind::Call,
+        1,
+        0);
 }
 
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
@@ -1548,6 +1570,13 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesUnmaskedWaveReadLaneAtFloatCapabilities)
     _checkUnmaskedWaveReadLaneAtCapabilities(
         kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneFirstUIntCapabilities)
+{
+    _checkUnmaskedWaveReadLaneAtCapabilities(
+        kDirectNVVMWaveReadLaneFirstUIntSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32CopyCapability)

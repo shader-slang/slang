@@ -1278,6 +1278,47 @@ static void _checkNVVMScalarPTXEvidence(
     }
 }
 
+SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstUIntDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
+    SLANG_CHECK_ABORT(
+        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT));
+    SLANG_CHECK_ABORT(
+        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT));
+
+    static const uint32_t kParameterWidths[] = {64};
+    _runNVVMSlangWaveDifferentialPTX(
+        kDirectNVVMWaveReadLaneFirstUIntSource,
+        "Ignoring UInt wave-read-lane-first PTX differential because libNVVM or NVRTC was not "
+        "found.",
+        kParameterWidths,
+        SLANG_COUNT_OF(kParameterWidths),
+        false,
+        [](SlangEmitCUDAMethod method, const String& ptx)
+        {
+            String signature;
+            String body;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                _extractPTXEntry(ptx.getUnownedSlice(), toSlice("computeMain"), signature, body)));
+            const UnownedStringSlice bodySlice = body.getUnownedSlice();
+            SLANG_CHECK(_countOccurrences(bodySlice, toSlice("vote.sync.ballot.b32")) == 1);
+            SLANG_CHECK(_countOccurrences(bodySlice, toSlice("shfl.sync.idx.b32")) == 1);
+            if (method == SLANG_EMIT_CUDA_VIA_NVVM)
+            {
+                SLANG_CHECK(ptx.indexOf("%laneid") >= 0);
+                SLANG_CHECK(_countOccurrences(bodySlice, toSlice("popc.b32")) == 1);
+            }
+            else
+            {
+                SLANG_CHECK(ptx.indexOf("%tid.x") >= 0);
+                SLANG_CHECK(_countOccurrences(bodySlice, toSlice("brev.b32")) == 1);
+                SLANG_CHECK(_countOccurrences(bodySlice, toSlice("bfind.shiftamt.u32")) == 1);
+            }
+        });
+}
+
 static void _runNVVMScalarDifferentialPTX(
     UnitTestContext* unitTestContext,
     NVVMScalarTestOperation operation)
@@ -1676,6 +1717,14 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveMaskPtxasAccepts)
         unitTestContext,
         kDirectNVVMWaveActiveMaskSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstUIntPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMWaveReadLaneFirstUIntSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtUIntPtxasAccepts)
@@ -2625,6 +2674,16 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveMaskRuntimeMatchesNVRTC)
         kDirectNVVMWaveActiveMaskSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveActiveMaskKernel(cuda, code); });
+}
+
+SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstUIntRuntimeMatchesNVRTC)
+{
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT,
+        kDirectNVVMWaveReadLaneFirstUIntSource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        { return _runWaveReadLaneFirstUIntKernel(cuda, code); });
 }
 
 SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtUIntRuntimeMatchesNVRTC)
