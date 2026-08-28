@@ -74,6 +74,11 @@ The manifest declares the package and its source dependencies:
       "version": ">=1.2.0 <2.0.0"
     }
   },
+  "tools": {
+    "slang-toolchain": {
+      "version": ">=2026.8.0"
+    }
+  },
   "retractions": [
     {
       "version": "1.1.0",
@@ -84,7 +89,7 @@ The manifest declares the package and its source dependencies:
 ```
 
 `schema_version` is the file format version and is currently `1`. `name`, `exports`, and
-`license_files` are also required. `dependencies`, `workspace`, and `host` are optional.
+`license_files` are also required. `dependencies`, `tools`, `workspace`, and `host` are optional.
 Package manifests allow JSON comments.
 
 `name` identifies the package throughout the dependency graph. `exports` lists relative source
@@ -113,6 +118,29 @@ primary whose source filename is `<name>.slang`. When more than one executable i
 With a single executable, `default` may be omitted and that name is used. Dependency manifests may
 declare this field, but only the workspace package controls executable generation.
 
+The optional `tools` object declares required **system tools**: programs already installed on the
+machine, not source packages and not lock rows. `slang package` checks that each named tool is
+present and that its version satisfies the declared constraint. It does not fetch those tools into
+`deps/` or record their versions in `slang-package-lock.json`.
+
+Schema `1` accepts only `slang-toolchain`, which is the Slang compiler that provides
+`slang-package`, regardless of how it was installed (a shader-slang/slang GitHub release, a Vulkan
+SDK distribution, or another bundle). Its `version` uses the same constraint grammar as Git
+dependencies (three-part versions, no `v` prefix). In the short term this is how a package states
+the minimum compiler it needs to work correctly: a builtin such as `neural`, a standard-library
+API, or a compiler fix that did not exist (or was broken) before that version. There is no
+separate way to depend on those builtins, so the toolchain version stands in for them.
+
+Every package in the graph may declare the field; `update`, `fetch`, `status`, `build`, and
+`validate` intersect those constraints against the installed compiler. `slang package init` writes
+`>=` that installed version when it can parse it. Slang compiler versions are calendar-based, not
+API levels, so a toolchain constraint should be a lower bound such as `>=2026.8.0`. Do not cap it
+at a speculative future date. Use `!=` to skip one known-bad compiler version without inventing an
+upper bound, for example `>=2026.8.0 !=2026.9.0`.
+
+Later schemas may add other system tools, or split Slang into separately versioned components if
+distributions start shipping them independently. Unknown `tools` keys are errors today.
+
 Ordinary dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package
 publishers must treat as immutable. A manifest may instead pin an opaque branch or tag with `ref`
 and assign its solver identity with `as`. `schema_version` in `slang-package.json` is only the file
@@ -128,8 +156,11 @@ the retracted release when another candidate satisfies the graph.
 
 The root-only `workspace.excludes` array is committed consumer policy. Each entry names a
 `package`, a `version` constraint, and a non-empty `reason`. Dependency manifests' workspace
-settings, including exclusions, are ignored. Resolution skips excluded Git releases. Unlike a
-publisher retraction, adding an exclusion changes the workspace's declared resolution intent, so
+settings, including exclusions, are ignored for the solve. If a reachable package lists
+`workspace.excludes` entries that this workspace does not copy (same `package` and `version`
+strings), `update`, `fetch`, `status`, `validate`, and `build` warn so those ignored excludes are
+visible. Resolution skips excluded Git releases. Unlike a publisher retraction, adding an
+exclusion changes the workspace's declared resolution intent, so
 `fetch` rejects a lock that still selects an excluded release and asks for `slang package update`.
 Path dependencies and local overrides carry an effective version for solver compatibility, but
 workspace exclusions apply only to remote Git selections.
@@ -142,9 +173,12 @@ Each dependency entry has one of four shapes:
 - `git`, `version`, `ref`, and `as` adds a compatibility assertion: `as` must satisfy `version`, or
   manifest validation fails.
 
-`git` may be a URL or a local Git repository path. A `version` is a space-separated intersection
-of `>`, `>=`, `<`, and `<=` comparisons, or a single exact version. Both `version` and `as` omit
-the release tag's `v` prefix. `ref` is normally a branch or tag; the lock, rather than the
+`git` may be a URL or a local Git repository path. A `version` is one or more clauses joined by
+`||`. Each clause is a space-separated intersection of `>`, `>=`, `<`, `<=`, and `!=` comparisons,
+or a single exact version. For example, `>=1.2.0 !=1.3.0` skips 1.3.0, and
+`>=1.0.0 <1.3.0 || >=1.3.1 <2.0.0` accepts either interval. Dependents still unify one version per
+package name: every incoming constraint must match that version. Both `version` and `as` omit the
+release tag's `v` prefix. `ref` is normally a branch or tag; the lock, rather than the
 manifest, records the exact commit.
 
 A dependency `path` must be relative to the manifest that declares it. The target directory must
@@ -248,7 +282,9 @@ relative to the primary (for example `__include "noise/hash";`), as shown in
 ## Creating and editing packages
 
 `slang package init` creates `slang-package.json` and the conventional directories in the current
-directory. It adds `.slang/`, `deps/`, `build/`, and `slang-workspace.json` to `.gitignore`.
+directory. It writes `tools.slang-toolchain` as `>=` the installed compiler version when that
+version can be parsed. It adds `.slang/`, `deps/`, `build/`, and `slang-workspace.json` to
+`.gitignore`.
 `.slang/cache/` contains resolver Git repositories used to inspect release manifests. Fetched
 source remains visible under `deps/`; generated files go under `build/`.
 

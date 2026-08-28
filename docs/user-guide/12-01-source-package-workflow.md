@@ -60,8 +60,9 @@ less slang-package-lock.json
 ```
 
 - `slang-package.json` is published intent: package name, exports, licenses, Git or path
-  dependencies, optional `host` executables, optional publisher `retractions`, and optional
-  root-only `workspace` settings (`deps`, `build`, `excludes`).
+  dependencies, optional `tools.slang-toolchain` for a minimum installed compiler (and thus its
+  builtins and standard library), optional `host` executables, optional publisher `retractions`,
+  and optional root-only `workspace` settings (`deps`, `build`, `excludes`).
 - `slang-package-lock.json` is the exact graph this workspace selected. `fetch` reproduces it
   without solving again.
 - `slang-workspace.json` is gitignored machine-local state for `edit` and `override`. It should
@@ -212,8 +213,10 @@ requested range. They skip matching Git candidates on `update`. They do **not** 
 existing lock, so `fetch` in CI stays reproducible after the publisher adds advice.
 
 **Workspace excludes** live in the root manifest's `workspace.excludes` array. They are committed
-consumer policy for *this* workspace. Nested packages' `workspace` objects are ignored. Resolution
-skips excluded Git tags, and `fetch` **rejects** a lock that still selects one: the lock is stale
+consumer policy for *this* workspace. Nested packages' `workspace` objects are ignored for the
+solve. If a dependency still lists excludes this workspace did not copy, the tool warns; copy the
+entry here if this project should skip that Git release too. Resolution skips excluded Git tags,
+and `fetch` **rejects** a lock that still selects one: the lock is stale
 relative to declared intent, so you must `update`. Path packages and overrides are local
 selections, so remote release exclusions do not filter them even though they carry an effective
 version for solver compatibility.

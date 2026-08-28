@@ -520,13 +520,8 @@ SlangResult validateProject(
 
     List<ModuleLocation> modules;
     List<ExportedSourceFile> sourceFiles;
-    SLANG_RETURN_ON_FAIL(_validatePackageTree(
-        projectRoot,
-        rootManifest,
-        modules,
-        sourceFiles,
-        mode,
-        outError));
+    SLANG_RETURN_ON_FAIL(
+        _validatePackageTree(projectRoot, rootManifest, modules, sourceFiles, mode, outError));
 
     String lockPath = Path::combine(projectRoot, kLockName);
     List<LocalPackage> localPackages;
@@ -539,7 +534,9 @@ SlangResult validateProject(
                 _collectPrimaryModules(modules, *outPrimaryModules);
             if (outSourceFiles)
                 _collectExportedSourceFiles(sourceFiles, *outSourceFiles);
-            return SLANG_OK;
+            List<ToolchainConstraint> toolchainConstraints;
+            addSlangToolchainConstraint(rootManifest, toolchainConstraints);
+            return selectSlangToolchain(toolchainConstraints, outError);
         }
         outError = localPackages.getCount()
                        ? "Registered local packages require slang-package-lock.json."
@@ -640,7 +637,22 @@ SlangResult validateProject(
         _collectPrimaryModules(modules, *outPrimaryModules);
     if (outSourceFiles)
         _collectExportedSourceFiles(sourceFiles, *outSourceFiles);
-    return SLANG_OK;
+    List<ToolchainConstraint> toolchainConstraints;
+    addSlangToolchainConstraint(rootManifest, toolchainConstraints);
+    for (Index i = 0; i < lock.packages.getCount(); ++i)
+    {
+        if (loaded[i])
+            addSlangToolchainConstraint(packageManifests[i], toolchainConstraints);
+        if (loaded[i] && outWarnings)
+        {
+            addUnadoptedWorkspaceExclusionWarnings(
+                rootManifest,
+                lock.packages[i].name,
+                packageManifests[i],
+                outWarnings);
+        }
+    }
+    return selectSlangToolchain(toolchainConstraints, outError);
 }
 
 } // namespace PackageTool

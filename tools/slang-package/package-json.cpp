@@ -726,6 +726,69 @@ static SlangResult _readHost(
     return SLANG_FAIL;
 }
 
+// Read the optional `tools` object. These entries name installed system programs whose presence
+// and version the package tool checks; they are not source dependencies and are not locked.
+// Schema 1 accepts only `slang-toolchain`, which packages use as a minimum-compiler requirement
+// when they need a builtin, standard-library API, or compiler fix from that version. Other keys
+// remain closed so later schemas can add tools or split Slang into separately versioned
+// components without silently ignoring them today.
+static SlangResult _readTools(
+    JSONContainer* container,
+    const JSONValue& root,
+    String& outSlangToolchainConstraint,
+    String& outError)
+{
+    outSlangToolchainConstraint = String();
+    JSONValue tools = _find(container, root, "tools");
+    if (!tools.isValid())
+        return SLANG_OK;
+    if (tools.getKind() != JSONValue::Kind::Object)
+    {
+        outError = "Field 'tools' must be an object.";
+        return SLANG_FAIL;
+    }
+    for (auto pair : container->getObject(tools))
+    {
+        String key = container->getStringFromKey(pair.key);
+        if (key != kSlangToolchainName)
+        {
+            outError = String("Unknown tool in 'tools': ") + key +
+                       ". Schema 1 accepts only 'slang-toolchain'.";
+            return SLANG_FAIL;
+        }
+    }
+    JSONValue slangToolchain = _find(container, tools, kSlangToolchainName);
+    if (!slangToolchain.isValid())
+        return SLANG_OK;
+    if (slangToolchain.getKind() != JSONValue::Kind::Object)
+    {
+        outError = "Field 'tools.slang-toolchain' must be an object.";
+        return SLANG_FAIL;
+    }
+    for (auto pair : container->getObject(slangToolchain))
+    {
+        String key = container->getStringFromKey(pair.key);
+        if (key != "version")
+        {
+            outError = String("Unknown field in 'tools.slang-toolchain': ") + key;
+            return SLANG_FAIL;
+        }
+    }
+    SLANG_RETURN_ON_FAIL(_readRequiredString(
+        container,
+        slangToolchain,
+        "version",
+        outSlangToolchainConstraint,
+        outError));
+    VersionConstraint ignored;
+    if (SLANG_FAILED(parseVersionConstraint(outSlangToolchainConstraint, ignored, outError)))
+    {
+        outError = String("Invalid tools.slang-toolchain version: ") + outError;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String& outError)
 {
     outManifest = Manifest();
@@ -739,7 +802,7 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
         String key = json.container->getStringFromKey(pair.key);
         if (key != "schema_version" && key != "name" && key != "exports" &&
             key != "license_files" && key != "dependencies" && key != "retractions" &&
-            key != "workspace" && key != "host")
+            key != "workspace" && key != "host" && key != "tools")
         {
             outError = String("Unknown field in slang-package.json: ") + key;
             return SLANG_FAIL;
@@ -773,6 +836,8 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
     SLANG_RETURN_ON_FAIL(
         _readWorkspace(json.container, json.root, outManifest.workspace, outError));
     SLANG_RETURN_ON_FAIL(_readHost(json.container, json.root, outManifest.host, outError));
+    SLANG_RETURN_ON_FAIL(
+        _readTools(json.container, json.root, outManifest.slangToolchainConstraint, outError));
     return SLANG_OK;
 }
 
@@ -875,6 +940,17 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
     for (const auto& dependency : manifest.dependencies)
         _writeDependency(writer, dependency);
     writer.endObject(SourceLoc());
+    if (manifest.slangToolchainConstraint.getLength())
+    {
+        _writeKey(writer, "tools");
+        writer.startObject(SourceLoc());
+        writer.addUnquotedKey(UnownedStringSlice(kSlangToolchainName), SourceLoc());
+        writer.startObject(SourceLoc());
+        _writeKey(writer, "version");
+        writer.addStringValue(manifest.slangToolchainConstraint.getUnownedSlice(), SourceLoc());
+        writer.endObject(SourceLoc());
+        writer.endObject(SourceLoc());
+    }
     if (manifest.retractions.getCount())
     {
         _writeKey(writer, "retractions");

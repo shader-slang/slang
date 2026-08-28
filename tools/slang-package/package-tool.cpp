@@ -367,13 +367,16 @@ static SlangResult _validateMaterializedManifests(
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
     String& outError,
-    bool allowLocalManifestChanges = false)
+    bool allowLocalManifestChanges = false,
+    List<String>* outWarnings = nullptr)
 {
     List<bool> trusted;
     trusted.setCount(lock.packages.getCount());
     for (Index i = 0; i < lock.packages.getCount(); ++i)
         trusted[i] = false;
     List<Index> pending;
+    List<ToolchainConstraint> toolchainConstraints;
+    addSlangToolchainConstraint(rootManifest, toolchainConstraints);
 
     for (const auto& dependency : rootManifest.dependencies)
     {
@@ -418,6 +421,8 @@ static SlangResult _validateMaterializedManifests(
         }
         if (!(allowLocalManifestChanges && localIndex >= 0))
             SLANG_RETURN_ON_FAIL(validateLockedPackageManifest(package, manifest, outError));
+        addSlangToolchainConstraint(manifest, toolchainConstraints);
+        addUnadoptedWorkspaceExclusionWarnings(rootManifest, package.name, manifest, outWarnings);
         const List<Dependency>& dependencies = allowLocalManifestChanges && localIndex >= 0
                                                    ? package.dependencies
                                                    : manifest.dependencies;
@@ -440,7 +445,8 @@ static SlangResult _validateMaterializedManifests(
             }
         }
     }
-    return requireAllLockPackagesTrusted(lock, trusted, outError);
+    SLANG_RETURN_ON_FAIL(requireAllLockPackagesTrusted(lock, trusted, outError));
+    return selectSlangToolchain(toolchainConstraints, outError);
 }
 
 static SlangResult _writeValidatedSearchPathsAfterLocalChange(
@@ -488,6 +494,16 @@ static SlangResult _init(const String& projectRoot, String& outError)
     manifest.licenseFiles.add("LICENSE");
     manifest.workspace.depsDirectory = "deps";
     manifest.workspace.buildDirectory = "build";
+    SemanticVersion installedToolchain;
+    String installedToolchainText;
+    String toolchainError;
+    if (SLANG_SUCCEEDED(getInstalledSlangToolchainVersion(
+            installedToolchain,
+            installedToolchainText,
+            toolchainError)))
+    {
+        manifest.slangToolchainConstraint = String(">=") + installedToolchainText;
+    }
     String licensePath = Path::combine(projectRoot, "LICENSE");
     if (!File::exists(licensePath) &&
         SLANG_FAILED(File::writeAllText(licensePath, getLicensePlaceholderText())))
@@ -556,8 +572,17 @@ static SlangResult _fetch(const String& projectRoot, bool allowClean, String& ou
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
     SLANG_RETURN_ON_FAIL(
         _materialize(projectRoot, manifest, lock, &lock, localPackages, allowClean, outError));
-    SLANG_RETURN_ON_FAIL(
-        _validateMaterializedManifests(projectRoot, manifest, lock, localPackages, outError));
+    List<String> warnings;
+    SLANG_RETURN_ON_FAIL(_validateMaterializedManifests(
+        projectRoot,
+        manifest,
+        lock,
+        localPackages,
+        outError,
+        false,
+        &warnings));
+    for (const auto& warning : warnings)
+        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, manifest, lock, localPackages, outError));
     fprintf(stdout, "Fetched %lld package(s).\n", (long long)lock.packages.getCount());
     return SLANG_OK;
@@ -694,8 +719,15 @@ static SlangResult _status(const String& projectRoot, String& outError)
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
-    if (SLANG_FAILED(
-            _validateMaterializedManifests(projectRoot, manifest, lock, localPackages, outError)))
+    List<String> warnings;
+    if (SLANG_FAILED(_validateMaterializedManifests(
+            projectRoot,
+            manifest,
+            lock,
+            localPackages,
+            outError,
+            false,
+            &warnings)))
     {
         appendErrorAdvice(
             outError,
@@ -703,6 +735,8 @@ static SlangResult _status(const String& projectRoot, String& outError)
             "if a path-package manifest changed.");
         return SLANG_FAIL;
     }
+    for (const auto& warning : warnings)
+        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
 
     Index cleanCheckoutCount = 0;
     for (const auto& package : lock.packages)

@@ -87,6 +87,19 @@ struct HostSettings
     String defaultExecutable;
 };
 
+/// Graph-wide requirement from a package's `tools.slang-toolchain.version`.
+///
+/// Consider this example: a package uses the `neural` builtin, which only exists after a given
+/// compiler release. It cannot depend on that builtin as a source package, so it declares
+/// `tools.slang-toolchain.version` as the minimum installed compiler that ships a working copy.
+/// Schema 1 only understands that one tool name; the check is against the compiler that provides
+/// `slang-package`, regardless of distribution.
+struct ToolchainConstraint
+{
+    String packageName;
+    String constraint;
+};
+
 struct Manifest
 {
     String name;
@@ -96,6 +109,13 @@ struct Manifest
     List<Retraction> retractions;
     WorkspaceSettings workspace;
     HostSettings host;
+    /// Version constraint from `tools.slang-toolchain`, or empty when omitted.
+    ///
+    /// This is a check against the installed compiler, not a lock row. A package uses it as a
+    /// minimum-compiler requirement when it needs a builtin, standard-library API, or compiler
+    /// fix that only exists after that version. Other `tools` keys are reserved for later
+    /// system-tool or component checks.
+    String slangToolchainConstraint;
 };
 
 inline bool hasHostExecutables(const Manifest& manifest)
@@ -198,6 +218,7 @@ inline bool isEditedLocalPackage(const LocalPackage& package)
 enum class VersionComparison
 {
     Equal,
+    NotEqual,
     Greater,
     GreaterEqual,
     Less,
@@ -210,9 +231,16 @@ struct VersionPredicate
     SemanticVersion version;
 };
 
-struct VersionConstraint
+/// One AND-group in a version constraint: every predicate must match.
+struct VersionClause
 {
     List<VersionPredicate> predicates;
+};
+
+/// Version matcher: clauses are OR, predicates inside a clause are AND.
+struct VersionConstraint
+{
+    List<VersionClause> clauses;
 
     bool matches(const SemanticVersion& version) const;
 };
@@ -229,7 +257,12 @@ struct TagCandidate
     SemanticVersion version;
 };
 
-/// Parse a version constraint written without a `v` prefix, such as `>=1.2.0 <2.0.0`.
+/// Parse a version constraint written without a `v` prefix.
+///
+/// Consider this example: `>=1.2.0 !=1.3.0` matches 1.2.0 and 1.4.0 but not 1.3.0.
+/// `>=1.0.0 <1.3.0 || >=1.3.1 <2.0.0` matches either interval. Whitespace-separated
+/// comparisons in one clause are AND; `||` joins clauses as OR. A clause may be a single
+/// exact version such as `1.4.0`.
 SlangResult parseVersionConstraint(
     const UnownedStringSlice& text,
     VersionConstraint& outConstraint,
@@ -271,6 +304,39 @@ inline String formatExactVersion(const SemanticVersion& version)
 {
     return String(version.m_major) + "." + String(version.m_minor) + "." + String(version.m_patch);
 }
+
+inline constexpr char kSlangToolchainName[] = "slang-toolchain";
+
+/// Record a package's `tools.slang-toolchain` constraint when the field is present.
+void addSlangToolchainConstraint(
+    const Manifest& manifest,
+    List<ToolchainConstraint>& ioConstraints);
+
+/// Return the sibling compiler's exact `MAJOR.MINOR.PATCH` identity.
+SlangResult getInstalledSlangToolchainVersion(
+    SemanticVersion& outVersion,
+    String& outExactText,
+    String& outError);
+
+/// Check that the installed compiler satisfies every `tools.slang-toolchain` constraint.
+///
+/// Consider this example: the workspace requires `>=2026.8.0` because it uses `neural`, and a
+/// dependency requires `>=2026.14.0` because of a later compiler fix. The installed compiler next
+/// to `slang-package` must satisfy both lower bounds. The installed version is not written to the
+/// lock.
+SlangResult selectSlangToolchain(const List<ToolchainConstraint>& constraints, String& outError);
+
+/// Record a warning when a dependency lists `workspace.excludes` that this workspace did not copy.
+///
+/// Consider this example: package `display` excludes `color-encoding` `1.0.0` because of a
+/// gradient bug, but the workspace that consumes `display` has no matching exclude. Nested
+/// `workspace` objects are ignored, so resolution can still select `1.0.0`. This warning tells
+/// the workspace author to copy the entry if this project should skip that release too.
+void addUnadoptedWorkspaceExclusionWarnings(
+    const Manifest& rootManifest,
+    const String& packageName,
+    const Manifest& packageManifest,
+    List<String>* ioWarnings);
 
 /// Append `advice` as a following line of `ioError`.
 ///

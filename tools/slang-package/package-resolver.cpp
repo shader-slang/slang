@@ -304,6 +304,27 @@ public:
         }
         outLock.packages.sort([](const LockedPackage& left, const LockedPackage& right)
                               { return left.name < right.name; });
+        List<ToolchainConstraint> toolchainConstraints;
+        addSlangToolchainConstraint(rootManifest, toolchainConstraints);
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (!reachable[i])
+                continue;
+            addSlangToolchainConstraint(
+                packages[i].resolvedManifest.manifest,
+                toolchainConstraints);
+        }
+        SLANG_RETURN_ON_FAIL(selectSlangToolchain(toolchainConstraints, outError));
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (!reachable[i])
+                continue;
+            addUnadoptedWorkspaceExclusionWarnings(
+                rootManifest,
+                packages[i].name,
+                packages[i].resolvedManifest.manifest,
+                warnings);
+        }
         return SLANG_OK;
     }
 
