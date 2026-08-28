@@ -1376,6 +1376,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
     bool appendsShuffleClamp = false;
     bool derivesFirstActiveLane = false;
     bool derivesFirstLanePredicate = false;
+    bool extractsMatchAllPredicate = false;
     switch (operation)
     {
     case SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX:
@@ -1426,6 +1427,11 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         intrinsicID = llvm::Intrinsic::nvvm_vote_all_sync;
         expectedArgumentCount = 2;
         expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
+        break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT:
+        intrinsicID = llvm::Intrinsic::nvvm_match_all_sync_i32p;
+        expectedArgumentCount = 2;
+        extractsMatchAllPredicate = true;
         break;
     default:
         return SLANG_E_INVALID_ARG;
@@ -1478,7 +1484,9 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
 
     llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
     llvm::CallInst* call = state->builder.CreateCall(intrinsic, llvmArguments);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(call);
+    llvm::Value* result = extractsMatchAllPredicate ? state->builder.CreateExtractValue(call, {1})
+                                                    : static_cast<llvm::Value*>(call);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(result);
     return SLANG_OK;
 }
 
@@ -1754,6 +1762,28 @@ static SlangResult _writeLegacyNVVMAssembly(
                 (++argument)->getType() != llvm::Type::getInt1Ty(state->context))
             {
                 return SLANG_E_NOT_AVAILABLE;
+            }
+        }
+        else if (intrinsicID == llvm::Intrinsic::nvvm_match_all_sync_i32p)
+        {
+            const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
+            llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
+            llvm::StructType* resultType =
+                llvm::dyn_cast<llvm::StructType>(function.getReturnType());
+            if (!function.isDeclaration() || !resultType || resultType->getNumElements() != 2 ||
+                resultType->getElementType(0) != int32Type ||
+                resultType->getElementType(1) != llvm::Type::getInt1Ty(state->context) ||
+                function.arg_size() != 2 || functionAttributes.getNumAttributes() != 3 ||
+                !function.hasFnAttribute(llvm::Attribute::Convergent) ||
+                !function.hasFnAttribute(llvm::Attribute::InaccessibleMemOnly) ||
+                !function.hasFnAttribute(llvm::Attribute::NoUnwind))
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+            for (const llvm::Argument& argument : function.args())
+            {
+                if (argument.getType() != int32Type)
+                    return SLANG_E_NOT_AVAILABLE;
             }
         }
         else if (intrinsicID == llvm::Intrinsic::cttz)

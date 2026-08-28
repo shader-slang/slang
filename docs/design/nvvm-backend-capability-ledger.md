@@ -1124,3 +1124,28 @@ passes 99/99 and Release passes 397/397 with sorted-name SHA-256
 names reproduces Slice 59's 390-name hash
 `eaa8420ddbba56d34cb047211d872acd6ad2dc0dcdd0209059e307e9879e3186` exactly. Debug preservation
 passes 10/10.
+
+Slice 61 adds public signed-i32 `WaveActiveAllEqual(value)` through feature 46/intrinsic operation
+12 at the canonical masked-helper boundary. Exact assembly plus `Func(Bool, UInt, Int)` matching
+distinguishes `_waveAllEqual(mask, value)` without helper names. V3 stays 528/308 bytes, and exact
+Slice 60 providers remain loadable with feature 46 clear. UInt, Float, wider, vector, and matrix
+overloads remain unsupported.
+
+The provider validates two i32 operands before mutation, calls
+`llvm.nvvm.match.all.sync.i32p(i32, i32) -> {i32, i1}`, and returns only extracted element 1 as the
+semantic Bool. The native match mask remains provider-private. LLVM 7 and the provider LLVM use
+compatible declarations and semantic attributes, so the legacy writer audits the exact aggregate
+signature without rewriting text or changing the provider ABI.
+
+Predicate-intrinsic scaffolding shares only the genuine Boolean-result/two-operand graph while each
+operation retains type, feature, operation, declaration, PTX, and runtime assertions. NVVM and
+NVRTC agree on `[64, 64]`, one global 32-bit load/store pair, two synchronized ballots, and one
+`match.all.sync.b32`. CUDA 12.9 `ptxas` accepts both. On an RTX 5090, distinct signed lane values
+produce zero in every lane and uniform `-17` produces one through both routes.
+
+Seven names add 169 measured lines, from 27,500 to 27,669. The complete Slice 46-61 wave/ABI
+matrix passes 106/106 and Release passes 404/404 with sorted-name SHA-256
+`40f3eba7cfb2602716a16b54d942cf09e34e9f2171835889a1dea43cb1e10d0a`; removing the seven Slice 61
+names reproduces Slice 60's 397-name hash
+`d5daef5d6db4caa82e5dd8039a8b0f5e095d13cdb819a81f7ea69a30ab873b0d` exactly. Debug preservation
+passes 10/10.

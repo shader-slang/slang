@@ -1406,12 +1406,13 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveIsFirstLaneDifferentialPTX)
         });
 }
 
-static void _runNVVMSlangWaveVoteDifferentialPTX(
+static void _runNVVMSlangWavePredicateDifferentialPTX(
     UnitTestContext* unitTestContext,
     const char* source,
     SlangNVVMBuilderFeature_3 feature,
     const char* unavailableMessage,
-    const UnownedStringSlice& voteMnemonic)
+    const UnownedStringSlice& intrinsicMnemonic,
+    Index expectedSignedNotEqualCount)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
@@ -1427,7 +1428,7 @@ static void _runNVVMSlangWaveVoteDifferentialPTX(
         kParameterWidths,
         SLANG_COUNT_OF(kParameterWidths),
         true,
-        [voteMnemonic](SlangEmitCUDAMethod, const String& ptx)
+        [intrinsicMnemonic, expectedSignedNotEqualCount](SlangEmitCUDAMethod, const String& ptx)
         {
             String signature;
             String body;
@@ -1435,31 +1436,47 @@ static void _runNVVMSlangWaveVoteDifferentialPTX(
                 _extractPTXEntry(ptx.getUnownedSlice(), toSlice("computeMain"), signature, body)));
             const UnownedStringSlice bodySlice = body.getUnownedSlice();
             SLANG_CHECK(_countOccurrences(bodySlice, toSlice("vote.sync.ballot.b32")) == 2);
-            SLANG_CHECK(_countOccurrences(bodySlice, voteMnemonic) == 1);
+            SLANG_CHECK(_countOccurrences(bodySlice, intrinsicMnemonic) == 1);
             SLANG_CHECK(_countOccurrences(bodySlice, toSlice("ld.global.u32")) == 1);
-            SLANG_CHECK(_countOccurrences(bodySlice, toSlice("setp.ne.s32")) == 1);
+            SLANG_CHECK(
+                _countOccurrences(bodySlice, toSlice("setp.ne.s32")) ==
+                expectedSignedNotEqualCount);
             SLANG_CHECK(_countOccurrences(bodySlice, toSlice("st.global.u32")) == 1);
         });
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAnyTrueDifferentialPTX)
 {
-    _runNVVMSlangWaveVoteDifferentialPTX(
+    _runNVVMSlangWavePredicateDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveActiveAnyTrueSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE,
         "Ignoring wave-active-any-true PTX differential because libNVVM or NVRTC was not found.",
-        toSlice("vote.sync.any.pred"));
+        toSlice("vote.sync.any.pred"),
+        1);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllTrueDifferentialPTX)
 {
-    _runNVVMSlangWaveVoteDifferentialPTX(
+    _runNVVMSlangWavePredicateDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveActiveAllTrueSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_TRUE,
         "Ignoring wave-active-all-true PTX differential because libNVVM or NVRTC was not found.",
-        toSlice("vote.sync.all.pred"));
+        toSlice("vote.sync.all.pred"),
+        1);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualIntDifferentialPTX)
+{
+    _runNVVMSlangWavePredicateDifferentialPTX(
+        unitTestContext,
+        kDirectNVVMWaveActiveAllEqualIntSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT,
+        "Ignoring signed-i32 wave-active-all-equal PTX differential because libNVVM or NVRTC was "
+        "not found.",
+        toSlice("match.all.sync.b32"),
+        0);
 }
 
 static void _runNVVMScalarDifferentialPTX(
@@ -1908,6 +1925,14 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllTruePtxasAccepts)
         unitTestContext,
         kDirectNVVMWaveActiveAllTrueSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_TRUE);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualIntPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMWaveActiveAllEqualIntSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtUIntPtxasAccepts)
@@ -2917,6 +2942,16 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveAllTrueRuntimeMatchesNVRTC)
         kDirectNVVMWaveActiveAllTrueSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveActiveAllTrueKernel(cuda, code); });
+}
+
+SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualIntRuntimeMatchesNVRTC)
+{
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT,
+        kDirectNVVMWaveActiveAllEqualIntSource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        { return _runWaveActiveAllEqualIntKernel(cuda, code); });
 }
 
 SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtUIntRuntimeMatchesNVRTC)

@@ -2965,6 +2965,45 @@ names reproduces Slice 59's 390-name hash
 `eaa8420ddbba56d34cb047211d872acd6ad2dc0dcdd0209059e307e9879e3186` exactly. Debug preservation
 passes 10/10.
 
+### Slice 61 public signed-i32 wave-active-all-equal and native aggregate adaptation
+
+Slice 61 adds feature 46 `WAVE_MASK_ALL_EQUAL_INT` and intrinsic operation 12 through the generic
+callback. CUDA specializes public `WaveActiveAllEqual(intValue)` to
+`WaveMaskAllEqual(WaveGetActiveMask(), intValue)`; final linked IR retains one exact
+`Func(Bool, UInt, Int)` helper ending in `_waveAllEqual($0, $1)`. Complete assembly and signature
+matching distinguishes the signed-i32 overload without helper names or graph rediscovery. UInt,
+Float, wider, vector, and matrix overloads remain unsupported. V3 remains 528/308 bytes, and an
+exact Slice 60 provider remains valid with feature 46 clear.
+
+The provider validates the i32 mask and i32 value before mutation, calls
+`llvm.nvvm.match.all.sync.i32p(i32, i32) -> {i32, i1}`, and immediately extracts aggregate element
+1 as the helper's semantic Bool result. The aggregate is the native LLVM/NVPTX encoding of PTX's
+matching-mask and predicate outputs; it does not enter the provider ABI or become a second Slang
+value representation. LLVM 7 and the provider LLVM use the same declaration and
+convergent/inaccessible-memory/nounwind attributes, so the legacy writer adds an exact semantic
+audit but no text rewrite, callback, or marker.
+
+The any/all/all-equal fixtures and direct/PTX evidence share setup only across their common
+Boolean-result, two-operand wave-intrinsic graph. Each registered row retains separate argument
+type, feature, operation, assembly, declaration, source, mnemonic, and runtime assertions. The
+public all-equal graph has five functions, four calls, four intrinsic emissions, no Bool function
+parameters, two Bool call results, two pointer offsets, one load, one signed-i32 conditional phi,
+and one store. Its feature union requires lane index, synchronized ballot, and signed-i32 masked
+all-equal; clearing the new feature returns E52016 before provider module construction.
+
+NVVM and NVRTC agree on a `[64, 64]` entry with one 32-bit global load, two
+`vote.sync.ballot.b32` instructions, one `match.all.sync.b32`, and one global 32-bit store. CUDA
+12.9 `ptxas` accepts both. On an RTX 5090, distinct per-lane signed values make all 32 lanes store
+zero, while a uniform `-17` makes all lanes store one through both routes.
+
+Seven independently registered evidence names add 169 physical lines across the five measured
+test/support files, from 27,500 to 27,669. The complete Slice 46-61 wave/ABI matrix passes 106/106
+and the Release NVVM prefix passes 404/404. Its exact sorted LF-terminated name set has SHA-256
+`40f3eba7cfb2602716a16b54d942cf09e34e9f2171835889a1dea43cb1e10d0a`; removing the seven Slice 61
+names reproduces Slice 60's 397-name hash
+`d5daef5d6db4caa82e5dd8039a8b0f5e095d13cdb819a81f7ea69a30ab873b0d` exactly. Debug preservation
+passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -3723,8 +3762,8 @@ The following remain open until their named slice supplies evidence:
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
   read-lane-at, public unmasked UInt/Int/Float read-lane-at, active-mask ballot, and public
-  UInt/Int/Float read-lane-first and is-first-lane, including other scalar types, votes,
-  reductions, and their convergence contracts;
+  UInt/Int/Float read-lane-first, is-first-lane, any/all-true, and signed-i32 all-equal, including
+  other scalar types, other votes, reductions, and their convergence contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

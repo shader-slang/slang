@@ -116,6 +116,7 @@ struct NVVMGenericAsmIntrinsicInfo
         UIntNoArguments,
         BoolUInt,
         BoolUIntBool,
+        BoolUIntInt,
         UIntUIntUInt,
         IntUIntInt,
         FloatUIntFloat,
@@ -218,6 +219,13 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(
             "wave-mask all-true intrinsic",
             NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntBool,
         },
+        {
+            "_waveAllEqual($0, $1)",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT,
+            "signed-i32 wave-mask all-equal intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntInt,
+        },
     };
     if (!genericAsm)
         return nullptr;
@@ -249,6 +257,10 @@ bool _isNVVMGenericAsmIntrinsicHelper(
         return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 2 &&
                isNVVMUnsignedI32Type(function->getParamType(0)) &&
                isNVVMBoolType(function->getParamType(1));
+    case NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntInt:
+        return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 2 &&
+               isNVVMUnsignedI32Type(function->getParamType(0)) &&
+               isNVVMSignedI32Type(function->getParamType(1));
     case NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUInt:
         return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 2 &&
                isNVVMUnsignedI32Type(function->getParamType(0)) &&
