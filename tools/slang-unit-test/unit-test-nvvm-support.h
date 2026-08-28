@@ -5199,6 +5199,17 @@ void computeMain(
     destination[laneIndex] = WaveReadLaneAt(laneIndex, sourceLane);
 }
 )";
+static const char kDirectNVVMUnmaskedWaveReadLaneAtIntSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform Ptr<int, Access::Read, AddressSpace::Device> source,
+    uniform int sourceLane)
+{
+    uint laneIndex = WaveGetLaneIndex();
+    destination[laneIndex] = WaveReadLaneAt(source[laneIndex], sourceLane);
+}
+)";
 static const char kDirectNVVMFloat32SubtractSource[] = R"(
 [CUDAKernel]
 void computeMain(
@@ -7855,6 +7866,7 @@ enum class WaveScalar32Expected
     UIntSourceLane,
     UnmaskedUIntSourceLane,
     IntSourceLane,
+    UnmaskedIntSourceLane,
     FloatSourceLane,
 };
 
@@ -7869,6 +7881,7 @@ static SlangResult _runWaveScalar32Kernel(
     const bool readsSourceLane = expectedKind == WaveScalar32Expected::UIntSourceLane ||
                                  expectedKind == WaveScalar32Expected::UnmaskedUIntSourceLane ||
                                  expectedKind == WaveScalar32Expected::IntSourceLane ||
+                                 expectedKind == WaveScalar32Expected::UnmaskedIntSourceLane ||
                                  expectedKind == WaveScalar32Expected::FloatSourceLane;
     if (!ptx.getLength() || (readsSourceLane && (sourceLane < 0 || sourceLane >= int(kLaneCount))))
         return SLANG_E_INVALID_ARG;
@@ -7898,6 +7911,7 @@ static SlangResult _runWaveScalar32Kernel(
     }
     CudaDevicePtr source = 0;
     const bool hasLoadedSource = expectedKind == WaveScalar32Expected::IntSourceLane ||
+                                 expectedKind == WaveScalar32Expected::UnmaskedIntSourceLane ||
                                  expectedKind == WaveScalar32Expected::FloatSourceLane;
     if (hasLoadedSource && (cuda.cuMemAlloc(&source, sizeof(intSourceValues)) != 0 || !source))
     {
@@ -7918,11 +7932,14 @@ static SlangResult _runWaveScalar32Kernel(
     void* uintShuffleParameters[] = {&destination, &mask, &sourceLane};
     void* unmaskedUIntShuffleParameters[] = {&destination, &sourceLane};
     void* loadedShuffleParameters[] = {&destination, &source, &mask, &sourceLane};
+    void* unmaskedLoadedShuffleParameters[] = {&destination, &source, &sourceLane};
     void** parameters = laneParameters;
     if (expectedKind == WaveScalar32Expected::UIntSourceLane)
         parameters = uintShuffleParameters;
     else if (expectedKind == WaveScalar32Expected::UnmaskedUIntSourceLane)
         parameters = unmaskedUIntShuffleParameters;
+    else if (expectedKind == WaveScalar32Expected::UnmaskedIntSourceLane)
+        parameters = unmaskedLoadedShuffleParameters;
     else if (hasLoadedSource)
         parameters = loadedShuffleParameters;
     if (cuda.cuLaunchKernel(function, 1, 1, 1, kLaneCount, 1, 1, 0, nullptr, parameters, nullptr) !=
@@ -7946,7 +7963,9 @@ static SlangResult _runWaveScalar32Kernel(
             expectedKind == WaveScalar32Expected::UIntSourceLane ||
             expectedKind == WaveScalar32Expected::UnmaskedUIntSourceLane)
             expected = uint32_t(sourceLane);
-        else if (expectedKind == WaveScalar32Expected::IntSourceLane)
+        else if (
+            expectedKind == WaveScalar32Expected::IntSourceLane ||
+            expectedKind == WaveScalar32Expected::UnmaskedIntSourceLane)
             expected = uint32_t(intSourceValues[sourceLane]);
         else if (expectedKind == WaveScalar32Expected::FloatSourceLane)
             expected = uint32_t(FloatAsInt(floatSourceValues[sourceLane]));
@@ -7997,6 +8016,18 @@ static SlangResult _runWaveReadLaneAtIntKernel(
     int sourceLane)
 {
     return _runWaveScalar32Kernel(cuda, ptxBlob, WaveScalar32Expected::IntSourceLane, sourceLane);
+}
+
+static SlangResult _runUnmaskedWaveReadLaneAtIntKernel(
+    CudaDriverApi& cuda,
+    ISlangBlob* ptxBlob,
+    int sourceLane)
+{
+    return _runWaveScalar32Kernel(
+        cuda,
+        ptxBlob,
+        WaveScalar32Expected::UnmaskedIntSourceLane,
+        sourceLane);
 }
 
 static SlangResult _runWaveReadLaneAtFloatKernel(

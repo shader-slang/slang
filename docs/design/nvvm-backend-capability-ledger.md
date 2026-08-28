@@ -955,3 +955,23 @@ Five evidence names add 241 measured test/support lines, from 25,512 to 25,753. 
 Slice 46-52 wave matrix passes 47/47 and Release passes 345/345 with sorted-name SHA-256
 `d112ef187a1ff7999b55ed3222b51f0c5ad01416f04a63b46a70a9d25ccb1029`; removing the five
 Slice 52 names reproduces Slice 51's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 53 proves public unmasked Int `WaveReadLaneAt()` through the same source-owned composition.
+The entry adds one signed device load and calls the public helper with value, lane, and synthesized
+mask; the helper routes that mask through the active-mask identity and into the established signed
+masked shuffle. Features 35, 37, and 39 are each required before provider module construction. V3
+remains 528/308 bytes and no production/provider file changes.
+
+Composition evidence is parameterized at its second scalar row. Shared runners preserve exact
+five-function/three-intrinsic/four-call topology, constituent capability failures, and the common
+ballot-plus-shuffle PTX mechanism while registered UInt and Int wrappers retain layer-local names.
+The measured marginal growth is 121 lines, half Slice 52's 241-line first-row cost.
+
+NVVM and NVRTC agree on `[64, 64, 32]`, one global 32-bit load/store pair, and exactly one ballot
+plus one shuffle in the entry. CUDA 12.9 `ptxas` accepts both; one RTX 5090 warp selects negative
+lane-0 and lane-7 Int values bit-exactly through both routes.
+
+Five names raise the measured files from 25,753 to 25,874 lines. The complete Slice 46-53 wave
+matrix passes 52/52 and Release passes 350/350 with sorted-name SHA-256
+`003afec34f28ad32e84961b91f1c87fff1fa006f1da535cb10ab00d29cc727c7`; removing the five Slice 53
+names reproduces Slice 52's count and hash exactly. Debug preservation passes 10/10.

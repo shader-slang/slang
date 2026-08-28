@@ -2675,6 +2675,31 @@ SHA-256 `d112ef187a1ff7999b55ed3222b51f0c5ad01416f04a63b46a70a9d25ccb1029`;
 removing the five Slice 52 names reproduces Slice 51's count and hash exactly. Debug preservation
 passes 10/10.
 
+### Slice 53 public Int wave-read composition and test reuse
+
+Slice 53 applies the same source-owned composition to a loaded Int value. Active-mask synthesis
+again threads one ballot result into a public helper; the entry loads the Int source element, and
+the helper passes its mask through the active-mask identity before calling the established signed
+masked-shuffle helper. Features 35, 37, and 39 are required independently before module creation.
+No production, facade, provider, ABI, or LLVM wrapper code changes.
+
+The Slice 52 composition assertions are now shared scalar runners rather than a copied per-type
+body. One runner checks exact five-function, three-intrinsic, four-call mask flow while taking only
+the measured value origin, shuffle operation, pointer-offset count, and load count as data. Another
+checks the three-feature union, and a third checks the common ballot-plus-shuffle PTX mechanism.
+The UInt tests retain their registered names and exact behavior; the new Int wrappers supply the
+signed row. This cuts marginal measured growth from Slice 52's 241 lines to 121 lines.
+
+NVVM and NVRTC agree on `[64, 64, 32]`, one global 32-bit load, one global 32-bit store, and exactly
+one ballot plus one shuffle in the entry. CUDA 12.9 `ptxas` accepts both, and one RTX 5090 warp
+selects the negative lane-0 and lane-7 Int values bit-exactly through both routes.
+
+Five new names raise the measured test/support files from 25,753 to 25,874 lines. The complete
+Slice 46-53 wave matrix passes 52/52 and the Release NVVM prefix passes 350/350. Its exact sorted
+LF-terminated name set has SHA-256
+`003afec34f28ad32e84961b91f1c87fff1fa006f1da535cb10ab00d29cc727c7`; removing the five Slice 53
+names reproduces Slice 52's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2806,7 +2831,8 @@ The program advances through bounded slices:
 50. canonical Float wave read-lane-at with native mixed-signature intrinsic transport;
 51. canonical active wave mask through synchronized ballot and repaired synthesized helper types;
 52. public unmasked UInt wave-read-lane-at through composition of active mask and masked shuffle;
-53. remaining wave operations and other advanced capabilities, then production-readiness
+53. public unmasked Int wave-read-lane-at plus parameterized composition evidence;
+54. remaining wave operations and other advanced capabilities, then production-readiness
     evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
@@ -3430,8 +3456,8 @@ The following remain open until their named slice supplies evidence:
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
-  read-lane-at, public unmasked UInt read-lane-at, and active-mask ballot, including other scalar
-  types, votes, reductions, and their convergence contracts;
+  read-lane-at, public unmasked UInt/Int read-lane-at, and active-mask ballot, including other
+  scalar types, votes, reductions, and their convergence contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 
