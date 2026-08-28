@@ -12198,7 +12198,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // a *conformance* requirement: its witness is a witness table for the bound.
                 // We must lower it with a `WitnessTableType` requirement value, because
                 // consumers of associated-type bounds read the witness-table entry for the bound.
-                // Equality constraints are handled by the generic path below.
+                // Equality constraints are handled separately below.
                 auto genericParent =
                     as<GenericDecl>(relocatedSubtypeConstraint.getDecl()->parentDecl);
                 if (genericParent && genericParent->inner != relocatedSubtypeConstraint.getDecl())
@@ -12247,6 +12247,32 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         getSup(subContext->astBuilder, relocatedSubtypeConstraint));
                     entry->setRequirementVal(subBuilder->getWitnessTableType(irBaseType));
                 }
+            }
+            else if (
+                relocatedSubtypeConstraint &&
+                relocatedSubtypeConstraint.getDecl()->isEqualityConstraint)
+            {
+                // Equality constraints deliberately keep the representation created above.
+                //
+                // Consider this example:
+                //
+                //     interface IScalar
+                //     {
+                //         associatedtype Mask;
+                //         __constraint Mask == bool;
+                //     }
+                //
+                // An equality constraint lowers to its interface requirement key, and its witness
+                // table entry carries the corresponding `TypeEqualityWitness`. Unlike a method,
+                // the interface requirement entry has no separate requirement value or type.
+                //
+                // The generic path below calls `removeLinkageDecorations` on a requirement value.
+                // For an equality constraint that value would be the requirement key itself. Its
+                // linkage is the stable identity used to defer and retrieve witness-table entries
+                // during linking, so removing it makes multiple equality keys collide under an
+                // empty mangled name. Leave the entry's value null and preserve the key's linkage.
+                SLANG_ASSERT(!entry->getRequirementVal());
+                SLANG_RELEASE_ASSERT(requirementKey->findDecoration<IRLinkageDecoration>());
             }
             else
             {
