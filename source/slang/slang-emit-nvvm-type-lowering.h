@@ -33,6 +33,9 @@ IRPtrTypeBase* asNVVMSupportedDevicePointerType(IRInst* type);
 /// Returns an accepted CUDA device pointer to float32, including its source access qualifier.
 IRPtrTypeBase* asNVVMSupportedDeviceFloat32PointerType(IRInst* type);
 
+/// Returns an accepted CUDA device pointer to any established scalar value type.
+IRPtrTypeBase* asNVVMSupportedDeviceScalarPointerType(IRInst* type);
+
 /// Returns an accepted CUDA device pointer to a fixed i32 array.
 IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     IRInst* type,

@@ -762,6 +762,35 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtIntDifferentialPTX)
         });
 }
 
+SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtFloatDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
+    SLANG_CHECK_ABORT(
+        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT));
+
+    static const uint32_t kParameterWidths[] = {64, 64, 32, 32};
+    _runNVVMSlangWaveDifferentialPTX(
+        kDirectNVVMWaveReadLaneAtFloatSource,
+        "Ignoring Float wave-read-lane-at PTX differential because libNVVM or NVRTC was not found.",
+        kParameterWidths,
+        SLANG_COUNT_OF(kParameterWidths),
+        true,
+        [](SlangEmitCUDAMethod method, const String& ptx)
+        {
+            SLANG_CHECK(ptx.indexOf("shfl.sync.idx.b32") >= 0);
+            if (method == SLANG_EMIT_CUDA_VIA_NVVM)
+            {
+                SLANG_CHECK(ptx.indexOf("%laneid") >= 0);
+            }
+            else
+            {
+                SLANG_CHECK(ptx.indexOf("%tid.x") >= 0);
+            }
+        });
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1516,6 +1545,14 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtIntPtxasAccepts)
         unitTestContext,
         kDirectNVVMWaveReadLaneAtIntSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtFloatPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMWaveReadLaneAtFloatSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyPtxasAccepts)
@@ -2417,6 +2454,19 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtIntRuntimeMatchesNVRTC)
         {
             SLANG_RETURN_ON_FAIL(_runWaveReadLaneAtIntKernel(cuda, code, 0));
             return _runWaveReadLaneAtIntKernel(cuda, code, 7);
+        });
+}
+
+SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtFloatRuntimeMatchesNVRTC)
+{
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT,
+        kDirectNVVMWaveReadLaneAtFloatSource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        {
+            SLANG_RETURN_ON_FAIL(_runWaveReadLaneAtFloatKernel(cuda, code, 0));
+            return _runWaveReadLaneAtFloatKernel(cuda, code, 7);
         });
 }
 

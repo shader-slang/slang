@@ -1369,6 +1369,9 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
 
     llvm::Intrinsic::ID intrinsicID;
     size_t expectedArgumentCount = 0;
+    llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
+    llvm::Type* expectedArgumentTypes[] = {int32Type, int32Type, int32Type};
+    bool appendsShuffleClamp = false;
     switch (operation)
     {
     case SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX:
@@ -1381,6 +1384,13 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
     case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT:
         intrinsicID = llvm::Intrinsic::nvvm_shfl_sync_idx_i32;
         expectedArgumentCount = 3;
+        appendsShuffleClamp = true;
+        break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_FLOAT:
+        intrinsicID = llvm::Intrinsic::nvvm_shfl_sync_idx_f32;
+        expectedArgumentCount = 3;
+        expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
+        appendsShuffleClamp = true;
         break;
     default:
         return SLANG_E_INVALID_ARG;
@@ -1393,17 +1403,16 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
     for (size_t i = 0; i < argumentCount; ++i)
     {
         llvm::Value* argument = _getValue(arguments[i]);
-        if (!argument || !argument->getType()->isIntegerTy(32) ||
+        if (!argument || argument->getType() != expectedArgumentTypes[i] ||
             !_isValueUsableAtInsertionPoint(state, insertionBlock, argument))
         {
             return SLANG_E_INVALID_ARG;
         }
         llvmArguments.push_back(argument);
     }
-    if (operation == SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT ||
-        operation == SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT)
+    if (appendsShuffleClamp)
     {
-        llvmArguments.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(state->context), 31));
+        llvmArguments.push_back(llvm::ConstantInt::get(int32Type, 31));
     }
 
     llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
@@ -1589,9 +1598,9 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
 // `fsub -0.0, value`. Finally, LLVM 14 gives NVVM special-register intrinsics function attributes
 // that the LLVM 7 parser does not know. Removing optimization-only attributes retains each
 // intrinsic's semantic name and type. LLVM may share one numbered attribute group between several
-// declarations, so count unique validated semantic attribute sets. LLVM 14's integer shuffle
-// declaration already uses the LLVM-7-compatible convergent/inaccessible-memory/nounwind set, but
-// validate its exact signature and attributes before serializing the mixed dialect. The provider
+// declarations, so count unique validated semantic attribute sets. LLVM 14's scalar shuffle
+// declarations already use the LLVM-7-compatible convergent/inaccessible-memory/nounwind set, but
+// validate their exact signatures and attributes before serializing the mixed dialect. The provider
 // exposes exactly one shape of each operation; validate every semantic instruction or declaration
 // before changing its spelling.
 static SlangResult _writeLegacyNVVMAssembly(
@@ -1631,10 +1640,16 @@ static SlangResult _writeLegacyNVVMAssembly(
             if (!hasAttributeSet)
                 semanticLegacyIntrinsicAttributeSets.push_back(functionAttributes);
         }
-        else if (intrinsicID == llvm::Intrinsic::nvvm_shfl_sync_idx_i32)
+        else if (
+            intrinsicID == llvm::Intrinsic::nvvm_shfl_sync_idx_i32 ||
+            intrinsicID == llvm::Intrinsic::nvvm_shfl_sync_idx_f32)
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
-            if (!function.isDeclaration() || !function.getReturnType()->isIntegerTy(32) ||
+            llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
+            llvm::Type* payloadType = intrinsicID == llvm::Intrinsic::nvvm_shfl_sync_idx_f32
+                                          ? llvm::Type::getFloatTy(state->context)
+                                          : int32Type;
+            if (!function.isDeclaration() || function.getReturnType() != payloadType ||
                 function.arg_size() != 4 || functionAttributes.getNumAttributes() != 3 ||
                 !function.hasFnAttribute(llvm::Attribute::Convergent) ||
                 !function.hasFnAttribute(llvm::Attribute::InaccessibleMemOnly) ||
@@ -1642,10 +1657,13 @@ static SlangResult _writeLegacyNVVMAssembly(
             {
                 return SLANG_E_NOT_AVAILABLE;
             }
+            size_t argumentIndex = 0;
             for (const llvm::Argument& argument : function.args())
             {
-                if (!argument.getType()->isIntegerTy(32))
+                llvm::Type* expectedType = argumentIndex == 1 ? payloadType : int32Type;
+                if (argument.getType() != expectedType)
                     return SLANG_E_NOT_AVAILABLE;
+                ++argumentIndex;
             }
         }
         for (llvm::BasicBlock& block : function)

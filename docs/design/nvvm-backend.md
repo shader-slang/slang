@@ -2574,6 +2574,43 @@ Release NVVM prefix passes 326/326. Its exact sorted LF-terminated name set has 
 `64c930268a8edb87cf2cfba3d12991e4ac66c2a4c9336399d1f03e54f5eda8f0`; removing the seven
 Slice 49 names reproduces Slice 48's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 50 float32 wave read-lane-at and scalar pointer offsets
+
+Slice 50 adds the third same-text shuffle specialization, exact
+`Func(Float, UInt, Float, Int)`. The existing descriptor lookup selects it from the owning
+function's complete canonical signature, independently of the UInt and Int rows. Feature 38,
+`WAVE_READ_LANE_AT_FLOAT`, and intrinsic operation 4 extend the unchanged callback. V3 remains
+528 bytes on x64 and 308 bytes on x86, and an exact Slice 49 provider remains valid with feature
+38 clear.
+
+The provider now records an exact expected argument-type vector for each operation. Integer
+shuffles require `(i32, i32, i32)`; Float requires `(i32, float, i32)`. Operation 4 emits native
+`llvm.nvvm.shfl.sync.idx.f32(mask, value, lane, 31)`. LLVM 7 and LLVM 14 define that declaration as
+`float(i32, float, i32, i32)` with the same
+`convergent inaccessiblememonly nounwind` set used by the integer form. The legacy writer validates
+the result, every argument, and those attributes without rewriting the declaration.
+
+The first end-to-end Float shuffle exposed that pointer-offset preflight still called the older
+integer-only pointer classifier even though centralized type lowering already supported Float
+device pointers. Type lowering now owns one established scalar-pointer classifier for Int, UInt,
+and Float. Offset preflight, value validation, and lowering consume it; array-element addressing
+retains its deliberately i32-only classifier. The fake now derives load/store scalar type through
+the original base of a pointer-offset chain and rejects mismatched stores, preserving the same
+typed-pointer invariant as the provider.
+
+The shared loaded-scalar fixture and one-warp launcher cover Int and Float without copying their
+graph or CUDA launch mechanics. LLVM/NVVM text contains one native Float shuffle, Float load/store,
+two pointer offsets, and two helper calls/returns. NVVM and NVRTC agree on `[64, 64, 32, 32]`, a
+global 32-bit load and store, and `shfl.sync.idx.b32`; CUDA 12.9 `ptxas` accepts both. The RTX 5090
+selects lanes 0 and 7 bit-exactly from a varying Float buffer, producing -11.5 and -6.25 through
+both routes.
+
+Seven independently registered evidence layers add 433 physical lines across the five measured
+test/support files, from 24,687 to 25,120. The focused Slice 48/49/50 matrix passes 21/21 and the
+Release NVVM prefix passes 333/333. Its exact sorted LF-terminated name set has SHA-256
+`57f52bd80e15eefb8a35bc51821d99a4b70c858f111535fde1fea3f90b2bb367`; removing the seven
+Slice 50 names reproduces Slice 49's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2702,7 +2739,8 @@ The program advances through bounded slices:
 47. exact wave lane count through the existing generic intrinsic family, composed with lane index;
 48. canonical UInt wave read-lane-at with scalar intrinsic argument transport;
 49. canonical Int wave read-lane-at with signature-aware same-text descriptor selection;
-50. remaining wave operations and other advanced capabilities, then production-readiness
+50. canonical Float wave read-lane-at with native mixed-signature intrinsic transport;
+51. remaining wave operations and other advanced capabilities, then production-readiness
     evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
@@ -3325,7 +3363,7 @@ The following remain open until their named slice supplies evidence:
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
-- wave/subgroup operations beyond lane index, lane count, and canonical UInt/Int i32 read-lane-at,
+- wave/subgroup operations beyond lane index, lane count, and canonical UInt/Int/Float read-lane-at,
   including active masks, other scalar types, votes, reductions, and their convergence contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.

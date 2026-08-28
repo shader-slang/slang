@@ -887,3 +887,25 @@ Seven evidence names add 476 measured test/support lines, from 24,211 to 24,687.
 Slice 48/49 matrix passes 14/14 and Release passes 326/326 with sorted-name SHA-256
 `64c930268a8edb87cf2cfba3d12991e4ac66c2a4c9336399d1f03e54f5eda8f0`; removing the seven
 Slice 49 names reproduces Slice 48's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 50 adds canonical Float `WaveMaskReadLaneAt` as feature 38/intrinsic operation 4. Its exact
+`Func(Float, UInt, Float, Int)` helper is the third row with
+`GenericAsm("__shfl_sync($0, $1, $2)")`; complete canonical signature matching selects it without
+making descriptor order semantic. V3 remains 528/308 bytes, and exact Slice 49 tables remain
+loadable without feature 38.
+
+The provider validates the exact mixed `(i32, float, i32)` argument vector and emits native
+`llvm.nvvm.shfl.sync.idx.f32(mask, value, lane, 31)`. The legacy writer validates its exact
+LLVM-7-compatible result, arguments, and convergent/inaccessible-memory/nounwind attributes. The
+end-to-end kernel also generalizes pointer-offset preflight from the old integer-only classifier to
+the centralized established scalar-pointer classifier. The fake propagates that same pointee kind
+through derived pointers for typed loads and stores.
+
+Int and Float share one loaded-scalar fixture and 32-bit one-warp launcher. NVVM and NVRTC agree on
+`[64, 64, 32, 32]`, a global 32-bit load/store, and `shfl.sync.idx.b32`; `ptxas` accepts both. One
+RTX 5090 warp selects Float source lanes 0 and 7 bit-exactly through both routes.
+
+Seven evidence names add 433 measured test/support lines, from 24,687 to 25,120. The focused
+Slice 48/49/50 matrix passes 21/21 and Release passes 333/333 with sorted-name SHA-256
+`57f52bd80e15eefb8a35bc51821d99a4b70c858f111535fde1fea3f90b2bb367`; removing the seven
+Slice 50 names reproduces Slice 49's count and hash exactly. Debug preservation passes 10/10.

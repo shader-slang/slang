@@ -507,6 +507,8 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT);
     const bool advertisesWaveReadLaneAtInt =
         _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT);
+    const bool advertisesWaveReadLaneAtFloat =
+        _hasFeature(api.features, SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT);
     if (api.structureSize < SLANG_NVVM_BUILDER_API_V3_MIN_SIZE ||
         api.abiVersion != SLANG_NVVM_BUILDER_ABI_VERSION_3 ||
         api.compatibilityAPI.structureSize != sizeof(SlangNVVMBuilderAPI_V2) ||
@@ -530,7 +532,7 @@ static SlangResult _validateHandleResult(SlangNVVMResult_1 result, T& handle)
          (api.structureSize < SLANG_NVVM_BUILDER_API_V3_GENERIC_SCALAR_FUNCTIONS_MIN_SIZE ||
           !api.getFloatingPointType || !api.emitCall || !api.emitValueReturn)) ||
         ((advertisesWaveLaneIndex || advertisesWaveLaneCount || advertisesWaveReadLaneAtUInt ||
-          advertisesWaveReadLaneAtInt) &&
+          advertisesWaveReadLaneAtInt || advertisesWaveReadLaneAtFloat) &&
          (api.structureSize < SLANG_NVVM_BUILDER_API_V3_WAVE_LANE_INDEX_MIN_SIZE ||
           !api.emitIntrinsic)))
     {
@@ -1296,6 +1298,9 @@ SlangResult NVVMIRBuilder::emitIntrinsic(
         break;
     case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT:
         requiredFeature = SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT;
+        break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_FLOAT:
+        requiredFeature = SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT;
         break;
     default:
         return SLANG_E_INVALID_ARG;

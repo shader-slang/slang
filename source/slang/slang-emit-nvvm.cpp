@@ -94,6 +94,7 @@ struct NVVMGenericAsmIntrinsicInfo
         UIntNoArguments,
         UIntUIntUIntInt,
         IntUIntIntInt,
+        FloatUIntFloatInt,
     };
 
     const char* assembly;
@@ -141,6 +142,13 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(
             "Int wave read-lane-at intrinsic",
             NVVMGenericAsmIntrinsicInfo::Signature::IntUIntIntInt,
         },
+        {
+            "__shfl_sync($0, $1, $2)",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_FLOAT,
+            "Float wave read-lane-at intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::FloatUIntFloatInt,
+        },
     };
     if (!genericAsm)
         return nullptr;
@@ -174,6 +182,11 @@ bool _isNVVMGenericAsmIntrinsicHelper(
         return function->getParamCount() == 3 && isNVVMSignedI32Type(function->getResultType()) &&
                isNVVMUnsignedI32Type(function->getParamType(0)) &&
                isNVVMSignedI32Type(function->getParamType(1)) &&
+               isNVVMSignedI32Type(function->getParamType(2));
+    case NVVMGenericAsmIntrinsicInfo::Signature::FloatUIntFloatInt:
+        return function->getParamCount() == 3 && isNVVMFloat32Type(function->getResultType()) &&
+               isNVVMUnsignedI32Type(function->getParamType(0)) &&
+               isNVVMFloat32Type(function->getParamType(1)) &&
                isNVVMSignedI32Type(function->getParamType(2));
     }
     SLANG_UNEXPECTED("unknown NVVM GenericAsm intrinsic signature");
@@ -411,13 +424,12 @@ SlangResult _validatePointerValue(
     bool requireWriteAccess,
     IRType* expectedPointeeType)
 {
-    auto ptrType = value ? asNVVMSupportedDevicePointerType(value->getDataType()) : nullptr;
-    auto float32PtrType =
-        value ? asNVVMSupportedDeviceFloat32PointerType(value->getDataType()) : nullptr;
+    auto scalarPtrType =
+        value ? asNVVMSupportedDeviceScalarPointerType(value->getDataType()) : nullptr;
     auto resourceElementPtrType =
         value ? asNVVMSupportedRWStructuredBufferI32ElementPointerType(value->getDataType())
               : nullptr;
-    IRPtrTypeBase* devicePtrType = ptrType ? ptrType : float32PtrType;
+    IRPtrTypeBase* devicePtrType = scalarPtrType;
     if (!devicePtrType &&
         (!resourceElementPtrType || value->getOp() != kIROp_RWStructuredBufferGetElementPtr))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
@@ -992,11 +1004,11 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_GetOffsetPtr:
                 if (inst->getOperandCount() != 2 ||
-                    !asNVVMSupportedDevicePointerType(inst->getDataType()))
+                    !asNVVMSupportedDeviceScalarPointerType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
-                        toSlice("device i32 pointer offset"));
+                        toSlice("device scalar pointer offset"));
                 }
                 _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_POINTER_ARITHMETIC);
                 break;
@@ -1299,8 +1311,9 @@ SlangResult _validateNVVMFunction(
                     IRInst* basePointer = inst->getOperand(0);
                     IRInst* elementOffset = inst->getOperand(1);
                     auto basePointerType =
-                        basePointer ? asNVVMSupportedDevicePointerType(basePointer->getDataType())
-                                    : nullptr;
+                        basePointer
+                            ? asNVVMSupportedDeviceScalarPointerType(basePointer->getDataType())
+                            : nullptr;
                     if (!basePointerType ||
                         !isTypeEqual(inst->getDataType(), basePointer->getDataType()))
                     {
@@ -2363,7 +2376,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle_1 loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "device i32 pointer offset",
+                            "device scalar pointer offset",
                             builder.emitPointerOffset(
                                 moduleScope.module,
                                 loweredBasePointer,
