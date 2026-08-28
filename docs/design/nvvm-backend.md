@@ -2807,6 +2807,41 @@ the Release NVVM prefix passes 369/369. Its exact sorted LF-terminated name set 
 `b8e9cc1b10ae6094dd3771696bc8ffa9f8c9a4fde60837c7b259c904097a8366`; removing the seven Slice 56
 names reproduces Slice 55's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 57 public Float wave-read-lane-first
+
+Slice 57 adds feature 42 `WAVE_READ_LANE_FIRST_FLOAT` and intrinsic operation 8 through the same
+generic callback. CUDA specializes the public composition to an exact final
+`Func(Float, UInt, Float)` helper ending in `_waveReadFirst($0, $1)`. Complete result/parameter
+signature matching distinguishes it from the UInt and Int helpers before provider type lowering.
+V3 remains 528/308 bytes, and an exact Slice 56 provider remains valid with feature 42 clear.
+
+The provider validates the UInt mask and Float value before mutation, emits the established
+`llvm.cttz.i32(mask, true)`, and supplies its lane to the established
+`llvm.nvvm.shfl.sync.idx.f32` with clamp 31. Slice 55 already owns exact `cttz` declaration
+validation and `immarg` normalization; Slice 50 already owns exact native f32 shuffle declaration
+validation. Combining them adds no LLVM text marker, fallback, callback, or table field.
+
+The shared provider fixture now carries payload type as explicit row data. UInt/Int continue to
+prove i32 function/call/store shapes, while Float proves native `float` helper parameters/results,
+the f32 shuffle call, and Float store. Fake value classification likewise retains Float semantics;
+the scalar runtime runner compares the bit pattern of lane zero's `-11.5f` source value.
+
+The public Float graph otherwise matches the prior rows: five functions, three intrinsic
+emissions, four calls, active-mask flow into the typed masked helper, two pointer offsets, one load,
+and one store. Clearing lane-index feature 34, ballot feature 39, or Float read-first feature 42
+independently returns E52016 before provider module construction.
+
+NVVM and NVRTC agree on `[64, 64]`, one global 32-bit Float load/store pair, and exactly one ballot
+plus one shuffle in the entry. NVVM uses a `popc.b32` sequence; NVRTC uses `brev.b32` plus
+`bfind.shiftamt.u32`. CUDA 12.9 `ptxas` accepts both, and all lanes of one RTX 5090 warp store the
+bit-exact lane-zero `-11.5f` value through each route.
+
+Seven independently registered evidence names add 151 physical lines across the five measured
+test/support files, from 26,482 to 26,633. The complete Slice 46-57 wave matrix passes 78/78 and
+the Release NVVM prefix passes 376/376. Its exact sorted LF-terminated name set has SHA-256
+`e345e4b4ef33f3a7fe6426c95d461fd46cfb6de8e183be59c2db77ecfa78b4e9`; removing the seven Slice 57
+names reproduces Slice 56's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -3565,8 +3600,8 @@ The following remain open until their named slice supplies evidence:
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
   read-lane-at, public unmasked UInt/Int/Float read-lane-at, active-mask ballot, and public
-  UInt/Int read-lane-first, including other scalar types, votes, reductions, and their convergence
-  contracts;
+  UInt/Int/Float read-lane-first, including other scalar types, votes, reductions, and their
+  convergence contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

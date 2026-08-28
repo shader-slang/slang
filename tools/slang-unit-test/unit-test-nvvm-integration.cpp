@@ -1352,6 +1352,20 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstIntDifferentialPTX)
         true);
 }
 
+SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstFloatDifferentialPTX)
+{
+    static const uint32_t kParameterWidths[] = {64, 64};
+    _runNVVMSlangWaveReadLaneFirstDifferentialPTX(
+        unitTestContext,
+        kDirectNVVMWaveReadLaneFirstFloatSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT,
+        "Ignoring Float wave-read-lane-first PTX differential because libNVVM or NVRTC was not "
+        "found.",
+        kParameterWidths,
+        SLANG_COUNT_OF(kParameterWidths),
+        true);
+}
+
 static void _runNVVMScalarDifferentialPTX(
     UnitTestContext* unitTestContext,
     NVVMScalarTestOperation operation)
@@ -1766,6 +1780,14 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstIntPtxasAccepts)
         unitTestContext,
         kDirectNVVMWaveReadLaneFirstIntSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_INT);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstFloatPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMWaveReadLaneFirstFloatSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtUIntPtxasAccepts)
@@ -2735,6 +2757,16 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstIntRuntimeMatchesNVRTC)
         kDirectNVVMWaveReadLaneFirstIntSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveReadLaneFirstIntKernel(cuda, code); });
+}
+
+SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstFloatRuntimeMatchesNVRTC)
+{
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT,
+        kDirectNVVMWaveReadLaneFirstFloatSource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        { return _runWaveReadLaneFirstFloatKernel(cuda, code); });
 }
 
 SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtUIntRuntimeMatchesNVRTC)

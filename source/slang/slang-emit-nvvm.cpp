@@ -116,6 +116,7 @@ struct NVVMGenericAsmIntrinsicInfo
         UIntNoArguments,
         UIntUIntUInt,
         IntUIntInt,
+        FloatUIntFloat,
         UIntUIntUIntInt,
         IntUIntIntInt,
         FloatUIntFloatInt,
@@ -187,6 +188,13 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(
             "Int wave read-lane-first intrinsic",
             NVVMGenericAsmIntrinsicInfo::Signature::IntUIntInt,
         },
+        {
+            "_waveReadFirst($0, $1)",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT,
+            "Float wave read-lane-first intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::FloatUIntFloat,
+        },
     };
     if (!genericAsm)
         return nullptr;
@@ -219,6 +227,10 @@ bool _isNVVMGenericAsmIntrinsicHelper(
         return isNVVMSignedI32Type(function->getResultType()) && function->getParamCount() == 2 &&
                isNVVMUnsignedI32Type(function->getParamType(0)) &&
                isNVVMSignedI32Type(function->getParamType(1));
+    case NVVMGenericAsmIntrinsicInfo::Signature::FloatUIntFloat:
+        return isNVVMFloat32Type(function->getResultType()) && function->getParamCount() == 2 &&
+               isNVVMUnsignedI32Type(function->getParamType(0)) &&
+               isNVVMFloat32Type(function->getParamType(1));
     case NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUIntInt:
         return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 3 &&
                isNVVMUnsignedI32Type(function->getParamType(0)) &&

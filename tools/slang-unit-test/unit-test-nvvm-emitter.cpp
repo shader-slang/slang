@@ -1072,6 +1072,17 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstIntUsesDirectPipeline)
         1);
 }
 
+SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstFloatUsesDirectPipeline)
+{
+    _checkPublicWaveReadDirectPipeline(
+        kDirectNVVMWaveReadLaneFirstFloatSource,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT,
+        2,
+        FakeNVVMBuilderValueKind::Load,
+        2,
+        1);
+}
+
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -1595,6 +1606,13 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneFirstIntCapabilities)
     _checkPublicWaveReadCapabilities(
         kDirectNVVMWaveReadLaneFirstIntSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_INT);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneFirstFloatCapabilities)
+{
+    _checkPublicWaveReadCapabilities(
+        kDirectNVVMWaveReadLaneFirstFloatSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32CopyCapability)

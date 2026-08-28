@@ -1403,8 +1403,10 @@ static bool _isFakeNVVMBuilderFloatValue(SlangNVVMValueHandle_1 value)
     {
         return valueRef.index >= 0 &&
                valueRef.index < gFakeNVVMBuilder.intrinsicOperations.getCount() &&
-               gFakeNVVMBuilder.intrinsicOperations[valueRef.index] ==
-                   SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_FLOAT;
+               (gFakeNVVMBuilder.intrinsicOperations[valueRef.index] ==
+                    SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_FLOAT ||
+                gFakeNVVMBuilder.intrinsicOperations[valueRef.index] ==
+                    SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT);
     }
     return valueRef.kind == FakeNVVMBuilderValueKind::FloatingPointConstant ||
            (valueRef.kind == FakeNVVMBuilderValueKind::ScalarOperation &&
@@ -2518,6 +2520,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsicV3(
     case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT:
     case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT:
     case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_INT:
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT:
         expectedArgumentCount = 2;
         break;
     default:
@@ -2548,6 +2551,12 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsicV3(
          operation == SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_INT) &&
         (!_isFakeNVVMBuilderIntegerValue(arguments[0]) ||
          !_isFakeNVVMBuilderIntegerValue(arguments[1])))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+    if (operation == SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT &&
+        (!_isFakeNVVMBuilderIntegerValue(arguments[0]) ||
+         !_isFakeNVVMBuilderFloatValue(arguments[1])))
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -5134,34 +5143,41 @@ static SlangResult _populateWaveReadLaneFirstKernel(
     SlangNVVMModuleHandle_1 module,
     const UnownedStringSlice& kernelName,
     const UnownedStringSlice& readFirstHelperName,
-    SlangNVVMIntrinsicOp_3 operation)
+    SlangNVVMIntrinsicOp_3 operation,
+    bool usesFloatValue)
 {
     SlangNVVMTypeHandle_1 voidType = nullptr;
     SlangNVVMTypeHandle_1 integerType = nullptr;
-    SlangNVVMTypeHandle_1 globalIntegerPointerType = nullptr;
+    SlangNVVMTypeHandle_1 valueType = nullptr;
+    SlangNVVMTypeHandle_1 globalValuePointerType = nullptr;
     SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
     SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, integerType));
+    if (usesFloatValue)
+    {
+        SLANG_RETURN_ON_FAIL(builder.getFloatingPointType(module, 32, valueType));
+    }
+    else
+    {
+        valueType = integerType;
+    }
     SLANG_RETURN_ON_FAIL(builder.getPointerType(
         module,
-        integerType,
+        valueType,
         SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-        globalIntegerPointerType));
+        globalValuePointerType));
 
-    SlangNVVMTypeHandle_1 helperParameterTypes[] = {integerType, integerType};
+    SlangNVVMTypeHandle_1 helperParameterTypes[] = {integerType, valueType};
     SlangNVVMTypeHandle_1 helperType = nullptr;
     SlangNVVMValueHandle_1 helper = nullptr;
     SLANG_RETURN_ON_FAIL(builder.getFunctionType(
         module,
-        integerType,
+        valueType,
         helperParameterTypes,
         SLANG_COUNT_OF(helperParameterTypes),
         helperType));
     SLANG_RETURN_ON_FAIL(builder.declareFunction(module, helperType, readFirstHelperName, helper));
 
-    SlangNVVMTypeHandle_1 kernelParameterTypes[] = {
-        globalIntegerPointerType,
-        integerType,
-        integerType};
+    SlangNVVMTypeHandle_1 kernelParameterTypes[] = {globalValuePointerType, integerType, valueType};
     SlangNVVMTypeHandle_1 kernelType = nullptr;
     SlangNVVMValueHandle_1 kernel = nullptr;
     SLANG_RETURN_ON_FAIL(builder.getFunctionType(
@@ -5302,6 +5318,16 @@ static const char kDirectNVVMWaveReadLaneFirstIntSource[] = R"(
 void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
     uniform Ptr<int, Access::Read, AddressSpace::Device> source)
+{
+    uint laneIndex = WaveGetLaneIndex();
+    destination[laneIndex] = WaveReadLaneFirst(source[laneIndex]);
+}
+)";
+static const char kDirectNVVMWaveReadLaneFirstFloatSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform Ptr<float, Access::Read, AddressSpace::Device> source)
 {
     uint laneIndex = WaveGetLaneIndex();
     destination[laneIndex] = WaveReadLaneFirst(source[laneIndex]);
@@ -7994,6 +8020,7 @@ enum class WaveScalar32Expected
     ActiveMask,
     UIntFirstLane,
     IntFirstLane,
+    FloatFirstLane,
     UIntSourceLane,
     UnmaskedUIntSourceLane,
     IntSourceLane,
@@ -8046,6 +8073,7 @@ static SlangResult _runWaveScalar32Kernel(
     const bool hasLoadedSource = expectedKind == WaveScalar32Expected::IntSourceLane ||
                                  expectedKind == WaveScalar32Expected::IntFirstLane ||
                                  expectedKind == WaveScalar32Expected::UnmaskedIntSourceLane ||
+                                 expectedKind == WaveScalar32Expected::FloatFirstLane ||
                                  expectedKind == WaveScalar32Expected::FloatSourceLane ||
                                  expectedKind == WaveScalar32Expected::UnmaskedFloatSourceLane;
     if (hasLoadedSource && (cuda.cuMemAlloc(&source, sizeof(intSourceValues)) != 0 || !source))
@@ -8055,7 +8083,8 @@ static SlangResult _runWaveScalar32Kernel(
     CudaBufferGuard sourceGuard{cuda, source};
     if (source)
     {
-        const bool hasFloatSource = expectedKind == WaveScalar32Expected::FloatSourceLane ||
+        const bool hasFloatSource = expectedKind == WaveScalar32Expected::FloatFirstLane ||
+                                    expectedKind == WaveScalar32Expected::FloatSourceLane ||
                                     expectedKind == WaveScalar32Expected::UnmaskedFloatSourceLane;
         const void* sourceValues = hasFloatSource ? static_cast<const void*>(floatSourceValues)
                                                   : static_cast<const void*>(intSourceValues);
@@ -8074,6 +8103,8 @@ static SlangResult _runWaveScalar32Kernel(
     if (expectedKind == WaveScalar32Expected::UIntSourceLane)
         parameters = uintShuffleParameters;
     else if (expectedKind == WaveScalar32Expected::IntFirstLane)
+        parameters = loadedFirstParameters;
+    else if (expectedKind == WaveScalar32Expected::FloatFirstLane)
         parameters = loadedFirstParameters;
     else if (expectedKind == WaveScalar32Expected::UnmaskedUIntSourceLane)
         parameters = unmaskedUIntShuffleParameters;
@@ -8104,6 +8135,8 @@ static SlangResult _runWaveScalar32Kernel(
             expected = 0;
         else if (expectedKind == WaveScalar32Expected::IntFirstLane)
             expected = uint32_t(intSourceValues[0]);
+        else if (expectedKind == WaveScalar32Expected::FloatFirstLane)
+            expected = uint32_t(FloatAsInt(floatSourceValues[0]));
         else if (
             expectedKind == WaveScalar32Expected::UIntSourceLane ||
             expectedKind == WaveScalar32Expected::UnmaskedUIntSourceLane)
@@ -8145,6 +8178,11 @@ static SlangResult _runWaveReadLaneFirstUIntKernel(CudaDriverApi& cuda, ISlangBl
 static SlangResult _runWaveReadLaneFirstIntKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)
 {
     return _runWaveScalar32Kernel(cuda, ptxBlob, WaveScalar32Expected::IntFirstLane);
+}
+
+static SlangResult _runWaveReadLaneFirstFloatKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)
+{
+    return _runWaveScalar32Kernel(cuda, ptxBlob, WaveScalar32Expected::FloatFirstLane);
 }
 
 static SlangResult _runWaveReadLaneAtUIntKernel(

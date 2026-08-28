@@ -1406,6 +1406,12 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         expectedArgumentCount = 2;
         derivesFirstActiveLane = true;
         break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT:
+        intrinsicID = llvm::Intrinsic::nvvm_shfl_sync_idx_f32;
+        expectedArgumentCount = 2;
+        expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
+        derivesFirstActiveLane = true;
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }
