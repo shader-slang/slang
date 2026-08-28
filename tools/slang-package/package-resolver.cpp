@@ -7,6 +7,7 @@
 #include "package-json.h"
 #include "package-local.h"
 #include "package-path.h"
+#include "package-report.h"
 
 namespace Slang
 {
@@ -30,6 +31,9 @@ struct ResolutionPackage
     String pathOwner;
     List<GitRequirement> gitRequirements;
     bool selected = false;
+    ResolveSelectionKind selectionKind = ResolveSelectionKind::HighestRelease;
+    List<ResolveConstraintNote> constraintNotes;
+    List<ResolveSkipNote> skips;
     LockedPackage locked;
     ResolvedManifest resolvedManifest;
 };
@@ -276,6 +280,7 @@ public:
     IPackageResolverSource* source = nullptr;
     String projectRoot;
     List<String>* warnings = nullptr;
+    ResolveReport* report = nullptr;
     const Manifest* rootManifest = nullptr;
     List<ResolutionPackage> packages;
     Index candidateAttemptCount = 0;
@@ -315,6 +320,22 @@ public:
                 toolchainConstraints);
         }
         SLANG_RETURN_ON_FAIL(selectSlangToolchain(toolchainConstraints, outError));
+        if (report)
+        {
+            publishReport();
+            report->toolchainConstraints = toolchainConstraints;
+            if (toolchainConstraints.getCount())
+            {
+                SemanticVersion installed;
+                String installedText;
+                String toolchainError;
+                if (SLANG_SUCCEEDED(getInstalledSlangToolchainVersion(
+                        installed,
+                        installedText,
+                        toolchainError)))
+                    report->installedToolchain = installedText;
+            }
+        }
         for (Index i = 0; i < packages.getCount(); ++i)
         {
             if (!reachable[i])
@@ -546,6 +567,70 @@ private:
         warnings->add(warning);
     }
 
+    String ownerVersionFor(const ResolvedManifest& declaringManifest) const
+    {
+        if (declaringManifest.ownerKey == _rootOwnerKey())
+            return String();
+        Index index = findPackage(declaringManifest.manifest.name);
+        if (index < 0 || !packages[index].selected)
+            return String();
+        return packages[index].locked.version;
+    }
+
+    static String gitConstraintText(const Dependency& dependency)
+    {
+        String text = dependency.version;
+        if (dependency.ref.getLength())
+        {
+            String pin = String("ref ") + dependency.ref + " as " + dependency.as;
+            if (text.getLength())
+                text = text + ", " + pin;
+            else
+                text = pin;
+        }
+        return text;
+    }
+
+    void addConstraintNote(
+        ResolutionPackage& package,
+        const ResolvedManifest& declaringManifest,
+        const String& text,
+        const VersionConstraint& constraint)
+    {
+        ResolveConstraintNote note;
+        note.ownerName = declaringManifest.manifest.name;
+        note.ownerVersion = ownerVersionFor(declaringManifest);
+        note.text = text;
+        note.constraint = constraint;
+        package.constraintNotes.add(note);
+    }
+
+    void publishReport()
+    {
+        if (!report)
+            return;
+        *report = ResolveReport();
+        report->rootPackageName = rootManifest->name;
+        List<bool> reachable;
+        getReachablePackages(reachable);
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (!reachable[i])
+                continue;
+            const ResolutionPackage& package = packages[i];
+            ResolvePackageExplanation explanation;
+            explanation.name = package.name;
+            explanation.version = package.locked.version;
+            explanation.git = package.locked.git;
+            explanation.ref = package.locked.ref;
+            explanation.path = package.locked.path;
+            explanation.selectionKind = package.selectionKind;
+            explanation.constraints = package.constraintNotes;
+            explanation.skips = package.skips;
+            report->packages.add(explanation);
+        }
+    }
+
     SlangResult loadPathManifest(
         const Dependency& dependency,
         const ResolvedManifest& declaringManifest,
@@ -674,6 +759,14 @@ private:
                            "' is required from one path with different 'as' versions.";
                 return SLANG_FAIL;
             }
+            VersionConstraint asConstraint;
+            String asError;
+            SLANG_RETURN_ON_FAIL(parseVersionConstraint(dependency.as, asConstraint, asError));
+            addConstraintNote(
+                package,
+                declaringManifest,
+                String("as ") + dependency.as,
+                asConstraint);
             return SLANG_OK;
         }
         if (!matchesAll(package, pathVersion))
@@ -707,6 +800,7 @@ private:
         package.canonicalPath = canonicalPath;
         package.pathOwner = declaringManifest.ownerKey;
         package.selected = true;
+        package.selectionKind = ResolveSelectionKind::Path;
         package.resolvedManifest = pathManifest;
         package.locked = LockedPackage();
         package.locked.name = package.name;
@@ -714,6 +808,10 @@ private:
         package.locked.version = dependency.as;
         package.locked.exports = pathManifest.manifest.exports;
         package.locked.dependencies = pathManifest.manifest.dependencies;
+        VersionConstraint asConstraint;
+        String asError;
+        SLANG_RETURN_ON_FAIL(parseVersionConstraint(dependency.as, asConstraint, asError));
+        addConstraintNote(package, declaringManifest, String("as ") + dependency.as, asConstraint);
         pruneUnreachableGitRequirements();
         for (const auto& child : pathManifest.manifest.dependencies)
             SLANG_RETURN_ON_FAIL(addDependency(child, pathManifest, outError));
@@ -758,6 +856,7 @@ private:
         requirement.as = dependency.as;
         requirement.constraint = constraint;
         package.gitRequirements.add(requirement);
+        addConstraintNote(package, declaringManifest, gitConstraintText(dependency), constraint);
         return SLANG_OK;
     }
 
@@ -931,6 +1030,10 @@ private:
             {
                 if (const Exclusion* exclusion = findExclusion(unresolved.name, candidate.version))
                 {
+                    ResolveSkipNote skip;
+                    skip.version = formatExactVersion(candidate.version);
+                    skip.reason = String("workspace excludes this release — ") + exclusion->reason;
+                    packages[unresolvedIndex].skips.add(skip);
                     addWarning(
                         String("Workspace excludes package '") + unresolved.name + "' release " +
                         candidate.ref + ": " + exclusion->reason);
@@ -938,6 +1041,10 @@ private:
                 }
                 if (const Retraction* retraction = findRetraction(retractions, candidate.version))
                 {
+                    ResolveSkipNote skip;
+                    skip.version = formatExactVersion(candidate.version);
+                    skip.reason = String("retracted — ") + retraction->reason;
+                    packages[unresolvedIndex].skips.add(skip);
                     addWarning(
                         String("Package '") + unresolved.name + "' retracts release " +
                         candidate.ref + ": " + retraction->reason);
@@ -963,6 +1070,14 @@ private:
 
             ResolutionPackage& selected = packages[unresolvedIndex];
             selected.selected = true;
+            if (getPinnedIdentity(selected, pinnedRef, pinnedAs, pinnedVersion))
+                selected.selectionKind = ResolveSelectionKind::PinnedRef;
+            else if (candidate.path.getLength() && candidate.isEdit)
+                selected.selectionKind = ResolveSelectionKind::Edit;
+            else if (candidate.path.getLength())
+                selected.selectionKind = ResolveSelectionKind::Override;
+            else
+                selected.selectionKind = ResolveSelectionKind::HighestRelease;
             selected.locked.name = selected.name;
             selected.locked.git = selected.git;
             selected.locked.version = formatExactVersion(candidate.version);
@@ -1028,12 +1143,14 @@ SlangResult resolveDependenciesWithSource(
     IPackageResolverSource& source,
     LockFile& outLock,
     String& outError,
-    List<String>* outWarnings)
+    List<String>* outWarnings,
+    ResolveReport* outReport)
 {
     Resolver resolver;
     resolver.source = &source;
     resolver.projectRoot = projectRoot;
     resolver.warnings = outWarnings;
+    resolver.report = outReport;
     return resolver.resolve(manifest, outLock, outError);
 }
 
@@ -1042,7 +1159,8 @@ SlangResult resolveDependencies(
     const Manifest& manifest,
     LockFile& outLock,
     String& outError,
-    List<String>* outWarnings)
+    List<String>* outWarnings,
+    ResolveReport* outReport)
 {
     GitPackageResolverSource source;
     source.projectRoot = projectRoot;
@@ -1052,6 +1170,7 @@ SlangResult resolveDependencies(
     resolver.source = &source;
     resolver.projectRoot = projectRoot;
     resolver.warnings = outWarnings;
+    resolver.report = outReport;
     return resolver.resolve(manifest, outLock, outError);
 }
 
@@ -1061,7 +1180,8 @@ SlangResult resolveDependenciesFromLocalPackages(
     const List<LocalPackage>& localPackages,
     LockFile& outLock,
     String& outError,
-    List<String>* outWarnings)
+    List<String>* outWarnings,
+    ResolveReport* outReport)
 {
     LocalPackageResolverSource source;
     source.projectRoot = projectRoot;
@@ -1072,6 +1192,7 @@ SlangResult resolveDependenciesFromLocalPackages(
     resolver.source = &source;
     resolver.projectRoot = projectRoot;
     resolver.warnings = outWarnings;
+    resolver.report = outReport;
     return resolver.resolve(manifest, outLock, outError);
 }
 

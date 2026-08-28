@@ -227,7 +227,7 @@ static bool _stringSetsEqual(const List<String>& left, const List<String>& right
     return true;
 }
 
-static bool _lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right)
+bool lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right)
 {
     return left.name == right.name && left.git == right.git && left.ref == right.ref &&
            left.version == right.version && left.commit == right.commit &&
@@ -235,7 +235,7 @@ static bool _lockedPackagesEqual(const LockedPackage& left, const LockedPackage&
            _dependenciesEqual(left.dependencies, right.dependencies);
 }
 
-static String _describeLockedPackage(const LockedPackage& package)
+String describeLockedPackage(const LockedPackage& package)
 {
     if (isLocalOverrideLockedPackage(package))
         return package.git + " via " + package.path + " as " + package.version;
@@ -284,23 +284,23 @@ void describeLockDiff(const LockFile* previous, const LockFile& next, List<Strin
         {
             outLines.add(
                 String("Would add '") + name + "' as " +
-                _describeLockedPackage(next.packages[nextIndex]));
+                describeLockedPackage(next.packages[nextIndex]));
             continue;
         }
         if (nextIndex < 0)
         {
             outLines.add(
                 String("Would remove '") + name + "' (" +
-                _describeLockedPackage(previous->packages[previousIndex]) + ")");
+                describeLockedPackage(previous->packages[previousIndex]) + ")");
             continue;
         }
         const LockedPackage& before = previous->packages[previousIndex];
         const LockedPackage& after = next.packages[nextIndex];
-        if (_lockedPackagesEqual(before, after))
+        if (lockedPackagesEqual(before, after))
             continue;
         outLines.add(
-            String("Would change '") + name + "' from " + _describeLockedPackage(before) + " to " +
-            _describeLockedPackage(after));
+            String("Would change '") + name + "' from " + describeLockedPackage(before) + " to " +
+            describeLockedPackage(after));
     }
 }
 

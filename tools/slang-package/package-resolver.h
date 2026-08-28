@@ -60,6 +60,8 @@ public:
         String& outError) = 0;
 };
 
+struct ResolveReport;
+
 /// Resolve dependencies using an explicitly supplied package source.
 SlangResult resolveDependenciesWithSource(
     const Manifest& manifest,
@@ -74,7 +76,8 @@ SlangResult resolveDependenciesWithSource(
     IPackageResolverSource& source,
     LockFile& outLock,
     String& outError,
-    List<String>* outWarnings = nullptr);
+    List<String>* outWarnings = nullptr,
+    ResolveReport* outReport = nullptr);
 
 /// Resolve dependencies from Git repositories, using a cache under the workspace root.
 SlangResult resolveDependencies(
@@ -82,7 +85,8 @@ SlangResult resolveDependencies(
     const Manifest& manifest,
     LockFile& outLock,
     String& outError,
-    List<String>* outWarnings = nullptr);
+    List<String>* outWarnings = nullptr,
+    ResolveReport* outReport = nullptr);
 
 /// Resolve dependencies using registered local manifests and Git for the remaining packages.
 SlangResult resolveDependenciesFromLocalPackages(
@@ -91,7 +95,8 @@ SlangResult resolveDependenciesFromLocalPackages(
     const List<LocalPackage>& localPackages,
     LockFile& outLock,
     String& outError,
-    List<String>* outWarnings = nullptr);
+    List<String>* outWarnings = nullptr,
+    ResolveReport* outReport = nullptr);
 
 } // namespace PackageTool
 } // namespace Slang

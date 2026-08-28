@@ -116,8 +116,9 @@ slang package update --dry-run
 git -C deps/color-encoding describe --tags --exact-match
 ```
 
-`--dry-run` prints how the lock would change (packages added, changed, or removed) and leaves
-checkouts and the lock file alone. The encoding checkout should still be `v1.0.0`. Resolver clones
+`--dry-run` prints the selected graph (what moved, what stayed, and why) and leaves
+checkouts and the lock file alone. Pass `--minimal` to keep one-line package changes without
+the constraint rationale. The encoding checkout should still be `v1.0.0`. Resolver clones
 under `.slang/cache/` may still be populated so the tool can list tags. `--dry-run` cannot be
 combined with `--clean`.
 

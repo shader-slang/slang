@@ -13,6 +13,7 @@
 #include "package-local.h"
 #include "package-lock.h"
 #include "package-path.h"
+#include "package-report.h"
 #include "package-resolver.h"
 #include "package-validate.h"
 
@@ -35,10 +36,11 @@ static void _printHelp()
         "Commands:\n"
         "  init             Create a package manifest and standard directories.\n"
         "  fetch [--clean]  Materialize dependencies from the lock file.\n"
-        "  update [--from-local] [--clean] [--dry-run]\n"
+        "  update [--from-local] [--clean] [--dry-run] [--minimal]\n"
         "                   Re-resolve dependencies and update the lock file.\n"
         "                   --from-local uses registered local package manifests.\n"
-        "                   --dry-run reports lock changes without writing them.\n"
+        "                   --dry-run reports the selected graph without writing the lock.\n"
+        "                   --minimal prints one-line package changes without rationale.\n"
         "  build            Compile optional bundle modules/source, host executables, and docs.\n"
         "  run [name] [args...]  Run a host executable produced by the last build.\n"
         "  test             Reserved. Package testing is not implemented yet.\n"
@@ -593,6 +595,7 @@ static SlangResult _update(
     bool fromLocal,
     bool allowClean,
     bool dryRun,
+    bool minimal,
     String& outError)
 {
     Manifest manifest;
@@ -634,6 +637,7 @@ static SlangResult _update(
 
     LockFile lock;
     List<String> warnings;
+    ResolveReport report;
     if (fromLocal)
     {
         SLANG_RETURN_ON_FAIL(resolveDependenciesFromLocalPackages(
@@ -642,27 +646,22 @@ static SlangResult _update(
             localPackages,
             lock,
             outError,
-            &warnings));
+            &warnings,
+            &report));
     }
     else
     {
-        SLANG_RETURN_ON_FAIL(resolveDependencies(projectRoot, manifest, lock, outError, &warnings));
+        SLANG_RETURN_ON_FAIL(
+            resolveDependencies(projectRoot, manifest, lock, outError, &warnings, &report));
     }
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+    String reportText =
+        formatResolveReport(manifest, previousLockPtr, lock, report, dryRun, minimal);
+    fprintf(stdout, "%s", reportText.getBuffer());
     if (dryRun)
     {
-        List<String> changes;
-        describeLockDiff(previousLockPtr, lock, changes);
-        if (changes.getCount() == 0)
-            fprintf(stdout, "Dry run: no lock changes.\n");
-        else
-        {
-            fprintf(stdout, "Dry run: would update slang-package-lock.json:\n");
-            for (const auto& change : changes)
-                fprintf(stdout, "  %s\n", change.getBuffer());
-        }
         fprintf(stdout, "Dry run: lock and dependency checkouts were not modified.\n");
         return SLANG_OK;
     }
@@ -685,7 +684,6 @@ static SlangResult _update(
             stdout,
             "The workspace contains local package state and requires slang-workspace.json.\n");
     }
-    fprintf(stdout, "Updated %lld package(s).\n", (long long)lock.packages.getCount());
     return SLANG_OK;
 }
 
@@ -1509,6 +1507,7 @@ SlangResult executeInDirectory(
         bool fromLocal = false;
         bool allowClean = false;
         bool dryRun = false;
+        bool minimal = false;
         for (int i = 2; i < argc; ++i)
         {
             String flag = argv[i];
@@ -1518,6 +1517,8 @@ SlangResult executeInDirectory(
                 allowClean = true;
             else if (flag == "--dry-run")
                 dryRun = true;
+            else if (flag == "--minimal")
+                minimal = true;
             else
             {
                 outError = String("Unknown update option: ") + flag;
@@ -1529,7 +1530,7 @@ SlangResult executeInDirectory(
             outError = "update --dry-run cannot be combined with --clean.";
             return SLANG_FAIL;
         }
-        return _update(projectRoot, fromLocal, allowClean, dryRun, outError);
+        return _update(projectRoot, fromLocal, allowClean, dryRun, minimal, outError);
     }
     if (command == "validate" && argc == 2)
         return _validate(projectRoot, outError);

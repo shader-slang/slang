@@ -439,6 +439,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             ${slang_SOURCE_DIR}/tools/slang-package/package-local.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-lock.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-path.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-report.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-resolver.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-tool.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-types.cpp

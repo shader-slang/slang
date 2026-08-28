@@ -241,9 +241,10 @@ and returned to tool ownership. Fetch and update refuse to replace an unregister
 changed files, extra commits, or stashes. Pass `--clean` explicitly to permit replacement.
 
 Run `slang package update` deliberately when manifest constraints or upstream releases change.
-`slang package update --dry-run` and `slang package update --from-local --dry-run` report how the
-lock would change without writing it or replacing checkouts. Resolver Git clones under
-`.slang/cache/` may still be populated so the tool can inspect available tags. Normal CI and
+`slang package update --dry-run` and `slang package update --from-local --dry-run` print the
+selected graph (what moved, what stayed, and why) without writing the lock or replacing
+checkouts. `--minimal` keeps one-line package changes and the summary count. Resolver Git clones
+under `.slang/cache/` may still be populated so the tool can inspect available tags. Normal CI and
 developer builds use `slang package fetch`; a missing or inconsistent lock is an
 error.
 

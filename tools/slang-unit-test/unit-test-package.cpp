@@ -5,6 +5,8 @@
 #include "core/slang-string-util.h"
 #include "package-json.h"
 #include "package-lock.h"
+#include "package-path.h"
+#include "package-report.h"
 #include "package-resolver.h"
 #include "package-tool.h"
 #include "package-types.h"
@@ -2166,6 +2168,123 @@ SLANG_UNIT_TEST(PackageResolverUsesLatestReleaseRetractions)
     SLANG_CHECK(noise->ref == "v1.0.0");
     SLANG_CHECK(warnings.getCount() == 1);
     SLANG_CHECK(warnings[0].getUnownedSlice().indexOf(UnownedStringSlice("retracts")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageResolveReportFormat)
+{
+    Manifest root = _makeManifest("video-preview");
+    String error;
+
+    LockedPackage previousEncoding;
+    previousEncoding.name = "color-encoding";
+    previousEncoding.git = "memory:color-encoding";
+    previousEncoding.ref = "v1.0.0";
+    previousEncoding.version = "1.0.0";
+    previousEncoding.commit = "aaa";
+    PackageTool::LockFile previous;
+    previous.packages.add(previousEncoding);
+
+    LockedPackage nextEncoding;
+    nextEncoding.name = "color-encoding";
+    nextEncoding.git = "memory:color-encoding";
+    nextEncoding.ref = "v1.1.0";
+    nextEncoding.version = "1.1.0";
+    nextEncoding.commit = "bbb";
+    LockedPackage nextConvert;
+    nextConvert.name = "color-convert";
+    nextConvert.git = "memory:color-convert";
+    nextConvert.ref = "v1.1.0";
+    nextConvert.version = "1.1.0";
+    nextConvert.commit = "ccc";
+    PackageTool::LockFile next;
+    next.packages.add(nextConvert);
+    next.packages.add(nextEncoding);
+
+    ResolveConstraintNote encodingConstraint;
+    encodingConstraint.ownerName = "video-preview";
+    encodingConstraint.text = ">=1.0.0 <2.0.0";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(parseVersionConstraint(
+        encodingConstraint.text.getUnownedSlice(),
+        encodingConstraint.constraint,
+        error)));
+    ResolveSkipNote skip;
+    skip.version = "1.0.0";
+    skip.reason = "retracted — Truncated Rec. 709 luma weights";
+    ResolvePackageExplanation encoding;
+    encoding.name = "color-encoding";
+    encoding.version = "1.1.0";
+    encoding.ref = "v1.1.0";
+    encoding.selectionKind = ResolveSelectionKind::HighestRelease;
+    encoding.constraints.add(encodingConstraint);
+    encoding.skips.add(skip);
+    ResolvePackageExplanation convert;
+    convert.name = "color-convert";
+    convert.version = "1.1.0";
+    convert.ref = "v1.1.0";
+    convert.selectionKind = ResolveSelectionKind::HighestRelease;
+    convert.constraints.add(encodingConstraint);
+    convert.constraints[0].text = ">=1.0.0 <2.0.0";
+    ResolveReport report;
+    report.rootPackageName = "video-preview";
+    report.packages.add(convert);
+    report.packages.add(encoding);
+
+    String detailed = formatResolveReport(root, &previous, next, report, false, false);
+    SLANG_CHECK(
+        detailed.getUnownedSlice().indexOf(UnownedStringSlice("Resolving dependencies...")) >= 0);
+    SLANG_CHECK(
+        detailed.getUnownedSlice().indexOf(
+            UnownedStringSlice("upgraded color-encoding 1.0.0 => 1.1.0")) >= 0);
+    SLANG_CHECK(
+        detailed.getUnownedSlice().indexOf(UnownedStringSlice("skipped 1.0.0: retracted")) >= 0);
+    SLANG_CHECK(
+        detailed.getUnownedSlice().indexOf(UnownedStringSlice("added color-convert 1.1.0")) >= 0);
+    SLANG_CHECK(
+        detailed.getUnownedSlice().indexOf(
+            UnownedStringSlice("Updated 2 packages: 1 upgraded, 1 added; 0 unchanged.")) >= 0);
+
+    String minimal = formatResolveReport(root, &previous, next, report, false, true);
+    SLANG_CHECK(
+        minimal.getUnownedSlice().indexOf(UnownedStringSlice("Resolving dependencies...")) < 0);
+    SLANG_CHECK(minimal.getUnownedSlice().indexOf(UnownedStringSlice("selected highest")) < 0);
+    SLANG_CHECK(
+        minimal.getUnownedSlice().indexOf(
+            UnownedStringSlice("upgraded color-encoding 1.0.0 => 1.1.0")) >= 0);
+    SLANG_CHECK(
+        minimal.getUnownedSlice().indexOf(UnownedStringSlice("added color-convert 1.1.0")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageResolverReportRecordsSkips)
+{
+    InMemoryPackageSource source;
+    source.addRelease("memory:noise", "1.0.0", _makeManifest("noise"));
+    source.addRelease("memory:noise", "1.1.0", _makeManifest("noise"));
+
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "noise", "memory:noise", ">=1.0.0");
+    Exclusion exclusion;
+    exclusion.packageName = "noise";
+    exclusion.version = "1.1.0";
+    exclusion.reason = "Workspace regression";
+    root.workspace.exclusions.add(exclusion);
+
+    PackageTool::LockFile lock;
+    List<String> warnings;
+    ResolveReport report;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveDependenciesWithSource(".", root, source, lock, error, &warnings, &report)));
+    const LockedPackage* noise = _findLockedPackage(lock, "noise");
+    SLANG_CHECK_ABORT(noise);
+    SLANG_CHECK(noise->ref == "v1.0.0");
+    SLANG_CHECK(report.packages.getCount() == 1);
+    SLANG_CHECK(report.packages[0].skips.getCount() == 1);
+    SLANG_CHECK(report.packages[0].skips[0].version == "1.1.0");
+    SLANG_CHECK(
+        report.packages[0].skips[0].reason.getUnownedSlice().indexOf(
+            UnownedStringSlice("workspace excludes")) >= 0);
+    SLANG_CHECK(report.packages[0].constraints.getCount() == 1);
+    SLANG_CHECK(report.packages[0].constraints[0].ownerName == "root");
 }
 
 SLANG_UNIT_TEST(PackageResolverAppliesWorkspaceExclusions)
