@@ -121,12 +121,6 @@ IRFloatLit* _asExecutableFloat32Constant(IRInst* value)
     return floatLit && isNVVMFloat32Type(floatLit->getDataType()) ? floatLit : nullptr;
 }
 
-// Records one independent provider semantic required by the accepted linked IR.
-void _requireFeature(NVVMIRFeatureSet& features, SlangNVVMBuilderFeature requiredFeature)
-{
-    features.words[requiredFeature / 64u] |= uint64_t(1) << (requiredFeature % 64u);
-}
-
 // Matches one canonical Slang type against a provider-owned semantic type role.
 bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc& semanticType)
 {
@@ -312,11 +306,47 @@ struct NVVMResolvedValueOperation
     SlangNVVMValueTypeDesc operandTypes[3] = {};
     SlangNVVMValueOperationDesc desc = {};
     const NVVMSemantics::CatalogEntry* staticEntry = nullptr;
-    NVVMSemantics::V4FamilyResolution family;
+    NVVMSemantics::ValueOperationFamilyResolution family;
     const char* diagnosticName = nullptr;
 };
 
-// Resolves canonical Slang value operations to either a frozen exact row or one bounded V4 family.
+// Records one exact typed provider operation, deduplicating identical overloads.
+void _requireValueOperation(
+    NVVMValueOperationRequirements& requirements,
+    const SlangNVVMValueOperationDesc& desc,
+    const char* diagnosticName)
+{
+    for (const auto& requirement : requirements)
+    {
+        const SlangNVVMValueOperationDesc existing = requirement.getDesc();
+        if (existing.operation != desc.operation || existing.operandCount != desc.operandCount ||
+            !NVVMSemantics::areSameType(existing.resultType, desc.resultType))
+        {
+            continue;
+        }
+
+        bool operandsMatch = true;
+        for (uint32_t i = 0; i < existing.operandCount; ++i)
+        {
+            operandsMatch =
+                operandsMatch &&
+                NVVMSemantics::areSameType(existing.operandTypes[i], desc.operandTypes[i]);
+        }
+        if (operandsMatch)
+            return;
+    }
+
+    NVVMValueOperationRequirement requirement;
+    requirement.operation = desc.operation;
+    requirement.resultType = desc.resultType;
+    requirement.operandCount = uint32_t(desc.operandCount);
+    requirement.diagnosticName = diagnosticName;
+    for (uint32_t i = 0; i < requirement.operandCount; ++i)
+        requirement.operandTypes[i] = desc.operandTypes[i];
+    requirements.add(requirement);
+}
+
+// Resolves canonical Slang value operations to either a fixed exact row or one bounded family.
 bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOperation)
 {
     outOperation = {};
@@ -349,7 +379,7 @@ bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOpe
         outOperation.diagnosticName = outOperation.staticEntry->diagnosticName;
         return true;
     }
-    if (!NVVMSemantics::resolveV4Family(outOperation.desc, outOperation.family))
+    if (!NVVMSemantics::resolveValueOperationFamily(outOperation.desc, outOperation.family))
         return false;
     outOperation.diagnosticName = outOperation.family.diagnosticName;
     return true;
@@ -387,15 +417,13 @@ SlangResult _validateI32Value(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree,
-    NVVMIRFeatureSet& features)
+    IRDominatorTree* dominatorTree)
 {
     if (!value || !isNVVMSignedI32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 value"));
 
     if (_asExecutableI32Constant(value))
     {
-        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
         return SLANG_OK;
     }
 
@@ -409,18 +437,11 @@ SlangResult _validateInteger32Value(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree,
-    NVVMIRFeatureSet& features)
+    IRDominatorTree* dominatorTree)
 {
     if (value && isNVVMSignedI32Type(value->getDataType()))
     {
-        return _validateI32Value(
-            codeGenContext,
-            value,
-            consumer,
-            availableValues,
-            dominatorTree,
-            features);
+        return _validateI32Value(codeGenContext, value, consumer, availableValues, dominatorTree);
     }
     if (!value || !isNVVMUnsignedI32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("32-bit integer value"));
@@ -433,14 +454,12 @@ SlangResult _validateSelectedIntegerValue(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree,
-    NVVMIRFeatureSet& features)
+    IRDominatorTree* dominatorTree)
 {
     if (!value || !isNVVMSupportedIntegerScalarType(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("selected integer value"));
     if (_asExecutableSelectedIntegerConstant(value))
     {
-        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
         return SLANG_OK;
     }
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
@@ -452,14 +471,12 @@ SlangResult _validateWaveMaskValue(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree,
-    NVVMIRFeatureSet& features)
+    IRDominatorTree* dominatorTree)
 {
     if (!value || !isNVVMUnsignedI32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("wave mask value"));
     if (_asExecutableInteger32Constant(value))
     {
-        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
         return SLANG_OK;
     }
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
@@ -471,14 +488,12 @@ SlangResult _validateBooleanValue(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree,
-    NVVMIRFeatureSet& features)
+    IRDominatorTree* dominatorTree)
 {
     if (!value || !isNVVMBoolType(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("Boolean value"));
     if (_asExecutableBoolConstant(value))
     {
-        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
         return SLANG_OK;
     }
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
@@ -490,15 +505,13 @@ SlangResult _validateFloat32Value(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree,
-    NVVMIRFeatureSet& features)
+    IRDominatorTree* dominatorTree)
 {
     if (!value || !isNVVMFloat32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("float32 value"));
 
     if (_asExecutableFloat32Constant(value))
     {
-        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT);
         return SLANG_OK;
     }
 
@@ -511,8 +524,7 @@ SlangResult _validateScalarValue(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree,
-    NVVMIRFeatureSet& features)
+    IRDominatorTree* dominatorTree)
 {
     if (value && isNVVMBoolType(value->getDataType()))
     {
@@ -521,8 +533,7 @@ SlangResult _validateScalarValue(
             value,
             consumer,
             availableValues,
-            dominatorTree,
-            features);
+            dominatorTree);
     }
     if (value && isNVVMFloat32Type(value->getDataType()))
     {
@@ -531,8 +542,7 @@ SlangResult _validateScalarValue(
             value,
             consumer,
             availableValues,
-            dominatorTree,
-            features);
+            dominatorTree);
     }
     if (value && isNVVMSupportedIntegerScalarType(value->getDataType()))
     {
@@ -541,8 +551,7 @@ SlangResult _validateScalarValue(
             value,
             consumer,
             availableValues,
-            dominatorTree,
-            features);
+            dominatorTree);
     }
     return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar value"));
 }
@@ -553,8 +562,7 @@ SlangResult _validateNumericValue(
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree,
-    NVVMIRFeatureSet& features)
+    IRDominatorTree* dominatorTree)
 {
     if (value && asNVVMSupportedSignedI32x2Type(value->getDataType()))
         return _validateAvailableValue(
@@ -563,13 +571,7 @@ SlangResult _validateNumericValue(
             consumer,
             availableValues,
             dominatorTree);
-    return _validateScalarValue(
-        codeGenContext,
-        value,
-        consumer,
-        availableValues,
-        dominatorTree,
-        features);
+    return _validateScalarValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
 // Checks an available scalar pointer and enforces the source access qualifier for stores.
@@ -658,8 +660,7 @@ SlangResult _validateBranchArguments(
     IRBlock* entryBlock,
     const HashSet<IRBlock*>& functionBlocks,
     const HashSet<IRInst*>& availableValues,
-    IRDominatorTree* dominatorTree,
-    NVVMIRFeatureSet& features)
+    IRDominatorTree* dominatorTree)
 {
     IRBlock* targetBlock = branch->getTargetBlock();
     SLANG_RETURN_ON_FAIL(_validateBlockTarget(codeGenContext, targetBlock, functionBlocks));
@@ -678,17 +679,8 @@ SlangResult _validateBranchArguments(
         SLANG_ASSERT(targetParam);
         if (!argument || !isTypeEqual(argument->getDataType(), targetParam->getDataType()))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch argument type"));
-        SLANG_RETURN_ON_FAIL(_validateScalarValue(
-            codeGenContext,
-            argument,
-            branch,
-            availableValues,
-            dominatorTree,
-            features));
-        _requireFeature(
-            features,
-            isNVVMFloat32Type(targetParam->getDataType()) ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI
-                                                          : SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
+        SLANG_RETURN_ON_FAIL(
+            _validateScalarValue(codeGenContext, argument, branch, availableValues, dominatorTree));
     }
     return SLANG_OK;
 }
@@ -883,7 +875,7 @@ SlangResult _validateNVVMFunction(
     IRFunc* entryPoint,
     IRFunc* function,
     const HashSet<IRFunc*>& functionSet,
-    NVVMIRFeatureSet& features)
+    NVVMValueOperationRequirements& requirements)
 {
     const bool isEntryPoint = function == entryPoint;
     IRBlock* entryBlock = function->getFirstBlock();
@@ -895,9 +887,6 @@ SlangResult _validateNVVMFunction(
     HashSet<IRBlock*> functionBlocks;
     for (auto block : function->getBlocks())
         functionBlocks.add(block);
-    if (functionBlocks.getCount() > 1)
-        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
-
     RefPtr<IRDominatorTree> dominatorTree = computeDominatorTree(function);
     List<IRBlock*> bodyOrder = _getNVVMBodyOrder(function, dominatorTree);
     for (auto block : bodyOrder)
@@ -910,15 +899,6 @@ SlangResult _validateNVVMFunction(
     UInt actualParamCount = 0;
     for (auto param : function->getParams())
     {
-        auto arrayPointerType =
-            isEntryPoint ? asNVVMSupportedDeviceArrayPointerType(param->getDataType()) : nullptr;
-        auto rawRWStructuredBufferType =
-            isEntryPoint ? asNVVMSupportedRawRWStructuredBufferI32Type(param->getDataType())
-                         : nullptr;
-        const bool usesFloat32 =
-            isEntryPoint ? (isNVVMFloat32Type(param->getDataType()) ||
-                            asNVVMSupportedDeviceFloat32PointerType(param->getDataType()))
-                         : isNVVMFloat32Type(param->getDataType());
         const bool isSupportedType =
             isEntryPoint ? isNVVMSupportedParameterType(param->getDataType())
                          : _isSupportedNVVMHelperParameterType(param->getDataType());
@@ -930,15 +910,6 @@ SlangResult _validateNVVMFunction(
                 isEntryPoint ? toSlice("entry-point parameter")
                              : toSlice("helper function parameter"));
         }
-        if (arrayPointerType)
-            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_ARRAY_ADDRESSING);
-        if (rawRWStructuredBufferType)
-            _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32);
-        if (usesFloat32)
-            _requireFeature(
-                features,
-                isEntryPoint ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD
-                             : SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
         availableValues.add(param);
         ++actualParamCount;
     }
@@ -949,9 +920,6 @@ SlangResult _validateNVVMFunction(
             isEntryPoint ? toSlice("entry-point parameter count")
                          : toSlice("helper parameter count"));
     }
-    if (isEntryPoint && actualParamCount)
-        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
-
     // Register every accepted block parameter before checking uses because emission creates all
     // phi placeholders before any body. Ordinary values join this set in the second pass, in the
     // same order in which their LLVM instructions will be emitted.
@@ -961,19 +929,8 @@ SlangResult _validateNVVMFunction(
         {
             for (auto param : block->getParams())
             {
-                if (isNVVMSupportedIntegerScalarType(param->getDataType()))
-                {
-                    _requireFeature(
-                        features,
-                        isNVVMSignedI32Type(param->getDataType())
-                            ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA
-                            : SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI);
-                }
-                else if (isNVVMFloat32Type(param->getDataType()))
-                {
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI);
-                }
-                else
+                if (!isNVVMSupportedIntegerScalarType(param->getDataType()) &&
+                    !isNVVMFloat32Type(param->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
                 }
@@ -990,19 +947,13 @@ SlangResult _validateNVVMFunction(
             switch (inst->getOp())
             {
             case kIROp_Load:
-                if (isNVVMFloat32Type(inst->getDataType()))
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
-                else if (!isNVVMSupportedNumericValueType(inst->getDataType()))
+                if (!isNVVMSupportedNumericValueType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
                 break;
 
             case kIROp_Store:
                 if (inst->getOperandCount() != 2 || !inst->getOperand(0))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("store"));
-                if (isNVVMFloat32Type(inst->getOperand(0)->getDataType()))
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD);
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
                 break;
 
             case kIROp_Add:
@@ -1023,8 +974,7 @@ SlangResult _validateNVVMFunction(
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
                             UnownedStringSlice(getIROpInfo(inst->getOp()).name));
-                    if (operation.staticEntry)
-                        _requireFeature(features, operation.staticEntry->legacyFeature);
+                    _requireValueOperation(requirements, operation.desc, operation.diagnosticName);
                 }
                 break;
 
@@ -1058,8 +1008,7 @@ SlangResult _validateNVVMFunction(
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
                             UnownedStringSlice(getIROpInfo(inst->getOp()).name));
-                    if (operation.staticEntry)
-                        _requireFeature(features, operation.staticEntry->legacyFeature);
+                    _requireValueOperation(requirements, operation.desc, operation.diagnosticName);
                 }
                 break;
 
@@ -1070,11 +1019,6 @@ SlangResult _validateNVVMFunction(
                         call && call->getOperandCount() ? as<IRFunc>(call->getOperand(0)) : nullptr;
                     if (!callee || !_isSupportedNVVMHelperResultType(inst->getDataType()))
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("value call"));
-                    _requireFeature(
-                        features,
-                        _usesGenericNVVMFunctions(callee)
-                            ? SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS
-                            : SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
                 }
                 break;
 
@@ -1107,8 +1051,9 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                     }
-                    if (NVVMSemantics::hasLegacyAdapter(*semantic))
-                        _requireFeature(features, semantic->legacyFeature);
+                    const SlangNVVMValueOperationDesc operation =
+                        NVVMSemantics::getOperationDesc(*semantic);
+                    _requireValueOperation(requirements, operation, semantic->diagnosticName);
                 }
                 break;
 
@@ -1117,7 +1062,7 @@ SlangResult _validateNVVMFunction(
                     NVVMResolvedValueOperation operation;
                     if (!_resolveNVVMValueOperation(inst, operation) || !operation.staticEntry)
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("wave-mask ballot"));
-                    _requireFeature(features, operation.staticEntry->legacyFeature);
+                    _requireValueOperation(requirements, operation.desc, operation.diagnosticName);
                 }
                 break;
 
@@ -1129,7 +1074,6 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("device scalar pointer offset"));
                 }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_POINTER_ARITHMETIC);
                 break;
 
             case kIROp_GetElementPtr:
@@ -1141,7 +1085,6 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("device i32 array element pointer"));
                 }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_ARRAY_ADDRESSING);
                 break;
 
             case kIROp_RWStructuredBufferGetElementPtr:
@@ -1152,7 +1095,6 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         toSlice("raw RWStructuredBuffer signed i32 element pointer"));
                 }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32);
                 break;
 
             case kIROp_Return:
@@ -1161,7 +1103,6 @@ SlangResult _validateNVVMFunction(
             case kIROp_UnconditionalBranch:
             case kIROp_Loop:
             case kIROp_IfElse:
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
                 break;
 
             default:
@@ -1216,8 +1157,7 @@ SlangResult _validateNVVMFunction(
                         store->getVal(),
                         store,
                         availableValues,
-                        dominatorTree,
-                        features));
+                        dominatorTree));
                 }
                 break;
 
@@ -1250,11 +1190,8 @@ SlangResult _validateNVVMFunction(
                             inst->getOperand(operandIndex),
                             inst,
                             availableValues,
-                            dominatorTree,
-                            features));
+                            dominatorTree));
                     }
-                    if (operation.staticEntry)
-                        _requireFeature(features, operation.staticEntry->legacyFeature);
                     availableValues.add(inst);
                 }
                 break;
@@ -1275,10 +1212,7 @@ SlangResult _validateNVVMFunction(
                     inst->getOperand(1),
                     inst,
                     availableValues,
-                    dominatorTree,
-                    features));
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_RELAXED_GLOBAL_I32_ATOMIC_ADD);
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_NVVM_IR_2_0_ASSEMBLY);
+                    dominatorTree));
                 availableValues.add(inst);
                 break;
 
@@ -1311,8 +1245,7 @@ SlangResult _validateNVVMFunction(
                             argument,
                             call,
                             availableValues,
-                            dominatorTree,
-                            features));
+                            dominatorTree));
                     }
                     if (!as<IRVoidType>(call->getDataType()))
                         availableValues.add(call);
@@ -1343,15 +1276,13 @@ SlangResult _validateNVVMFunction(
                     inst->getOperand(0),
                     inst,
                     availableValues,
-                    dominatorTree,
-                    features));
+                    dominatorTree));
                 SLANG_RETURN_ON_FAIL(_validateBooleanValue(
                     codeGenContext,
                     inst->getOperand(1),
                     inst,
                     availableValues,
-                    dominatorTree,
-                    features));
+                    dominatorTree));
                 availableValues.add(inst);
                 break;
 
@@ -1383,8 +1314,7 @@ SlangResult _validateNVVMFunction(
                         elementOffset,
                         inst,
                         availableValues,
-                        dominatorTree,
-                        features));
+                        dominatorTree));
                     availableValues.add(inst);
                 }
                 break;
@@ -1433,8 +1363,7 @@ SlangResult _validateNVVMFunction(
                         elementIndex,
                         inst,
                         availableValues,
-                        dominatorTree,
-                        features));
+                        dominatorTree));
                     availableValues.add(inst);
                 }
                 break;
@@ -1461,8 +1390,7 @@ SlangResult _validateNVVMFunction(
                         elementIndex,
                         inst,
                         availableValues,
-                        dominatorTree,
-                        features));
+                        dominatorTree));
                     availableValues.add(inst);
                 }
                 break;
@@ -1494,8 +1422,7 @@ SlangResult _validateNVVMFunction(
                                 returnInst->getVal(),
                                 returnInst,
                                 availableValues,
-                                dominatorTree,
-                                features));
+                                dominatorTree));
                         }
                         else
                         {
@@ -1504,8 +1431,7 @@ SlangResult _validateNVVMFunction(
                                 returnInst->getVal(),
                                 returnInst,
                                 availableValues,
-                                dominatorTree,
-                                features));
+                                dominatorTree));
                         }
                         hasHelperReturn = true;
                     }
@@ -1523,8 +1449,7 @@ SlangResult _validateNVVMFunction(
                         entryBlock,
                         functionBlocks,
                         availableValues,
-                        dominatorTree,
-                        features));
+                        dominatorTree));
                 }
                 break;
 
@@ -1539,8 +1464,7 @@ SlangResult _validateNVVMFunction(
                         entryBlock,
                         functionBlocks,
                         availableValues,
-                        dominatorTree,
-                        features));
+                        dominatorTree));
                     SLANG_RETURN_ON_FAIL(_validateBlockTarget(
                         codeGenContext,
                         loop->getBreakBlock(),
@@ -1700,9 +1624,9 @@ SlangResult _getLoweredNVVMValue(
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
-    NVVMIRFeatureSet& outFeatures)
+    NVVMValueOperationRequirements& outRequirements)
 {
-    outFeatures = {};
+    outRequirements = {};
     if (!linkedIR.module || linkedIR.entryPoints.getCount() != 1)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point count"));
 
@@ -1733,27 +1657,28 @@ SlangResult validateNVVMSupportedIR(
 
     for (auto function : functions)
     {
-        if (function == entryPoint)
-            continue;
-        _requireFeature(
-            outFeatures,
-            _usesGenericNVVMFunctions(function)
-                ? SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS
-                : SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
-    }
-    for (auto function : functions)
-    {
-        SLANG_RETURN_ON_FAIL(
-            _validateNVVMFunction(codeGenContext, entryPoint, function, functionSet, outFeatures));
+        SLANG_RETURN_ON_FAIL(_validateNVVMFunction(
+            codeGenContext,
+            entryPoint,
+            function,
+            functionSet,
+            outRequirements));
     }
 
     // Scalar CUDA launch parameters and executable scalar operations are meaningful only for a
     // CUDA kernel. Preserve Slice 6's conventional zero-parameter empty compute entry point, but
     // do not invent a raw CUDA launch ABI for an ordinary shader entry point.
-    bool hasRequiredFeatures = false;
-    for (uint32_t i = 0; i < SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT; ++i)
-        hasRequiredFeatures = hasRequiredFeatures || outFeatures.words[i] != 0;
-    if (hasRequiredFeatures && !entryPoint->findDecoration<IRCudaKernelDecoration>())
+    bool requiresCUDAKernel = functions.getCount() > 1 || entryPoint->getParamCount() != 0;
+    for (auto function : functions)
+    {
+        for (auto block : function->getBlocks())
+        {
+            requiresCUDAKernel = requiresCUDAKernel || block != function->getFirstBlock();
+            for (auto inst : block->getOrdinaryInsts())
+                requiresCUDAKernel = requiresCUDAKernel || inst->getOp() != kIROp_Return;
+        }
+    }
+    if (requiresCUDAKernel && !entryPoint->findDecoration<IRCudaKernelDecoration>())
     {
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("CUDA kernel decoration"));
     }
@@ -1796,10 +1721,24 @@ SlangResult emitNVVMIRFromLinkedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
     const NVVMIRBuilder& builder,
+    const NVVMValueOperationRequirements& requirements,
     ComPtr<IArtifact>& outArtifact)
 {
     outArtifact.setNull();
     SLANG_RELEASE_ASSERT(linkedIR.entryPoints.getCount() == 1);
+
+    // Capability queries are pure. Complete this exact typed preflight before module creation so
+    // an unsupported overload cannot leave partial provider state behind.
+    for (const auto& requirement : requirements)
+    {
+        if (!builder.supportsValueOperation(requirement.getDesc()))
+        {
+            return _requireBuilderOperation(
+                codeGenContext,
+                requirement.diagnosticName,
+                SLANG_E_NOT_AVAILABLE);
+        }
+    }
 
     IRFunc* entryPoint = linkedIR.entryPoints[0];
     auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>();
@@ -1810,64 +1749,6 @@ SlangResult emitNVVMIRFromLinkedIR(
     HashSet<IRFunc*> functionSet;
     SLANG_RETURN_ON_FAIL(
         _collectNVVMFunctions(codeGenContext, linkedIR, entryPoint, functions, functionSet));
-
-    // Extended helper signatures and typed GenericAsm semantics are provider capabilities rather
-    // than legacy feature bits. Checking them before module creation preserves preflight's
-    // no-provider-mutation failure boundary.
-    for (auto function : functions)
-    {
-        if (function != entryPoint &&
-            (as<IRVoidType>(function->getResultType()) ||
-             asNVVMSupportedUInt3Type(function->getResultType())) &&
-            !builder.supportsExtendedConstruction())
-        {
-            return _requireBuilderOperation(
-                codeGenContext,
-                "extended function construction",
-                SLANG_E_NOT_AVAILABLE);
-        }
-        for (auto block : function->getBlocks())
-        {
-            for (auto inst : block->getOrdinaryInsts())
-            {
-                NVVMResolvedValueOperation valueOperation;
-                if (_resolveNVVMValueOperation(inst, valueOperation) &&
-                    !builder.supportsValueOperation(valueOperation.desc))
-                {
-                    return _requireBuilderOperation(
-                        codeGenContext,
-                        valueOperation.diagnosticName,
-                        SLANG_E_NOT_AVAILABLE);
-                }
-                auto genericAsm = as<IRGenericAsm>(inst);
-                if (!genericAsm)
-                    continue;
-                const NVVMSemantics::CatalogEntry* semantic =
-                    _findNVVMGenericAsmSemantic(genericAsm, function);
-                SLANG_RELEASE_ASSERT(semantic);
-                const SlangNVVMValueOperationDesc operation =
-                    NVVMSemantics::getOperationDesc(*semantic);
-                if (!builder.supportsValueOperation(operation))
-                {
-                    return _requireBuilderOperation(
-                        codeGenContext,
-                        semantic->diagnosticName,
-                        SLANG_E_NOT_AVAILABLE);
-                }
-            }
-        }
-    }
-
-    bool needsGlobalStorage = false;
-    for (auto globalInst : linkedIR.module->getGlobalInsts())
-        needsGlobalStorage = needsGlobalStorage || asNVVMSupportedSharedI32ArrayGlobal(globalInst);
-    if (needsGlobalStorage && !builder.supportsGlobalStorage())
-    {
-        return _requireBuilderOperation(
-            codeGenContext,
-            "global storage construction",
-            SLANG_E_NOT_AVAILABLE);
-    }
 
     ScopedNVVMModule moduleScope;
     moduleScope.builder = &builder;
@@ -2528,32 +2409,19 @@ SlangResult emitNVVMIRFromLinkedIR(
         "kernel annotation",
         builder.markFunctionAsKernel(moduleScope.module, functionMap.getValue(entryPoint))));
 
-    if (!builder.supportsSerializationDiagnostics())
-    {
-        return _requireBuilderOperation(
-            codeGenContext,
-            "verified LLVM IR serialization",
-            SLANG_E_NOT_AVAILABLE);
-    }
-
-    const bool useNVVMIR20Assembly = builder.supportsNVVMIR20Assembly();
-    const SlangNVVMSerializationFormat serializationFormat =
-        useNVVMIR20Assembly ? SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY
-                            : SLANG_NVVM_SERIALIZATION_FORMAT_BITCODE;
-    const char* serializationOperation = useNVVMIR20Assembly
-                                             ? "verified NVVM IR 2.0 assembly serialization"
-                                             : "verified LLVM bitcode serialization";
-
     ComPtr<ISlangBlob> serializedIR;
     String verifierDiagnostics;
     SlangResult serializationResult = builder.serializeModule(
         moduleScope.module,
-        serializationFormat,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
         serializedIR,
         verifierDiagnostics);
     if (SLANG_FAILED(serializationResult))
     {
-        _requireBuilderOperation(codeGenContext, serializationOperation, serializationResult);
+        _requireBuilderOperation(
+            codeGenContext,
+            "verified NVVM IR 2.0 assembly serialization",
+            serializationResult);
         if (verifierDiagnostics.getLength())
         {
             codeGenContext->getSink()->diagnoseRaw(
@@ -2570,13 +2438,14 @@ SlangResult emitNVVMIRFromLinkedIR(
     }
     if (!serializedIR || !serializedIR->getBufferSize())
     {
-        return _requireBuilderOperation(codeGenContext, serializationOperation, SLANG_FAIL);
+        return _requireBuilderOperation(
+            codeGenContext,
+            "verified NVVM IR 2.0 assembly serialization",
+            SLANG_FAIL);
     }
 
-    const ArtifactKind artifactKind =
-        useNVVMIR20Assembly ? ArtifactKind::Assembly : ArtifactKind::ObjectCode;
     auto artifact = ArtifactUtil::createArtifact(
-        ArtifactDesc::make(artifactKind, ArtifactPayload::LLVMIR, ArtifactStyle::Kernel));
+        ArtifactDesc::make(ArtifactKind::Assembly, ArtifactPayload::LLVMIR, ArtifactStyle::Kernel));
     artifact->addRepresentationUnknown(serializedIR);
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
     outArtifact = artifact;

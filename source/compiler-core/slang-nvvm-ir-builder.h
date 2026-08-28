@@ -28,52 +28,6 @@ public:
         NVVMIRBuilder& outBuilder);
 
     bool isInitialized() const { return m_foundation.createModule != nullptr; }
-    bool supportsSerializationDiagnostics() const { return isInitialized(); }
-    /// Returns whether the provider advertised the complete Slice 4 scalar-memory prefix.
-    bool supportsScalarOperations() const;
-    /// Returns whether the provider advertised the complete Slice 7 scalar-control-flow prefix.
-    bool supportsScalarControlFlow() const;
-    /// Returns whether the provider advertised the complete Slice 8 scalar-SSA prefix.
-    bool supportsScalarSSA() const;
-    /// Returns whether the provider advertised the complete Slice 9 scalar-function prefix.
-    bool supportsScalarFunctions() const;
-    /// Returns whether the provider advertised the complete Slice 10 pointer-arithmetic prefix.
-    bool supportsScalarPointerArithmetic() const;
-    /// Returns whether the provider advertised the complete Slice 11 array-addressing prefix.
-    bool supportsScalarArrayAddressing() const;
-    /// Returns whether the provider advertised the complete Slice 12 integer-multiply prefix.
-    bool supportsScalarIntegerMultiply() const;
-    /// Returns whether the provider advertised the complete Slice 13 integer-bit-AND prefix.
-    bool supportsScalarIntegerBitAnd() const;
-    /// Returns whether the provider advertised the complete Slice 14 integer-bit-OR prefix.
-    bool supportsScalarIntegerBitOr() const;
-    /// Returns whether the provider advertised the complete Slice 15 integer-bit-XOR prefix.
-    bool supportsScalarIntegerBitXor() const;
-    /// Returns whether the provider advertised the complete Slice 16 integer-bit-NOT prefix.
-    bool supportsScalarIntegerBitNot() const;
-    /// Returns whether the provider advertised the complete Slice 17 integer-negate prefix.
-    bool supportsScalarIntegerNegate() const;
-    /// Returns whether the provider can serialize the audited NVVM IR 2.0 text dialect.
-    bool supportsNVVMIR20Assembly() const;
-    /// Returns whether the provider advertised the complete Slice 19 atomic-add prefix.
-    bool supportsRelaxedGlobalI32AtomicAdd() const;
-    /// Returns whether the provider advertised the complete Slice 21 integer-equality prefix.
-    bool supportsScalarIntegerEqual() const;
-    /// Returns whether the provider advertised the complete Slice 22 integer-inequality prefix.
-    bool supportsScalarIntegerNotEqual() const;
-    /// Returns whether the provider advertised the complete Slice 23 signed-greater-than prefix.
-    bool supportsScalarIntegerSignedGreaterThan() const;
-    /// Returns whether the provider advertised the complete Slice 24 signed-less-equal prefix.
-    bool supportsScalarIntegerSignedLessEqual() const;
-    /// Returns whether the provider advertised the complete Slice 25 signed-greater-equal prefix.
-    bool supportsScalarIntegerSignedGreaterEqual() const;
-    /// Returns whether the provider advertised the complete Slice 26 raw resource prefix.
-    bool supportsRawRWStructuredBufferI32() const;
-    /// Returns whether one temporary semantic feature is supported by the current value table.
-    bool supportsFeature(SlangNVVMBuilderFeature feature) const;
-    /// Returns whether every bit in a required semantic feature set is available.
-    bool supportsFeatures(const SlangNVVMBuilderFeatureSet& requiredFeatures) const;
-    const SlangNVVMBuilderFeatureSet& getSupportedFeatures() const { return m_features; }
     /// Returns the provider identity that affects generated IR and shader-cache keys.
     String getVersionString() const;
     const SlangNVVMBuilderAPI& getAPI() const { return m_api; }
@@ -83,13 +37,6 @@ public:
     {
         return &m_valueOperations;
     }
-
-    bool supportsExtendedConstruction() const { return isInitialized(); }
-
-    /// Returns whether the exact construction table supports fixed vectors.
-    bool supportsVectorConstruction() const { return supportsExtendedConstruction(); }
-
-    bool supportsGlobalStorage() const { return isInitialized(); }
 
     /// Queries one complete typed operation.
     bool supportsValueOperation(const SlangNVVMValueOperationDesc& operation) const;
@@ -118,7 +65,7 @@ public:
         uint32_t bitWidth,
         SlangNVVMTypeHandle& outType) const;
 
-    /// Gets the module-context-owned IEEE floating-point type used by an advertised feature.
+    /// Gets a module-context-owned IEEE floating-point type.
     SlangResult getFloatingPointType(
         SlangNVVMModuleHandle module,
         uint32_t bitWidth,
@@ -180,7 +127,7 @@ public:
     /// Emits ADD or SUB for same-typed scalar integer values.
     SlangResult emitIntegerBinary(
         SlangNVVMModuleHandle module,
-        SlangNVVMIntegerBinaryOp operation,
+        SlangNVVMValueOperation operation,
         SlangNVVMValueHandle left,
         SlangNVVMValueHandle right,
         SlangNVVMValueHandle& outValue) const;
@@ -188,14 +135,14 @@ public:
     /// Emits one scalar-integer unary operation through the current semantic table.
     SlangResult emitIntegerUnary(
         SlangNVVMModuleHandle module,
-        SlangNVVMIntegerUnaryOp operation,
+        SlangNVVMValueOperation operation,
         SlangNVVMValueHandle value,
         SlangNVVMValueHandle& outValue) const;
 
     /// Emits one scalar-integer binary operation through the current semantic table.
     SlangResult emitIntegerBinaryOperation(
         SlangNVVMModuleHandle module,
-        SlangNVVMIntegerBinaryOp operation,
+        SlangNVVMValueOperation operation,
         SlangNVVMValueHandle left,
         SlangNVVMValueHandle right,
         SlangNVVMValueHandle& outValue) const;
@@ -203,7 +150,7 @@ public:
     /// Emits one scalar-integer comparison through the current semantic table.
     SlangResult emitIntegerCompare(
         SlangNVVMModuleHandle module,
-        SlangNVVMIntegerCompareOp operation,
+        SlangNVVMValueOperation operation,
         SlangNVVMValueHandle left,
         SlangNVVMValueHandle right,
         SlangNVVMValueHandle& outValue) const;
@@ -211,7 +158,7 @@ public:
     /// Emits one scalar floating-point binary operation through the current semantic table.
     SlangResult emitFloatingBinary(
         SlangNVVMModuleHandle module,
-        SlangNVVMFloatingBinaryOp operation,
+        SlangNVVMValueOperation operation,
         SlangNVVMValueHandle left,
         SlangNVVMValueHandle right,
         SlangNVVMValueHandle& outValue) const;
@@ -219,14 +166,14 @@ public:
     /// Emits one scalar floating-point unary operation through the current semantic table.
     SlangResult emitFloatingUnary(
         SlangNVVMModuleHandle module,
-        SlangNVVMFloatingUnaryOp operation,
+        SlangNVVMValueOperation operation,
         SlangNVVMValueHandle value,
         SlangNVVMValueHandle& outValue) const;
 
     /// Emits one scalar floating-point comparison through the current semantic table.
     SlangResult emitFloatingCompare(
         SlangNVVMModuleHandle module,
-        SlangNVVMFloatingCompareOp operation,
+        SlangNVVMValueOperation operation,
         SlangNVVMValueHandle left,
         SlangNVVMValueHandle right,
         SlangNVVMValueHandle& outValue) const;
@@ -263,14 +210,6 @@ public:
 
     /// Emits a typed valued return in the current function.
     SlangResult emitValueReturn(SlangNVVMModuleHandle module, SlangNVVMValueHandle value) const;
-
-    /// Emits one target intrinsic through the current semantic table.
-    SlangResult emitIntrinsic(
-        SlangNVVMModuleHandle module,
-        SlangNVVMIntrinsicOp operation,
-        const SlangNVVMValueHandle* arguments,
-        size_t argumentCount,
-        SlangNVVMValueHandle& outValue) const;
 
     /// Emits a signed integer less-than comparison and returns its i1 result.
     SlangResult emitIntegerSignedLessThan(
@@ -484,7 +423,6 @@ private:
     SlangNVVMBuilderFoundationAPI m_foundation = {};
     SlangNVVMBuilderConstructionAPI m_construction = {};
     SlangNVVMBuilderValueOperationsAPI m_valueOperations = {};
-    SlangNVVMBuilderFeatureSet m_features = {};
     ComPtr<ISlangSharedLibrary> m_library;
 };
 

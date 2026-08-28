@@ -23,18 +23,6 @@ static SlangResult _validateHandleResult(SlangNVVMResult result, T& handle)
     return handle ? result : SLANG_FAIL;
 }
 
-static void _addFeature(SlangNVVMBuilderFeatureSet& features, SlangNVVMBuilderFeature feature)
-{
-    features.words[feature / 64u] |= uint64_t(1) << (feature % 64u);
-}
-
-static bool _hasFeature(const SlangNVVMBuilderFeatureSet& features, SlangNVVMBuilderFeature feature)
-{
-    if (feature >= SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT * 64u)
-        return false;
-    return (features.words[feature / 64u] & (uint64_t(1) << (feature % 64u))) != 0;
-}
-
 static bool _hasRequiredFoundation(const SlangNVVMBuilderFoundationAPI& api)
 {
     return api.createModule && api.destroyModule && api.serializeModuleWithDiagnostics &&
@@ -132,169 +120,7 @@ static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI
     outBuilder.m_construction = construction;
     outBuilder.m_valueOperations = valueOperations;
     outBuilder.m_library = library;
-
-    SlangNVVMBuilderFeatureSet& features = outBuilder.m_features;
-    const SlangNVVMBuilderFeature structuralFeatures[] = {
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY,
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA,
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS,
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_POINTER_ARITHMETIC,
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_ARRAY_ADDRESSING,
-        SLANG_NVVM_BUILDER_FEATURE_RELAXED_GLOBAL_I32_ATOMIC_ADD,
-        SLANG_NVVM_BUILDER_FEATURE_NVVM_IR_2_0_ASSEMBLY,
-        SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32,
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT,
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI,
-        SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS,
-    };
-    for (SlangNVVMBuilderFeature feature : structuralFeatures)
-        _addFeature(features, feature);
-
-    for (SlangNVVMBuilderFeature feature = 0; feature < SLANG_NVVM_BUILDER_FEATURE_COUNT; ++feature)
-    {
-        bool hasCatalogEntries = false;
-        bool supportsEveryEntry = true;
-        for (const NVVMSemantics::CatalogEntry& entry : NVVMSemantics::kCatalog)
-        {
-            if (entry.legacyFeature != feature)
-                continue;
-
-            hasCatalogEntries = true;
-            const SlangNVVMValueOperationDesc desc = NVVMSemantics::getOperationDesc(entry);
-            uint32_t supported = 0;
-            SLANG_RETURN_ON_FAIL(valueOperations.isOperationSupported(&desc, &supported));
-            supportsEveryEntry = supportsEveryEntry && supported != 0;
-        }
-        if (hasCatalogEntries && supportsEveryEntry)
-            _addFeature(features, feature);
-    }
     return SLANG_OK;
-}
-
-bool NVVMIRBuilder::supportsScalarOperations() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_MEMORY);
-}
-
-bool NVVMIRBuilder::supportsScalarControlFlow() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
-}
-
-bool NVVMIRBuilder::supportsScalarSSA() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
-}
-
-bool NVVMIRBuilder::supportsScalarFunctions() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FUNCTIONS);
-}
-
-bool NVVMIRBuilder::supportsScalarPointerArithmetic() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_POINTER_ARITHMETIC);
-}
-
-bool NVVMIRBuilder::supportsScalarArrayAddressing() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_ARRAY_ADDRESSING);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerMultiply() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerBitAnd() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_AND);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerBitOr() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_OR);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerBitXor() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_XOR);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerBitNot() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_NOT);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerNegate() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NEGATE);
-}
-
-bool NVVMIRBuilder::supportsNVVMIR20Assembly() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_NVVM_IR_2_0_ASSEMBLY);
-}
-
-bool NVVMIRBuilder::supportsRelaxedGlobalI32AtomicAdd() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_RELAXED_GLOBAL_I32_ATOMIC_ADD);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerEqual() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_EQUAL);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerNotEqual() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NOT_EQUAL);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerSignedGreaterThan() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_THAN);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerSignedLessEqual() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_LESS_EQUAL);
-}
-
-bool NVVMIRBuilder::supportsScalarIntegerSignedGreaterEqual() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_EQUAL);
-}
-
-bool NVVMIRBuilder::supportsRawRWStructuredBufferI32() const
-{
-    return supportsFeature(SLANG_NVVM_BUILDER_FEATURE_RAW_RW_STRUCTURED_BUFFER_I32);
-}
-
-bool NVVMIRBuilder::supportsFeature(SlangNVVMBuilderFeature feature) const
-{
-    return feature < SLANG_NVVM_BUILDER_FEATURE_COUNT && _hasFeature(m_features, feature);
-}
-
-bool NVVMIRBuilder::supportsFeatures(const SlangNVVMBuilderFeatureSet& requiredFeatures) const
-{
-    for (uint32_t i = 0; i < SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT; ++i)
-    {
-        const uint32_t firstFeature = i * 64u;
-        const uint32_t remainingFeatures = SLANG_NVVM_BUILDER_FEATURE_COUNT > firstFeature
-                                               ? SLANG_NVVM_BUILDER_FEATURE_COUNT - firstFeature
-                                               : 0;
-        const uint64_t knownFeatureMask = remainingFeatures >= 64u ? ~uint64_t(0)
-                                          : remainingFeatures
-                                              ? (uint64_t(1) << remainingFeatures) - 1u
-                                              : 0;
-        if ((requiredFeatures.words[i] & ~knownFeatureMask) != 0 ||
-            (requiredFeatures.words[i] & ~m_features.words[i]) != 0)
-        {
-            return false;
-        }
-    }
-    return true;
 }
 
 bool NVVMIRBuilder::supportsValueOperation(const SlangNVVMValueOperationDesc& operation) const
@@ -345,14 +171,7 @@ String NVVMIRBuilder::getVersionString() const
             << ";llvm=" << m_api.llvmVersionMajor << "." << m_api.llvmVersionMinor << "."
             << m_api.llvmVersionPatch << ";nvvm-ir=" << m_api.nvvmIRVersionMajor << "."
             << m_api.nvvmIRVersionMinor << ";pointer-model=" << uint32_t(m_api.pointerModel)
-            << ";feature-words=";
-    for (uint32_t i = 0; i < SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT; ++i)
-    {
-        if (i)
-            builder << ",";
-        builder << m_features.words[i];
-    }
-    builder << ";timestamp="
+            << ";timestamp="
             << SharedLibraryUtils::getSharedLibraryTimestamp(
                    reinterpret_cast<void*>(m_foundation.createModule));
     return builder.produceString();
@@ -394,8 +213,6 @@ SlangResult NVVMIRBuilder::getIntegerType(
     outType = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarOperations())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result = m_construction.getIntegerType(module, bitWidth, &outType);
     return _validateHandleResult(result, outType);
 }
@@ -408,21 +225,6 @@ SlangResult NVVMIRBuilder::getFloatingPointType(
     outType = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_GREATER_THAN) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_LESS_EQUAL) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_GREATER_EQUAL) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_LESS_THAN) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI) &&
-        !supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS))
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result = m_construction.getFloatingPointType(module, bitWidth, &outType);
     return _validateHandleResult(result, outType);
 }
@@ -436,8 +238,6 @@ SlangResult NVVMIRBuilder::getPointerType(
     outType = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarOperations())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.getPointerType(module, pointeeType, addressSpace, &outType);
     return _validateHandleResult(result, outType);
@@ -483,8 +283,6 @@ SlangResult NVVMIRBuilder::getFunctionParameter(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarOperations())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.getFunctionParameter(module, function, parameterIndex, &outValue);
     return _validateHandleResult(result, outValue);
@@ -521,8 +319,6 @@ SlangResult NVVMIRBuilder::emitLoad(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarOperations())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result = m_construction.emitLoad(module, pointer, alignment, &outValue);
     return _validateHandleResult(result, outValue);
 }
@@ -535,14 +331,12 @@ SlangResult NVVMIRBuilder::emitStore(
 {
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarOperations())
-        return SLANG_E_NOT_AVAILABLE;
     return m_construction.emitStore(module, value, pointer, alignment);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerBinary(
     SlangNVVMModuleHandle module,
-    SlangNVVMIntegerBinaryOp operation,
+    SlangNVVMValueOperation operation,
     SlangNVVMValueHandle left,
     SlangNVVMValueHandle right,
     SlangNVVMValueHandle& outValue) const
@@ -550,19 +344,16 @@ SlangResult NVVMIRBuilder::emitIntegerBinary(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (operation != SLANG_NVVM_INTEGER_BINARY_OP_ADD &&
-        operation != SLANG_NVVM_INTEGER_BINARY_OP_SUBTRACT)
+    if (operation != SLANG_NVVM_VALUE_OP_ADD && operation != SLANG_NVVM_VALUE_OP_SUBTRACT)
     {
         return SLANG_E_INVALID_ARG;
     }
-    if (!supportsScalarControlFlow())
-        return SLANG_E_NOT_AVAILABLE;
     return emitIntegerBinaryOperation(module, operation, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerUnary(
     SlangNVVMModuleHandle module,
-    SlangNVVMIntegerUnaryOp operation,
+    SlangNVVMValueOperation operation,
     SlangNVVMValueHandle value,
     SlangNVVMValueHandle& outValue) const
 {
@@ -570,22 +361,22 @@ SlangResult NVVMIRBuilder::emitIntegerUnary(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
 
-    const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::findLegacyOperation(
-        NVVMSemantics::LegacyFamily::IntegerUnary,
-        uint32_t(operation));
-    if (!entry)
+    if (operation != SLANG_NVVM_VALUE_OP_BIT_NOT && operation != SLANG_NVVM_VALUE_OP_NEGATE)
         return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(entry->legacyFeature))
-        return SLANG_E_NOT_AVAILABLE;
-
-    const SlangNVVMValueOperationDesc desc = NVVMSemantics::getOperationDesc(*entry);
+    const SlangNVVMValueTypeDesc operandTypes[] = {NVVMSemantics::kSignedI32};
+    const SlangNVVMValueOperationDesc desc = {
+        operation,
+        NVVMSemantics::kSignedI32,
+        operandTypes,
+        SLANG_COUNT_OF(operandTypes),
+    };
     const SlangNVVMValueHandle operands[] = {value};
     return emitValueOperation(module, desc, operands, SLANG_COUNT_OF(operands), outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerBinaryOperation(
     SlangNVVMModuleHandle module,
-    SlangNVVMIntegerBinaryOp operation,
+    SlangNVVMValueOperation operation,
     SlangNVVMValueHandle left,
     SlangNVVMValueHandle right,
     SlangNVVMValueHandle& outValue) const
@@ -594,22 +385,25 @@ SlangResult NVVMIRBuilder::emitIntegerBinaryOperation(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
 
-    const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::findLegacyOperation(
-        NVVMSemantics::LegacyFamily::IntegerBinary,
-        uint32_t(operation));
-    if (!entry)
+    if (operation < SLANG_NVVM_VALUE_OP_ADD || operation > SLANG_NVVM_VALUE_OP_BIT_XOR)
         return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(entry->legacyFeature))
-        return SLANG_E_NOT_AVAILABLE;
-
-    const SlangNVVMValueOperationDesc desc = NVVMSemantics::getOperationDesc(*entry);
+    const SlangNVVMValueTypeDesc operandTypes[] = {
+        NVVMSemantics::kSignedI32,
+        NVVMSemantics::kSignedI32,
+    };
+    const SlangNVVMValueOperationDesc desc = {
+        operation,
+        NVVMSemantics::kSignedI32,
+        operandTypes,
+        SLANG_COUNT_OF(operandTypes),
+    };
     const SlangNVVMValueHandle operands[] = {left, right};
     return emitValueOperation(module, desc, operands, SLANG_COUNT_OF(operands), outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerCompare(
     SlangNVVMModuleHandle module,
-    SlangNVVMIntegerCompareOp operation,
+    SlangNVVMValueOperation operation,
     SlangNVVMValueHandle left,
     SlangNVVMValueHandle right,
     SlangNVVMValueHandle& outValue) const
@@ -618,22 +412,25 @@ SlangResult NVVMIRBuilder::emitIntegerCompare(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
 
-    const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::findLegacyOperation(
-        NVVMSemantics::LegacyFamily::IntegerCompare,
-        uint32_t(operation));
-    if (!entry)
+    if (operation < SLANG_NVVM_VALUE_OP_EQUAL || operation > SLANG_NVVM_VALUE_OP_GREATER_EQUAL)
         return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(entry->legacyFeature))
-        return SLANG_E_NOT_AVAILABLE;
-
-    const SlangNVVMValueOperationDesc desc = NVVMSemantics::getOperationDesc(*entry);
+    const SlangNVVMValueTypeDesc operandTypes[] = {
+        NVVMSemantics::kSignedI32,
+        NVVMSemantics::kSignedI32,
+    };
+    const SlangNVVMValueOperationDesc desc = {
+        operation,
+        NVVMSemantics::kBool,
+        operandTypes,
+        SLANG_COUNT_OF(operandTypes),
+    };
     const SlangNVVMValueHandle operands[] = {left, right};
     return emitValueOperation(module, desc, operands, SLANG_COUNT_OF(operands), outValue);
 }
 
 SlangResult NVVMIRBuilder::emitFloatingBinary(
     SlangNVVMModuleHandle module,
-    SlangNVVMFloatingBinaryOp operation,
+    SlangNVVMValueOperation operation,
     SlangNVVMValueHandle left,
     SlangNVVMValueHandle right,
     SlangNVVMValueHandle& outValue) const
@@ -642,22 +439,25 @@ SlangResult NVVMIRBuilder::emitFloatingBinary(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
 
-    const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::findLegacyOperation(
-        NVVMSemantics::LegacyFamily::FloatingBinary,
-        uint32_t(operation));
-    if (!entry)
+    if (operation < SLANG_NVVM_VALUE_OP_ADD || operation > SLANG_NVVM_VALUE_OP_DIVIDE)
         return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(entry->legacyFeature))
-        return SLANG_E_NOT_AVAILABLE;
-
-    const SlangNVVMValueOperationDesc desc = NVVMSemantics::getOperationDesc(*entry);
+    const SlangNVVMValueTypeDesc operandTypes[] = {
+        NVVMSemantics::kFloat32,
+        NVVMSemantics::kFloat32,
+    };
+    const SlangNVVMValueOperationDesc desc = {
+        operation,
+        NVVMSemantics::kFloat32,
+        operandTypes,
+        SLANG_COUNT_OF(operandTypes),
+    };
     const SlangNVVMValueHandle operands[] = {left, right};
     return emitValueOperation(module, desc, operands, SLANG_COUNT_OF(operands), outValue);
 }
 
 SlangResult NVVMIRBuilder::emitFloatingUnary(
     SlangNVVMModuleHandle module,
-    SlangNVVMFloatingUnaryOp operation,
+    SlangNVVMValueOperation operation,
     SlangNVVMValueHandle value,
     SlangNVVMValueHandle& outValue) const
 {
@@ -665,22 +465,22 @@ SlangResult NVVMIRBuilder::emitFloatingUnary(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
 
-    const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::findLegacyOperation(
-        NVVMSemantics::LegacyFamily::FloatingUnary,
-        uint32_t(operation));
-    if (!entry)
+    if (operation != SLANG_NVVM_VALUE_OP_NEGATE)
         return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(entry->legacyFeature))
-        return SLANG_E_NOT_AVAILABLE;
-
-    const SlangNVVMValueOperationDesc desc = NVVMSemantics::getOperationDesc(*entry);
+    const SlangNVVMValueTypeDesc operandTypes[] = {NVVMSemantics::kFloat32};
+    const SlangNVVMValueOperationDesc desc = {
+        operation,
+        NVVMSemantics::kFloat32,
+        operandTypes,
+        SLANG_COUNT_OF(operandTypes),
+    };
     const SlangNVVMValueHandle operands[] = {value};
     return emitValueOperation(module, desc, operands, SLANG_COUNT_OF(operands), outValue);
 }
 
 SlangResult NVVMIRBuilder::emitFloatingCompare(
     SlangNVVMModuleHandle module,
-    SlangNVVMFloatingCompareOp operation,
+    SlangNVVMValueOperation operation,
     SlangNVVMValueHandle left,
     SlangNVVMValueHandle right,
     SlangNVVMValueHandle& outValue) const
@@ -689,15 +489,18 @@ SlangResult NVVMIRBuilder::emitFloatingCompare(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
 
-    const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::findLegacyOperation(
-        NVVMSemantics::LegacyFamily::FloatingCompare,
-        uint32_t(operation));
-    if (!entry)
+    if (operation < SLANG_NVVM_VALUE_OP_EQUAL || operation > SLANG_NVVM_VALUE_OP_GREATER_EQUAL)
         return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(entry->legacyFeature))
-        return SLANG_E_NOT_AVAILABLE;
-
-    const SlangNVVMValueOperationDesc desc = NVVMSemantics::getOperationDesc(*entry);
+    const SlangNVVMValueTypeDesc operandTypes[] = {
+        NVVMSemantics::kFloat32,
+        NVVMSemantics::kFloat32,
+    };
+    const SlangNVVMValueOperationDesc desc = {
+        operation,
+        NVVMSemantics::kBool,
+        operandTypes,
+        SLANG_COUNT_OF(operandTypes),
+    };
     const SlangNVVMValueHandle operands[] = {left, right};
     return emitValueOperation(module, desc, operands, SLANG_COUNT_OF(operands), outValue);
 }
@@ -714,8 +517,6 @@ SlangResult NVVMIRBuilder::getFloatingPointConstant(
         return SLANG_E_UNINITIALIZED;
     if (bitWidth != 32 || (bitPattern >> 32) != 0)
         return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT))
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction
             .getFloatingPointConstant(module, floatingPointType, bitWidth, bitPattern, &outValue);
@@ -731,8 +532,6 @@ SlangResult NVVMIRBuilder::emitPhi(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI))
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result = m_construction.emitPhi(module, targetBlock, type, &outValue);
     return _validateHandleResult(result, outValue);
 }
@@ -745,8 +544,6 @@ SlangResult NVVMIRBuilder::addPhiIncoming(
 {
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI))
-        return SLANG_E_NOT_AVAILABLE;
     return m_construction.addPhiIncoming(module, phi, value, predecessorBlock);
 }
 
@@ -760,8 +557,6 @@ SlangResult NVVMIRBuilder::emitCall(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS))
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.emitCall(module, callee, arguments, argumentCount, &outValue);
     return _validateHandleResult(result, outValue);
@@ -772,32 +567,7 @@ SlangResult NVVMIRBuilder::emitValueReturn(SlangNVVMModuleHandle module, SlangNV
 {
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS))
-        return SLANG_E_NOT_AVAILABLE;
     return m_construction.emitValueReturn(module, value);
-}
-
-SlangResult NVVMIRBuilder::emitIntrinsic(
-    SlangNVVMModuleHandle module,
-    SlangNVVMIntrinsicOp operation,
-    const SlangNVVMValueHandle* arguments,
-    size_t argumentCount,
-    SlangNVVMValueHandle& outValue) const
-{
-    outValue = nullptr;
-    if (!isInitialized())
-        return SLANG_E_UNINITIALIZED;
-
-    const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::findLegacyOperation(
-        NVVMSemantics::LegacyFamily::Intrinsic,
-        uint32_t(operation));
-    if (!entry || argumentCount != entry->operandCount)
-        return SLANG_E_INVALID_ARG;
-    if (!supportsFeature(entry->legacyFeature))
-        return SLANG_E_NOT_AVAILABLE;
-
-    const SlangNVVMValueOperationDesc desc = NVVMSemantics::getOperationDesc(*entry);
-    return emitValueOperation(module, desc, arguments, argumentCount, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerSignedLessThan(
@@ -809,14 +579,7 @@ SlangResult NVVMIRBuilder::emitIntegerSignedLessThan(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarControlFlow())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerCompare(
-        module,
-        SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_THAN,
-        left,
-        right,
-        outValue);
+    return emitIntegerCompare(module, SLANG_NVVM_VALUE_OP_LESS_THAN, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitBranch(
@@ -825,8 +588,6 @@ SlangResult NVVMIRBuilder::emitBranch(
 {
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarControlFlow())
-        return SLANG_E_NOT_AVAILABLE;
     return m_construction.emitBranch(module, targetBlock);
 }
 
@@ -838,8 +599,6 @@ SlangResult NVVMIRBuilder::emitConditionalBranch(
 {
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarControlFlow())
-        return SLANG_E_NOT_AVAILABLE;
     return m_construction.emitConditionalBranch(module, condition, trueBlock, falseBlock);
 }
 
@@ -852,8 +611,6 @@ SlangResult NVVMIRBuilder::getIntegerConstant(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarSSA())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.getIntegerConstant(module, integerType, value, &outValue);
     return _validateHandleResult(result, outValue);
@@ -868,8 +625,6 @@ SlangResult NVVMIRBuilder::emitIntegerPhi(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarSSA())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.emitPhi(module, targetBlock, integerType, &outValue);
     return _validateHandleResult(result, outValue);
@@ -883,8 +638,6 @@ SlangResult NVVMIRBuilder::addIntegerPhiIncoming(
 {
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarSSA())
-        return SLANG_E_NOT_AVAILABLE;
     return m_construction.addPhiIncoming(module, phi, value, predecessorBlock);
 }
 
@@ -898,8 +651,6 @@ SlangResult NVVMIRBuilder::emitIntegerCall(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarFunctions())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.emitCall(module, callee, arguments, argumentCount, &outValue);
     return _validateHandleResult(result, outValue);
@@ -911,8 +662,6 @@ SlangResult NVVMIRBuilder::emitIntegerReturn(
 {
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarFunctions())
-        return SLANG_E_NOT_AVAILABLE;
     return m_construction.emitValueReturn(module, value);
 }
 
@@ -925,8 +674,6 @@ SlangResult NVVMIRBuilder::emitPointerOffset(
     outPointer = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarPointerArithmetic())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.emitPointerOffset(module, basePointer, elementOffset, &outPointer);
     return _validateHandleResult(result, outPointer);
@@ -941,8 +688,6 @@ SlangResult NVVMIRBuilder::getArrayType(
     outType = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarArrayAddressing())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.getArrayType(module, elementType, elementCount, &outType);
     return _validateHandleResult(result, outType);
@@ -957,8 +702,6 @@ SlangResult NVVMIRBuilder::getVectorType(
     outType = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsVectorConstruction())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.getVectorType(module, elementType, elementCount, &outType);
     return _validateHandleResult(result, outType);
@@ -975,8 +718,6 @@ SlangResult NVVMIRBuilder::declareGlobalStorage(
     outStorage = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsGlobalStorage())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result = m_construction.declareGlobalStorage(
         module,
         valueType,
@@ -997,8 +738,6 @@ SlangResult NVVMIRBuilder::emitVectorElementExtract(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsVectorConstruction())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.emitVectorElementExtract(module, vector, elementIndex, &outValue);
     return _validateHandleResult(result, outValue);
@@ -1013,8 +752,6 @@ SlangResult NVVMIRBuilder::emitArrayElementPointer(
     outPointer = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarArrayAddressing())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.emitArrayElementPointer(module, baseArrayPointer, elementIndex, &outPointer);
     return _validateHandleResult(result, outPointer);
@@ -1029,14 +766,7 @@ SlangResult NVVMIRBuilder::emitIntegerMultiply(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerMultiply())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerBinaryOperation(
-        module,
-        SLANG_NVVM_INTEGER_BINARY_OP_MULTIPLY,
-        left,
-        right,
-        outValue);
+    return emitIntegerBinaryOperation(module, SLANG_NVVM_VALUE_OP_MULTIPLY, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerBitAnd(
@@ -1048,14 +778,7 @@ SlangResult NVVMIRBuilder::emitIntegerBitAnd(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerBitAnd())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerBinaryOperation(
-        module,
-        SLANG_NVVM_INTEGER_BINARY_OP_BIT_AND,
-        left,
-        right,
-        outValue);
+    return emitIntegerBinaryOperation(module, SLANG_NVVM_VALUE_OP_BIT_AND, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerBitOr(
@@ -1067,14 +790,7 @@ SlangResult NVVMIRBuilder::emitIntegerBitOr(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerBitOr())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerBinaryOperation(
-        module,
-        SLANG_NVVM_INTEGER_BINARY_OP_BIT_OR,
-        left,
-        right,
-        outValue);
+    return emitIntegerBinaryOperation(module, SLANG_NVVM_VALUE_OP_BIT_OR, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerBitXor(
@@ -1086,14 +802,7 @@ SlangResult NVVMIRBuilder::emitIntegerBitXor(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerBitXor())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerBinaryOperation(
-        module,
-        SLANG_NVVM_INTEGER_BINARY_OP_BIT_XOR,
-        left,
-        right,
-        outValue);
+    return emitIntegerBinaryOperation(module, SLANG_NVVM_VALUE_OP_BIT_XOR, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerBitNot(
@@ -1104,9 +813,7 @@ SlangResult NVVMIRBuilder::emitIntegerBitNot(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerBitNot())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerUnary(module, SLANG_NVVM_INTEGER_UNARY_OP_BIT_NOT, value, outValue);
+    return emitIntegerUnary(module, SLANG_NVVM_VALUE_OP_BIT_NOT, value, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerNegate(
@@ -1117,9 +824,7 @@ SlangResult NVVMIRBuilder::emitIntegerNegate(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerNegate())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerUnary(module, SLANG_NVVM_INTEGER_UNARY_OP_NEGATE, value, outValue);
+    return emitIntegerUnary(module, SLANG_NVVM_VALUE_OP_NEGATE, value, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitRelaxedGlobalI32AtomicAdd(
@@ -1131,8 +836,6 @@ SlangResult NVVMIRBuilder::emitRelaxedGlobalI32AtomicAdd(
     outOriginalValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsRelaxedGlobalI32AtomicAdd())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
         m_construction.emitRelaxedGlobalI32AtomicAdd(module, pointer, value, &outOriginalValue);
     return _validateHandleResult(result, outOriginalValue);
@@ -1147,9 +850,7 @@ SlangResult NVVMIRBuilder::emitIntegerEqual(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerEqual())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerCompare(module, SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL, left, right, outValue);
+    return emitIntegerCompare(module, SLANG_NVVM_VALUE_OP_EQUAL, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerNotEqual(
@@ -1161,14 +862,7 @@ SlangResult NVVMIRBuilder::emitIntegerNotEqual(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerNotEqual())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerCompare(
-        module,
-        SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL,
-        left,
-        right,
-        outValue);
+    return emitIntegerCompare(module, SLANG_NVVM_VALUE_OP_NOT_EQUAL, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerSignedGreaterThan(
@@ -1180,14 +874,7 @@ SlangResult NVVMIRBuilder::emitIntegerSignedGreaterThan(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerSignedGreaterThan())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerCompare(
-        module,
-        SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN,
-        left,
-        right,
-        outValue);
+    return emitIntegerCompare(module, SLANG_NVVM_VALUE_OP_GREATER_THAN, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerSignedLessEqual(
@@ -1199,14 +886,7 @@ SlangResult NVVMIRBuilder::emitIntegerSignedLessEqual(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerSignedLessEqual())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerCompare(
-        module,
-        SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_EQUAL,
-        left,
-        right,
-        outValue);
+    return emitIntegerCompare(module, SLANG_NVVM_VALUE_OP_LESS_EQUAL, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerSignedGreaterEqual(
@@ -1218,14 +898,7 @@ SlangResult NVVMIRBuilder::emitIntegerSignedGreaterEqual(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsScalarIntegerSignedGreaterEqual())
-        return SLANG_E_NOT_AVAILABLE;
-    return emitIntegerCompare(
-        module,
-        SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_EQUAL,
-        left,
-        right,
-        outValue);
+    return emitIntegerCompare(module, SLANG_NVVM_VALUE_OP_GREATER_EQUAL, left, right, outValue);
 }
 
 SlangResult NVVMIRBuilder::getRawRWStructuredBufferI32Type(
@@ -1235,8 +908,6 @@ SlangResult NVVMIRBuilder::getRawRWStructuredBufferI32Type(
     outType = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsRawRWStructuredBufferI32())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result = m_construction.getRawRWStructuredBufferI32Type(module, &outType);
     return _validateHandleResult(result, outType);
 }
@@ -1250,8 +921,6 @@ SlangResult NVVMIRBuilder::emitRawRWStructuredBufferI32ElementPointer(
     outPointer = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsRawRWStructuredBufferI32())
-        return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result = m_construction.emitRawRWStructuredBufferI32ElementPointer(
         module,
         buffer,
@@ -1295,14 +964,10 @@ SlangResult NVVMIRBuilder::serializeModule(
     outDiagnostics = String();
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!supportsSerializationDiagnostics())
-        return SLANG_E_NOT_AVAILABLE;
 
     auto serializeWithDiagnostics = m_foundation.serializeModuleWithDiagnostics;
     if (format == SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY)
     {
-        if (!supportsNVVMIR20Assembly())
-            return SLANG_E_NOT_AVAILABLE;
         serializeWithDiagnostics = m_foundation.serializeNVVMIR20AssemblyWithDiagnostics;
     }
 

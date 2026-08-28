@@ -3619,15 +3619,13 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
     SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(this, linkingAndOptimizationOptions, linkedIR));
-    NVVMIRFeatureSet requiredFeatures;
-    SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requiredFeatures));
+    NVVMValueOperationRequirements requirements;
+    SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requirements));
 
     NVVMIRBuilder* builder = nullptr;
     String explicitBuilderPath;
     SlangResult loadResult = getSession()->getOrLoadNVVMIRBuilder(builder, &explicitBuilderPath);
-    const bool supportsRequiredFeatures = builder && builder->supportsSerializationDiagnostics() &&
-                                          builder->supportsFeatures(requiredFeatures);
-    if (SLANG_FAILED(loadResult) || !supportsRequiredFeatures)
+    if (SLANG_FAILED(loadResult) || !builder || !builder->isInitialized())
     {
         StringBuilder location;
         if (explicitBuilderPath.getLength())
@@ -3641,7 +3639,8 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
     }
 
     ComPtr<IArtifact> sourceArtifact;
-    SLANG_RETURN_ON_FAIL(emitNVVMIRFromLinkedIR(this, linkedIR, *builder, sourceArtifact));
+    SLANG_RETURN_ON_FAIL(
+        emitNVVMIRFromLinkedIR(this, linkedIR, *builder, requirements, sourceArtifact));
     maybeDumpIntermediate(sourceArtifact);
 
     return emitWithDownstreamForEntryPoints(

@@ -78,7 +78,6 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarFunctions());
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -245,7 +244,6 @@ static void _runNVVMSlangRealFloat32ArithmeticDifferentialPTX(
         _getNVVMFloat32ArithmeticTestCase(testOperation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(testCase.feature));
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -326,7 +324,6 @@ static void _runNVVMSlangRealFloat32ComparisonDifferentialPTX(
         _getNVVMFloat32ComparisonTestCase(testOperation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(testCase.feature));
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -418,8 +415,6 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32ConstantDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT));
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -481,7 +476,6 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32PhiDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI));
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -543,8 +537,6 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32FunctionDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS));
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -655,7 +647,6 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsVectorConstruction());
 
     static const uint32_t kParameterWidths[] = {64, 64};
     _runNVVMSlangDifferentialPTX(
@@ -690,7 +681,6 @@ SLANG_UNIT_TEST(nvvmSlangSharedMemoryDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsGlobalStorage());
 
     static const uint32_t kParameterWidths[] = {64, 64};
     _runNVVMSlangDifferentialPTX(
@@ -713,7 +703,6 @@ SLANG_UNIT_TEST(nvvmSlangMixedNumericDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsVectorConstruction());
 
     static const uint32_t kParameterWidths[] = {
         64,
@@ -751,7 +740,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
 
     static const uint32_t kParameterWidths[] = {64};
     _runNVVMSlangDifferentialPTX(
@@ -779,8 +767,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveLaneCountDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT));
 
     static const uint32_t kParameterWidths[] = {64};
     _runNVVMSlangDifferentialPTX(
@@ -804,9 +790,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtUIntDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT));
 
     static const uint32_t kParameterWidths[] = {64, 32, 32};
     _runNVVMSlangDifferentialPTX(
@@ -833,9 +816,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtIntDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT));
 
     static const uint32_t kParameterWidths[] = {64, 64, 32, 32};
     _runNVVMSlangDifferentialPTX(
@@ -862,9 +842,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtFloatDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT));
 
     static const uint32_t kParameterWidths[] = {64, 64, 32, 32};
     _runNVVMSlangDifferentialPTX(
@@ -891,9 +868,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveMaskDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT));
 
     static const uint32_t kParameterWidths[] = {64};
     _runNVVMSlangDifferentialPTX(
@@ -920,7 +894,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveMaskDifferentialPTX)
 static void _checkUnmaskedWaveReadLaneAtDifferentialPTX(
     UnitTestContext* context,
     const char* source,
-    SlangNVVMBuilderFeature shuffleFeature,
     const char* unavailableMessage,
     const uint32_t* parameterWidths,
     Index parameterWidthCount,
@@ -928,10 +901,6 @@ static void _checkUnmaskedWaveReadLaneAtDifferentialPTX(
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(context, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(shuffleFeature));
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT));
 
     _runNVVMSlangDifferentialPTX(
         source,
@@ -966,7 +935,6 @@ SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtUIntDifferentialPTX)
     _checkUnmaskedWaveReadLaneAtDifferentialPTX(
         unitTestContext,
         kDirectNVVMUnmaskedWaveReadLaneAtUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT,
         "Ignoring unmasked UInt wave-read-lane-at PTX differential because libNVVM or NVRTC was "
         "not found.",
         kParameterWidths,
@@ -980,7 +948,6 @@ SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtIntDifferentialPTX)
     _checkUnmaskedWaveReadLaneAtDifferentialPTX(
         unitTestContext,
         kDirectNVVMUnmaskedWaveReadLaneAtIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT,
         "Ignoring unmasked Int wave-read-lane-at PTX differential because libNVVM or NVRTC was "
         "not found.",
         kParameterWidths,
@@ -994,7 +961,6 @@ SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtFloatDifferentialPTX)
     _checkUnmaskedWaveReadLaneAtDifferentialPTX(
         unitTestContext,
         kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT,
         "Ignoring unmasked Float wave-read-lane-at PTX differential because libNVVM or NVRTC was "
         "not found.",
         kParameterWidths,
@@ -1006,8 +972,6 @@ SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD));
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -1064,7 +1028,6 @@ SLANG_UNIT_TEST(nvvmSlangRealPointerOffsetDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarPointerArithmetic());
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -1138,7 +1101,6 @@ SLANG_UNIT_TEST(nvvmSlangRealFixedDeviceArrayDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarArrayAddressing());
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -1212,7 +1174,6 @@ SLANG_UNIT_TEST(nvvmSlangRealRawRWStructuredBufferI32DifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsRawRWStructuredBufferI32());
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -1310,32 +1271,20 @@ static bool _supportsNVVMScalarTestOperation(
     const NVVMIRBuilder& builder,
     NVVMScalarTestOperation operation)
 {
-    switch (operation)
-    {
-    case NVVMScalarTestOperation::Multiply:
-        return builder.supportsScalarIntegerMultiply();
-    case NVVMScalarTestOperation::BitAnd:
-        return builder.supportsScalarIntegerBitAnd();
-    case NVVMScalarTestOperation::BitOr:
-        return builder.supportsScalarIntegerBitOr();
-    case NVVMScalarTestOperation::BitXor:
-        return builder.supportsScalarIntegerBitXor();
-    case NVVMScalarTestOperation::BitNot:
-        return builder.supportsScalarIntegerBitNot();
-    case NVVMScalarTestOperation::Negate:
-        return builder.supportsScalarIntegerNegate();
-    case NVVMScalarTestOperation::Equal:
-        return builder.supportsScalarIntegerEqual();
-    case NVVMScalarTestOperation::NotEqual:
-        return builder.supportsScalarIntegerNotEqual();
-    case NVVMScalarTestOperation::SignedGreaterThan:
-        return builder.supportsScalarIntegerSignedGreaterThan();
-    case NVVMScalarTestOperation::SignedLessEqual:
-        return builder.supportsScalarIntegerSignedLessEqual();
-    case NVVMScalarTestOperation::SignedGreaterEqual:
-        return builder.supportsScalarIntegerSignedGreaterEqual();
-    }
-    return false;
+    const auto& testCase = _getNVVMScalarTestCase(operation);
+    const bool isUnary = testCase.key.family == FakeNVVMBuilderScalarFamily::Unary;
+    const bool isCompare = testCase.key.family == FakeNVVMBuilderScalarFamily::Compare;
+    const SlangNVVMValueTypeDesc operandTypes[] = {
+        NVVMSemantics::kSignedI32,
+        NVVMSemantics::kSignedI32,
+    };
+    const SlangNVVMValueOperationDesc desc = {
+        testCase.key.operation,
+        isCompare ? NVVMSemantics::kBool : NVVMSemantics::kSignedI32,
+        operandTypes,
+        isUnary ? 1u : 2u,
+    };
+    return builder.supportsValueOperation(desc);
 }
 
 static void _checkNVVMScalarPTXEvidence(
@@ -1378,7 +1327,6 @@ static void _checkNVVMScalarPTXEvidence(
 static void _runNVVMSlangWaveReadLaneFirstDifferentialPTX(
     UnitTestContext* unitTestContext,
     const char* source,
-    SlangNVVMBuilderFeature readFirstFeature,
     const char* unavailableMessage,
     const uint32_t* parameterWidths,
     Index parameterWidthCount,
@@ -1386,10 +1334,6 @@ static void _runNVVMSlangWaveReadLaneFirstDifferentialPTX(
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT));
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(readFirstFeature));
 
     _runNVVMSlangDifferentialPTX(
         source,
@@ -1426,7 +1370,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstUIntDifferentialPTX)
     _runNVVMSlangWaveReadLaneFirstDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveReadLaneFirstUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT,
         "Ignoring UInt wave-read-lane-first PTX differential because libNVVM or NVRTC was not "
         "found.",
         kParameterWidths,
@@ -1440,7 +1383,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstIntDifferentialPTX)
     _runNVVMSlangWaveReadLaneFirstDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveReadLaneFirstIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_INT,
         "Ignoring Int wave-read-lane-first PTX differential because libNVVM or NVRTC was not "
         "found.",
         kParameterWidths,
@@ -1454,7 +1396,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstFloatDifferentialPTX)
     _runNVVMSlangWaveReadLaneFirstDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveReadLaneFirstFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT,
         "Ignoring Float wave-read-lane-first PTX differential because libNVVM or NVRTC was not "
         "found.",
         kParameterWidths,
@@ -1466,11 +1407,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveIsFirstLaneDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT));
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_IS_FIRST_LANE));
 
     static const uint32_t kParameterWidths[] = {64};
     _runNVVMSlangDifferentialPTX(
@@ -1505,17 +1441,12 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveIsFirstLaneDifferentialPTX)
 static void _runNVVMSlangWavePredicateDifferentialPTX(
     UnitTestContext* unitTestContext,
     const char* source,
-    SlangNVVMBuilderFeature feature,
     const char* unavailableMessage,
     const UnownedStringSlice& intrinsicMnemonic,
     Index expectedSignedNotEqualCount)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT));
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(feature));
 
     static const uint32_t kParameterWidths[] = {64, 64};
     _runNVVMSlangDifferentialPTX(
@@ -1546,7 +1477,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAnyTrueDifferentialPTX)
     _runNVVMSlangWavePredicateDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveActiveAnyTrueSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE,
         "Ignoring wave-active-any-true PTX differential because libNVVM or NVRTC was not found.",
         toSlice("vote.sync.any.pred"),
         1);
@@ -1557,7 +1487,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllTrueDifferentialPTX)
     _runNVVMSlangWavePredicateDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveActiveAllTrueSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_TRUE,
         "Ignoring wave-active-all-true PTX differential because libNVVM or NVRTC was not found.",
         toSlice("vote.sync.all.pred"),
         1);
@@ -1568,7 +1497,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualIntDifferentialPTX)
     _runNVVMSlangWavePredicateDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveActiveAllEqualIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT,
         "Ignoring signed-i32 wave-active-all-equal PTX differential because libNVVM or NVRTC was "
         "not found.",
         toSlice("match.all.sync.b32"),
@@ -1580,7 +1508,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualUIntDifferentialPTX)
     _runNVVMSlangWavePredicateDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveActiveAllEqualUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT,
         "Ignoring unsigned-i32 wave-active-all-equal PTX differential because libNVVM or NVRTC "
         "was not found.",
         toSlice("match.all.sync.b32"),
@@ -1592,7 +1519,6 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualFloatDifferentialPTX)
     _runNVVMSlangWavePredicateDifferentialPTX(
         unitTestContext,
         kDirectNVVMWaveActiveAllEqualFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_FLOAT,
         "Ignoring float32 wave-active-all-equal PTX differential because libNVVM or NVRTC was "
         "not found.",
         toSlice("match.all.sync.b32"),
@@ -1695,7 +1621,6 @@ SLANG_UNIT_TEST(nvvmSlangRealRelaxedGlobalI32AtomicAddDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsRelaxedGlobalI32AtomicAdd());
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -1775,7 +1700,6 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarFunctions());
 
     String cudaRoot;
     String ptxasPath;
@@ -1827,19 +1751,13 @@ SLANG_UNIT_TEST(nvvmSlangRealScalarPtxasAccepts)
     }
 }
 
-// Numeric V4 families have no synthetic V3 feature bit, so this sentinel requests only the common
-// real-provider preflight performed by these integration helpers.
-static const SlangNVVMBuilderFeature kNoRequiredLegacyFeature = SLANG_NVVM_BUILDER_FEATURE_COUNT;
 
 static void _runNVVMSlangRealSourcePtxasAccepts(
     UnitTestContext* unitTestContext,
-    const char* source,
-    SlangNVVMBuilderFeature feature)
+    const char* source)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    if (feature != kNoRequiredLegacyFeature)
-        SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(feature));
 
     String cudaRoot;
     String ptxasPath;
@@ -1885,34 +1803,24 @@ static void _runNVVMSlangRealFloat32ArithmeticPtxasAccepts(
 {
     const NVVMFloat32ArithmeticTestCase& testCase =
         _getNVVMFloat32ArithmeticTestCase(testOperation);
-    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, testCase.source, testCase.feature);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, testCase.source);
 }
 
 SLANG_UNIT_TEST(nvvmSlangCUDAExecutionPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMCUDAExecutionRuntimeSource,
-        SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMCUDAExecutionRuntimeSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangSharedMemoryPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsGlobalStorage());
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMSharedMemorySource,
-        SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMSharedMemorySource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangMixedNumericPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMMixedNumericSource,
-        kNoRequiredLegacyFeature);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMMixedNumericSource);
 }
 
 #define NVVM_FLOAT32_ARITHMETIC_PTXAS_TEST(NAME, OPERATION) \
@@ -1937,7 +1845,7 @@ static void _runNVVMSlangRealFloat32ComparisonPtxasAccepts(
 {
     const NVVMFloat32ComparisonTestCase& testCase =
         _getNVVMFloat32ComparisonTestCase(testOperation);
-    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, testCase.source, testCase.feature);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, testCase.source);
 }
 
 #define NVVM_FLOAT32_COMPARISON_PTXAS_TEST(NAME, OPERATION) \
@@ -1961,178 +1869,119 @@ NVVM_FLOAT32_COMPARISON_PTXAS_TEST(nvvmSlangRealFloat32LessThanPtxasAccepts, Ord
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32ConstantPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMFloat32ConstantSource,
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMFloat32ConstantSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32PhiPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMFloat32PhiSource,
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMFloat32PhiSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32FunctionPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMFloat32FunctionSource,
-        SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMFloat32FunctionSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveLaneIndexSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveLaneIndexSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveLaneCountPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveLaneCountSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveLaneCountSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtUIntPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveReadLaneAtUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveReadLaneAtUIntSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtIntPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveReadLaneAtIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveReadLaneAtIntSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtFloatPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveReadLaneAtFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveReadLaneAtFloatSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveMaskPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveActiveMaskSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveActiveMaskSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstUIntPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveReadLaneFirstUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveReadLaneFirstUIntSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstIntPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveReadLaneFirstIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_INT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveReadLaneFirstIntSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneFirstFloatPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveReadLaneFirstFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveReadLaneFirstFloatSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveIsFirstLanePtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveIsFirstLaneSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_IS_FIRST_LANE);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveIsFirstLaneSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAnyTruePtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveActiveAnyTrueSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveActiveAnyTrueSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllTruePtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveActiveAllTrueSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_TRUE);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveActiveAllTrueSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualIntPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveActiveAllEqualIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveActiveAllEqualIntSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualUIntPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveActiveAllEqualUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveActiveAllEqualUIntSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualFloatPtxasAccepts)
 {
-    _runNVVMSlangRealSourcePtxasAccepts(
-        unitTestContext,
-        kDirectNVVMWaveActiveAllEqualFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_FLOAT);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWaveActiveAllEqualFloatSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtUIntPtxasAccepts)
 {
     _runNVVMSlangRealSourcePtxasAccepts(
         unitTestContext,
-        kDirectNVVMUnmaskedWaveReadLaneAtUIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT);
+        kDirectNVVMUnmaskedWaveReadLaneAtUIntSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtIntPtxasAccepts)
 {
     _runNVVMSlangRealSourcePtxasAccepts(
         unitTestContext,
-        kDirectNVVMUnmaskedWaveReadLaneAtIntSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT);
+        kDirectNVVMUnmaskedWaveReadLaneAtIntSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealUnmaskedWaveReadLaneAtFloatPtxasAccepts)
 {
     _runNVVMSlangRealSourcePtxasAccepts(
         unitTestContext,
-        kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT);
+        kDirectNVVMUnmaskedWaveReadLaneAtFloatSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD));
 
     String cudaRoot;
     String ptxasPath;
@@ -2180,7 +2029,6 @@ SLANG_UNIT_TEST(nvvmSlangRealPointerOffsetPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarPointerArithmetic());
 
     String cudaRoot;
     String ptxasPath;
@@ -2228,7 +2076,6 @@ SLANG_UNIT_TEST(nvvmSlangRealFixedDeviceArrayPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarArrayAddressing());
 
     String cudaRoot;
     String ptxasPath;
@@ -2276,7 +2123,6 @@ SLANG_UNIT_TEST(nvvmSlangRealRawRWStructuredBufferI32PtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsRawRWStructuredBufferI32());
 
     String cudaRoot;
     String ptxasPath;
@@ -2392,7 +2238,6 @@ SLANG_UNIT_TEST(nvvmSlangRealRelaxedGlobalI32AtomicAddPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsRelaxedGlobalI32AtomicAdd());
 
     String cudaRoot;
     String ptxasPath;
@@ -2443,7 +2288,6 @@ SLANG_UNIT_TEST(nvvmSlangScalarRuntimeMatchesNVRTC)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarFunctions());
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -2566,14 +2410,11 @@ SLANG_UNIT_TEST(nvvmSlangScalarRuntimeMatchesNVRTC)
 template<typename TExecute>
 static void _runNVVMSlangSourceRuntimeMatchesNVRTC(
     UnitTestContext* unitTestContext,
-    SlangNVVMBuilderFeature feature,
     const char* source,
     TExecute execute)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    if (feature != kNoRequiredLegacyFeature)
-        SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(feature));
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -2655,7 +2496,6 @@ static void _runNVVMSlangFloat32ArithmeticRuntimeMatchesNVRTC(
         _getNVVMFloat32ArithmeticTestCase(testOperation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(testCase.feature));
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -2763,7 +2603,6 @@ static void _runNVVMSlangFloat32ComparisonRuntimeMatchesNVRTC(
         _getNVVMFloat32ComparisonTestCase(testOperation);
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(testCase.feature));
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -2871,8 +2710,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat32ConstantRuntimeMatchesNVRTC)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_CONSTANT));
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -2958,7 +2795,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat32PhiRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_SCALAR_PHI,
         kDirectNVVMFloat32PhiSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         {
@@ -2973,7 +2809,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat32FunctionRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS,
         kDirectNVVMFloat32FunctionSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         {
@@ -2988,7 +2823,6 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS,
         kDirectNVVMCUDAExecutionRuntimeSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runCUDAExecutionKernel(cuda, code); });
@@ -2998,10 +2832,8 @@ SLANG_UNIT_TEST(nvvmSlangSharedMemoryRuntimeMatchesNVRTC)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsGlobalStorage());
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS,
         kDirectNVVMSharedMemorySource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runSharedMemoryKernel(cuda, code); });
@@ -3011,7 +2843,6 @@ SLANG_UNIT_TEST(nvvmSlangMixedNumericRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        kNoRequiredLegacyFeature,
         kDirectNVVMMixedNumericSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runMixedNumericKernel(cuda, code); });
@@ -3021,7 +2852,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX,
         kDirectNVVMWaveLaneIndexSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveLaneIndexKernel(cuda, code); });
@@ -3031,7 +2861,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveLaneCountRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT,
         kDirectNVVMWaveLaneCountSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveLaneCountKernel(cuda, code); });
@@ -3041,7 +2870,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT,
         kDirectNVVMWaveReadLaneAtUIntSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         {
@@ -3054,7 +2882,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtIntRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT,
         kDirectNVVMWaveReadLaneAtIntSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         {
@@ -3067,7 +2894,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtFloatRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT,
         kDirectNVVMWaveReadLaneAtFloatSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         {
@@ -3080,7 +2906,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveMaskRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT,
         kDirectNVVMWaveActiveMaskSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveActiveMaskKernel(cuda, code); });
@@ -3090,7 +2915,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstUIntRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT,
         kDirectNVVMWaveReadLaneFirstUIntSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveReadLaneFirstUIntKernel(cuda, code); });
@@ -3100,7 +2924,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstIntRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_INT,
         kDirectNVVMWaveReadLaneFirstIntSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveReadLaneFirstIntKernel(cuda, code); });
@@ -3110,7 +2933,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstFloatRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT,
         kDirectNVVMWaveReadLaneFirstFloatSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveReadLaneFirstFloatKernel(cuda, code); });
@@ -3120,7 +2942,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveIsFirstLaneRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_IS_FIRST_LANE,
         kDirectNVVMWaveIsFirstLaneSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveIsFirstLaneKernel(cuda, code); });
@@ -3130,7 +2951,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveAnyTrueRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE,
         kDirectNVVMWaveActiveAnyTrueSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveActiveAnyTrueKernel(cuda, code); });
@@ -3140,7 +2960,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveAllTrueRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_TRUE,
         kDirectNVVMWaveActiveAllTrueSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveActiveAllTrueKernel(cuda, code); });
@@ -3150,7 +2969,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualIntRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT,
         kDirectNVVMWaveActiveAllEqualIntSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveActiveAllEqualIntKernel(cuda, code); });
@@ -3160,7 +2978,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualUIntRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT,
         kDirectNVVMWaveActiveAllEqualUIntSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveActiveAllEqualUIntKernel(cuda, code); });
@@ -3170,7 +2987,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualFloatRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_FLOAT,
         kDirectNVVMWaveActiveAllEqualFloatSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         { return _runWaveActiveAllEqualFloatKernel(cuda, code); });
@@ -3180,7 +2996,6 @@ SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtUIntRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT,
         kDirectNVVMUnmaskedWaveReadLaneAtUIntSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         {
@@ -3193,7 +3008,6 @@ SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtIntRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT,
         kDirectNVVMUnmaskedWaveReadLaneAtIntSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         {
@@ -3206,7 +3020,6 @@ SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtFloatRuntimeMatchesNVRTC)
 {
     _runNVVMSlangSourceRuntimeMatchesNVRTC(
         unitTestContext,
-        SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT,
         kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
         [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
         {
@@ -3219,8 +3032,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat32CopyRuntimeMatchesNVRTC)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(
-        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD));
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -3306,7 +3117,6 @@ SLANG_UNIT_TEST(nvvmSlangPointerOffsetRuntimeMatchesNVRTC)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarPointerArithmetic());
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -3389,7 +3199,6 @@ SLANG_UNIT_TEST(nvvmSlangFixedDeviceArrayRuntimeMatchesNVRTC)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsScalarArrayAddressing());
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -3475,7 +3284,6 @@ SLANG_UNIT_TEST(nvvmSlangRawRWStructuredBufferI32RuntimeMatchesNVRTC)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsRawRWStructuredBufferI32());
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -3797,7 +3605,6 @@ SLANG_UNIT_TEST(nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    SLANG_CHECK_ABORT(preflightBuilder.supportsRelaxedGlobalI32AtomicAdd());
 
     CudaDriverApi cuda;
     if (!cuda.load() || cuda.cuInit(0) != 0)
@@ -3924,7 +3731,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderPtxasAcceptsScalarReferenceKernels)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
-    SLANG_CHECK_ABORT(builder.supportsScalarOperations());
 
     String cudaRoot;
     String ptxasPath;
