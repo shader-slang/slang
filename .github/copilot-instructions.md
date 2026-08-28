@@ -39,9 +39,15 @@ Note: If pip install fails with externally-managed-environment error, use `--bre
 
 **macOS (Homebrew):**
 
+Homebrew's default `clang-format` and `gersemi` formulas track upstream latest, which is usually newer than the pinned versions above. Install the pinned versions explicitly:
+
 ```bash
-brew install clang-format gersemi prettier shfmt
+brew tap cpp-linter/tap
+brew install cpp-linter/tap/clang-format@17 prettier shfmt
+python3 -m pip install gersemi==0.21.0
 ```
+
+Note: If pip install fails with externally-managed-environment error, use `--break-system-packages` flag or create a virtual environment.
 
 You can also use `./extras/formatting.sh --check-only` to verify formatting without modifying files.
 
