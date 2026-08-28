@@ -1059,3 +1059,23 @@ Seven names add 151 measured lines, from 26,482 to 26,633. The complete Slice 46
 passes 78/78 and Release passes 376/376 with sorted-name SHA-256
 `e345e4b4ef33f3a7fe6426c95d461fd46cfb6de8e183be59c2db77ecfa78b4e9`; removing the seven Slice 57
 names reproduces Slice 56's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 58 adds public `WaveIsFirstLane()` through feature 43/intrinsic operation 9 at the canonical
+masked-helper boundary. Exact assembly plus `Func(Bool, UInt)` matching distinguishes
+`WaveMaskIsFirstLane(mask)`. Direct helper signatures now preserve Bool specifically as a result;
+Bool parameters and phis remain unsupported. V3 stays 528/308 bytes, and exact Slice 57 providers
+remain loadable with feature 43 clear.
+
+The provider validates one i32 mask before mutation and emits the source predicate
+`(mask & -mask) == (1 << laneId)` with ordinary LLVM integer instructions plus the established
+lane-id intrinsic. It returns native i1 through the generic function path and adds no callback,
+text marker, declaration normalization, or compatibility rewrite.
+
+NVVM and NVRTC agree on a `[64]` entry, two synchronized ballots, `neg`, `and`, `shl`, equality,
+and one global 32-bit store. CUDA 12.9 `ptxas` accepts both, and one RTX 5090 warp stores one in
+lane zero and zero in lanes 1-31 through both routes.
+
+Seven names add 349 measured lines, from 26,633 to 26,982. The complete Slice 46-58 wave matrix
+passes 85/85 and Release passes 383/383 with sorted-name SHA-256
+`ddb9139c2d89bafd5be199f9d299f3c85b6ca8cca82146b9466ddbaf7fb84335`; removing the seven Slice 58
+names reproduces Slice 57's count and hash exactly. Debug preservation passes 10/10.

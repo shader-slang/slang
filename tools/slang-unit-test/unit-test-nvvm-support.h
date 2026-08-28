@@ -290,6 +290,7 @@ enum class FakeNVVMBuilderResultTypeKind
 {
     Void,
     Integer,
+    Boolean,
     Float,
 };
 
@@ -306,6 +307,7 @@ enum class FakeNVVMBuilderParameterTypeKind
 enum class FakeNVVMBuilderScalarTypeKind
 {
     Integer,
+    Boolean,
     Float,
 };
 
@@ -1419,12 +1421,27 @@ static bool _isFakeNVVMBuilderFloatValue(SlangNVVMValueHandle_1 value)
 static bool _isFakeNVVMBuilderBooleanValue(SlangNVVMValueHandle_1 value)
 {
     FakeNVVMBuilderValueRef valueRef;
-    if (_getFakeNVVMBuilderValueRef(value, valueRef) &&
-        valueRef.kind == FakeNVVMBuilderValueKind::IntegerConstant)
+    if (!_getFakeNVVMBuilderValueRef(value, valueRef))
+        return false;
+    if (valueRef.kind == FakeNVVMBuilderValueKind::IntegerConstant)
     {
         return valueRef.index >= 0 &&
                valueRef.index < gFakeNVVMBuilder.integerConstantBitWidths.getCount() &&
                gFakeNVVMBuilder.integerConstantBitWidths[valueRef.index] == 1;
+    }
+    if (valueRef.kind == FakeNVVMBuilderValueKind::Call)
+    {
+        return valueRef.index >= 0 &&
+               valueRef.index < gFakeNVVMBuilder.callResultTypeKinds.getCount() &&
+               gFakeNVVMBuilder.callResultTypeKinds[valueRef.index] ==
+                   FakeNVVMBuilderScalarTypeKind::Boolean;
+    }
+    if (valueRef.kind == FakeNVVMBuilderValueKind::Intrinsic)
+    {
+        return valueRef.index >= 0 &&
+               valueRef.index < gFakeNVVMBuilder.intrinsicOperations.getCount() &&
+               gFakeNVVMBuilder.intrinsicOperations[valueRef.index] ==
+                   SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_IS_FIRST_LANE;
     }
     Index operationIndex = -1;
     return _getFakeNVVMBuilderScalarOperationIndex(value, operationIndex) &&
@@ -1549,6 +1566,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
     const Index functionTypeIndex = gFakeNVVMBuilder.getFunctionTypeCallCount++;
     const bool hasSupportedResult = resultType == _getFakeNVVMBuilderVoidType() ||
                                     resultType == _getFakeNVVMBuilderIntegerType() ||
+                                    resultType == _getFakeNVVMBuilderBooleanType() ||
                                     resultType == _getFakeNVVMBuilderFloatType();
     if (module != _getFakeNVVMBuilderModule() || !hasSupportedResult ||
         (!parameterTypes && parameterCount) || !outType ||
@@ -1559,6 +1577,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
     gFakeNVVMBuilder.functionTypeResultKinds.add(
         resultType == _getFakeNVVMBuilderVoidType()      ? FakeNVVMBuilderResultTypeKind::Void
         : resultType == _getFakeNVVMBuilderIntegerType() ? FakeNVVMBuilderResultTypeKind::Integer
+        : resultType == _getFakeNVVMBuilderBooleanType() ? FakeNVVMBuilderResultTypeKind::Boolean
                                                          : FakeNVVMBuilderResultTypeKind::Float);
     gFakeNVVMBuilder.functionTypeParameterCounts.add(parameterCount);
     gFakeNVVMBuilder.functionTypeParameterKindOffsets.add(
@@ -2347,8 +2366,10 @@ static SlangResult _fakeNVVMBuilderEmitCallImpl(
     const Index functionTypeIndex = gFakeNVVMBuilder.functionTypeIndices[calleeFunctionIndex];
     const FakeNVVMBuilderResultTypeKind resultKind =
         gFakeNVVMBuilder.functionTypeResultKinds[functionTypeIndex];
-    if ((resultKind != FakeNVVMBuilderResultTypeKind::Integer &&
-         (requireInteger || resultKind != FakeNVVMBuilderResultTypeKind::Float)) ||
+    if ((requireInteger ? resultKind != FakeNVVMBuilderResultTypeKind::Integer
+                        : resultKind != FakeNVVMBuilderResultTypeKind::Integer &&
+                              resultKind != FakeNVVMBuilderResultTypeKind::Boolean &&
+                              resultKind != FakeNVVMBuilderResultTypeKind::Float) ||
         gFakeNVVMBuilder.functionTypeParameterCounts[functionTypeIndex] != argumentCount)
     {
         return SLANG_E_INVALID_ARG;
@@ -2384,6 +2405,8 @@ static SlangResult _fakeNVVMBuilderEmitCallImpl(
     gFakeNVVMBuilder.callResultTypeKinds.add(
         resultKind == FakeNVVMBuilderResultTypeKind::Integer
             ? FakeNVVMBuilderScalarTypeKind::Integer
+        : resultKind == FakeNVVMBuilderResultTypeKind::Boolean
+            ? FakeNVVMBuilderScalarTypeKind::Boolean
             : FakeNVVMBuilderScalarTypeKind::Float);
     *outValue = _getFakeNVVMBuilderCall(resultIndex);
     return failAfterWrite ? SLANG_FAIL : SLANG_OK;
@@ -2450,6 +2473,8 @@ static SlangResult _fakeNVVMBuilderEmitValueReturnImpl(
         gFakeNVVMBuilder.functionTypeResultKinds[functionTypeIndex];
     const bool isExactValue =
         resultKind == FakeNVVMBuilderResultTypeKind::Integer ? _isFakeNVVMBuilderIntegerValue(value)
+        : resultKind == FakeNVVMBuilderResultTypeKind::Boolean
+            ? _isFakeNVVMBuilderBooleanValue(value)
         : resultKind == FakeNVVMBuilderResultTypeKind::Float ? _isFakeNVVMBuilderFloatValue(value)
                                                              : false;
     if (!isExactValue || (requireInteger && resultKind != FakeNVVMBuilderResultTypeKind::Integer))
@@ -2523,6 +2548,9 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsicV3(
     case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT:
         expectedArgumentCount = 2;
         break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_IS_FIRST_LANE:
+        expectedArgumentCount = 1;
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }
@@ -2557,6 +2585,11 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsicV3(
     if (operation == SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT &&
         (!_isFakeNVVMBuilderIntegerValue(arguments[0]) ||
          !_isFakeNVVMBuilderFloatValue(arguments[1])))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+    if (operation == SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_IS_FIRST_LANE &&
+        !_isFakeNVVMBuilderIntegerValue(arguments[0]))
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -5138,6 +5171,80 @@ static SlangResult _populateWaveActiveMaskKernel(
     return SLANG_OK;
 }
 
+static SlangResult _populateWaveIsFirstLaneKernel(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle_1 module,
+    const UnownedStringSlice& kernelName,
+    const UnownedStringSlice& helperName)
+{
+    SlangNVVMTypeHandle_1 voidType = nullptr;
+    SlangNVVMTypeHandle_1 integerType = nullptr;
+    SlangNVVMTypeHandle_1 boolType = nullptr;
+    SlangNVVMTypeHandle_1 globalIntegerPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, integerType));
+    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 1, boolType));
+    SLANG_RETURN_ON_FAIL(builder.getPointerType(
+        module,
+        integerType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        globalIntegerPointerType));
+
+    SlangNVVMTypeHandle_1 helperType = nullptr;
+    SlangNVVMValueHandle_1 helper = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(module, boolType, &integerType, 1, helperType));
+    SLANG_RETURN_ON_FAIL(builder.declareFunction(module, helperType, helperName, helper));
+
+    SlangNVVMTypeHandle_1 kernelParameterTypes[] = {globalIntegerPointerType, integerType};
+    SlangNVVMTypeHandle_1 kernelType = nullptr;
+    SlangNVVMValueHandle_1 kernel = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
+        module,
+        voidType,
+        kernelParameterTypes,
+        SLANG_COUNT_OF(kernelParameterTypes),
+        kernelType));
+    SLANG_RETURN_ON_FAIL(builder.declareFunction(module, kernelType, kernelName, kernel));
+
+    SlangNVVMValueHandle_1 destination = nullptr;
+    SlangNVVMValueHandle_1 mask = nullptr;
+    SlangNVVMValueHandle_1 helperMask = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 0, destination));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 1, mask));
+    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, helper, 0, helperMask));
+
+    SlangNVVMBlockHandle_1 helperBlock = nullptr;
+    SlangNVVMBlockHandle_1 kernelBlock = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, helper, toSlice("entry"), helperBlock));
+    SLANG_RETURN_ON_FAIL(builder.createBlock(module, kernel, toSlice("entry"), kernelBlock));
+
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, helperBlock));
+    SlangNVVMValueHandle_1 isFirst = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.emitIntrinsic(
+        module,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_IS_FIRST_LANE,
+        &helperMask,
+        1,
+        isFirst));
+    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, isFirst));
+
+    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, kernelBlock));
+    SlangNVVMValueHandle_1 predicate = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.emitCall(module, helper, &mask, 1, predicate));
+    const SlangNVVMValueHandle_1 ballotArguments[] = {mask, predicate};
+    SlangNVVMValueHandle_1 ballot = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.emitIntrinsic(
+        module,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT,
+        ballotArguments,
+        SLANG_COUNT_OF(ballotArguments),
+        ballot));
+    SLANG_RETURN_ON_FAIL(builder.emitStore(module, ballot, destination, 4));
+    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
+    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, kernel));
+    return SLANG_OK;
+}
+
 static SlangResult _populateWaveReadLaneFirstKernel(
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle_1 module,
@@ -5331,6 +5438,15 @@ void computeMain(
 {
     uint laneIndex = WaveGetLaneIndex();
     destination[laneIndex] = WaveReadLaneFirst(source[laneIndex]);
+}
+)";
+static const char kDirectNVVMWaveIsFirstLaneSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
+{
+    uint laneIndex = WaveGetLaneIndex();
+    destination[laneIndex] = WaveIsFirstLane() ? 1 : 0;
 }
 )";
 static const char kDirectNVVMUnmaskedWaveReadLaneAtUIntSource[] = R"(
@@ -8018,6 +8134,7 @@ enum class WaveScalar32Expected
     LaneIndex,
     LaneCount,
     ActiveMask,
+    IsFirstLane,
     UIntFirstLane,
     IntFirstLane,
     FloatFirstLane,
@@ -8131,6 +8248,8 @@ static SlangResult _runWaveScalar32Kernel(
             expected = kLaneCount;
         else if (expectedKind == WaveScalar32Expected::ActiveMask)
             expected = ~uint32_t(0);
+        else if (expectedKind == WaveScalar32Expected::IsFirstLane)
+            expected = laneIndex == 0 ? 1 : 0;
         else if (expectedKind == WaveScalar32Expected::UIntFirstLane)
             expected = 0;
         else if (expectedKind == WaveScalar32Expected::IntFirstLane)
@@ -8168,6 +8287,11 @@ static SlangResult _runWaveLaneCountKernel(CudaDriverApi& cuda, ISlangBlob* ptxB
 static SlangResult _runWaveActiveMaskKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)
 {
     return _runWaveScalar32Kernel(cuda, ptxBlob, WaveScalar32Expected::ActiveMask);
+}
+
+static SlangResult _runWaveIsFirstLaneKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)
+{
+    return _runWaveScalar32Kernel(cuda, ptxBlob, WaveScalar32Expected::IsFirstLane);
 }
 
 static SlangResult _runWaveReadLaneFirstUIntKernel(CudaDriverApi& cuda, ISlangBlob* ptxBlob)

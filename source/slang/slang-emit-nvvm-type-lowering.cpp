@@ -280,7 +280,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // helper signature.
     const bool isLegal =
         (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-        (use == NVVMTypeUse::HelperResult && (isI32 || isFloat32)) ||
+        (use == NVVMTypeUse::HelperResult && (isI32 || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isI32 || isFloat32 || deviceScalarPointer || deviceArrayPointer || rawResource)) ||
         (use == NVVMTypeUse::HelperParameter && (isI32 || isFloat32)) ||

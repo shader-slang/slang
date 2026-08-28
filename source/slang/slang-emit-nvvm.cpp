@@ -114,6 +114,7 @@ struct NVVMGenericAsmIntrinsicInfo
     enum class Signature
     {
         UIntNoArguments,
+        BoolUInt,
         UIntUIntUInt,
         IntUIntInt,
         FloatUIntFloat,
@@ -195,6 +196,13 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(
             "Float wave read-lane-first intrinsic",
             NVVMGenericAsmIntrinsicInfo::Signature::FloatUIntFloat,
         },
+        {
+            "(($0 & -$0) == (WarpMask(1) << _getLaneId()))",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_IS_FIRST_LANE,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_IS_FIRST_LANE,
+            "wave-mask is-first-lane intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::BoolUInt,
+        },
     };
     if (!genericAsm)
         return nullptr;
@@ -219,6 +227,9 @@ bool _isNVVMGenericAsmIntrinsicHelper(
     {
     case NVVMGenericAsmIntrinsicInfo::Signature::UIntNoArguments:
         return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 0;
+    case NVVMGenericAsmIntrinsicInfo::Signature::BoolUInt:
+        return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 1 &&
+               isNVVMUnsignedI32Type(function->getParamType(0));
     case NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUInt:
         return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 2 &&
                isNVVMUnsignedI32Type(function->getParamType(0)) &&
@@ -640,23 +651,29 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
     return getMangledName(function);
 }
 
-// Returns whether a type is an accepted canonical scalar in a helper signature.
-bool _isSupportedNVVMHelperScalarType(IRInst* type)
+// Returns whether a type is an accepted canonical scalar in a helper parameter.
+bool _isSupportedNVVMHelperParameterType(IRInst* type)
 {
     return isNVVMInteger32Type(type) || isNVVMFloat32Type(type);
+}
+
+// Returns whether a type is an accepted canonical scalar in a helper result.
+bool _isSupportedNVVMHelperResultType(IRInst* type)
+{
+    return _isSupportedNVVMHelperParameterType(type) || isNVVMBoolType(type);
 }
 
 // Returns whether a canonical helper signature needs the generic V3 scalar-function path.
 bool _usesGenericNVVMScalarFunctions(IRFunc* helper)
 {
     SLANG_RELEASE_ASSERT(helper);
-    SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperScalarType(helper->getResultType()));
+    SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperResultType(helper->getResultType()));
     if (!isNVVMSignedI32Type(helper->getResultType()))
         return true;
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
         IRType* parameterType = helper->getParamType(parameterIndex);
-        SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperScalarType(parameterType));
+        SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperParameterType(parameterType));
         if (!isNVVMSignedI32Type(parameterType))
             return true;
     }
@@ -679,11 +696,11 @@ SlangResult _validateNVVMHelperTarget(
     }
     if (helper->getParent() != linkedIR.module->getModuleInst() || !helper->isDefinition())
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("call"));
-    if (!_isSupportedNVVMHelperScalarType(helper->getResultType()))
+    if (!_isSupportedNVVMHelperResultType(helper->getResultType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function result type"));
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
-        if (!_isSupportedNVVMHelperScalarType(helper->getParamType(parameterIndex)))
+        if (!_isSupportedNVVMHelperParameterType(helper->getParamType(parameterIndex)))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function parameter"));
     }
     return SLANG_OK;
@@ -835,9 +852,9 @@ SlangResult _validateNVVMFunction(
             isEntryPoint ? (isNVVMFloat32Type(param->getDataType()) ||
                             asNVVMSupportedDeviceFloat32PointerType(param->getDataType()))
                          : isNVVMFloat32Type(param->getDataType());
-        const bool isSupportedType = isEntryPoint
-                                         ? isNVVMSupportedParameterType(param->getDataType())
-                                         : _isSupportedNVVMHelperScalarType(param->getDataType());
+        const bool isSupportedType =
+            isEntryPoint ? isNVVMSupportedParameterType(param->getDataType())
+                         : _isSupportedNVVMHelperParameterType(param->getDataType());
         if (actualParamCount >= function->getParamCount() || !isSupportedType ||
             !isTypeEqual(param->getDataType(), function->getParamType(actualParamCount)))
         {
@@ -1073,7 +1090,7 @@ SlangResult _validateNVVMFunction(
                     auto call = as<IRCall>(inst);
                     auto callee =
                         call && call->getOperandCount() ? as<IRFunc>(call->getOperand(0)) : nullptr;
-                    if (!callee || !_isSupportedNVVMHelperScalarType(inst->getDataType()))
+                    if (!callee || !_isSupportedNVVMHelperResultType(inst->getDataType()))
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar call"));
                     _requireFeature(
                         features,
@@ -1550,13 +1567,26 @@ SlangResult _validateNVVMFunction(
                                 codeGenContext,
                                 toSlice("helper return type"));
                         }
-                        SLANG_RETURN_ON_FAIL(_validateScalarValue(
-                            codeGenContext,
-                            returnInst->getVal(),
-                            returnInst,
-                            availableValues,
-                            dominatorTree,
-                            features));
+                        if (isNVVMBoolType(returnInst->getVal()->getDataType()))
+                        {
+                            SLANG_RETURN_ON_FAIL(_validateBooleanValue(
+                                codeGenContext,
+                                returnInst->getVal(),
+                                returnInst,
+                                availableValues,
+                                dominatorTree,
+                                features));
+                        }
+                        else
+                        {
+                            SLANG_RETURN_ON_FAIL(_validateScalarValue(
+                                codeGenContext,
+                                returnInst->getVal(),
+                                returnInst,
+                                availableValues,
+                                dominatorTree,
+                                features));
+                        }
                         hasHelperReturn = true;
                     }
                 }

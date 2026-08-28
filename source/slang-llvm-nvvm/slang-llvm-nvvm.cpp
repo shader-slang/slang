@@ -1369,12 +1369,13 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         return SLANG_E_INVALID_ARG;
     }
 
-    llvm::Intrinsic::ID intrinsicID;
+    llvm::Intrinsic::ID intrinsicID = llvm::Intrinsic::not_intrinsic;
     size_t expectedArgumentCount = 0;
     llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
     llvm::Type* expectedArgumentTypes[] = {int32Type, int32Type, int32Type};
     bool appendsShuffleClamp = false;
     bool derivesFirstActiveLane = false;
+    bool derivesFirstLanePredicate = false;
     switch (operation)
     {
     case SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX:
@@ -1412,6 +1413,10 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
         derivesFirstActiveLane = true;
         break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_IS_FIRST_LANE:
+        expectedArgumentCount = 1;
+        derivesFirstLanePredicate = true;
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }
@@ -1429,6 +1434,20 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
             return SLANG_E_INVALID_ARG;
         }
         llvmArguments.push_back(argument);
+    }
+    if (derivesFirstLanePredicate)
+    {
+        llvm::Function* laneIDIntrinsic = llvm::Intrinsic::getDeclaration(
+            state->module.get(),
+            llvm::Intrinsic::nvvm_read_ptx_sreg_laneid);
+        llvm::Value* laneID = state->builder.CreateCall(laneIDIntrinsic);
+        llvm::Value* firstMaskBit =
+            state->builder.CreateAnd(llvmArguments[0], state->builder.CreateNeg(llvmArguments[0]));
+        llvm::Value* laneBit =
+            state->builder.CreateShl(llvm::ConstantInt::get(int32Type, 1), laneID);
+        llvm::Value* predicate = state->builder.CreateICmpEQ(firstMaskBit, laneBit);
+        *outValue = reinterpret_cast<SlangNVVMValueHandle_1>(predicate);
+        return SLANG_OK;
     }
     if (derivesFirstActiveLane)
     {

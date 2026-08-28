@@ -2842,6 +2842,48 @@ the Release NVVM prefix passes 376/376. Its exact sorted LF-terminated name set 
 `e345e4b4ef33f3a7fe6426c95d461fd46cfb6de8e183be59c2db77ecfa78b4e9`; removing the seven Slice 57
 names reproduces Slice 56's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 58 public wave-is-first-lane and Boolean helper results
+
+Slice 58 adds feature 43 `WAVE_MASK_IS_FIRST_LANE` and intrinsic operation 9 through the existing
+generic callback. CUDA specializes public `WaveIsFirstLane()` to
+`WaveMaskIsFirstLane(WaveGetActiveMask())`; final linked IR retains one exact `Func(Bool, UInt)`
+helper ending in `(($0 & -$0) == (WarpMask(1) << _getLaneId()))`. Complete assembly and signature
+matching selects the provider semantic without helper names or graph rediscovery. V3 remains
+528/308 bytes, and an exact Slice 57 provider remains valid with feature 43 clear.
+
+This graph exposes the first ordinary helper returning Bool. Type lowering and preflight now admit
+Bool specifically in the helper-result role, and generic call/value-return transport preserves it
+as native i1. Helper parameters remain i32/float, and block phis remain signed i32/float. The test
+sink deliberately uses Int `1/0`: an initial UInt sink produced an unrelated unsigned-i32 phi, and
+expanding that representation contract would not be justified by this wave operation.
+
+The provider validates one usable i32 mask before mutation. It constructs `mask & -mask`, obtains
+the established lane id, constructs `1 << laneId`, compares the two i32 values, and returns the i1
+predicate. These are ordinary LLVM `sub`, `and`, `shl`, and `icmp eq` instructions plus the already
+legacy-audited lane-id declaration, so no new compatibility rewrite, callback, or text marker is
+needed. The fake provider likewise adds a distinct Boolean result kind for function declarations,
+calls, intrinsic results, and value returns without treating i1 as i32.
+
+Historical V3 fixtures now clear an append-only feature suffix through one shared helper. Each
+fixture still names its exact first unavailable feature, but later slices no longer need to append
+another manual bit clear to every older compatibility case.
+
+The public graph has five functions, four calls, four intrinsic emissions, two Bool call results,
+one signed-i32 conditional phi, one pointer offset, and one store. Its feature union requires lane
+index, synchronized ballot, and masked-is-first-lane; clearing any one independently returns E52016
+before provider module construction.
+
+NVVM and NVRTC agree on a `[64]` entry with two `vote.sync.ballot.b32` instructions, one
+`neg.s32`, least-bit `and.b32`, lane-bit `shl.b32`, `setp.eq.s32`, and one global 32-bit store.
+CUDA 12.9 `ptxas` accepts both, and all lanes in one RTX 5090 warp observe the same result through
+both routes: lane zero stores one and lanes 1-31 store zero.
+
+Seven independently registered evidence names add 349 physical lines across the five measured
+test/support files, from 26,633 to 26,982. The complete Slice 46-58 wave matrix passes 85/85 and
+the Release NVVM prefix passes 383/383. Its exact sorted LF-terminated name set has SHA-256
+`ddb9139c2d89bafd5be199f9d299f3c85b6ca8cca82146b9466ddbaf7fb84335`; removing the seven Slice 58
+names reproduces Slice 57's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -3600,8 +3642,8 @@ The following remain open until their named slice supplies evidence:
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
   read-lane-at, public unmasked UInt/Int/Float read-lane-at, active-mask ballot, and public
-  UInt/Int/Float read-lane-first, including other scalar types, votes, reductions, and their
-  convergence contracts;
+  UInt/Int/Float read-lane-first and is-first-lane, including other scalar types, votes,
+  reductions, and their convergence contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 
