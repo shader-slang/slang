@@ -612,6 +612,26 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_CastInterfaceToTaggedUnionPtr:
         result.taggedUnion = true;
+        result.untaggedUnion = true;
+        result.tagOps = true;
+        result.tagType = true;
+        break;
+    case kIROp_AssumeAddress:
+        result.assumeAddress = true;
+        break;
+    case kIROp_UntaggedUnionType:
+    case kIROp_NoneTypeElement:
+        result.untaggedUnion = true;
+        break;
+    case kIROp_GetTagOfElementInSet:
+    case kIROp_GetTagForSuperSet:
+    case kIROp_GetTagForSubSet:
+    case kIROp_GetTagForMappedSet:
+        result.tagOps = true;
+        result.tagType = true;
+        break;
+    case kIROp_SetTagType:
+        result.tagType = true;
         break;
     case kIROp_InOutImplicitCast:
     case kIROp_OutImplicitCast:
@@ -1034,6 +1054,12 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Scan the IR module and determine which lowering/legalization passes are needed.
+    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
+    requiredLoweringPassSet = {};
+    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
+
+    if (requiredLoweringPassSet.assumeAddress)
     {
         bool validate = !isCPUTarget(targetRequest) && !isCUDATarget(targetRequest);
         SLANG_PASS(validateAndRemoveAssumeAddress, validate, sink);
@@ -1042,11 +1068,6 @@ Result linkAndOptimizeIR(
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
-
-    // Scan the IR module and determine which lowering/legalization passes are needed.
-    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
-    requiredLoweringPassSet = {};
-    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     // Debug info is added by the front-end. If the target cannot express debug info, or if the user
     // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
@@ -1106,16 +1127,31 @@ Result linkAndOptimizeIR(
     // so this pass is independent of debug-info state. It writes its
     // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
-    if (requiredLoweringPassSet.coverageTracing)
+    // Placement options are read OUTSIDE the gate below, and the bindless
+    // index is fully validated here -- value kind, value range, and target
+    // support alike.
+    //
+    // The gate is `requiredLoweringPassSet.coverageTracing`, derived from
+    // coverage marker ops present in the IR, so a module with nothing
+    // instrumentable never opens it. Validating the bindless index inside
+    // would mean an empty or declaration-only translation unit accepted an
+    // unsupported option set in total silence: the user asks for the shared
+    // descriptor array, gets no diagnostic, and finds out from a
+    // pipeline-layout mismatch at runtime.
+    //
+    // `-trace-coverage-binding` gets no equivalent checks here -- its values
+    // are consumed by `instrumentCoverage` inside the gate, and an
+    // unsatisfiable binding surfaces there. It is read alongside the index
+    // only because the two describe one placement and are cheaper to read
+    // together than to split across the gate.
+    int explicitBinding = -1;
+    int explicitSpace = -1;
+    int bindlessIndex = -1;
+    // One option set, read both here and inside the gate below.
+    auto& coverageOpts = codeGenContext->getTargetReq()->getOptionSet();
     {
-        // Pull explicit binding values from `-trace-coverage-binding`
-        // here; pass -1 for either side to request auto-allocation in
-        // the synthesis routine.
-        int explicitBinding = -1;
-        int explicitSpace = -1;
-        List<int> reservedSpaces;
-        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
         {
             if (values->getCount() > 0)
             {
@@ -1123,7 +1159,80 @@ Result linkAndOptimizeIR(
                 explicitSpace = (int)(*values)[0].intValue2;
             }
         }
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
+        // `-trace-coverage-bindless-index <index>`. -1 leaves the ordinary
+        // single-buffer form; >= 0 selects the unbounded-descriptor-array
+        // form. WHERE the array lives is a separate decision that stays with
+        // `-trace-coverage-binding` (or auto-allocation), because the host's
+        // descriptor set layout is the host's to choose and the compiler
+        // cannot see it.
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBindlessIndex))
+        {
+            if (values->getCount() > 0)
+            {
+                // A host setting this through the API can supply any value
+                // kind. Reading `intValue` off a string-valued entry would
+                // yield 0 and quietly select array element 0, so reject the
+                // wrong kind rather than acting on a value that was never
+                // meant as an index. Matches the reserved-space handling
+                // below.
+                //
+                // Reported as an internal "unexpected" diagnostic rather
+                // than a registered one, unlike the range check just below:
+                // a wrong value *kind* means the caller mis-built the option
+                // entry itself, which no CLI input can produce and which the
+                // option's own type contract already forbids. A negative
+                // index is a well-formed option carrying an out-of-range
+                // value, so it gets a user-facing code (E45117).
+                if ((*values)[0].kind != CompilerOptionValueKind::Int)
+                {
+                    if (sink)
+                    {
+                        SLANG_DIAGNOSE_UNEXPECTED(
+                            sink,
+                            SourceLoc(),
+                            "TraceCoverageBindlessIndex option value must be an integer");
+                    }
+                    return SLANG_FAIL;
+                }
+                // The CLI parser rejects negatives, but a host setting this
+                // through the API bypasses it, and a negative index would
+                // silently fall back to the single-buffer form -- one binding
+                // per shader, the opposite of what the caller asked for.
+                int requestedIndex = (int)(*values)[0].intValue;
+                if (requestedIndex < 0)
+                {
+                    if (sink)
+                        sink->diagnose(Diagnostics::CoverageBindlessNegativeIndex{});
+                    return SLANG_FAIL;
+                }
+                bindlessIndex = requestedIndex;
+            }
+        }
+        // Target support is validated here rather than inside
+        // `instrumentCoverage` for the same reason the value checks are: the
+        // pass only runs when `requiredLoweringPassSet.coverageTracing` is
+        // set, and that flag is derived from coverage marker ops present in
+        // the IR. A module with nothing instrumentable in it -- an empty or
+        // declaration-only translation unit -- never opens that gate, so a
+        // request for the bindless form on a target that cannot express it
+        // would compile clean and report nothing. The host would then learn
+        // it did not get the shared binding it asked for from a
+        // pipeline-layout mismatch at runtime, which is precisely the failure
+        // this option exists to remove.
+        if (bindlessIndex >= 0 && !isKhronosTarget(targetRequest))
+        {
+            if (sink)
+                sink->diagnose(Diagnostics::CoverageBindlessTargetNotSupported{});
+            return SLANG_FAIL;
+        }
+    }
+
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        List<int> reservedSpaces;
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
         {
             for (auto value : *values)
             {
@@ -1161,7 +1270,7 @@ Result linkAndOptimizeIR(
         int counterByteWidth = kDefaultCoverageCounterByteWidth;
         bool hasExplicitCounterByteWidth = false;
         if (auto values =
-                opts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
         {
             if (values->getCount() > 0)
             {
@@ -1202,7 +1311,8 @@ Result linkAndOptimizeIR(
         // verified against the Metal compiler — so the requested width is
         // honored there.
         bool coverageBoolean = false;
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
         {
             if (values->getCount() > 0)
                 coverageBoolean = (*values)[0].intValue != 0;
@@ -1223,6 +1333,7 @@ Result linkAndOptimizeIR(
             (int)reservedSpaces.getCount(),
             counterByteWidth,
             coverageBoolean,
+            bindlessIndex,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);
@@ -1609,14 +1720,17 @@ Result linkAndOptimizeIR(
             requiredLoweringPassSet.reinterpret = true;
     }
 
-    SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
+    if (requiredLoweringPassSet.untaggedUnion)
+        SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
     if (requiredLoweringPassSet.reinterpret)
         SLANG_PASS(lowerReinterpret, targetProgram, sink);
 
     SLANG_PASS(lowerSequentialIDTagCasts, codeGenContext->getLinkage(), sink);
-    SLANG_PASS(lowerTagInsts, sink);
-    SLANG_PASS(lowerTagTypes);
+    if (requiredLoweringPassSet.tagOps)
+        SLANG_PASS(lowerTagInsts, sink);
+    if (requiredLoweringPassSet.tagType)
+        SLANG_PASS(lowerTagTypes);
 
     SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
 

@@ -37,7 +37,7 @@ target):
 
 ## Links
 
-* [SER white paper for NVAPI](https://developer.nvidia.com/sites/default/files/akamai/gameworks/ser-whitepaper.pdf)
+- [SER white paper for NVAPI](https://developer.nvidia.com/sites/default/files/akamai/gameworks/ser-whitepaper.pdf)
 
 # API Reference
 
@@ -45,15 +45,16 @@ The HitObject API provides cross-platform SER functionality. The API is based on
 
 ## Free Functions
 
-* [ReorderThread](#reorder-thread)
+- [ReorderThread](#reorder-thread)
 
 ## Fused Functions (Vulkan EXT only)
 
-* [ReorderExecute](#reorder-execute)
-* [TraceReorderExecute](#trace-reorder-execute)
-* [TraceMotionReorderExecute](#trace-motion-reorder-execute)
+- [ReorderExecute](#reorder-execute)
+- [TraceReorderExecute](#trace-reorder-execute)
+- [TraceMotionReorderExecute](#trace-motion-reorder-execute)
 
---------------------------------------------------------------------------------
+---
+
 # `struct HitObject`
 
 ## Description
@@ -64,48 +65,50 @@ and its related functions are available in raytracing shader types only.
 
 ## Methods
 
-* [TraceRay](#trace-ray)
-* [TraceMotionRay](#trace-motion-ray)
-* [MakeMiss](#make-miss)
-* [MakeHit](#make-hit)
-* [MakeMotionHit](#make-motion-hit)
-* [MakeMotionMiss](#make-motion-miss)
-* [MakeNop](#make-nop)
-* [FromRayQuery](#from-ray-query)
-* [Invoke](#invoke)
-* [IsMiss](#is-miss)
-* [IsHit](#is-hit)
-* [IsNop](#is-nop)
-* [GetRayDesc](#get-ray-desc)
-* [GetRayFlags](#get-ray-flags)
-* [GetRayTMin](#get-ray-tmin)
-* [GetRayTCurrent](#get-ray-tcurrent)
-* [GetWorldRayOrigin](#get-world-ray-origin)
-* [GetWorldRayDirection](#get-world-ray-direction)
-* [GetShaderTableIndex](#get-shader-table-index)
-* [SetShaderTableIndex](#set-shader-table-index)
-* [GetInstanceIndex](#get-instance-index)
-* [GetInstanceID](#get-instance-id)
-* [GetGeometryIndex](#get-geometry-index)
-* [GetPrimitiveIndex](#get-primitive-index)
-* [GetHitKind](#get-hit-kind)
-* [GetAttributes](#get-attributes)
-* [GetTriangleVertexPositions](#get-triangle-vertex-positions)
-* [GetWorldToObject](#get-world-to-object)
-* [GetObjectToWorld](#get-object-to-world)
-* [GetCurrentTime](#get-current-time)
-* [GetObjectRayOrigin](#get-object-ray-origin)
-* [GetObjectRayDirection](#get-object-ray-direction)
-* [GetShaderRecordBufferHandle](#get-shader-record-buffer-handle)
-* [GetClusterID](#get-cluster-id)
-* [GetSpherePositionAndRadius](#get-sphere-position-and-radius)
-* [GetLssPositionsAndRadii](#get-lss-positions-and-radii)
-* [IsSphereHit](#is-sphere-hit)
-* [IsLssHit](#is-lss-hit)
-* [LoadLocalRootTableConstant](#load-local-root-table-constant)
+- [TraceRay](#trace-ray)
+- [TraceMotionRay](#trace-motion-ray)
+- [MakeMiss](#make-miss)
+- [MakeHit](#make-hit)
+- [MakeMotionHit](#make-motion-hit)
+- [MakeMotionMiss](#make-motion-miss)
+- [MakeNop](#make-nop)
+- [FromRayQuery](#from-ray-query)
+- [Invoke](#invoke)
+- [IsMiss](#is-miss)
+- [IsHit](#is-hit)
+- [IsNop](#is-nop)
+- [GetRayDesc](#get-ray-desc)
+- [GetRayFlags](#get-ray-flags)
+- [GetRayTMin](#get-ray-tmin)
+- [GetRayTCurrent](#get-ray-tcurrent)
+- [GetWorldRayOrigin](#get-world-ray-origin)
+- [GetWorldRayDirection](#get-world-ray-direction)
+- [GetShaderTableIndex](#get-shader-table-index)
+- [SetShaderTableIndex](#set-shader-table-index)
+- [GetInstanceIndex](#get-instance-index)
+- [GetInstanceID](#get-instance-id)
+- [GetGeometryIndex](#get-geometry-index)
+- [GetPrimitiveIndex](#get-primitive-index)
+- [GetHitKind](#get-hit-kind)
+- [GetAttributes](#get-attributes)
+- [GetTriangleVertexPositions](#get-triangle-vertex-positions)
+- [GetWorldToObject](#get-world-to-object)
+- [GetObjectToWorld](#get-object-to-world)
+- [GetCurrentTime](#get-current-time)
+- [GetObjectRayOrigin](#get-object-ray-origin)
+- [GetObjectRayDirection](#get-object-ray-direction)
+- [GetShaderRecordBufferHandle](#get-shader-record-buffer-handle)
+- [GetClusterID](#get-cluster-id)
+- [GetSpherePositionAndRadius](#get-sphere-position-and-radius)
+- [GetLssPositionsAndRadii](#get-lss-positions-and-radii)
+- [IsSphereHit](#is-sphere-hit)
+- [IsLssHit](#is-lss-hit)
+- [LoadLocalRootTableConstant](#load-local-root-table-constant)
 
---------------------------------------------------------------------------------
+---
+
 <a id="trace-ray"></a>
+
 # `HitObject.TraceRay`
 
 ## Description
@@ -113,7 +116,7 @@ and its related functions are available in raytracing shader types only.
 Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
 resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
 
-## Signature 
+## Signature
 
 ```
 static HitObject HitObject.TraceRay<payload_t>(
@@ -127,8 +130,10 @@ static HitObject HitObject.TraceRay<payload_t>(
     inout payload_t      Payload);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="trace-motion-ray"></a>
+
 # `HitObject.TraceMotionRay`
 
 ## Description
@@ -138,7 +143,7 @@ resulting hit information as a HitObject and does not trigger closesthit or miss
 
 **Note**: Requires motion blur support. Available on Vulkan (NV/EXT) and CUDA.
 
-## Signature 
+## Signature
 
 ```
 static HitObject HitObject.TraceMotionRay<payload_t>(
@@ -153,9 +158,10 @@ static HitObject HitObject.TraceMotionRay<payload_t>(
     inout payload_t      Payload);
 ```
 
+---
 
---------------------------------------------------------------------------------
 <a id="make-hit"></a>
+
 # `HitObject.MakeHit`
 
 ## Description
@@ -169,7 +175,7 @@ BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attribut
 
 **Note**: This function is **NV-only** and not available with the cross-vendor EXT extension.
 
-## Signature 
+## Signature
 
 ```
 static HitObject HitObject.MakeHit<attr_t>(
@@ -193,8 +199,10 @@ static HitObject HitObject.MakeHit<attr_t>(
     attr_t               attributes);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="make-motion-hit"></a>
+
 # `HitObject.MakeMotionHit`
 
 ## Description
@@ -203,7 +211,7 @@ See MakeHit but handles Motion.
 
 **Note**: This function is **NV-only** and not available with the cross-vendor EXT extension.
 
-## Signature 
+## Signature
 
 ```
 static HitObject HitObject.MakeMotionHit<attr_t>(
@@ -229,8 +237,10 @@ static HitObject HitObject.MakeMotionHit<attr_t>(
     attr_t               attributes);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="make-miss"></a>
+
 # `HitObject.MakeMiss`
 
 ## Description
@@ -239,7 +249,7 @@ Creates a HitObject representing a miss based on values explicitly passed as arg
 tracing a ray. The provided shader table index must reference a valid miss record in the shader
 table.
 
-## Signature 
+## Signature
 
 ```
 static HitObject HitObject.MakeMiss(
@@ -247,15 +257,17 @@ static HitObject HitObject.MakeMiss(
     RayDesc              Ray);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="make-motion-miss"></a>
+
 # `HitObject.MakeMotionMiss`
 
 ## Description
 
 See MakeMiss but handles Motion. Available on Vulkan (NV and EXT extensions).
 
-## Signature 
+## Signature
 
 ```
 static HitObject HitObject.MakeMotionMiss(
@@ -264,8 +276,10 @@ static HitObject HitObject.MakeMotionMiss(
     float                CurrentTime);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="make-nop"></a>
+
 # `HitObject.MakeNop`
 
 ## Description
@@ -282,8 +296,10 @@ miss.
 static HitObject HitObject.MakeNop();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="from-ray-query"></a>
+
 # `HitObject.FromRayQuery`
 
 ## Description
@@ -305,8 +321,10 @@ static HitObject HitObject.FromRayQuery<RayQuery_t, attr_t>(
     attr_t               CommittedCustomAttribs);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="invoke"></a>
+
 # `HitObject.Invoke`
 
 ## Description
@@ -328,50 +346,58 @@ static void HitObject.Invoke<payload_t>(
     inout payload_t      Payload);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="is-miss"></a>
+
 # `HitObject.IsMiss`
 
 ## Description
 
 Returns true if the HitObject encodes a miss, otherwise returns false.
 
-## Signature 
+## Signature
 
 ```
 bool HitObject.IsMiss();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="is-hit"></a>
+
 # `HitObject.IsHit`
 
 ## Description
 
 Returns true if the HitObject encodes a hit, otherwise returns false.
 
-## Signature 
+## Signature
 
 ```
 bool HitObject.IsHit();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="is-nop"></a>
+
 # `HitObject.IsNop`
 
 ## Description
 
 Returns true if the HitObject encodes a nop, otherwise returns false.
 
-## Signature 
+## Signature
 
 ```
 bool HitObject.IsNop();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-ray-desc"></a>
+
 # `HitObject.GetRayDesc`
 
 ## Description
@@ -384,8 +410,10 @@ Queries ray properties from HitObject. Valid if the hit object represents a hit 
 RayDesc HitObject.GetRayDesc();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-ray-flags"></a>
+
 # `HitObject.GetRayFlags`
 
 ## Description
@@ -400,8 +428,10 @@ Returns the ray flags used when tracing the ray. Valid if the hit object represe
 uint HitObject.GetRayFlags();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-ray-tmin"></a>
+
 # `HitObject.GetRayTMin`
 
 ## Description
@@ -416,8 +446,10 @@ Returns the minimum T value of the ray. Valid if the hit object represents a hit
 float HitObject.GetRayTMin();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-ray-tcurrent"></a>
+
 # `HitObject.GetRayTCurrent`
 
 ## Description
@@ -432,8 +464,10 @@ Returns the current T value (hit distance) of the ray. Valid if the hit object r
 float HitObject.GetRayTCurrent();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-world-ray-origin"></a>
+
 # `HitObject.GetWorldRayOrigin`
 
 ## Description
@@ -448,8 +482,10 @@ Returns the ray origin in world space. Valid if the hit object represents a hit 
 float3 HitObject.GetWorldRayOrigin();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-world-ray-direction"></a>
+
 # `HitObject.GetWorldRayDirection`
 
 ## Description
@@ -464,92 +500,106 @@ Returns the ray direction in world space. Valid if the hit object represents a h
 float3 HitObject.GetWorldRayDirection();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-shader-table-index"></a>
+
 # `HitObject.GetShaderTableIndex`
 
 ## Description
 
 Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
 
-## Signature 
+## Signature
 
 ```
 uint HitObject.GetShaderTableIndex();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-instance-index"></a>
+
 # `HitObject.GetInstanceIndex`
 
 ## Description
 
 Returns the instance index of a hit. Valid if the hit object represents a hit.
 
-## Signature 
+## Signature
 
 ```
 uint HitObject.GetInstanceIndex();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-instance-id"></a>
+
 # `HitObject.GetInstanceID`
 
 ## Description
 
 Returns the instance ID of a hit. Valid if the hit object represents a hit.
 
-## Signature 
+## Signature
 
 ```
 uint HitObject.GetInstanceID();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-geometry-index"></a>
+
 # `HitObject.GetGeometryIndex`
 
 ## Description
 
 Returns the geometry index of a hit. Valid if the hit object represents a hit.
 
-## Signature 
+## Signature
 
 ```
 uint HitObject.GetGeometryIndex();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-primitive-index"></a>
+
 # `HitObject.GetPrimitiveIndex`
 
 ## Description
 
 Returns the primitive index of a hit. Valid if the hit object represents a hit.
 
-## Signature 
+## Signature
 
 ```
 uint HitObject.GetPrimitiveIndex();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-hit-kind"></a>
+
 # `HitObject.GetHitKind`
 
 ## Description
 
 Returns the hit kind. Valid if the hit object represents a hit.
 
-## Signature 
+## Signature
 
 ```
 uint HitObject.GetHitKind();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-attributes"></a>
+
 # `HitObject.GetAttributes`
 
 ## Description
@@ -562,8 +612,10 @@ Returns the attributes of a hit. Valid if the hit object represents a hit or a m
 attr_t HitObject.GetAttributes<attr_t>();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-triangle-vertex-positions"></a>
+
 # `HitObject.GetTriangleVertexPositions`
 
 ## Description
@@ -578,8 +630,10 @@ Returns the world-space vertex positions of the triangle that was hit. Valid if 
 void HitObject.GetTriangleVertexPositions(out float3 positions[3]);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="load-local-root-table-constant"></a>
+
 # `HitObject.LoadLocalRootTableConstant`
 
 ## Description
@@ -589,14 +643,16 @@ represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
 
 **Note**: **D3D12/HLSL only**.
 
-## Signature 
+## Signature
 
 ```
 uint HitObject.LoadLocalRootTableConstant(uint RootConstantOffsetInBytes);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="set-shader-table-index"></a>
+
 # `HitObject.SetShaderTableIndex`
 
 ## Description
@@ -609,8 +665,10 @@ Sets the shader table index of the hit object. Used to modify which shader gets 
 void HitObject.SetShaderTableIndex(uint RecordIndex);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-world-to-object"></a>
+
 # `HitObject.GetWorldToObject`
 
 ## Description
@@ -627,8 +685,10 @@ float3x4 HitObject.GetWorldToObject3x4();
 float4x3 HitObject.GetWorldToObject4x3();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-object-to-world"></a>
+
 # `HitObject.GetObjectToWorld`
 
 ## Description
@@ -645,8 +705,10 @@ float3x4 HitObject.GetObjectToWorld3x4();
 float4x3 HitObject.GetObjectToWorld4x3();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-current-time"></a>
+
 # `HitObject.GetCurrentTime`
 
 ## Description
@@ -655,56 +717,64 @@ Returns the current time for motion blur. Valid if the hit object represents a m
 
 **Note**: Requires motion blur support. Available on Vulkan (NV/EXT).
 
-## Signature 
+## Signature
 
 ```
 float HitObject.GetCurrentTime();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-object-ray-origin"></a>
+
 # `HitObject.GetObjectRayOrigin`
 
 ## Description
 
 Returns the ray origin in object space. Valid if the hit object represents a hit.
 
-## Signature 
+## Signature
 
 ```
 float3 HitObject.GetObjectRayOrigin();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-object-ray-direction"></a>
+
 # `HitObject.GetObjectRayDirection`
 
 ## Description
 
 Returns the ray direction in object space. Valid if the hit object represents a hit.
 
-## Signature 
+## Signature
 
 ```
 float3 HitObject.GetObjectRayDirection();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-shader-record-buffer-handle"></a>
+
 # `HitObject.GetShaderRecordBufferHandle`
 
 ## Description
 
 Returns the shader record buffer handle. Valid if the hit object represents a hit or a miss.
 
-## Signature 
+## Signature
 
 ```
 uint2 HitObject.GetShaderRecordBufferHandle();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-cluster-id"></a>
+
 # `HitObject.GetClusterID`
 
 ## Description
@@ -713,14 +783,16 @@ Returns the cluster ID for cluster acceleration structures. Valid if the hit obj
 
 **Note**: **NV-only** (requires `GL_NV_cluster_acceleration_structure`).
 
-## Signature 
+## Signature
 
 ```
 int HitObject.GetClusterID();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-sphere-position-and-radius"></a>
+
 # `HitObject.GetSpherePositionAndRadius`
 
 ## Description
@@ -729,14 +801,16 @@ Returns the position and radius of a sphere primitive. Valid if the hit object r
 
 **Note**: **NV-only**.
 
-## Signature 
+## Signature
 
 ```
 float4 HitObject.GetSpherePositionAndRadius();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="get-lss-positions-and-radii"></a>
+
 # `HitObject.GetLssPositionsAndRadii`
 
 ## Description
@@ -745,14 +819,16 @@ Returns the positions and radii of a linear swept sphere primitive. Valid if the
 
 **Note**: **NV-only**.
 
-## Signature 
+## Signature
 
 ```
 float2x4 HitObject.GetLssPositionsAndRadii();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="is-sphere-hit"></a>
+
 # `HitObject.IsSphereHit`
 
 ## Description
@@ -761,14 +837,16 @@ Returns true if the HitObject represents a hit on a sphere primitive, otherwise 
 
 **Note**: **NV-only**.
 
-## Signature 
+## Signature
 
 ```
 bool HitObject.IsSphereHit();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="is-lss-hit"></a>
+
 # `HitObject.IsLssHit`
 
 ## Description
@@ -777,14 +855,16 @@ Returns true if the HitObject represents a hit on a linear swept sphere primitiv
 
 **Note**: **NV-only**.
 
-## Signature 
+## Signature
 
 ```
 bool HitObject.IsLssHit();
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="reorder-thread"></a>
+
 # `ReorderThread`
 
 ## Description
@@ -805,7 +885,7 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 
 With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
 
-## Signature 
+## Signature
 
 ```
 void ReorderThread(
@@ -818,8 +898,10 @@ void ReorderThread(
 void ReorderThread(HitObject HitOrMiss);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="reorder-execute"></a>
+
 # `ReorderExecute`
 
 ## Description
@@ -844,8 +926,10 @@ void ReorderExecute<payload_t>(
     inout payload_t      Payload);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="trace-reorder-execute"></a>
+
 # `TraceReorderExecute`
 
 ## Description
@@ -882,8 +966,10 @@ void TraceReorderExecute<payload_t>(
     inout payload_t      Payload);
 ```
 
---------------------------------------------------------------------------------
+---
+
 <a id="trace-motion-reorder-execute"></a>
+
 # `TraceMotionReorderExecute`
 
 ## Description
