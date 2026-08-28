@@ -45,9 +45,8 @@ The layout IR module itself does **not** get its own `### LAYOUT-IR:`
 dump section. Instead, after the per-translation-unit executable IR is
 emitted (`### LOWER-TO-IR:`), the layout module is merged into the
 post-link IR before the post-link pipeline runs. The **first
-`### AFTER <pass>:` block** in `-dump-ir` output (e.g.
-`### AFTER validateAndRemoveAssumeAddress:`) is therefore the earliest
-post-link snapshot, and the layout decorations attached by
+`### AFTER <pass>:` block** in `-dump-ir` output is therefore the
+earliest post-link snapshot, and the layout decorations attached by
 `createIRModuleForLayout` are visible there as:
 
 - `[layout(%N)]` decorations on stub globals (`global_param`,
@@ -228,10 +227,22 @@ merged in). The `### LOWER-TO-IR:` block (pre-link executable IR) is
 the right place for `CHECK-NOT` patterns asserting the absence of
 layout decorations, since the layout module has not been merged at
 that point. Note that FileCheck patterns are evaluated in order; use
-`// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:` to pin
-subsequent `CHECK` lines to the post-link snapshot. Be aware that
-identifiers inside the IR dump (`%N`) are renumbered at each pass
-boundary, so use FileCheck regex-variable captures
+`// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:` to pin subsequent
+`CHECK` lines to the post-link snapshot.
+
+**Never spell out the pass name in that label.** The claim these tests
+make is about a _position_ in the dump — the earliest post-link
+snapshot — not about any particular pass. Which pass happens to run
+first there is an implementation detail that changes: passes get
+gated on `RequiredLoweringPassSet` flags so they are skipped when the
+module holds nothing for them to do (issue #11917), and a gated-out
+pass emits no `### AFTER <pass>:` header at all. Pinning the name
+makes the test fail the day that pass is gated, renamed or reordered,
+even though nothing it asserts has changed. The regex label matches
+whichever pass is first and is immune to all three.
+
+Be aware that identifiers inside the IR dump (`%N`) are renumbered at
+each pass boundary, so use FileCheck regex-variable captures
 (`[[#%layout_id:]]`) when referencing the same instruction across
 multiple `CHECK` lines.
 

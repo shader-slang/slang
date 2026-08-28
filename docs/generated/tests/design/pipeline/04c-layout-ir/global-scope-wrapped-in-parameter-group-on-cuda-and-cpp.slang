@@ -27,14 +27,14 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = int(tid.x);
 }
 
-// SPV-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// SPV-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // SPV: {{^}}varLayout(
 // SPV-NEXT: structTypeLayout(
 
-// CUDA-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CUDA-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CUDA: {{^}}varLayout(
 // CUDA-NEXT: parameterGroupTypeLayout(
 
-// CPP-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CPP-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CPP: {{^}}varLayout(
 // CPP-NEXT: parameterGroupTypeLayout(

@@ -28,7 +28,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 // CHECK-LABEL: ### LOWER-TO-IR:
 // CHECK-NOT: [layout(
 // CHECK-NOT: EntryPointLayout(
-// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CHECK: EntryPointLayout(
 // CHECK: [layout(%{{[0-9]+}})]
 // CHECK: global_param
