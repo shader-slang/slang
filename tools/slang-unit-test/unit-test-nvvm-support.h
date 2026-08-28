@@ -5189,6 +5189,16 @@ void computeMain(
     destination[laneIndex] = WaveGetActiveMask();
 }
 )";
+static const char kDirectNVVMUnmaskedWaveReadLaneAtUIntSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int sourceLane)
+{
+    uint laneIndex = WaveGetLaneIndex();
+    destination[laneIndex] = WaveReadLaneAt(laneIndex, sourceLane);
+}
+)";
 static const char kDirectNVVMFloat32SubtractSource[] = R"(
 [CUDAKernel]
 void computeMain(
@@ -7843,6 +7853,7 @@ enum class WaveScalar32Expected
     LaneCount,
     ActiveMask,
     UIntSourceLane,
+    UnmaskedUIntSourceLane,
     IntSourceLane,
     FloatSourceLane,
 };
@@ -7856,6 +7867,7 @@ static SlangResult _runWaveScalar32Kernel(
     static const uint32_t kLaneCount = 32;
     const String ptx = _getBlobText(ptxBlob);
     const bool readsSourceLane = expectedKind == WaveScalar32Expected::UIntSourceLane ||
+                                 expectedKind == WaveScalar32Expected::UnmaskedUIntSourceLane ||
                                  expectedKind == WaveScalar32Expected::IntSourceLane ||
                                  expectedKind == WaveScalar32Expected::FloatSourceLane;
     if (!ptx.getLength() || (readsSourceLane && (sourceLane < 0 || sourceLane >= int(kLaneCount))))
@@ -7904,10 +7916,13 @@ static SlangResult _runWaveScalar32Kernel(
     uint32_t mask = ~uint32_t(0);
     void* laneParameters[] = {&destination};
     void* uintShuffleParameters[] = {&destination, &mask, &sourceLane};
+    void* unmaskedUIntShuffleParameters[] = {&destination, &sourceLane};
     void* loadedShuffleParameters[] = {&destination, &source, &mask, &sourceLane};
     void** parameters = laneParameters;
     if (expectedKind == WaveScalar32Expected::UIntSourceLane)
         parameters = uintShuffleParameters;
+    else if (expectedKind == WaveScalar32Expected::UnmaskedUIntSourceLane)
+        parameters = unmaskedUIntShuffleParameters;
     else if (hasLoadedSource)
         parameters = loadedShuffleParameters;
     if (cuda.cuLaunchKernel(function, 1, 1, 1, kLaneCount, 1, 1, 0, nullptr, parameters, nullptr) !=
@@ -7927,7 +7942,9 @@ static SlangResult _runWaveScalar32Kernel(
             expected = kLaneCount;
         else if (expectedKind == WaveScalar32Expected::ActiveMask)
             expected = ~uint32_t(0);
-        else if (expectedKind == WaveScalar32Expected::UIntSourceLane)
+        else if (
+            expectedKind == WaveScalar32Expected::UIntSourceLane ||
+            expectedKind == WaveScalar32Expected::UnmaskedUIntSourceLane)
             expected = uint32_t(sourceLane);
         else if (expectedKind == WaveScalar32Expected::IntSourceLane)
             expected = uint32_t(intSourceValues[sourceLane]);
@@ -7960,6 +7977,18 @@ static SlangResult _runWaveReadLaneAtUIntKernel(
     int sourceLane)
 {
     return _runWaveScalar32Kernel(cuda, ptxBlob, WaveScalar32Expected::UIntSourceLane, sourceLane);
+}
+
+static SlangResult _runUnmaskedWaveReadLaneAtUIntKernel(
+    CudaDriverApi& cuda,
+    ISlangBlob* ptxBlob,
+    int sourceLane)
+{
+    return _runWaveScalar32Kernel(
+        cuda,
+        ptxBlob,
+        WaveScalar32Expected::UnmaskedUIntSourceLane,
+        sourceLane);
 }
 
 static SlangResult _runWaveReadLaneAtIntKernel(

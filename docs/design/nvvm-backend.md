@@ -2645,6 +2645,36 @@ Release NVVM prefix passes 340/340. Its exact sorted LF-terminated name set has 
 `7abb718be35a0e9ad61202e3c8776c718f22c43a790c22df960140164cf5ce2b`; removing the seven
 Slice 51 names reproduces Slice 50's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 52 public UInt wave-read composition
+
+Slice 52 closes the source-level boundary deliberately left by the masked UInt shuffle and active
+mask slices. The CUDA definition of scalar `WaveReadLaneAt(value, lane)` calls
+`WaveMaskReadLaneAt(WaveGetActiveMask(), value, lane)`. After active-mask synthesis, the entry
+computes one canonical ballot and threads that value into a public
+`Func(UInt, UInt, Int, UInt)` helper. That helper calls the UInt active-mask identity and passes its
+result to the existing masked-shuffle helper. The direct route consumes those ordinary calls and
+the three established target operations without another feature, facade operation, provider
+mapping, or LLVM wrapper entry.
+
+The fake graph contains five functions, three intrinsic emissions, and four direct calls. It proves
+the entry's ballot result is the added public-helper argument, that the public helper passes its
+mask parameter through `WaveGetActiveMask(UInt)`, and that the returned value is the first argument
+of the masked shuffle. Clearing lane-index feature 35, UInt shuffle feature 36, or ballot feature 39
+independently produces E52016 before provider module construction. V3 remains 528 bytes on x64 and
+308 bytes on x86.
+
+NVVM and NVRTC agree on the `[64, 32]` launch ABI, one 32-bit global store, and no global load. Each
+entry contains exactly one `vote.sync.ballot.b32` and one `shfl.sync.idx.b32`; direct NVVM uses
+`%laneid`, while NVRTC uses `%tid.x`. CUDA 12.9 `ptxas` accepts both, and one RTX 5090 warp selects
+source lanes 0 and 7 correctly through both routes.
+
+Five independently registered composition evidence names add 241 physical lines across the five
+measured test/support files, from 25,512 to 25,753. The complete Slice 46-52 wave matrix passes
+47/47 and the Release NVVM prefix passes 345/345. Its exact sorted LF-terminated name set has
+SHA-256 `d112ef187a1ff7999b55ed3222b51f0c5ad01416f04a63b46a70a9d25ccb1029`;
+removing the five Slice 52 names reproduces Slice 51's count and hash exactly. Debug preservation
+passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2775,7 +2805,8 @@ The program advances through bounded slices:
 49. canonical Int wave read-lane-at with signature-aware same-text descriptor selection;
 50. canonical Float wave read-lane-at with native mixed-signature intrinsic transport;
 51. canonical active wave mask through synchronized ballot and repaired synthesized helper types;
-52. remaining wave operations and other advanced capabilities, then production-readiness
+52. public unmasked UInt wave-read-lane-at through composition of active mask and masked shuffle;
+53. remaining wave operations and other advanced capabilities, then production-readiness
     evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
@@ -3398,9 +3429,9 @@ The following remain open until their named slice supplies evidence:
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
-- wave/subgroup operations beyond lane index, lane count, canonical UInt/Int/Float read-lane-at,
-  and active-mask ballot, including other scalar types, votes, reductions, and their convergence
-  contracts;
+- wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
+  read-lane-at, public unmasked UInt read-lane-at, and active-mask ballot, including other scalar
+  types, votes, reductions, and their convergence contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

@@ -934,3 +934,24 @@ Seven evidence names add 392 measured test/support lines, from 25,120 to 25,512.
 Slice 46-51 wave matrix passes 42/42 and Release passes 340/340 with sorted-name SHA-256
 `7abb718be35a0e9ad61202e3c8776c718f22c43a790c22df960140164cf5ce2b`; removing the seven
 Slice 51 names reproduces Slice 50's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 52 proves the public unmasked UInt `WaveReadLaneAt(value, lane)` wrapper without adding a
+provider operation. CUDA target selection composes `WaveGetActiveMask()` with
+`WaveMaskReadLaneAt(mask, value, lane)`. Active-mask synthesis produces one ballot in the entry and
+threads its result into the public `Func(UInt, UInt, Int, UInt)` helper, whose ordinary calls reuse
+the established active-mask identity and UInt masked-shuffle paths. V3 remains 528/308 bytes and
+the production/provider diff is empty.
+
+The fake records five functions, three intrinsic emissions, and four calls, including exact ballot
+result flow from the entry through the synthesized public-helper argument and active-mask identity
+to the masked shuffle. Removing lane-index feature 35, UInt shuffle feature 36, or ballot feature
+39 independently produces E52016 before provider module construction.
+
+NVVM and NVRTC agree on `[64, 32]`, one global 32-bit store, no load, and exactly one
+`vote.sync.ballot.b32` plus one `shfl.sync.idx.b32` in the entry. CUDA 12.9 `ptxas` accepts both,
+and one RTX 5090 warp selects lanes 0 and 7 correctly through both routes.
+
+Five evidence names add 241 measured test/support lines, from 25,512 to 25,753. The complete
+Slice 46-52 wave matrix passes 47/47 and Release passes 345/345 with sorted-name SHA-256
+`d112ef187a1ff7999b55ed3222b51f0c5ad01416f04a63b46a70a9d25ccb1029`; removing the five
+Slice 52 names reproduces Slice 51's count and hash exactly. Debug preservation passes 10/10.
