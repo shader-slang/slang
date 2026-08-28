@@ -2501,6 +2501,49 @@ Release NVVM prefix passes 312/312. Its exact sorted LF-terminated name set has 
 `dbd8d587f633ab06ac2daaf086690a14fa3b9f4cab8c22332d0a75e562d65ab7`; removing the seven
 Slice 47 names reproduces Slice 46's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 48 UInt wave read-lane-at and intrinsic arguments
+
+Slice 48 adds a kernel that computes `laneIndex = WaveGetLaneIndex()`, passes that UInt value to
+`WaveMaskReadLaneAt(mask, laneIndex, sourceLane)`, and stores the selected lane's index through
+`destination[laneIndex]`. CUDA target selection retains a specialized one-block
+`Func(UInt, UInt, UInt, Int)` helper whose terminator is exact
+`GenericAsm("__shfl_sync($0, $1, $2)")`. The three semantic arguments are the helper parameters;
+the GenericAsm instruction itself still has only its assembly-string operand.
+
+The GenericAsm descriptor now includes an exact structural signature. Preflight accepts the
+shuffle spelling only when its helper returns UInt and has `(UInt mask, UInt value, Int lane)`
+parameters. Direct emission lowers those existing parameters from the helper value map and passes
+their provider handles in declaration order. It does not parse placeholders, match helper names,
+or construct a second representation of the arguments. The two zero-argument wave helpers retain
+their established descriptor signature.
+
+Feature 36, `WAVE_READ_LANE_AT_UINT`, and intrinsic operation 2 extend the unchanged generic
+callback. The V3 table remains 528 bytes on x64 and 308 bytes on x86; exact Slice 47 tables remain
+valid with feature 36 clear. The facade maps operation 2 to its feature before dispatch, and the
+provider requires exactly three available same-function i32 arguments before any module mutation.
+
+The LLVM 14 provider emits
+`llvm.nvvm.shfl.sync.idx.i32(mask, value, lane, 31)`. The final constant is CUDA's default 32-lane
+clamp and is provider policy rather than a fourth Slang semantic argument. LLVM 14 declares the
+intrinsic as `i32(i32, i32, i32, i32)` with exact
+`convergent inaccessiblememonly nounwind` attributes. That declaration is already accepted by the
+LLVM-7-era NVVM reader, so the legacy writer validates it but leaves it unchanged. Both LLVM and
+negotiated NVVM text contain one lane-id call, one shuffle call with clamp 31, two UInt helper
+calls/returns, one pointer offset, and one store.
+
+The fake graph records all three shuffle-helper parameter references and the kernel call's
+`mask`, lane-index call result, and `sourceLane` arguments. NVVM and NVRTC agree on the
+`[64, 32, 32]` launch ABI, one global 32-bit store, no global load, and
+`shfl.sync.idx.b32`. CUDA 12.9 `ptxas` accepts both routes. On the RTX 5090, one full 32-thread warp
+selects source lanes 0 and 7 and writes the selected lane index to all 32 destinations through both
+compilers.
+
+Seven independently registered evidence layers add 479 physical lines across the five measured
+test/support files, from 23,732 to 24,211. The focused Slice 47/48 matrix passes 14/14 and the
+Release NVVM prefix passes 319/319. Its exact sorted LF-terminated name set has SHA-256
+`6c97ed4746f5a67237d642f180e69984ec4bdc0f5ae23e5eecb540bd7d51d83c`; removing the seven
+Slice 48 names reproduces Slice 47's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -3250,7 +3293,8 @@ The following remain open until their named slice supplies evidence:
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
-- wave/subgroup operations, including their lane, mask, convergence, and intrinsic contracts;
+- wave/subgroup operations beyond lane index, lane count, and canonical UInt read-lane-at,
+  including active masks, other scalar types, votes, reductions, and their convergence contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

@@ -89,10 +89,17 @@ struct NVVMFloat32BinaryInfo
 
 struct NVVMGenericAsmIntrinsicInfo
 {
+    enum class Signature
+    {
+        UIntNoArguments,
+        UIntUIntUIntInt,
+    };
+
     const char* assembly;
     SlangNVVMBuilderFeature_3 feature;
     SlangNVVMIntrinsicOp_3 operation;
     const char* diagnosticName;
+    Signature signature;
 };
 
 // Maps an exact CUDA-selected GenericAsm terminator to one negotiated provider semantic.
@@ -104,12 +111,21 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(IRGenericAsm
             SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX,
             SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX,
             "wave lane index intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::UIntNoArguments,
         },
         {
             "(warpSize)",
             SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT,
             SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_COUNT,
             "wave lane count intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::UIntNoArguments,
+        },
+        {
+            "__shfl_sync($0, $1, $2)",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT,
+            "UInt wave read-lane-at intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUIntInt,
         },
     };
     if (!genericAsm)
@@ -120,6 +136,26 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(IRGenericAsm
             return &info;
     }
     return nullptr;
+}
+
+// Checks the complete canonical helper signature selected for one exact GenericAsm semantic.
+bool _isNVVMGenericAsmIntrinsicHelper(
+    IRFunc* function,
+    const NVVMGenericAsmIntrinsicInfo& intrinsicInfo)
+{
+    if (!function || !isNVVMUnsignedI32Type(function->getResultType()))
+        return false;
+
+    switch (intrinsicInfo.signature)
+    {
+    case NVVMGenericAsmIntrinsicInfo::Signature::UIntNoArguments:
+        return function->getParamCount() == 0;
+    case NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUIntInt:
+        return function->getParamCount() == 3 && isNVVMUnsignedI32Type(function->getParamType(0)) &&
+               isNVVMUnsignedI32Type(function->getParamType(1)) &&
+               isNVVMSignedI32Type(function->getParamType(2));
+    }
+    SLANG_UNEXPECTED("unknown NVVM GenericAsm intrinsic signature");
 }
 
 // Maps a canonical floating binary IR opcode to the provider semantic that owns it.
@@ -924,9 +960,9 @@ SlangResult _validateNVVMFunction(
                     const NVVMGenericAsmIntrinsicInfo* intrinsicInfo =
                         _findNVVMGenericAsmIntrinsicInfo(genericAsm);
                     if (isEntryPoint || genericAsm != terminator ||
-                        functionBlocks.getCount() != 1 || function->getParamCount() != 0 ||
-                        genericAsm->getOperandCount() != 1 ||
-                        !isNVVMUnsignedI32Type(function->getResultType()) || !intrinsicInfo)
+                        functionBlocks.getCount() != 1 || genericAsm->getOperandCount() != 1 ||
+                        !intrinsicInfo ||
+                        !_isNVVMGenericAsmIntrinsicHelper(function, *intrinsicInfo))
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                     }
@@ -2252,6 +2288,20 @@ SlangResult emitNVVMIRFromLinkedIR(
                         const NVVMGenericAsmIntrinsicInfo* intrinsicInfo =
                             _findNVVMGenericAsmIntrinsicInfo(as<IRGenericAsm>(inst));
                         SLANG_RELEASE_ASSERT(intrinsicInfo);
+                        List<SlangNVVMValueHandle_1> loweredArguments;
+                        for (auto parameter : function->getParams())
+                        {
+                            SlangNVVMValueHandle_1 loweredArgument = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                parameter,
+                                valueMap,
+                                typeContext,
+                                loweredArgument));
+                            loweredArguments.add(loweredArgument);
+                        }
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
@@ -2259,8 +2309,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                             builder.emitIntrinsic(
                                 moduleScope.module,
                                 intrinsicInfo->operation,
-                                nullptr,
-                                0,
+                                loweredArguments.getCount() ? loweredArguments.getBuffer()
+                                                            : nullptr,
+                                size_t(loweredArguments.getCount()),
                                 loweredValue)));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,

@@ -653,7 +653,8 @@ extern "C"
 #define SLANG_NVVM_BUILDER_FEATURE_GENERIC_SCALAR_FUNCTIONS ((SlangNVVMBuilderFeature_3)33u)
 #define SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX ((SlangNVVMBuilderFeature_3)34u)
 #define SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT ((SlangNVVMBuilderFeature_3)35u)
-#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 36u
+#define SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT ((SlangNVVMBuilderFeature_3)36u)
+#define SLANG_NVVM_BUILDER_FEATURE_COUNT_3 37u
 #define SLANG_NVVM_BUILDER_FEATURE_WORD_COUNT_3 4u
 
     typedef struct SlangNVVMBuilderFeatureSet_3
@@ -782,6 +783,7 @@ extern "C"
     typedef uint32_t SlangNVVMIntrinsicOp_3;
 #define SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX ((SlangNVVMIntrinsicOp_3)0u)
 #define SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_COUNT ((SlangNVVMIntrinsicOp_3)1u)
+#define SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT ((SlangNVVMIntrinsicOp_3)2u)
 
     /// Emits one stable target intrinsic with its exact operation-defined scalar signature.
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangNVVMEmitIntrinsic_3)(
@@ -853,6 +855,9 @@ extern "C"
      sizeof(((SlangNVVMBuilderAPI_V3*)0)->emitIntrinsic))
 
 #define SLANG_NVVM_BUILDER_API_V3_WAVE_LANE_COUNT_MIN_SIZE \
+    SLANG_NVVM_BUILDER_API_V3_WAVE_LANE_INDEX_MIN_SIZE
+
+#define SLANG_NVVM_BUILDER_API_V3_WAVE_READ_LANE_AT_UINT_MIN_SIZE \
     SLANG_NVVM_BUILDER_API_V3_WAVE_LANE_INDEX_MIN_SIZE
 
     typedef SlangNVVMResult_1(SLANG_NVVM_CALL* SlangGetNVVMBuilderAPI_V3)(

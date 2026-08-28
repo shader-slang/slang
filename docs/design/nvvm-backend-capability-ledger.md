@@ -847,3 +847,23 @@ Seven evidence names add 364 measured test/support lines, from 23,368 to 23,732.
 Slice 46/47 matrix passes 14/14 and the Release NVVM prefix passes 312/312 with sorted-name SHA-256
 `dbd8d587f633ab06ac2daaf086690a14fa3b9f4cab8c22332d0a75e562d65ab7`; removing the seven
 Slice 47 names reproduces Slice 46's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 48 adds canonical UInt `WaveMaskReadLaneAt` as feature 36/intrinsic operation 2 through the
+unchanged generic callback. CUDA target selection produces an exact one-block
+`Func(UInt, UInt, UInt, Int)` helper ending in `GenericAsm("__shfl_sync($0, $1, $2)")`. A structural
+descriptor admits only that result/parameter shape, and direct emission passes the helper's three
+existing parameter values to the provider rather than parsing placeholders. V3 remains 528 bytes
+on x64 and 308 bytes on x86, and exact Slice 47 tables remain loadable without feature 36.
+
+The provider validates three available i32 arguments and emits
+`llvm.nvvm.shfl.sync.idx.i32(mask, value, lane, 31)`. Its exact LLVM 14 declaration has
+`convergent inaccessiblememonly nounwind` attributes, which the audited NVVM 2.0 writer validates
+and preserves unchanged. Both dialects contain one lane-id and one shuffle intrinsic call, two
+UInt helper calls/returns, one pointer offset, and one store. NVVM and NVRTC agree on
+`[64, 32, 32]`, one global 32-bit store, no load, and `shfl.sync.idx.b32`; `ptxas` accepts both.
+One 32-thread RTX 5090 warp selects source lanes 0 and 7 correctly through both routes.
+
+Seven evidence names add 479 measured test/support lines, from 23,732 to 24,211. The focused
+Slice 47/48 matrix passes 14/14 and Release passes 319/319 with sorted-name SHA-256
+`6c97ed4746f5a67237d642f180e69984ec4bdc0f5ae23e5eecb540bd7d51d83c`; removing the seven
+Slice 48 names reproduces Slice 47's count and hash exactly. Debug preservation passes 10/10.
