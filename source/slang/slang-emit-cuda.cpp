@@ -1037,11 +1037,12 @@ bool CUDASourceEmitter::tryEmitTextureAtomic(IRInst* inst)
             .location = loc});
     };
 
-    // A multisampled texture atomic is diagnosed earlier by
-    // `checkUnsupportedTextureAtomic` (the multisample resource type is not
-    // representable here, so it must be caught before type emission); the
-    // classifier below rejects it too via `_getCUDASuredGeomDimensions`, so it is
-    // never emitted regardless.
+    // The classifier below rejects unsupported geometries — a multisampled or
+    // array texture has no `sured` form, so `_getCUDASuredGeomDimensions` returns
+    // 0 — and any such atomic reaching here becomes `E41405` rather than being
+    // emitted. A multisampled texture is also diagnosed earlier and more
+    // generally by the module-level `checkUnsupportedInst` pass (E55215), which
+    // rejects the resource type itself at the default optimization level.
     CUDATextureAtomicClass info = classifyTextureAtomicForCuda(atomic, imageSubscript, accessChain);
     if (!info.supported)
     {

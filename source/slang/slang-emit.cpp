@@ -2835,11 +2835,6 @@ Result linkAndOptimizeIR(
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
-    // Runs at every optimization level: the CUDA emitter aborts on a
-    // multisampled texture type regardless of `-minimum-slang-optimization`, so
-    // this guard cannot live in the optimization-gated pass above.
-    SLANG_PASS(checkUnsupportedTextureAtomic, codeGenContext->getTargetReq(), sink);
-
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 
 #undef SLANG_PASS

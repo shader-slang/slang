@@ -15,11 +15,12 @@
 //     stride we would compute from the element type would not match the true
 //     backing layout.
 //
-// The multisampled-texture case is diagnosed by a *different*, earlier path
-// (`checkUnsupportedTextureAtomic`, which runs before emission because the CUDA
-// emitter cannot even name a multisample resource type) and would short-circuit
-// the compile before the emit-point diagnostics here fire, so it lives in its
-// own file: `cuda-texture-atomic-multisample-unsupported.slang`.
+// A multisampled `RWTexture` is not covered here: the CUDA emitter cannot name a
+// multisample resource type, so at the default optimization level the module-level
+// `checkUnsupportedInst` pass rejects the type itself (E55215) before any
+// emit-point atomic check runs. (That pass is skipped under
+// `-minimum-slang-optimization`, where an MS texture instead reaches emission —
+// the min-opt validation skip is intentional.)
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target cuda -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target ptx -entry computeMain -stage compute
