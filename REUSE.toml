@@ -19,6 +19,12 @@ SPDX-FileCopyrightText = "2018 Vladimir \"allejo\" Jimenez"
 SPDX-License-Identifier = "Apache-2.0 WITH LLVM-exception"
 
 [[annotations]]
+path = "external/spirv-tools-generated/options-pinned.h"
+precedence = "closest"
+SPDX-FileCopyrightText = "The Abseil Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
 path = [
   "external/spirv/spirv.h",
   "external/glext.h",
