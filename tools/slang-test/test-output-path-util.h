@@ -15,12 +15,13 @@ namespace Slang
 // A value is rejected (returns `SLANG_E_INVALID_ARG`, with `outError` naming the option, the path,
 // and the allowed alternatives) when it is an absolute path — a POSIX `/tmp/...` is meaningless
 // on Windows and a `C:\...` on POSIX. The absolute check is platform-independent, so a
-// Windows-shaped path is caught on Linux CI and vice versa. Malformed quoting (an unterminated
-// quote) is also rejected rather than silently unescaped to an empty string.
+// Windows-shaped path is caught on Linux CI and vice versa. No absolute path is carved out, not
+// even a null device such as `/dev/null`: a test that wants to discard its output writes
+// `-o -` and lets the output go to stdout. Malformed quoting (an unterminated quote) is also
+// rejected rather than silently unescaped to an empty string.
 //
-// These output targets are exempt and preserved unchanged: `-o -` (write to stdout) and the host's
-// null-device discard sink (`/dev/null` on POSIX, `NUL` on Windows — only the host's own spelling
-// is recognised). Path-qualified relative values are also preserved.
+// `-o -` (write to stdout) names a stream rather than a file, so it is exempt from the check and
+// preserved unchanged. Path-qualified relative values are also preserved.
 SlangResult normalizeTestOutputPathsForTestFile(
     const String& filePath,
     List<String>& args,

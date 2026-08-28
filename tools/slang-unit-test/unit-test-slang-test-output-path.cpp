@@ -83,72 +83,15 @@ SLANG_UNIT_TEST(slangTestOutputPathNormalization)
         SLANG_CHECK(error.indexOf(UnownedStringSlice("/tmp/out.spv")) >= 0);
     }
 
-    // The null-device discard sink is exempt and preserved unchanged, but the spelling is
-    // host-specific: `/dev/null` on POSIX, `NUL` on Windows. Only the host's own spelling is
-    // recognised, so the other host's spelling stays subject to the normal path handling.
-#if SLANG_WINDOWS_FAMILY
-    {
-        const char* values[] = {"-o", "NUL"};
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        String error;
-        SLANG_CHECK(SLANG_SUCCEEDED(normalizeTestOutputPathsForTestFile(testPath, args, error)));
-
-        const char* expected[] = {"-o", "NUL"};
-        checkArgs(args, expected, SLANG_COUNT_OF(expected));
-    }
-
-    // Case-insensitive on Windows.
-    {
-        const char* values[] = {"-o", "nul"};
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        String error;
-        SLANG_CHECK(SLANG_SUCCEEDED(normalizeTestOutputPathsForTestFile(testPath, args, error)));
-
-        const char* expected[] = {"-o", "nul"};
-        checkArgs(args, expected, SLANG_COUNT_OF(expected));
-    }
-
-    // The POSIX spelling is not the null device on Windows, so `/dev/null` is rejected there as an
-    // ordinary absolute path (the non-portability the guard exists to catch).
-    {
-        const char* values[] = {"-o", "/dev/null"};
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        String error;
-        SLANG_CHECK(SLANG_FAILED(normalizeTestOutputPathsForTestFile(testPath, args, error)));
-    }
-#else
+    // The null device gets no exemption on any host: `/dev/null` is an absolute path like any
+    // other, and it is not a path a Windows compiler can open. A test that wants to discard its
+    // output uses `-o -` instead, which the case above already covers.
     {
         const char* values[] = {"-target", "spirv-asm", "-o", "/dev/null"};
         List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
         String error;
-        SLANG_CHECK(SLANG_SUCCEEDED(normalizeTestOutputPathsForTestFile(testPath, args, error)));
-
-        const char* expected[] = {"-target", "spirv-asm", "-o", "/dev/null"};
-        checkArgs(args, expected, SLANG_COUNT_OF(expected));
-    }
-
-    // `/DEV/NULL` is NOT the null device on case-sensitive POSIX, so it is rejected as an ordinary
-    // absolute path.
-    {
-        const char* values[] = {"-o", "/DEV/NULL"};
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        String error;
         SLANG_CHECK(SLANG_FAILED(normalizeTestOutputPathsForTestFile(testPath, args, error)));
     }
-
-    // The Windows spelling is not the null device on POSIX, so `NUL` is not exempt here — but it
-    // has no path separator, so it is a bare relative filename and gets anchored beside the test
-    // file.
-    {
-        const char* values[] = {"-o", "NUL"};
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        String error;
-        SLANG_CHECK(SLANG_SUCCEEDED(normalizeTestOutputPathsForTestFile(testPath, args, error)));
-
-        const char* expected[] = {"-o", "tests/diagnostics/NUL"};
-        checkArgs(args, expected, SLANG_COUNT_OF(expected));
-    }
-#endif
 
     {
         const char* values[] = {"-separate-debug-info-output", "/tmp/debug.spv"};
@@ -157,8 +100,8 @@ SLANG_UNIT_TEST(slangTestOutputPathNormalization)
         SLANG_CHECK(SLANG_FAILED(normalizeTestOutputPathsForTestFile(testPath, args, error)));
     }
 
-    // A rooted Windows drive path is rejected even on this (non-Windows) host, so a directive
-    // authored on Windows is caught by Linux CI.
+    // A rooted Windows drive path is rejected on every host, so a directive authored on Windows is
+    // caught by Linux CI too.
     {
         const char* values[] = {"-o", "C:\\out.spv"};
         List<String> args = makeArgs(values, SLANG_COUNT_OF(values));

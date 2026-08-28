@@ -30,22 +30,6 @@ static bool isAbsoluteOnAnyPlatform(const UnownedStringSlice& path)
     return Path::isDriveSpecification(Path::getFirstElement(path));
 }
 
-// Returns true if `path` is *this host's* null device, the sanctioned "discard the output" sink,
-// which is exempt from the absolute-path rejection below (the POSIX spelling `/dev/null` is itself
-// an absolute path). Matched host-specifically so the *other* host's spelling stays subject to the
-// portability check: a `-o /dev/null` directive is still non-portable to Windows and is rejected
-// there.
-static bool isNullDeviceDiscardSink(const UnownedStringSlice& path)
-{
-#if SLANG_WINDOWS_FAMILY
-    // Windows device names are case-insensitive.
-    return path.caseInsensitiveEquals(UnownedStringSlice("NUL"));
-#else
-    // POSIX paths are case-sensitive, so `/DEV/NULL` is a different, non-null path.
-    return path == UnownedStringSlice("/dev/null");
-#endif
-}
-
 SlangResult normalizeTestOutputPathsForTestFile(
     const String& filePath,
     List<String>& args,
@@ -92,9 +76,10 @@ SlangResult normalizeTestOutputPathsForTestFile(
             unescapedPath = buf.produceString();
         }
 
-        // Exempt from the absolute-path check: `-o -` (stdout) and this host's null-device discard
-        // sink. Both are allowed output targets that need no rewriting.
-        if (unescapedPath != "-" && !isNullDeviceDiscardSink(unescapedPath.getUnownedSlice()))
+        // `-o -` (write to stdout) names a stream rather than a file, so it is neither checked nor
+        // rewritten. It is also how a test discards output it does not care about, which is why no
+        // spelling of the null device needs to be recognised here.
+        if (unescapedPath != "-")
         {
             // An absolute output path cannot be reproduced across the platforms the suite runs on,
             // so reject it rather than silently rewrite it: there is no well-defined relative path
@@ -104,8 +89,7 @@ SlangResult normalizeTestOutputPathsForTestFile(
                 StringBuilder builder;
                 builder << "absolute path '" << outputPath << "' passed to '" << args[i]
                         << "' is not portable across platforms; use a relative path (a bare "
-                           "filename is placed beside the test file), the host null device "
-                           "('/dev/null' on POSIX, 'NUL' on Windows) to discard, or '"
+                           "filename is placed beside the test file), or '"
                         << args[i] << " -' to write to stdout";
                 outError = builder.produceString();
                 return SLANG_E_INVALID_ARG;
