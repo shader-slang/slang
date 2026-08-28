@@ -6,7 +6,7 @@
 
 // CHECK-DAG: OpCooperativeMatrixMulAdd
 // CHECK-DAG: OpCooperativeMatrixPerElementOpEXT
-// CHECK-DAG: OpCooperativeMatrixReduceNV
+// CHECK-DAG: OpCooperativeMatrixReduceEXT
 // CHECK-DAG: OpCooperativeMatrixLoadTensorNV
 // CHECK-DAG: OpCreateTensorLayoutNV
 // CHECK-DAG: OpTensorLayoutSetDimensionNV
@@ -14,7 +14,7 @@
 // CHECK-DAG: OpCreateTensorViewNV
 // CHECK-DAG: OpTensorLayoutSetClampValueNV
 // CHECK-DAG: OpTypeTensorLayoutNV
-// CHECK-DAG: OpCooperativeMatrixConvertNV
+// CHECK-DAG: OpCooperativeMatrixConvertUseEXT
 
 struct FlashAttentionCmStandaloneParams
 {
