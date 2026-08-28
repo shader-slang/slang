@@ -14,7 +14,7 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        llvmPackages = pkgs.llvmPackages_21;
+        llvmPackages = pkgs.llvmPackages_22;
         # We want to use Clang instead of GCC because it seems to behave better
         # with LLDB, so we use `mkShell` with the LLVM stdenv
         mkShell = pkgs.mkShell.override { stdenv = llvmPackages.stdenv; };
