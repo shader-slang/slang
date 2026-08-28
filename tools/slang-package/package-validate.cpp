@@ -285,7 +285,8 @@ static SlangResult _addModule(
     const String& exportRoot,
     const String& relativePath,
     List<ModuleLocation>& ioModules,
-    String& outError)
+    String& outError,
+    bool skipSourceValidation)
 {
     String normalizedImport = _normalizePath(Path::getPathWithoutExt(relativePath));
     StringBuilder canonicalImportBuilder;
@@ -295,7 +296,8 @@ static SlangResult _addModule(
     String fullPath = Path::combine(exportRoot, relativePath);
     for (const auto& existing : ioModules)
     {
-        if (existing.canonicalImport.getUnownedSlice().caseInsensitiveEquals(
+        if (!skipSourceValidation &&
+            existing.canonicalImport.getUnownedSlice().caseInsensitiveEquals(
                 canonicalImport.getUnownedSlice()))
         {
             if (existing.canonicalImport == canonicalImport)
@@ -331,7 +333,8 @@ static SlangResult _validateExport(
     const String& exportRoot,
     List<ModuleLocation>& ioModules,
     List<ExportedSourceFile>& ioSourceFiles,
-    String& outError)
+    String& outError,
+    bool skipSourceValidation)
 {
     SlangPathType exportType;
     if (SLANG_FAILED(Path::getPathType(exportRoot, &exportType)) ||
@@ -356,28 +359,31 @@ static SlangResult _validateExport(
     {
         String owner = _findOwningModule(relativePath, normalizedSourcePaths);
         bool isPrimary = owner.getLength() == 0;
-        String expectedName = _canonicalModuleName(isPrimary ? relativePath : owner);
         String fullPath = Path::combine(exportRoot, relativePath);
-        ModuleHeaderKind kind;
-        String declaredName;
-        SLANG_RETURN_ON_FAIL(_readModuleHeader(fullPath, kind, declaredName, outError));
-        if (isPrimary && kind != ModuleHeaderKind::Module)
+        if (!skipSourceValidation)
         {
-            outError = String("Primary module file must start with 'module ") + expectedName +
-                       ";': " + fullPath;
-            return SLANG_FAIL;
-        }
-        if (!isPrimary && kind != ModuleHeaderKind::Implementing)
-        {
-            outError = String("Companion module file must start with 'implementing ") +
-                       expectedName + ";': " + fullPath;
-            return SLANG_FAIL;
-        }
-        if (declaredName != expectedName)
-        {
-            outError = String("Module declaration name '") + declaredName +
-                       "' does not match expected name '" + expectedName + "': " + fullPath;
-            return SLANG_FAIL;
+            String expectedName = _canonicalModuleName(isPrimary ? relativePath : owner);
+            ModuleHeaderKind kind;
+            String declaredName;
+            SLANG_RETURN_ON_FAIL(_readModuleHeader(fullPath, kind, declaredName, outError));
+            if (isPrimary && kind != ModuleHeaderKind::Module)
+            {
+                outError = String("Primary module file must start with 'module ") + expectedName +
+                           ";': " + fullPath;
+                return SLANG_FAIL;
+            }
+            if (!isPrimary && kind != ModuleHeaderKind::Implementing)
+            {
+                outError = String("Companion module file must start with 'implementing ") +
+                           expectedName + ";': " + fullPath;
+                return SLANG_FAIL;
+            }
+            if (declaredName != expectedName)
+            {
+                outError = String("Module declaration name '") + declaredName +
+                           "' does not match expected name '" + expectedName + "': " + fullPath;
+                return SLANG_FAIL;
+            }
         }
         ExportedSourceFile sourceFile;
         sourceFile.relativePath = _normalizePath(relativePath);
@@ -385,8 +391,15 @@ static SlangResult _validateExport(
         sourceFile.sourcePath = fullPath;
         ioSourceFiles.add(sourceFile);
         if (isPrimary)
-            SLANG_RETURN_ON_FAIL(
-                _addModule(packageName, exportRoot, relativePath, ioModules, outError));
+        {
+            SLANG_RETURN_ON_FAIL(_addModule(
+                packageName,
+                exportRoot,
+                relativePath,
+                ioModules,
+                outError,
+                skipSourceValidation));
+        }
     }
     return SLANG_OK;
 }
@@ -445,9 +458,11 @@ static SlangResult _validatePackageTree(
     const Manifest& manifest,
     List<ModuleLocation>& ioModules,
     List<ExportedSourceFile>& ioSourceFiles,
-    String& outError)
+    String& outError,
+    bool skipSourceValidation)
 {
-    SLANG_RETURN_ON_FAIL(_validateLicenseFiles(packageRoot, manifest, outError));
+    if (!skipSourceValidation)
+        SLANG_RETURN_ON_FAIL(_validateLicenseFiles(packageRoot, manifest, outError));
     if (manifest.exports.getCount() == 0)
     {
         outError =
@@ -470,8 +485,13 @@ static SlangResult _validatePackageTree(
             outError = String("Package export escapes its package: ") + exportRoot;
             return SLANG_FAIL;
         }
-        SLANG_RETURN_ON_FAIL(
-            _validateExport(manifest.name, exportRoot, ioModules, ioSourceFiles, outError));
+        SLANG_RETURN_ON_FAIL(_validateExport(
+            manifest.name,
+            exportRoot,
+            ioModules,
+            ioSourceFiles,
+            outError,
+            skipSourceValidation));
     }
     return SLANG_OK;
 }
@@ -520,11 +540,18 @@ static SlangResult _readMaterializedManifest(
 SlangResult validatePackageTree(
     const String& packageRoot,
     const Manifest& manifest,
-    String& outError)
+    String& outError,
+    bool skipSourceValidation)
 {
     List<ModuleLocation> modules;
     List<ExportedSourceFile> sourceFiles;
-    return _validatePackageTree(packageRoot, manifest, modules, sourceFiles, outError);
+    return _validatePackageTree(
+        packageRoot,
+        manifest,
+        modules,
+        sourceFiles,
+        outError,
+        skipSourceValidation);
 }
 
 SlangResult validateResolvedProject(
@@ -535,12 +562,18 @@ SlangResult validateResolvedProject(
     String& outError,
     List<String>* outWarnings,
     List<PrimaryModule>* outPrimaryModules,
-    List<ExportedSourceFile>* outSourceFiles)
+    List<ExportedSourceFile>* outSourceFiles,
+    bool skipSourceValidation)
 {
     List<ModuleLocation> modules;
     List<ExportedSourceFile> sourceFiles;
-    SLANG_RETURN_ON_FAIL(
-        _validatePackageTree(projectRoot, rootManifest, modules, sourceFiles, outError));
+    SLANG_RETURN_ON_FAIL(_validatePackageTree(
+        projectRoot,
+        rootManifest,
+        modules,
+        sourceFiles,
+        outError,
+        skipSourceValidation));
 
     List<Manifest> packageManifests;
     packageManifests.setCount(lock.packages.getCount());
@@ -620,8 +653,13 @@ SlangResult validateResolvedProject(
             }
         }
 
-        SLANG_RETURN_ON_FAIL(
-            _validatePackageTree(packageRoots[index], manifest, modules, sourceFiles, outError));
+        SLANG_RETURN_ON_FAIL(_validatePackageTree(
+            packageRoots[index],
+            manifest,
+            modules,
+            sourceFiles,
+            outError,
+            skipSourceValidation));
     }
     SLANG_RETURN_ON_FAIL(requireAllLockPackagesTrusted(lock, reachable, outError));
     if (outPrimaryModules)
@@ -651,7 +689,8 @@ SlangResult validateProject(
     String& outError,
     List<String>* outWarnings,
     List<PrimaryModule>* outPrimaryModules,
-    List<ExportedSourceFile>* outSourceFiles)
+    List<ExportedSourceFile>* outSourceFiles,
+    bool skipSourceValidation)
 {
     Manifest rootManifest;
     SLANG_RETURN_ON_FAIL(
@@ -681,7 +720,8 @@ SlangResult validateProject(
         outError,
         outWarnings,
         outPrimaryModules,
-        outSourceFiles);
+        outSourceFiles,
+        skipSourceValidation);
 }
 
 } // namespace PackageTool

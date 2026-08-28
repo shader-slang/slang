@@ -1844,18 +1844,28 @@ SLANG_UNIT_TEST(PackageCommandsValidateDependencyModuleLayout)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Companion")) >= 0);
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "slang-package-lock.json")));
 
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(companionPath, "implementing noise;\n")));
+    const char* skipUpdateArguments[] = {"slang-package", "update", "--minimal", "--skip-validate"};
     error = String();
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(skipUpdateArguments),
+        skipUpdateArguments,
+        error)));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "slang-package-lock.json")));
 
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(companionPath, "module helper;\n")));
     const char* fetchArguments[] = {"slang-package", "fetch"};
     error = String();
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Companion")) >= 0);
+
+    const char* skipFetchArguments[] = {"slang-package", "fetch", "--skip-validate"};
+    error = String();
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(skipFetchArguments),
+        skipFetchArguments,
+        error)));
 }
 
 SLANG_UNIT_TEST(PackageValidateRejectsFlattenedModuleAlias)

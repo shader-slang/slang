@@ -38,7 +38,8 @@ const char* getLicensePlaceholderText();
 SlangResult validatePackageTree(
     const String& packageRoot,
     const Manifest& manifest,
-    String& outError);
+    String& outError,
+    bool skipSourceValidation = false);
 
 /// Validate a proposed materialized graph without reading its lock from disk.
 ///
@@ -53,17 +54,20 @@ SlangResult validateResolvedProject(
     String& outError,
     List<String>* outWarnings = nullptr,
     List<PrimaryModule>* outPrimaryModules = nullptr,
-    List<ExportedSourceFile>* outSourceFiles = nullptr);
+    List<ExportedSourceFile>* outSourceFiles = nullptr,
+    bool skipSourceValidation = false);
 
 /// Validate the workspace package and its materialized, locked dependency closure. When requested,
 /// return every primary module in the resolved graph in import-path order, and every exported
-/// `.slang` file for bundle source copy.
+/// `.slang` file for bundle source copy. `skipSourceValidation` still walks exports for the build
+/// inventory, but does not enforce licenses, first-declaration placement, or import uniqueness.
 SlangResult validateProject(
     const String& projectRoot,
     String& outError,
     List<String>* outWarnings = nullptr,
     List<PrimaryModule>* outPrimaryModules = nullptr,
-    List<ExportedSourceFile>* outSourceFiles = nullptr);
+    List<ExportedSourceFile>* outSourceFiles = nullptr,
+    bool skipSourceValidation = false);
 
 } // namespace PackageTool
 } // namespace Slang

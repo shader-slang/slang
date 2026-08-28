@@ -139,7 +139,9 @@ Before changing checkouts, update validates the workspace package. After materia
 selection, it validates every reachable package's manifest, licenses, exports, and module layout,
 and checks module import uniqueness across the graph. The new lock and successful resolution
 report are written only after those checks pass. Fetch performs the same pre- and
-post-materialization validation while reproducing the existing lock.
+post-materialization validation while reproducing the existing lock. `--skip-validate` is an
+escape hatch that leaves lock identity checks in place but skips source, license, and
+module-layout validation.
 
 `v1.1.0` of the preview prints full-precision luma weights `(0.2126, 0.7152, 0.0722)` instead of
 the truncated `(0.2130, 0.7150, 0.0720)` from `v1.0.0`.

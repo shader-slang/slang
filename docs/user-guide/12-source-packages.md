@@ -280,6 +280,11 @@ reachable dependency to conform to the closed manifest schema, license and expor
 layout, and graph-wide module import uniqueness. Validation covers the whole reachable graph, not
 only changed lock rows, because an unchanged package can conflict with a newly selected module.
 
+Pass `--skip-validate` on `fetch`, `update`, or `build` only as an escape hatch. It still checks
+the lock against declared dependencies and materialized manifests, but it skips license files,
+first-declaration placement, and import uniqueness. The command prints a warning. Do not use it
+in CI; `slang package validate` has no skip flag.
+
 `slang package status` checks the root manifest against the lock, verifies registered edits and
 overrides, validates the materialized manifests, and checks that tool-owned Git checkouts remain at
 their locked commits without changed files or stashes. It prints the registered local package

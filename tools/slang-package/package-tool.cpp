@@ -35,13 +35,16 @@ static void _printHelp()
         "\n"
         "Commands:\n"
         "  init             Create a package manifest and standard directories.\n"
-        "  fetch [--clean]  Materialize dependencies from the lock file.\n"
-        "  update [--from-local] [--clean] [--dry-run] [--minimal]\n"
+        "  fetch [--clean] [--skip-validate]\n"
+        "                   Materialize dependencies from the lock file.\n"
+        "  update [--from-local] [--clean] [--dry-run] [--minimal] [--skip-validate]\n"
         "                   Re-resolve dependencies and update the lock file.\n"
         "                   --from-local uses registered local package manifests.\n"
         "                   --dry-run reports the selected graph without writing the lock.\n"
         "                   --minimal prints one-line package changes without rationale.\n"
-        "  build            Compile optional bundle modules/source, host executables, and docs.\n"
+        "                   --skip-validate skips source, license, and module-layout checks.\n"
+        "  build [--skip-validate]\n"
+        "                   Compile optional bundle modules/source, host executables, and docs.\n"
         "  run [name] [args...]  Run a host executable produced by the last build.\n"
         "  test             Reserved. Package testing is not implemented yet.\n"
         "  docs             Print the location of generated documentation (build/docs).\n"
@@ -552,7 +555,19 @@ static SlangResult _init(const String& projectRoot, String& outError)
     return SLANG_OK;
 }
 
-static SlangResult _fetch(const String& projectRoot, bool allowClean, String& outError)
+static void _warnSkippedSourceValidation()
+{
+    fprintf(
+        stderr,
+        "slang-package: warning: skipped source, license, and module-layout validation "
+        "(--skip-validate).\n");
+}
+
+static SlangResult _fetch(
+    const String& projectRoot,
+    bool allowClean,
+    bool skipValidate,
+    String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
@@ -571,13 +586,34 @@ static SlangResult _fetch(const String& projectRoot, bool allowClean, String& ou
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
-    SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
+    if (!skipValidate)
+        SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
     SLANG_RETURN_ON_FAIL(
         _materialize(projectRoot, manifest, lock, &lock, localPackages, allowClean, outError));
     List<String> warnings;
-    SLANG_RETURN_ON_FAIL(
-        validateResolvedProject(projectRoot, manifest, lock, localPackages, outError, &warnings));
+    if (skipValidate)
+    {
+        SLANG_RETURN_ON_FAIL(_validateMaterializedManifests(
+            projectRoot,
+            manifest,
+            lock,
+            localPackages,
+            outError,
+            false,
+            &warnings));
+        _warnSkippedSourceValidation();
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(validateResolvedProject(
+            projectRoot,
+            manifest,
+            lock,
+            localPackages,
+            outError,
+            &warnings));
+    }
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, manifest, lock, localPackages, outError));
@@ -591,6 +627,7 @@ static SlangResult _update(
     bool allowClean,
     bool dryRun,
     bool minimal,
+    bool skipValidate,
     String& outError)
 {
     Manifest manifest;
@@ -603,7 +640,8 @@ static SlangResult _update(
         outError = "update --from-local requires a registered local package.";
         return SLANG_FAIL;
     }
-    SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
+    if (!skipValidate)
+        SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
 
     LockFile previousLock;
     LockFile* previousLockPtr = nullptr;
@@ -657,6 +695,8 @@ static SlangResult _update(
     {
         for (const auto& warning : warnings)
             fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+        if (skipValidate)
+            _warnSkippedSourceValidation();
         fprintf(stdout, "%s", reportText.getBuffer());
         fprintf(stdout, "Dry run: lock and dependency checkouts were not modified.\n");
         return SLANG_OK;
@@ -670,12 +710,33 @@ static SlangResult _update(
         localPackages,
         allowClean,
         outError));
-    SLANG_RETURN_ON_FAIL(
-        validateResolvedProject(projectRoot, manifest, lock, localPackages, outError, &warnings));
+    if (skipValidate)
+    {
+        SLANG_RETURN_ON_FAIL(_validateMaterializedManifests(
+            projectRoot,
+            manifest,
+            lock,
+            localPackages,
+            outError,
+            false,
+            &warnings));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(validateResolvedProject(
+            projectRoot,
+            manifest,
+            lock,
+            localPackages,
+            outError,
+            &warnings));
+    }
     SLANG_RETURN_ON_FAIL(writeLockFile(lockPath, lock, outError));
     SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, manifest, lock, localPackages, outError));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+    if (skipValidate)
+        _warnSkippedSourceValidation();
     fprintf(stdout, "%s", reportText.getBuffer());
     if (fromLocal)
     {
@@ -1059,7 +1120,7 @@ static SlangResult _deployExecutableRuntime(
 /// `build/bundle/source` when those workspace.bundle outputs are enabled. When requested by the
 /// workspace `host` section, also compile each listed executable primary to a native artifact at
 /// the build root.
-static SlangResult _build(const String& projectRoot, String& outError)
+static SlangResult _build(const String& projectRoot, bool skipValidate, String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
@@ -1067,10 +1128,17 @@ static SlangResult _build(const String& projectRoot, String& outError)
     List<PrimaryModule> primaryModules;
     List<ExportedSourceFile> sourceFiles;
     List<String> warnings;
-    SLANG_RETURN_ON_FAIL(
-        validateProject(projectRoot, outError, &warnings, &primaryModules, &sourceFiles));
+    SLANG_RETURN_ON_FAIL(validateProject(
+        projectRoot,
+        outError,
+        &warnings,
+        &primaryModules,
+        &sourceFiles,
+        skipValidate));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+    if (skipValidate)
+        _warnSkippedSourceValidation();
 
     List<String> searchPaths;
     SLANG_RETURN_ON_FAIL(
@@ -1494,14 +1562,32 @@ SlangResult executeInDirectory(
     String command = argv[1];
     if (command == "init" && argc == 2)
         return _init(projectRoot, outError);
-    if (command == "fetch" && (argc == 2 || (argc == 3 && String(argv[2]) == "--clean")))
-        return _fetch(projectRoot, argc == 3, outError);
+    if (command == "fetch")
+    {
+        bool allowClean = false;
+        bool skipValidate = false;
+        for (int i = 2; i < argc; ++i)
+        {
+            String flag = argv[i];
+            if (flag == "--clean")
+                allowClean = true;
+            else if (flag == "--skip-validate")
+                skipValidate = true;
+            else
+            {
+                outError = String("Unknown fetch option: ") + flag;
+                return SLANG_FAIL;
+            }
+        }
+        return _fetch(projectRoot, allowClean, skipValidate, outError);
+    }
     if (command == "update")
     {
         bool fromLocal = false;
         bool allowClean = false;
         bool dryRun = false;
         bool minimal = false;
+        bool skipValidate = false;
         for (int i = 2; i < argc; ++i)
         {
             String flag = argv[i];
@@ -1513,6 +1599,8 @@ SlangResult executeInDirectory(
                 dryRun = true;
             else if (flag == "--minimal")
                 minimal = true;
+            else if (flag == "--skip-validate")
+                skipValidate = true;
             else
             {
                 outError = String("Unknown update option: ") + flag;
@@ -1524,12 +1612,26 @@ SlangResult executeInDirectory(
             outError = "update --dry-run cannot be combined with --clean.";
             return SLANG_FAIL;
         }
-        return _update(projectRoot, fromLocal, allowClean, dryRun, minimal, outError);
+        return _update(projectRoot, fromLocal, allowClean, dryRun, minimal, skipValidate, outError);
     }
     if (command == "validate" && argc == 2)
         return _validate(projectRoot, outError);
-    if (command == "build" && argc == 2)
-        return _build(projectRoot, outError);
+    if (command == "build")
+    {
+        bool skipValidate = false;
+        for (int i = 2; i < argc; ++i)
+        {
+            String flag = argv[i];
+            if (flag == "--skip-validate")
+                skipValidate = true;
+            else
+            {
+                outError = String("Unknown build option: ") + flag;
+                return SLANG_FAIL;
+            }
+        }
+        return _build(projectRoot, skipValidate, outError);
+    }
     if (command == "run")
         return _run(projectRoot, argc - 2, argv + 2, outError);
     if (command == "test" && argc == 2)
