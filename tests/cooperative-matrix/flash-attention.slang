@@ -5,7 +5,7 @@
 // Check that key opcodes are generated.
 
 // CHECK-DAG: OpCooperativeMatrixMulAdd
-// CHECK-DAG: OpCooperativeMatrixPerElementOpNV
+// CHECK-DAG: OpCooperativeMatrixPerElementOpEXT
 // CHECK-DAG: OpCooperativeMatrixReduceNV
 // CHECK-DAG: OpCooperativeMatrixLoadTensorNV
 // CHECK-DAG: OpCreateTensorLayoutNV
