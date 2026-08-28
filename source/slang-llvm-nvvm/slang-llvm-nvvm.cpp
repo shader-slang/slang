@@ -1422,6 +1422,11 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         expectedArgumentCount = 2;
         expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
         break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_TRUE:
+        intrinsicID = llvm::Intrinsic::nvvm_vote_all_sync;
+        expectedArgumentCount = 2;
+        expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }
@@ -1728,7 +1733,8 @@ static SlangResult _writeLegacyNVVMAssembly(
         }
         else if (
             intrinsicID == llvm::Intrinsic::nvvm_vote_ballot_sync ||
-            intrinsicID == llvm::Intrinsic::nvvm_vote_any_sync)
+            intrinsicID == llvm::Intrinsic::nvvm_vote_any_sync ||
+            intrinsicID == llvm::Intrinsic::nvvm_vote_all_sync)
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
             llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);

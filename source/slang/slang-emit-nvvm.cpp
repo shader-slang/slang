@@ -211,6 +211,13 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(
             "wave-mask any-true intrinsic",
             NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntBool,
         },
+        {
+            "(__all_sync($0, $1) != 0)",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_TRUE,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_TRUE,
+            "wave-mask all-true intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntBool,
+        },
     };
     if (!genericAsm)
         return nullptr;

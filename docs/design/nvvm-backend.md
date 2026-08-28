@@ -2925,6 +2925,46 @@ names reproduces Slice 58's 383-name hash
 `ddb9139c2d89bafd5be199f9d299f3c85b6ca8cca82146b9466ddbaf7fb84335` exactly. Debug preservation
 passes 10/10.
 
+### Slice 60 public wave-active-all-true and shared vote evidence
+
+Slice 60 adds feature 45 `WAVE_MASK_ALL_TRUE` and intrinsic operation 11 through the generic
+callback. CUDA specializes public `WaveActiveAllTrue(condition)` to
+`WaveMaskAllTrue(WaveGetActiveMask(), condition)`; final linked IR retains one exact
+`Func(Bool, UInt, Bool)` helper ending in `(__all_sync($0, $1) != 0)`. Complete assembly and
+signature matching distinguishes it from any-true without helper names or graph rediscovery. V3
+remains 528/308 bytes, and an exact Slice 59 provider remains valid with feature 45 clear.
+
+Slice 59 already established every type and graph role used here. The provider validates i32 mask
+plus i1 condition before mutation and calls `llvm.nvvm.vote.all.sync(i32, i1) -> i1`. LLVM 7 and
+the provider LLVM use the same synchronized-vote signature and semantic attributes. The legacy
+writer audits ballot, any, and all declarations through one exact rule; no text rewrite, callback,
+or marker is added.
+
+Any/all provider fixtures now share one vote-parameterized function, and their negotiation, real
+assembly, direct fake-graph, and differential PTX tests share setup by canonical graph shape. Each
+registered row still supplies and asserts its own feature, operation, names, source, intrinsic
+declaration, and PTX mnemonic. The refactor therefore removes repeated scaffolding without merging
+the independently negotiated semantics.
+
+The public graph has five functions, four calls, four intrinsic emissions, two Bool helper
+parameters, two Bool call results, two pointer offsets, one signed-i32 comparison, one load, one
+signed-i32 conditional phi, and one store. Its feature union requires lane index, synchronized
+ballot, and masked all-true; clearing any one independently returns E52016 before provider module
+construction.
+
+NVVM and NVRTC agree on a `[64, 64]` entry with one 32-bit global load, two
+`vote.sync.ballot.b32` instructions, one `vote.sync.all.pred`, signed inequality, and one global
+32-bit store. CUDA 12.9 `ptxas` accepts both. The RTX 5090 runtime fixture supplies one to 31 lanes
+and zero to lane seven; all 32 active lanes store zero through both routes.
+
+Seven independently registered evidence names add 150 physical lines across the five measured
+test/support files, from 27,350 to 27,500. The complete Slice 46-60 wave matrix passes 99/99 and
+the Release NVVM prefix passes 397/397. Its exact sorted LF-terminated name set has SHA-256
+`d5daef5d6db4caa82e5dd8039a8b0f5e095d13cdb819a81f7ea69a30ab873b0d`; removing the seven Slice 60
+names reproduces Slice 59's 390-name hash
+`eaa8420ddbba56d34cb047211d872acd6ad2dc0dcdd0209059e307e9879e3186` exactly. Debug preservation
+passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
