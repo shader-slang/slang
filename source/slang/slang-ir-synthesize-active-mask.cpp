@@ -488,6 +488,12 @@ struct SynthesizeActiveMaskForFunctionContext
         // for the function serves as the starting point of the outer-most region.
         //
         transformRegions(funcEntryBlock);
+
+        // Ordinary functions receive the active mask as a new entry-block parameter, and the
+        // module-level phase has already appended the matching argument at every direct call site.
+        // Keep the function value's declared type synchronized with that canonical parameter list
+        // so later consumers see the same signature at the definition and its calls.
+        fixUpFuncType(m_func);
     }
 
     void breakCriticalAndPseudoCriticalEdges()

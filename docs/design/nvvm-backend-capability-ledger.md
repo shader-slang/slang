@@ -909,3 +909,28 @@ Seven evidence names add 433 measured test/support lines, from 24,687 to 25,120.
 Slice 48/49/50 matrix passes 21/21 and Release passes 333/333 with sorted-name SHA-256
 `57f52bd80e15eefb8a35bc51821d99a4b70c858f111535fde1fea3f90b2bb367`; removing the seven
 Slice 50 names reproduces Slice 49's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 51 adds synchronized wave-mask ballot as feature 39/intrinsic operation 5 through the
+unchanged generic callback. Existing CUDA active-mask synthesis turns `WaveGetActiveMask()` into
+canonical `waveMaskBallot(0xffffffff, true)` and threads the result through a helper. The pass had
+appended the helper's mask parameter and every call argument without repairing the function value's
+declared type; calling established `fixUpFuncType()` after each transformation now keeps the
+definition and calls canonical for all downstream consumers. V3 remains 528/308 bytes, and exact
+Slice 50 tables remain loadable without feature 39.
+
+The provider validates `(i32, i1)` and emits
+`llvm.nvvm.vote.ballot.sync(mask, predicate)`. Its exact LLVM 7/14 declaration is
+`i32(i32, i1)` with convergent/inaccessible-memory/nounwind attributes, which the legacy writer
+validates and preserves. Generic constant construction adds only canonical i1 true acceptance;
+the emitter admits UInt literals specifically as wave masks, so the previous general unsigned
+pointer-offset boundary remains unsupported. The fake records each integer constant's bit width
+and enforces exact i32/i1 ballot operands.
+
+NVVM and NVRTC agree on `[64]`, one global 32-bit store, no load, and
+`vote.sync.ballot.b32`; CUDA 12.9 `ptxas` accepts both. One full RTX 5090 warp stores
+`0xffffffff` in every lane through both routes.
+
+Seven evidence names add 392 measured test/support lines, from 25,120 to 25,512. The complete
+Slice 46-51 wave matrix passes 42/42 and Release passes 340/340 with sorted-name SHA-256
+`7abb718be35a0e9ad61202e3c8776c718f22c43a790c22df960140164cf5ce2b`; removing the seven
+Slice 51 names reproduces Slice 50's count and hash exactly. Debug preservation passes 10/10.

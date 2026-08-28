@@ -2611,6 +2611,40 @@ Release NVVM prefix passes 333/333. Its exact sorted LF-terminated name set has 
 `57f52bd80e15eefb8a35bc51821d99a4b70c858f111535fde1fea3f90b2bb367`; removing the seven
 Slice 50 names reproduces Slice 49's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 51 synchronized ballot and active wave mask
+
+Slice 51 adds feature 39 `WAVE_MASK_BALLOT` and intrinsic operation 5 through the unchanged generic
+callback. CUDA target selection initially produces `waveGetActiveMask`, but the existing
+active-mask synthesis pass canonically replaces it with
+`waveMaskBallot(0xffffffff, true)`. Direct preflight accepts that final UInt/Bool operation rather
+than matching `__activemask()` text or bypassing the synthesis pass. V3 remains 528 bytes on x64
+and 308 bytes on x86, and an exact Slice 50 provider remains valid with feature 39 clear.
+
+The first direct compile exposed that active-mask synthesis appended a UInt entry-block parameter
+and matching call argument to ordinary helper functions without updating their declared function
+type. The helper consequently had a zero-parameter `Func(UInt)` value but a one-parameter body and
+call. The producer now calls the established `fixUpFuncType()` after transforming each function,
+so definition, call, and downstream consumers share one canonical signature. The direct emitter's
+strict call validation remains unchanged.
+
+The provider validates exact `(i32, i1)` arguments and emits
+`llvm.nvvm.vote.ballot.sync(mask, predicate)`. LLVM 7 and LLVM 14 define the same
+`i32(i32, i1)` declaration with `convergent inaccessiblememonly nounwind`; the legacy writer
+validates and preserves it. The generic integer-constant callback now accepts the canonical i1
+`true` bit while retaining its signed-width i32 contract. UInt literal materialization remains
+scoped to the operation-defined wave-mask operand, preserving the unsupported general UInt-offset
+boundary. The fake records integer-constant widths and rejects ballot operands other than i32/i1.
+
+LLVM/NVVM text contains one lane-id call and one synchronized ballot call. NVVM and NVRTC agree on
+the `[64]` launch ABI, one global 32-bit store, no load, and `vote.sync.ballot.b32`; CUDA 12.9
+`ptxas` accepts both. One full RTX 5090 warp stores `0xffffffff` in every lane through both routes.
+
+Seven independently registered evidence layers add 392 physical lines across the five measured
+test/support files, from 25,120 to 25,512. The complete Slice 46-51 wave matrix passes 42/42 and the
+Release NVVM prefix passes 340/340. Its exact sorted LF-terminated name set has SHA-256
+`7abb718be35a0e9ad61202e3c8776c718f22c43a790c22df960140164cf5ce2b`; removing the seven
+Slice 51 names reproduces Slice 50's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -2740,7 +2774,8 @@ The program advances through bounded slices:
 48. canonical UInt wave read-lane-at with scalar intrinsic argument transport;
 49. canonical Int wave read-lane-at with signature-aware same-text descriptor selection;
 50. canonical Float wave read-lane-at with native mixed-signature intrinsic transport;
-51. remaining wave operations and other advanced capabilities, then production-readiness
+51. canonical active wave mask through synchronized ballot and repaired synthesized helper types;
+52. remaining wave operations and other advanced capabilities, then production-readiness
     evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
@@ -3363,8 +3398,9 @@ The following remain open until their named slice supplies evidence:
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
-- wave/subgroup operations beyond lane index, lane count, and canonical UInt/Int/Float read-lane-at,
-  including active masks, other scalar types, votes, reductions, and their convergence contracts;
+- wave/subgroup operations beyond lane index, lane count, canonical UInt/Int/Float read-lane-at,
+  and active-mask ballot, including other scalar types, votes, reductions, and their convergence
+  contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 

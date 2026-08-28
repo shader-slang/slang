@@ -1107,7 +1107,9 @@ static SlangResult SLANG_NVVM_CALL _getIntegerConstant(
     llvm::IntegerType* llvmIntegerType =
         llvm::dyn_cast_or_null<llvm::IntegerType>(_getType(integerType));
     if (!state || !llvmIntegerType || &llvmIntegerType->getContext() != &state->context ||
-        !llvm::isIntN(llvmIntegerType->getBitWidth(), value) || !outValue)
+        (!llvm::isIntN(llvmIntegerType->getBitWidth(), value) &&
+         (llvmIntegerType->getBitWidth() != 1 || value != 1)) ||
+        !outValue)
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -1392,6 +1394,11 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
         appendsShuffleClamp = true;
         break;
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT:
+        intrinsicID = llvm::Intrinsic::nvvm_vote_ballot_sync;
+        expectedArgumentCount = 2;
+        expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }
@@ -1598,11 +1605,11 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat_1 format)
 // `fsub -0.0, value`. Finally, LLVM 14 gives NVVM special-register intrinsics function attributes
 // that the LLVM 7 parser does not know. Removing optimization-only attributes retains each
 // intrinsic's semantic name and type. LLVM may share one numbered attribute group between several
-// declarations, so count unique validated semantic attribute sets. LLVM 14's scalar shuffle
-// declarations already use the LLVM-7-compatible convergent/inaccessible-memory/nounwind set, but
-// validate their exact signatures and attributes before serializing the mixed dialect. The provider
-// exposes exactly one shape of each operation; validate every semantic instruction or declaration
-// before changing its spelling.
+// declarations, so count unique validated semantic attribute sets. LLVM 14's scalar shuffle and
+// synchronized-ballot declarations already use the LLVM-7-compatible
+// convergent/inaccessible-memory/nounwind set, but validate their exact signatures and attributes
+// before serializing the mixed dialect. The provider exposes exactly one shape of each operation;
+// validate every semantic instruction or declaration before changing its spelling.
 static SlangResult _writeLegacyNVVMAssembly(
     ModuleState* state,
     llvm::SmallVectorImpl<char>& outSerializedData)
@@ -1664,6 +1671,25 @@ static SlangResult _writeLegacyNVVMAssembly(
                 if (argument.getType() != expectedType)
                     return SLANG_E_NOT_AVAILABLE;
                 ++argumentIndex;
+            }
+        }
+        else if (intrinsicID == llvm::Intrinsic::nvvm_vote_ballot_sync)
+        {
+            const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
+            llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
+            if (!function.isDeclaration() || function.getReturnType() != int32Type ||
+                function.arg_size() != 2 || functionAttributes.getNumAttributes() != 3 ||
+                !function.hasFnAttribute(llvm::Attribute::Convergent) ||
+                !function.hasFnAttribute(llvm::Attribute::InaccessibleMemOnly) ||
+                !function.hasFnAttribute(llvm::Attribute::NoUnwind))
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+            auto argument = function.arg_begin();
+            if (argument->getType() != int32Type ||
+                (++argument)->getType() != llvm::Type::getInt1Ty(state->context))
+            {
+                return SLANG_E_NOT_AVAILABLE;
             }
         }
         for (llvm::BasicBlock& block : function)

@@ -19,6 +19,7 @@ namespace
 static const uint32_t kNVVMScalar32Alignment = 4;
 static const IRIntegerValue kNVVMI32Min = -2147483647 - 1;
 static const IRIntegerValue kNVVMI32Max = 2147483647;
+static const IRIntegerValue kNVVMUInt32Max = 4294967295;
 
 struct ScopedNVVMModule
 {
@@ -65,6 +66,27 @@ IRIntLit* _asExecutableI32Constant(IRInst* value)
 
     const IRIntegerValue intValue = intLit->getValue();
     return intValue >= kNVVMI32Min && intValue <= kNVVMI32Max ? intLit : nullptr;
+}
+
+// Returns an executable signed or unsigned 32-bit literal, excluding module/layout constants.
+IRIntLit* _asExecutableInteger32Constant(IRInst* value)
+{
+    if (auto intLit = _asExecutableI32Constant(value))
+        return intLit;
+
+    auto intLit = as<IRIntLit>(value);
+    if (!intLit || !isNVVMUnsignedI32Type(intLit->getDataType()))
+        return nullptr;
+
+    const IRIntegerValue intValue = intLit->getValue();
+    return intValue >= 0 && intValue <= kNVVMUInt32Max ? intLit : nullptr;
+}
+
+// Returns a canonical executable Boolean literal.
+IRBoolLit* _asExecutableBoolConstant(IRInst* value)
+{
+    auto boolLit = as<IRBoolLit>(value);
+    return boolLit && isNVVMBoolType(boolLit->getDataType()) ? boolLit : nullptr;
 }
 
 // Returns an executable scalar float32 literal, excluding layout and other module constants.
@@ -341,7 +363,7 @@ SlangResult _validateI32Value(
 }
 
 // Checks sign-independent transport of a canonical 32-bit integer value. Unsigned constants are
-// deliberately excluded until their exact literal contract is added; lane index is an SSA value.
+// admitted only by operation-specific contracts such as wave masks.
 SlangResult _validateInteger32Value(
     CodeGenContext* codeGenContext,
     IRInst* value,
@@ -362,6 +384,44 @@ SlangResult _validateInteger32Value(
     }
     if (!value || !isNVVMUnsignedI32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("32-bit integer value"));
+    return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
+}
+
+// Checks a canonical UInt wave mask, including its operation-defined 32-bit literal form.
+SlangResult _validateWaveMaskValue(
+    CodeGenContext* codeGenContext,
+    IRInst* value,
+    IRInst* consumer,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree,
+    NVVMIRFeatureSet& features)
+{
+    if (!value || !isNVVMUnsignedI32Type(value->getDataType()))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("wave mask value"));
+    if (_asExecutableInteger32Constant(value))
+    {
+        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
+        return SLANG_OK;
+    }
+    return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
+}
+
+// Checks transport of a canonical Boolean value or materializes its literal through i1.
+SlangResult _validateBooleanValue(
+    CodeGenContext* codeGenContext,
+    IRInst* value,
+    IRInst* consumer,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree,
+    NVVMIRFeatureSet& features)
+{
+    if (!value || !isNVVMBoolType(value->getDataType()))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("Boolean value"));
+    if (_asExecutableBoolConstant(value))
+    {
+        _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_SSA);
+        return SLANG_OK;
+    }
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
@@ -1002,6 +1062,14 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_WaveMaskBallot:
+                if (inst->getOperandCount() != 2 || !isNVVMUnsignedI32Type(inst->getDataType()))
+                {
+                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("wave-mask ballot"));
+                }
+                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT);
+                break;
+
             case kIROp_GetOffsetPtr:
                 if (inst->getOperandCount() != 2 ||
                     !asNVVMSupportedDeviceScalarPointerType(inst->getDataType()))
@@ -1306,6 +1374,24 @@ SlangResult _validateNVVMFunction(
                 hasHelperReturn = true;
                 break;
 
+            case kIROp_WaveMaskBallot:
+                SLANG_RETURN_ON_FAIL(_validateWaveMaskValue(
+                    codeGenContext,
+                    inst->getOperand(0),
+                    inst,
+                    availableValues,
+                    dominatorTree,
+                    features));
+                SLANG_RETURN_ON_FAIL(_validateBooleanValue(
+                    codeGenContext,
+                    inst->getOperand(1),
+                    inst,
+                    availableValues,
+                    dominatorTree,
+                    features));
+                availableValues.add(inst);
+                break;
+
             case kIROp_GetOffsetPtr:
                 {
                     IRInst* basePointer = inst->getOperand(0);
@@ -1576,16 +1662,31 @@ SlangResult _getLoweredNVVMValue(
         return SLANG_OK;
     }
 
-    if (auto intLit = _asExecutableI32Constant(irValue))
+    if (auto intLit = _asExecutableInteger32Constant(irValue))
     {
         SlangNVVMTypeHandle_1 integerType = nullptr;
+        IRIntegerValue integerValue = intLit->getValue();
+        if (isNVVMUnsignedI32Type(intLit->getDataType()) && integerValue > kNVVMI32Max)
+            integerValue -= IRIntegerValue(1) << 32;
         SLANG_RETURN_ON_FAIL(
             typeContext.lowerType(intLit->getDataType(), NVVMTypeUse::Value, integerType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
-            "signed i32 constant",
-            builder
-                .getIntegerConstant(module, integerType, int64_t(intLit->getValue()), outValue)));
+            "32-bit integer constant",
+            builder.getIntegerConstant(module, integerType, int64_t(integerValue), outValue)));
+        valueMap[irValue] = outValue;
+        return SLANG_OK;
+    }
+
+    if (auto boolLit = _asExecutableBoolConstant(irValue))
+    {
+        SlangNVVMTypeHandle_1 boolType = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            typeContext.lowerType(boolLit->getDataType(), NVVMTypeUse::Value, boolType));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "Boolean constant",
+            builder.getIntegerConstant(module, boolType, boolLit->getValue() ? 1 : 0, outValue)));
         valueMap[irValue] = outValue;
         return SLANG_OK;
     }
@@ -2350,6 +2451,34 @@ SlangResult emitNVVMIRFromLinkedIR(
                             codeGenContext,
                             "generic scalar return",
                             builder.emitValueReturn(moduleScope.module, loweredValue)));
+                    }
+                    break;
+
+                case kIROp_WaveMaskBallot:
+                    {
+                        SlangNVVMValueHandle_1 loweredArguments[2] = {};
+                        for (UInt operandIndex = 0; operandIndex < 2; ++operandIndex)
+                        {
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                inst->getOperand(operandIndex),
+                                valueMap,
+                                typeContext,
+                                loweredArguments[operandIndex]));
+                        }
+                        SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "wave-mask ballot intrinsic",
+                            builder.emitIntrinsic(
+                                moduleScope.module,
+                                SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT,
+                                loweredArguments,
+                                SLANG_COUNT_OF(loweredArguments),
+                                loweredValue)));
+                        valueMap[inst] = loweredValue;
                     }
                     break;
 

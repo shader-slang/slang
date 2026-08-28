@@ -824,6 +824,77 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtFloatUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangWaveActiveMaskUsesDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMWaveActiveMaskSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 2);
+        Index ballotIntrinsicIndex = -1;
+        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+        {
+            if (gFakeNVVMBuilder.intrinsicOperations[i] == SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT)
+            {
+                ballotIntrinsicIndex = i;
+            }
+        }
+        SLANG_CHECK_ABORT(ballotIntrinsicIndex >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[ballotIntrinsicIndex] == 2);
+        const Index ballotArgumentOffset =
+            gFakeNVVMBuilder.intrinsicArgumentOffsets[ballotIntrinsicIndex];
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicArgumentValueRefs[ballotArgumentOffset + 0].kind ==
+            FakeNVVMBuilderValueKind::IntegerConstant);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.intrinsicArgumentValueRefs[ballotArgumentOffset + 1].kind ==
+            FakeNVVMBuilderValueKind::IntegerConstant);
+        SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues.getCount() == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[0] == -1);
+        SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[1] == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.integerConstantBitWidths[0] == 32);
+        SLANG_CHECK(gFakeNVVMBuilder.integerConstantBitWidths[1] == 1);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+        Index activeMaskCallIndex = -1;
+        for (Index i = 0; i < gFakeNVVMBuilder.callArgumentCounts.getCount(); ++i)
+        {
+            if (gFakeNVVMBuilder.callArgumentCounts[i] == 1)
+                activeMaskCallIndex = i;
+        }
+        SLANG_CHECK_ABORT(activeMaskCallIndex >= 0);
+        const Index callArgumentOffset = gFakeNVVMBuilder.callArgumentOffsets[activeMaskCallIndex];
+        SLANG_CHECK(
+            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset].kind ==
+            FakeNVVMBuilderValueKind::Intrinsic);
+        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::Call);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -1228,6 +1299,38 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneAtFloatCapability)
         SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
             globalSession,
             kDirectNVVMWaveReadLaneAtFloatSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveMaskBallotCapability)
+{
+    _resetDirectNVVMFakes();
+    _enableFakeNVVMBuilderV3();
+    gFakeNVVMBuilder.apiV3.features.words[SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT / 64u] &=
+        ~(uint64_t(1) << (SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT % 64u));
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMWaveActiveMaskSource,
             code,
             diagnostics)));
         SLANG_CHECK(code == nullptr);
