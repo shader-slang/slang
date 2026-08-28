@@ -1378,6 +1378,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         intrinsicID = llvm::Intrinsic::nvvm_read_ptx_sreg_warpsize;
         break;
     case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT:
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT:
         intrinsicID = llvm::Intrinsic::nvvm_shfl_sync_idx_i32;
         expectedArgumentCount = 3;
         break;
@@ -1399,7 +1400,8 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         }
         llvmArguments.push_back(argument);
     }
-    if (operation == SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT)
+    if (operation == SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT ||
+        operation == SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT)
     {
         llvmArguments.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(state->context), 31));
     }

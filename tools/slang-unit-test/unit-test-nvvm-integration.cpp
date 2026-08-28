@@ -608,6 +608,7 @@ static void _runNVVMSlangWaveDifferentialPTX(
     const char* unavailableMessage,
     const uint32_t* parameterWidths,
     Index parameterWidthCount,
+    bool expectGlobalLoad,
     TCheckPTX checkPTX)
 {
     ComPtr<slang::IGlobalSession> globalSession;
@@ -645,7 +646,7 @@ static void _runNVVMSlangWaveDifferentialPTX(
             _summarizePTXEntry(ptx.getUnownedSlice(), toSlice("computeMain"), summaries[i])));
         SLANG_CHECK(_hasPTXParameterWidths(summaries[i], parameterWidths, parameterWidthCount));
         SLANG_CHECK(summaries[i].hasGlobalStore32);
-        SLANG_CHECK(!summaries[i].hasGlobalLoad32);
+        SLANG_CHECK(summaries[i].hasGlobalLoad32 == expectGlobalLoad);
     }
     SLANG_CHECK(_haveEqualPTXParameterWidths(summaries[0], summaries[1]));
 }
@@ -662,6 +663,7 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveLaneIndexDifferentialPTX)
         "Ignoring wave-lane-index PTX differential because libNVVM or NVRTC was not found.",
         kParameterWidths,
         SLANG_COUNT_OF(kParameterWidths),
+        false,
         [](SlangEmitCUDAMethod method, const String& ptx)
         {
             if (method == SLANG_EMIT_CUDA_VIA_NVVM)
@@ -690,6 +692,7 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveLaneCountDifferentialPTX)
         "Ignoring wave-lane-count PTX differential because libNVVM or NVRTC was not found.",
         kParameterWidths,
         SLANG_COUNT_OF(kParameterWidths),
+        false,
         [](SlangEmitCUDAMethod method, const String& ptx)
         {
             SLANG_CHECK(ptx.indexOf("%tid.x") >= 0 || ptx.indexOf("%laneid") >= 0);
@@ -715,6 +718,36 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtUIntDifferentialPTX)
         "Ignoring UInt wave-read-lane-at PTX differential because libNVVM or NVRTC was not found.",
         kParameterWidths,
         SLANG_COUNT_OF(kParameterWidths),
+        false,
+        [](SlangEmitCUDAMethod method, const String& ptx)
+        {
+            SLANG_CHECK(ptx.indexOf("shfl.sync.idx.b32") >= 0);
+            if (method == SLANG_EMIT_CUDA_VIA_NVVM)
+            {
+                SLANG_CHECK(ptx.indexOf("%laneid") >= 0);
+            }
+            else
+            {
+                SLANG_CHECK(ptx.indexOf("%tid.x") >= 0);
+            }
+        });
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtIntDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    SLANG_CHECK_ABORT(preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX));
+    SLANG_CHECK_ABORT(
+        preflightBuilder.supportsFeature(SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT));
+
+    static const uint32_t kParameterWidths[] = {64, 64, 32, 32};
+    _runNVVMSlangWaveDifferentialPTX(
+        kDirectNVVMWaveReadLaneAtIntSource,
+        "Ignoring Int wave-read-lane-at PTX differential because libNVVM or NVRTC was not found.",
+        kParameterWidths,
+        SLANG_COUNT_OF(kParameterWidths),
+        true,
         [](SlangEmitCUDAMethod method, const String& ptx)
         {
             SLANG_CHECK(ptx.indexOf("shfl.sync.idx.b32") >= 0);
@@ -1475,6 +1508,14 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtUIntPtxasAccepts)
         unitTestContext,
         kDirectNVVMWaveReadLaneAtUIntSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealWaveReadLaneAtIntPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMWaveReadLaneAtIntSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealFloat32CopyPtxasAccepts)
@@ -2363,6 +2404,19 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC)
         {
             SLANG_RETURN_ON_FAIL(_runWaveReadLaneAtUIntKernel(cuda, code, 0));
             return _runWaveReadLaneAtUIntKernel(cuda, code, 7);
+        });
+}
+
+SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtIntRuntimeMatchesNVRTC)
+{
+    _runNVVMSlangSourceRuntimeMatchesNVRTC(
+        unitTestContext,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT,
+        kDirectNVVMWaveReadLaneAtIntSource,
+        [](CudaDriverApi& cuda, ISlangBlob* code) -> SlangResult
+        {
+            SLANG_RETURN_ON_FAIL(_runWaveReadLaneAtIntKernel(cuda, code, 0));
+            return _runWaveReadLaneAtIntKernel(cuda, code, 7);
         });
 }
 

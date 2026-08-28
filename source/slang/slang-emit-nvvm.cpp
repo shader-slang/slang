@@ -93,6 +93,7 @@ struct NVVMGenericAsmIntrinsicInfo
     {
         UIntNoArguments,
         UIntUIntUIntInt,
+        IntUIntIntInt,
     };
 
     const char* assembly;
@@ -102,8 +103,14 @@ struct NVVMGenericAsmIntrinsicInfo
     Signature signature;
 };
 
+bool _isNVVMGenericAsmIntrinsicHelper(
+    IRFunc* function,
+    const NVVMGenericAsmIntrinsicInfo& intrinsicInfo);
+
 // Maps an exact CUDA-selected GenericAsm terminator to one negotiated provider semantic.
-const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(IRGenericAsm* genericAsm)
+const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(
+    IRGenericAsm* genericAsm,
+    IRFunc* function)
 {
     static const NVVMGenericAsmIntrinsicInfo kInfos[] = {
         {
@@ -127,12 +134,20 @@ const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(IRGenericAsm
             "UInt wave read-lane-at intrinsic",
             NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUIntInt,
         },
+        {
+            "__shfl_sync($0, $1, $2)",
+            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT,
+            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT,
+            "Int wave read-lane-at intrinsic",
+            NVVMGenericAsmIntrinsicInfo::Signature::IntUIntIntInt,
+        },
     };
     if (!genericAsm)
         return nullptr;
     for (const NVVMGenericAsmIntrinsicInfo& info : kInfos)
     {
-        if (genericAsm->getAsm() == UnownedStringSlice(info.assembly))
+        if (genericAsm->getAsm() == UnownedStringSlice(info.assembly) &&
+            _isNVVMGenericAsmIntrinsicHelper(function, info))
             return &info;
     }
     return nullptr;
@@ -143,16 +158,22 @@ bool _isNVVMGenericAsmIntrinsicHelper(
     IRFunc* function,
     const NVVMGenericAsmIntrinsicInfo& intrinsicInfo)
 {
-    if (!function || !isNVVMUnsignedI32Type(function->getResultType()))
+    if (!function)
         return false;
 
     switch (intrinsicInfo.signature)
     {
     case NVVMGenericAsmIntrinsicInfo::Signature::UIntNoArguments:
-        return function->getParamCount() == 0;
+        return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 0;
     case NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUIntInt:
-        return function->getParamCount() == 3 && isNVVMUnsignedI32Type(function->getParamType(0)) &&
+        return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 3 &&
+               isNVVMUnsignedI32Type(function->getParamType(0)) &&
                isNVVMUnsignedI32Type(function->getParamType(1)) &&
+               isNVVMSignedI32Type(function->getParamType(2));
+    case NVVMGenericAsmIntrinsicInfo::Signature::IntUIntIntInt:
+        return function->getParamCount() == 3 && isNVVMSignedI32Type(function->getResultType()) &&
+               isNVVMUnsignedI32Type(function->getParamType(0)) &&
+               isNVVMSignedI32Type(function->getParamType(1)) &&
                isNVVMSignedI32Type(function->getParamType(2));
     }
     SLANG_UNEXPECTED("unknown NVVM GenericAsm intrinsic signature");
@@ -958,11 +979,10 @@ SlangResult _validateNVVMFunction(
                 {
                     auto genericAsm = as<IRGenericAsm>(inst);
                     const NVVMGenericAsmIntrinsicInfo* intrinsicInfo =
-                        _findNVVMGenericAsmIntrinsicInfo(genericAsm);
+                        _findNVVMGenericAsmIntrinsicInfo(genericAsm, function);
                     if (isEntryPoint || genericAsm != terminator ||
                         functionBlocks.getCount() != 1 || genericAsm->getOperandCount() != 1 ||
-                        !intrinsicInfo ||
-                        !_isNVVMGenericAsmIntrinsicHelper(function, *intrinsicInfo))
+                        !intrinsicInfo)
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                     }
@@ -2286,7 +2306,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_GenericAsm:
                     {
                         const NVVMGenericAsmIntrinsicInfo* intrinsicInfo =
-                            _findNVVMGenericAsmIntrinsicInfo(as<IRGenericAsm>(inst));
+                            _findNVVMGenericAsmIntrinsicInfo(as<IRGenericAsm>(inst), function);
                         SLANG_RELEASE_ASSERT(intrinsicInfo);
                         List<SlangNVVMValueHandle_1> loweredArguments;
                         for (auto parameter : function->getParams())

@@ -867,3 +867,23 @@ Seven evidence names add 479 measured test/support lines, from 23,732 to 24,211.
 Slice 47/48 matrix passes 14/14 and Release passes 319/319 with sorted-name SHA-256
 `6c97ed4746f5a67237d642f180e69984ec4bdc0f5ae23e5eecb540bd7d51d83c`; removing the seven
 Slice 48 names reproduces Slice 47's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 49 adds canonical Int `WaveMaskReadLaneAt` as feature 37/intrinsic operation 3. Its exact
+`Func(Int, UInt, Int, Int)` helper has the same
+`GenericAsm("__shfl_sync($0, $1, $2)")` text as the Slice 48 UInt helper, so descriptor lookup now
+matches both exact text and the complete canonical function signature. It examines every
+same-text row until one signature matches; declaration order cannot choose the semantic.
+
+The facade keeps signed and unsigned support independently negotiable, while the provider maps
+both operations to the same signless `llvm.nvvm.shfl.sync.idx.i32(mask, value, lane, 31)` after
+validation. V3 remains 528 bytes on x64 and 308 bytes on x86, and exact Slice 48 tables remain
+loadable without feature 37. The signed kernel contains two pointer offsets, one source load, the
+lane-id and shuffle calls, and one destination store. NVVM and NVRTC agree on
+`[64, 64, 32, 32]`, one global 32-bit load and store, and `shfl.sync.idx.b32`; `ptxas` accepts
+both. One 32-thread RTX 5090 warp selects source lanes 0 and 7 from a varying signed buffer through
+both routes.
+
+Seven evidence names add 476 measured test/support lines, from 24,211 to 24,687. The focused
+Slice 48/49 matrix passes 14/14 and Release passes 326/326 with sorted-name SHA-256
+`64c930268a8edb87cf2cfba3d12991e4ac66c2a4c9336399d1f03e54f5eda8f0`; removing the seven
+Slice 49 names reproduces Slice 48's count and hash exactly. Debug preservation passes 10/10.
