@@ -6329,8 +6329,39 @@ void computeMain(
     destination[5] = __sizeOf<vector<double, 4> >();
 }
 )";
-static const char kDirectNVVMUnsupportedCUDAAggregateLayoutSource[] = R"(
-struct LayoutAggregate
+static const char kDirectNVVMCUDAAggregateLayoutSource[] = R"(
+struct PadLadenStruct
+{
+    double a;
+    uint8_t b;
+};
+
+struct StructWithArray : IDefaultInitializable
+{
+    PadLadenStruct a[1];
+    uint8_t b;
+    matrix<half, 3, 3> c;
+    uint8_t d;
+};
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
+{
+    StructWithArray value;
+    destination[0] = __sizeOf(value);
+    destination[1] = __offsetOf(value, value.a);
+    destination[2] = __offsetOf(value, value.b);
+    destination[3] = __offsetOf(value, value.c);
+    destination[4] = __offsetOf(value, value.d);
+    destination[5] = __sizeOf<int>();
+    destination[6] = __alignOf<StructWithArray>();
+    destination[7] = __alignOf(value);
+    destination[8] = __sizeOf<StructWithArray>();
+}
+)";
+static const char kDirectNVVMNonCanonicalCUDAOffsetSource[] = R"(
+struct OffsetStruct : IDefaultInitializable
 {
     int value;
 };
@@ -6339,7 +6370,11 @@ struct LayoutAggregate
 void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
 {
-    destination[0] = __alignOf<LayoutAggregate>();
+    OffsetStruct left;
+    OffsetStruct right;
+    left.value = 1;
+    right.value = 2;
+    destination[0] = __offsetOf(left, right.value);
 }
 )";
 static const char kDirectNVVMCUDAExecutionRuntimeSource[] = R"(

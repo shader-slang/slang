@@ -7,10 +7,12 @@
 #include "slang-code-gen.h"
 #include "slang-diagnostics.h"
 #include "slang-emit-nvvm-type-lowering.h"
+#include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -335,47 +337,141 @@ const NVVMSemantics::CatalogEntry* _findNVVMGenericAsmSemantic(
     return nullptr;
 }
 
-struct NVVMCUDATypeLayoutQuery
+enum class NVVMCUDALayoutQueryKind
 {
-    IRIntegerValue value = 0;
+    None,
+    Size,
+    Alignment,
+    Offset,
 };
 
-// Folds the exact type-only GenericAsm shape emitted by CUDA's `__sizeOf` and `__alignOf`
-// specializations. The queried type is compile-time metadata, so runtime NVVM type support does
-// not constrain this deliberately bounded scalar/vector family.
-bool _getNVVMCUDATypeLayoutQuery(
-    CodeGenContext* codeGenContext,
-    IRGenericAsm* genericAsm,
-    IRFunc* function,
-    NVVMCUDATypeLayoutQuery& outQuery)
+struct NVVMCUDALayoutQuery
+{
+    NVVMCUDALayoutQueryKind kind = NVVMCUDALayoutQueryKind::None;
+    IRType* explicitType = nullptr;
+};
+
+// Recognizes one exact CUDA-prelude layout-query helper. These helpers describe compile-time
+// metadata; their aggregate parameters are not part of the direct backend's runtime value ABI.
+bool _getNVVMCUDALayoutQuery(IRFunc* function, NVVMCUDALayoutQuery& outQuery)
 {
     outQuery = {};
-    if (!genericAsm || !function || function->getParamCount() != 0 ||
-        !isNVVMSignedI32Type(function->getResultType()) || genericAsm->getOperandCount() != 2 ||
-        !as<IRStringLit>(genericAsm->getOperand(0)))
-    {
+    if (!function || !isNVVMSignedI32Type(function->getResultType()))
         return false;
-    }
 
-    auto queriedType = as<IRType>(genericAsm->getOperand(1));
-    if (!queriedType)
+    IRBlock* block = function->getFirstBlock();
+    if (!block || block->getNextBlock())
         return false;
+    auto genericAsm = as<IRGenericAsm>(block->getTerminator());
+    if (!genericAsm || genericAsm->getOperandCount() == 0 ||
+        !as<IRStringLit>(genericAsm->getOperand(0)))
+        return false;
+    for (auto inst : block->getOrdinaryInsts())
+    {
+        if (inst != genericAsm)
+            return false;
+    }
 
     const UnownedStringSlice assembly = genericAsm->getAsm();
-    const bool requestsAlignment = assembly == toSlice("alignof($[0])");
-    const bool requestsSize = assembly == toSlice("sizeof($[0])");
-    if (!requestsAlignment && !requestsSize)
-        return false;
-
-    IRType* scalarType = queriedType;
-    if (auto vectorType = as<IRVectorType>(queriedType))
+    if (assembly == toSlice("sizeof($[0])") || assembly == toSlice("alignof($[0])"))
     {
-        auto elementCount = as<IRIntLit>(vectorType->getElementCount());
-        if (!elementCount || elementCount->getValue() < 2 || elementCount->getValue() > 4)
+        if (function->getParamCount() != 0 || genericAsm->getOperandCount() != 2)
             return false;
-        scalarType = vectorType->getElementType();
+        auto explicitType = as<IRType>(genericAsm->getOperand(1));
+        if (!explicitType)
+            return false;
+        outQuery.kind = assembly == toSlice("sizeof($[0])") ? NVVMCUDALayoutQueryKind::Size
+                                                            : NVVMCUDALayoutQueryKind::Alignment;
+        outQuery.explicitType = explicitType;
+        return true;
     }
-    if (!isNVVMSupportedIntegerScalarType(scalarType) && !isFloatingType(scalarType))
+    if (assembly == toSlice("sizeof($T0)") || assembly == toSlice("alignof($T0)"))
+    {
+        if (function->getParamCount() != 1 || genericAsm->getOperandCount() != 1)
+            return false;
+        outQuery.kind = assembly == toSlice("sizeof($T0)") ? NVVMCUDALayoutQueryKind::Size
+                                                           : NVVMCUDALayoutQueryKind::Alignment;
+        return true;
+    }
+    if (assembly == toSlice("int(((char*)&($1)) - ((char*)&($0)))"))
+    {
+        if (function->getParamCount() != 2 || genericAsm->getOperandCount() != 1)
+            return false;
+        outQuery.kind = NVVMCUDALayoutQueryKind::Offset;
+        return true;
+    }
+    return false;
+}
+
+// Resolves one canonical query call through the shared CUDA layout rules. In particular, an
+// offset is owned by the exact struct-field key already present in IR, never by positional or
+// structural matching in the emitter.
+bool _getNVVMCUDALayoutQueryValue(
+    CodeGenContext* codeGenContext,
+    IRCall* call,
+    IRFunc* function,
+    const NVVMCUDALayoutQuery& query,
+    IRIntegerValue& outValue)
+{
+    outValue = 0;
+    if (!call || !function || !isNVVMSignedI32Type(call->getDataType()) ||
+        call->getArgCount() != function->getParamCount())
+    {
+        return false;
+    }
+
+    for (UInt argumentIndex = 0; argumentIndex < call->getArgCount(); ++argumentIndex)
+    {
+        IRInst* argument = call->getArg(argumentIndex);
+        if (!argument ||
+            !isTypeEqual(argument->getDataType(), function->getParamType(argumentIndex)))
+        {
+            return false;
+        }
+    }
+
+    if (query.kind == NVVMCUDALayoutQueryKind::Offset)
+    {
+        auto aggregateType =
+            call->getArgCount() == 2 ? as<IRStructType>(call->getArg(0)->getDataType()) : nullptr;
+        auto fieldExtract =
+            call->getArgCount() == 2 ? as<IRFieldExtract>(call->getArg(1)) : nullptr;
+        if (!aggregateType || !fieldExtract || fieldExtract->getBase() != call->getArg(0))
+            return false;
+
+        IRStructField* selectedField = nullptr;
+        for (auto field : aggregateType->getFields())
+        {
+            if (field->getKey() == fieldExtract->getField())
+            {
+                selectedField = field;
+                break;
+            }
+        }
+        if (!selectedField ||
+            !isTypeEqual(selectedField->getFieldType(), fieldExtract->getDataType()))
+        {
+            return false;
+        }
+
+        IRIntegerValue offset = 0;
+        if (SLANG_FAILED(getOffset(
+                codeGenContext->getTargetReq(),
+                IRTypeLayoutRules::getCUDA(),
+                selectedField,
+                &offset)) ||
+            offset < 0 || offset > kNVVMI32Max)
+        {
+            return false;
+        }
+        outValue = offset;
+        return true;
+    }
+
+    IRType* queriedType = query.explicitType;
+    if (!queriedType && call->getArgCount() == 1)
+        queriedType = function->getParamType(0);
+    if (!queriedType)
         return false;
 
     IRSizeAndAlignment layout;
@@ -388,11 +484,12 @@ bool _getNVVMCUDATypeLayoutQuery(
         return false;
     }
 
-    const IRIntegerValue value = requestsAlignment ? layout.alignment : layout.size;
+    const IRIntegerValue value =
+        query.kind == NVVMCUDALayoutQueryKind::Alignment ? layout.alignment : layout.size;
     if (value <= 0 || value > kNVVMI32Max)
         return false;
 
-    outQuery.value = value;
+    outValue = value;
     return true;
 }
 
@@ -1256,20 +1353,12 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                     }
-                    NVVMCUDATypeLayoutQuery layoutQuery;
-                    const bool isLayoutQuery = _getNVVMCUDATypeLayoutQuery(
-                        codeGenContext,
-                        genericAsm,
-                        function,
-                        layoutQuery);
                     const NVVMSemantics::CatalogEntry* semantic =
                         _findNVVMGenericAsmSemantic(genericAsm, function);
-                    if (!isLayoutQuery && (genericAsm->getOperandCount() != 1 || !semantic))
+                    if (genericAsm->getOperandCount() != 1 || !semantic)
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                     }
-                    if (isLayoutQuery)
-                        break;
                     const SlangNVVMValueOperationDesc operation =
                         NVVMSemantics::getOperationDesc(*semantic);
                     _requireValueOperation(requirements, operation, semantic->diagnosticName);
@@ -1902,6 +1991,59 @@ SlangResult _getLoweredNVVMValue(
 
 } // namespace
 
+SlangResult foldNVVMCompileTimeLayoutQueries(CodeGenContext* codeGenContext, LinkedIR& linkedIR)
+{
+    if (!linkedIR.module)
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("CUDA layout query module"));
+
+    struct Fold
+    {
+        IRCall* call = nullptr;
+        IRIntegerValue value = 0;
+    };
+    List<Fold> folds;
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        auto function = as<IRFunc>(globalInst);
+        if (!function)
+            continue;
+        for (auto block : function->getBlocks())
+        {
+            for (auto inst : block->getOrdinaryInsts())
+            {
+                auto call = as<IRCall>(inst);
+                auto callee = call ? as<IRFunc>(call->getCallee()) : nullptr;
+                NVVMCUDALayoutQuery query;
+                if (!callee || !_getNVVMCUDALayoutQuery(callee, query))
+                    continue;
+
+                IRIntegerValue value = 0;
+                if (!_getNVVMCUDALayoutQueryValue(codeGenContext, call, callee, query, value))
+                {
+                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("CUDA layout query"));
+                }
+                folds.add({call, value});
+            }
+        }
+    }
+
+    if (!folds.getCount())
+        return SLANG_OK;
+
+    IRBuilder builder(linkedIR.module);
+    for (const Fold& fold : folds)
+    {
+        IRInst* constant = builder.getIntValue(fold.call->getDataType(), fold.value);
+        fold.call->replaceUsesWith(constant);
+        fold.call->removeAndDeallocate();
+    }
+
+    IRDeadCodeEliminationOptions options;
+    options.keepLayoutsAlive = true;
+    eliminateDeadCode(linkedIR.module, options);
+    return SLANG_OK;
+}
+
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
@@ -2480,34 +2622,6 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_GenericAsm:
                     {
-                        NVVMCUDATypeLayoutQuery layoutQuery;
-                        if (_getNVVMCUDATypeLayoutQuery(
-                                codeGenContext,
-                                as<IRGenericAsm>(inst),
-                                function,
-                                layoutQuery))
-                        {
-                            SlangNVVMTypeHandle loweredResultType = nullptr;
-                            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-                                function->getResultType(),
-                                NVVMTypeUse::HelperResult,
-                                loweredResultType));
-                            SlangNVVMValueHandle loweredValue = nullptr;
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                "CUDA type-layout constant",
-                                builder.getIntegerConstant(
-                                    moduleScope.module,
-                                    loweredResultType,
-                                    int64_t(layoutQuery.value),
-                                    loweredValue)));
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                "CUDA type-layout return",
-                                builder.emitValueReturn(moduleScope.module, loweredValue)));
-                            break;
-                        }
-
                         const NVVMSemantics::CatalogEntry* semantic =
                             _findNVVMGenericAsmSemantic(as<IRGenericAsm>(inst), function);
                         SLANG_RELEASE_ASSERT(semantic);

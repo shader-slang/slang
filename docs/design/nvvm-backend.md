@@ -4334,9 +4334,10 @@ zero-parameter kernel, the 16-byte `SLANG_globalParams` symbol, and 28 integer g
 12.9 `ptxas` accepts it for `sm_70`. The complete Release NVVM prefix passes 336/336 without a
 builder ABI revision.
 
-Aggregate, array, matrix, pointer, resource, and offset queries remain outside this slice. The
-remaining measured conventional-shader boundary is the multi-field global-parameter graph in
-`sampler-comparison-state-unused.slang`.
+At the Slice 74 boundary, aggregate, array, matrix, pointer, resource, and offset queries remained
+outside the direct subset. Slice 76 supersedes the helper-call implementation with call-site
+folding and admits every size/alignment shape for which the shared CUDA IR layout is determinate,
+plus canonical struct-field offsets.
 
 ### Slice 75: Multi-field conventional CUDA parameter storage
 
@@ -4366,6 +4367,34 @@ on the GPU and produces `11, 21, 31, 41`. CUDA 12.9 `ptxas` accepts the sampler 
 Release host and standalone provider builds pass; and the complete NVVM prefix passes 337/337.
 A fixed sampler array remains an exact E52017 boundary before provider discovery.
 
+### Slice 76: Pre-runtime CUDA layout-query folding
+
+CUDA layout queries are now removed before the direct runtime subset is validated. The preparation
+pass recognizes the exact prelude helper definitions for type- and value-form `__sizeOf` and
+`__alignOf`, plus the exact CUDA `__offsetOf` pointer-difference spelling. It resolves each call
+through `IRTypeLayoutRules::getCUDA()`, replaces the call with a signed-i32 constant, and invokes
+ordinary IR dead-code elimination.
+
+This is a compile-time/runtime boundary rather than aggregate provider support. For example,
+`cuda-array-layout.slang` initially links a `StructWithArray` constructor, aggregate-returning
+calls, four field extracts, and five aggregate-parameter query helpers. After folding, the direct
+emitter sees only six integer stores. No queried aggregate type, constructor, field value, query
+helper, or `GenericAsm` text crosses the builder interface. The earlier Slice 74 zero-argument
+helpers use the same path, so the provider no longer declares or calls runtime functions merely to
+return layout constants.
+
+An offset is accepted only when its second argument is a direct `IRFieldExtract` of its first
+argument and the key names a field in that exact struct. The shared CUDA layout rule owns the byte
+offset. A query using one aggregate as the base and a field from another aggregate stops with
+E52017 before builder discovery; the emitter does not search for structurally equivalent values or
+reconstruct a field path.
+
+`tests/cuda/cuda-array-layout.slang` now passes CUDA/NVRTC and direct libNVVM on the GPU with
+`48, 0, 16, 20, 44, 4, 0, 0`. Its direct PTX contains a 16-byte conventional parameter block,
+literal stores for the six measured values, and no helper functions. CUDA 12.9 `ptxas` accepts it
+for `sm_70`. The Release host and isolated provider builds pass, and the complete NVVM prefix
+passes 338/338. Builder ABI revision 3 is unchanged.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4380,9 +4409,10 @@ The following remain open until their named slice supplies evidence:
 - external/indirect calls, richer helper ABI, integer shifts/division/remainder, saturating or
   overflow-decorated arithmetic, float64/low-precision scalar families, and general vector or
   matrix operations beyond the bounded signed-i32x2 add proof;
-- pointer and aggregate addressing beyond signed-i32 scalar offsets on selected numeric device
-  pointers and the exact fixed-i32 device-array subset, including other `IRGetElementPtr` shapes,
-  array values, structs, general globals, additional shared-memory shapes, and address spaces;
+- pointer and runtime aggregate addressing beyond signed-i32 scalar offsets on selected numeric
+  device pointers and the exact fixed-i32 device-array subset, including other `IRGetElementPtr`
+  shapes, array values, structs, general globals, additional shared-memory shapes, and address
+  spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;

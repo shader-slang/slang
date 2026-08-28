@@ -26,6 +26,9 @@ struct NVVMValueOperationRequirement
 
 using NVVMValueOperationRequirements = List<NVVMValueOperationRequirement>;
 
+/// Replaces exact CUDA layout-query calls with constants and removes their compile-time-only IR.
+SlangResult foldNVVMCompileTimeLayoutQueries(CodeGenContext* codeGenContext, LinkedIR& linkedIR);
+
 /// Checks whether linked Slang IR is in the exact direct-NVVM subset.
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,

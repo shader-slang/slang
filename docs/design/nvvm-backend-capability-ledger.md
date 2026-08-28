@@ -1360,3 +1360,21 @@ resource at byte offset 8. A two-resource CUDA/NVVM GPU comparison passes 2/2 wi
 `11, 21, 31, 41`, while a fixed sampler array remains E52017 before provider discovery. CUDA 12.9
 `ptxas` accepts the sampler PTX for `sm_70`; Release host and standalone provider builds pass; and
 the complete NVVM prefix passes 337/337.
+
+Slice 76 moves CUDA layout queries out of the runtime helper ABI. One pre-validation pass recognizes
+the exact type/value `__sizeOf` and `__alignOf` helpers and the exact `__offsetOf` helper, computes
+their results with the shared CUDA IR layout rules, replaces every call with signed-i32 constants,
+and runs ordinary DCE. The Slice 74 scalar/vector family now uses this same path instead of
+declaring zero-argument provider functions.
+
+Layout-determinate nested structs, arrays, matrices, selected scalars/vectors, and pointers can be
+queried without admitting those types as runtime direct-NVVM values. Struct offsets additionally
+require `field_extract(base, key)` where `base` is the query's exact first argument and `key` names
+an exact field; a mixed-base control remains E52017 before provider discovery. The fake provider
+sees one entry function, no query calls or value returns, and only integer-constant stores for the
+representative aggregate graph.
+
+The existing `cuda-array-layout.slang` comparison passes both CUDA/NVRTC and direct libNVVM with
+`48, 0, 16, 20, 44, 4, 0, 0`. Direct PTX contains six literal global stores and no helper
+definitions, and CUDA 12.9 `ptxas` accepts it for `sm_70`. Builder ABI revision 3 is unchanged.
+The Release host and isolated provider builds pass, and the complete NVVM prefix passes 338/338.
