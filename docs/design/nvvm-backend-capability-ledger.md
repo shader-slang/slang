@@ -1020,3 +1020,23 @@ Seven names add 347 measured lines, from 25,957 to 26,304. The complete Slice 46
 passes 64/64 and Release passes 362/362 with sorted-name SHA-256
 `652de9ad6905f2e885264851e4245cdc88e9119414a920111ee081b557ff786f`; removing the seven Slice 55
 names reproduces Slice 54's count and hash exactly. Debug preservation passes 10/10.
+
+Slice 56 adds public Int `WaveReadLaneFirst()` as feature 41/intrinsic operation 7. The exact
+signed helper has `Func(Int, UInt, Int)` shape and shares `_waveReadFirst($0, $1)` with UInt, so
+complete signature matching preserves the source semantic before both payloads become signless
+i32. V3 remains 528/308 bytes, and exact Slice 55 providers remain loadable with feature 41 clear.
+
+The provider validates the same two i32 operands before mutation and shares Slice 55's
+`llvm.cttz.i32(mask, true)` plus `llvm.nvvm.shfl.sync.idx.i32` implementation. It adds no LLVM
+declaration, compatibility rewrite, callback, or table field. The signed public entry instead adds
+one ordinary source-pointer load to the established ballot/public-helper/active-mask/helper graph.
+
+NVVM and NVRTC agree on `[64, 64]`, one global 32-bit load/store pair, and exactly one ballot plus
+one shuffle in the entry. NVVM uses `popc`; NVRTC uses `brev` plus `bfind.shiftamt`. CUDA 12.9
+`ptxas` accepts both, and one full RTX 5090 warp reads lane zero's value `-40` bit-exactly through
+both routes.
+
+Seven names add 178 measured lines, from 26,304 to 26,482. The complete Slice 46-56 wave matrix
+passes 71/71 and Release passes 369/369 with sorted-name SHA-256
+`b8e9cc1b10ae6094dd3771696bc8ffa9f8c9a4fde60837c7b259c904097a8366`; removing the seven Slice 56
+names reproduces Slice 55's count and hash exactly. Debug preservation passes 10/10.

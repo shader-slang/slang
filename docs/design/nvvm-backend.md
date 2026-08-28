@@ -2769,6 +2769,44 @@ the Release NVVM prefix passes 362/362. Its exact sorted LF-terminated name set 
 `652de9ad6905f2e885264851e4245cdc88e9119414a920111ee081b557ff786f`; removing the seven Slice 55
 names reproduces Slice 54's count and hash exactly. Debug preservation passes 10/10.
 
+### Slice 56 public Int wave-read-lane-first
+
+Slice 56 adds feature 41 `WAVE_READ_LANE_FIRST_INT` and intrinsic operation 7 through the unchanged
+generic callback. CUDA specializes the same public composition to Int, producing an exact final
+`Func(Int, UInt, Int)` masked helper whose terminator is `_waveReadFirst($0, $1)`. Direct preflight
+distinguishes it from the UInt row by complete result/parameter signature, then requires the new
+feature before module creation. This keeps the independently shipped Slang semantics explicit even
+though LLVM represents both payloads as signless i32. V3 remains 528/308 bytes, and an exact Slice
+55 provider remains valid with feature 41 clear.
+
+Operation 7 shares the provider case established by Slice 55. Ownership, insertion point, arity,
+type, and availability validation all complete before mutation; the provider then derives the lane
+with `llvm.cttz.i32(mask, true)` and emits the indexed i32 shuffle with clamp 31. No new LLVM
+declaration or legacy text marker exists: the already-audited exact `cttz` declaration validation,
+attribute normalization, and `immarg` removal remain the single LLVM 14-to-7 bridge.
+
+The public signed entry uses an AS1 source pointer and one ordinary i32 load before calling the
+public helper. Its canonical graph otherwise matches UInt: five functions, three intrinsic
+emissions, four calls, one ballot, the active-mask identity, the typed masked helper, and one final
+store. Clearing lane-index feature 34, ballot feature 39, or signed read-first feature 41
+independently returns E52016 before provider module construction.
+
+The second row extracts shared fake-provider negotiation/build checks and a shared differential-PTX
+runner while retaining independently registered UInt and Int wrappers. Existing public topology,
+capability, and scalar runtime runners already expose the signed row's measured dimensions: loaded
+value origin, two pointer offsets, one load, `[64, 64]` ABI, and lane-zero expected bits.
+
+NVVM and NVRTC agree on one global 32-bit load/store pair and exactly one ballot plus one shuffle in
+the entry. NVVM uses a `popc.b32` sequence for count-trailing-zeros; NVRTC uses `brev.b32` plus
+`bfind.shiftamt.u32`. CUDA 12.9 `ptxas` accepts both, and every lane in one RTX 5090 warp stores the
+bit-exact signed lane-zero source value `-40` through both routes.
+
+Seven independently registered evidence names add 178 physical lines across the five measured
+test/support files, from 26,304 to 26,482. The complete Slice 46-56 wave matrix passes 71/71 and
+the Release NVVM prefix passes 369/369. Its exact sorted LF-terminated name set has SHA-256
+`b8e9cc1b10ae6094dd3771696bc8ffa9f8c9a4fde60837c7b259c904097a8366`; removing the seven Slice 56
+names reproduces Slice 55's count and hash exactly. Debug preservation passes 10/10.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific
@@ -3526,8 +3564,8 @@ The following remain open until their named slice supplies evidence:
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
-  read-lane-at, public unmasked UInt/Int/Float read-lane-at, active-mask ballot, and public UInt
-  read-lane-first, including other scalar types, votes, reductions, and their convergence
+  read-lane-at, public unmasked UInt/Int/Float read-lane-at, active-mask ballot, and public
+  UInt/Int read-lane-first, including other scalar types, votes, reductions, and their convergence
   contracts;
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.

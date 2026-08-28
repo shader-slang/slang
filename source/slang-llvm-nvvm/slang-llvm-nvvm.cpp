@@ -1401,6 +1401,7 @@ static SlangResult SLANG_NVVM_CALL _emitIntrinsicV3(
         expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
         break;
     case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT:
+    case SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_INT:
         intrinsicID = llvm::Intrinsic::nvvm_shfl_sync_idx_i32;
         expectedArgumentCount = 2;
         derivesFirstActiveLane = true;

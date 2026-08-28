@@ -1061,6 +1061,17 @@ SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstUIntUsesDirectPipeline)
         0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstIntUsesDirectPipeline)
+{
+    _checkPublicWaveReadDirectPipeline(
+        kDirectNVVMWaveReadLaneFirstIntSource,
+        SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_INT,
+        2,
+        FakeNVVMBuilderValueKind::Load,
+        2,
+        1);
+}
+
 SLANG_UNIT_TEST(nvvmSlangFloat32CopyUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -1512,7 +1523,7 @@ SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveMaskBallotCapability)
 }
 
 // Proves that every constituent operation is required before provider module construction.
-static void _checkUnmaskedWaveReadLaneAtCapabilities(
+static void _checkPublicWaveReadCapabilities(
     const char* source,
     SlangNVVMBuilderFeature_3 shuffleFeature)
 {
@@ -1553,30 +1564,37 @@ static void _checkUnmaskedWaveReadLaneAtCapabilities(
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesUnmaskedWaveReadLaneAtUIntCapabilities)
 {
-    _checkUnmaskedWaveReadLaneAtCapabilities(
+    _checkPublicWaveReadCapabilities(
         kDirectNVVMUnmaskedWaveReadLaneAtUIntSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesUnmaskedWaveReadLaneAtIntCapabilities)
 {
-    _checkUnmaskedWaveReadLaneAtCapabilities(
+    _checkPublicWaveReadCapabilities(
         kDirectNVVMUnmaskedWaveReadLaneAtIntSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesUnmaskedWaveReadLaneAtFloatCapabilities)
 {
-    _checkUnmaskedWaveReadLaneAtCapabilities(
+    _checkPublicWaveReadCapabilities(
         kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneFirstUIntCapabilities)
 {
-    _checkUnmaskedWaveReadLaneAtCapabilities(
+    _checkPublicWaveReadCapabilities(
         kDirectNVVMWaveReadLaneFirstUIntSource,
         SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNegotiatesWaveReadLaneFirstIntCapabilities)
+{
+    _checkPublicWaveReadCapabilities(
+        kDirectNVVMWaveReadLaneFirstIntSource,
+        SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_INT);
 }
 
 SLANG_UNIT_TEST(nvvmSlangNegotiatesFloat32CopyCapability)
