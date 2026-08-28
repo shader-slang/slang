@@ -3117,9 +3117,16 @@ representative workload. The next bounded slices are:
 66. add the complete ordinary CUDA execution-index/dimension bundle, and synchronization if its
     independent representation audit passes, with a multi-block runtime workload;
 67. add canonical static shared storage and the aggregate addressing needed by a synchronized
-    block-level workload; and
-68. broaden numeric types, conversions, and fixed vectors through the generic V4 descriptors, with
-    the exact bundle selected by a prevalence and policy audit.
+    block-level workload;
+68. broaden numeric types, conversions, and fixed vectors through generic typed descriptors, with
+    the exact bundle selected by a prevalence and policy audit;
+69. collapse the experimental builder onto one exact forward-only ABI;
+70. replace historical feature bits with exact typed-operation preflight; and
+71. establish file-backed direct-NVVM shader tests and measure the conventional-suite boundary.
+
+Slice 72 is selected by that corpus evidence: define the conventional compute entry and global
+shader-parameter ABI needed by the first existing CUDA/compute tests. Later capability slices are
+chosen by the number and value of corpus tests their first unsupported canonical IR shape unlocks.
 
 Additional wave intrinsics and advanced NVIDIA features no longer take priority merely because
 they resemble the most recent work. Core execution, memory/address-space composition, and numeric
@@ -3555,9 +3562,14 @@ The program advances through bounded slices:
 65. declarative semantic catalogs and consolidated family tests;
 66. the core CUDA execution-index/dimension bundle and audited synchronization;
 67. shared memory and aggregate addressing through a representative block workload;
-68. prioritized numeric widths, conversions, and fixed-vector breadth; and
-69. further capability work selected from measured workload blockers, followed by
-    production-readiness evaluation.
+68. prioritized numeric widths, conversions, and fixed-vector breadth;
+69. one exact forward-only builder ABI with no historical table compatibility;
+70. exact typed-operation capability preflight with no feature-bit adapter; and
+71. a file-backed direct-NVVM shader corpus and measured conventional-compute boundary.
+
+Slice 72 begins conventional compute-entry and global shader-parameter ABI work. Subsequent
+capability bundles are selected from the first unsupported canonical IR shapes observed in the
+ordinary shader corpus, followed by production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -4175,6 +4187,51 @@ and the host copies the exact tables while retaining the provider library. This 
 and objects shielded behind the private C ABI without maintaining historical table layouts. The
 temporary feature view is removed separately by Slice 70 so the ABI cut and capability-policy cut
 remain independently reviewable.
+
+### Slice 70: Exact typed-operation capability preflight
+
+The host no longer synthesizes a historical feature view. During canonical linked-IR validation it
+collects and deduplicates owned `SlangNVVMValueOperationDesc` requirements containing the semantic
+operation plus complete result and operand types. After loading the exact builder and before
+creating a provider module, the host queries every required descriptor. Rejection returns
+`SLANG_E_NOT_AVAILABLE` without provider mutation.
+
+All 49 builder feature constants, legacy catalog metadata/adapters, old operation enums, and
+feature-specific facade methods are removed. Structural construction callbacks are exact-ABI
+invariants validated at builder initialization; they are not duplicated as semantic capabilities.
+The provider, facade, emitter, and fake tests therefore share one current typed operation contract.
+
+### Slice 71: File-backed shader corpus and conventional boundary
+
+Successful direct lowering is now exercised by ordinary test files as well as embedded integration
+fixtures:
+
+| File | Established composition |
+| --- | --- |
+| `tests/cuda/nvvm-raw-scalar.slang` | Raw device pointer ABI, helper call, branch/phi, finite loop, and global store |
+| `tests/cuda/nvvm-core-execution.slang` | Thread index, shared `int[64]`, aggregate addressing, barrier, and global store |
+| `tests/cuda/nvvm-mixed-numeric.slang` | Selected integer widths/signedness, explicit conversions, float32, and `int2` memory/addition |
+
+Each file selects `-target ptx -emit-cuda-via-nvvm -capability cuda_sm_7_0` through a normal
+`slang-test` directive and checks stable PTX semantic evidence. Embedded sources remain in the unit
+suite because those tests also run from packaged build trees without a source checkout; this small
+file corpus is the ordinary test-runner compatibility signal, not a replacement for deeper fake,
+`ptxas`, differential, and runtime layers.
+
+A bounded existing-suite probe selected the next architecture boundary:
+
+| Existing shader | First direct-NVVM stop |
+| --- | --- |
+| `tests/cuda/compile-to-cuda.slang` | `entry-point parameter` |
+| `tests/cuda/cuda-layout.slang` | `entry-point parameter` |
+| `tests/cuda/wave-lane-index-multidim.slang` | `entry-point parameter` |
+| `tests/cuda/sampler-comparison-state-unused.slang` | `get_field_addr` in the conventional global-parameter/resource graph |
+
+These are valid producer shapes for ordinary `[numthreads]` compute programs, not malformed raw
+CUDA IR to patch in the emitter. Slice 72 must define and preserve one canonical conventional CUDA
+entry/global-parameter ABI, then admit it at the direct consumer. `compile-to-cuda.slang` is the
+first acceptance target; broader resource, vector/composite, and scalar/libdevice bundles follow
+from the next measured stops.
 
 The following remain open until their named slice supplies evidence:
 

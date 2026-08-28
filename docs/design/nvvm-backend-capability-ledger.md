@@ -7,6 +7,28 @@ reached a deliberate, stable boundary; it is not counted as backend support. Emp
 fields have not been collected yet. `Pending` describes planned evidence that has not run and does
 not establish backend support.
 
+## File-backed compatibility gate
+
+The ordinary shader corpus now provides the prioritization signal in addition to the deeper unit
+and runtime matrix. Only passing direct-NVVM files are registered; probes that stop at an
+unsupported shape remain planning evidence rather than expected failures.
+
+| Shader | Route | Status | Evidence or first stop |
+| --- | --- | --- | --- |
+| `tests/cuda/nvvm-raw-scalar.slang` | Direct NVVM PTX | Pass | Helper, branch/phi, finite loop, and global signed-i32 store; FileCheck observes the entry and store |
+| `tests/cuda/nvvm-core-execution.slang` | Direct NVVM PTX | Pass | `%tid.x`, shared storage, group barrier, and global store are present |
+| `tests/cuda/nvvm-mixed-numeric.slang` | Direct NVVM PTX | Pass | Narrow/wide integer, float32, and fixed-vector workload emits the expected typed global stores |
+| `tests/cuda/nvvm-unsupported-ir.slang` | Direct NVVM diagnostic | Expected stop | Exact `CUDA kernel decoration` boundary for executable conventional compute |
+| `tests/cuda/compile-to-cuda.slang` | Direct NVVM probe | Expected stop | Canonical conventional `entry-point parameter`; first Slice 72 acceptance target |
+| `tests/cuda/cuda-layout.slang` | Direct NVVM probe | Expected stop | Canonical conventional `entry-point parameter` |
+| `tests/cuda/wave-lane-index-multidim.slang` | Direct NVVM probe | Expected stop | Canonical conventional `entry-point parameter` |
+| `tests/cuda/sampler-comparison-state-unused.slang` | Direct NVVM probe | Expected stop | `get_field_addr` in the conventional global-parameter/resource graph |
+
+Slices 69 and 70 consolidated the implementation onto one exact forward-only builder ABI and one
+typed-descriptor capability system. Older rows below retain the interface names that described the
+historical evidence when it was collected; they are not claims that those compatibility surfaces
+remain in the current implementation.
+
 ## Semantic capability evidence
 
 | Test | Bucket | Requirements | NVRTC | NVVM | First NVVM stop | Diagnostic or capability | ABI/runtime comparison | Measurements |
