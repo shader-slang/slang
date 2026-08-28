@@ -2301,8 +2301,6 @@ public:
         /// The type for which conformances are being checked
         Type* conformingType;
 
-        Witness* conformingWitness;
-
         /// The outer declaration for the conformances being checked (either a type or `extension`
         /// declaration)
         ContainerDecl* parentDecl;
@@ -2545,9 +2543,16 @@ public:
 
     // Find the default implementation of an interface requirement,
     // and insert it to the witness table, if it exists.
+    //
+    // `subTypeConformsToInterfaceWitness` is the witness that the conforming type satisfies the
+    // interface whose requirement is being witnessed here. It is the witness for the *specific*
+    // (possibly nested base-interface) table being populated, not necessarily the outer conformance
+    // being checked; the default-impl generic is specialized against it so its interior
+    // `lookupWitness` calls resolve against the correct table (see #12814).
     bool findDefaultInterfaceImpl(
         ConformanceCheckingContext* context,
         DeclRef<Decl> requiredMemberDeclRef,
+        SubtypeWitness* subTypeConformsToInterfaceWitness,
         RefPtr<WitnessTable> witnessTable);
 
     // Find the appropriate member of a declared type to

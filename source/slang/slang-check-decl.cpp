@@ -9930,6 +9930,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
 bool SemanticsVisitor::findDefaultInterfaceImpl(
     ConformanceCheckingContext* context,
     DeclRef<Decl> requiredMemberDeclRef,
+    SubtypeWitness* subTypeConformsToInterfaceWitness,
     RefPtr<WitnessTable> witnessTable)
 {
     // Interface default implementations are represented as callable stubs over
@@ -9980,7 +9981,7 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
     //    ```
     // Given this, we can simply form a GenericAppDeclRef to `IFoo::bar_defaultImpl`
     // with `This` being `context->conformingType` and `This:IFoo` being
-    // `context->conformingWitness`.
+    // `subTypeConformsToInterfaceWitness`.
     //
     // The following logic will create this declref, and register it to the witness table.
     //
@@ -9998,7 +9999,7 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
         m_astBuilder->getMemberDeclRef(interfaceDeclRef, genericDeclOfDefaultImplStub);
     List<Val*> specArgs;
     specArgs.add(context->conformingType);
-    specArgs.add(context->conformingWitness);
+    specArgs.add(subTypeConformsToInterfaceWitness);
 
     // Form a declref to `IFoo::bar_defaultImpl<conformingType>`.
     resultDeclRef = m_astBuilder->getGenericAppDeclRef(
@@ -10153,7 +10154,6 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     SubtypeWitness* subTypeConformsToSuperInterfaceWitness)
 {
     SLANG_UNUSED(superInterfaceDeclRef)
-    SLANG_UNUSED(subTypeConformsToSuperInterfaceWitness);
     SLANG_UNUSED(superInterfaceType);
 
 
@@ -10559,7 +10559,11 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // Finally, if there is a default implementation for the required member,
     // we can use that as a witness.
     //
-    if (findDefaultInterfaceImpl(context, requiredMemberDeclRef, witnessTable))
+    if (findDefaultInterfaceImpl(
+            context,
+            requiredMemberDeclRef,
+            subTypeConformsToSuperInterfaceWitness,
+            witnessTable))
         return true;
 
     // We failed to find a member of the type that can be used
@@ -11295,7 +11299,6 @@ bool SemanticsVisitor::checkConformance(
     ConformanceCheckingContext context;
     context.conformingType = subType;
     context.parentDecl = parentDecl;
-    context.conformingWitness = subIsSuperWitness;
 
     RefPtr<WitnessTable> witnessTable = inheritanceDecl->witnessTable;
     if (!witnessTable)
