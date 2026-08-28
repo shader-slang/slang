@@ -123,7 +123,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->declareGlobalStorage != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=2") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=3") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -731,14 +731,45 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsConventionalGlobalParameterStorage)
 
     SlangNVVMTypeHandle voidType = nullptr;
     SlangNVVMTypeHandle integerType = nullptr;
+    SlangNVVMTypeHandle countType = nullptr;
+    SlangNVVMTypeHandle dataPointerType = nullptr;
     SlangNVVMTypeHandle resourceType = nullptr;
+    SlangNVVMTypeHandle foreignIntegerType = nullptr;
+    SlangNVVMTypeHandle foreignCountType = nullptr;
+    SlangNVVMTypeHandle foreignDataPointerType = nullptr;
     SlangNVVMTypeHandle foreignResourceType = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 32, integerType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 64, countType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        module.module,
+        integerType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        dataPointerType)));
+    const SlangNVVMTypeHandle resourceFieldTypes[] = {dataPointerType, countType};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getStructType(
+        module.module,
+        resourceFieldTypes,
+        SLANG_COUNT_OF(resourceFieldTypes),
+        resourceType)));
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getRawRWStructuredBufferI32Type(module.module, resourceType)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.getRawRWStructuredBufferI32Type(foreignModule.module, foreignResourceType)));
+        SLANG_SUCCEEDED(builder.getIntegerType(foreignModule.module, 32, foreignIntegerType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getIntegerType(foreignModule.module, 64, foreignCountType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        foreignModule.module,
+        foreignIntegerType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        foreignDataPointerType)));
+    const SlangNVVMTypeHandle foreignResourceFieldTypes[] = {
+        foreignDataPointerType,
+        foreignCountType,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getStructType(
+        foreignModule.module,
+        foreignResourceFieldTypes,
+        SLANG_COUNT_OF(foreignResourceFieldTypes),
+        foreignResourceType)));
 
     SlangNVVMTypeHandle rejectedType = reinterpret_cast<SlangNVVMTypeHandle>(uintptr_t(1));
     SLANG_CHECK(
@@ -803,11 +834,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsConventionalGlobalParameterStorage)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitLoad(module.module, fieldPointer, 8, buffer)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getIntegerConstant(module.module, integerType, 0, index)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitRawRWStructuredBufferI32ElementPointer(
-        module.module,
-        buffer,
-        index,
-        elementPointer)));
+    SlangNVVMValueHandle dataPointer = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitStructFieldValue(module.module, buffer, 0, dataPointer)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitPointerOffset(module.module, dataPointer, index, elementPointer)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getIntegerConstant(module.module, integerType, 42, value)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(module.module, value, elementPointer, 4)));
@@ -3778,46 +3809,50 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("store i32")) == 1);
 }
 
-SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRawRWStructuredBufferI32Operations)
+SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
     SLANG_CHECK_ABORT(builder.isInitialized());
 
     ScopedNVVMBuilderModule module;
-    module.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createModule(toSlice("invalid-raw-rw-structured-buffer-i32"), module.module)));
     ScopedNVVMBuilderModule foreignModule;
+    module.builder = &builder;
     foreignModule.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(
-        toSlice("invalid-raw-rw-structured-buffer-i32-foreign"),
-        foreignModule.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("invalid-struct-field-value"), module.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("invalid-struct-field-value-foreign"), foreignModule.module)));
+
+    auto makeResourceType = [&](SlangNVVMModuleHandle targetModule,
+                                SlangNVVMTypeHandle& outVoidType,
+                                SlangNVVMTypeHandle& outIntegerType,
+                                SlangNVVMTypeHandle& outResourceType)
+    {
+        SlangNVVMTypeHandle countType = nullptr;
+        SlangNVVMTypeHandle dataPointerType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(targetModule, outVoidType)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getIntegerType(targetModule, 32, outIntegerType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(targetModule, 64, countType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+            targetModule,
+            outIntegerType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            dataPointerType)));
+        const SlangNVVMTypeHandle resourceFieldTypes[] = {dataPointerType, countType};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getStructType(
+            targetModule,
+            resourceFieldTypes,
+            SLANG_COUNT_OF(resourceFieldTypes),
+            outResourceType)));
+    };
 
     SlangNVVMTypeHandle voidType = nullptr;
     SlangNVVMTypeHandle integerType = nullptr;
-    SlangNVVMTypeHandle wideIntegerType = nullptr;
     SlangNVVMTypeHandle resourceType = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 32, integerType)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 64, wideIntegerType)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getRawRWStructuredBufferI32Type(module.module, resourceType)));
-
-    SlangNVVMTypeHandle rejectedType = reinterpret_cast<SlangNVVMTypeHandle>(uintptr_t(1));
-    SLANG_CHECK(
-        builder.getConstructionAPI()->getRawRWStructuredBufferI32Type(nullptr, &rejectedType) ==
-        SLANG_E_INVALID_ARG);
-    SLANG_CHECK(rejectedType == nullptr);
-    SLANG_CHECK(
-        builder.getConstructionAPI()->getRawRWStructuredBufferI32Type(module.module, nullptr) ==
-        SLANG_E_INVALID_ARG);
-
-    const SlangNVVMTypeHandle parameterTypes[] = {
-        resourceType,
-        integerType,
-        wideIntegerType,
-    };
+    makeResourceType(module.module, voidType, integerType, resourceType);
+    const SlangNVVMTypeHandle parameterTypes[] = {resourceType, integerType};
     SlangNVVMTypeHandle functionType = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
         module.module,
@@ -3830,110 +3865,92 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRawRWStructuredBufferI32Operations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
-        toSlice("invalidRawRWStructuredBufferI32"),
+        toSlice("invalidStructFieldValue"),
         function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
-        toSlice("otherRawRWStructuredBufferI32"),
+        toSlice("otherStructFieldValue"),
         otherFunction)));
 
     SlangNVVMValueHandle buffer = nullptr;
     SlangNVVMValueHandle index = nullptr;
-    SlangNVVMValueHandle wideIndex = nullptr;
     SlangNVVMValueHandle otherBuffer = nullptr;
-    SlangNVVMValueHandle otherIndex = nullptr;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, buffer)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 1, index)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 2, wideIndex)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.getFunctionParameter(module.module, otherFunction, 0, otherBuffer)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, otherFunction, 1, otherIndex)));
 
     SlangNVVMTypeHandle foreignVoidType = nullptr;
     SlangNVVMTypeHandle foreignIntegerType = nullptr;
     SlangNVVMTypeHandle foreignResourceType = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(foreignModule.module, foreignVoidType)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getIntegerType(foreignModule.module, 32, foreignIntegerType)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.getRawRWStructuredBufferI32Type(foreignModule.module, foreignResourceType)));
+    makeResourceType(
+        foreignModule.module,
+        foreignVoidType,
+        foreignIntegerType,
+        foreignResourceType);
     const SlangNVVMTypeHandle foreignParameterTypes[] = {
         foreignResourceType,
         foreignIntegerType,
     };
     SlangNVVMTypeHandle foreignFunctionType = nullptr;
-    SlangNVVMValueHandle foreignFunction = nullptr;
-    SlangNVVMValueHandle foreignBuffer = nullptr;
-    SlangNVVMValueHandle foreignIndex = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
         foreignModule.module,
         foreignVoidType,
         foreignParameterTypes,
         SLANG_COUNT_OF(foreignParameterTypes),
         foreignFunctionType)));
+    SlangNVVMValueHandle foreignFunction = nullptr;
+    SlangNVVMValueHandle foreignBuffer = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignModule.module,
         foreignFunctionType,
-        toSlice("foreignRawRWStructuredBufferI32"),
+        toSlice("foreignStructFieldValue"),
         foreignFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.getFunctionParameter(foreignModule.module, foreignFunction, 0, foreignBuffer)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.getFunctionParameter(foreignModule.module, foreignFunction, 1, foreignIndex)));
 
     SlangNVVMBlockHandle block = nullptr;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.createBlock(module.module, function, toSlice("entry"), block)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, block)));
 
-    String diagnostics;
-
     auto expectRejected = [&](SlangNVVMModuleHandle targetModule,
-                              SlangNVVMValueHandle targetBuffer,
-                              SlangNVVMValueHandle targetIndex)
+                              SlangNVVMValueHandle targetValue,
+                              uint32_t fieldIndex)
     {
         SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
         SLANG_CHECK(
-            builder.emitRawRWStructuredBufferI32ElementPointer(
-                targetModule,
-                targetBuffer,
-                targetIndex,
-                rejected) == SLANG_E_INVALID_ARG);
+            builder.emitStructFieldValue(targetModule, targetValue, fieldIndex, rejected) ==
+            SLANG_E_INVALID_ARG);
         SLANG_CHECK(rejected == nullptr);
     };
     SLANG_CHECK(
-        builder.getConstructionAPI()
-            ->emitRawRWStructuredBufferI32ElementPointer(module.module, buffer, index, nullptr) ==
+        builder.getConstructionAPI()->emitStructFieldValue(module.module, buffer, 0, nullptr) ==
         SLANG_E_INVALID_ARG);
-    expectRejected(nullptr, buffer, index);
-    expectRejected(foreignModule.module, buffer, index);
-    expectRejected(module.module, nullptr, index);
-    expectRejected(module.module, buffer, nullptr);
-    expectRejected(module.module, index, index);
-    expectRejected(module.module, buffer, buffer);
-    expectRejected(module.module, buffer, wideIndex);
-    expectRejected(module.module, otherBuffer, index);
-    expectRejected(module.module, buffer, otherIndex);
-    expectRejected(module.module, foreignBuffer, index);
-    expectRejected(module.module, buffer, foreignIndex);
+    expectRejected(nullptr, buffer, 0);
+    expectRejected(foreignModule.module, buffer, 0);
+    expectRejected(module.module, nullptr, 0);
+    expectRejected(module.module, index, 0);
+    expectRejected(module.module, buffer, 2);
+    expectRejected(module.module, otherBuffer, 0);
+    expectRejected(module.module, foreignBuffer, 0);
 
+    SlangNVVMValueHandle dataPointer = nullptr;
     SlangNVVMValueHandle elementPointer = nullptr;
     SlangNVVMValueHandle value = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitRawRWStructuredBufferI32ElementPointer(
-        module.module,
-        buffer,
-        index,
-        elementPointer)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitStructFieldValue(module.module, buffer, 0, dataPointer)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitPointerOffset(module.module, dataPointer, index, elementPointer)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getIntegerConstant(module.module, integerType, 42, value)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(module.module, value, elementPointer, 4)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
 
+    String diagnostics;
     ComPtr<ISlangBlob> completeBlob;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
         module.module,
@@ -3941,7 +3958,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRawRWStructuredBufferI32Operations)
         completeBlob,
         diagnostics)));
     const String complete = _getBlobText(completeBlob);
-    expectRejected(module.module, buffer, index);
+    expectRejected(module.module, buffer, 0);
     ComPtr<ISlangBlob> afterTerminatedBlob;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
         module.module,
@@ -3951,8 +3968,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRawRWStructuredBufferI32Operations)
     SLANG_CHECK(_getBlobText(afterTerminatedBlob) == complete);
 
     SLANG_CHECK(
-        complete.indexOf("define void @invalidRawRWStructuredBufferI32({ i32 addrspace(1)*, i64 } "
-                         "%slangParameter0, i32 %slangParameter1, i64 %slangParameter2)") >= 0);
+        complete.indexOf("define void @invalidStructFieldValue({ i32 addrspace(1)*, i64 } "
+                         "%slangParameter0, i32 %slangParameter1)") >= 0);
     SLANG_CHECK(_countOccurrences(complete.getUnownedSlice(), toSlice("extractvalue")) == 1);
     SLANG_CHECK(_countOccurrences(complete.getUnownedSlice(), toSlice("getelementptr i32")) == 1);
     SLANG_CHECK(complete.indexOf("getelementptr inbounds") < 0);

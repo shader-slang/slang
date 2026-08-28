@@ -319,6 +319,13 @@ public:
         uint32_t fieldIndex,
         SlangNVVMValueHandle& outPointer) const;
 
+    /// Extracts one statically selected field from a struct value.
+    SlangResult emitStructFieldValue(
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle structValue,
+        uint32_t fieldIndex,
+        SlangNVVMValueHandle& outValue) const;
+
     /// Emits multiplication for same-typed scalar integer values.
     SlangResult emitIntegerMultiply(
         SlangNVVMModuleHandle module,
@@ -400,18 +407,6 @@ public:
         SlangNVVMValueHandle left,
         SlangNVVMValueHandle right,
         SlangNVVMValueHandle& outValue) const;
-
-    /// Gets the exact raw CUDA ABI type for `RWStructuredBuffer<int>`.
-    SlangResult getRawRWStructuredBufferI32Type(
-        SlangNVVMModuleHandle module,
-        SlangNVVMTypeHandle& outType) const;
-
-    /// Emits an element pointer from an exact raw CUDA `RWStructuredBuffer<int>` value.
-    SlangResult emitRawRWStructuredBufferI32ElementPointer(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle buffer,
-        SlangNVVMValueHandle elementIndex,
-        SlangNVVMValueHandle& outPointer) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle module) const;

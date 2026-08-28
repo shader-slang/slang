@@ -31,7 +31,7 @@ struct NVVMConventionalGlobalParams
 };
 
 // Recognizes the first canonical collected CUDA parameter block: one synthesized struct whose
-// sole field is an RWStructuredBuffer<int> view at offset zero.
+// sole field is a selected-scalar RWStructuredBuffer view at offset zero.
 bool _getNVVMConventionalGlobalParams(IRInst* inst, NVVMConventionalGlobalParams& outParams)
 {
     outParams = {};
@@ -51,7 +51,7 @@ bool _getNVVMConventionalGlobalParams(IRInst* inst, NVVMConventionalGlobalParams
     uint32_t fieldIndex = 0;
     for (auto field : elementType->getFields())
     {
-        if (selectedField || !asNVVMSupportedRawRWStructuredBufferI32Type(field->getFieldType()))
+        if (selectedField || !asNVVMSupportedRawRWStructuredBufferType(field->getFieldType()))
             return false;
         selectedField = field;
         selectedFieldIndex = fieldIndex;
@@ -101,6 +101,45 @@ SlangNVVMValueOperationDesc _getNVVMCUDAExecutionGlobalOperationDesc(
     SlangNVVMValueOperation operation)
 {
     return {operation, NVVMSemantics::kUnsignedI32x3, nullptr, 0};
+}
+
+IRIntLit* _asExecutableInteger32Constant(IRInst* value);
+
+// Recognizes either canonical spelling produced for one CUDA execution-vector component.
+bool _getNVVMCUDAExecutionVectorElement(IRInst* inst, IRInst*& outBase, uint32_t& outElementIndex)
+{
+    outBase = nullptr;
+    outElementIndex = 0;
+
+    IRInst* base = nullptr;
+    IRIntLit* elementIndex = nullptr;
+    if (auto swizzle = as<IRSwizzle>(inst))
+    {
+        if (swizzle->getElementCount() != 1)
+            return false;
+        base = swizzle->getBase();
+        elementIndex = _asExecutableInteger32Constant(swizzle->getElementIndex(0));
+    }
+    else if (auto getElement = as<IRGetElement>(inst))
+    {
+        base = getElement->getBase();
+        elementIndex = _asExecutableInteger32Constant(getElement->getIndex());
+    }
+    else
+    {
+        return false;
+    }
+
+    if (!isNVVMUnsignedI32Type(inst->getDataType()) ||
+        !asNVVMSupportedUInt3Type(base->getDataType()) || !elementIndex ||
+        elementIndex->getValue() < 0 || elementIndex->getValue() >= 3)
+    {
+        return false;
+    }
+
+    outBase = base;
+    outElementIndex = uint32_t(elementIndex->getValue());
+    return true;
 }
 
 struct ScopedNVVMModule
@@ -675,13 +714,12 @@ SlangResult _validatePointerValue(
     auto numericPtrType =
         value ? asNVVMSupportedDeviceNumericPointerType(value->getDataType()) : nullptr;
     auto resourceElementPtrType =
-        value ? asNVVMSupportedRWStructuredBufferI32ElementPointerType(value->getDataType())
-              : nullptr;
+        value ? asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType()) : nullptr;
     auto sharedElementPtrType =
         value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
     auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
     if (!fieldPtrType || value->getOp() != kIROp_FieldAddress ||
-        !asNVVMSupportedRawRWStructuredBufferI32Type(fieldPtrType->getValueType()))
+        !asNVVMSupportedRawRWStructuredBufferType(fieldPtrType->getValueType()))
     {
         fieldPtrType = nullptr;
     }
@@ -700,7 +738,7 @@ SlangResult _validatePointerValue(
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
-            toSlice("raw RWStructuredBuffer signed i32 load or store consumer"));
+            toSlice("raw RWStructuredBuffer scalar load or store consumer"));
     }
     if (requireWriteAccess && acceptedPtrType->getAccessQualifier() != AccessQualifier::ReadWrite)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("read-only pointer store"));
@@ -1050,7 +1088,7 @@ SlangResult _validateNVVMFunction(
             {
             case kIROp_Load:
                 if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
-                    !asNVVMSupportedRawRWStructuredBufferI32Type(inst->getDataType()))
+                    !asNVVMSupportedRawRWStructuredBufferType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 break;
 
@@ -1126,15 +1164,11 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Swizzle:
+            case kIROp_GetElement:
                 {
-                    auto swizzle = as<IRSwizzle>(inst);
-                    auto elementIndex = swizzle && swizzle->getElementCount() == 1
-                                            ? _asExecutableI32Constant(swizzle->getElementIndex(0))
-                                            : nullptr;
-                    if (!swizzle || !isNVVMUnsignedI32Type(swizzle->getDataType()) ||
-                        !asNVVMSupportedUInt3Type(swizzle->getBase()->getDataType()) ||
-                        !elementIndex || elementIndex->getValue() < 0 ||
-                        elementIndex->getValue() >= 3)
+                    IRInst* base = nullptr;
+                    uint32_t elementIndex = 0;
+                    if (!_getNVVMCUDAExecutionVectorElement(inst, base, elementIndex))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -1192,11 +1226,11 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_RWStructuredBufferGetElementPtr:
                 if (inst->getOperandCount() != 2 ||
-                    !asNVVMSupportedRWStructuredBufferI32ElementPointerType(inst->getDataType()))
+                    !asNVVMSupportedRWStructuredBufferElementPointerType(inst->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
-                        toSlice("raw RWStructuredBuffer signed i32 element pointer"));
+                        toSlice("raw RWStructuredBuffer scalar element pointer"));
                 }
                 break;
 
@@ -1209,7 +1243,7 @@ SlangResult _validateNVVMFunction(
                     if (!fieldAddress ||
                         !_getNVVMConventionalGlobalParams(fieldAddress->getBase(), globalParams) ||
                         fieldAddress->getField() != globalParams.field->getKey() || !pointerType ||
-                        !asNVVMSupportedRawRWStructuredBufferI32Type(pointerType->getValueType()))
+                        !asNVVMSupportedRawRWStructuredBufferType(pointerType->getValueType()))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -1374,15 +1408,19 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Swizzle:
+            case kIROp_GetElement:
                 {
-                    auto swizzle = cast<IRSwizzle>(inst);
+                    IRInst* base = nullptr;
+                    uint32_t elementIndex = 0;
+                    SLANG_RELEASE_ASSERT(
+                        _getNVVMCUDAExecutionVectorElement(inst, base, elementIndex));
                     SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                         codeGenContext,
-                        swizzle->getBase(),
-                        swizzle,
+                        base,
+                        inst,
                         availableValues,
                         dominatorTree));
-                    availableValues.add(swizzle);
+                    availableValues.add(inst);
                 }
                 break;
 
@@ -1503,12 +1541,19 @@ SlangResult _validateNVVMFunction(
                 {
                     IRInst* buffer = inst->getOperand(0);
                     IRInst* elementIndex = inst->getOperand(1);
+                    IRType* bufferElementType = nullptr;
+                    auto resultPointerType =
+                        asNVVMSupportedRWStructuredBufferElementPointerType(inst->getDataType());
                     if (!buffer ||
-                        !asNVVMSupportedRawRWStructuredBufferI32Type(buffer->getDataType()))
+                        !asNVVMSupportedRawRWStructuredBufferType(
+                            buffer->getDataType(),
+                            &bufferElementType) ||
+                        !resultPointerType ||
+                        !isTypeEqual(bufferElementType, resultPointerType->getValueType()))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("raw RWStructuredBuffer signed i32 relation"));
+                            toSlice("raw RWStructuredBuffer scalar relation"));
                     }
                     SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                         codeGenContext,
@@ -1516,7 +1561,7 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree));
-                    SLANG_RETURN_ON_FAIL(_validateI32Value(
+                    SLANG_RETURN_ON_FAIL(_validateInteger32Value(
                         codeGenContext,
                         elementIndex,
                         inst,
@@ -2138,7 +2183,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredPointer));
                         SlangNVVMValueHandle loweredValue = nullptr;
                         const uint32_t alignment =
-                            asNVVMSupportedRawRWStructuredBufferI32Type(load->getDataType())
+                            asNVVMSupportedRawRWStructuredBufferType(load->getDataType())
                                 ? kNVVMRawRWStructuredBufferAlignment
                                 : getNVVMNumericValueAlignment(load->getDataType());
                         SLANG_RELEASE_ASSERT(alignment);
@@ -2315,15 +2360,18 @@ SlangResult emitNVVMIRFromLinkedIR(
                     break;
 
                 case kIROp_Swizzle:
+                case kIROp_GetElement:
                     {
-                        auto swizzle = cast<IRSwizzle>(inst);
-                        auto elementIndex = cast<IRIntLit>(swizzle->getElementIndex(0));
+                        IRInst* base = nullptr;
+                        uint32_t elementIndex = 0;
+                        SLANG_RELEASE_ASSERT(
+                            _getNVVMCUDAExecutionVectorElement(inst, base, elementIndex));
                         SlangNVVMValueHandle loweredBase = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            swizzle->getBase(),
+                            base,
                             valueMap,
                             typeContext,
                             loweredBase));
@@ -2334,9 +2382,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                             builder.emitVectorElementExtract(
                                 moduleScope.module,
                                 loweredBase,
-                                uint32_t(elementIndex->getValue()),
+                                elementIndex,
                                 loweredValue)));
-                        valueMap[swizzle] = loweredValue;
+                        valueMap[inst] = loweredValue;
                     }
                     break;
 
@@ -2504,13 +2552,22 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "raw RWStructuredBuffer signed i32 element pointer",
-                            builder.emitRawRWStructuredBufferI32ElementPointer(
+                            "raw RWStructuredBuffer data pointer",
+                            builder.emitStructFieldValue(
                                 moduleScope.module,
                                 loweredBuffer,
-                                loweredElementIndex,
+                                0,
                                 loweredPointer)));
-                        valueMap[inst] = loweredPointer;
+                        SlangNVVMValueHandle loweredElementPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw RWStructuredBuffer scalar element pointer",
+                            builder.emitPointerOffset(
+                                moduleScope.module,
+                                loweredPointer,
+                                loweredElementIndex,
+                                loweredElementPointer)));
+                        valueMap[inst] = loweredElementPointer;
                     }
                     break;
 

@@ -33,15 +33,14 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
 {
     return api.getVoidType && api.getIntegerType && api.getFloatingPointType &&
            api.getPointerType && api.getFunctionType && api.getArrayType && api.getVectorType &&
-           api.getStructType && api.getRawRWStructuredBufferI32Type && api.declareFunction &&
-           api.getFunctionParameter && api.createBlock && api.setInsertBlock && api.emitLoad &&
-           api.emitStore && api.emitBranch && api.emitConditionalBranch && api.getIntegerConstant &&
+           api.getStructType && api.declareFunction && api.getFunctionParameter &&
+           api.createBlock && api.setInsertBlock && api.emitLoad && api.emitStore &&
+           api.emitBranch && api.emitConditionalBranch && api.getIntegerConstant &&
            api.getFloatingPointConstant && api.emitPhi && api.addPhiIncoming && api.emitCall &&
            api.emitValueReturn && api.emitReturnVoid && api.emitPointerOffset &&
-           api.emitArrayElementPointer && api.emitStructFieldPointer &&
-           api.emitVectorElementExtract && api.emitRawRWStructuredBufferI32ElementPointer &&
-           api.emitRelaxedGlobalI32AtomicAdd && api.declareGlobalStorage &&
-           api.markFunctionAsKernel;
+           api.emitArrayElementPointer && api.emitStructFieldPointer && api.emitStructFieldValue &&
+           api.emitVectorElementExtract && api.emitRelaxedGlobalI32AtomicAdd &&
+           api.declareGlobalStorage && api.markFunctionAsKernel;
 }
 
 static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI& api)
@@ -788,6 +787,20 @@ SlangResult NVVMIRBuilder::emitStructFieldPointer(
     return _validateHandleResult(result, outPointer);
 }
 
+SlangResult NVVMIRBuilder::emitStructFieldValue(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle structValue,
+    uint32_t fieldIndex,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    const SlangNVVMResult result =
+        m_construction.emitStructFieldValue(module, structValue, fieldIndex, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
 SlangResult NVVMIRBuilder::emitIntegerMultiply(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle left,
@@ -930,34 +943,6 @@ SlangResult NVVMIRBuilder::emitIntegerSignedGreaterEqual(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
     return emitIntegerCompare(module, SLANG_NVVM_VALUE_OP_GREATER_EQUAL, left, right, outValue);
-}
-
-SlangResult NVVMIRBuilder::getRawRWStructuredBufferI32Type(
-    SlangNVVMModuleHandle module,
-    SlangNVVMTypeHandle& outType) const
-{
-    outType = nullptr;
-    if (!isInitialized())
-        return SLANG_E_UNINITIALIZED;
-    const SlangNVVMResult result = m_construction.getRawRWStructuredBufferI32Type(module, &outType);
-    return _validateHandleResult(result, outType);
-}
-
-SlangResult NVVMIRBuilder::emitRawRWStructuredBufferI32ElementPointer(
-    SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle buffer,
-    SlangNVVMValueHandle elementIndex,
-    SlangNVVMValueHandle& outPointer) const
-{
-    outPointer = nullptr;
-    if (!isInitialized())
-        return SLANG_E_UNINITIALIZED;
-    const SlangNVVMResult result = m_construction.emitRawRWStructuredBufferI32ElementPointer(
-        module,
-        buffer,
-        elementIndex,
-        &outPointer);
-    return _validateHandleResult(result, outPointer);
 }
 
 SlangResult NVVMIRBuilder::emitReturnVoid(SlangNVVMModuleHandle module) const

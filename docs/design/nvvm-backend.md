@@ -3564,12 +3564,13 @@ The program advances through bounded slices:
 67. shared memory and aggregate addressing through a representative block workload;
 68. prioritized numeric widths, conversions, and fixed-vector breadth;
 69. one exact forward-only builder ABI with no historical table compatibility;
-70. exact typed-operation capability preflight with no feature-bit adapter; and
-71. a file-backed direct-NVVM shader corpus and measured conventional-compute boundary.
+70. exact typed-operation capability preflight with no feature-bit adapter;
+71. a file-backed direct-NVVM shader corpus and measured conventional-compute boundary;
+72. the first conventional compute ABI and one-field integer resource block; and
+73. generic scalar resource views plus multidimensional wave execution.
 
-Slice 72 begins conventional compute-entry and global shader-parameter ABI work. Subsequent
-capability bundles are selected from the first unsupported canonical IR shapes observed in the
-ordinary shader corpus, followed by production-readiness evaluation.
+Subsequent capability bundles are selected from the first unsupported canonical IR shapes observed
+in the ordinary shader corpus, followed by production-readiness evaluation.
 
 Slice 3b hardens the builder boundary between items 3 and 4 with versioned verifier diagnostics and
 the reverse LLVM load-order proof; it deliberately adds none of item 4's scalar or pointer surface.
@@ -4274,6 +4275,39 @@ The next corpus probe now stops at `GenericAsm` for `cuda-layout.slang`, `getEle
 multi-field sampler/resource block in `sampler-comparison-state-unused.slang`. Those measured
 stops, rather than the removed entry-parameter boundary, select subsequent work.
 
+### Slice 73: Generic scalar resource views and multidimensional wave execution
+
+The current exact builder ABI is revision 3. It removes the two callbacks named for
+`RWStructuredBuffer<int>` and adds one generic `emitStructFieldValue` construction operation.
+Slang now builds a selected scalar resource view structurally as
+`{ ptr addrspace(1) element, i64 }`; resource addressing extracts field zero and applies the
+existing typed pointer-offset operation. The real provider therefore owns only LLVM aggregate
+extraction and GEP construction, while Slang remains the single source of truth for the CUDA
+resource ABI and accepted source-resource semantics.
+
+The accepted resource element set is the established selected integer scalars at 8, 16, 32, and
+64 bits plus float32. The conventional global parameter block remains deliberately bounded to one
+resource field at offset zero, size 16, and alignment 8. Read-only buffers, resource atomics,
+aggregate/vector resource elements, and multi-field parameter blocks still stop before provider
+creation.
+
+CUDA varying legalization produces two canonical spellings for a component of a target execution
+`uint3`: a one-component `swizzle` and a constant-index `getElement`. The direct consumer now maps
+both exact shapes to the same provider vector extraction operation. It does not admit dynamic
+indices or arbitrary vectors, and it leaves `SV_GroupIndex` linearization with
+`legalizeEntryPointVaryingParamsForCUDA`.
+
+`tests/cuda/wave-lane-index-multidim.slang` now runs through NVRTC, direct libNVVM, and Vulkan. Its
+`8 x 8 x 1` group combines `SV_GroupIndex`, float resource stores, control flow,
+`WaveIsFirstLane`, and `WaveGetLaneIndex`; all routes produce the expected comparison result. The
+direct PTX exposes a visible zero-parameter kernel, the 16-byte `SLANG_globalParams` symbol,
+multidimensional `%tid`/`%ntid` reads, synchronized wave voting, and two float global stores, and
+CUDA 12.9 `ptxas` accepts it for `sm_70`.
+
+The post-slice corpus probes still stop at `GenericAsm` for `cuda-layout.slang` and at the exact
+multi-field conventional-global address for `sampler-comparison-state-unused.slang`. These are the
+next measured choices rather than reasons to widen the current resource recognizer.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4281,9 +4315,10 @@ The following remain open until their named slice supplies evidence:
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
-  global parameter blocks beyond one exact `RWStructuredBuffer<int>` field, and raw CUDA parameters
+  global parameter blocks beyond one exact selected-scalar resource field, and raw CUDA parameters
   beyond the selected integer and float32 scalars, selected numeric device pointers, fixed i32
-  array pointers, signed-i32x2 device pointers, and exact raw `RWStructuredBuffer<int>`;
+  array pointers, signed-i32x2 device pointers, and selected-scalar raw read-write structured
+  buffers;
 - external/indirect calls, richer helper ABI, integer shifts/division/remainder, saturating or
   overflow-decorated arithmetic, float64/low-precision scalar families, and general vector or
   matrix operations beyond the bounded signed-i32x2 add proof;

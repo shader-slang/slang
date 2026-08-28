@@ -22,7 +22,7 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/cuda/compile-to-cuda.slang` | NVRTC + direct NVVM runtime | Pass | Ordinary `SV_DispatchThreadID`, one conventional `RWStructuredBuffer<int>`, host-populated `SLANG_globalParams`, and zero-parameter kernel produce identical results |
 | `tests/cuda/nvvm-conventional-global-unsupported.slang` | Direct NVVM diagnostic | Expected stop | Exact one-field conventional parameter-block boundary before provider discovery |
 | `tests/cuda/cuda-layout.slang` | Direct NVVM probe | Expected stop | `GenericAsm` after conventional entry/global lowering |
-| `tests/cuda/wave-lane-index-multidim.slang` | Direct NVVM probe | Expected stop | `getElement` after conventional varying legalization |
+| `tests/cuda/wave-lane-index-multidim.slang` | NVRTC + direct NVVM + Vulkan runtime | Pass | A two-dimensional group combines `SV_GroupIndex`, float resource stores, and wave operations with identical comparison output; direct PTX passes `ptxas` |
 | `tests/cuda/sampler-comparison-state-unused.slang` | Direct NVVM probe | Expected stop | Conventional field address in a multi-field sampler/resource parameter block |
 
 Slices 69 and 70 consolidated the implementation onto one exact forward-only builder ABI and one
@@ -333,8 +333,10 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage` | V4 construction version 3 preserves versions 1 and 2, rejects invalid type/address-space/alignment/name/output and duplicate-name cases without mutation, then emits exact normal and LLVM-7-compatible address-space-3 storage/GEP/load/store forms | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesSharedGlobalStorageCapability` | An exact V4 construction-version-2 provider retains Slice 66 programs but reports E52018 for shared storage before module creation | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies` | Dimensioned descriptors emit signed/unsigned comparisons, signed/unsigned widening, integer/float conversions, and selected one-to-four-lane integer binary operations in normal and compatible assembly; mixed signedness, i24, and five-lane vectors remain unsupported with sanitized output | Pass |
-| `slang-unit-test-tool/nvvmIRBuilderBuildsConventionalGlobalParameterStorage` | Exact ABI revision 2 constructs an unpacked one-resource struct, externally visible constant-address-space global, field GEP, resource load, and store in verified normal and NVVM-2.0-compatible assembly; foreign types and invalid fields stop without mutation | Pass |
-| `slang-unit-test-tool/nvvmSlangConventionalComputeUsesDirectPipeline` | The fake provider observes a zero-parameter kernel, external `SLANG_globalParams`, UInt3 block/thread arithmetic, field/resource load, and raw structured-buffer store from ordinary source | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderBuildsConventionalGlobalParameterStorage` | Exact ABI revision 3 structurally constructs an unpacked resource view and one-field global block, extracts the resource pointer value, applies a typed pointer offset, and emits verified normal and NVVM-2.0-compatible assembly | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderRejectsInvalidStructFieldValueOperations` | Generic aggregate extraction rejects null, foreign, non-struct, out-of-range, unavailable, and post-termination operands without module mutation | Pass |
+| `slang-unit-test-tool/nvvmSlangConventionalComputeUsesDirectPipeline` | The fake provider observes a zero-parameter kernel, external `SLANG_globalParams`, UInt3 block/thread arithmetic, structural field/resource loads, pointer extraction/offset, and a structured-buffer store from ordinary source | Pass |
+| `slang-unit-test-tool/nvvmSlangMultidimensionalWaveUsesDirectPipeline` | The exact existing shader graph performs five canonical UInt3 component extractions, two float resource pointer extractions/offsets/stores, and the established wave operations without resource-specific builder callbacks | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesNumericFamilyCapability` | A static-catalog-only V4 provider is discovered once but reports E52018 for the mixed numeric family before module creation or libNVVM program creation | Pass |
 | `slang-unit-test-tool/nvvmSlangMixedNumericDifferentialPTX` | Raw signed/unsigned 8/16/64-bit scalars, float32, eight numeric pointers, explicit conversions, signed/unsigned branches, and signed-i32x2 load/add/store compile through both routes | Pass |
 | `slang-unit-test-tool/nvvmSlangMixedNumericPtxasAccepts` | CUDA 12.9 `ptxas` accepts direct NVVM and NVRTC PTX for the representative mixed-width/vector workload | Pass |
@@ -1304,3 +1306,21 @@ removing the five Slice 68 names reproduces Slice 67's hash
 `3d3e5effec15efd6d8eec74752802df83fe21ffb89e9d9037b3abf0803d25c0b` exactly. The rebuilt Debug
 host fake-provider sample passes 8/8; real-provider validation uses Release because the local LLVM
 dependency build does not provide Debug libraries.
+
+Slice 73 replaces the current builder's two `RWStructuredBuffer<int>`-specific callbacks with one
+generic struct-value extraction operation. Selected scalar resource views are now assembled as an
+unpacked global-pointer/count struct, and element addressing composes field extraction with the
+existing typed pointer-offset operation. Exact ABI revision 3 is forward-only; the host, facade,
+real provider, and fake provider expose no legacy resource-specific surface.
+
+The direct consumer accepts both canonical producer spellings for a CUDA execution-vector
+component: one-lane `swizzle` and constant-index `getElement`. The existing
+`wave-lane-index-multidim.slang` runtime comparison passes all five registered CUDA/Vulkan lanes.
+Its direct PTX contains the 16-byte conventional global block, multidimensional execution-register
+reads, synchronized wave voting, and two float global stores; CUDA 12.9 `ptxas` accepts the PTX for
+`sm_70`.
+
+The full Release NVVM prefix passes 335/335 after restoring the established sign-independent
+ordinary pointer-offset contract and keeping the new sign-independent resource index contract.
+The next file-backed probes remain `GenericAsm` in `cuda-layout.slang` and the multi-field
+conventional-global address in `sampler-comparison-state-unused.slang`.

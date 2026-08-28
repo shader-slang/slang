@@ -260,26 +260,40 @@ IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type)
     return ptrType;
 }
 
-IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferI32Type(IRInst* type)
+static bool _isNVVMSupportedResourceElementType(IRInst* type)
 {
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type);
+}
+
+IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferType(
+    IRInst* type,
+    IRType** outElementType)
+{
+    if (outElementType)
+        *outElementType = nullptr;
+
     auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
     if (!bufferType || bufferType->getOp() != kIROp_HLSLRWStructuredBufferType ||
-        bufferType->getOperandCount() != 3 || !isNVVMSignedI32Type(bufferType->getElementType()))
+        bufferType->getOperandCount() != 3 ||
+        !_isNVVMSupportedResourceElementType(bufferType->getElementType()))
     {
         return nullptr;
     }
 
     IRType* dataLayout = bufferType->getDataLayout();
-    return dataLayout && dataLayout->getOp() == kIROp_DefaultBufferLayoutType ? bufferType
-                                                                              : nullptr;
+    if (!dataLayout || dataLayout->getOp() != kIROp_DefaultBufferLayoutType)
+        return nullptr;
+    if (outElementType)
+        *outElementType = bufferType->getElementType();
+    return bufferType;
 }
 
-IRPtrTypeBase* asNVVMSupportedRWStructuredBufferI32ElementPointerType(IRInst* type)
+IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
 {
     auto ptrType = as<IRPtrTypeBase>(type);
     IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
     if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
-        !isNVVMSignedI32Type(ptrType->getValueType()) ||
+        !_isNVVMSupportedResourceElementType(ptrType->getValueType()) ||
         ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
         ptrType->getAddressSpace() != AddressSpace::Generic || !dataLayout ||
         dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
@@ -294,7 +308,7 @@ bool isNVVMSupportedParameterType(IRInst* type)
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedDeviceNumericPointerType(type) ||
            asNVVMSupportedDeviceArrayPointerType(type) ||
-           asNVVMSupportedRawRWStructuredBufferI32Type(type);
+           asNVVMSupportedRawRWStructuredBufferType(type);
 }
 
 SlangResult NVVMTypeLoweringContext::_requireBuilderOperation(
@@ -381,6 +395,36 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
     return SLANG_OK;
 }
 
+SlangResult NVVMTypeLoweringContext::_lowerRawRWStructuredBufferType(
+    IRHLSLStructuredBufferTypeBase* type,
+    SlangNVVMTypeHandle& outType)
+{
+    outType = nullptr;
+    IRType* elementType = nullptr;
+    SLANG_RELEASE_ASSERT(asNVVMSupportedRawRWStructuredBufferType(type, &elementType));
+
+    SlangNVVMTypeHandle loweredElementType = nullptr;
+    SLANG_RETURN_ON_FAIL(lowerType(elementType, NVVMTypeUse::Value, loweredElementType));
+    SlangNVVMTypeHandle dataPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        "raw RWStructuredBuffer data-pointer type",
+        m_builder.getPointerType(
+            m_module,
+            loweredElementType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            dataPointerType)));
+    SlangNVVMTypeHandle countType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        "raw RWStructuredBuffer count type",
+        m_builder.getIntegerType(m_module, 64, countType)));
+    const SlangNVVMTypeHandle fieldTypes[] = {dataPointerType, countType};
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        "raw RWStructuredBuffer view type",
+        m_builder.getStructType(m_module, fieldTypes, SLANG_COUNT_OF(fieldTypes), outType)));
+    m_typeMap[type] = outType;
+    return SLANG_OK;
+}
+
 SlangResult NVVMTypeLoweringContext::_lowerPointerType(
     IRType* canonicalType,
     IRType* pointeeType,
@@ -412,7 +456,7 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             pointeeType->getOp() == kIROp_ArrayType ? "device fixed i32 array pointer type"
-                                                    : "device i32 pointer type",
+                                                    : "device numeric pointer type",
             m_builder.getPointerType(m_module, loweredPointeeType, addressSpace, outType)));
         m_pointerRepresentationMap[key] = outType;
     }
@@ -440,9 +484,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRArrayType* deviceArrayType = nullptr;
     IRPtrTypeBase* deviceArrayPointer =
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
-    IRHLSLStructuredBufferTypeBase* rawResource = asNVVMSupportedRawRWStructuredBufferI32Type(type);
+    IRHLSLStructuredBufferTypeBase* rawResource = asNVVMSupportedRawRWStructuredBufferType(type);
     IRPtrTypeBase* resourceElementPointer =
-        asNVVMSupportedRWStructuredBufferI32ElementPointerType(type);
+        asNVVMSupportedRWStructuredBufferElementPointerType(type);
     IRPtrTypeBase* sharedElementPointer = asNVVMSupportedSharedI32ElementPointerType(type);
 
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
@@ -525,9 +569,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
     else if (rawResource)
     {
-        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "raw RWStructuredBuffer signed i32 type",
-            m_builder.getRawRWStructuredBufferI32Type(m_module, outType)));
+        return _lowerRawRWStructuredBufferType(rawResource, outType);
     }
     else if (sharedElementPointer)
     {

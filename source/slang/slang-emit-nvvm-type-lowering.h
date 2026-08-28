@@ -72,11 +72,13 @@ IRGlobalVar* asNVVMSupportedSharedI32ArrayGlobal(
 /// Returns the canonical shared-address-space pointer produced for one i32 array element.
 IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type);
 
-/// Returns the exact raw CUDA `RWStructuredBuffer<int, DefaultLayout>` launch-value type.
-IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferI32Type(IRInst* type);
+/// Returns an exact raw CUDA `RWStructuredBuffer<T, DefaultLayout>` for a selected scalar `T`.
+IRHLSLStructuredBufferTypeBase* asNVVMSupportedRawRWStructuredBufferType(
+    IRInst* type,
+    IRType** outElementType = nullptr);
 
-/// Returns the canonical pointer produced by accepted structured-buffer element addressing.
-IRPtrTypeBase* asNVVMSupportedRWStructuredBufferI32ElementPointerType(IRInst* type);
+/// Returns the canonical pointer produced by selected-scalar structured-buffer element addressing.
+IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type);
 
 /// Returns whether `type` has an accepted direct CUDA launch-parameter representation.
 bool isNVVMSupportedParameterType(IRInst* type);
@@ -125,6 +127,9 @@ private:
 
     SlangResult _lowerArrayType(IRArrayType* type, SlangNVVMTypeHandle& outType);
     SlangResult _lowerStructType(IRStructType* type, SlangNVVMTypeHandle& outType);
+    SlangResult _lowerRawRWStructuredBufferType(
+        IRHLSLStructuredBufferTypeBase* type,
+        SlangNVVMTypeHandle& outType);
     SlangResult _lowerPointerType(
         IRType* canonicalType,
         IRType* pointeeType,

@@ -414,35 +414,6 @@ static SlangResult SLANG_NVVM_CALL _getStructType(
     return SLANG_OK;
 }
 
-// Returns the one structural source of truth for the raw CUDA `RWStructuredBuffer<int>` ABI.
-static llvm::StructType* _getRawRWStructuredBufferI32LLVMType(ModuleState* state)
-{
-    if (!state)
-        return nullptr;
-
-    llvm::Type* fields[] = {
-        llvm::PointerType::get(
-            llvm::Type::getInt32Ty(state->context),
-            SLANG_NVVM_ADDRESS_SPACE_GLOBAL),
-        llvm::Type::getInt64Ty(state->context),
-    };
-    return llvm::StructType::get(state->context, fields, false);
-}
-
-static SlangResult SLANG_NVVM_CALL
-_getRawRWStructuredBufferI32Type(SlangNVVMModuleHandle module, SlangNVVMTypeHandle* outType)
-{
-    if (outType)
-        *outType = nullptr;
-
-    ModuleState* state = _getModule(module);
-    if (!state || !outType)
-        return SLANG_E_INVALID_ARG;
-
-    *outType = reinterpret_cast<SlangNVVMTypeHandle>(_getRawRWStructuredBufferI32LLVMType(state));
-    return SLANG_OK;
-}
-
 static SlangResult SLANG_NVVM_CALL _getFunctionType(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle resultType,
@@ -1570,35 +1541,29 @@ static SlangResult SLANG_NVVM_CALL _emitStructFieldPointer(
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _emitRawRWStructuredBufferI32ElementPointer(
+static SlangResult SLANG_NVVM_CALL _emitStructFieldValue(
     SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle buffer,
-    SlangNVVMValueHandle elementIndex,
-    SlangNVVMValueHandle* outPointer)
+    SlangNVVMValueHandle structValue,
+    uint32_t fieldIndex,
+    SlangNVVMValueHandle* outValue)
 {
-    if (outPointer)
-        *outPointer = nullptr;
+    if (outValue)
+        *outValue = nullptr;
 
     ModuleState* state = _getModule(module);
-    llvm::Value* llvmBuffer = _getValue(buffer);
-    llvm::Value* llvmElementIndex = _getValue(elementIndex);
+    llvm::Value* llvmStructValue = _getValue(structValue);
+    llvm::StructType* structType =
+        llvmStructValue ? llvm::dyn_cast<llvm::StructType>(llvmStructValue->getType()) : nullptr;
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    llvm::StructType* bufferType = _getRawRWStructuredBufferI32LLVMType(state);
-    if (!state || !outPointer || !insertionBlock || !llvmBuffer || !llvmElementIndex ||
-        llvmBuffer->getType() != bufferType || !llvmElementIndex->getType()->isIntegerTy(32) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmBuffer) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmElementIndex))
+    if (!state || !outValue || !insertionBlock || !structType ||
+        fieldIndex >= structType->getNumElements() ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmStructValue))
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    llvm::Value* dataPointer = state->builder.CreateExtractValue(llvmBuffer, {0});
-    // A Slang structured-buffer index does not establish LLVM's stronger inbounds provenance.
-    llvm::Value* result = state->builder.CreateGEP(
-        llvm::Type::getInt32Ty(state->context),
-        dataPointer,
-        llvmElementIndex);
-    *outPointer = reinterpret_cast<SlangNVVMValueHandle>(result);
+    llvm::Value* result = state->builder.CreateExtractValue(llvmStructValue, {fieldIndex});
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
@@ -2539,7 +2504,6 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.getArrayType = _getArrayType;
     api.getVectorType = _getVectorType;
     api.getStructType = _getStructType;
-    api.getRawRWStructuredBufferI32Type = _getRawRWStructuredBufferI32Type;
     api.declareFunction = _declareFunction;
     api.getFunctionParameter = _getFunctionParameter;
     api.createBlock = _createBlock;
@@ -2558,8 +2522,8 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitPointerOffset = _emitPointerOffset;
     api.emitArrayElementPointer = _emitArrayElementPointer;
     api.emitStructFieldPointer = _emitStructFieldPointer;
+    api.emitStructFieldValue = _emitStructFieldValue;
     api.emitVectorElementExtract = _emitVectorElementExtract;
-    api.emitRawRWStructuredBufferI32ElementPointer = _emitRawRWStructuredBufferI32ElementPointer;
     api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
     api.declareGlobalStorage = _declareGlobalStorage;
     api.markFunctionAsKernel = _markFunctionAsKernel;

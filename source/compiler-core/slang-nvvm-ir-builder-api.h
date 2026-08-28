@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 2u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 3u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -199,9 +199,6 @@ extern "C"
             const SlangNVVMTypeHandle* fieldTypes,
             size_t fieldCount,
             SlangNVVMTypeHandle* outType);
-        SlangNVVMResult(SLANG_NVVM_CALL* getRawRWStructuredBufferI32Type)(
-            SlangNVVMModuleHandle module,
-            SlangNVVMTypeHandle* outType);
         SlangNVVMResult(SLANG_NVVM_CALL* declareFunction)(
             SlangNVVMModuleHandle module,
             SlangNVVMTypeHandle functionType,
@@ -286,16 +283,16 @@ extern "C"
             SlangNVVMValueHandle baseStructPointer,
             uint32_t fieldIndex,
             SlangNVVMValueHandle* outPointer);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitStructFieldValue)(
+            SlangNVVMModuleHandle module,
+            SlangNVVMValueHandle structValue,
+            uint32_t fieldIndex,
+            SlangNVVMValueHandle* outValue);
         SlangNVVMResult(SLANG_NVVM_CALL* emitVectorElementExtract)(
             SlangNVVMModuleHandle module,
             SlangNVVMValueHandle vector,
             uint32_t elementIndex,
             SlangNVVMValueHandle* outValue);
-        SlangNVVMResult(SLANG_NVVM_CALL* emitRawRWStructuredBufferI32ElementPointer)(
-            SlangNVVMModuleHandle module,
-            SlangNVVMValueHandle buffer,
-            SlangNVVMValueHandle elementIndex,
-            SlangNVVMValueHandle* outPointer);
         SlangNVVMResult(SLANG_NVVM_CALL* emitRelaxedGlobalI32AtomicAdd)(
             SlangNVVMModuleHandle module,
             SlangNVVMValueHandle pointer,
