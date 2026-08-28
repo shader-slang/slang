@@ -119,9 +119,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getAPI().nvvmIRVersionMinor == 0);
         SLANG_CHECK(builder.getAPI().pointerModel == SLANG_NVVM_POINTER_MODEL_TYPED);
         SLANG_CHECK(builder.getFoundationAPI()->createModule != nullptr);
+        SLANG_CHECK(builder.getConstructionAPI()->getStructType != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->declareGlobalStorage != nullptr);
+        SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=1") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=2") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -590,6 +592,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             nullptr,
             arrayType,
+            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
             SLANG_NVVM_ADDRESS_SPACE_SHARED,
             4,
             toSlice("rejectedNullModule"),
@@ -600,6 +603,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             scope.module,
             foreignArrayType,
+            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
             SLANG_NVVM_ADDRESS_SPACE_SHARED,
             4,
             toSlice("rejectedForeignType"),
@@ -610,6 +614,18 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             scope.module,
             arrayType,
+            SlangNVVMGlobalLinkage(2),
+            SLANG_NVVM_ADDRESS_SPACE_SHARED,
+            4,
+            toSlice("rejectedLinkage"),
+            rejected) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejected == nullptr);
+    rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.declareGlobalStorage(
+            scope.module,
+            arrayType,
+            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
             SlangNVVMAddressSpace(2),
             4,
             toSlice("rejectedAddressSpace"),
@@ -620,6 +636,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             scope.module,
             arrayType,
+            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
             SLANG_NVVM_ADDRESS_SPACE_SHARED,
             3,
             toSlice("rejectedAlignment"),
@@ -630,6 +647,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareGlobalStorage(
         scope.module,
         arrayType,
+        SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
         SLANG_NVVM_ADDRESS_SPACE_SHARED,
         4,
         toSlice("sharedValues"),
@@ -639,6 +657,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             scope.module,
             arrayType,
+            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
             SLANG_NVVM_ADDRESS_SPACE_SHARED,
             4,
             toSlice("sharedValues"),
@@ -683,6 +702,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
                 "@sharedValues = internal addrspace(3) global [64 x i32] undef, align 4") >= 0);
         SLANG_CHECK(text.indexOf("rejectedNullModule") < 0);
         SLANG_CHECK(text.indexOf("rejectedForeignType") < 0);
+        SLANG_CHECK(text.indexOf("rejectedLinkage") < 0);
         SLANG_CHECK(text.indexOf("rejectedAddressSpace") < 0);
         SLANG_CHECK(text.indexOf("rejectedAlignment") < 0);
         // LLVM folds this constant-index address to a constant expression and prints it once at
@@ -690,6 +710,130 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("getelementptr")) == 2);
         SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("store i32 7")) == 1);
         SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("load i32")) == 1);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsConventionalGlobalParameterStorage)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.isInitialized());
+
+    ScopedNVVMBuilderModule module;
+    ScopedNVVMBuilderModule foreignModule;
+    module.builder = &builder;
+    foreignModule.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("conventional-global-parameters"), module.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(
+        toSlice("conventional-global-parameters-foreign"),
+        foreignModule.module)));
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle integerType = nullptr;
+    SlangNVVMTypeHandle resourceType = nullptr;
+    SlangNVVMTypeHandle foreignResourceType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 32, integerType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getRawRWStructuredBufferI32Type(module.module, resourceType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getRawRWStructuredBufferI32Type(foreignModule.module, foreignResourceType)));
+
+    SlangNVVMTypeHandle rejectedType = reinterpret_cast<SlangNVVMTypeHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.getStructType(module.module, nullptr, 1, rejectedType) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedType == nullptr);
+    rejectedType = reinterpret_cast<SlangNVVMTypeHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.getStructType(module.module, &foreignResourceType, 1, rejectedType) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedType == nullptr);
+
+    const SlangNVVMTypeHandle fieldTypes[] = {resourceType};
+    SlangNVVMTypeHandle parameterStructType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getStructType(
+        module.module,
+        fieldTypes,
+        SLANG_COUNT_OF(fieldTypes),
+        parameterStructType)));
+
+    SlangNVVMValueHandle globalParameters = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareGlobalStorage(
+        module.module,
+        parameterStructType,
+        SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL,
+        SLANG_NVVM_ADDRESS_SPACE_CONSTANT,
+        8,
+        toSlice("SLANG_globalParams"),
+        globalParameters)));
+
+    SlangNVVMTypeHandle functionType = nullptr;
+    SlangNVVMValueHandle function = nullptr;
+    SlangNVVMBlockHandle entryBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionType(module.module, voidType, nullptr, 0, functionType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        toSlice("conventionalGlobalParameters"),
+        function)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
+
+    auto expectRejectedField = [&](SlangNVVMValueHandle base, uint32_t fieldIndex)
+    {
+        SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitStructFieldPointer(module.module, base, fieldIndex, rejected) ==
+            SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejected == nullptr);
+    };
+    expectRejectedField(nullptr, 0);
+    expectRejectedField(globalParameters, 1);
+
+    SlangNVVMValueHandle fieldPointer = nullptr;
+    SlangNVVMValueHandle buffer = nullptr;
+    SlangNVVMValueHandle index = nullptr;
+    SlangNVVMValueHandle elementPointer = nullptr;
+    SlangNVVMValueHandle value = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitStructFieldPointer(module.module, globalParameters, 0, fieldPointer)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitLoad(module.module, fieldPointer, 8, buffer)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getIntegerConstant(module.module, integerType, 0, index)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitRawRWStructuredBufferI32ElementPointer(
+        module.module,
+        buffer,
+        index,
+        elementPointer)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getIntegerConstant(module.module, integerType, 42, value)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(module.module, value, elementPointer, 4)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(module.module, function)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assembly)));
+        const String text = _getBlobText(assembly);
+        SLANG_CHECK(
+            text.indexOf("@SLANG_globalParams = addrspace(4) global { { i32 addrspace(1)*, i64 } } "
+                         "undef, align 8") >= 0);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("getelementptr")) == 2);
+        SLANG_CHECK(
+            _countOccurrences(text.getUnownedSlice(), toSlice("load { i32 addrspace(1)*, i64 }")) ==
+            1);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("extractvalue")) == 1);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("store i32 42")) == 1);
+        SLANG_CHECK(text.indexOf("!nvvm.annotations") >= 0);
     }
 }
 
@@ -1885,15 +2029,19 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
     };
     SLANG_CHECK(!builder.supportsValueOperation(unsupportedWidthAdd));
 
-    const SlangNVVMValueTypeDesc signedI32x2 = NVVMSemantics::kSignedI32x2;
-    const SlangNVVMValueTypeDesc vectorOperandTypes[] = {signedI32x2, signedI32x2};
-    const SlangNVVMValueOperationDesc unsupportedVectorMultiply = {
+    const SlangNVVMValueTypeDesc signedI32x5 = {
+        SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+        32,
+        5,
+    };
+    const SlangNVVMValueTypeDesc vectorOperandTypes[] = {signedI32x5, signedI32x5};
+    const SlangNVVMValueOperationDesc unsupportedVectorWidthMultiply = {
         SLANG_NVVM_VALUE_OP_MULTIPLY,
-        signedI32x2,
+        signedI32x5,
         vectorOperandTypes,
         SLANG_COUNT_OF(vectorOperandTypes),
     };
-    SLANG_CHECK(!builder.supportsValueOperation(unsupportedVectorMultiply));
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedVectorWidthMultiply));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderRealProviderPreservesShortBuffers)

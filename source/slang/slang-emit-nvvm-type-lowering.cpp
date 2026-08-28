@@ -94,7 +94,7 @@ IRVectorType* asNVVMSupportedSignedI32x2Type(IRInst* type)
 bool isNVVMSupportedNumericValueType(IRInst* type)
 {
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupportedSignedI32x2Type(type);
+           asNVVMSupportedSignedI32x2Type(type) || asNVVMSupportedUInt3Type(type);
 }
 
 uint32_t getNVVMNumericValueAlignment(IRInst* type)
@@ -358,6 +358,29 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     return SLANG_OK;
 }
 
+SlangResult NVVMTypeLoweringContext::_lowerStructType(
+    IRStructType* type,
+    SlangNVVMTypeHandle& outType)
+{
+    outType = nullptr;
+    List<SlangNVVMTypeHandle> fieldTypes;
+    for (auto field : type->getFields())
+    {
+        SlangNVVMTypeHandle fieldType = nullptr;
+        SLANG_RETURN_ON_FAIL(lowerType(field->getFieldType(), NVVMTypeUse::Value, fieldType));
+        fieldTypes.add(fieldType);
+    }
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        "struct type",
+        m_builder.getStructType(
+            m_module,
+            fieldTypes.getCount() ? fieldTypes.getBuffer() : nullptr,
+            size_t(fieldTypes.getCount()),
+            outType)));
+    m_typeMap[type] = outType;
+    return SLANG_OK;
+}
+
 SlangResult NVVMTypeLoweringContext::_lowerPointerType(
     IRType* canonicalType,
     IRType* pointeeType,
@@ -411,6 +434,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isBool = isNVVMBoolType(type);
     IRVectorType* uint3Type = asNVVMSupportedUInt3Type(type);
     IRVectorType* signedI32x2Type = asNVVMSupportedSignedI32x2Type(type);
+    IRStructType* structType = as<IRStructType>(type);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedArrayType = asNVVMSupportedI32ArrayType(type);
     IRArrayType* deviceArrayType = nullptr;
@@ -434,7 +458,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloat32 || isBool || uint3Type || signedI32x2Type || fixedArrayType ||
           deviceNumericPointer || deviceArrayPointer || rawResource || resourceElementPointer ||
-          sharedElementPointer));
+          sharedElementPointer || structType));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -482,6 +506,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (fixedArrayType)
     {
         return _lowerArrayType(fixedArrayType, outType);
+    }
+    else if (structType)
+    {
+        return _lowerStructType(structType, outType);
     }
     else if (deviceNumericPointer)
     {

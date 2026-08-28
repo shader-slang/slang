@@ -1050,9 +1050,11 @@ Result linkAndOptimizeIR(
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     // Debug info is added by the front-end. If the target cannot express debug info, or if the user
-    // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
+    // specifies -g0, strip it now to allow more optimization and cleanup. The direct NVVM builder
+    // does not yet expose LLVM debug-metadata construction, so its accepted IR is intentionally
+    // debug-free even when a runtime asks Slang for a debug-layer compilation.
     if (requiredLoweringPassSet.debugInfo &&
-        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None))
+        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None || emitNVVMDirectly))
         SLANG_PASS(stripDebugInfo);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
@@ -2227,6 +2229,10 @@ Result linkAndOptimizeIR(
     // as late as possible, so that it doesn't affect how other
     // optimization passes need to work.
     //
+    if (emitNVVMDirectly)
+    {
+        SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink());
+    }
     switch (target)
     {
     case CodeGenTarget::GLSL:

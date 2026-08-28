@@ -19,10 +19,11 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/cuda/nvvm-core-execution.slang` | Direct NVVM PTX | Pass | `%tid.x`, shared storage, group barrier, and global store are present |
 | `tests/cuda/nvvm-mixed-numeric.slang` | Direct NVVM PTX | Pass | Narrow/wide integer, float32, and fixed-vector workload emits the expected typed global stores |
 | `tests/cuda/nvvm-unsupported-ir.slang` | Direct NVVM diagnostic | Expected stop | Exact `CUDA kernel decoration` boundary for executable conventional compute |
-| `tests/cuda/compile-to-cuda.slang` | Direct NVVM probe | Expected stop | Canonical conventional `entry-point parameter`; first Slice 72 acceptance target |
-| `tests/cuda/cuda-layout.slang` | Direct NVVM probe | Expected stop | Canonical conventional `entry-point parameter` |
-| `tests/cuda/wave-lane-index-multidim.slang` | Direct NVVM probe | Expected stop | Canonical conventional `entry-point parameter` |
-| `tests/cuda/sampler-comparison-state-unused.slang` | Direct NVVM probe | Expected stop | `get_field_addr` in the conventional global-parameter/resource graph |
+| `tests/cuda/compile-to-cuda.slang` | NVRTC + direct NVVM runtime | Pass | Ordinary `SV_DispatchThreadID`, one conventional `RWStructuredBuffer<int>`, host-populated `SLANG_globalParams`, and zero-parameter kernel produce identical results |
+| `tests/cuda/nvvm-conventional-global-unsupported.slang` | Direct NVVM diagnostic | Expected stop | Exact one-field conventional parameter-block boundary before provider discovery |
+| `tests/cuda/cuda-layout.slang` | Direct NVVM probe | Expected stop | `GenericAsm` after conventional entry/global lowering |
+| `tests/cuda/wave-lane-index-multidim.slang` | Direct NVVM probe | Expected stop | `getElement` after conventional varying legalization |
+| `tests/cuda/sampler-comparison-state-unused.slang` | Direct NVVM probe | Expected stop | Conventional field address in a multi-field sampler/resource parameter block |
 
 Slices 69 and 70 consolidated the implementation onto one exact forward-only builder ABI and one
 typed-descriptor capability system. Older rows below retain the interface names that described the
@@ -331,7 +332,9 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangNegotiatesCUDAExecutionCapability` | An exact V4 construction-version-1 provider is discovered but reports E52018 for required extended construction before module creation or operation emission | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage` | V4 construction version 3 preserves versions 1 and 2, rejects invalid type/address-space/alignment/name/output and duplicate-name cases without mutation, then emits exact normal and LLVM-7-compatible address-space-3 storage/GEP/load/store forms | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesSharedGlobalStorageCapability` | An exact V4 construction-version-2 provider retains Slice 66 programs but reports E52018 for shared storage before module creation | Pass |
-| `slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies` | Dimensioned V4 descriptors emit signed/unsigned comparisons, signed/unsigned widening, integer/float conversions, and signed-i32x2 addition in normal and compatible assembly; mixed signedness, i24, and vector multiply remain unsupported with sanitized output | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies` | Dimensioned descriptors emit signed/unsigned comparisons, signed/unsigned widening, integer/float conversions, and selected one-to-four-lane integer binary operations in normal and compatible assembly; mixed signedness, i24, and five-lane vectors remain unsupported with sanitized output | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderBuildsConventionalGlobalParameterStorage` | Exact ABI revision 2 constructs an unpacked one-resource struct, externally visible constant-address-space global, field GEP, resource load, and store in verified normal and NVVM-2.0-compatible assembly; foreign types and invalid fields stop without mutation | Pass |
+| `slang-unit-test-tool/nvvmSlangConventionalComputeUsesDirectPipeline` | The fake provider observes a zero-parameter kernel, external `SLANG_globalParams`, UInt3 block/thread arithmetic, field/resource load, and raw structured-buffer store from ordinary source | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesNumericFamilyCapability` | A static-catalog-only V4 provider is discovered once but reports E52018 for the mixed numeric family before module creation or libNVVM program creation | Pass |
 | `slang-unit-test-tool/nvvmSlangMixedNumericDifferentialPTX` | Raw signed/unsigned 8/16/64-bit scalars, float32, eight numeric pointers, explicit conversions, signed/unsigned branches, and signed-i32x2 load/add/store compile through both routes | Pass |
 | `slang-unit-test-tool/nvvmSlangMixedNumericPtxasAccepts` | CUDA 12.9 `ptxas` accepts direct NVVM and NVRTC PTX for the representative mixed-width/vector workload | Pass |

@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 1u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 2u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -60,6 +60,10 @@ extern "C"
 #define SLANG_NVVM_ADDRESS_SPACE_SHARED ((SlangNVVMAddressSpace)3u)
 #define SLANG_NVVM_ADDRESS_SPACE_CONSTANT ((SlangNVVMAddressSpace)4u)
 #define SLANG_NVVM_ADDRESS_SPACE_LOCAL ((SlangNVVMAddressSpace)5u)
+
+    typedef uint32_t SlangNVVMGlobalLinkage;
+#define SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL ((SlangNVVMGlobalLinkage)0u)
+#define SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL ((SlangNVVMGlobalLinkage)1u)
 
     typedef uint32_t SlangNVVMBuilderInterfaceID;
 #define SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION ((SlangNVVMBuilderInterfaceID)0u)
@@ -190,6 +194,11 @@ extern "C"
             SlangNVVMTypeHandle elementType,
             uint32_t elementCount,
             SlangNVVMTypeHandle* outType);
+        SlangNVVMResult(SLANG_NVVM_CALL* getStructType)(
+            SlangNVVMModuleHandle module,
+            const SlangNVVMTypeHandle* fieldTypes,
+            size_t fieldCount,
+            SlangNVVMTypeHandle* outType);
         SlangNVVMResult(SLANG_NVVM_CALL* getRawRWStructuredBufferI32Type)(
             SlangNVVMModuleHandle module,
             SlangNVVMTypeHandle* outType);
@@ -272,6 +281,11 @@ extern "C"
             SlangNVVMValueHandle baseArrayPointer,
             SlangNVVMValueHandle elementIndex,
             SlangNVVMValueHandle* outPointer);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitStructFieldPointer)(
+            SlangNVVMModuleHandle module,
+            SlangNVVMValueHandle baseStructPointer,
+            uint32_t fieldIndex,
+            SlangNVVMValueHandle* outPointer);
         SlangNVVMResult(SLANG_NVVM_CALL* emitVectorElementExtract)(
             SlangNVVMModuleHandle module,
             SlangNVVMValueHandle vector,
@@ -290,6 +304,7 @@ extern "C"
         SlangNVVMResult(SLANG_NVVM_CALL* declareGlobalStorage)(
             SlangNVVMModuleHandle module,
             SlangNVVMTypeHandle valueType,
+            SlangNVVMGlobalLinkage linkage,
             SlangNVVMAddressSpace addressSpace,
             uint32_t alignment,
             const char* name,

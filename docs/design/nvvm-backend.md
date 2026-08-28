@@ -4233,15 +4233,57 @@ entry/global-parameter ABI, then admit it at the direct consumer. `compile-to-cu
 first acceptance target; broader resource, vector/composite, and scalar/libdevice bundles follow
 from the next measured stops.
 
+### Slice 72: First conventional compute ABI
+
+The direct route now reuses `legalizeEntryPointVaryingParamsForCUDA`, so an ordinary
+`uint3 : SV_DispatchThreadID` is produced as the established
+`blockIdx * blockDim + threadIdx` UInt3 graph instead of being interpreted by the emitter. Varying
+legalization also repairs the entry function type after replacing its parameters; this keeps the
+function declaration and legalized entry block under one producer-owned signature invariant.
+
+The first accepted conventional global shape is the collected
+`ConstantBuffer<GlobalParams>` whose synthesized struct contains exactly one
+`RWStructuredBuffer<int>` field at offset zero with size 16 and alignment 8. It lowers to the same
+host-facing ABI as CUDA source:
+
+```llvm
+@SLANG_globalParams = addrspace(4) global { { i32 addrspace(1)*, i64 } } undef, align 8
+```
+
+The zero-parameter kernel loads the resource view through a structural field GEP, and the existing
+CUDA runtime finds and populates that symbol before launch. The provider ABI revision is 2 and
+adds only generic unpacked struct construction, statically indexed struct-field addressing, and
+explicit internal/external global linkage. Shared globals select internal linkage; the conventional
+parameter block selects external linkage. No callback names a Slang resource, parameter block, or
+source construct.
+
+`tests/cuda/compile-to-cuda.slang` now runs its unchanged ordinary source through both NVRTC and
+direct libNVVM CUDA lanes and produces identical output on the GPU. Direct PTX contains a visible
+zero-argument `computeMain`, `.visible .const .align 8 .b8 SLANG_globalParams[16]`, and the expected
+`%tid`, `%ntid`, and `%ctaid` register reads. A two-resource parameter block stops before provider
+discovery at the exact conventional-field boundary.
+
+The execution graph also replaces the signed-i32x2-only addition case with the existing
+dimensioned integer family: selected 8/16/32/64-bit signed or unsigned vectors with one through
+four lanes use the same typed binary-operation contract. The Slang emitter still admits only the
+previous signed-i32x2 proof and the UInt3 CUDA execution role; this provider generalization does
+not by itself claim arbitrary source vectors.
+
+The next corpus probe now stops at `GenericAsm` for `cuda-layout.slang`, `getElement` for
+`wave-lane-index-multidim.slang`, and the exact conventional field-address boundary for the
+multi-field sampler/resource block in `sampler-comparison-state-unused.slang`. Those measured
+stops, rather than the removed entry-parameter boundary, select subsequent work.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
   owns LLVM 7.0.1 plus an older CMake frontend or LLVM 14.0.6 plus negotiated text;
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
-- conventional shader-entry parameters and raw CUDA parameters beyond the selected integer and
-  float32 scalars, selected numeric device pointers, fixed i32 array pointers, signed-i32x2 device
-  pointers, and exact raw `RWStructuredBuffer<int>`;
+- conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
+  global parameter blocks beyond one exact `RWStructuredBuffer<int>` field, and raw CUDA parameters
+  beyond the selected integer and float32 scalars, selected numeric device pointers, fixed i32
+  array pointers, signed-i32x2 device pointers, and exact raw `RWStructuredBuffer<int>`;
 - external/indirect calls, richer helper ABI, integer shifts/division/remainder, saturating or
   overflow-decorated arithmetic, float64/low-precision scalar families, and general vector or
   matrix operations beyond the bounded signed-i32x2 add proof;

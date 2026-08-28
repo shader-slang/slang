@@ -383,6 +383,37 @@ static SlangResult SLANG_NVVM_CALL _getVectorType(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _getStructType(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMTypeHandle* fieldTypes,
+    size_t fieldCount,
+    SlangNVVMTypeHandle* outType)
+{
+    if (outType)
+        *outType = nullptr;
+
+    ModuleState* state = _getModule(module);
+    if (!state || (!fieldTypes && fieldCount) || !outType)
+        return SLANG_E_INVALID_ARG;
+
+    llvm::SmallVector<llvm::Type*, 8> llvmFieldTypes;
+    llvmFieldTypes.reserve(fieldCount);
+    for (size_t i = 0; i < fieldCount; ++i)
+    {
+        llvm::Type* fieldType = _getType(fieldTypes[i]);
+        if (!fieldType || &fieldType->getContext() != &state->context ||
+            !llvm::StructType::isValidElementType(fieldType))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+        llvmFieldTypes.push_back(fieldType);
+    }
+
+    *outType = reinterpret_cast<SlangNVVMTypeHandle>(
+        llvm::StructType::get(state->context, llvmFieldTypes, false));
+    return SLANG_OK;
+}
+
 // Returns the one structural source of truth for the raw CUDA `RWStructuredBuffer<int>` ABI.
 static llvm::StructType* _getRawRWStructuredBufferI32LLVMType(ModuleState* state)
 {
@@ -1257,6 +1288,7 @@ static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
 static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle valueType,
+    SlangNVVMGlobalLinkage linkage,
     SlangNVVMAddressSpace addressSpace,
     uint32_t alignment,
     const char* name,
@@ -1271,6 +1303,8 @@ static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
     const llvm::StringRef llvmName = _getStringRef(name, nameSize);
     if (!state || !llvmValueType || &llvmValueType->getContext() != &state->context ||
         !llvm::PointerType::isLoadableOrStorableType(llvmValueType) || !llvmValueType->isSized() ||
+        (linkage != SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL &&
+         linkage != SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL) ||
         !_isNVVMAddressSpace(addressSpace) || !alignment || !llvm::isPowerOf2_32(alignment) ||
         alignment > llvm::Value::MaximumAlignment || !name || !nameSize ||
         state->module->getNamedValue(llvmName) || !outStorage)
@@ -1282,7 +1316,8 @@ static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
         *state->module,
         llvmValueType,
         false,
-        llvm::GlobalValue::InternalLinkage,
+        linkage == SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL ? llvm::GlobalValue::ExternalLinkage
+                                                      : llvm::GlobalValue::InternalLinkage,
         llvm::UndefValue::get(llvmValueType),
         llvmName,
         nullptr,
@@ -1500,6 +1535,37 @@ static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
         llvmElementIndex};
     // A Slang subscript does not establish LLVM's stronger inbounds provenance contract.
     llvm::Value* result = state->builder.CreateGEP(arrayType, llvmBaseArrayPointer, indices);
+    *outPointer = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitStructFieldPointer(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle baseStructPointer,
+    uint32_t fieldIndex,
+    SlangNVVMValueHandle* outPointer)
+{
+    if (outPointer)
+        *outPointer = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmBaseStructPointer = _getValue(baseStructPointer);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::PointerType* pointerType =
+        llvmBaseStructPointer ? llvm::dyn_cast<llvm::PointerType>(llvmBaseStructPointer->getType())
+                              : nullptr;
+    llvm::StructType* structType =
+        pointerType ? llvm::dyn_cast<llvm::StructType>(pointerType->getPointerElementType())
+                    : nullptr;
+    if (!state || !outPointer || !insertionBlock || !structType ||
+        fieldIndex >= structType->getNumElements() ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmBaseStructPointer))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* result =
+        state->builder.CreateStructGEP(structType, llvmBaseStructPointer, fieldIndex);
     *outPointer = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
@@ -2293,10 +2359,11 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
         return nullptr;
     if (type.laneCount == 1)
         return scalarType;
-    if (type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER && type.bitWidth == 32 &&
-        type.laneCount == 2)
+    if ((type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+         type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+        type.laneCount >= 2 && type.laneCount <= 4)
     {
-        return llvm::FixedVectorType::get(scalarType, 2);
+        return llvm::FixedVectorType::get(scalarType, type.laneCount);
     }
     return nullptr;
 }
@@ -2337,7 +2404,6 @@ static SlangResult _emitNumericFamily(
                      : state->builder.CreateNeg(llvmOperands[0]);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerBinary:
-    case Slang::NVVMSemantics::ValueOperationFamily::SignedI32x2Add:
         switch (operation.operation)
         {
         case SLANG_NVVM_VALUE_OP_ADD:
@@ -2472,6 +2538,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.getFunctionType = _getFunctionType;
     api.getArrayType = _getArrayType;
     api.getVectorType = _getVectorType;
+    api.getStructType = _getStructType;
     api.getRawRWStructuredBufferI32Type = _getRawRWStructuredBufferI32Type;
     api.declareFunction = _declareFunction;
     api.getFunctionParameter = _getFunctionParameter;
@@ -2490,6 +2557,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitReturnVoid = _emitReturnVoid;
     api.emitPointerOffset = _emitPointerOffset;
     api.emitArrayElementPointer = _emitArrayElementPointer;
+    api.emitStructFieldPointer = _emitStructFieldPointer;
     api.emitVectorElementExtract = _emitVectorElementExtract;
     api.emitRawRWStructuredBufferI32ElementPointer = _emitRawRWStructuredBufferI32ElementPointer;
     api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;

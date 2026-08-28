@@ -17,7 +17,6 @@ enum class ValueOperationFamily : uint32_t
     IntegerConvert,
     IntegerToFloat,
     FloatToInteger,
-    SignedI32x2Add,
 };
 
 struct ValueOperationFamilyResolution
@@ -489,6 +488,15 @@ inline bool isSelectedScalarInteger(const SlangNVVMValueTypeDesc& type)
     return isInteger && isSelectedWidth && type.laneCount == 1;
 }
 
+inline bool isSelectedIntegerValue(const SlangNVVMValueTypeDesc& type)
+{
+    const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                           type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
+    const bool isSelectedWidth =
+        type.bitWidth == 8 || type.bitWidth == 16 || type.bitWidth == 32 || type.bitWidth == 64;
+    return isInteger && isSelectedWidth && type.laneCount >= 1 && type.laneCount <= 4;
+}
+
 /// Resolves the bounded, dimensioned numeric families added after the frozen exact catalog.
 inline bool resolveValueOperationFamily(
     const SlangNVVMValueOperationDesc& desc,
@@ -511,7 +519,7 @@ inline bool resolveValueOperationFamily(
     }
 
     const bool isBinaryInteger = desc.operandCount == 2 &&
-                                 isSelectedScalarInteger(desc.resultType) &&
+                                 isSelectedIntegerValue(desc.resultType) &&
                                  areSameType(desc.resultType, desc.operandTypes[0]) &&
                                  areSameType(desc.resultType, desc.operandTypes[1]);
     if (isBinaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_ADD ||
@@ -557,14 +565,6 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
-    if (desc.operation == SLANG_NVVM_VALUE_OP_ADD && desc.operandCount == 2 &&
-        areSameType(desc.resultType, kSignedI32x2) &&
-        areSameType(desc.operandTypes[0], kSignedI32x2) &&
-        areSameType(desc.operandTypes[1], kSignedI32x2))
-    {
-        outResolution = {ValueOperationFamily::SignedI32x2Add, "signed i32x2 addition"};
-        return true;
-    }
     return false;
 }
 

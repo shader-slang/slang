@@ -537,6 +537,11 @@ protected:
         // Allow subtype to perform any cleanup or finalization
         // after all parameters have been processed.
         endEntryPointImpl();
+
+        // Varying legalization can remove the original parameters or replace them with target
+        // parameters. Keep the function type synchronized with the entry block so downstream
+        // consumers see the legalized signature rather than the source-level signature.
+        fixUpFuncType(entryPointFunc);
     }
 
     virtual void beginEntryPointImpl() {}

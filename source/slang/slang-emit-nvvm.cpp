@@ -20,6 +20,88 @@ static const uint32_t kNVVMScalar32Alignment = 4;
 static const IRIntegerValue kNVVMI32Min = -2147483647 - 1;
 static const IRIntegerValue kNVVMI32Max = 2147483647;
 static const IRIntegerValue kNVVMUInt32Max = 4294967295;
+static const uint32_t kNVVMRawRWStructuredBufferAlignment = 8;
+
+struct NVVMConventionalGlobalParams
+{
+    IRGlobalParam* globalParam = nullptr;
+    IRStructType* elementType = nullptr;
+    IRStructField* field = nullptr;
+    uint32_t fieldIndex = 0;
+};
+
+// Recognizes the first canonical collected CUDA parameter block: one synthesized struct whose
+// sole field is an RWStructuredBuffer<int> view at offset zero.
+bool _getNVVMConventionalGlobalParams(IRInst* inst, NVVMConventionalGlobalParams& outParams)
+{
+    outParams = {};
+    auto globalParam = as<IRGlobalParam>(inst);
+    auto constantBufferType =
+        globalParam ? as<IRConstantBufferType>(globalParam->getDataType()) : nullptr;
+    auto elementType =
+        constantBufferType ? as<IRStructType>(constantBufferType->getElementType()) : nullptr;
+    if (!globalParam || !elementType ||
+        !elementType->findDecoration<IRSynthesizedParameterGroupDecoration>())
+    {
+        return false;
+    }
+
+    IRStructField* selectedField = nullptr;
+    uint32_t selectedFieldIndex = 0;
+    uint32_t fieldIndex = 0;
+    for (auto field : elementType->getFields())
+    {
+        if (selectedField || !asNVVMSupportedRawRWStructuredBufferI32Type(field->getFieldType()))
+            return false;
+        selectedField = field;
+        selectedFieldIndex = fieldIndex;
+        ++fieldIndex;
+    }
+    if (!selectedField)
+        return false;
+
+    auto offset = selectedField->findDecoration<IROffsetDecoration>();
+    auto sizeAndAlignment = elementType->findDecoration<IRSizeAndAlignmentDecoration>();
+    if (!offset || offset->getOffset() != 0 || !sizeAndAlignment ||
+        sizeAndAlignment->getSize() != 16 || sizeAndAlignment->getAlignment() != 8)
+    {
+        return false;
+    }
+
+    outParams = {globalParam, elementType, selectedField, selectedFieldIndex};
+    return true;
+}
+
+// Maps a canonical global produced by CUDA varying legalization to its semantic provider operation.
+bool _getNVVMCUDAExecutionGlobalOperation(IRInst* inst, SlangNVVMValueOperation& outOperation)
+{
+    outOperation = 0;
+    auto globalParam = as<IRGlobalParam>(inst);
+    auto targetIntrinsic =
+        globalParam ? globalParam->findDecoration<IRTargetIntrinsicDecoration>() : nullptr;
+    if (!globalParam || !targetIntrinsic || !asNVVMSupportedUInt3Type(globalParam->getDataType()))
+        return false;
+
+    const UnownedStringSlice definition = targetIntrinsic->getDefinition();
+    if (definition == toSlice("threadIdx"))
+        outOperation = SLANG_NVVM_VALUE_OP_THREAD_INDEX;
+    else if (definition == toSlice("blockIdx"))
+        outOperation = SLANG_NVVM_VALUE_OP_BLOCK_INDEX;
+    else if (definition == toSlice("blockDim"))
+        outOperation = SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS;
+    else if (definition == toSlice("gridDim"))
+        outOperation = SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS;
+    else
+        return false;
+    return true;
+}
+
+// Builds the complete typed descriptor shared by execution-global preflight and emission.
+SlangNVVMValueOperationDesc _getNVVMCUDAExecutionGlobalOperationDesc(
+    SlangNVVMValueOperation operation)
+{
+    return {operation, NVVMSemantics::kUnsignedI32x3, nullptr, 0};
+}
 
 struct ScopedNVVMModule
 {
@@ -393,10 +475,15 @@ SlangResult _validateAvailableValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    // Canonical module-owned shared storage exists before every function body and therefore does
-    // not participate in instruction dominance. All other executable values remain SSA-ordered.
+    // Canonical module-owned storage and CUDA execution globals exist before every function body
+    // and therefore do not participate in instruction dominance. All other executable values
+    // remain SSA-ordered.
+    NVVMConventionalGlobalParams globalParams;
+    SlangNVVMValueOperation executionOperation = 0;
     if (value && consumer && value->getModule() == consumer->getModule() &&
-        asNVVMSupportedSharedI32ArrayGlobal(value))
+        (asNVVMSupportedSharedI32ArrayGlobal(value) ||
+         _getNVVMConventionalGlobalParams(value, globalParams) ||
+         _getNVVMCUDAExecutionGlobalOperation(value, executionOperation)))
     {
         return SLANG_OK;
     }
@@ -556,7 +643,7 @@ SlangResult _validateScalarValue(
     return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar value"));
 }
 
-// Checks a selected scalar or the bounded signed-i32x2 vector proof.
+// Checks a selected scalar or one of the fixed integer-vector roles admitted by preflight.
 SlangResult _validateNumericValue(
     CodeGenContext* codeGenContext,
     IRInst* value,
@@ -564,7 +651,8 @@ SlangResult _validateNumericValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (value && asNVVMSupportedSignedI32x2Type(value->getDataType()))
+    if (value && (asNVVMSupportedSignedI32x2Type(value->getDataType()) ||
+                  asNVVMSupportedUInt3Type(value->getDataType())))
         return _validateAvailableValue(
             codeGenContext,
             value,
@@ -591,23 +679,30 @@ SlangResult _validatePointerValue(
               : nullptr;
     auto sharedElementPtrType =
         value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
+    auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
+    if (!fieldPtrType || value->getOp() != kIROp_FieldAddress ||
+        !asNVVMSupportedRawRWStructuredBufferI32Type(fieldPtrType->getValueType()))
+    {
+        fieldPtrType = nullptr;
+    }
     IRPtrTypeBase* devicePtrType = numericPtrType;
-    IRPtrTypeBase* acceptedPtrType = devicePtrType ? devicePtrType : sharedElementPtrType;
-    if (!acceptedPtrType &&
-        (!resourceElementPtrType || value->getOp() != kIROp_RWStructuredBufferGetElementPtr))
+    IRPtrTypeBase* acceptedPtrType = devicePtrType            ? devicePtrType
+                                     : sharedElementPtrType   ? sharedElementPtrType
+                                     : resourceElementPtrType ? resourceElementPtrType
+                                                              : fieldPtrType;
+    if (!acceptedPtrType)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
-    IRType* actualPointeeType =
-        acceptedPtrType ? acceptedPtrType->getValueType() : resourceElementPtrType->getValueType();
+    IRType* actualPointeeType = acceptedPtrType->getValueType();
     if (!expectedPointeeType || !isTypeEqual(actualPointeeType, expectedPointeeType))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device pointer pointee type"));
-    if (resourceElementPtrType && consumer->getOp() != kIROp_Store)
+    if (resourceElementPtrType && consumer->getOp() != kIROp_Load &&
+        consumer->getOp() != kIROp_Store)
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
-            toSlice("raw RWStructuredBuffer signed i32 store consumer"));
+            toSlice("raw RWStructuredBuffer signed i32 load or store consumer"));
     }
-    if (requireWriteAccess && acceptedPtrType &&
-        acceptedPtrType->getAccessQualifier() != AccessQualifier::ReadWrite)
+    if (requireWriteAccess && acceptedPtrType->getAccessQualifier() != AccessQualifier::ReadWrite)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("read-only pointer store"));
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
@@ -859,6 +954,13 @@ SlangResult _validateNVVMSymbolNames(
     }
     for (auto globalInst : module->getGlobalInsts())
     {
+        NVVMConventionalGlobalParams globalParams;
+        if (_getNVVMConventionalGlobalParams(globalInst, globalParams))
+        {
+            if (!names.add(String("SLANG_globalParams")))
+                return _diagnoseUnsupportedIR(codeGenContext, toSlice("global storage name"));
+            continue;
+        }
         auto globalVar = asNVVMSupportedSharedI32ArrayGlobal(globalInst);
         if (!globalVar)
             continue;
@@ -947,7 +1049,8 @@ SlangResult _validateNVVMFunction(
             switch (inst->getOp())
             {
             case kIROp_Load:
-                if (!isNVVMSupportedNumericValueType(inst->getDataType()))
+                if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
+                    !asNVVMSupportedRawRWStructuredBufferI32Type(inst->getDataType()))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 break;
 
@@ -1094,6 +1197,24 @@ SlangResult _validateNVVMFunction(
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
                         toSlice("raw RWStructuredBuffer signed i32 element pointer"));
+                }
+                break;
+
+            case kIROp_FieldAddress:
+                {
+                    auto fieldAddress = as<IRFieldAddress>(inst);
+                    NVVMConventionalGlobalParams globalParams;
+                    auto pointerType =
+                        fieldAddress ? as<IRPtrTypeBase>(fieldAddress->getDataType()) : nullptr;
+                    if (!fieldAddress ||
+                        !_getNVVMConventionalGlobalParams(fieldAddress->getBase(), globalParams) ||
+                        fieldAddress->getField() != globalParams.field->getKey() || !pointerType ||
+                        !asNVVMSupportedRawRWStructuredBufferI32Type(pointerType->getValueType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("conventional global parameter field address"));
+                    }
                 }
                 break;
 
@@ -1368,6 +1489,16 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_FieldAddress:
+                SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                    codeGenContext,
+                    cast<IRFieldAddress>(inst)->getBase(),
+                    inst,
+                    availableValues,
+                    dominatorTree));
+                availableValues.add(inst);
+                break;
+
             case kIROp_RWStructuredBufferGetElementPtr:
                 {
                     IRInst* buffer = inst->getOperand(0);
@@ -1572,6 +1703,21 @@ SlangResult _getLoweredNVVMValue(
         return SLANG_OK;
     }
 
+    SlangNVVMValueOperation executionOperation = 0;
+    if (_getNVVMCUDAExecutionGlobalOperation(irValue, executionOperation))
+    {
+        const SlangNVVMValueOperationDesc operation =
+            _getNVVMCUDAExecutionGlobalOperationDesc(executionOperation);
+        const NVVMSemantics::CatalogEntry* semantic = NVVMSemantics::find(operation);
+        SLANG_RELEASE_ASSERT(semantic);
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            semantic->diagnosticName,
+            builder.emitValueOperation(module, operation, nullptr, 0, outValue)));
+        valueMap[irValue] = outValue;
+        return SLANG_OK;
+    }
+
     if (auto intLit = _asExecutableSelectedIntegerConstant(irValue))
     {
         SlangNVVMTypeHandle integerType = nullptr;
@@ -1678,7 +1824,20 @@ SlangResult validateNVVMSupportedIR(
                 requiresCUDAKernel = requiresCUDAKernel || inst->getOp() != kIROp_Return;
         }
     }
-    if (requiresCUDAKernel && !entryPoint->findDecoration<IRCudaKernelDecoration>())
+    bool hasConventionalCUDAABI = false;
+    NVVMConventionalGlobalParams conventionalGlobalParams;
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        NVVMConventionalGlobalParams globalParams;
+        SlangNVVMValueOperation executionOperation = 0;
+        if (_getNVVMConventionalGlobalParams(globalInst, globalParams))
+            conventionalGlobalParams = globalParams;
+        hasConventionalCUDAABI =
+            hasConventionalCUDAABI || globalParams.globalParam ||
+            _getNVVMCUDAExecutionGlobalOperation(globalInst, executionOperation);
+    }
+    if (requiresCUDAKernel && !entryPoint->findDecoration<IRCudaKernelDecoration>() &&
+        !hasConventionalCUDAABI)
     {
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("CUDA kernel decoration"));
     }
@@ -1705,11 +1864,26 @@ SlangResult validateNVVMSupportedIR(
                 codeGenContext,
                 UnownedStringSlice(getIROpInfo(globalInst->getOp()).name));
         }
+        NVVMConventionalGlobalParams globalParams;
+        if (_getNVVMConventionalGlobalParams(globalInst, globalParams))
+            continue;
+        SlangNVVMValueOperation executionOperation = 0;
+        if (_getNVVMCUDAExecutionGlobalOperation(globalInst, executionOperation))
+        {
+            const SlangNVVMValueOperationDesc desc =
+                _getNVVMCUDAExecutionGlobalOperationDesc(executionOperation);
+            const NVVMSemantics::CatalogEntry* semantic = NVVMSemantics::find(desc);
+            SLANG_RELEASE_ASSERT(semantic);
+            _requireValueOperation(outRequirements, desc, semantic->diagnosticName);
+            continue;
+        }
         if (as<IRDecoration>(globalInst) || as<IRConstant>(globalInst) ||
             as<IRStructKey>(globalInst) || getIROpInfo(globalInst->getOp()).isHoistable())
         {
             continue;
         }
+        if (globalInst == conventionalGlobalParams.elementType)
+            continue;
         return _diagnoseUnsupportedIR(
             codeGenContext,
             UnownedStringSlice(getIROpInfo(globalInst->getOp()).name));
@@ -1767,6 +1941,30 @@ SlangResult emitNVVMIRFromLinkedIR(
     // map.
     for (auto globalInst : linkedIR.module->getGlobalInsts())
     {
+        NVVMConventionalGlobalParams globalParams;
+        if (_getNVVMConventionalGlobalParams(globalInst, globalParams))
+        {
+            SlangNVVMTypeHandle loweredStructType = nullptr;
+            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                globalParams.elementType,
+                NVVMTypeUse::Value,
+                loweredStructType));
+            SlangNVVMValueHandle loweredStorage = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "conventional global parameter storage declaration",
+                builder.declareGlobalStorage(
+                    moduleScope.module,
+                    loweredStructType,
+                    SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL,
+                    SLANG_NVVM_ADDRESS_SPACE_CONSTANT,
+                    kNVVMRawRWStructuredBufferAlignment,
+                    toSlice("SLANG_globalParams"),
+                    loweredStorage)));
+            valueMap[globalParams.globalParam] = loweredStorage;
+            continue;
+        }
+
         IRArrayType* arrayType = nullptr;
         auto globalVar = asNVVMSupportedSharedI32ArrayGlobal(globalInst, &arrayType);
         if (!globalVar)
@@ -1782,6 +1980,7 @@ SlangResult emitNVVMIRFromLinkedIR(
             builder.declareGlobalStorage(
                 moduleScope.module,
                 loweredArrayType,
+                SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
                 SLANG_NVVM_ADDRESS_SPACE_SHARED,
                 kNVVMScalar32Alignment,
                 getMangledName(globalVar),
@@ -1939,11 +2138,13 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredPointer));
                         SlangNVVMValueHandle loweredValue = nullptr;
                         const uint32_t alignment =
-                            getNVVMNumericValueAlignment(load->getDataType());
+                            asNVVMSupportedRawRWStructuredBufferI32Type(load->getDataType())
+                                ? kNVVMRawRWStructuredBufferAlignment
+                                : getNVVMNumericValueAlignment(load->getDataType());
                         SLANG_RELEASE_ASSERT(alignment);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "numeric load",
+                            "value load",
                             builder.emitLoad(
                                 moduleScope.module,
                                 loweredPointer,
@@ -2246,6 +2447,35 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 loweredBasePointer,
                                 loweredElementIndex,
+                                loweredPointer)));
+                        valueMap[inst] = loweredPointer;
+                    }
+                    break;
+
+                case kIROp_FieldAddress:
+                    {
+                        auto fieldAddress = cast<IRFieldAddress>(inst);
+                        NVVMConventionalGlobalParams globalParams;
+                        SLANG_RELEASE_ASSERT(_getNVVMConventionalGlobalParams(
+                            fieldAddress->getBase(),
+                            globalParams));
+                        SlangNVVMValueHandle loweredBasePointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            fieldAddress->getBase(),
+                            valueMap,
+                            typeContext,
+                            loweredBasePointer));
+                        SlangNVVMValueHandle loweredPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "conventional global parameter field address",
+                            builder.emitStructFieldPointer(
+                                moduleScope.module,
+                                loweredBasePointer,
+                                globalParams.fieldIndex,
                                 loweredPointer)));
                         valueMap[inst] = loweredPointer;
                     }

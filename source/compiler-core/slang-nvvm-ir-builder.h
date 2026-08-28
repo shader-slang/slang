@@ -281,10 +281,18 @@ public:
         uint32_t elementCount,
         SlangNVVMTypeHandle& outType) const;
 
-    /// Declares internal uninitialized storage with an exact provider type and NVVM address space.
+    /// Gets an unpacked literal struct type from an ordered field-type sequence.
+    SlangResult getStructType(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMTypeHandle* fieldTypes,
+        size_t fieldCount,
+        SlangNVVMTypeHandle& outType) const;
+
+    /// Declares uninitialized storage with exact linkage, provider type, and NVVM address space.
     SlangResult declareGlobalStorage(
         SlangNVVMModuleHandle module,
         SlangNVVMTypeHandle valueType,
+        SlangNVVMGlobalLinkage linkage,
         SlangNVVMAddressSpace addressSpace,
         uint32_t alignment,
         const UnownedStringSlice& name,
@@ -302,6 +310,13 @@ public:
         SlangNVVMModuleHandle module,
         SlangNVVMValueHandle baseArrayPointer,
         SlangNVVMValueHandle elementIndex,
+        SlangNVVMValueHandle& outPointer) const;
+
+    /// Emits the address of one statically selected struct field.
+    SlangResult emitStructFieldPointer(
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle baseStructPointer,
+        uint32_t fieldIndex,
         SlangNVVMValueHandle& outPointer) const;
 
     /// Emits multiplication for same-typed scalar integer values.

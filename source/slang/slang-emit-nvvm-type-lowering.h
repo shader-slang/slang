@@ -36,7 +36,7 @@ IRVectorType* asNVVMSupportedUInt3Type(IRInst* type);
 /// Returns the bounded signed-i32x2 vector used to prove fixed-vector transport and arithmetic.
 IRVectorType* asNVVMSupportedSignedI32x2Type(IRInst* type);
 
-/// Returns whether `type` is a selected scalar or signed-i32x2 value.
+/// Returns whether `type` is a selected scalar or established fixed integer vector.
 bool isNVVMSupportedNumericValueType(IRInst* type);
 
 /// Returns the natural byte alignment of one selected numeric value, or zero when unsupported.
@@ -124,6 +124,7 @@ private:
     };
 
     SlangResult _lowerArrayType(IRArrayType* type, SlangNVVMTypeHandle& outType);
+    SlangResult _lowerStructType(IRStructType* type, SlangNVVMTypeHandle& outType);
     SlangResult _lowerPointerType(
         IRType* canonicalType,
         IRType* pointeeType,
