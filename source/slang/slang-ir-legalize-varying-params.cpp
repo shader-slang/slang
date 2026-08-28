@@ -1135,7 +1135,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
 
-    bool hasRegisteredPayloadWriteback(IRType* payloadType) const
+    bool hasAlreadyRegisteredPayloadWriteback(IRType* payloadType) const
     {
         return m_payloadWritebacks.findFirstIndex(
                    [&](const PayloadWritebackInfo& writeback)
@@ -2325,7 +2325,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 // payload using the pointer-packing fallback still reaches its own
                 // output assignment.
                 if (info.kind == LayoutResourceKind::VaryingOutput &&
-                    hasRegisteredPayloadWriteback(info.type))
+                    hasAlreadyRegisteredPayloadWriteback(info.type))
                 {
                     return LegalizedVaryingVal();
                 }
