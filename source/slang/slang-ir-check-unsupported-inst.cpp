@@ -106,13 +106,19 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
     }
 }
 
-// False for the targets this check rejects a surviving function-typed value on (issue #12367):
-// kernel C++/CUDA, the Metal and WebGPU families, and `ShaderSharedLibrary`/`ShaderHostCallable`/
-// `ShaderLLVMIR` (which lower through kernel C++). Other targets are handled elsewhere.
+// False for the targets on which a surviving function-typed value would be emitted as invalid
+// output (issue #12367): kernel C++/CUDA, the Metal and WebGPU families, and `ShaderSharedLibrary`/
+// `ShaderHostCallable`/`ShaderLLVMIR` (which lower through kernel C++). A `true` result does not
+// mean the target can represent a function-typed value. HLSL and GLSL cannot either, but reject one
+// loudly during emit (`E99999`), so this check need not cover them. SPIR-V is separately scoped:
+// at the default optimization level it aborts in spirv-opt, but at `-O0` it can silently emit
+// invalid output; closing that is tracked apart from this change.
 static bool doesTargetSupportFuncTypedValue(TargetRequest* target)
 {
     switch (target->getTarget())
     {
+    // TODO: C++ and CUDA (the CPP*/CUDA*/PTX cases below) can represent a function pointer, so they
+    // should eventually support a function-typed value and be removed from this list.
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
