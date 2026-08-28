@@ -8,7 +8,7 @@ Writing Module Files, Import, and Include
 
 This chapter is for authors of Slang modules and source packages. It states how to name files, how to write `import` and `__include`, and how those constructs are resolved. The compiler rules are the same whether or not you use `slang package`; the package layout is the conventional way to keep those rules from colliding across dependencies.
 
-The language model for modules, `__include` versus `#include`, and `public` / `internal` / `private` is in [Modules and Access Control](modules). Fetching and validating packages is in [Slang Source Packages](source-packages). A command walkthrough is in [Using Source Packages](source-package-workflow).
+The language model for modules, `__include` versus `#include`, and `public` / `internal` / `private` is in [Modules and Access Control](modules). Fetching and validating packages is in [Slang Source Packages](source-packages). A command walkthrough is in [Using Source Packages](source-package-workflow). Command success and failure contracts are in [Source Package Command Use Cases](source-package-command-use-cases).
 
 ## A running example
 

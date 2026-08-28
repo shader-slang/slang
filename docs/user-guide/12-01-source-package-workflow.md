@@ -8,8 +8,9 @@ Using Source Packages
 
 This chapter is a command walkthrough. It shows *when* to run each `slang package` command and
 what you should see. Manifest fields, lock format, and validation rules are in
-[Slang Source Packages](source-packages). Module file naming is in
-[Writing Module Files, Import, and Include](module-files).
+[Slang Source Packages](source-packages). Must-succeed and must-fail contracts for those commands
+are in [Source Package Command Use Cases](source-package-command-use-cases). Module file naming is
+in [Writing Module Files, Import, and Include](module-files).
 
 The short form `slang pkg` accepts the same commands. Slang uses a single dash for
 multi-character options, for example `-help`, not `--help`, except for `slang package` flags such
