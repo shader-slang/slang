@@ -6303,6 +6303,32 @@ void computeMain(
     GroupMemoryBarrierWithGroupSync();
 }
 )";
+static const char kDirectNVVMCUDATypeLayoutSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
+{
+    destination[0] = __alignOf<uint8_t>();
+    destination[1] = __alignOf<vector<half, 3> >();
+    destination[2] = __alignOf<vector<half, 4> >();
+    destination[3] = __alignOf<vector<double, 2> >();
+    destination[4] = __sizeOf<vector<half, 3> >();
+    destination[5] = __sizeOf<vector<double, 4> >();
+}
+)";
+static const char kDirectNVVMUnsupportedCUDAAggregateLayoutSource[] = R"(
+struct LayoutAggregate
+{
+    int value;
+};
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
+{
+    destination[0] = __alignOf<LayoutAggregate>();
+}
+)";
 static const char kDirectNVVMCUDAExecutionRuntimeSource[] = R"(
 [CUDAKernel]
 void computeMain(

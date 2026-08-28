@@ -1324,3 +1324,20 @@ The full Release NVVM prefix passes 335/335 after restoring the established sign
 ordinary pointer-offset contract and keeping the new sign-independent resource index contract.
 The next file-backed probes remain `GenericAsm` in `cuda-layout.slang` and the multi-field
 conventional-global address in `sampler-comparison-state-unused.slang`.
+
+Slice 74 admits exact compile-time CUDA `__alignOf`/`__sizeOf` helpers without widening the runtime
+builder contract. A zero-parameter signed-i32 helper with sole terminator
+`GenericAsm("alignof($[0])", T)` or `GenericAsm("sizeof($[0])", T)` is folded through the shared IR
+CUDA layout rules when `T` is a selected integer or half/float/double scalar, or a two- through
+four-lane vector of one. The result uses the existing i32 constant and generic value-return
+operations; queried types, assembly text, and new semantic operation descriptors do not cross the
+provider boundary. Aggregate queries remain E52017 before provider discovery.
+
+The real CUDA comparison found and corrected the shared IR rule for Slang's prelude-defined
+`__half3` and `__half4`: both are four-byte aligned and half3 has eight-byte padded size, matching
+the existing AST CUDA layout rule and generated CUDA. The complete 28-alignment NVRTC/direct
+comparison passes 2/2, the direct PTX contains the 16-byte conventional block and 28 integer global
+stores, and CUDA 12.9 `ptxas` accepts it for `sm_70`. Release host and standalone provider builds
+pass, as does the full NVVM prefix at 336/336. Builder ABI revision 3 is unchanged. The next
+measured conventional boundary is the multi-field global-parameter graph in
+`sampler-comparison-state-unused.slang`.

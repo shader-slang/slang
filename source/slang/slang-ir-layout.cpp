@@ -739,6 +739,31 @@ struct CUDALayoutRules : CLayoutRules
 {
     CUDALayoutRules() { ruleName = IRTypeLayoutRuleName::CUDA; }
 
+    Result calcSizeAndAlignment(
+        TargetRequest* targetReq,
+        IRType* type,
+        IRSizeAndAlignment* outSizeAndAlignment) override
+    {
+        auto vectorType = as<IRVectorType>(type);
+        auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
+        if (vectorType && vectorType->getElementType()->getOp() == kIROp_HalfType && elementCount &&
+            elementCount->getValue() >= 3)
+        {
+            // Slang's CUDA prelude defines __half3 and __half4 as 4-byte-aligned structs. This
+            // differs from the vector_types.h rule used by the native integer/float vectors and
+            // also gives __half3 two bytes of tail padding.
+            IRSizeAndAlignment elementLayout;
+            SLANG_RETURN_ON_FAIL(
+                getSizeAndAlignment(targetReq, this, vectorType->getElementType(), &elementLayout));
+            const int alignment = int(elementLayout.size * 2);
+            *outSizeAndAlignment = IRSizeAndAlignment(
+                align(elementLayout.size * elementCount->getValue(), alignment),
+                alignment);
+            return SLANG_OK;
+        }
+        return CLayoutRules::calcSizeAndAlignment(targetReq, type, outSizeAndAlignment);
+    }
+
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(
         IRSizeAndAlignment element,
         IRIntegerValue count)

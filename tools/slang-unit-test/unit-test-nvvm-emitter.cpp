@@ -571,6 +571,79 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangCUDATypeLayoutQueriesUseDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMCUDATypeLayoutSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 7);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emittedValueOperations.getCount() == 0);
+
+        const int64_t expectedValues[] = {1, 4, 4, 16, 8, 32};
+        bool matchedValues[SLANG_COUNT_OF(expectedValues)] = {};
+        for (Index returnIndex = 0; returnIndex < gFakeNVVMBuilder.scalarReturnValueRefs.getCount();
+             ++returnIndex)
+        {
+            const FakeNVVMBuilderValueRef returnValue =
+                gFakeNVVMBuilder.scalarReturnValueRefs[returnIndex];
+            SLANG_CHECK(returnValue.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+            SLANG_CHECK(returnValue.index >= 0);
+            SLANG_CHECK(returnValue.index < gFakeNVVMBuilder.integerConstantValues.getCount());
+            SLANG_CHECK(gFakeNVVMBuilder.integerConstantBitWidths[returnValue.index] == 32);
+
+            const int64_t value = gFakeNVVMBuilder.integerConstantValues[returnValue.index];
+            bool matched = false;
+            for (Index expectedIndex = 0; expectedIndex < SLANG_COUNT_OF(expectedValues);
+                 ++expectedIndex)
+            {
+                if (!matchedValues[expectedIndex] && value == expectedValues[expectedIndex])
+                {
+                    matchedValues[expectedIndex] = true;
+                    matched = true;
+                    break;
+                }
+            }
+            SLANG_CHECK(matched);
+        }
+        for (bool matched : matchedValues)
+            SLANG_CHECK(matched);
+
+        for (Index callIndex = 0; callIndex < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount();
+             ++callIndex)
+        {
+            SLANG_CHECK(gFakeNVVMBuilder.callArgumentCounts[callIndex] == 0);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.callResultKinds[callIndex] ==
+                FakeNVVMBuilderResultTypeKind::Integer);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.storeValueRefs[callIndex].kind == FakeNVVMBuilderValueKind::Call);
+            SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[callIndex].index == callIndex);
+        }
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangConventionalComputeUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -3338,6 +3411,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedSharedFloatArraySource, "'device i32 array element pointer'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
+        {kDirectNVVMUnsupportedCUDAAggregateLayoutSource, "'GenericAsm'"},
         {kDirectNVVMFloatingSineSource, "'GenericAsm'"},
         {kDirectNVVMIntegerLeftShiftSource, "'shl'"},
         {kDirectNVVMIntegerRightShiftSource, "'shr'"},

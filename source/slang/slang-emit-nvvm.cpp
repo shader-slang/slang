@@ -9,6 +9,7 @@
 #include "slang-emit-nvvm-type-lowering.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -322,6 +323,67 @@ const NVVMSemantics::CatalogEntry* _findNVVMGenericAsmSemantic(
         }
     }
     return nullptr;
+}
+
+struct NVVMCUDATypeLayoutQuery
+{
+    IRIntegerValue value = 0;
+};
+
+// Folds the exact type-only GenericAsm shape emitted by CUDA's `__sizeOf` and `__alignOf`
+// specializations. The queried type is compile-time metadata, so runtime NVVM type support does
+// not constrain this deliberately bounded scalar/vector family.
+bool _getNVVMCUDATypeLayoutQuery(
+    CodeGenContext* codeGenContext,
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMCUDATypeLayoutQuery& outQuery)
+{
+    outQuery = {};
+    if (!genericAsm || !function || function->getParamCount() != 0 ||
+        !isNVVMSignedI32Type(function->getResultType()) || genericAsm->getOperandCount() != 2 ||
+        !as<IRStringLit>(genericAsm->getOperand(0)))
+    {
+        return false;
+    }
+
+    auto queriedType = as<IRType>(genericAsm->getOperand(1));
+    if (!queriedType)
+        return false;
+
+    const UnownedStringSlice assembly = genericAsm->getAsm();
+    const bool requestsAlignment = assembly == toSlice("alignof($[0])");
+    const bool requestsSize = assembly == toSlice("sizeof($[0])");
+    if (!requestsAlignment && !requestsSize)
+        return false;
+
+    IRType* scalarType = queriedType;
+    if (auto vectorType = as<IRVectorType>(queriedType))
+    {
+        auto elementCount = as<IRIntLit>(vectorType->getElementCount());
+        if (!elementCount || elementCount->getValue() < 2 || elementCount->getValue() > 4)
+            return false;
+        scalarType = vectorType->getElementType();
+    }
+    if (!isNVVMSupportedIntegerScalarType(scalarType) && !isFloatingType(scalarType))
+        return false;
+
+    IRSizeAndAlignment layout;
+    if (SLANG_FAILED(getSizeAndAlignment(
+            codeGenContext->getTargetReq(),
+            IRTypeLayoutRules::getCUDA(),
+            queriedType,
+            &layout)))
+    {
+        return false;
+    }
+
+    const IRIntegerValue value = requestsAlignment ? layout.alignment : layout.size;
+    if (value <= 0 || value > kNVVMI32Max)
+        return false;
+
+    outQuery.value = value;
+    return true;
 }
 
 // Converts one canonical Slang type to its stable provider semantic role.
@@ -1180,14 +1242,24 @@ SlangResult _validateNVVMFunction(
             case kIROp_GenericAsm:
                 {
                     auto genericAsm = as<IRGenericAsm>(inst);
-                    const NVVMSemantics::CatalogEntry* semantic =
-                        _findNVVMGenericAsmSemantic(genericAsm, function);
-                    if (isEntryPoint || genericAsm != terminator ||
-                        functionBlocks.getCount() != 1 || genericAsm->getOperandCount() != 1 ||
-                        !semantic)
+                    if (isEntryPoint || genericAsm != terminator || functionBlocks.getCount() != 1)
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                     }
+                    NVVMCUDATypeLayoutQuery layoutQuery;
+                    const bool isLayoutQuery = _getNVVMCUDATypeLayoutQuery(
+                        codeGenContext,
+                        genericAsm,
+                        function,
+                        layoutQuery);
+                    const NVVMSemantics::CatalogEntry* semantic =
+                        _findNVVMGenericAsmSemantic(genericAsm, function);
+                    if (!isLayoutQuery && (genericAsm->getOperandCount() != 1 || !semantic))
+                    {
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
+                    }
+                    if (isLayoutQuery)
+                        break;
                     const SlangNVVMValueOperationDesc operation =
                         NVVMSemantics::getOperationDesc(*semantic);
                     _requireValueOperation(requirements, operation, semantic->diagnosticName);
@@ -2390,6 +2462,34 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_GenericAsm:
                     {
+                        NVVMCUDATypeLayoutQuery layoutQuery;
+                        if (_getNVVMCUDATypeLayoutQuery(
+                                codeGenContext,
+                                as<IRGenericAsm>(inst),
+                                function,
+                                layoutQuery))
+                        {
+                            SlangNVVMTypeHandle loweredResultType = nullptr;
+                            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                                function->getResultType(),
+                                NVVMTypeUse::HelperResult,
+                                loweredResultType));
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "CUDA type-layout constant",
+                                builder.getIntegerConstant(
+                                    moduleScope.module,
+                                    loweredResultType,
+                                    int64_t(layoutQuery.value),
+                                    loweredValue)));
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "CUDA type-layout return",
+                                builder.emitValueReturn(moduleScope.module, loweredValue)));
+                            break;
+                        }
+
                         const NVVMSemantics::CatalogEntry* semantic =
                             _findNVVMGenericAsmSemantic(as<IRGenericAsm>(inst), function);
                         SLANG_RELEASE_ASSERT(semantic);

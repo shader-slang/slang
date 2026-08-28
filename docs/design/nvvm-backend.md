@@ -4308,6 +4308,36 @@ The post-slice corpus probes still stop at `GenericAsm` for `cuda-layout.slang` 
 multi-field conventional-global address for `sampler-comparison-state-unused.slang`. These are the
 next measured choices rather than reasons to widen the current resource recognizer.
 
+### Slice 74: Compile-time CUDA type-layout queries
+
+CUDA specialization represents `__alignOf<T>()` and `__sizeOf<T>()` as zero-parameter signed-i32
+helpers whose sole block terminates in `GenericAsm("alignof($[0])", T)` or
+`GenericAsm("sizeof($[0])", T)`. The direct route now recognizes that exact structural category
+for selected 8/16/32/64-bit integer types, half, float, double, and their two- through four-lane
+vectors. It computes the result with `IRTypeLayoutRules::getCUDA()` and returns an ordinary i32
+constant. The queried metadata type never enters runtime NVVM type lowering, and neither GenericAsm
+text nor a type-specific operation crosses the builder boundary.
+
+The first full runtime comparison exposed a shared IR-layout defect rather than an NVVM lowering
+defect. Slang's CUDA prelude declares `__half3` and `__half4` with four-byte alignment, and the
+existing AST CUDA layout rule also gives `__half3` eight-byte padded size. The IR CUDA rule had
+instead applied the native `vector_types.h` formula, producing alignment 2/8 and size 6/8. The IR
+rule now mirrors the prelude and AST producer for these two custom half-vector types. This keeps
+direct layout folding, OptiX payload packing, and CUDA varying legalization on the same corrected
+ABI instead of adding emitter-local constants.
+
+`tests/cuda/cuda-layout.slang` now runs through both NVRTC and direct libNVVM and agrees on all 28
+scalar/vector alignments, including `2,4,4,4` for half through half4. A bounded fake fixture also
+proves exact alignment and size constants, zero-argument helper-call topology, no provider semantic
+operation, and pre-provider rejection of an aggregate query. Direct PTX has a visible
+zero-parameter kernel, the 16-byte `SLANG_globalParams` symbol, and 28 integer global stores; CUDA
+12.9 `ptxas` accepts it for `sm_70`. The complete Release NVVM prefix passes 336/336 without a
+builder ABI revision.
+
+Aggregate, array, matrix, pointer, resource, and offset queries remain outside this slice. The
+remaining measured conventional-shader boundary is the multi-field global-parameter graph in
+`sampler-comparison-state-unused.slang`.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
