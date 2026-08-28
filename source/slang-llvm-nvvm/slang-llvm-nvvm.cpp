@@ -1,4 +1,5 @@
 #include "compiler-core/slang-nvvm-ir-builder-api.h"
+#include "compiler-core/slang-nvvm-semantic-catalog.h"
 #include "slang.h"
 
 #include "llvm/ADT/APFloat.h"
@@ -2256,116 +2257,6 @@ static void _fillBuilderAPIV3(SlangNVVMBuilderAPI_V3& api)
     api.emitIntrinsic = _emitIntrinsicV3;
 }
 
-static bool _isValueTypeV4(
-    const SlangNVVMValueTypeDesc_4& type,
-    SlangNVVMValueTypeKind_4 kind,
-    uint32_t bitWidth)
-{
-    return type.kind == kind && type.bitWidth == bitWidth && type.laneCount == 1 &&
-           type.reserved == 0;
-}
-
-static bool _isSameValueTypeV4(
-    const SlangNVVMValueTypeDesc_4& left,
-    const SlangNVVMValueTypeDesc_4& right)
-{
-    return left.kind == right.kind && left.bitWidth == right.bitWidth &&
-           left.laneCount == right.laneCount && left.reserved == right.reserved;
-}
-
-static bool _isBoolV4(const SlangNVVMValueTypeDesc_4& type)
-{
-    return _isValueTypeV4(type, SLANG_NVVM_VALUE_TYPE_BOOL_4, 1);
-}
-
-static bool _isSignedI32V4(const SlangNVVMValueTypeDesc_4& type)
-{
-    return _isValueTypeV4(type, SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4, 32);
-}
-
-static bool _isUnsignedI32V4(const SlangNVVMValueTypeDesc_4& type)
-{
-    return _isValueTypeV4(type, SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4, 32);
-}
-
-static bool _isFloat32V4(const SlangNVVMValueTypeDesc_4& type)
-{
-    return _isValueTypeV4(type, SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4, 32);
-}
-
-static bool _isEstablishedWavePayloadV4(const SlangNVVMValueTypeDesc_4& type)
-{
-    return _isSignedI32V4(type) || _isUnsignedI32V4(type) || _isFloat32V4(type);
-}
-
-// Validates one complete semantic overload without consulting or exposing LLVM types.
-static bool _isValueOperationSupportedV4(const SlangNVVMValueOperationDesc_4& desc)
-{
-    if (desc.structureSize != sizeof(desc) || (!desc.operandTypes && desc.operandCount))
-        return false;
-
-    const SlangNVVMValueTypeDesc_4* operands = desc.operandTypes;
-    switch (desc.operation)
-    {
-    case SLANG_NVVM_VALUE_OP_ADD_4:
-    case SLANG_NVVM_VALUE_OP_SUBTRACT_4:
-    case SLANG_NVVM_VALUE_OP_MULTIPLY_4:
-        return desc.operandCount == 2 &&
-               (_isSignedI32V4(desc.resultType) || _isFloat32V4(desc.resultType)) &&
-               _isSameValueTypeV4(desc.resultType, operands[0]) &&
-               _isSameValueTypeV4(desc.resultType, operands[1]);
-    case SLANG_NVVM_VALUE_OP_DIVIDE_4:
-        return desc.operandCount == 2 && _isFloat32V4(desc.resultType) &&
-               _isFloat32V4(operands[0]) && _isFloat32V4(operands[1]);
-    case SLANG_NVVM_VALUE_OP_BIT_AND_4:
-    case SLANG_NVVM_VALUE_OP_BIT_OR_4:
-    case SLANG_NVVM_VALUE_OP_BIT_XOR_4:
-        return desc.operandCount == 2 && _isSignedI32V4(desc.resultType) &&
-               _isSignedI32V4(operands[0]) && _isSignedI32V4(operands[1]);
-    case SLANG_NVVM_VALUE_OP_BIT_NOT_4:
-        return desc.operandCount == 1 && _isSignedI32V4(desc.resultType) &&
-               _isSignedI32V4(operands[0]);
-    case SLANG_NVVM_VALUE_OP_NEGATE_4:
-        return desc.operandCount == 1 &&
-               (_isSignedI32V4(desc.resultType) || _isFloat32V4(desc.resultType)) &&
-               _isSameValueTypeV4(desc.resultType, operands[0]);
-    case SLANG_NVVM_VALUE_OP_EQUAL_4:
-    case SLANG_NVVM_VALUE_OP_NOT_EQUAL_4:
-    case SLANG_NVVM_VALUE_OP_LESS_THAN_4:
-    case SLANG_NVVM_VALUE_OP_GREATER_THAN_4:
-    case SLANG_NVVM_VALUE_OP_LESS_EQUAL_4:
-    case SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4:
-        return desc.operandCount == 2 && _isBoolV4(desc.resultType) &&
-               (_isSignedI32V4(operands[0]) || _isFloat32V4(operands[0])) &&
-               _isSameValueTypeV4(operands[0], operands[1]);
-    case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX_4:
-    case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT_4:
-        return desc.operandCount == 0 && _isUnsignedI32V4(desc.resultType);
-    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT_4:
-        return desc.operandCount == 3 && _isEstablishedWavePayloadV4(desc.resultType) &&
-               _isUnsignedI32V4(operands[0]) && _isSameValueTypeV4(desc.resultType, operands[1]) &&
-               _isSignedI32V4(operands[2]);
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT_4:
-        return desc.operandCount == 2 && _isUnsignedI32V4(desc.resultType) &&
-               _isUnsignedI32V4(operands[0]) && _isBoolV4(operands[1]);
-    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST_4:
-        return desc.operandCount == 2 && _isEstablishedWavePayloadV4(desc.resultType) &&
-               _isUnsignedI32V4(operands[0]) && _isSameValueTypeV4(desc.resultType, operands[1]);
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE_4:
-        return desc.operandCount == 1 && _isBoolV4(desc.resultType) &&
-               _isUnsignedI32V4(operands[0]);
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE_4:
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE_4:
-        return desc.operandCount == 2 && _isBoolV4(desc.resultType) &&
-               _isUnsignedI32V4(operands[0]) && _isBoolV4(operands[1]);
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL_4:
-        return desc.operandCount == 2 && _isBoolV4(desc.resultType) &&
-               _isUnsignedI32V4(operands[0]) && _isEstablishedWavePayloadV4(operands[1]);
-    default:
-        return false;
-    }
-}
-
 static SlangResult SLANG_NVVM_CALL
 _isOperationSupportedV4(const SlangNVVMValueOperationDesc_4* operation, uint32_t* outSupported)
 {
@@ -2376,188 +2267,68 @@ _isOperationSupportedV4(const SlangNVVMValueOperationDesc_4* operation, uint32_t
     {
         return SLANG_E_INVALID_ARG;
     }
-    *outSupported = _isValueOperationSupportedV4(*operation) ? 1u : 0u;
+    *outSupported = Slang::NVVMSemantics::find(*operation) ? 1u : 0u;
     return SLANG_OK;
 }
 
-static SlangResult _emitScalarOperationV4(
+static SlangResult _emitCatalogOperationV4(
     SlangNVVMModuleHandle_1 module,
-    const SlangNVVMValueOperationDesc_4& desc,
+    const Slang::NVVMSemantics::CatalogEntry& entry,
     const SlangNVVMValueHandle_1* operands,
     SlangNVVMValueHandle_1* outValue)
 {
-    const bool isFloat = _isFloat32V4(desc.operandTypes[0]);
-    switch (desc.operation)
+    using Slang::NVVMSemantics::LegacyFamily;
+    switch (entry.legacyFamily)
     {
-    case SLANG_NVVM_VALUE_OP_ADD_4:
-        return isFloat ? _emitFloatingBinaryV3(
-                             module,
-                             SLANG_NVVM_FLOATING_BINARY_OP_ADD,
-                             operands[0],
-                             operands[1],
-                             outValue)
-                       : _emitIntegerBinaryV3(
-                             module,
-                             SLANG_NVVM_INTEGER_BINARY_OP_3_ADD,
-                             operands[0],
-                             operands[1],
-                             outValue);
-    case SLANG_NVVM_VALUE_OP_SUBTRACT_4:
-        return isFloat ? _emitFloatingBinaryV3(
-                             module,
-                             SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT,
-                             operands[0],
-                             operands[1],
-                             outValue)
-                       : _emitIntegerBinaryV3(
-                             module,
-                             SLANG_NVVM_INTEGER_BINARY_OP_3_SUB,
-                             operands[0],
-                             operands[1],
-                             outValue);
-    case SLANG_NVVM_VALUE_OP_MULTIPLY_4:
-        return isFloat ? _emitFloatingBinaryV3(
-                             module,
-                             SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY,
-                             operands[0],
-                             operands[1],
-                             outValue)
-                       : _emitIntegerBinaryV3(
-                             module,
-                             SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY,
-                             operands[0],
-                             operands[1],
-                             outValue);
-    case SLANG_NVVM_VALUE_OP_DIVIDE_4:
-        return _emitFloatingBinaryV3(
+    case LegacyFamily::IntegerUnary:
+        return _emitIntegerUnaryV3(
             module,
-            SLANG_NVVM_FLOATING_BINARY_OP_DIVIDE,
+            SlangNVVMIntegerUnaryOp_3(entry.legacyOperation),
+            operands[0],
+            outValue);
+    case LegacyFamily::IntegerBinary:
+        return _emitIntegerBinaryV3(
+            module,
+            SlangNVVMIntegerBinaryOp_3(entry.legacyOperation),
             operands[0],
             operands[1],
             outValue);
-    case SLANG_NVVM_VALUE_OP_BIT_AND_4:
-    case SLANG_NVVM_VALUE_OP_BIT_OR_4:
-    case SLANG_NVVM_VALUE_OP_BIT_XOR_4:
-        {
-            const SlangNVVMIntegerBinaryOp_3 operation =
-                desc.operation == SLANG_NVVM_VALUE_OP_BIT_AND_4
-                    ? SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_AND
-                : desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR_4
-                    ? SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_OR
-                    : SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_XOR;
-            return _emitIntegerBinaryV3(module, operation, operands[0], operands[1], outValue);
-        }
-    case SLANG_NVVM_VALUE_OP_BIT_NOT_4:
-        return _emitIntegerUnaryV3(
+    case LegacyFamily::IntegerCompare:
+        return _emitIntegerCompareV3(
             module,
-            SLANG_NVVM_INTEGER_UNARY_OP_BIT_NOT,
+            SlangNVVMIntegerCompareOp_3(entry.legacyOperation),
+            operands[0],
+            operands[1],
+            outValue);
+    case LegacyFamily::FloatingUnary:
+        return _emitFloatingUnaryV3(
+            module,
+            SlangNVVMFloatingUnaryOp_3(entry.legacyOperation),
             operands[0],
             outValue);
-    case SLANG_NVVM_VALUE_OP_NEGATE_4:
-        return isFloat ? _emitFloatingUnaryV3(
-                             module,
-                             SLANG_NVVM_FLOATING_UNARY_OP_NEGATE,
-                             operands[0],
-                             outValue)
-                       : _emitIntegerUnaryV3(
-                             module,
-                             SLANG_NVVM_INTEGER_UNARY_OP_NEGATE,
-                             operands[0],
-                             outValue);
-    default:
-        break;
+    case LegacyFamily::FloatingBinary:
+        return _emitFloatingBinaryV3(
+            module,
+            SlangNVVMFloatingBinaryOp_3(entry.legacyOperation),
+            operands[0],
+            operands[1],
+            outValue);
+    case LegacyFamily::FloatingCompare:
+        return _emitFloatingCompareV3(
+            module,
+            SlangNVVMFloatingCompareOp_3(entry.legacyOperation),
+            operands[0],
+            operands[1],
+            outValue);
+    case LegacyFamily::Intrinsic:
+        return _emitIntrinsicV3(
+            module,
+            SlangNVVMIntrinsicOp_3(entry.legacyOperation),
+            operands,
+            entry.operandCount,
+            outValue);
     }
-
-    if (isFloat)
-    {
-        SlangNVVMFloatingCompareOp_3 operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL;
-        switch (desc.operation)
-        {
-        case SLANG_NVVM_VALUE_OP_EQUAL_4:
-            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL;
-            break;
-        case SLANG_NVVM_VALUE_OP_NOT_EQUAL_4:
-            operation = SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL;
-            break;
-        case SLANG_NVVM_VALUE_OP_LESS_THAN_4:
-            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_LESS_THAN;
-            break;
-        case SLANG_NVVM_VALUE_OP_GREATER_THAN_4:
-            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_THAN;
-            break;
-        case SLANG_NVVM_VALUE_OP_LESS_EQUAL_4:
-            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_LESS_EQUAL;
-            break;
-        case SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4:
-            operation = SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_EQUAL;
-            break;
-        default:
-            return SLANG_E_INVALID_ARG;
-        }
-        return _emitFloatingCompareV3(module, operation, operands[0], operands[1], outValue);
-    }
-
-    SlangNVVMIntegerCompareOp_3 operation = SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL;
-    switch (desc.operation)
-    {
-    case SLANG_NVVM_VALUE_OP_EQUAL_4:
-        operation = SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL;
-        break;
-    case SLANG_NVVM_VALUE_OP_NOT_EQUAL_4:
-        operation = SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL;
-        break;
-    case SLANG_NVVM_VALUE_OP_LESS_THAN_4:
-        operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_THAN;
-        break;
-    case SLANG_NVVM_VALUE_OP_GREATER_THAN_4:
-        operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN;
-        break;
-    case SLANG_NVVM_VALUE_OP_LESS_EQUAL_4:
-        operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_EQUAL;
-        break;
-    case SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4:
-        operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_EQUAL;
-        break;
-    default:
-        return SLANG_E_INVALID_ARG;
-    }
-    return _emitIntegerCompareV3(module, operation, operands[0], operands[1], outValue);
-}
-
-static SlangNVVMIntrinsicOp_3 _getIntrinsicOperationV3(const SlangNVVMValueOperationDesc_4& desc)
-{
-    switch (desc.operation)
-    {
-    case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX_4:
-        return SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX;
-    case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT_4:
-        return SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_COUNT;
-    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT_4:
-        return _isFloat32V4(desc.resultType)       ? SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_FLOAT
-               : _isUnsignedI32V4(desc.resultType) ? SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT
-                                                   : SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT;
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT_4:
-        return SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT;
-    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST_4:
-        return _isFloat32V4(desc.resultType) ? SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT
-               : _isUnsignedI32V4(desc.resultType)
-                   ? SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT
-                   : SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_INT;
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE_4:
-        return SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_IS_FIRST_LANE;
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE_4:
-        return SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ANY_TRUE;
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE_4:
-        return SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_TRUE;
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL_4:
-        return _isFloat32V4(desc.operandTypes[1])
-                   ? SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_FLOAT
-               : _isUnsignedI32V4(desc.operandTypes[1])
-                   ? SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_UINT
-                   : SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT;
-    default:
-        return ~SlangNVVMIntrinsicOp_3(0);
-    }
+    return SLANG_E_INVALID_ARG;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitOperationV4(
@@ -2570,19 +2341,15 @@ static SlangResult SLANG_NVVM_CALL _emitOperationV4(
     if (outValue)
         *outValue = nullptr;
     if (!operation || !outValue || operation->structureSize != sizeof(*operation) ||
-        operation->operandCount != operandCount || (!operands && operandCount) ||
-        !_isValueOperationSupportedV4(*operation))
+        operation->operandCount != operandCount || (!operands && operandCount))
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    if (operation->operation < SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX_4)
-        return _emitScalarOperationV4(module, *operation, operands, outValue);
-
-    const SlangNVVMIntrinsicOp_3 intrinsicOperation = _getIntrinsicOperationV3(*operation);
-    if (intrinsicOperation == ~SlangNVVMIntrinsicOp_3(0))
+    const Slang::NVVMSemantics::CatalogEntry* entry = Slang::NVVMSemantics::find(*operation);
+    if (!entry)
         return SLANG_E_INVALID_ARG;
-    return _emitIntrinsicV3(module, intrinsicOperation, operands, operandCount, outValue);
+    return _emitCatalogOperationV4(module, *entry, operands, outValue);
 }
 
 static void _fillBuilderFoundationAPIV4(SlangNVVMBuilderFoundationAPI_4& api)

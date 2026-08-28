@@ -96,6 +96,23 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesV4InterfacesAndTypedOperations)
     SLANG_CHECK(sizeof(SlangNVVMBuilderConstructionAPI_4) == constructionSize);
     SLANG_CHECK(sizeof(SlangNVVMBuilderValueOperationsAPI_4) == valueOperationsSize);
 
+    SLANG_CHECK(NVVMSemantics::getCatalogCount() == 40);
+    size_t genericAsmSemanticCount = 0;
+    for (const NVVMSemantics::CatalogEntry& semantic : NVVMSemantics::kCatalog)
+    {
+        const SlangNVVMValueOperationDesc_4 operation = NVVMSemantics::getOperationDesc(semantic);
+        SLANG_CHECK(NVVMSemantics::find(operation) == &semantic);
+        SLANG_CHECK(
+            NVVMSemantics::findLegacyOperation(semantic.legacyFamily, semantic.legacyOperation) ==
+            &semantic);
+        genericAsmSemanticCount += semantic.genericAsm ? 1 : 0;
+
+        SlangNVVMValueOperationDesc_4 malformedOperation = operation;
+        ++malformedOperation.resultType.bitWidth;
+        SLANG_CHECK(NVVMSemantics::find(malformedOperation) == nullptr);
+    }
+    SLANG_CHECK(genericAsmSemanticCount == 14);
+
     gFakeNVVMBuilder.reset();
     gFakeNVVMBuilder.foundationV4 = _makeFakeNVVMBuilderFoundationAPIV4();
     gFakeNVVMBuilder.constructionV4 = _makeFakeNVVMBuilderConstructionAPIV4();

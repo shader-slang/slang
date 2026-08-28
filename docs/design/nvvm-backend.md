@@ -3167,6 +3167,50 @@ preservation sample passes 10/10 with unrelated graphics API detection disabled.
 test/support files grow by 558 measured lines, from 27,950 to 28,508; consolidation is deliberately
 the next slice rather than mixed into the ABI migration.
 
+### Slice 65: One typed semantic catalog
+
+Slice 65 makes `slang-nvvm-semantic-catalog.h` the single declarative source of truth for the 40
+established value-operation overloads: 14 signed-i32 operations, 11 float32 operations, and 15
+wave operations. Each row owns the V4 operation, complete result and operand types, diagnostic
+name, and frozen V3 feature, callback family, and operation used by compatibility. Fourteen wave
+rows additionally own their exact canonical GenericAsm spelling; wave-mask ballot continues to
+come from ordinary Slang IR. Signature comparison is now one generic exact matcher over type kind,
+bit width, lane count, and reserved fields. The previous Cartesian whole-signature enum is gone.
+
+The emitter retains only the representation-specific mapping from a canonical `IROp` to a V4
+semantic operation. It obtains the canonical result and operand types from the IR instruction and
+resolves the complete shape through the catalog. GenericAsm recognition uses the same rows. The
+facade queries those rows to synthesize the frozen feature view and requires every row promised by
+a bundled feature. Its V3 adapter, the LLVM provider, and the fake provider dispatch by the row's
+legacy callback family instead of maintaining independent semantic switches. The provider still
+owns LLVM handle, ownership, insertion-point, and no-mutation validation; sharing semantic rows
+does not move those representation checks into the host.
+
+An unsupported comparison with a canonical Boolean result is intentionally allowed to reach the
+operand validator before provider discovery. For example, an unsigned-i32 or pointer comparison
+is rejected as an unsupported `signed i32 value`, as it was before this refactor. This is not a
+second accepted semantic shape: exact catalog resolution remains mandatory after successful
+operand validation and for all support and emission calls. Keeping the validation order preserves
+the useful producer-to-consumer diagnostic and still proves that no malformed operation can reach
+the provider.
+
+Adding an overload of an existing semantic operation and existing type kinds now requires one
+catalog row plus its behavioral tests. It requires no V4 root field, callback, feature ID, facade
+wrapper, provider matcher branch, or fake dispatch branch. A new ordinary-IR operation may also
+need one canonical `IROp`-to-semantic mapping; a new GenericAsm helper spelling is carried directly
+by its row. Existing scalar, float, and wave tests were already organized around shared family
+descriptors and named registration macros, so they were retained rather than obscured by a second
+test generator. The fake dispatch and catalog signature coverage are now descriptor-driven.
+
+Measured physical lines across the three changed production implementations plus the new catalog
+fall from 8,844 to 7,707, a reduction of 1,137 lines including the 560-line catalog. The five NVVM
+test/support files fall from 28,508 to 28,396 lines. The registered Release ledger remains exactly
+419 names with SHA-256
+`c634caa999f2b191c85b37cc7885d39462bcef55406ef64dc04bd1a1d02590c9`. The complete Release prefix
+passes 419/419, including compatible assembly, `ptxas`, and runtime lanes; the focused Release
+catalog and family sample passes 12/12, and the Debug preservation sample passes all 11 selected
+tests with unrelated graphics API detection disabled.
+
 ## CUDA Pass Ownership Audit
 
 As the first Slang-to-NVVM emitter expands beyond empty compute, each current CUDA-specific

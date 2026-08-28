@@ -2,6 +2,7 @@
 
 #include "compiler-core/slang-artifact-impl.h"
 #include "compiler-core/slang-artifact-util.h"
+#include "compiler-core/slang-nvvm-semantic-catalog.h"
 #include "core/slang-dictionary.h"
 #include "slang-code-gen.h"
 #include "slang-diagnostics.h"
@@ -102,326 +103,168 @@ void _requireFeature(NVVMIRFeatureSet& features, SlangNVVMBuilderFeature_3 requi
     features.words[requiredFeature / 64u] |= uint64_t(1) << (requiredFeature % 64u);
 }
 
-struct NVVMFloat32BinaryInfo
+// Matches one canonical Slang scalar type against a provider-owned semantic type role.
+bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc_4& semanticType)
 {
-    SlangNVVMBuilderFeature_3 feature;
-    SlangNVVMFloatingBinaryOp_3 operation;
-    const char* diagnosticName;
-};
+    if (!type || semanticType.laneCount != 1 || semanticType.reserved != 0)
+        return false;
 
-struct NVVMGenericAsmIntrinsicInfo
-{
-    enum class Signature
+    switch (semanticType.kind)
     {
-        UIntNoArguments,
-        BoolUInt,
-        BoolUIntBool,
-        BoolUIntInt,
-        BoolUIntUInt,
-        BoolUIntFloat,
-        UIntUIntUInt,
-        IntUIntInt,
-        FloatUIntFloat,
-        UIntUIntUIntInt,
-        IntUIntIntInt,
-        FloatUIntFloatInt,
-    };
+    case SLANG_NVVM_VALUE_TYPE_BOOL_4:
+        return semanticType.bitWidth == 1 && isNVVMBoolType(type);
+    case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER_4:
+        return semanticType.bitWidth == 32 && isNVVMSignedI32Type(type);
+    case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER_4:
+        return semanticType.bitWidth == 32 && isNVVMUnsignedI32Type(type);
+    case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4:
+        return semanticType.bitWidth == 32 && isNVVMFloat32Type(type);
+    default:
+        return false;
+    }
+}
 
-    const char* assembly;
-    SlangNVVMBuilderFeature_3 feature;
-    SlangNVVMIntrinsicOp_3 operation;
-    const char* diagnosticName;
-    Signature signature;
-};
-
-bool _isNVVMGenericAsmIntrinsicHelper(
+// Checks the complete canonical helper signature against one typed semantic catalog row.
+bool _isNVVMGenericAsmSemanticSignature(
     IRFunc* function,
-    const NVVMGenericAsmIntrinsicInfo& intrinsicInfo);
+    const NVVMSemantics::CatalogEntry& semantic)
+{
+    if (!function || function->getParamCount() != semantic.operandCount ||
+        !_isNVVMSemanticType(function->getResultType(), semantic.resultType))
+    {
+        return false;
+    }
 
-// Maps an exact CUDA-selected GenericAsm terminator to one negotiated provider semantic.
-const NVVMGenericAsmIntrinsicInfo* _findNVVMGenericAsmIntrinsicInfo(
+    for (uint32_t i = 0; i < semantic.operandCount; ++i)
+    {
+        if (!_isNVVMSemanticType(function->getParamType(i), semantic.operandTypes[i]))
+            return false;
+    }
+    return true;
+}
+
+// Maps an exact CUDA-selected GenericAsm terminator to one typed provider semantic.
+const NVVMSemantics::CatalogEntry* _findNVVMGenericAsmSemantic(
     IRGenericAsm* genericAsm,
     IRFunc* function)
 {
-    static const NVVMGenericAsmIntrinsicInfo kInfos[] = {
-        {
-            "_getLaneId()",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_INDEX,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_INDEX,
-            "wave lane index intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::UIntNoArguments,
-        },
-        {
-            "(warpSize)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_LANE_COUNT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_LANE_COUNT,
-            "wave lane count intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::UIntNoArguments,
-        },
-        {
-            "__shfl_sync($0, $1, $2)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_UINT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_UINT,
-            "UInt wave read-lane-at intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUIntInt,
-        },
-        {
-            "__shfl_sync($0, $1, $2)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_INT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_INT,
-            "Int wave read-lane-at intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::IntUIntIntInt,
-        },
-        {
-            "__shfl_sync($0, $1, $2)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_AT_FLOAT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_AT_FLOAT,
-            "Float wave read-lane-at intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::FloatUIntFloatInt,
-        },
-        {
-            "_waveReadFirst($0, $1)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_UINT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_UINT,
-            "UInt wave read-lane-first intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUInt,
-        },
-        {
-            "_waveReadFirst($0, $1)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_INT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_INT,
-            "Int wave read-lane-first intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::IntUIntInt,
-        },
-        {
-            "_waveReadFirst($0, $1)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_READ_LANE_FIRST_FLOAT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_READ_LANE_FIRST_FLOAT,
-            "Float wave read-lane-first intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::FloatUIntFloat,
-        },
-        {
-            "(($0 & -$0) == (WarpMask(1) << _getLaneId()))",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_IS_FIRST_LANE,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_IS_FIRST_LANE,
-            "wave-mask is-first-lane intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::BoolUInt,
-        },
-        {
-            "(__any_sync($0, $1) != 0)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ANY_TRUE,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ANY_TRUE,
-            "wave-mask any-true intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntBool,
-        },
-        {
-            "(__all_sync($0, $1) != 0)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_TRUE,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_TRUE,
-            "wave-mask all-true intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntBool,
-        },
-        {
-            "_waveAllEqual($0, $1)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_INT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_INT,
-            "signed-i32 wave-mask all-equal intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntInt,
-        },
-        {
-            "_waveAllEqual($0, $1)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_UINT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_UINT,
-            "unsigned-i32 wave-mask all-equal intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntUInt,
-        },
-        {
-            "_waveAllEqual($0, $1)",
-            SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_ALL_EQUAL_FLOAT,
-            SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_ALL_EQUAL_FLOAT,
-            "float32 wave-mask all-equal intrinsic",
-            NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntFloat,
-        },
-    };
-    if (!genericAsm)
+    if (!genericAsm || !function)
         return nullptr;
-    for (const NVVMGenericAsmIntrinsicInfo& info : kInfos)
+
+    for (const NVVMSemantics::CatalogEntry& semantic : NVVMSemantics::kCatalog)
     {
-        if (genericAsm->getAsm() == UnownedStringSlice(info.assembly) &&
-            _isNVVMGenericAsmIntrinsicHelper(function, info))
-            return &info;
+        if (semantic.genericAsm &&
+            genericAsm->getAsm() == UnownedStringSlice(semantic.genericAsm) &&
+            _isNVVMGenericAsmSemanticSignature(function, semantic))
+        {
+            return &semantic;
+        }
     }
     return nullptr;
 }
 
-// Checks the complete canonical helper signature selected for one exact GenericAsm semantic.
-bool _isNVVMGenericAsmIntrinsicHelper(
-    IRFunc* function,
-    const NVVMGenericAsmIntrinsicInfo& intrinsicInfo)
+// Converts one canonical Slang scalar type to its stable provider semantic role.
+bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc_4& outType)
 {
-    if (!function)
+    if (isNVVMBoolType(type))
+        outType = NVVMSemantics::kBool;
+    else if (isNVVMSignedI32Type(type))
+        outType = NVVMSemantics::kSignedI32;
+    else if (isNVVMUnsignedI32Type(type))
+        outType = NVVMSemantics::kUnsignedI32;
+    else if (isNVVMFloat32Type(type))
+        outType = NVVMSemantics::kFloat32;
+    else
         return false;
-
-    switch (intrinsicInfo.signature)
-    {
-    case NVVMGenericAsmIntrinsicInfo::Signature::UIntNoArguments:
-        return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 0;
-    case NVVMGenericAsmIntrinsicInfo::Signature::BoolUInt:
-        return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 1 &&
-               isNVVMUnsignedI32Type(function->getParamType(0));
-    case NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntBool:
-        return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 2 &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMBoolType(function->getParamType(1));
-    case NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntInt:
-        return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 2 &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMSignedI32Type(function->getParamType(1));
-    case NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntUInt:
-        return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 2 &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMUnsignedI32Type(function->getParamType(1));
-    case NVVMGenericAsmIntrinsicInfo::Signature::BoolUIntFloat:
-        return isNVVMBoolType(function->getResultType()) && function->getParamCount() == 2 &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMFloat32Type(function->getParamType(1));
-    case NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUInt:
-        return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 2 &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMUnsignedI32Type(function->getParamType(1));
-    case NVVMGenericAsmIntrinsicInfo::Signature::IntUIntInt:
-        return isNVVMSignedI32Type(function->getResultType()) && function->getParamCount() == 2 &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMSignedI32Type(function->getParamType(1));
-    case NVVMGenericAsmIntrinsicInfo::Signature::FloatUIntFloat:
-        return isNVVMFloat32Type(function->getResultType()) && function->getParamCount() == 2 &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMFloat32Type(function->getParamType(1));
-    case NVVMGenericAsmIntrinsicInfo::Signature::UIntUIntUIntInt:
-        return isNVVMUnsignedI32Type(function->getResultType()) && function->getParamCount() == 3 &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMUnsignedI32Type(function->getParamType(1)) &&
-               isNVVMSignedI32Type(function->getParamType(2));
-    case NVVMGenericAsmIntrinsicInfo::Signature::IntUIntIntInt:
-        return function->getParamCount() == 3 && isNVVMSignedI32Type(function->getResultType()) &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMSignedI32Type(function->getParamType(1)) &&
-               isNVVMSignedI32Type(function->getParamType(2));
-    case NVVMGenericAsmIntrinsicInfo::Signature::FloatUIntFloatInt:
-        return function->getParamCount() == 3 && isNVVMFloat32Type(function->getResultType()) &&
-               isNVVMUnsignedI32Type(function->getParamType(0)) &&
-               isNVVMFloat32Type(function->getParamType(1)) &&
-               isNVVMSignedI32Type(function->getParamType(2));
-    }
-    SLANG_UNEXPECTED("unknown NVVM GenericAsm intrinsic signature");
+    return true;
 }
 
-// Maps a canonical floating binary IR opcode to the provider semantic that owns it.
-bool _getNVVMFloat32BinaryInfo(IROp op, NVVMFloat32BinaryInfo& outInfo)
+bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation_4& outOperation)
 {
     switch (op)
     {
     case kIROp_Add:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ADD,
-            SLANG_NVVM_FLOATING_BINARY_OP_ADD,
-            "float32 addition",
-        };
+        outOperation = SLANG_NVVM_VALUE_OP_ADD_4;
         return true;
     case kIROp_Sub:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_SUBTRACT,
-            SLANG_NVVM_FLOATING_BINARY_OP_SUBTRACT,
-            "float32 subtraction",
-        };
+        outOperation = SLANG_NVVM_VALUE_OP_SUBTRACT_4;
         return true;
     case kIROp_Mul:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_MULTIPLY,
-            SLANG_NVVM_FLOATING_BINARY_OP_MULTIPLY,
-            "float32 multiplication",
-        };
+        outOperation = SLANG_NVVM_VALUE_OP_MULTIPLY_4;
         return true;
     case kIROp_Div:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_DIVIDE,
-            SLANG_NVVM_FLOATING_BINARY_OP_DIVIDE,
-            "float32 division",
-        };
+        outOperation = SLANG_NVVM_VALUE_OP_DIVIDE_4;
+        return true;
+    case kIROp_BitAnd:
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_AND_4;
+        return true;
+    case kIROp_BitOr:
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_OR_4;
+        return true;
+    case kIROp_BitXor:
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_XOR_4;
+        return true;
+    case kIROp_BitNot:
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_NOT_4;
+        return true;
+    case kIROp_Neg:
+        outOperation = SLANG_NVVM_VALUE_OP_NEGATE_4;
+        return true;
+    case kIROp_Eql:
+        outOperation = SLANG_NVVM_VALUE_OP_EQUAL_4;
+        return true;
+    case kIROp_Neq:
+        outOperation = SLANG_NVVM_VALUE_OP_NOT_EQUAL_4;
+        return true;
+    case kIROp_Less:
+        outOperation = SLANG_NVVM_VALUE_OP_LESS_THAN_4;
+        return true;
+    case kIROp_Greater:
+        outOperation = SLANG_NVVM_VALUE_OP_GREATER_THAN_4;
+        return true;
+    case kIROp_Leq:
+        outOperation = SLANG_NVVM_VALUE_OP_LESS_EQUAL_4;
+        return true;
+    case kIROp_Geq:
+        outOperation = SLANG_NVVM_VALUE_OP_GREATER_EQUAL_4;
+        return true;
+    case kIROp_WaveMaskBallot:
+        outOperation = SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT_4;
         return true;
     default:
         return false;
     }
 }
 
-struct NVVMFloat32CompareInfo
+// Resolves an exact canonical Slang value operation through the single typed semantic catalog.
+const NVVMSemantics::CatalogEntry* _findNVVMValueOperation(IRInst* inst)
 {
-    SlangNVVMBuilderFeature_3 feature;
-    SlangNVVMFloatingCompareOp_3 operation;
-    const char* diagnosticName;
-};
+    if (!inst || inst->getOperandCount() > 3)
+        return nullptr;
 
-// Classifies the exact canonical floating comparison shape accepted by the direct backend.
-bool _getNVVMFloat32CompareInfo(IRInst* inst, NVVMFloat32CompareInfo& outInfo)
-{
-    if (!inst || inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
-        return false;
-
-    IRInst* left = inst->getOperand(0);
-    IRInst* right = inst->getOperand(1);
-    if (!left || !right || !isNVVMFloat32Type(left->getDataType()) ||
-        !isNVVMFloat32Type(right->getDataType()))
+    SlangNVVMValueOperation_4 operation = 0;
+    SlangNVVMValueTypeDesc_4 resultType = {};
+    SlangNVVMValueTypeDesc_4 operandTypes[3] = {};
+    if (!_getNVVMValueOperation(inst->getOp(), operation) ||
+        !_getNVVMSemanticType(inst->getDataType(), resultType))
     {
-        return false;
+        return nullptr;
+    }
+    for (UInt i = 0; i < inst->getOperandCount(); ++i)
+    {
+        IRInst* operand = inst->getOperand(i);
+        if (!operand || !_getNVVMSemanticType(operand->getDataType(), operandTypes[i]))
+            return nullptr;
     }
 
-    switch (inst->getOp())
-    {
-    case kIROp_Eql:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_EQUAL,
-            SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_EQUAL,
-            "float32 ordered equality",
-        };
-        return true;
-    case kIROp_Neq:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NOT_EQUAL,
-            SLANG_NVVM_FLOATING_COMPARE_OP_UNORDERED_NOT_EQUAL,
-            "float32 unordered inequality",
-        };
-        return true;
-    case kIROp_Greater:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_GREATER_THAN,
-            SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_THAN,
-            "float32 ordered greater-than",
-        };
-        return true;
-    case kIROp_Leq:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_LESS_EQUAL,
-            SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_LESS_EQUAL,
-            "float32 ordered less-than-or-equal",
-        };
-        return true;
-    case kIROp_Geq:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_GREATER_EQUAL,
-            SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_GREATER_EQUAL,
-            "float32 ordered greater-than-or-equal",
-        };
-        return true;
-    case kIROp_Less:
-        outInfo = {
-            SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_ORDERED_LESS_THAN,
-            SLANG_NVVM_FLOATING_COMPARE_OP_ORDERED_LESS_THAN,
-            "float32 ordered less-than",
-        };
-        return true;
-    default:
-        return false;
-    }
+    const SlangNVVMValueOperationDesc_4 desc = {
+        uint32_t(sizeof(SlangNVVMValueOperationDesc_4)),
+        operation,
+        resultType,
+        inst->getOperandCount() ? operandTypes : nullptr,
+        inst->getOperandCount(),
+    };
+    return NVVMSemantics::find(desc);
 }
 
 // Checks that an executable operand has an accepted definition that dominates its use.
@@ -1003,79 +846,28 @@ SlangResult _validateNVVMFunction(
             case kIROp_Sub:
             case kIROp_Mul:
             case kIROp_Div:
-                if (inst->getOperandCount() == 2 && isNVVMFloat32Type(inst->getDataType()))
-                {
-                    NVVMFloat32BinaryInfo info;
-                    SLANG_RELEASE_ASSERT(_getNVVMFloat32BinaryInfo(inst->getOp(), info));
-                    _requireFeature(features, info.feature);
-                    break;
-                }
-                if (inst->getOp() == kIROp_Div)
-                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("div"));
-                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
-                {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        inst->getOp() == kIROp_Mul ? toSlice("signed i32 multiplication")
-                                                   : toSlice("signed i32 arithmetic"));
-                }
-                _requireFeature(
-                    features,
-                    inst->getOp() == kIROp_Mul ? SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_MULTIPLY
-                                               : SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
-                break;
-
             case kIROp_BitAnd:
-                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
-                {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        toSlice("signed i32 bitwise AND"));
-                }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_AND);
-                break;
-
             case kIROp_BitOr:
-                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
-                {
-                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("signed i32 bitwise OR"));
-                }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_OR);
-                break;
-
             case kIROp_BitXor:
-                if (inst->getOperandCount() != 2 || !isNVVMSignedI32Type(inst->getDataType()))
-                {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        toSlice("signed i32 bitwise XOR"));
-                }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_XOR);
-                break;
-
             case kIROp_BitNot:
-                if (inst->getOperandCount() != 1 || !isNVVMSignedI32Type(inst->getDataType()))
-                {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        toSlice("signed i32 bitwise NOT"));
-                }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_BIT_NOT);
-                break;
-
             case kIROp_Neg:
-                if (inst->getOperandCount() == 1 && isNVVMFloat32Type(inst->getDataType()))
                 {
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE);
-                    break;
+                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
+                    if (!semantic)
+                    {
+                        const UnownedStringSlice construct =
+                            inst->getOp() == kIROp_Div      ? toSlice("div")
+                            : inst->getOp() == kIROp_Mul    ? toSlice("signed i32 multiplication")
+                            : inst->getOp() == kIROp_BitAnd ? toSlice("signed i32 bitwise AND")
+                            : inst->getOp() == kIROp_BitOr  ? toSlice("signed i32 bitwise OR")
+                            : inst->getOp() == kIROp_BitXor ? toSlice("signed i32 bitwise XOR")
+                            : inst->getOp() == kIROp_BitNot ? toSlice("signed i32 bitwise NOT")
+                            : inst->getOp() == kIROp_Neg ? toSlice("signed i32 arithmetic negation")
+                                                         : toSlice("signed i32 arithmetic");
+                        return _diagnoseUnsupportedIR(codeGenContext, construct);
+                    }
+                    _requireFeature(features, semantic->legacyFeature);
                 }
-                if (inst->getOperandCount() != 1 || !isNVVMSignedI32Type(inst->getDataType()))
-                {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        toSlice("signed i32 arithmetic negation"));
-                }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NEGATE);
                 break;
 
             case kIROp_AtomicAdd:
@@ -1103,50 +895,24 @@ SlangResult _validateNVVMFunction(
             case kIROp_Leq:
             case kIROp_Geq:
                 {
-                    NVVMFloat32CompareInfo info;
-                    if (_getNVVMFloat32CompareInfo(inst, info))
+                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
+                    if (semantic)
                     {
-                        _requireFeature(features, info.feature);
+                        _requireFeature(features, semantic->legacyFeature);
                         break;
                     }
-                }
-                if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
-                {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        inst->getOp() == kIROp_Less      ? toSlice("signed i32 comparison")
-                        : inst->getOp() == kIROp_Eql     ? toSlice("signed i32 equality")
-                        : inst->getOp() == kIROp_Neq     ? toSlice("signed i32 inequality")
-                        : inst->getOp() == kIROp_Greater ? toSlice("signed i32 greater-than")
-                        : inst->getOp() == kIROp_Leq     ? toSlice("signed i32 less-than-or-equal")
-                                                     : toSlice("signed i32 greater-than-or-equal"));
-                }
-                switch (inst->getOp())
-                {
-                case kIROp_Less:
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_CONTROL_FLOW);
-                    break;
-                case kIROp_Eql:
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_EQUAL);
-                    break;
-                case kIROp_Neq:
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_NOT_EQUAL);
-                    break;
-                case kIROp_Greater:
-                    _requireFeature(
-                        features,
-                        SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_THAN);
-                    break;
-                case kIROp_Leq:
-                    _requireFeature(
-                        features,
-                        SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_LESS_EQUAL);
-                    break;
-                default:
-                    _requireFeature(
-                        features,
-                        SLANG_NVVM_BUILDER_FEATURE_SCALAR_INTEGER_SIGNED_GREATER_EQUAL);
-                    break;
+                    if (inst->getOperandCount() != 2 || !isNVVMBoolType(inst->getDataType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            inst->getOp() == kIROp_Less      ? toSlice("signed i32 comparison")
+                            : inst->getOp() == kIROp_Eql     ? toSlice("signed i32 equality")
+                            : inst->getOp() == kIROp_Neq     ? toSlice("signed i32 inequality")
+                            : inst->getOp() == kIROp_Greater ? toSlice("signed i32 greater-than")
+                            : inst->getOp() == kIROp_Leq
+                                ? toSlice("signed i32 less-than-or-equal")
+                                : toSlice("signed i32 greater-than-or-equal"));
+                    }
                 }
                 break;
 
@@ -1168,24 +934,25 @@ SlangResult _validateNVVMFunction(
             case kIROp_GenericAsm:
                 {
                     auto genericAsm = as<IRGenericAsm>(inst);
-                    const NVVMGenericAsmIntrinsicInfo* intrinsicInfo =
-                        _findNVVMGenericAsmIntrinsicInfo(genericAsm, function);
+                    const NVVMSemantics::CatalogEntry* semantic =
+                        _findNVVMGenericAsmSemantic(genericAsm, function);
                     if (isEntryPoint || genericAsm != terminator ||
                         functionBlocks.getCount() != 1 || genericAsm->getOperandCount() != 1 ||
-                        !intrinsicInfo)
+                        !semantic)
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                     }
-                    _requireFeature(features, intrinsicInfo->feature);
+                    _requireFeature(features, semantic->legacyFeature);
                 }
                 break;
 
             case kIROp_WaveMaskBallot:
-                if (inst->getOperandCount() != 2 || !isNVVMUnsignedI32Type(inst->getDataType()))
                 {
-                    return _diagnoseUnsupportedIR(codeGenContext, toSlice("wave-mask ballot"));
+                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
+                    if (!semantic)
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("wave-mask ballot"));
+                    _requireFeature(features, semantic->legacyFeature);
                 }
-                _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_WAVE_MASK_BALLOT);
                 break;
 
             case kIROp_GetOffsetPtr:
@@ -1352,8 +1119,9 @@ SlangResult _validateNVVMFunction(
             case kIROp_Leq:
             case kIROp_Geq:
                 {
-                    NVVMFloat32CompareInfo info;
-                    if (_getNVVMFloat32CompareInfo(inst, info))
+                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
+                    if (semantic &&
+                        semantic->operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4)
                     {
                         SLANG_RETURN_ON_FAIL(_validateFloat32Value(
                             codeGenContext,
@@ -1369,7 +1137,6 @@ SlangResult _validateNVVMFunction(
                             availableValues,
                             dominatorTree,
                             features));
-                        _requireFeature(features, info.feature);
                     }
                     else
                     {
@@ -1388,6 +1155,8 @@ SlangResult _validateNVVMFunction(
                             dominatorTree,
                             features));
                     }
+                    SLANG_RELEASE_ASSERT(semantic);
+                    _requireFeature(features, semantic->legacyFeature);
                     availableValues.add(inst);
                 }
                 break;
@@ -1404,28 +1173,32 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Neg:
-                if (isNVVMFloat32Type(inst->getDataType()))
                 {
-                    SLANG_RETURN_ON_FAIL(_validateFloat32Value(
-                        codeGenContext,
-                        inst->getOperand(0),
-                        inst,
-                        availableValues,
-                        dominatorTree,
-                        features));
-                    _requireFeature(features, SLANG_NVVM_BUILDER_FEATURE_SCALAR_FLOAT32_NEGATE);
+                    const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
+                    SLANG_RELEASE_ASSERT(semantic);
+                    if (semantic->resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT_4)
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateFloat32Value(
+                            codeGenContext,
+                            inst->getOperand(0),
+                            inst,
+                            availableValues,
+                            dominatorTree,
+                            features));
+                    }
+                    else
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateI32Value(
+                            codeGenContext,
+                            inst->getOperand(0),
+                            inst,
+                            availableValues,
+                            dominatorTree,
+                            features));
+                    }
+                    _requireFeature(features, semantic->legacyFeature);
+                    availableValues.add(inst);
                 }
-                else
-                {
-                    SLANG_RETURN_ON_FAIL(_validateI32Value(
-                        codeGenContext,
-                        inst->getOperand(0),
-                        inst,
-                        availableValues,
-                        dominatorTree,
-                        features));
-                }
-                availableValues.add(inst);
                 break;
 
             case kIROp_AtomicAdd:
@@ -2154,235 +1927,47 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Sub:
                 case kIROp_Mul:
                 case kIROp_Div:
-                    {
-                        SlangNVVMValueHandle_1 loweredLeft = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(0),
-                            valueMap,
-                            typeContext,
-                            loweredLeft));
-                        SlangNVVMValueHandle_1 loweredRight = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(1),
-                            valueMap,
-                            typeContext,
-                            loweredRight));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        if (isNVVMFloat32Type(inst->getDataType()))
-                        {
-                            NVVMFloat32BinaryInfo info;
-                            SLANG_RELEASE_ASSERT(_getNVVMFloat32BinaryInfo(inst->getOp(), info));
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                info.diagnosticName,
-                                builder.emitFloatingBinary(
-                                    moduleScope.module,
-                                    info.operation,
-                                    loweredLeft,
-                                    loweredRight,
-                                    loweredValue)));
-                        }
-                        else
-                        {
-                            SlangNVVMIntegerBinaryOp_3 operation;
-                            const char* diagnosticName = nullptr;
-                            switch (inst->getOp())
-                            {
-                            case kIROp_Add:
-                                operation = SLANG_NVVM_INTEGER_BINARY_OP_3_ADD;
-                                diagnosticName = "signed i32 addition";
-                                break;
-                            case kIROp_Sub:
-                                operation = SLANG_NVVM_INTEGER_BINARY_OP_3_SUB;
-                                diagnosticName = "signed i32 subtraction";
-                                break;
-                            case kIROp_Mul:
-                                operation = SLANG_NVVM_INTEGER_BINARY_OP_3_MULTIPLY;
-                                diagnosticName = "signed i32 multiplication";
-                                break;
-                            default:
-                                SLANG_UNEXPECTED("invalid NVVM integer binary opcode");
-                            }
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                diagnosticName,
-                                builder.emitIntegerBinaryOperation(
-                                    moduleScope.module,
-                                    operation,
-                                    loweredLeft,
-                                    loweredRight,
-                                    loweredValue)));
-                        }
-                        valueMap[inst] = loweredValue;
-                    }
-                    break;
-
                 case kIROp_BitAnd:
-                    {
-                        SlangNVVMValueHandle_1 loweredLeft = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(0),
-                            valueMap,
-                            typeContext,
-                            loweredLeft));
-                        SlangNVVMValueHandle_1 loweredRight = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(1),
-                            valueMap,
-                            typeContext,
-                            loweredRight));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "signed i32 bitwise AND",
-                            builder.emitIntegerBinaryOperation(
-                                moduleScope.module,
-                                SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_AND,
-                                loweredLeft,
-                                loweredRight,
-                                loweredValue)));
-                        valueMap[inst] = loweredValue;
-                    }
-                    break;
-
                 case kIROp_BitOr:
-                    {
-                        SlangNVVMValueHandle_1 loweredLeft = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(0),
-                            valueMap,
-                            typeContext,
-                            loweredLeft));
-                        SlangNVVMValueHandle_1 loweredRight = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(1),
-                            valueMap,
-                            typeContext,
-                            loweredRight));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "signed i32 bitwise OR",
-                            builder.emitIntegerBinaryOperation(
-                                moduleScope.module,
-                                SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_OR,
-                                loweredLeft,
-                                loweredRight,
-                                loweredValue)));
-                        valueMap[inst] = loweredValue;
-                    }
-                    break;
-
                 case kIROp_BitXor:
-                    {
-                        SlangNVVMValueHandle_1 loweredLeft = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(0),
-                            valueMap,
-                            typeContext,
-                            loweredLeft));
-                        SlangNVVMValueHandle_1 loweredRight = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(1),
-                            valueMap,
-                            typeContext,
-                            loweredRight));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "signed i32 bitwise XOR",
-                            builder.emitIntegerBinaryOperation(
-                                moduleScope.module,
-                                SLANG_NVVM_INTEGER_BINARY_OP_3_BIT_XOR,
-                                loweredLeft,
-                                loweredRight,
-                                loweredValue)));
-                        valueMap[inst] = loweredValue;
-                    }
-                    break;
-
                 case kIROp_BitNot:
+                case kIROp_Neg:
+                case kIROp_Less:
+                case kIROp_Eql:
+                case kIROp_Neq:
+                case kIROp_Greater:
+                case kIROp_Leq:
+                case kIROp_Geq:
+                case kIROp_WaveMaskBallot:
                     {
-                        SlangNVVMValueHandle_1 loweredOperand = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(0),
-                            valueMap,
-                            typeContext,
-                            loweredOperand));
+                        const NVVMSemantics::CatalogEntry* semantic = _findNVVMValueOperation(inst);
+                        SLANG_RELEASE_ASSERT(semantic);
+                        SlangNVVMValueHandle_1 loweredOperands[3] = {};
+                        for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
+                             ++operandIndex)
+                        {
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                inst->getOperand(operandIndex),
+                                valueMap,
+                                typeContext,
+                                loweredOperands[operandIndex]));
+                        }
+
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        const SlangNVVMValueOperationDesc_4 operation =
+                            NVVMSemantics::getOperationDesc(*semantic);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "signed i32 bitwise NOT",
-                            builder.emitIntegerUnary(
+                            semantic->diagnosticName,
+                            builder.emitValueOperation(
                                 moduleScope.module,
-                                SLANG_NVVM_INTEGER_UNARY_OP_BIT_NOT,
-                                loweredOperand,
+                                operation,
+                                inst->getOperandCount() ? loweredOperands : nullptr,
+                                inst->getOperandCount(),
                                 loweredValue)));
-                        valueMap[inst] = loweredValue;
-                    }
-                    break;
-
-                case kIROp_Neg:
-                    {
-                        SlangNVVMValueHandle_1 loweredOperand = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(0),
-                            valueMap,
-                            typeContext,
-                            loweredOperand));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        if (isNVVMFloat32Type(inst->getDataType()))
-                        {
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                "float32 negation",
-                                builder.emitFloatingUnary(
-                                    moduleScope.module,
-                                    SLANG_NVVM_FLOATING_UNARY_OP_NEGATE,
-                                    loweredOperand,
-                                    loweredValue)));
-                        }
-                        else
-                        {
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                "signed i32 arithmetic negation",
-                                builder.emitIntegerUnary(
-                                    moduleScope.module,
-                                    SLANG_NVVM_INTEGER_UNARY_OP_NEGATE,
-                                    loweredOperand,
-                                    loweredValue)));
-                        }
                         valueMap[inst] = loweredValue;
                     }
                     break;
@@ -2420,88 +2005,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
-                case kIROp_Less:
-                case kIROp_Eql:
-                case kIROp_Neq:
-                case kIROp_Greater:
-                case kIROp_Leq:
-                case kIROp_Geq:
-                    {
-                        SlangNVVMValueHandle_1 loweredLeft = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(0),
-                            valueMap,
-                            typeContext,
-                            loweredLeft));
-                        SlangNVVMValueHandle_1 loweredRight = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            inst->getOperand(1),
-                            valueMap,
-                            typeContext,
-                            loweredRight));
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        NVVMFloat32CompareInfo info;
-                        if (_getNVVMFloat32CompareInfo(inst, info))
-                        {
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                info.diagnosticName,
-                                builder.emitFloatingCompare(
-                                    moduleScope.module,
-                                    info.operation,
-                                    loweredLeft,
-                                    loweredRight,
-                                    loweredValue)));
-                        }
-                        else
-                        {
-                            SlangNVVMIntegerCompareOp_3 operation =
-                                SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_EQUAL;
-                            const char* diagnosticName = "signed i32 less-than-or-equal comparison";
-                            if (inst->getOp() == kIROp_Less)
-                            {
-                                operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_LESS_THAN;
-                                diagnosticName = "signed i32 less-than comparison";
-                            }
-                            else if (inst->getOp() == kIROp_Eql)
-                            {
-                                operation = SLANG_NVVM_INTEGER_COMPARE_OP_EQUAL;
-                                diagnosticName = "signed i32 equality comparison";
-                            }
-                            else if (inst->getOp() == kIROp_Neq)
-                            {
-                                operation = SLANG_NVVM_INTEGER_COMPARE_OP_NOT_EQUAL;
-                                diagnosticName = "signed i32 inequality comparison";
-                            }
-                            else if (inst->getOp() == kIROp_Greater)
-                            {
-                                operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_THAN;
-                                diagnosticName = "signed i32 greater-than comparison";
-                            }
-                            else if (inst->getOp() == kIROp_Geq)
-                            {
-                                operation = SLANG_NVVM_INTEGER_COMPARE_OP_SIGNED_GREATER_EQUAL;
-                                diagnosticName = "signed i32 greater-than-or-equal comparison";
-                            }
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                diagnosticName,
-                                builder.emitIntegerCompare(
-                                    moduleScope.module,
-                                    operation,
-                                    loweredLeft,
-                                    loweredRight,
-                                    loweredValue)));
-                        }
-                        valueMap[inst] = loweredValue;
-                    }
-                    break;
 
                 case kIROp_Call:
                     {
@@ -2550,9 +2053,9 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_GenericAsm:
                     {
-                        const NVVMGenericAsmIntrinsicInfo* intrinsicInfo =
-                            _findNVVMGenericAsmIntrinsicInfo(as<IRGenericAsm>(inst), function);
-                        SLANG_RELEASE_ASSERT(intrinsicInfo);
+                        const NVVMSemantics::CatalogEntry* semantic =
+                            _findNVVMGenericAsmSemantic(as<IRGenericAsm>(inst), function);
+                        SLANG_RELEASE_ASSERT(semantic);
                         List<SlangNVVMValueHandle_1> loweredArguments;
                         for (auto parameter : function->getParams())
                         {
@@ -2568,12 +2071,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredArguments.add(loweredArgument);
                         }
                         SlangNVVMValueHandle_1 loweredValue = nullptr;
+                        const SlangNVVMValueOperationDesc_4 operation =
+                            NVVMSemantics::getOperationDesc(*semantic);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            intrinsicInfo->diagnosticName,
-                            builder.emitIntrinsic(
+                            semantic->diagnosticName,
+                            builder.emitValueOperation(
                                 moduleScope.module,
-                                intrinsicInfo->operation,
+                                operation,
                                 loweredArguments.getCount() ? loweredArguments.getBuffer()
                                                             : nullptr,
                                 size_t(loweredArguments.getCount()),
@@ -2585,33 +2090,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
-                case kIROp_WaveMaskBallot:
-                    {
-                        SlangNVVMValueHandle_1 loweredArguments[2] = {};
-                        for (UInt operandIndex = 0; operandIndex < 2; ++operandIndex)
-                        {
-                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                inst->getOperand(operandIndex),
-                                valueMap,
-                                typeContext,
-                                loweredArguments[operandIndex]));
-                        }
-                        SlangNVVMValueHandle_1 loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "wave-mask ballot intrinsic",
-                            builder.emitIntrinsic(
-                                moduleScope.module,
-                                SLANG_NVVM_INTRINSIC_OP_WAVE_MASK_BALLOT,
-                                loweredArguments,
-                                SLANG_COUNT_OF(loweredArguments),
-                                loweredValue)));
-                        valueMap[inst] = loweredValue;
-                    }
-                    break;
 
                 case kIROp_GetOffsetPtr:
                     {
