@@ -694,7 +694,7 @@ SLANG_UNIT_TEST(nvvmSlangConventionalComputeUsesDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.structFieldTypes[0] == _getFakeNVVMBuilderResourceViewType());
         SLANG_CHECK(gFakeNVVMBuilder.declareGlobalStorageCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.globalStorageValueType == _getFakeNVVMBuilderStructType());
-        SLANG_CHECK(gFakeNVVMBuilder.globalStorageLinkage == SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageLinkage == SLANG_NVVM_LINKAGE_EXTERNAL);
         SLANG_CHECK(
             gFakeNVVMBuilder.globalStorageAddressSpace == SLANG_NVVM_ADDRESS_SPACE_CONSTANT);
         SLANG_CHECK(gFakeNVVMBuilder.globalStorageAlignment == 8);
@@ -2521,6 +2521,15 @@ SLANG_UNIT_TEST(nvvmSlangScalarFunctionsUseDirectPipeline)
         const Index kernelFunction = gFakeNVVMBuilder.kernelFunctionIndices[0];
         SLANG_CHECK_ABORT(kernelFunction >= 0);
         SLANG_CHECK_ABORT(kernelFunction < gFakeNVVMBuilder.functionTypeIndices.getCount());
+        for (Index functionIndex = 0; functionIndex < 3; ++functionIndex)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.functionLinkages[functionIndex] ==
+                (functionIndex == kernelFunction ? SLANG_NVVM_LINKAGE_EXTERNAL
+                                                 : SLANG_NVVM_LINKAGE_INTERNAL));
+            SLANG_CHECK(
+                gFakeNVVMBuilder.functionFlags[functionIndex] == SLANG_NVVM_FUNCTION_FLAG_NONE);
+        }
         const Index kernelType = gFakeNVVMBuilder.functionTypeIndices[kernelFunction];
         SLANG_CHECK(
             gFakeNVVMBuilder.functionTypeResultKinds[kernelType] ==
@@ -2743,6 +2752,78 @@ SLANG_UNIT_TEST(nvvmSlangScalarFunctionsUseDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangPreservesFunctionContracts)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMFunctionContractSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.functionNames.getCount() == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.functionLinkages.getCount() == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.functionFlags.getCount() == 4);
+
+        Index entryIndex = -1;
+        Index helperIndex = -1;
+        Index plainIndex = -1;
+        Index exportIndex = -1;
+        for (Index functionIndex = 0; functionIndex < gFakeNVVMBuilder.functionNames.getCount();
+             ++functionIndex)
+        {
+            const String& name = gFakeNVVMBuilder.functionNames[functionIndex];
+            if (name == "computeMain")
+                entryIndex = functionIndex;
+            else if (name == "exportedFunc")
+                exportIndex = functionIndex;
+            else if (name.indexOf("helperFunc") >= 0)
+                helperIndex = functionIndex;
+            else if (name.indexOf("plainHelper") >= 0)
+                plainIndex = functionIndex;
+        }
+        SLANG_CHECK_ABORT(entryIndex >= 0);
+        SLANG_CHECK_ABORT(helperIndex >= 0);
+        SLANG_CHECK_ABORT(plainIndex >= 0);
+        SLANG_CHECK_ABORT(exportIndex >= 0);
+
+        SLANG_CHECK(gFakeNVVMBuilder.functionLinkages[entryIndex] == SLANG_NVVM_LINKAGE_EXTERNAL);
+        SLANG_CHECK(gFakeNVVMBuilder.functionFlags[entryIndex] == SLANG_NVVM_FUNCTION_FLAG_NONE);
+        SLANG_CHECK(gFakeNVVMBuilder.functionLinkages[helperIndex] == SLANG_NVVM_LINKAGE_INTERNAL);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionFlags[helperIndex] == SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+        SLANG_CHECK(gFakeNVVMBuilder.functionLinkages[plainIndex] == SLANG_NVVM_LINKAGE_INTERNAL);
+        SLANG_CHECK(gFakeNVVMBuilder.functionFlags[plainIndex] == SLANG_NVVM_FUNCTION_FLAG_NONE);
+        SLANG_CHECK(gFakeNVVMBuilder.functionLinkages[exportIndex] == SLANG_NVVM_LINKAGE_EXTERNAL);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionFlags[exportIndex] == SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.kernelFunctionIndices.getCount() == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.kernelFunctionIndices[0] == entryIndex);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);

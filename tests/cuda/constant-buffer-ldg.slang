@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK_NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0
+//TEST:SIMPLE(filecheck=CHECK_NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 // Positive companion to shader-slang/slang#10188: a genuine `ConstantBuffer<>` (not the SBT)
 // is truly immutable and MUST still use `__ldg` — guards against the SBT exclusion being too

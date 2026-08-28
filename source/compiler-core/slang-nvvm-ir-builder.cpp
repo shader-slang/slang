@@ -262,15 +262,22 @@ SlangResult NVVMIRBuilder::getFunctionType(
 SlangResult NVVMIRBuilder::declareFunction(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle functionType,
+    SlangNVVMLinkage linkage,
+    SlangNVVMFunctionFlags flags,
     const UnownedStringSlice& name,
     SlangNVVMValueHandle& outFunction) const
 {
     outFunction = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    const SlangNVVMResult result =
-        m_construction
-            .declareFunction(module, functionType, name.begin(), name.getLength(), &outFunction);
+    const SlangNVVMResult result = m_construction.declareFunction(
+        module,
+        functionType,
+        linkage,
+        flags,
+        name.begin(),
+        name.getLength(),
+        &outFunction);
     return _validateHandleResult(result, outFunction);
 }
 
@@ -726,7 +733,7 @@ SlangResult NVVMIRBuilder::getStructType(
 SlangResult NVVMIRBuilder::declareGlobalStorage(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle valueType,
-    SlangNVVMGlobalLinkage linkage,
+    SlangNVVMLinkage linkage,
     SlangNVVMAddressSpace addressSpace,
     uint32_t alignment,
     const UnownedStringSlice& name,

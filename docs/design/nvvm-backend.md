@@ -4463,6 +4463,36 @@ not yet preserve `IRNoInlineDecoration`, so no lane was registered merely becaus
 helper functions happen to remain. Release host and standalone-provider builds pass, and the
 complete NVVM prefix passes 340/340.
 
+### Slice 79: Function linkage, no-inline, and device-export symbols
+
+Exact builder ABI revision 5 gives function declarations the same generic
+`SlangNVVMLinkage` contract as global storage plus independent `SlangNVVMFunctionFlags`. The real
+provider validates both dimensions before module mutation, maps internal/external linkage to LLVM,
+and maps the no-inline bit to LLVM's `noinline` attribute. The fake provider records the same
+contract. No compatibility ABI, CUDA-specific callback, or separate function/global linkage enum
+is retained.
+
+The direct emitter derives that contract from canonical linked IR. The selected entry is external
+and unconstrained, an ordinary reachable helper is internal, and a helper with
+`IRCudaDeviceExportDecoration` is external. A non-entry `IRNoInlineDecoration` supplies the
+no-inline flag. Entry names still come from their entry-point decoration, ordinary helpers use
+their Slang mangled name, and device exports use the exact source-level name stored as operand zero
+of the export decoration. The decoration producer remains the single source of truth.
+
+`tests/cuda/noinline.slang` now passes CUDA-source, ordinary PTX, and direct-libNVVM lanes 3/3.
+Direct PTX contains internal `.func` definitions for the no-inline and plain helpers, a
+`.visible .func exportedFunc`, and `.visible .entry computeMain`; CUDA 12.9 `ptxas` accepts it for
+`sm_70`. Normal LLVM 14 assembly, LLVM 7-compatible text, and the fake boundary independently
+verify all four function contracts.
+
+An audit also found that a static `SIMPLE` PTX lane needs `-o -` to request the whole linked target
+module. Without it, the test harness can request entry-point output and take a CUDA/NVRTC route,
+making a supposed direct check a false positive. All existing static direct-PTX lanes now request
+whole-target stdout explicitly, and two order-dependent checks were relaxed to DAG checks because
+the real direct module places helpers differently. Release host and standalone-provider builds
+pass, the complete NVVM prefix passes 342/342, and the combined unit/file-backed run passes
+354/354.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4475,10 +4505,10 @@ The following remain open until their named slice supplies evidence:
   sampler/unsized-sampler-array placeholders, and raw CUDA parameters beyond the selected integer
   and float32 scalars, selected numeric device pointers, fixed i32 array pointers, signed-i32x2
   device pointers, and selected-scalar raw read-write structured buffers;
-- external/indirect calls, richer helper ABI, integer shifts/division/remainder, saturating or
-  overflow-decorated arithmetic, function attributes including no-inline, float64/low-precision
-  scalar families, and general vector or matrix operations beyond the bounded signed-i32x2 add
-  proof;
+- external/indirect calls, richer helper ABI, calling conventions and function attributes beyond
+  no-inline, integer shifts/division/remainder, saturating or overflow-decorated arithmetic,
+  float64/low-precision scalar families, and general vector or matrix operations beyond the
+  bounded signed-i32x2 add proof;
 - pointer and runtime aggregate addressing beyond signed-i32 scalar offsets on selected numeric
   device pointers and the exact fixed-i32 device-array subset, including other `IRGetElementPtr`
   shapes, array values, structs, general globals, additional shared-memory shapes, and address

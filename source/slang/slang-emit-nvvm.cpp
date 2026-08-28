@@ -1078,6 +1078,13 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
         SLANG_RELEASE_ASSERT(entryPointDecoration);
         return entryPointDecoration->getName()->getStringSlice();
     }
+    if (auto exportDecoration = function->findDecorationImpl(kIROp_CudaDeviceExportDecoration))
+    {
+        SLANG_RELEASE_ASSERT(exportDecoration->getOperandCount() == 1);
+        auto exportName = as<IRStringLit>(exportDecoration->getOperand(0));
+        SLANG_RELEASE_ASSERT(exportName);
+        return exportName->getStringSlice();
+    }
     return getMangledName(function);
 }
 
@@ -2354,7 +2361,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 builder.declareGlobalStorage(
                     moduleScope.module,
                     loweredStructType,
-                    SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL,
+                    SLANG_NVVM_LINKAGE_EXTERNAL,
                     SLANG_NVVM_ADDRESS_SPACE_CONSTANT,
                     kNVVMPointerAlignment,
                     toSlice("SLANG_globalParams"),
@@ -2378,7 +2385,7 @@ SlangResult emitNVVMIRFromLinkedIR(
             builder.declareGlobalStorage(
                 moduleScope.module,
                 loweredArrayType,
-                SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
+                SLANG_NVVM_LINKAGE_INTERNAL,
                 SLANG_NVVM_ADDRESS_SPACE_SHARED,
                 kNVVMScalar32Alignment,
                 getMangledName(globalVar),
@@ -2420,12 +2427,21 @@ SlangResult emitNVVMIRFromLinkedIR(
                 functionType)));
 
         SlangNVVMValueHandle loweredFunction = nullptr;
+        const bool isExported =
+            isEntryPoint || function->findDecorationImpl(kIROp_CudaDeviceExportDecoration);
+        const SlangNVVMLinkage linkage =
+            isExported ? SLANG_NVVM_LINKAGE_EXTERNAL : SLANG_NVVM_LINKAGE_INTERNAL;
+        SlangNVVMFunctionFlags flags = SLANG_NVVM_FUNCTION_FLAG_NONE;
+        if (!isEntryPoint && function->findDecoration<IRNoInlineDecoration>())
+            flags |= SLANG_NVVM_FUNCTION_FLAG_NO_INLINE;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
             "function declaration",
             builder.declareFunction(
                 moduleScope.module,
                 functionType,
+                linkage,
+                flags,
                 _getNVVMFunctionName(function, entryPoint),
                 loweredFunction)));
         functionMap[function] = loweredFunction;

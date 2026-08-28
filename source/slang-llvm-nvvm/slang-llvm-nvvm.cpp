@@ -449,6 +449,8 @@ static SlangResult SLANG_NVVM_CALL _getFunctionType(
 static SlangResult SLANG_NVVM_CALL _declareFunction(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle functionType,
+    SlangNVVMLinkage linkage,
+    SlangNVVMFunctionFlags flags,
     const char* name,
     size_t nameSize,
     SlangNVVMValueHandle* outFunction)
@@ -457,7 +459,8 @@ static SlangResult SLANG_NVVM_CALL _declareFunction(
     llvm::FunctionType* llvmFunctionType =
         llvm::dyn_cast_or_null<llvm::FunctionType>(_getType(functionType));
     if (!state || !llvmFunctionType || &llvmFunctionType->getContext() != &state->context ||
-        !name || !nameSize || !outFunction)
+        (linkage != SLANG_NVVM_LINKAGE_INTERNAL && linkage != SLANG_NVVM_LINKAGE_EXTERNAL) ||
+        (flags & ~SLANG_NVVM_FUNCTION_FLAG_NO_INLINE) || !name || !nameSize || !outFunction)
         return SLANG_E_INVALID_ARG;
 
     const llvm::StringRef llvmName = _getStringRef(name, nameSize);
@@ -466,9 +469,12 @@ static SlangResult SLANG_NVVM_CALL _declareFunction(
 
     llvm::Function* function = llvm::Function::Create(
         llvmFunctionType,
-        llvm::GlobalValue::ExternalLinkage,
+        linkage == SLANG_NVVM_LINKAGE_INTERNAL ? llvm::GlobalValue::InternalLinkage
+                                               : llvm::GlobalValue::ExternalLinkage,
         llvmName,
         *state->module);
+    if (flags & SLANG_NVVM_FUNCTION_FLAG_NO_INLINE)
+        function->addFnAttr(llvm::Attribute::NoInline);
     size_t parameterIndex = 0;
     for (llvm::Argument& parameter : function->args())
     {
@@ -1267,7 +1273,7 @@ static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
 static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle valueType,
-    SlangNVVMGlobalLinkage linkage,
+    SlangNVVMLinkage linkage,
     SlangNVVMAddressSpace addressSpace,
     uint32_t alignment,
     const char* name,
@@ -1282,8 +1288,7 @@ static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
     const llvm::StringRef llvmName = _getStringRef(name, nameSize);
     if (!state || !llvmValueType || &llvmValueType->getContext() != &state->context ||
         !llvm::PointerType::isLoadableOrStorableType(llvmValueType) || !llvmValueType->isSized() ||
-        (linkage != SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL &&
-         linkage != SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL) ||
+        (linkage != SLANG_NVVM_LINKAGE_INTERNAL && linkage != SLANG_NVVM_LINKAGE_EXTERNAL) ||
         !_isNVVMAddressSpace(addressSpace) || !alignment || !llvm::isPowerOf2_32(alignment) ||
         alignment > llvm::Value::MaximumAlignment || !name || !nameSize ||
         state->module->getNamedValue(llvmName) || !outStorage)
@@ -1295,8 +1300,8 @@ static SlangResult SLANG_NVVM_CALL _declareGlobalStorage(
         *state->module,
         llvmValueType,
         false,
-        linkage == SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL ? llvm::GlobalValue::ExternalLinkage
-                                                      : llvm::GlobalValue::InternalLinkage,
+        linkage == SLANG_NVVM_LINKAGE_EXTERNAL ? llvm::GlobalValue::ExternalLinkage
+                                               : llvm::GlobalValue::InternalLinkage,
         llvm::UndefValue::get(llvmValueType),
         llvmName,
         nullptr,

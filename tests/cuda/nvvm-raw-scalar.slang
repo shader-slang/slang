@@ -2,7 +2,7 @@
 // The helper, branch, and loop make this a file-backed composition test rather than an empty
 // routing check.
 
-//TEST:SIMPLE(filecheck=CHECK): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0
+//TEST:SIMPLE(filecheck=CHECK): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 int chooseAndAccumulate(int left, int right)
 {

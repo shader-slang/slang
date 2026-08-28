@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -line-directive-mode none
 //TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx
+//TEST:SIMPLE(filecheck=CHECK_NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 // Test that [noinline] emits CUDA's `__noinline__` declaration specifier and that it is
 // applied to ordinary `__device__` functions only. `[CudaHost]` is excluded from this file
@@ -64,3 +65,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // the entry point in the output, so it is checked first.
 // CHECK_PTX: {{^}}.func{{.*}}helperFunc
 // CHECK_PTX: {{^}}.visible .entry computeMain
+
+// Direct NVVM keeps ordinary helpers internal, applies `noinline` to `helperFunc`, and uses the
+// exact source name and external linkage recorded by `[CudaDeviceExport]`. At the test harness's
+// O0 setting the unconstrained plain helper remains present, but it is still internal.
+// CHECK_NVVM: {{^}}.func{{.*}}helperFunc
+// CHECK_NVVM: {{^}}.func{{.*}}plainHelper
+// CHECK_NVVM: {{^}}.visible .func{{.*}}exportedFunc
+// CHECK_NVVM: {{^}}.visible .entry computeMain

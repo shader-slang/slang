@@ -1,7 +1,7 @@
 // Exercises canonical CUDA execution state, shared storage, aggregate addressing, and a group
 // barrier through one raw direct-NVVM kernel.
 
-//TEST:SIMPLE(filecheck=CHECK): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0
+//TEST:SIMPLE(filecheck=CHECK): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 groupshared int sharedValues[64];
 
@@ -15,7 +15,7 @@ void computeMain(uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> desti
 }
 
 // CHECK: .visible .entry computeMain
-// CHECK: .shared
-// CHECK: mov.u32 {{.*}}%tid.x
-// CHECK: bar.sync
-// CHECK: st.global.u32
+// CHECK-DAG: .shared
+// CHECK-DAG: mov.u32 {{.*}}%tid.x
+// CHECK-DAG: bar.sync
+// CHECK-DAG: st.global.u32

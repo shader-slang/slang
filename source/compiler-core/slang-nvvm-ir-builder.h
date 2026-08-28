@@ -86,10 +86,12 @@ public:
         size_t parameterCount,
         SlangNVVMTypeHandle& outType) const;
 
-    /// Declares a function in the module with the exact caller-provided name.
+    /// Declares a function with explicit linkage, attributes, and caller-provided name.
     SlangResult declareFunction(
         SlangNVVMModuleHandle module,
         SlangNVVMTypeHandle functionType,
+        SlangNVVMLinkage linkage,
+        SlangNVVMFunctionFlags flags,
         const UnownedStringSlice& name,
         SlangNVVMValueHandle& outFunction) const;
 
@@ -293,7 +295,7 @@ public:
     SlangResult declareGlobalStorage(
         SlangNVVMModuleHandle module,
         SlangNVVMTypeHandle valueType,
-        SlangNVVMGlobalLinkage linkage,
+        SlangNVVMLinkage linkage,
         SlangNVVMAddressSpace addressSpace,
         uint32_t alignment,
         const UnownedStringSlice& name,

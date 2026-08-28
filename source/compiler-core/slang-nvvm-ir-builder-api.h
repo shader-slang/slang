@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 4u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 5u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -61,9 +61,14 @@ extern "C"
 #define SLANG_NVVM_ADDRESS_SPACE_CONSTANT ((SlangNVVMAddressSpace)4u)
 #define SLANG_NVVM_ADDRESS_SPACE_LOCAL ((SlangNVVMAddressSpace)5u)
 
-    typedef uint32_t SlangNVVMGlobalLinkage;
-#define SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL ((SlangNVVMGlobalLinkage)0u)
-#define SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL ((SlangNVVMGlobalLinkage)1u)
+    typedef uint32_t SlangNVVMLinkage;
+#define SLANG_NVVM_LINKAGE_INTERNAL ((SlangNVVMLinkage)0u)
+#define SLANG_NVVM_LINKAGE_EXTERNAL ((SlangNVVMLinkage)1u)
+
+    /** Independent semantic properties of one function definition. */
+    typedef uint32_t SlangNVVMFunctionFlags;
+#define SLANG_NVVM_FUNCTION_FLAG_NONE ((SlangNVVMFunctionFlags)0u)
+#define SLANG_NVVM_FUNCTION_FLAG_NO_INLINE ((SlangNVVMFunctionFlags)1u << 0)
 
     /** Independent semantic properties of one non-volatile load. */
     typedef uint32_t SlangNVVMLoadFlags;
@@ -208,6 +213,8 @@ extern "C"
         SlangNVVMResult(SLANG_NVVM_CALL* declareFunction)(
             SlangNVVMModuleHandle module,
             SlangNVVMTypeHandle functionType,
+            SlangNVVMLinkage linkage,
+            SlangNVVMFunctionFlags flags,
             const char* name,
             size_t nameSize,
             SlangNVVMValueHandle* outFunction);
@@ -308,7 +315,7 @@ extern "C"
         SlangNVVMResult(SLANG_NVVM_CALL* declareGlobalStorage)(
             SlangNVVMModuleHandle module,
             SlangNVVMTypeHandle valueType,
-            SlangNVVMGlobalLinkage linkage,
+            SlangNVVMLinkage linkage,
             SlangNVVMAddressSpace addressSpace,
             uint32_t alignment,
             const char* name,

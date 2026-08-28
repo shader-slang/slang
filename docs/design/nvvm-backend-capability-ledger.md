@@ -1415,3 +1415,21 @@ CUDA/NVRTC, direct libNVVM, and Vulkan 3/3. CUDA 12.9 `ptxas` accepts both new d
 `sm_70`; Release host and standalone-provider builds pass; and the complete NVVM prefix passes
 340/340. `noinline.slang` is not registered: its probe compiles, but direct emission does not yet
 preserve `IRNoInlineDecoration`, so retained unoptimized helpers would be false semantic evidence.
+
+Slice 79 preserves function contracts through exact builder ABI revision 5. One generic linkage
+enum now serves both function declarations and global storage; independent function flags
+currently carry no-inline. The provider validates both inputs before mutation and maps them to
+LLVM internal/external linkage and `noinline`. The direct emitter makes the selected entry and
+CUDA device exports external, ordinary reachable helpers internal, and non-entry no-inline helpers
+constrained. A device export uses the exact source name stored in its canonical IR decoration.
+
+The existing no-inline fixture passes CUDA-source, ordinary PTX, and direct libNVVM 3/3. Its direct
+PTX distinguishes internal no-inline and plain helpers, `.visible .func exportedFunc`, and
+`.visible .entry computeMain`; CUDA 12.9 `ptxas` accepts it for `sm_70`. Normal LLVM 14 text, LLVM
+7-compatible text, and the fake boundary independently cover the declaration matrix.
+
+An audit corrected five existing static direct-PTX lanes to request whole-target stdout with
+`-o -`; without that option the harness could route an entry-point output request through
+CUDA/NVRTC and produce false-positive direct coverage. All audited lanes pass against actual
+direct output. Release host and standalone-provider builds pass, the complete NVVM prefix passes
+342/342, and the combined unit/file-backed run passes 354/354.

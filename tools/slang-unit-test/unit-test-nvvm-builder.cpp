@@ -123,7 +123,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->declareGlobalStorage != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=4") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=5") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -239,6 +239,96 @@ SLANG_UNIT_TEST(nvvmIRBuilderSerializesEmptyKernel)
     for (size_t i = 0; i < bitcodeBlob->getBufferSize(); ++i)
         hasEmbeddedNull = hasEmbeddedNull || bitcodeBytes[i] == 0;
     SLANG_CHECK(hasEmbeddedNull);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderPreservesFunctionContracts)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("function-contracts"), scope.module)));
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle functionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionType(scope.module, voidType, nullptr, 0, functionType)));
+
+    SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.declareFunction(
+            scope.module,
+            functionType,
+            SlangNVVMLinkage(2),
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("invalidLinkage"),
+            rejected) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejected == nullptr);
+    rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_INTERNAL,
+            SlangNVVMFunctionFlags(SLANG_NVVM_FUNCTION_FLAG_NO_INLINE << 1),
+            toSlice("invalidFlags"),
+            rejected) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejected == nullptr);
+
+    auto defineFunction =
+        [&](const char* name, SlangNVVMLinkage linkage, SlangNVVMFunctionFlags flags)
+    {
+        SlangNVVMValueHandle function = nullptr;
+        SlangNVVMBlockHandle entryBlock = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            linkage,
+            flags,
+            UnownedStringSlice(name),
+            function)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.createBlock(scope.module, function, toSlice("entry"), entryBlock)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, entryBlock)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+        return function;
+    };
+
+    defineFunction(
+        "internalNoInline",
+        SLANG_NVVM_LINKAGE_INTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+    defineFunction("internalPlain", SLANG_NVVM_LINKAGE_INTERNAL, SLANG_NVVM_FUNCTION_FLAG_NONE);
+    defineFunction(
+        "exportedNoInline",
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+    SlangNVVMValueHandle kernel = defineFunction(
+        "functionContractKernel",
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, kernel)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        const String text = _getBlobText(assembly);
+        SLANG_CHECK(text.indexOf("define internal void @internalNoInline() #0") >= 0);
+        SLANG_CHECK(text.indexOf("define internal void @internalPlain()") >= 0);
+        SLANG_CHECK(text.indexOf("define void @exportedNoInline() #0") >= 0);
+        SLANG_CHECK(text.indexOf("define void @functionContractKernel()") >= 0);
+        SLANG_CHECK(text.indexOf("attributes #0 = { noinline }") >= 0);
+        SLANG_CHECK(text.indexOf("invalidLinkage") < 0);
+        SLANG_CHECK(text.indexOf("invalidFlags") < 0);
+    }
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderRejectsUnknownOperationsWithoutMutation)
@@ -397,6 +487,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         scope.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("cudaExecutionOperations"),
         function)));
     SlangNVVMValueHandle scalarParameter = nullptr;
@@ -421,6 +513,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignScope.module,
         foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignCUDAExecutionOperations"),
         foreignFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -592,7 +686,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             nullptr,
             arrayType,
-            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
+            SLANG_NVVM_LINKAGE_INTERNAL,
             SLANG_NVVM_ADDRESS_SPACE_SHARED,
             4,
             toSlice("rejectedNullModule"),
@@ -603,7 +697,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             scope.module,
             foreignArrayType,
-            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
+            SLANG_NVVM_LINKAGE_INTERNAL,
             SLANG_NVVM_ADDRESS_SPACE_SHARED,
             4,
             toSlice("rejectedForeignType"),
@@ -614,7 +708,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             scope.module,
             arrayType,
-            SlangNVVMGlobalLinkage(2),
+            SlangNVVMLinkage(2),
             SLANG_NVVM_ADDRESS_SPACE_SHARED,
             4,
             toSlice("rejectedLinkage"),
@@ -625,7 +719,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             scope.module,
             arrayType,
-            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
+            SLANG_NVVM_LINKAGE_INTERNAL,
             SlangNVVMAddressSpace(2),
             4,
             toSlice("rejectedAddressSpace"),
@@ -636,7 +730,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             scope.module,
             arrayType,
-            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
+            SLANG_NVVM_LINKAGE_INTERNAL,
             SLANG_NVVM_ADDRESS_SPACE_SHARED,
             3,
             toSlice("rejectedAlignment"),
@@ -647,7 +741,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareGlobalStorage(
         scope.module,
         arrayType,
-        SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
+        SLANG_NVVM_LINKAGE_INTERNAL,
         SLANG_NVVM_ADDRESS_SPACE_SHARED,
         4,
         toSlice("sharedValues"),
@@ -657,7 +751,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
         builder.declareGlobalStorage(
             scope.module,
             arrayType,
-            SLANG_NVVM_GLOBAL_LINKAGE_INTERNAL,
+            SLANG_NVVM_LINKAGE_INTERNAL,
             SLANG_NVVM_ADDRESS_SPACE_SHARED,
             4,
             toSlice("sharedValues"),
@@ -672,6 +766,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         scope.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("sharedGlobalStorage"),
         function)));
     SLANG_CHECK_ABORT(
@@ -794,7 +890,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsConventionalGlobalParameterStorage)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareGlobalStorage(
         module.module,
         parameterStructType,
-        SLANG_NVVM_GLOBAL_LINKAGE_EXTERNAL,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
         SLANG_NVVM_ADDRESS_SPACE_CONSTANT,
         8,
         toSlice("SLANG_globalParams"),
@@ -808,6 +904,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsConventionalGlobalParameterStorage)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("conventionalGlobalParameters"),
         function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -903,8 +1001,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
         parameterTypes,
         SLANG_COUNT_OF(parameterTypes),
         functionType)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.declareFunction(scope.module, functionType, toSlice("invalidFloat32"), function)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        scope.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("invalidFloat32"),
+        function)));
     SlangNVVMValueHandle left = nullptr;
     SlangNVVMValueHandle right = nullptr;
     SlangNVVMValueHandle integer = nullptr;
@@ -938,6 +1041,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignScope.module,
         foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignFloat32"),
         foreignFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -2212,6 +2317,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         firstModule.module,
         firstFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("uniqueKernel"),
         firstFunction)));
 
@@ -2220,6 +2327,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidOperations)
         builder.declareFunction(
             firstModule.module,
             firstFunctionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
             toSlice("uniqueKernel"),
             invalidFunction) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(invalidFunction == nullptr);
@@ -2227,6 +2336,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidOperations)
         builder.declareFunction(
             secondModule.module,
             firstFunctionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
             toSlice("foreignType"),
             invalidFunction) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(invalidFunction == nullptr);
@@ -2463,6 +2574,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         firstModule.module,
         firstFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("rejectInvalidScalarOperations"),
         firstFunction)));
 
@@ -2497,6 +2610,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         secondModule.module,
         secondFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignScalarFunction"),
         secondFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -2671,6 +2786,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
             firstModule.module,
             functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
             UnownedStringSlice(name),
             outFunction)));
     };
@@ -2718,6 +2835,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignModule.module,
         foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignControlFunction"),
         foreignFunction)));
     SlangNVVMValueHandle foreignX = nullptr;
@@ -3050,11 +3169,18 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarSSAOperations)
         functionType)));
     SlangNVVMValueHandle function = nullptr;
     SlangNVVMValueHandle secondFunction = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.declareFunction(module.module, functionType, toSlice("latePhiKernel"), function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("latePhiKernel"),
+        function)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("sameModuleForeignFunction"),
         secondFunction)));
 
@@ -3198,8 +3324,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarFunctionOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.getFunctionType(module.module, integerType, &integerType, 1, helperType)));
     SlangNVVMValueHandle helper = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.declareFunction(module.module, helperType, toSlice("invalidCallHelper"), helper)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        helperType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("invalidCallHelper"),
+        helper)));
     SlangNVVMValueHandle helperValue = nullptr;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, helper, 0, helperValue)));
@@ -3213,8 +3344,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarFunctionOperations)
         SLANG_COUNT_OF(callerParameterTypes),
         callerType)));
     SlangNVVMValueHandle caller = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.declareFunction(module.module, callerType, toSlice("invalidCallCaller"), caller)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        callerType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("invalidCallCaller"),
+        caller)));
     SlangNVVMValueHandle x = nullptr;
     SlangNVVMValueHandle y = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, caller, 0, x)));
@@ -3227,6 +3363,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarFunctionOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         voidFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("invalidCallVoid"),
         voidFunction)));
     SlangNVVMValueHandle voidFunctionValue = nullptr;
@@ -3244,6 +3382,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarFunctionOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignModule.module,
         foreignHelperType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignCallHelper"),
         foreignHelper)));
     SlangNVVMValueHandle foreignValue = nullptr;
@@ -3450,11 +3590,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerOffsetOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("invalidPointerOffset"),
         function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("otherPointerOffset"),
         otherFunction)));
 
@@ -3500,6 +3644,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerOffsetOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignModule.module,
         foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignPointerOffset"),
         foreignFunction)));
     SlangNVVMValueHandle foreignPointer = nullptr;
@@ -3689,11 +3835,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("invalidArrayAddressing"),
         function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("otherArrayAddressing"),
         otherFunction)));
 
@@ -3735,6 +3885,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignModule.module,
         foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignArrayAddressing"),
         foreignFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -3915,11 +4067,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("invalidStructFieldValue"),
         function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("otherStructFieldValue"),
         otherFunction)));
 
@@ -3957,6 +4113,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignModule.module,
         foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignStructFieldValue"),
         foreignFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -4149,11 +4307,15 @@ static void _runNVVMScalarInvalidOperations(
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("invalidScalarOperation"),
         function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("otherScalarOperation"),
         otherFunction)));
 
@@ -4198,6 +4360,8 @@ static void _runNVVMScalarInvalidOperations(
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignModule.module,
         foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignScalarOperation"),
         foreignFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -4475,11 +4639,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRelaxedGlobalI32AtomicAddOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("rejectInvalidRelaxedGlobalI32AtomicAdd"),
         function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("otherRelaxedGlobalI32AtomicAdd"),
         otherFunction)));
 
@@ -4545,6 +4713,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRelaxedGlobalI32AtomicAddOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         foreignModule.module,
         foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
         toSlice("foreignRelaxedGlobalI32AtomicAdd"),
         foreignFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(

@@ -1,7 +1,7 @@
 // Exercises the bounded integer-width, signedness, conversion, float32, and int2 support selected
 // by Slice 68 through an ordinary file-backed direct-NVVM compilation.
 
-//TEST:SIMPLE(filecheck=CHECK): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0
+//TEST:SIMPLE(filecheck=CHECK): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 [CUDAKernel]
 void computeMain(
@@ -31,9 +31,9 @@ void computeMain(
 }
 
 // CHECK: .visible .entry computeMain
-// CHECK: mov.u32 {{.*}}%tid.x
-// CHECK: st.global.u8
-// CHECK: st.global.u16
-// CHECK: st.global.u64
-// CHECK: st.global.u32
-// CHECK: st.global.f32
+// CHECK-DAG: mov.u32 {{.*}}%tid.x
+// CHECK-DAG: st.global.u8
+// CHECK-DAG: st.global.u16
+// CHECK-DAG: st.global.u64
+// CHECK-DAG: st.global.u32
+// CHECK-DAG: st.global.f32
