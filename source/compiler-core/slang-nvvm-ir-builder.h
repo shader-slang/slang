@@ -373,10 +373,10 @@ public:
         size_t elementCount,
         SlangNVVMValueHandle& outValue) const;
 
-    /// Extracts the integer-indexed element of a fixed vector.
-    SlangResult emitVectorElementExtract(
+    /// Extracts the integer-indexed element of a fixed vector or array value.
+    SlangResult emitSequentialElementExtract(
         SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle vector,
+        SlangNVVMValueHandle sequentialValue,
         SlangNVVMValueHandle elementIndex,
         SlangNVVMValueHandle& outValue) const;
 

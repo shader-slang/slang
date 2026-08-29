@@ -128,7 +128,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=17") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=18") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -1352,12 +1352,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
 
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitVectorElementExtract(scope.module, nullptr, scalarParameter, rejectedValue) ==
+        builder
+            .emitSequentialElementExtract(scope.module, nullptr, scalarParameter, rejectedValue) ==
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitVectorElementExtract(
+        builder.emitSequentialElementExtract(
             scope.module,
             scalarParameter,
             scalarParameter,
@@ -1365,7 +1366,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitVectorElementExtract(
+        builder.emitSequentialElementExtract(
             scope.module,
             foreignVector,
             scalarParameter,
@@ -1390,7 +1391,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         for (uint32_t axis = 0; axis < 3; ++axis)
         {
             SlangNVVMValueHandle component = nullptr;
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitVectorElementExtract(
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitSequentialElementExtract(
                 scope.module,
                 vector,
                 axisConstants[axis],
@@ -1398,19 +1399,22 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         }
         rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
         SLANG_CHECK(
-            builder.emitVectorElementExtract(scope.module, vector, nullptr, rejectedValue) ==
-            SLANG_E_INVALID_ARG);
-        SLANG_CHECK(rejectedValue == nullptr);
-        rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-        SLANG_CHECK(
-            builder.emitVectorElementExtract(scope.module, vector, foreignIndex, rejectedValue) ==
+            builder.emitSequentialElementExtract(scope.module, vector, nullptr, rejectedValue) ==
             SLANG_E_INVALID_ARG);
         SLANG_CHECK(rejectedValue == nullptr);
         rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
         SLANG_CHECK(
             builder
-                .emitVectorElementExtract(scope.module, vector, axisConstants[3], rejectedValue) ==
+                .emitSequentialElementExtract(scope.module, vector, foreignIndex, rejectedValue) ==
             SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejectedValue == nullptr);
+        rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitSequentialElementExtract(
+                scope.module,
+                vector,
+                axisConstants[3],
+                rejectedValue) == SLANG_E_INVALID_ARG);
         SLANG_CHECK(rejectedValue == nullptr);
     }
 
@@ -1613,7 +1617,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderConstructsAndConvertsIntegerVectors)
         builder.emitVectorConstruct(scope.module, vectorType, elements, 2, vector)));
     SlangNVVMValueHandle firstExtract = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitVectorElementExtract(scope.module, vector, first, firstExtract)));
+        builder.emitSequentialElementExtract(scope.module, vector, first, firstExtract)));
 
     const SlangNVVMValueTypeDesc unsignedI32x2 = {
         SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
@@ -1639,7 +1643,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderConstructsAndConvertsIntegerVectors)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getIntegerConstant(scope.module, i32Type, 1, secondIndex)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitVectorElementExtract(scope.module, converted, secondIndex, secondExtract)));
+        builder.emitSequentialElementExtract(scope.module, converted, secondIndex, secondExtract)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
 
@@ -1993,6 +1997,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
     SLANG_CHECK(invalidType == nullptr);
 
     SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle i32Type = nullptr;
     SlangNVVMTypeHandle floatType = nullptr;
     SlangNVVMTypeHandle integerType = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
@@ -5279,11 +5284,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)
     };
 
     SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle i32Type = nullptr;
     SlangNVVMTypeHandle floatType = nullptr;
     SlangNVVMTypeHandle float2Type = nullptr;
     SlangNVVMTypeHandle arrayType = nullptr;
     getTypes(module.module, voidType, floatType, float2Type, arrayType);
-    const SlangNVVMTypeHandle parameterTypes[] = {float2Type, float2Type, floatType};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 32, i32Type)));
+    const SlangNVVMTypeHandle parameterTypes[] = {float2Type, float2Type, floatType, i32Type};
     SlangNVVMTypeHandle functionType = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
         module.module,
@@ -5311,6 +5318,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)
     SlangNVVMValueHandle firstRow = nullptr;
     SlangNVVMValueHandle secondRow = nullptr;
     SlangNVVMValueHandle scalar = nullptr;
+    SlangNVVMValueHandle dynamicIndex = nullptr;
     SlangNVVMValueHandle otherFirstRow = nullptr;
     SlangNVVMValueHandle otherSecondRow = nullptr;
     SLANG_CHECK_ABORT(
@@ -5319,6 +5327,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)
         SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 1, secondRow)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 2, scalar)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 3, dynamicIndex)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.getFunctionParameter(module.module, otherFunction, 0, otherFirstRow)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -5459,6 +5469,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)
     SlangNVVMValueHandle extractedRow = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitAggregateElementExtract(module.module, aggregate, 1, extractedRow)));
+    SlangNVVMValueHandle dynamicallyExtractedRow = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitSequentialElementExtract(
+        module.module,
+        aggregate,
+        dynamicIndex,
+        dynamicallyExtractedRow)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
 
     String diagnostics;
@@ -5472,7 +5488,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)
     SLANG_CHECK(diagnostics.getLength() == 0);
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("insertvalue")) == 4);
-    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("extractvalue")) == 1);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("extractvalue")) == 3);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("select")) == 2);
     SLANG_CHECK(assembly.indexOf("poison") < 0);
 
     expectRejectedConstruction(module.module, arrayType, rows, SLANG_COUNT_OF(rows));
@@ -5493,7 +5510,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)
         diagnostics)));
     const String compatible = _getBlobText(compatibleBlob);
     SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("insertvalue")) == 4);
-    SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("extractvalue")) == 1);
+    SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("extractvalue")) == 3);
+    SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("select")) == 2);
     SLANG_CHECK(compatible.indexOf("poison") < 0);
 }
 

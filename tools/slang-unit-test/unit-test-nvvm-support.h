@@ -364,6 +364,7 @@ enum class FakeNVVMBuilderParameterTypeKind
     ScalarStruct,
     ResourceView,
     ValueVector,
+    NumericArray,
 };
 
 enum class FakeNVVMBuilderScalarTypeKind
@@ -443,7 +444,7 @@ struct FakeNVVMBuilderState
         emitAggregateConstructCallCount = 0;
         emitRelaxedGlobalI32AtomicAddCallCount = 0;
         emitVectorConstructCallCount = 0;
-        emitVectorElementExtractCallCount = 0;
+        emitSequentialElementExtractCallCount = 0;
         workgroupBarrierCallCount = 0;
         deviceMemoryBarrierCallCount = 0;
         for (Index family = 0; family < Index(FakeNVVMBuilderScalarFamily::Count); ++family)
@@ -724,7 +725,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderRelaxedGlobalI32AtomicAddStorage relaxedGlobalI32AtomicAddStorage[16];
     FakeNVVMBuilderExecutionRegisterStorage executionRegisterStorage[8];
     FakeNVVMBuilderVectorConstructStorage vectorConstructStorage[16];
-    FakeNVVMBuilderVectorElementStorage vectorElementStorage[16];
+    FakeNVVMBuilderVectorElementStorage vectorElementStorage[64];
     FakeNVVMBuilderGlobalStorage globalStorage[4];
     FakeNVVMBuilderLocalStorage localStorage[8];
 
@@ -775,7 +776,7 @@ struct FakeNVVMBuilderState
     int emitAggregateConstructCallCount = 0;
     int emitRelaxedGlobalI32AtomicAddCallCount = 0;
     int emitVectorConstructCallCount = 0;
-    int emitVectorElementExtractCallCount = 0;
+    int emitSequentialElementExtractCallCount = 0;
     int workgroupBarrierCallCount = 0;
     int deviceMemoryBarrierCallCount = 0;
     int scalarFamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::Count)] = {};
@@ -2155,6 +2156,12 @@ static bool _isFakeNVVMBuilderVectorValue(
     }
     if (valueRef.kind == FakeNVVMBuilderValueKind::AggregateElement)
         return _isFakeNVVMBuilderAggregateElementValueOfTypeKind(valueRef, expectedVectorTypeKind);
+    if (valueRef.kind == FakeNVVMBuilderValueKind::VectorElement)
+    {
+        return valueRef.index >= 0 &&
+               valueRef.index < gFakeNVVMBuilder.vectorElementTypeKinds.getCount() &&
+               gFakeNVVMBuilder.vectorElementTypeKinds[valueRef.index] == expectedVectorTypeKind;
+    }
     if (valueRef.kind == FakeNVVMBuilderValueKind::SurfaceOperation && valueRef.index >= 0 &&
         valueRef.index < gFakeNVVMBuilder.surfaceOperations.getCount())
     {
@@ -2273,10 +2280,28 @@ static bool _isFakeNVVMBuilderValueOfTypeKind(
             FakeNVVMBuilderValueRef valueRef;
             if (!_getFakeNVVMBuilderValueRef(value, valueRef) || valueRef.index < 0)
                 return false;
+            if (valueRef.kind == FakeNVVMBuilderValueKind::Parameter)
+            {
+                FakeNVVMBuilderParameterTypeKind parameterTypeKind;
+                return _getFakeNVVMBuilderParameterTypeKind(valueRef, parameterTypeKind) &&
+                       parameterTypeKind == FakeNVVMBuilderParameterTypeKind::NumericArray;
+            }
             if (valueRef.kind == FakeNVVMBuilderValueKind::AggregateConstruct)
             {
                 return valueRef.index < gFakeNVVMBuilder.aggregateConstructResultTypes.getCount() &&
                        gFakeNVVMBuilder.aggregateConstructResultTypes[valueRef.index] ==
+                           _getFakeNVVMBuilderArrayType();
+            }
+            if (valueRef.kind == FakeNVVMBuilderValueKind::ScalarPhi)
+            {
+                return valueRef.index < gFakeNVVMBuilder.scalarPhiTypes.getCount() &&
+                       gFakeNVVMBuilder.scalarPhiTypes[valueRef.index] ==
+                           _getFakeNVVMBuilderArrayType();
+            }
+            if (valueRef.kind == FakeNVVMBuilderValueKind::Call)
+            {
+                return valueRef.index < gFakeNVVMBuilder.callResultTypes.getCount() &&
+                       gFakeNVVMBuilder.callResultTypes[valueRef.index] ==
                            _getFakeNVVMBuilderArrayType();
             }
             return valueRef.kind == FakeNVVMBuilderValueKind::Load &&
@@ -2807,7 +2832,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetStructType(
             vectorElementTypeKind != FakeNVVMBuilderScalarTypeKind::Boolean;
         isCopyableStruct = fieldTypes[i] == _getFakeNVVMBuilderIntegerType() ||
                            fieldTypes[i] == _getFakeNVVMBuilderHalfType() ||
-                           fieldTypes[i] == _getFakeNVVMBuilderFloatType() || isNumericVector;
+                           fieldTypes[i] == _getFakeNVVMBuilderFloatType() ||
+                           fieldTypes[i] == _getFakeNVVMBuilderArrayType() || isNumericVector;
     }
     bool isGlobalParams = fieldCount != 0 && !isResourceView && !isCopyableStruct;
     bool hasGlobalResource = false;
@@ -2905,6 +2931,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
             parameterTypes[i] != _getFakeNVVMBuilderArrayPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderScalarStructPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderScalarStructType() &&
+            parameterTypes[i] != _getFakeNVVMBuilderArrayType() &&
             !_getFakeNVVMBuilderVectorTypeInfo(
                 parameterTypes[i],
                 vectorElementCount,
@@ -2947,6 +2974,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
                 ? FakeNVVMBuilderParameterTypeKind::ScalarStructPointer
             : parameterTypes[i] == _getFakeNVVMBuilderScalarStructType()
                 ? FakeNVVMBuilderParameterTypeKind::ScalarStruct
+            : parameterTypes[i] == _getFakeNVVMBuilderArrayType()
+                ? FakeNVVMBuilderParameterTypeKind::NumericArray
             : isValueVector ? FakeNVVMBuilderParameterTypeKind::ValueVector
                             : FakeNVVMBuilderParameterTypeKind::ResourceView;
         SLANG_ASSERT(
@@ -4857,17 +4886,18 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderDeclareGlobalStorage(
     return gFakeNVVMBuilder.failGlobalStorageAfterWrite ? SLANG_FAIL : SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitVectorElementExtract(
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitSequentialElementExtract(
     SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle vector,
+    SlangNVVMValueHandle sequentialValue,
     SlangNVVMValueHandle elementIndex,
     SlangNVVMValueHandle* outValue)
 {
-    ++gFakeNVVMBuilder.emitVectorElementExtractCallCount;
+    ++gFakeNVVMBuilder.emitSequentialElementExtractCallCount;
     if (outValue)
         *outValue = nullptr;
     FakeNVVMBuilderValueRef vectorRef;
     FakeNVVMBuilderValueRef elementIndexRef;
+    const bool hasSequentialValueRef = _getFakeNVVMBuilderValueRef(sequentialValue, vectorRef);
     Index elementIndexConstantIndex = -1;
     uint32_t recordedElementIndex = UINT32_MAX;
     if (_getFakeNVVMBuilderIntegerConstantIndex(elementIndex, elementIndexConstantIndex))
@@ -4877,18 +4907,31 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitVectorElementExtract(
         if (constantValue >= 0 && constantValue <= UINT32_MAX)
             recordedElementIndex = uint32_t(constantValue);
     }
+    const bool hasElementIndexRef = _getFakeNVVMBuilderValueRef(elementIndex, elementIndexRef);
     uint32_t vectorElementCount = 0;
     FakeNVVMBuilderScalarTypeKind vectorElementTypeKind = FakeNVVMBuilderScalarTypeKind::Integer;
+    if (_isFakeNVVMBuilderValueOfTypeKind(
+            sequentialValue,
+            FakeNVVMBuilderScalarTypeKind::NumericArray))
+    {
+        vectorElementCount = gFakeNVVMBuilder.arrayElementCount;
+        if (!_getFakeNVVMBuilderTypeKind(gFakeNVVMBuilder.arrayElementType, vectorElementTypeKind))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+    }
     for (uint32_t candidateCount = 2; candidateCount <= 4; ++candidateCount)
     {
-        if (_isFakeNVVMBuilderIntegerVectorValue(vector, candidateCount))
+        if (vectorElementCount)
+            break;
+        if (_isFakeNVVMBuilderIntegerVectorValue(sequentialValue, candidateCount))
         {
             vectorElementCount = candidateCount;
             vectorElementTypeKind = FakeNVVMBuilderScalarTypeKind::Integer;
             break;
         }
         if (_isFakeNVVMBuilderVectorValue(
-                vector,
+                sequentialValue,
                 FakeNVVMBuilderScalarTypeKind::Boolean,
                 candidateCount))
         {
@@ -4897,7 +4940,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitVectorElementExtract(
             break;
         }
         if (_isFakeNVVMBuilderVectorValue(
-                vector,
+                sequentialValue,
                 FakeNVVMBuilderScalarTypeKind::Float,
                 candidateCount))
         {
@@ -4906,7 +4949,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitVectorElementExtract(
             break;
         }
         if (_isFakeNVVMBuilderVectorValue(
-                vector,
+                sequentialValue,
                 FakeNVVMBuilderScalarTypeKind::Half,
                 candidateCount))
         {
@@ -4916,9 +4959,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitVectorElementExtract(
         }
     }
     if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
-        !vectorElementCount || !_getFakeNVVMBuilderValueRef(vector, vectorRef) ||
-        !_isFakeNVVMBuilderIntegerValue(elementIndex) ||
-        !_getFakeNVVMBuilderValueRef(elementIndex, elementIndexRef) ||
+        !vectorElementCount || !hasSequentialValueRef ||
+        !_isFakeNVVMBuilderIntegerValue(elementIndex) || !hasElementIndexRef ||
         (recordedElementIndex != UINT32_MAX && recordedElementIndex >= vectorElementCount) ||
         !outValue ||
         gFakeNVVMBuilder.vectorElementIndices.getCount() >=
@@ -5325,7 +5367,7 @@ static SlangNVVMBuilderConstructionAPI _makeFakeNVVMBuilderConstructionAPI()
     api.emitAggregateConstruct = _fakeNVVMBuilderEmitAggregateConstruct;
     api.emitAggregateElementExtract = _fakeNVVMBuilderEmitAggregateElementExtract;
     api.emitVectorConstruct = _fakeNVVMBuilderEmitVectorConstruct;
-    api.emitVectorElementExtract = _fakeNVVMBuilderEmitVectorElementExtract;
+    api.emitSequentialElementExtract = _fakeNVVMBuilderEmitSequentialElementExtract;
     api.emitRelaxedGlobalI32AtomicAdd = _fakeNVVMBuilderEmitRelaxedGlobalI32AtomicAdd;
     api.declareGlobalStorage = _fakeNVVMBuilderDeclareGlobalStorage;
     api.markFunctionAsKernel = _fakeNVVMBuilderMarkFunctionAsKernel;
@@ -8602,7 +8644,7 @@ static SlangResult _populateNumericFamilyFunction(
     SlangNVVMValueHandle extractedHalf = nullptr;
     SLANG_RETURN_ON_FAIL(builder.getIntegerConstant(module, int32Type, 0, zeroIndex));
     SLANG_RETURN_ON_FAIL(
-        builder.emitVectorElementExtract(module, constructedHalf2, zeroIndex, extractedHalf));
+        builder.emitSequentialElementExtract(module, constructedHalf2, zeroIndex, extractedHalf));
 
     operandTypes[0] = signedI32x2;
     operandTypes[1] = signedI32x2;
@@ -8740,7 +8782,7 @@ static SlangResult _populateNumericFamilyFunction(
         2,
         vectorComparison));
     SlangNVVMValueHandle dynamicBooleanLane = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitVectorElementExtract(
+    SLANG_RETURN_ON_FAIL(builder.emitSequentialElementExtract(
         module,
         vectorComparison,
         parameters[9],
@@ -11893,7 +11935,7 @@ static SlangResult _populateByteOffsetPointerKernel(
         builder.emitLoad(module, vectorPointer, 16, SLANG_NVVM_LOAD_FLAG_INVARIANT, vectorValue));
     SLANG_RETURN_ON_FAIL(builder.getIntegerConstant(module, integerType, 0, firstIndex));
     SLANG_RETURN_ON_FAIL(
-        builder.emitVectorElementExtract(module, vectorValue, firstIndex, firstValue));
+        builder.emitSequentialElementExtract(module, vectorValue, firstIndex, firstValue));
     SLANG_RETURN_ON_FAIL(
         builder.emitByteOffsetPointer(module, destination, byteOffset, integerType, scalarPointer));
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, firstValue, scalarPointer, 4));

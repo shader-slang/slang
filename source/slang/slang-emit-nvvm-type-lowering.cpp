@@ -195,7 +195,8 @@ IRArrayType* asNVVMSupportedNumericArrayType(IRInst* type, uint32_t* outElementC
         *outElementCount = 0;
 
     auto arrayType = as<IRArrayType>(type);
-    if (!arrayType || arrayType->getOp() != kIROp_ArrayType || arrayType->getOperandCount() != 2 ||
+    if (!arrayType || arrayType->getOp() != kIROp_ArrayType ||
+        (arrayType->getOperandCount() != 2 && arrayType->getOperandCount() != 3) ||
         !_isNVVMSupportedByteAddressLeafValueType(arrayType->getElementType()))
     {
         return nullptr;
@@ -204,6 +205,14 @@ IRArrayType* asNVVMSupportedNumericArrayType(IRInst* type, uint32_t* outElementC
     auto elementCount = as<IRIntLit>(arrayType->getElementCount());
     if (!elementCount || elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX)
         return nullptr;
+
+    if (IRInst* stride = arrayType->getArrayStride())
+    {
+        auto strideValue = as<IRIntLit>(stride);
+        const uint32_t naturalStride = getNVVMNumericValueAlignment(arrayType->getElementType());
+        if (!strideValue || strideValue->getValue() != naturalStride)
+            return nullptr;
+    }
 
     if (outElementCount)
         *outElementCount = uint32_t(elementCount->getValue());
@@ -232,6 +241,25 @@ IRStructType* asNVVMSupportedScalarStructType(IRInst* type)
         hasField = true;
     }
     return hasField ? structType : nullptr;
+}
+
+IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type)
+{
+    if (auto scalarStructType = asNVVMSupportedScalarStructType(type))
+        return scalarStructType;
+
+    auto structType = as<IRStructType>(type);
+    if (!structType || !structType->findDecoration<IRPhysicalTypeDecoration>())
+        return nullptr;
+
+    IRStructField* onlyField = nullptr;
+    for (auto field : structType->getFields())
+    {
+        if (onlyField || !asNVVMSupportedNumericArrayType(field->getFieldType()))
+            return nullptr;
+        onlyField = field;
+    }
+    return onlyField ? structType : nullptr;
 }
 
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type)
@@ -837,7 +865,7 @@ IRParameterGroupType* asNVVMSupportedParameterGroupType(IRInst* type, IRType** o
     }
 
     IRType* elementType = parameterGroupType->getElementType();
-    if (!asNVVMSupportedScalarStructType(elementType) &&
+    if (!asNVVMSupportedParameterGroupStructType(elementType) &&
         !asNVVMSupportedNumericArrayType(elementType))
         return nullptr;
 
@@ -1178,9 +1206,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
-         (isNVVMSupportedValueType(type) || copyableStructType || localScalarStructPointer ||
-          localNumericPointer || localNumericArrayPointer || isSurface || isSampledTexture ||
-          samplerValue)) ||
+         (isNVVMSupportedValueType(type) || fixedNumericArrayType || copyableStructType ||
+          localScalarStructPointer || localNumericPointer || localNumericArrayPointer ||
+          isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
           fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||

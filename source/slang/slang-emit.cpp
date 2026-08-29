@@ -1941,7 +1941,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
-    if (isCPUTargetViaLLVM(targetRequest))
+    if (isCPUTargetViaLLVM(targetRequest) || emitNVVMDirectly)
     {
         // The LLVM targets are special in that we always lower all matrices
         // into arrays of vectors, because matrices aren't (yet?) built-in types

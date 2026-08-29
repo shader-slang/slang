@@ -5424,6 +5424,44 @@ so that runtime lane is deliberately not registered. The focused fake-provider t
 numeric-array parameter group, whole-array load, local array/vector addresses, generated helper
 names, and dynamic Half lane store. The complete NVVM unit-test prefix passes 380/380.
 
+### Slice 111: Layout-preserving matrix storage
+
+The direct route now runs the established LLVM buffer-storage lowering before matrix legalization.
+Consider `ConstantBuffer<float4x4>` compiled with column-major layout: the storage pass still sees
+the logical matrix and produces a `[PhysicalType]` struct whose sole field is the major-vector
+array, plus the existing unpack helper that converts physical columns into logical rows. Matrix
+legalization then removes the remaining matrix values. The NVVM emitter therefore consumes a
+canonical aggregate graph and never infers matrix dimensions, major-ness, or a transpose from a
+post-legalization array.
+
+The selected parameter-group contract admits that exact physical wrapper structurally: it must
+carry `[PhysicalType]`, contain exactly one fixed numeric-array field, and use either an implicit
+array stride or an explicit stride equal to the selected element's natural LLVM stride. This is a
+representation boundary rather than matrix recognition. The same generic fixed-array value may be
+passed to a generated helper, loaded as a whole, selected through its wrapper field, and indexed as
+a first-class sequential value.
+
+Forward-only builder ABI revision 18 replaces vector-only value extraction with sequential-value
+extraction. Fixed vectors retain LLVM `extractelement`; fixed arrays use `extractvalue` for a
+constant index. LLVM has no dynamic `extractvalue`, so a dynamic fixed-array index becomes one
+constant extraction and typed select per element, starting from `undef` to preserve the source
+operation's undefined out-of-range result. The provider uses the same bounded-select pattern for
+dynamic Boolean vectors because CUDA 12.9 libNVVM miscompiles their native dynamic extraction.
+
+`column-major.slang` now passes its direct runtime lane with the unchanged result `1`;
+`row-major.slang` remains `11, 22, 33, 1`. Their 2,951-byte and 1,433-byte PTX modules assemble with
+CUDA 12.9.86 `ptxas -arch=sm_70` to 3,688-byte and 3,048-byte cubins. The neighboring
+`non-square-row-major.slang` packed CUDA contract also passes direct runtime with `12, 16`; its
+881-byte PTX assembles to a 2,920-byte cubin.
+
+The non-square column-major probe remains deliberately unsupported. Its canonical physical type is
+`Array<Float3, 2, stride=12>`, while LLVM represents `<3 x float>` with 16-byte natural alignment
+and allocation size. Admitting that array as an ordinary LLVM aggregate would silently change the
+fixture's packing contract, so the direct route retains the precise conventional-parameter-field
+diagnostic until a generic padded sequential-storage representation exists. Release host/provider
+builds pass, the focused ABI/builder/emitter checks pass, and the complete NVVM prefix remains
+380/380.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production

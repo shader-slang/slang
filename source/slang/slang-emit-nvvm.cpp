@@ -118,7 +118,7 @@ struct NVVMStructField
 };
 
 // Resolves the aggregate-address shapes with executable representations: a field in the collected
-// CUDA parameter block, a selected scalar in a loaded parameter group, or a selected numeric field
+// CUDA parameter block, a selected value in a loaded parameter group, or a selected numeric field
 // in a local copyable struct.
 bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& outAddress)
 {
@@ -193,7 +193,8 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     if (outAddress.isMutableLocal)
         return isNVVMSupportedNumericValueType(fieldType);
 
-    return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType);
+    return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
+           asNVVMSupportedNumericArrayType(fieldType);
 }
 
 // Resolves one copyable field extraction by canonical struct key and verifies its result type.
@@ -440,7 +441,8 @@ struct NVVMParameterGroupArrayElementPointer
     IRPtrTypeBase* resultType = nullptr;
 };
 
-// Resolves one immutable element address from a loaded numeric-array parameter group.
+// Resolves one immutable element address from a numeric-array parameter group, either directly or
+// through the sole array field of its canonical physical storage wrapper.
 bool _getNVVMParameterGroupArrayElementPointer(
     IRInst* inst,
     NVVMParameterGroupArrayElementPointer& outPointer)
@@ -452,13 +454,25 @@ bool _getNVVMParameterGroupArrayElementPointer(
     IRInst* base = inst->getOperand(0);
     IRInst* index = inst->getOperand(1);
     IRType* parameterGroupElementType = nullptr;
-    auto parameterGroup =
+    const bool hasParameterGroupBase =
         base ? asNVVMSupportedParameterGroupType(base->getDataType(), &parameterGroupElementType)
-             : nullptr;
-    auto arrayType = asNVVMSupportedNumericArrayType(parameterGroupElementType);
+             : false;
+    IRArrayType* arrayType = hasParameterGroupBase
+                                 ? asNVVMSupportedNumericArrayType(parameterGroupElementType)
+                                 : nullptr;
+    if (!arrayType)
+    {
+        NVVMStructField fieldAddress;
+        if (base && base->getOp() == kIROp_FieldAddress &&
+            _getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress) &&
+            !fieldAddress.isConventionalGlobal && !fieldAddress.isMutableLocal)
+        {
+            arrayType = asNVVMSupportedNumericArrayType(fieldAddress.field->getFieldType());
+        }
+    }
     auto resultType = as<IRPtrTypeBase>(inst->getDataType());
     IRType* resultLayout = resultType ? resultType->getDataLayout() : nullptr;
-    if (!parameterGroup || !arrayType || !resultType || resultType->getOp() != kIROp_PtrType ||
+    if (!arrayType || !resultType || resultType->getOp() != kIROp_PtrType ||
         resultType->getOperandCount() != 4 || !resultLayout ||
         resultLayout->getOp() != kIROp_ScalarBufferLayoutType ||
         resultType->getAccessQualifier() != AccessQualifier::ReadWrite ||
@@ -586,15 +600,16 @@ SlangNVVMValueOperationDesc _getNVVMCUDAExecutionGlobalOperationDesc(
 
 IRIntLit* _asExecutableInteger32Constant(IRInst* value);
 
-struct NVVMVectorElement
+struct NVVMSequentialElement
 {
     IRInst* base = nullptr;
     IRInst* index = nullptr;
 };
 
-// Resolves an integer-indexed scalar read from one accepted ordinary value vector. Constant
-// indices are checked here; a dynamic index retains the source IR value for provider lowering.
-bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
+// Resolves an integer-indexed element read from one accepted ordinary vector or fixed-array value.
+// Constant indices are checked here; a dynamic index retains the source IR value for provider
+// lowering.
+bool _getNVVMSequentialElement(IRInst* inst, NVVMSequentialElement& outElement)
 {
     outElement = {};
 
@@ -618,10 +633,23 @@ bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
     }
 
     uint32_t baseElementCount = 0;
-    auto baseType =
-        asNVVMSupportedValueVectorType(base ? base->getDataType() : nullptr, &baseElementCount);
-    if (!baseType || !isTypeEqual(inst->getDataType(), baseType->getElementType()) ||
-        !elementIndex || !isNVVMSupportedIntegerScalarType(elementIndex->getDataType()))
+    IRType* baseElementType = nullptr;
+    if (auto baseVectorType =
+            asNVVMSupportedValueVectorType(base ? base->getDataType() : nullptr, &baseElementCount))
+    {
+        baseElementType = baseVectorType->getElementType();
+    }
+    else if (!as<IRSwizzle>(inst))
+    {
+        if (auto baseArrayType = asNVVMSupportedNumericArrayType(
+                base ? base->getDataType() : nullptr,
+                &baseElementCount))
+        {
+            baseElementType = baseArrayType->getElementType();
+        }
+    }
+    if (!baseElementType || !isTypeEqual(inst->getDataType(), baseElementType) || !elementIndex ||
+        !isNVVMSupportedIntegerScalarType(elementIndex->getDataType()))
     {
         return false;
     }
@@ -2584,7 +2612,8 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
 {
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return isNVVMSupportedValueType(type) || asNVVMSupportedCopyableStructType(type) ||
+    return isNVVMSupportedValueType(type) || asNVVMSupportedNumericArrayType(type) ||
+           asNVVMSupportedCopyableStructType(type) ||
            asNVVMSupportedLocalScalarStructPointerType(type) ||
            asNVVMSupportedLocalNumericPointerType(type) ||
            asNVVMSupportedLocalNumericArrayPointerType(type) ||
@@ -3047,7 +3076,7 @@ SlangResult _validateNVVMFunction(
                     if (!_resolveNVVMValueOperation(inst, operation))
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                            toSlice("selected value construction or extraction"));
                     _requireValueOperation(
                         requirements.valueOperations,
                         operation.desc,
@@ -3109,18 +3138,18 @@ SlangResult _validateNVVMFunction(
             case kIROp_SwizzleSet:
             case kIROp_GetElement:
                 {
-                    NVVMVectorElement element;
+                    NVVMSequentialElement element;
                     NVVMVectorConstruction construction;
                     NVVMAggregateElement aggregateElement;
                     NVVMAggregateConstruction aggregateConstruction;
-                    if (!_getNVVMVectorElement(inst, element) &&
+                    if (!_getNVVMSequentialElement(inst, element) &&
                         !_getNVVMVectorConstruction(inst, construction) &&
                         !_getNVVMAggregateElement(inst, aggregateElement) &&
                         !_getNVVMAggregateConstruction(inst, aggregateConstruction))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("selected value construction or extraction"));
+                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
                     }
                 }
                 break;
@@ -3612,11 +3641,11 @@ SlangResult _validateNVVMFunction(
             case kIROp_SwizzleSet:
             case kIROp_GetElement:
                 {
-                    NVVMVectorElement element;
+                    NVVMSequentialElement element;
                     NVVMVectorConstruction construction;
                     NVVMAggregateElement aggregateElement;
                     NVVMAggregateConstruction aggregateConstruction;
-                    if (_getNVVMVectorElement(inst, element))
+                    if (_getNVVMSequentialElement(inst, element))
                     {
                         SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                             codeGenContext,
@@ -5084,7 +5113,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                     codeGenContext,
                                     "numeric vector swizzled-store extraction",
-                                    builder.emitVectorElementExtract(
+                                    builder.emitSequentialElementExtract(
                                         moduleScope.module,
                                         loweredSource,
                                         loweredSourceIndex,
@@ -5368,9 +5397,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                             break;
                         }
 
-                        NVVMVectorElement element;
+                        NVVMSequentialElement element;
                         NVVMVectorConstruction construction;
-                        if (_getNVVMVectorElement(inst, element))
+                        if (_getNVVMSequentialElement(inst, element))
                         {
                             SlangNVVMValueHandle loweredBase = nullptr;
                             SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -5394,7 +5423,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
                                 "value vector element extraction",
-                                builder.emitVectorElementExtract(
+                                builder.emitSequentialElementExtract(
                                     moduleScope.module,
                                     loweredBase,
                                     loweredIndex,
@@ -5448,7 +5477,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                     codeGenContext,
                                     "numeric vector swizzle extraction",
-                                    builder.emitVectorElementExtract(
+                                    builder.emitSequentialElementExtract(
                                         moduleScope.module,
                                         loweredBase,
                                         loweredIndex,
@@ -5678,7 +5707,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                         codeGenContext,
                                         "texture fetch location extraction",
-                                        builder.emitVectorElementExtract(
+                                        builder.emitSequentialElementExtract(
                                             moduleScope.module,
                                             loweredLocation,
                                             index,

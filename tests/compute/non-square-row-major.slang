@@ -9,6 +9,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-slang -compute -dx12 -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-vk -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-cuda -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-cuda -compute -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PACKED): -slang -output-using-type -shaderobj -mtl
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-llvm -compute -output-using-type -xslang -fvk-use-scalar-layout -xslang -matrix-layout-row-major -shaderobj
 

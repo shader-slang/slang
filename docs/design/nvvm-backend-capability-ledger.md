@@ -43,7 +43,9 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/language-feature/operator-overload/builtin-operator-fastpath-bool.slang` | CPU + Vulkan + direct NVVM runtime/PTX | Pass | Scalar and Bool4 equality/inequality, explicit Boolean-vector construction, negation, and extraction produce all eight expected values; direct PTX passes `ptxas` |
 | `tests/cuda/nvvm-float-matrix-values.slang` | Direct NVVM runtime/PTX | Pass | Float2x2 construction, matrix/scalar and matrix/matrix addition, branch/aggregate-phi transport, and constant row/column extraction produce `8, 15`; direct PTX passes `ptxas` |
 | `tests/compute/row-major.slang` | CUDA + direct NVVM runtime/PTX | Pass | A legalized Float4x4 constant-buffer value crosses generated matrix/vector helpers and local row/lane addresses; direct output is `11, 22, 33, 1` and PTX passes `ptxas` |
-| `tests/compute/column-major.slang` | Direct NVVM PTX | Pass | The same legalized Float4x4 memory/helper graph emits verified PTX and passes `ptxas`; direct runtime remains unregistered because it currently returns `0` instead of `1` |
+| `tests/compute/column-major.slang` | CUDA + direct NVVM runtime/PTX | Pass | Early LLVM storage lowering preserves the column-major Float4x4 representation and emits an explicit unpack/transpose graph; direct output is the unchanged expected `1` and PTX passes `ptxas` |
+| `tests/compute/non-square-row-major.slang` | CUDA + direct NVVM runtime/PTX | Pass | The existing packed Float3x2 CUDA contract produces `12, 16`; the 881-byte direct PTX passes `ptxas` |
+| `tests/compute/non-square-column-major.slang` | Direct NVVM diagnostic | Expected stop | Its established physical form is `Array<Float3, 2, stride=12>`, which cannot be represented by LLVM's naturally 16-byte-strided `<3 x float>` array without a distinct padded-storage contract |
 | `tests/compute/groupshared.slang` | CUDA + direct NVVM runtime/PTX | Pass | The established helper-based Int shared-array workload returns `1, 0, 3, 2`; direct PTX preserves shared load/store and synchronization and passes `ptxas` |
 | `tests/language-feature/execution-model/groupshared-barrier-functional.slang` | CUDA + direct NVVM runtime/PTX | Pass | An unsigned execution index writes shared Int storage, synchronizes, and reads its neighbor with results `10, 20, 30, 0`; direct PTX passes `ptxas` |
 | `tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang` | CUDA + direct NVVM runtime/PTX | Pass | Three barrier calls preserve two rounds of shared communication with results `2, 3, 0, 1`; direct PTX passes `ptxas` |
@@ -1624,3 +1626,18 @@ store. The real `row-major.slang` runtime/PTX lanes pass, while `column-major.sl
 for PTX only because its direct runtime probe returns `0`. CUDA 12.9.86 `ptxas -arch=sm_70`
 accepts the 1,435-byte row-major and 2,951-byte column-major modules and emits 3,048-byte and
 3,688-byte cubins. Release host/provider builds pass and the complete NVVM prefix passes 380/380.
+
+Slice 111 moves the established LLVM buffer-storage lowering before matrix legalization on the
+direct route. Column-major intent is therefore preserved as a canonical `[PhysicalType]` wrapper
+around a fixed numeric array, and the existing unpack helper explicitly performs the conversion to
+logical row vectors. Builder ABI revision 18 generalizes selected-value extraction from vectors to
+fixed arrays; a dynamic LLVM array index becomes bounded `extractvalue` plus typed `select`
+operations because LLVM has no dynamic `extractvalue` instruction.
+
+The existing `column-major.slang` runtime expectation now passes unchanged with output `1`, while
+`row-major.slang` remains `11, 22, 33, 1`. Their 2,951-byte and 1,433-byte PTX modules assemble to
+3,688-byte and 3,048-byte cubins. The neighboring packed non-square row-major fixture also passes
+direct runtime with `12, 16`; its 881-byte PTX assembles to a 2,920-byte cubin. Non-square
+column-major remains an exact adjacent stop because its physical array has a 12-byte Float3 stride,
+whereas LLVM's `<3 x float>` array element has 16-byte natural alignment and allocation size.
+Release host/provider builds pass and the complete NVVM unit-test prefix remains 380/380.

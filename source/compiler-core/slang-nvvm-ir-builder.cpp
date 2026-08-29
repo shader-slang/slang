@@ -42,7 +42,7 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
            api.emitByteOffsetPointer && api.emitSequentialElementPointer &&
            api.emitStructFieldPointer && api.emitAggregateConstruct &&
            api.emitAggregateElementExtract && api.emitVectorConstruct &&
-           api.emitVectorElementExtract && api.emitRelaxedGlobalI32AtomicAdd &&
+           api.emitSequentialElementExtract && api.emitRelaxedGlobalI32AtomicAdd &&
            api.declareGlobalStorage && api.markFunctionAsKernel;
 }
 
@@ -941,17 +941,20 @@ SlangResult NVVMIRBuilder::emitVectorConstruct(
     return _validateHandleResult(result, outValue);
 }
 
-SlangResult NVVMIRBuilder::emitVectorElementExtract(
+SlangResult NVVMIRBuilder::emitSequentialElementExtract(
     SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle vector,
+    SlangNVVMValueHandle sequentialValue,
     SlangNVVMValueHandle elementIndex,
     SlangNVVMValueHandle& outValue) const
 {
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    const SlangNVVMResult result =
-        m_construction.emitVectorElementExtract(module, vector, elementIndex, &outValue);
+    const SlangNVVMResult result = m_construction.emitSequentialElementExtract(
+        module,
+        sequentialValue,
+        elementIndex,
+        &outValue);
     return _validateHandleResult(result, outValue);
 }
 

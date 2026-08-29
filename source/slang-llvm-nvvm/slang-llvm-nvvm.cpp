@@ -1421,9 +1421,9 @@ _emitValueReturn(SlangNVVMModuleHandle module, SlangNVVMValueHandle value)
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
+static SlangResult SLANG_NVVM_CALL _emitSequentialElementExtract(
     SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle vector,
+    SlangNVVMValueHandle sequentialValue,
     SlangNVVMValueHandle elementIndex,
     SlangNVVMValueHandle* outValue)
 {
@@ -1431,14 +1431,24 @@ static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
         *outValue = nullptr;
 
     ModuleState* state = _getModule(module);
-    llvm::Value* llvmVector = _getValue(vector);
+    llvm::Value* llvmSequentialValue = _getValue(sequentialValue);
     llvm::Value* llvmElementIndex = _getValue(elementIndex);
-    auto vectorType =
-        llvmVector ? llvm::dyn_cast<llvm::FixedVectorType>(llvmVector->getType()) : nullptr;
+    auto vectorType = llvmSequentialValue
+                          ? llvm::dyn_cast<llvm::FixedVectorType>(llvmSequentialValue->getType())
+                          : nullptr;
+    auto arrayType = llvmSequentialValue
+                         ? llvm::dyn_cast<llvm::ArrayType>(llvmSequentialValue->getType())
+                         : nullptr;
+    const uint64_t elementCount = vectorType  ? vectorType->getNumElements()
+                                  : arrayType ? arrayType->getNumElements()
+                                              : 0;
+    llvm::Type* elementType = vectorType  ? vectorType->getElementType()
+                              : arrayType ? arrayType->getElementType()
+                                          : nullptr;
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!state || !outValue || !insertionBlock || !vectorType || !llvmElementIndex ||
-        !llvm::isa<llvm::IntegerType>(llvmElementIndex->getType()) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmVector) ||
+    if (!state || !outValue || !insertionBlock || !elementCount || !elementType ||
+        !llvmElementIndex || !llvm::isa<llvm::IntegerType>(llvmElementIndex->getType()) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmSequentialValue) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmElementIndex))
     {
         return SLANG_E_INVALID_ARG;
@@ -1446,21 +1456,28 @@ static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
     auto constantIndex = llvm::dyn_cast<llvm::ConstantInt>(llvmElementIndex);
     if (constantIndex)
     {
-        if (constantIndex->getValue().uge(vectorType->getNumElements()))
+        if (constantIndex->getValue().uge(elementCount))
             return SLANG_E_INVALID_ARG;
     }
 
     llvm::Value* result = nullptr;
-    if (!constantIndex && vectorType->getElementType()->isIntegerTy(1))
+    if (constantIndex && arrayType)
     {
-        // CUDA 12.9's libNVVM lowers a dynamic extract from `<N x i1>` to invalid PTX: it feeds
-        // the byte loaded from its temporary vector spill directly to `selp` as a predicate. A
-        // fixed vector has at most four lanes in this ABI, so preserve the operation with constant
-        // extracts and typed selects. An out-of-range index retains LLVM's undefined result.
-        result = llvm::UndefValue::get(vectorType->getElementType());
-        for (uint32_t lane = 0; lane < vectorType->getNumElements(); ++lane)
+        result = state->builder.CreateExtractValue(
+            llvmSequentialValue,
+            uint32_t(constantIndex->getZExtValue()));
+    }
+    else if (!constantIndex && (arrayType || elementType->isIntegerTy(1)))
+    {
+        // LLVM has no dynamic `extractvalue`, and CUDA 12.9's libNVVM mishandles dynamic extracts
+        // from `<N x i1>`. Both fixed sequences are bounded in this ABI, so use constant extracts
+        // and typed selects. An out-of-range index retains LLVM's undefined result.
+        result = llvm::UndefValue::get(elementType);
+        for (uint32_t lane = 0; lane < elementCount; ++lane)
         {
-            llvm::Value* laneValue = state->builder.CreateExtractElement(llvmVector, lane);
+            llvm::Value* laneValue =
+                arrayType ? state->builder.CreateExtractValue(llvmSequentialValue, lane)
+                          : state->builder.CreateExtractElement(llvmSequentialValue, lane);
             llvm::Value* laneIndex = llvm::ConstantInt::get(llvmElementIndex->getType(), lane);
             llvm::Value* isLane = state->builder.CreateICmpEQ(llvmElementIndex, laneIndex);
             result = state->builder.CreateSelect(isLane, laneValue, result);
@@ -1468,7 +1485,7 @@ static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
     }
     else
     {
-        result = state->builder.CreateExtractElement(llvmVector, llvmElementIndex);
+        result = state->builder.CreateExtractElement(llvmSequentialValue, llvmElementIndex);
     }
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
@@ -3696,7 +3713,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitAggregateConstruct = _emitAggregateConstruct;
     api.emitAggregateElementExtract = _emitAggregateElementExtract;
     api.emitVectorConstruct = _emitVectorConstruct;
-    api.emitVectorElementExtract = _emitVectorElementExtract;
+    api.emitSequentialElementExtract = _emitSequentialElementExtract;
     api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
     api.declareGlobalStorage = _declareGlobalStorage;
     api.markFunctionAsKernel = _markFunctionAsKernel;

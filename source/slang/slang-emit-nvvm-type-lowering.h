@@ -68,6 +68,9 @@ bool isNVVMSupportedByteAddressValueType(IRInst* type);
 /// Returns an exact nonempty struct whose fields are all selected scalar values.
 IRStructType* asNVVMSupportedScalarStructType(IRInst* type);
 
+/// Returns a selected parameter-group struct, including one canonical physical array wrapper.
+IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type);
+
 /// Returns an exact nonempty struct whose direct fields are selected numeric values.
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type);
 
