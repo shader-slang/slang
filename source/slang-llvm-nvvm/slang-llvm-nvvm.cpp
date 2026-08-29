@@ -1005,6 +1005,27 @@ static SlangResult _emitFloatingUnary(
     return SLANG_OK;
 }
 
+static llvm::CmpInst::Predicate _getFloatingComparePredicate(SlangNVVMValueOperation operation)
+{
+    switch (operation)
+    {
+    case SLANG_NVVM_VALUE_OP_EQUAL:
+        return llvm::CmpInst::FCMP_OEQ;
+    case SLANG_NVVM_VALUE_OP_NOT_EQUAL:
+        return llvm::CmpInst::FCMP_UNE;
+    case SLANG_NVVM_VALUE_OP_GREATER_THAN:
+        return llvm::CmpInst::FCMP_OGT;
+    case SLANG_NVVM_VALUE_OP_LESS_EQUAL:
+        return llvm::CmpInst::FCMP_OLE;
+    case SLANG_NVVM_VALUE_OP_GREATER_EQUAL:
+        return llvm::CmpInst::FCMP_OGE;
+    case SLANG_NVVM_VALUE_OP_LESS_THAN:
+        return llvm::CmpInst::FCMP_OLT;
+    default:
+        return llvm::CmpInst::BAD_FCMP_PREDICATE;
+    }
+}
+
 static SlangResult _emitFloatingCompare(
     SlangNVVMModuleHandle module,
     SlangNVVMValueOperation operation,
@@ -1028,35 +1049,12 @@ static SlangResult _emitFloatingCompare(
         return SLANG_E_INVALID_ARG;
     }
 
-    switch (operation)
-    {
-    case SLANG_NVVM_VALUE_OP_EQUAL:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
-            state->builder.CreateFCmpOEQ(llvmLeft, llvmRight));
-        return SLANG_OK;
-    case SLANG_NVVM_VALUE_OP_NOT_EQUAL:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
-            state->builder.CreateFCmpUNE(llvmLeft, llvmRight));
-        return SLANG_OK;
-    case SLANG_NVVM_VALUE_OP_GREATER_THAN:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
-            state->builder.CreateFCmpOGT(llvmLeft, llvmRight));
-        return SLANG_OK;
-    case SLANG_NVVM_VALUE_OP_LESS_EQUAL:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
-            state->builder.CreateFCmpOLE(llvmLeft, llvmRight));
-        return SLANG_OK;
-    case SLANG_NVVM_VALUE_OP_GREATER_EQUAL:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
-            state->builder.CreateFCmpOGE(llvmLeft, llvmRight));
-        return SLANG_OK;
-    case SLANG_NVVM_VALUE_OP_LESS_THAN:
-        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
-            state->builder.CreateFCmpOLT(llvmLeft, llvmRight));
-        return SLANG_OK;
-    default:
+    const llvm::CmpInst::Predicate predicate = _getFloatingComparePredicate(operation);
+    if (predicate == llvm::CmpInst::BAD_FCMP_PREDICATE)
         return SLANG_E_INVALID_ARG;
-    }
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(
+        state->builder.CreateFCmp(predicate, llvmLeft, llvmRight));
+    return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL
@@ -2550,6 +2548,9 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
 }
 
 // Materializes the physical vector operand required by LLVM for one validated scalar broadcast.
+// LLVM 14's `CreateVectorSplat` starts from `poison`, which libNVVM's LLVM 7 reader cannot parse.
+// Inserting the scalar into every bounded lane from `undef` preserves the exact splat semantics in
+// both textual dialects and lets libNVVM optimize the ordinary vector construction.
 static llvm::Value* _materializeBroadcastOperand(
     ModuleState* state,
     llvm::Value* value,
@@ -2562,7 +2563,11 @@ static llvm::Value* _materializeBroadcastOperand(
         return value;
     if (declaredType.laneCount != 1 || operationLaneCount < 2 || operationLaneCount > 4)
         return nullptr;
-    return state->builder.CreateVectorSplat(operationLaneCount, value);
+    llvm::Value* result =
+        llvm::UndefValue::get(llvm::FixedVectorType::get(value->getType(), operationLaneCount));
+    for (uint32_t lane = 0; lane < operationLaneCount; ++lane)
+        result = state->builder.CreateInsertElement(result, value, lane);
+    return result;
 }
 
 static SlangResult _emitValueOperationFamily(
@@ -2596,7 +2601,9 @@ static SlangResult _emitValueOperationFamily(
         family == Slang::NVVMSemantics::ValueOperationFamily::IntegerBinary ||
         family == Slang::NVVMSemantics::ValueOperationFamily::IntegerCompare ||
         family == Slang::NVVMSemantics::ValueOperationFamily::FloatBinary ||
-        family == Slang::NVVMSemantics::ValueOperationFamily::BooleanBinary;
+        family == Slang::NVVMSemantics::ValueOperationFamily::FloatCompare ||
+        family == Slang::NVVMSemantics::ValueOperationFamily::BooleanBinary ||
+        family == Slang::NVVMSemantics::ValueOperationFamily::BooleanCompare;
     if (isBroadcastFamily)
     {
         for (size_t i = 0; i < operation.operandCount; ++i)
@@ -2715,6 +2722,15 @@ static SlangResult _emitValueOperationFamily(
             result = state->builder.CreateICmp(predicate, llvmOperands[0], llvmOperands[1]);
         }
         break;
+    case Slang::NVVMSemantics::ValueOperationFamily::FloatCompare:
+        {
+            const llvm::CmpInst::Predicate predicate =
+                _getFloatingComparePredicate(operation.operation);
+            if (predicate == llvm::CmpInst::BAD_FCMP_PREDICATE)
+                return SLANG_E_INVALID_ARG;
+            result = state->builder.CreateFCmp(predicate, llvmOperands[0], llvmOperands[1]);
+        }
+        break;
     case Slang::NVVMSemantics::ValueOperationFamily::BooleanUnary:
         result = state->builder.CreateNot(llvmOperands[0]);
         break;
@@ -2722,6 +2738,13 @@ static SlangResult _emitValueOperationFamily(
         result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_AND
                      ? state->builder.CreateAnd(llvmOperands[0], llvmOperands[1])
                      : state->builder.CreateOr(llvmOperands[0], llvmOperands[1]);
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::BooleanCompare:
+        result = state->builder.CreateICmp(
+            operation.operation == SLANG_NVVM_VALUE_OP_EQUAL ? llvm::CmpInst::ICMP_EQ
+                                                             : llvm::CmpInst::ICMP_NE,
+            llvmOperands[0],
+            llvmOperands[1]);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerConvert:
         if (operation.resultType.bitWidth == operation.operandTypes[0].bitWidth)

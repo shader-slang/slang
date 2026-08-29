@@ -2499,12 +2499,22 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("fadd <3 x float>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("frem <3 x float>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fmul <3 x float>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fcmp oeq <3 x float>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fcmp une <3 x float>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fcmp olt <3 x float>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fcmp ogt <3 x float>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fcmp ole <3 x float>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fcmp oge <3 x float>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("xor <2 x i1>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("and <2 x i1>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("or <2 x i1>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("icmp eq <2 x i1>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("icmp ne <2 x i1>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("insertelement <2 x i1>")) >= 0);
         SLANG_CHECK(_countOccurrences(text, toSlice("extractelement <2 x i1>")) >= 2);
         SLANG_CHECK(_countOccurrences(text, toSlice("select i1")) >= 2);
-        SLANG_CHECK(_countOccurrences(text, toSlice("shufflevector")) >= 6);
+        SLANG_CHECK(_countOccurrences(text, toSlice("insertelement")) >= 20);
+        SLANG_CHECK(text.indexOf(toSlice("poison")) < 0);
         SLANG_CHECK(text.indexOf(toSlice("ret <2 x i32>")) >= 0);
     }
 
@@ -2632,6 +2642,38 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_COUNT_OF(float64x2Operands),
     };
     SLANG_CHECK(!builder.supportsValueOperation(unsupportedFloatRemainder));
+
+    const SlangNVVMValueTypeDesc float32x2 = {
+        SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+        32,
+        2,
+    };
+    const SlangNVVMValueTypeDesc float32x2Operands[] = {float32x2, float32x2};
+    const SlangNVVMValueOperationDesc mismatchedFloatComparisonLanes = {
+        SLANG_NVVM_VALUE_OP_EQUAL,
+        bool3,
+        float32x2Operands,
+        SLANG_COUNT_OF(float32x2Operands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(mismatchedFloatComparisonLanes));
+
+    const SlangNVVMValueTypeDesc bool2Operands[] = {bool2, bool2};
+    const SlangNVVMValueOperationDesc unsupportedBooleanOrdering = {
+        SLANG_NVVM_VALUE_OP_LESS_THAN,
+        bool2,
+        bool2Operands,
+        SLANG_COUNT_OF(bool2Operands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedBooleanOrdering));
+    invalidResult = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitValueOperation(
+            scope.module,
+            unsupportedBooleanOrdering,
+            invalidOperands,
+            SLANG_COUNT_OF(invalidOperands),
+            invalidResult) == SLANG_E_NOT_AVAILABLE);
+    SLANG_CHECK(invalidResult == nullptr);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderRealProviderPreservesShortBuffers)

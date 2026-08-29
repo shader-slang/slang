@@ -15,8 +15,10 @@ enum class ValueOperationFamily : uint32_t
     IntegerBinary,
     IntegerCompare,
     FloatBinary,
+    FloatCompare,
     BooleanUnary,
     BooleanBinary,
+    BooleanCompare,
     IntegerConvert,
     IntegerToFloat,
     FloatToInteger,
@@ -614,6 +616,26 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
+    SlangNVVMValueTypeDesc floatCompareResultElement = {};
+    if (desc.operandCount == 2)
+    {
+        floatCompareResultElement = desc.operandTypes[0];
+        floatCompareResultElement.laneCount = desc.resultType.laneCount;
+    }
+    const bool isFloatCompare = desc.operandCount == 2 && isSelectedBoolValue(desc.resultType) &&
+                                isSelectedFloatValue(desc.operandTypes[0]) &&
+                                isSelectedFloatValue(desc.operandTypes[1]) &&
+                                isComponentWiseBinary(
+                                    floatCompareResultElement,
+                                    desc.operandTypes[0],
+                                    desc.operandTypes[1]);
+    if (isFloatCompare && desc.operation >= SLANG_NVVM_VALUE_OP_EQUAL &&
+        desc.operation <= SLANG_NVVM_VALUE_OP_GREATER_EQUAL)
+    {
+        outResolution = {ValueOperationFamily::FloatCompare, "parameterized float32 comparison"};
+        return true;
+    }
+
     const bool isBinaryFloat =
         desc.operandCount == 2 && isSelectedFloatValue(desc.resultType) &&
         isSelectedFloatValue(desc.operandTypes[0]) && isSelectedFloatValue(desc.operandTypes[1]) &&
@@ -650,6 +672,12 @@ inline bool resolveValueOperationFamily(
         outResolution = {
             ValueOperationFamily::BooleanBinary,
             "parameterized Boolean binary operation"};
+        return true;
+    }
+    if (isBinaryBoolean && (desc.operation == SLANG_NVVM_VALUE_OP_EQUAL ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_NOT_EQUAL))
+    {
+        outResolution = {ValueOperationFamily::BooleanCompare, "parameterized Boolean comparison"};
         return true;
     }
 

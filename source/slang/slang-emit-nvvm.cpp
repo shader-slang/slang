@@ -458,13 +458,13 @@ struct NVVMVectorConstruction
 };
 
 // Resolves the canonical flat constructor, scalar splat, or multi-lane swizzle of one accepted
-// numeric vector. Every output lane retains its exact scalar value or base/index source.
+// ordinary value vector. Every output lane retains its exact scalar value or base/index source.
 bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstruction)
 {
     outConstruction = {};
     uint32_t elementCount = 0;
     auto resultType =
-        asNVVMSupportedNumericVectorType(inst ? inst->getDataType() : nullptr, &elementCount);
+        asNVVMSupportedValueVectorType(inst ? inst->getDataType() : nullptr, &elementCount);
     if (!resultType)
         return false;
 
@@ -494,9 +494,8 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
     {
         IRInst* base = swizzle->getBase();
         uint32_t baseElementCount = 0;
-        auto baseType = asNVVMSupportedNumericVectorType(
-            base ? base->getDataType() : nullptr,
-            &baseElementCount);
+        auto baseType =
+            asNVVMSupportedValueVectorType(base ? base->getDataType() : nullptr, &baseElementCount);
         if (!baseType || swizzle->getElementCount() != elementCount ||
             !isTypeEqual(baseType->getElementType(), resultType->getElementType()))
         {
@@ -3707,7 +3706,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "numeric vector construction",
+                            "value vector construction",
                             builder.emitVectorConstruct(
                                 moduleScope.module,
                                 loweredResultType,

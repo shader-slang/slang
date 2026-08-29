@@ -10,7 +10,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
 //TEST:SIMPLE(filecheck=CHECK_NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -59,6 +59,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // lane so a dropped or duplicated component is visible: fmod(7.5,2)=1.5, fmod(-7.5,2)=-1.5,
     // fmod(8.5,3)=2.5.
     float3 fmod3 = float3(7.5, -7.5, 8.5) % float3(2.0, 2.0, 3.0);
+
+    // Keep the Float3 comparison dependent on a buffer load so direct emission must preserve the
+    // vector predicate instead of replacing these three expected results with constants.
+    float runtimeOffset = float(outputBuffer[37]);
+    bool3 fcmp3 = (f3 + runtimeOffset) < float3(2.5, 3.0, 3.5);
 
     // 8-bit components with a negative operand: `int8_t2` lowers to CUDA's `char2`, whose members
     // are `signed char`, so `-6 >> 1` is -3. This pins the signed reading of the declared member
@@ -114,4 +119,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[34] = int(fmod3.x * 2.0f); //BUF-NEXT: 3
     outputBuffer[35] = int(fmod3.y * 2.0f); //BUF-NEXT: -3
     outputBuffer[36] = int(fmod3.z * 2.0f); //BUF-NEXT: 5
+    outputBuffer[37] = fcmp3.x ? 1 : 0; //BUF-NEXT: 1
+    outputBuffer[38] = fcmp3.y ? 1 : 0; //BUF-NEXT: 0
+    outputBuffer[39] = fcmp3.z ? 1 : 0; //BUF-NEXT: 0
 }

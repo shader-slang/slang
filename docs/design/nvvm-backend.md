@@ -4894,6 +4894,34 @@ builds pass, the complete NVVM prefix passes 363/363, and the combined changed-s
 24/24 with five unrelated lanes ignored. Float32 operator-suite probing advances to the independent
 vector floating-point comparison boundary.
 
+### Slice 92: Selected Float32 and Boolean comparisons
+
+The typed value-operation resolver now admits component-wise Float32 comparisons and Boolean
+equality/inequality for one through four lanes. No operation ID or callback was added: the result
+and operand descriptors already carry exact element kind, bit width, and lane count. Float32 uses
+the scalar catalog's established IEEE policy for every width—ordered equality and ordering, but
+unordered inequality. Boolean ordering remains unsupported. The provider validates original
+scalar/vector handles, applies the existing scalar-broadcast normalization, and emits LLVM `fcmp`
+or `icmp` with the descriptor-selected result width.
+
+A runtime-dependent Float32 broadcast exposed LLVM 14's `CreateVectorSplat` printing `poison`, a
+token rejected by libNVVM's LLVM 7 reader. The provider now builds every two- through four-lane
+splat with explicit inserts from `undef`. This directly produces valid semantics in both dialects;
+the compatibility writer does not perform an untyped textual replacement.
+
+Canonical Boolean `makeVector`, scalar-splat, and swizzle instructions now use the same ordinary
+value-vector construction path as selected integer and Float32 vectors. The constructor shape was
+already element-generic; only the compiler and fake-provider gates retained the numeric-only
+bring-up restriction. Exact Boolean scalar elements and two- through four-lane vector types are
+still required, and no array, matrix, aggregate, or implicit conversion is admitted.
+
+The existing Boolean builtin-operator suite now runs through direct libNVVM, covering scalar and
+Bool4 equality/inequality, explicit Bool4 construction, negation, and extraction. The established
+CUDA vector-binary suite adds three asymmetric Float3 comparison results and continues to pass its
+CPU, CUDA/NVRTC, and direct-libNVVM lanes. The broader Float32 builtin suite advances through its
+vector comparison to the independent `makeMatrix` boundary. Release host/provider builds pass and
+the complete NVVM prefix remains 363/363.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4914,8 +4942,8 @@ The following remain open until their named slice supplies evidence:
   scalar families,
   and vector or matrix operations beyond bounded selected-numeric construction and integer-indexed
   selected-value extraction, selected integer/Float32 scalar-broadcast binary arithmetic, integer
-  shifts/division/remainder/comparison, Boolean logic/comparison results, Float32 remainder, and
-  same-lane integer conversion;
+  and Float32 comparisons, Boolean logic and equality/inequality, integer shifts/division/remainder,
+  Float32 remainder, and same-lane integer conversion;
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical

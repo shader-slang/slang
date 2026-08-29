@@ -4220,22 +4220,10 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitVectorConstruct(
         *outValue = nullptr;
 
     FakeNVVMBuilderScalarTypeKind vectorElementTypeKind = FakeNVVMBuilderScalarTypeKind::Integer;
-    bool isVectorType = false;
-    if (elementCount >= 2 && elementCount <= 4)
-    {
-        const uint32_t vectorElementCount = uint32_t(elementCount);
-        if (vectorType == _getFakeNVVMBuilderVectorType(vectorElementCount))
-        {
-            isVectorType = true;
-        }
-        else if (
-            vectorType ==
-            _getFakeNVVMBuilderVectorType(vectorElementCount, FakeNVVMBuilderScalarTypeKind::Float))
-        {
-            vectorElementTypeKind = FakeNVVMBuilderScalarTypeKind::Float;
-            isVectorType = true;
-        }
-    }
+    uint32_t vectorElementCount = 0;
+    const bool isVectorType =
+        _getFakeNVVMBuilderVectorTypeInfo(vectorType, vectorElementCount, vectorElementTypeKind) &&
+        vectorElementCount == elementCount;
     FakeNVVMBuilderValueRef elementRefs[4] = {};
     if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
         !isVectorType || !elements || !outValue ||
@@ -4424,6 +4412,32 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
             operation->operandTypes);
     }
     if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerCompare)
+    {
+        gFakeNVVMBuilder.emittedValueOperations.add(
+            {FakeNVVMBuilderScalarFamily::Compare, uint32_t(operation->operation)});
+        return _recordFakeNVVMBuilderScalarOperation(
+            module,
+            {FakeNVVMBuilderScalarFamily::Compare, uint32_t(operation->operation)},
+            operands,
+            uint32_t(operandCount),
+            outValue,
+            &operation->resultType,
+            operation->operandTypes);
+    }
+    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatCompare)
+    {
+        gFakeNVVMBuilder.emittedValueOperations.add(
+            {FakeNVVMBuilderScalarFamily::FloatingCompare, uint32_t(operation->operation)});
+        return _recordFakeNVVMBuilderScalarOperation(
+            module,
+            {FakeNVVMBuilderScalarFamily::FloatingCompare, uint32_t(operation->operation)},
+            operands,
+            uint32_t(operandCount),
+            outValue,
+            &operation->resultType,
+            operation->operandTypes);
+    }
+    if (resolution.family == NVVMSemantics::ValueOperationFamily::BooleanCompare)
     {
         gFakeNVVMBuilder.emittedValueOperations.add(
             {FakeNVVMBuilderScalarFamily::Compare, uint32_t(operation->operation)});
@@ -7030,6 +7044,7 @@ static SlangResult _populateNumericFamilyFunction(
     SlangNVVMTypeHandle floatType = nullptr;
     SlangNVVMTypeHandle int2Type = nullptr;
     SlangNVVMTypeHandle int8x2Type = nullptr;
+    SlangNVVMTypeHandle bool2Type = nullptr;
     SlangNVVMTypeHandle float3Type = nullptr;
     SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 8, int8Type));
     SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 16, int16Type));
@@ -7039,6 +7054,7 @@ static SlangResult _populateNumericFamilyFunction(
     SLANG_RETURN_ON_FAIL(builder.getFloatingPointType(module, 32, floatType));
     SLANG_RETURN_ON_FAIL(builder.getVectorType(module, int32Type, 2, int2Type));
     SLANG_RETURN_ON_FAIL(builder.getVectorType(module, int8Type, 2, int8x2Type));
+    SLANG_RETURN_ON_FAIL(builder.getVectorType(module, boolTypeHandle, 2, bool2Type));
     SLANG_RETURN_ON_FAIL(builder.getVectorType(module, floatType, 3, float3Type));
 
     const SlangNVVMTypeHandle parameterTypes[] = {
@@ -7264,6 +7280,14 @@ static SlangResult _populateNumericFamilyFunction(
         vectorComparison,
         parameters[9],
         dynamicBooleanLane));
+    const SlangNVVMValueHandle booleanElements[] = {parameters[10], dynamicBooleanLane};
+    SlangNVVMValueHandle constructedBooleanVector = nullptr;
+    SLANG_RETURN_ON_FAIL(builder.emitVectorConstruct(
+        module,
+        bool2Type,
+        booleanElements,
+        SLANG_COUNT_OF(booleanElements),
+        constructedBooleanVector));
 
     operandTypes[0] = signedI8x2;
     operandTypes[1] = signedI8x2;
@@ -7310,6 +7334,34 @@ static SlangResult _populateNumericFamilyFunction(
     SLANG_RETURN_ON_FAIL(
         emitOperation(SLANG_NVVM_VALUE_OP_MULTIPLY, float32x3, operandTypes, operands, 2, ignored));
 
+    const SlangNVVMValueOperation floatComparisons[] = {
+        SLANG_NVVM_VALUE_OP_EQUAL,
+        SLANG_NVVM_VALUE_OP_NOT_EQUAL,
+        SLANG_NVVM_VALUE_OP_LESS_THAN,
+        SLANG_NVVM_VALUE_OP_GREATER_THAN,
+        SLANG_NVVM_VALUE_OP_LESS_EQUAL,
+        SLANG_NVVM_VALUE_OP_GREATER_EQUAL,
+    };
+    const SlangNVVMValueTypeDesc bool3 = {SLANG_NVVM_VALUE_TYPE_BOOL, 1, 3};
+    operandTypes[0] = float32x3;
+    operandTypes[1] = float32x3;
+    operands[0] = parameters[7];
+    operands[1] = parameters[8];
+    for (SlangNVVMValueOperation comparison : floatComparisons)
+    {
+        SLANG_RETURN_ON_FAIL(emitOperation(comparison, bool3, operandTypes, operands, 2, ignored));
+    }
+    operandTypes[1] = float32;
+    operands[1] = parameters[2];
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_LESS_THAN, bool3, operandTypes, operands, 2, ignored));
+    operandTypes[0] = float32;
+    operandTypes[1] = float32x3;
+    operands[0] = parameters[2];
+    operands[1] = parameters[8];
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_GREATER_THAN, bool3, operandTypes, operands, 2, ignored));
+
     operandTypes[0] = bool2;
     operands[0] = vectorComparison;
     SlangNVVMValueHandle invertedComparison = nullptr;
@@ -7336,6 +7388,24 @@ static SlangResult _populateNumericFamilyFunction(
     operands[1] = combinedComparison;
     SLANG_RETURN_ON_FAIL(
         emitOperation(SLANG_NVVM_VALUE_OP_BIT_OR, bool2, operandTypes, operands, 2, ignored));
+    operandTypes[0] = bool2;
+    operandTypes[1] = bool2;
+    operands[0] = constructedBooleanVector;
+    operands[1] = combinedComparison;
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_EQUAL, bool2, operandTypes, operands, 2, ignored));
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_NOT_EQUAL, bool2, operandTypes, operands, 2, ignored));
+    operandTypes[1] = boolType;
+    operands[1] = parameters[10];
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_EQUAL, bool2, operandTypes, operands, 2, ignored));
+    operandTypes[0] = boolType;
+    operandTypes[1] = bool2;
+    operands[0] = parameters[10];
+    operands[1] = constructedBooleanVector;
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_NOT_EQUAL, bool2, operandTypes, operands, 2, ignored));
     return builder.emitValueReturn(module, broadcastSum);
 }
 
@@ -7355,6 +7425,9 @@ void computeMain(
     bool2 logic = (!negative && predicate) || negative;
     float3 sum = float3(1.5, 2.5, 3.5) + 0.5;
     float3 floatRemainder = float3(7.5, -7.5, 8.5) % float3(2.0, 2.0, 3.0);
+    bool3 floatLess = sum < floatRemainder;
+    bool2 explicitBoolean = bool2(predicate, negative.x);
+    bool2 equalBoolean = explicitBoolean == logic;
     destination[0] = shift.y;
     destination[1] = int(quotient.x);
     destination[2] = int(remainder.y);
@@ -7363,6 +7436,8 @@ void computeMain(
     destination[5] = int(floatRemainder.y * 2.0);
     destination[6] = broadcastSum.x + reverseDifference.y;
     destination[7] = logic.y ? 1 : 0;
+    destination[8] = floatLess.x ? 1 : 0;
+    destination[9] = equalBoolean.y ? 1 : 0;
 }
 )";
 
