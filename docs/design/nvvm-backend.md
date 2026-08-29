@@ -5926,6 +5926,29 @@ retains an unrelated pre-existing Dawn/WebGPU bind-group validation failure. Foc
 provider coverage passes, Release host/provider builds pass, and the complete NVVM prefix passes
 397/397.
 
+### Slice 128: Specialized generic entry-point promotion
+
+The existing `int-generic.slang` compute harness now runs an optimized direct-NVVM lane and keeps a
+separate static PTX lane. The harness remains the source of truth for its declared
+`Material<1,2>` entry-point specialization. A bare unspecialized `computeMain<M>` still correctly
+diagnoses E38014; neither direct emission nor the builder infers or reconstructs generic arguments.
+
+After frontend specialization and established CUDA optimization, the material, associated BRDF,
+and interface operations disappear. The direct emitter receives only the conventional global
+`RWStructuredBuffer<Int>`, dispatch-thread index arithmetic, and a constant store of `3`. No
+production code or builder ABI changed.
+
+The fixture passes all 3/3 lanes, including the new runtime comparison and exact PTX/FileCheck
+specialization. Its 645-byte PTX contains the selected `computeMain` entry and UInt32 store of `3`;
+CUDA 12.9.86 `ptxas -arch=sm_70` emits a 2,792-byte cubin. Release host/provider builds pass, and
+the complete NVVM prefix remains 397/397.
+
+The same harness census rejected five apparent compile-only promotions. Arrays of existential
+resources, a loop-unrolled resource array, and a parameter block stop at three distinct `struct
+field address` producers; `dynamic-dispatch-7.slang` stops at an aggregate helper parameter; and
+`struct-default-init.slang` stops at array construction. The first three form the next larger
+producer audit instead of being hidden inside this specialization proof.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production

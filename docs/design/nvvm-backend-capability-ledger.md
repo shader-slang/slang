@@ -37,6 +37,7 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/compute/structured-buffer-swizzle-store.slang` | CUDA + direct NVVM runtime/PTX | Pass | Four Float4 destination permutations preserve independent component stores and produce `4`; direct PTX reloads `v4.f32` after scalar lane stores and passes `ptxas` |
 | `tests/compute/dynamic-dispatch-bindless-texture.slang` | CPU + CUDA + direct NVVM runtime/PTX | Pass | A resource-bearing struct loaded from a structured buffer crosses a specialized helper; Float4 texture fetch and Float32 truncation produce the unchanged UInt result, and direct PTX passes `ptxas` |
 | `tests/compute/func-param-legalize.slang` | CUDA + direct NVVM runtime/PTX | Pass | Texture, sampler, and Float fields cross mutable local storage and a helper as one aggregate; Float4 level sampling produces four unchanged outputs, and direct PTX passes `ptxas` |
+| `tests/compute/int-generic.slang` | CUDA + direct NVVM runtime/PTX | Pass | The harness specializes `computeMain<M>` to `Material<1,2>` before direct emission; runtime produces `3`, static PTX proves the constant global store, and `ptxas` accepts it |
 | `tests/cuda/vector-dot-unroll.slang` | CUDA source + direct NVVM PTX | Pass | Float2/3/4 and Int3 fallback helpers cross the selected vector ABI; PTX retains scalarized dot arithmetic and passes `ptxas` |
 | `tests/hlsl-intrinsic/vector-dot-int.slang` | CUDA/NVRTC + direct NVVM runtime/PTX | Pass | Int3, UInt3, UInt64x2, and Int16x4 dot helpers produce `-14, 28, 20, 5`; direct PTX passes `ptxas` |
 | `tests/compute/vector-scalar-compare.slang` | CUDA/NVRTC + direct NVVM runtime/PTX | Pass | Integer vector/scalar bitwise and comparison operations feed `all(bool2)` through a dynamic Boolean extract; all 16 results agree and unoptimized PTX passes `ptxas` |
@@ -1756,3 +1757,15 @@ serialization, exact libdevice demand, and both LLVM dialects.
 2,792-byte cubin. The exact direct lane of `func-param-legalize.slang` passes; its 837-byte PTX
 assembles to a 2,920-byte cubin, while the whole fixture retains an unrelated Dawn/WebGPU failure.
 Release builds pass and the complete NVVM prefix passes 397/397.
+
+Slice 128 promotes the existing generic-entry fixture without changing production code or builder
+ABI. The compute harness specializes `computeMain<M>` to its declared `Material<1,2>` type before
+direct emission; a bare unspecialized compile retains the correct E38014 diagnostic. Optimized
+linked IR contains only the established conventional output resource, dispatch index, and constant
+store, so the backend never reconstructs generic or interface syntax.
+
+`int-generic.slang` passes 3/3 lanes, including direct runtime and explicit specialized
+PTX/FileCheck coverage. Its 645-byte PTX stores `3` and assembles with CUDA 12.9.86
+`ptxas -arch=sm_70` to a 2,792-byte cubin. Release builds pass and the complete NVVM prefix remains
+397/397. Five neighboring harness probes retain independent resource-field, helper-aggregate, and
+array-construction boundaries rather than being registered from misleading unbound compiles.
