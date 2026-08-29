@@ -225,30 +225,6 @@ public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
 
-[OverloadRank(15)]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
-{
-    return mul(m2, m1);
-}
-
-[OverloadRank(15)]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
-{
-    return mul(m2, m1);
-}
-
-[OverloadRank(15)]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
-{
-    return mul(m2, m1);
-}
-
 [ForceInline]
 [OverloadRank(15)]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
@@ -357,22 +333,6 @@ public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 [ForceInline]
 [OverloadRank(14)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
-{
-    return all(equal(left, right));
-}
-
-[ForceInline]
-[OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
-{
-    return any(notEqual(left, right));
-}
-
-[ForceInline]
-[OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -385,30 +345,6 @@ public bool operator!=<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vec
 {
     return any(notEqual(left, right));
 }
-
-${
-for (auto type : kBaseTypes) {
-    char const* typeName = type.name;
-    if (!type.flags) continue;
-$}
-[ForceInline]
-[OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
-{
-    return all(equal(left, right));
-}
-
-[ForceInline]
-[OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator!=<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
-{
-    return any(notEqual(left, right));
-}
-${
-}
-$}
 
 /// Array length
 __generic<T, let N : int>

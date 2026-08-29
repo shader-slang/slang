@@ -2634,6 +2634,17 @@ bool SemanticsVisitor::_coerce(
         AddTypeOverloadCandidates(toType, overloadContext);
     }
 
+    bool usedLegacyGenericParameterCount =
+        tryResolveOverloadUsingLegacyGenericParameterCount(overloadContext);
+    // Cost probes call `_coerce` without asking it to construct an expression. Apply the
+    // compatibility rule during a probe so its cost remains usable, but wait until the conversion
+    // is reified before warning at the source expression.
+    if (usedLegacyGenericParameterCount && outToExpr && sink)
+    {
+        sink->diagnose(Diagnostics::DeprecatedGenericParameterCountOverloadTieBreaker{
+            .location = overloadContext.loc});
+    }
+
     // After all of the overload candidates have been added
     // to the context and processed, we need to see whether
     // there was one best overload or not.
@@ -2936,8 +2947,10 @@ bool SemanticsVisitor::_coerce(
 
             // TODO: Register associated differentiable methods & types here as well.
         }
-        if (!cachedMethod)
+        if (!cachedMethod && !usedLegacyGenericParameterCount)
         {
+            // Do not cache a compatibility-selected conversion during a cost probe. The later
+            // source-level conversion must resolve it again so that it can emit the warning above.
             // We can only cache the method if it is a public, otherwise we may not be able to
             // use this method depending on where we are performing the coercion.
             if (overloadContext.bestCandidate->item.declRef &&

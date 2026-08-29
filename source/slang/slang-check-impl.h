@@ -3405,6 +3405,10 @@ public:
     // so that the better candidate compares as less-than the other
     int CompareOverloadCandidates(OverloadCandidate* left, OverloadCandidate* right);
 
+    /// Applies the pre-202c generic-parameter-count tie-breaker after all ordinary ranking rules.
+    /// Returns true only when the compatibility rule selects a unique candidate.
+    bool tryResolveOverloadUsingLegacyGenericParameterCount(OverloadResolveContext& context);
+
     /// If `declRef` representations a specialization of a generic, returns the number of
     /// specialized generic arguments. Otherwise, returns zero.
     ///

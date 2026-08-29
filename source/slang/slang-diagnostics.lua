@@ -4051,6 +4051,16 @@ standalone_note(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-generic-parameter-count-overload-tie-breaker",
+    40021,
+    "deprecated generic-parameter-count overload tie-breaker",
+    span {
+        loc = "location",
+        message = "overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c"
+    }
+)
+
 err(
     "case-outside-switch",
     39999,

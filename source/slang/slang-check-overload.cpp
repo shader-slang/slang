@@ -2194,14 +2194,6 @@ int SemanticsVisitor::compareOverloadCandidateSpecificity(
     // to implement, but actually implementing that full check here
     // could make overload resolution far more expensive.
     //
-    // For now we are going to do something far simpler and hackier,
-    // which is to say that a candidate with more generic parameters
-    // is always preferred over one with fewer.
-    //
-    // TODO: We could extend this definition to account for constraints
-    // on generic parameters in the count, which would handle the
-    // need to prefer a more-constrained generic when possible.
-    //
     // TODO: In the long run we should clearly replace this with
     // the more general "does A being applicable imply B being applicable"
     // test.
@@ -2211,11 +2203,6 @@ int SemanticsVisitor::compareOverloadCandidateSpecificity(
     // in some cases disambiguation of which declaration should be
     // preferred will depend on knowing the actual arguments.
     //
-    auto leftSpecCount = getSpecializedParamCount(left.declRef);
-    auto rightSpecCount = getSpecializedParamCount(right.declRef);
-    if (leftSpecCount != rightSpecCount)
-        return int(leftSpecCount - rightSpecCount);
-
     return 0;
 }
 
@@ -2437,6 +2424,57 @@ int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, Overloa
     }
 
     return 0;
+}
+
+bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCount(
+    OverloadResolveContext& context)
+{
+    if (isSlang202cOrLater(this) || context.bestCandidates.getCount() < 2 ||
+        context.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+    {
+        return false;
+    }
+
+    // Before Slang 202c, generic parameter count was used as a proxy for specificity. Consider
+    // this example:
+    //
+    //      int select<T>(vector<T, 3> value);
+    //      int select<T, let N : int>(vector<T, N> value);
+    //
+    // Given a `float3`, preferring fewer required generic parameters happens to choose the
+    // fixed-size overload. The proxy is not valid in general, though: constraints can make a
+    // declaration with more generic parameters applicable to a narrower set of arguments.
+    // `bestCandidates` contains exactly the candidates that remain tied after every ordinary
+    // ranking criterion, so applying the legacy rule here makes it the final compatibility
+    // fallback instead of allowing it to override a meaningful comparison such as `OverloadRank`.
+    Index bestCandidateIndex = 0;
+    Int bestGenericParameterCount =
+        getSpecializedParamCount(context.bestCandidates[bestCandidateIndex].item.declRef);
+    bool hasUniqueBestCandidate = true;
+
+    for (Index i = 1; i < context.bestCandidates.getCount(); ++i)
+    {
+        Int genericParameterCount =
+            getSpecializedParamCount(context.bestCandidates[i].item.declRef);
+        if (genericParameterCount < bestGenericParameterCount)
+        {
+            bestCandidateIndex = i;
+            bestGenericParameterCount = genericParameterCount;
+            hasUniqueBestCandidate = true;
+        }
+        else if (genericParameterCount == bestGenericParameterCount)
+        {
+            hasUniqueBestCandidate = false;
+        }
+    }
+
+    if (!hasUniqueBestCandidate)
+        return false;
+
+    context.bestCandidateStorage = context.bestCandidates[bestCandidateIndex];
+    context.bestCandidate = &context.bestCandidateStorage;
+    context.bestCandidates.clear();
+    return true;
 }
 
 void SemanticsVisitor::AddOverloadCandidateInner(
@@ -3463,6 +3501,12 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     if (!context.bestCandidate && !typeOverloadChecked)
     {
         AddOverloadCandidates(funcExpr, context);
+    }
+
+    if (tryResolveOverloadUsingLegacyGenericParameterCount(context))
+    {
+        getSink()->diagnose(
+            Diagnostics::DeprecatedGenericParameterCountOverloadTieBreaker{.location = expr->loc});
     }
 
     if (context.bestCandidates.getCount() > 0)
