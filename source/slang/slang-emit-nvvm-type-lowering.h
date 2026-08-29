@@ -74,7 +74,7 @@ IRStructType* asNVVMSupportedPhysicalArrayStructType(IRInst* type);
 /// Returns a selected parameter-group struct, including a canonical physical array wrapper.
 IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type);
 
-/// Returns an exact nonempty struct whose direct fields are selected numeric values.
+/// Returns an exact nonempty struct whose leaves are selected numeric values.
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type);
 
 /// Returns an exact generic local pointer or output parameter to a selected numeric value.

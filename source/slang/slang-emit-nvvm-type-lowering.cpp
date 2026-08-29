@@ -275,8 +275,12 @@ IRStructType* asNVVMSupportedCopyableStructType(IRInst* type)
     bool hasField = false;
     for (auto field : structType->getFields())
     {
-        if (!isNVVMSupportedNumericValueType(field->getFieldType()))
+        IRType* fieldType = field->getFieldType();
+        if (!isNVVMSupportedNumericValueType(fieldType) &&
+            !asNVVMSupportedCopyableStructType(fieldType))
+        {
             return nullptr;
+        }
         hasField = true;
     }
     return hasField ? structType : nullptr;
@@ -414,7 +418,7 @@ uint32_t getNVVMCopyableValueAlignment(IRInst* type)
     uint32_t alignment = 0;
     for (auto field : structType->getFields())
     {
-        const uint32_t fieldAlignment = getNVVMNumericValueAlignment(field->getFieldType());
+        const uint32_t fieldAlignment = getNVVMCopyableValueAlignment(field->getFieldType());
         SLANG_RELEASE_ASSERT(fieldAlignment);
         alignment = Math::Max(alignment, fieldAlignment);
     }

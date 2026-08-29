@@ -6115,7 +6115,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedSharedFloatArraySource, "'sequential element pointer'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
-        {kDirectNVVMUnsupportedNestedStructHelperSource, "'helper function parameter'"},
         {kDirectNVVMNonCanonicalCUDAOffsetSource, "'CUDA layout query'"},
         {kDirectNVVMUnsupportedFixedSamplerArrayStorageSource, "'struct field address'"},
         {kDirectNVVMUnsupportedNestedParameterBlockSource, "'struct field address'"},

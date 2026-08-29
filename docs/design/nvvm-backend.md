@@ -5624,10 +5624,47 @@ element pointers, semantic field indices, lane pointer, typed load/extract/store
 provider operations. Adjacent incompatible-layout, whole-aggregate, and immutable physical-matrix
 regressions pass, and the complete NVVM unit-test prefix passes 385/385.
 
-The next bounded corpus probes are independent: `assoctype-nested-lookup.slang` stops at a helper
-result type, `constant-buffer-memory-packing.slang` stops at a different struct-field shape, and
-`bitcast-64bit.slang` stops at a wide helper parameter. They remain prioritization choices rather
-than reasons to widen this resource-field contract.
+### Slice 118: Nested copyable aggregates across helpers
+
+The copyable-struct family now follows a canonical nested struct tree to selected numeric
+scalar/vector leaves. Consider the specialized representation exercised by
+`assoctype-nested-lookup.slang`:
+
+    struct ConcreteFoo { float x; };
+    struct FooPair { ConcreteFoo a; ConcreteFoo b; };
+
+Source interfaces, associated types, and generic witnesses have already disappeared from the
+optimized executable IR. The remaining initializers return `ConcreteFoo` and `FooPair` by value,
+the consumer takes `FooPair` by value, and mutable locals use keyed address chains such as `a.x`.
+This slice therefore extends ordinary aggregate transport instead of adding source-level dynamic
+dispatch or associated-type handling to the emitter.
+
+Classification, alignment, CUDA-versus-LLVM layout proof, and retained declaration selection all
+recurse through the same copyable type tree. Layout validation checks every nested struct rather
+than trusting only the outer size and offsets. Validation retains every nested declaration rooted
+at an accepted signature, local, or structured-buffer type, so provider type lowering no longer
+depends on an incidental independent use of the inner type.
+
+Nested mutable field addresses are admitted only through their resolved parent field producer.
+This matters because selecting an inner aggregate produces an explicit scalar-layout pointer that
+is intentionally not the compact local-pointer spelling. Recursively proving the parent is a
+mutable copyable field keeps arbitrary explicit pointers rejected while reusing the existing typed
+struct-field callback. Existing provider struct, aggregate load/store, call, and return operations
+then compose without an ABI revision or provider-specific branch.
+
+The old nested-helper rejection case was removed. It could only reach a fake provider whose single
+flat struct handle cannot faithfully distinguish nested type identities; weakening that fake would
+discard the exact-type checks it exists to provide. The real LLVM provider is the authoritative
+regression here. `assoctype-nested-lookup.slang` passes direct runtime with its unchanged Float
+result `3`, its direct PTX lane passes, and its 486-byte PTX assembles with CUDA 12.9.86
+`ptxas -arch=sm_70` to a 2,664-byte cubin. Focused flat-aggregate and unsupported-IR regressions
+pass, and the complete NVVM unit-test prefix remains 385/385. The whole fixture prefix is 6/7 plus
+one ignored because its unrelated WebGPU lane fails Dawn bind-group validation; both CUDA lanes
+pass.
+
+The next bounded corpus probes are independent: `constant-buffer-memory-packing.slang` stops at a
+different struct-field shape, and `bitcast-64bit.slang` stops at a wide helper parameter. They
+remain prioritization choices rather than reasons to widen this nested aggregate contract.
 
 The following remain open until their named slice supplies evidence:
 
@@ -5638,7 +5675,7 @@ The following remain open until their named slice supplies evidence:
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
   global parameter fields beyond selected integer/float32 scalars and selected 32-bit numeric
   vector resource elements, flat selected-scalar parameter blocks and constant buffers,
-  selected integer/float32 scalar, 32-bit numeric-vector, and layout-compatible first-level
+  selected integer/float32 scalar, 32-bit numeric-vector, and layout-compatible recursively
   numeric-field aggregate structured buffers, plus read-only logical access to selected
   sole-array physical matrix elements in read-write structured buffers,
   read-only/read-write byte-address buffers, selected read-only texture elements with scalar Float
@@ -5648,7 +5685,7 @@ The following remain open until their named slice supplies evidence:
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;
-- external/indirect calls, helper pointer/aggregate ABI beyond flat first-level numeric-field
+- external/indirect calls, helper pointer/aggregate ABI beyond recursively nested numeric-field
   structs passed and returned by value, exact selected-scalar-struct local pointers and
   `BorrowInOutParam` parameters, plus selected numeric local pointers and exact `OutParam` or
   `BorrowInOutParam` parameters, and fixed numeric local-array pointers with exact `OutParam` or
@@ -5671,9 +5708,9 @@ The following remain open until their named slice supplies evidence:
   vectors, including other
   `IRGetElementPtr`
   shapes, pointer escape through helpers beyond the exact selected-scalar-struct, numeric-value,
-  and fixed-numeric-array helper subsets or through SSA, nested or dynamically indexed aggregate
-  values, mutable aggregate families beyond layout-compatible first-level numeric-field structs,
-  first-class aggregate field reads beyond flat copyable helper values, aggregate layouts requiring
+  and fixed-numeric-array helper subsets or through SSA, dynamically indexed aggregate values,
+  mutable aggregate families beyond layout-compatible recursively numeric-field structs,
+  first-class aggregate field reads beyond copyable helper values, aggregate layouts requiring
   padding, true mutable device globals beyond the established actual-global atomic subset,
   thread-local contexts beyond flat scalar fields, additional shared-memory shapes, and
   address spaces;

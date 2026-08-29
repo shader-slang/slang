@@ -11026,32 +11026,6 @@ void computeMain(
     *destination = readArrayElement(source, index);
 }
 )";
-static const char kDirectNVVMUnsupportedNestedStructHelperSource[] = R"(
-struct Inner
-{
-    int value;
-};
-
-struct Outer
-{
-    Inner inner;
-};
-
-int readValue(Outer value)
-{
-    return value.inner.value;
-}
-
-[CUDAKernel]
-void computeMain(
-    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
-    uniform int input)
-{
-    Outer value;
-    value.inner.value = input;
-    *destination = readValue(value);
-}
-)";
 static const char kDirectNVVMUnsupportedPointerHelperParameterSource[] = R"(
 int readValue(Ptr<int, Access::Read, AddressSpace::Device> source)
 {

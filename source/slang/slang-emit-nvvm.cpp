@@ -119,7 +119,7 @@ struct NVVMStructField
 
 // Resolves the aggregate-address shapes with executable representations: a field in the collected
 // CUDA parameter block, a selected value in a loaded parameter group, the sole array field in
-// canonical physical resource storage, or a selected numeric field in a local copyable struct.
+// canonical physical resource storage, or a selected field in mutable copyable-struct storage.
 bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& outAddress)
 {
     outAddress = {};
@@ -134,6 +134,25 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     {
         structType = globalParams.elementType;
         outAddress.isConventionalGlobal = true;
+    }
+    else if (auto parentFieldAddress = as<IRFieldAddress>(fieldAddress->getBase()))
+    {
+        // A nested field address carries the complete pointer spelling produced for its parent
+        // field, which is intentionally more explicit than a local `Ptr<T>`. Resolve the producer
+        // recursively so only a field proven to belong to mutable copyable storage can introduce
+        // another mutable aggregate address.
+        NVVMStructField parentAddress;
+        auto basePointerType = as<IRPtrTypeBase>(parentFieldAddress->getDataType());
+        structType = basePointerType
+                         ? asNVVMSupportedCopyableStructType(basePointerType->getValueType())
+                         : nullptr;
+        if (!structType || !_getNVVMStructFieldAddress(parentFieldAddress, parentAddress) ||
+            !parentAddress.isMutable ||
+            !isTypeEqual(parentAddress.field->getFieldType(), structType))
+        {
+            return false;
+        }
+        outAddress.isMutable = true;
     }
     else if (
         auto resourceElementPointer = asNVVMSupportedRWStructuredBufferElementPointerType(
@@ -204,7 +223,10 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     }
 
     if (outAddress.isMutable)
-        return isNVVMSupportedNumericValueType(fieldType);
+    {
+        return isNVVMSupportedNumericValueType(fieldType) ||
+               asNVVMSupportedCopyableStructType(fieldType);
+    }
 
     return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
            asNVVMSupportedNumericArrayType(fieldType);
@@ -513,7 +535,7 @@ bool _getNVVMByValueParameterAlignment(
     return true;
 }
 
-// Verifies that a selected resource struct can use one unpadded LLVM struct for storage. Consider
+// Verifies that a selected copyable struct can use unpadded LLVM structs for storage. Consider
 // `Thing { uint pos; float radius; half4 color; }`: CUDA and LLVM give its fields offsets 0, 4, and
 // 8 and the same 16-byte stride, even though their preferred aggregate alignment differs. Matching
 // offsets and size are the actual memory contract; a mismatch must be handled by layout lowering
@@ -558,8 +580,28 @@ bool _hasNVVMCompatibleStructLayout(CodeGenContext* codeGenContext, IRStructType
         {
             return false;
         }
+        if (auto nestedType = asNVVMSupportedCopyableStructType(field->getFieldType()))
+        {
+            if (!_hasNVVMCompatibleStructLayout(codeGenContext, nestedType))
+                return false;
+        }
     }
     return true;
+}
+
+// Retains the canonical declaration closure of a selected struct. Nested copyable fields are
+// semantic type dependencies of their parent even when no independent local or signature mentions
+// them, so validation must accept the complete tree that type lowering will visit.
+void _addNVVMReachableStructTypes(IRStructType* type, HashSet<IRInst*>& reachableTypes)
+{
+    if (!type || reachableTypes.contains(type))
+        return;
+    reachableTypes.add(type);
+    for (auto field : type->getFields())
+    {
+        if (auto nestedType = asNVVMSupportedCopyableStructType(field->getFieldType()))
+            _addNVVMReachableStructTypes(nestedType, reachableTypes);
+    }
 }
 
 // Returns the retained aggregate declaration required by an accepted structured-buffer view.
@@ -4603,7 +4645,7 @@ SlangResult validateNVVMSupportedIR(
                         codeGenContext,
                         toSlice("structured-buffer aggregate layout"));
                 }
-                selectedReachableStructTypes.add(elementStruct);
+                _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
             }
         }
     }
@@ -4611,11 +4653,27 @@ SlangResult validateNVVMSupportedIR(
     for (auto function : functions)
     {
         if (auto resultType = asNVVMSupportedCopyableStructType(function->getResultType()))
-            selectedReachableStructTypes.add(resultType);
+        {
+            if (!_hasNVVMCompatibleStructLayout(codeGenContext, resultType))
+            {
+                return _diagnoseUnsupportedIR(
+                    codeGenContext,
+                    toSlice("helper copyable-struct result layout"));
+            }
+            _addNVVMReachableStructTypes(resultType, selectedReachableStructTypes);
+        }
         for (auto parameter : function->getParams())
         {
             if (auto parameterType = asNVVMSupportedCopyableStructType(parameter->getDataType()))
-                selectedReachableStructTypes.add(parameterType);
+            {
+                if (!_hasNVVMCompatibleStructLayout(codeGenContext, parameterType))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("helper copyable-struct parameter layout"));
+                }
+                _addNVVMReachableStructTypes(parameterType, selectedReachableStructTypes);
+            }
             if (auto elementStruct =
                     _getNVVMRawBufferAggregateElementType(parameter->getDataType()))
             {
@@ -4625,14 +4683,14 @@ SlangResult validateNVVMSupportedIR(
                         codeGenContext,
                         toSlice("structured-buffer aggregate layout"));
                 }
-                selectedReachableStructTypes.add(elementStruct);
+                _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
             }
             IRStructType* pointerValueType = nullptr;
             if (asNVVMSupportedLocalScalarStructPointerType(
                     parameter->getDataType(),
                     &pointerValueType))
             {
-                selectedReachableStructTypes.add(pointerValueType);
+                _addNVVMReachableStructTypes(pointerValueType, selectedReachableStructTypes);
             }
         }
         for (auto block : function->getBlocks())
@@ -4644,7 +4702,7 @@ SlangResult validateNVVMSupportedIR(
                                                       inst->getDataType(),
                                                       &localValueType))
                 {
-                    selectedReachableStructTypes.add(localValueType);
+                    _addNVVMReachableStructTypes(localValueType, selectedReachableStructTypes);
                 }
             }
         }
