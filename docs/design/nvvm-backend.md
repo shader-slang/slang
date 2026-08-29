@@ -4723,6 +4723,48 @@ retains eight `ld.global.f32` and eight `st.global.f32` instructions. CUDA 12.9.
 `ptxas -arch=sm_70` accepts the module. The Release host and isolated-provider builds pass, four
 focused array/adjacent units pass 4/4, and the complete NVVM prefix passes 356/356.
 
+### Slice 87: Selected vector operation families
+
+Ordinary direct-NVVM SSA values now include exact two- through four-lane selected integer,
+float32, and Boolean vectors. One canonical classifier owns the element-kind and lane-count shape;
+numeric construction narrows it to selected integer/float32 elements, while constant extraction
+accepts comparison-produced Boolean vectors as well. The established 32-bit byte-address,
+structured-buffer, pointer, and ABI classifiers narrow this broader value family, so no memory or
+calling-convention role expands accidentally.
+
+The descriptor-based operation interface remains the only execution boundary. Three appended
+operation IDs name remainder, left shift, and right shift; no callback, feature constant, structure
+size, compatibility layer, or builder ABI revision is added. Integer operands require exact
+matching kind, width, and lane count. Comparison results use Boolean descriptors with the same lane
+count. The real provider reads signedness from those descriptors to select `ashr`/`lshr`,
+`sdiv`/`udiv`, `srem`/`urem`, and signed/unsigned predicates over LLVM's otherwise signless integer
+types. Float32 vectors map directly to unflagged LLVM `fadd`, `fsub`, `fmul`, `fdiv`, and `frem`.
+
+Consider this excerpt from `tests/cuda/cuda-vector-binary-ops.slang`:
+
+```slang
+int8_t2 c2 = int8_t2(-6, 7);
+int8_t2 cshr2 = c2 >> int8_t2(1, 1);
+int8_t2 cdiv2 = c2 / int8_t2(2, 2);
+int8_t2 cmod2 = c2 % int8_t2(4, 4);
+bool2 cneg2 = c2 < int8_t2(0, 0);
+float3 fmod3 = float3(7.5, -7.5, 8.5) % float3(2.0, 2.0, 3.0);
+```
+
+Final linked IR retains exact `shr`, `div`, `irem`, vector `cmpLT`, and `frem` instructions. The
+provider-family test preserves representative `shl`, `lshr`, `ashr`, `sdiv`, `srem`, vector
+`icmp`, `fadd`, and `frem` instructions in both LLVM 14 and NVVM-2.0-compatible text. The fake
+boundary records exact semantic descriptors, ordinary vector constructors, operation-result
+identity, and integer/Boolean/Float scalar extracts. The four former scalar unsupported controls
+now compile through the same families, while the adjacent unsupported matrix remains pre-provider.
+
+The existing shader passes CPU, CUDA/NVRTC, direct-libNVVM runtime, and direct PTX lanes 4/4. Its
+37 asymmetric output values cover lane order and signed narrow behavior. Because every source
+operand is constant, libNVVM folds the operations to literal global stores in final PTX; opcode
+evidence intentionally remains at the unoptimized provider boundary. CUDA 12.9.86
+`ptxas -arch=sm_70` accepts the direct module. Release host and standalone-provider builds pass,
+four focused/adjacent units pass 4/4, and the complete NVVM prefix passes 358/358.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4738,10 +4780,10 @@ The following remain open until their named slice supplies evidence:
   signed-i32x2 device pointers, and selected-scalar raw read-only/read-write structured and
   byte-address buffers;
 - external/indirect calls, richer helper ABI, calling conventions and function attributes beyond
-  no-inline, integer shifts/division/remainder, saturating or overflow-decorated arithmetic,
-  float64/low-precision scalar families, and vector or matrix operations beyond bounded
-  signed/unsigned i32x2-i32x4 plus Float2-Float4 construction/extraction, established integer
-  wrapping arithmetic, and same-lane integer conversion;
+  no-inline, saturating or overflow-decorated arithmetic, float64/low-precision scalar families,
+  and vector or matrix operations beyond bounded selected-integer/float32 construction,
+  extraction, binary arithmetic, integer shifts/division/remainder/comparison, Boolean comparison
+  results, float32 remainder, and same-lane integer conversion;
 - pointer and runtime aggregate addressing beyond signed-i32 scalar offsets on selected numeric
   device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a flat
   by-value entry struct, plus direct scalar indexing of canonical structured/byte-address data

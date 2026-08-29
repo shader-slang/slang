@@ -30,6 +30,12 @@ bool isNVVMFloat32Type(IRInst* type);
 /// Returns whether `type` is the canonical Boolean result produced by an accepted comparison.
 bool isNVVMBoolType(IRInst* type);
 
+/// Returns an exact two- through four-lane selected integer, float32, or Boolean vector.
+IRVectorType* asNVVMSupportedValueVectorType(IRInst* type, uint32_t* outElementCount = nullptr);
+
+/// Returns an exact two- through four-lane selected integer or float32 vector.
+IRVectorType* asNVVMSupportedNumericVectorType(IRInst* type, uint32_t* outElementCount = nullptr);
+
 /// Returns an exact two- through four-lane 32-bit Int, UInt, or Float vector.
 IRVectorType* asNVVMSupported32BitNumericVectorType(
     IRInst* type,

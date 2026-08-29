@@ -400,7 +400,7 @@ struct NVVMVectorElement
     uint32_t index = 0;
 };
 
-// Resolves an exact constant-index scalar read from one accepted 32-bit numeric vector.
+// Resolves an exact constant-index scalar read from one accepted ordinary value vector.
 bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
 {
     outElement = {};
@@ -425,9 +425,8 @@ bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
     }
 
     uint32_t baseElementCount = 0;
-    auto baseType = asNVVMSupported32BitNumericVectorType(
-        base ? base->getDataType() : nullptr,
-        &baseElementCount);
+    auto baseType =
+        asNVVMSupportedValueVectorType(base ? base->getDataType() : nullptr, &baseElementCount);
     if (!baseType || !isTypeEqual(inst->getDataType(), baseType->getElementType()) ||
         !elementIndex || elementIndex->getValue() < 0 ||
         elementIndex->getValue() >= baseElementCount)
@@ -460,7 +459,7 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
     outConstruction = {};
     uint32_t elementCount = 0;
     auto resultType =
-        asNVVMSupported32BitNumericVectorType(inst ? inst->getDataType() : nullptr, &elementCount);
+        asNVVMSupportedNumericVectorType(inst ? inst->getDataType() : nullptr, &elementCount);
     if (!resultType)
         return false;
 
@@ -490,7 +489,7 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
     {
         IRInst* base = swizzle->getBase();
         uint32_t baseElementCount = 0;
-        auto baseType = asNVVMSupported32BitNumericVectorType(
+        auto baseType = asNVVMSupportedNumericVectorType(
             base ? base->getDataType() : nullptr,
             &baseElementCount);
         if (!baseType || swizzle->getElementCount() != elementCount ||
@@ -861,17 +860,27 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
 {
     if (as<IRVoidType>(type))
         outType = NVVMSemantics::kVoid;
-    else if (asNVVMSupportedI32VectorType(type))
+    else if (auto vectorType = asNVVMSupportedValueVectorType(type))
     {
+        IRType* elementType = vectorType->getElementType();
+        uint32_t bitWidth = 0;
         bool isSigned = false;
         uint32_t elementCount = 0;
-        SLANG_RELEASE_ASSERT(asNVVMSupportedI32VectorType(type, &isSigned, &elementCount));
-        outType = {
-            isSigned ? SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
-                     : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
-            32,
-            elementCount,
-        };
+        SLANG_RELEASE_ASSERT(asNVVMSupportedValueVectorType(type, &elementCount));
+        if (isNVVMSupportedIntegerScalarType(elementType, &bitWidth, &isSigned))
+            outType = {
+                isSigned ? SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                         : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+                bitWidth,
+                elementCount,
+            };
+        else if (isNVVMFloat32Type(elementType))
+            outType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, elementCount};
+        else
+        {
+            SLANG_RELEASE_ASSERT(isNVVMBoolType(elementType));
+            outType = {SLANG_NVVM_VALUE_TYPE_BOOL, 1, elementCount};
+        }
     }
     else if (isNVVMBoolType(type))
         outType = NVVMSemantics::kBool;
@@ -911,6 +920,16 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation& outOperation)
         return true;
     case kIROp_Div:
         outOperation = SLANG_NVVM_VALUE_OP_DIVIDE;
+        return true;
+    case kIROp_IRem:
+    case kIROp_FRem:
+        outOperation = SLANG_NVVM_VALUE_OP_REMAINDER;
+        return true;
+    case kIROp_Lsh:
+        outOperation = SLANG_NVVM_VALUE_OP_SHIFT_LEFT;
+        return true;
+    case kIROp_Rsh:
+        outOperation = SLANG_NVVM_VALUE_OP_SHIFT_RIGHT;
         return true;
     case kIROp_BitAnd:
         outOperation = SLANG_NVVM_VALUE_OP_BIT_AND;
@@ -1248,7 +1267,7 @@ SlangResult _validateNumericValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (value && asNVVMSupported32BitNumericVectorType(value->getDataType()))
+    if (value && asNVVMSupportedValueVectorType(value->getDataType()))
         return _validateAvailableValue(
             codeGenContext,
             value,
@@ -1714,6 +1733,10 @@ SlangResult _validateNVVMFunction(
             case kIROp_Sub:
             case kIROp_Mul:
             case kIROp_Div:
+            case kIROp_IRem:
+            case kIROp_FRem:
+            case kIROp_Lsh:
+            case kIROp_Rsh:
             case kIROp_BitAnd:
             case kIROp_BitOr:
             case kIROp_BitXor:
@@ -1788,7 +1811,7 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("32-bit numeric vector operation"));
+                            toSlice("selected value vector operation"));
                     }
                 }
                 break;
@@ -1992,6 +2015,10 @@ SlangResult _validateNVVMFunction(
             case kIROp_Sub:
             case kIROp_Mul:
             case kIROp_Div:
+            case kIROp_IRem:
+            case kIROp_FRem:
+            case kIROp_Lsh:
+            case kIROp_Rsh:
             case kIROp_BitAnd:
             case kIROp_BitOr:
             case kIROp_BitXor:
@@ -3225,6 +3252,10 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Sub:
                 case kIROp_Mul:
                 case kIROp_Div:
+                case kIROp_IRem:
+                case kIROp_FRem:
+                case kIROp_Lsh:
+                case kIROp_Rsh:
                 case kIROp_BitAnd:
                 case kIROp_BitOr:
                 case kIROp_BitXor:

@@ -2511,8 +2511,10 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
         return nullptr;
     if (type.laneCount == 1)
         return scalarType;
-    if ((type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
-         type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+    if ((type.kind == SLANG_NVVM_VALUE_TYPE_BOOL ||
+         type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+         type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
+         type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT) &&
         type.laneCount >= 2 && type.laneCount <= 4)
     {
         return llvm::FixedVectorType::get(scalarType, type.laneCount);
@@ -2567,6 +2569,11 @@ static SlangResult _emitNumericFamily(
         case SLANG_NVVM_VALUE_OP_MULTIPLY:
             result = state->builder.CreateMul(llvmOperands[0], llvmOperands[1]);
             break;
+        case SLANG_NVVM_VALUE_OP_DIVIDE:
+            result = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                         ? state->builder.CreateSDiv(llvmOperands[0], llvmOperands[1])
+                         : state->builder.CreateUDiv(llvmOperands[0], llvmOperands[1]);
+            break;
         case SLANG_NVVM_VALUE_OP_BIT_AND:
             result = state->builder.CreateAnd(llvmOperands[0], llvmOperands[1]);
             break;
@@ -2575,6 +2582,41 @@ static SlangResult _emitNumericFamily(
             break;
         case SLANG_NVVM_VALUE_OP_BIT_XOR:
             result = state->builder.CreateXor(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_REMAINDER:
+            result = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                         ? state->builder.CreateSRem(llvmOperands[0], llvmOperands[1])
+                         : state->builder.CreateURem(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_SHIFT_LEFT:
+            result = state->builder.CreateShl(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_SHIFT_RIGHT:
+            result = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                         ? state->builder.CreateAShr(llvmOperands[0], llvmOperands[1])
+                         : state->builder.CreateLShr(llvmOperands[0], llvmOperands[1]);
+            break;
+        default:
+            return SLANG_E_INVALID_ARG;
+        }
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::FloatBinary:
+        switch (operation.operation)
+        {
+        case SLANG_NVVM_VALUE_OP_ADD:
+            result = state->builder.CreateFAdd(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_SUBTRACT:
+            result = state->builder.CreateFSub(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_MULTIPLY:
+            result = state->builder.CreateFMul(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_DIVIDE:
+            result = state->builder.CreateFDiv(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_REMAINDER:
+            result = state->builder.CreateFRem(llvmOperands[0], llvmOperands[1]);
             break;
         default:
             return SLANG_E_INVALID_ARG;

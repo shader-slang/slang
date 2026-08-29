@@ -655,6 +655,169 @@ SLANG_UNIT_TEST(nvvmSlangIntegerVectorSwizzleUsesGenericConstruction)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMVectorOperationFamilySource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+            StringBuilder state;
+            state << "direct NVVM result " << int(result) << "; types "
+                  << gFakeNVVMBuilder.getVectorTypeCallCount << "; constructs "
+                  << gFakeNVVMBuilder.emitVectorConstructCallCount << "; operations "
+                  << gFakeNVVMBuilder.scalarOperations.getCount() << "; extracts "
+                  << gFakeNVVMBuilder.emitVectorElementExtractCallCount << "; stores "
+                  << gFakeNVVMBuilder.emitStoreCallCount << "; modules "
+                  << gFakeNVVMBuilder.createModuleCallCount << "; programs "
+                  << gFakeNVVM.createProgramCallCount;
+            for (const FakeNVVMBuilderScalarOperation& operation :
+                 gFakeNVVMBuilder.scalarOperations)
+            {
+                state << "; op " << operation.key.operation << " type " << operation.resultType.kind
+                      << "/" << operation.resultType.bitWidth << "/"
+                      << operation.resultType.laneCount;
+            }
+            getTestReporter()->message(TestMessageType::TestFailure, state.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool sawSignedI32x2RightShift = false;
+        bool sawSignedI8x2Divide = false;
+        bool sawSignedI8x2Remainder = false;
+        bool sawSignedI8x2LessThan = false;
+        bool sawFloat32x3Add = false;
+        bool sawFloat32x3Remainder = false;
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            const SlangNVVMValueTypeDesc& type = operation.resultType;
+            sawSignedI32x2RightShift =
+                sawSignedI32x2RightShift ||
+                (operation.key.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT &&
+                 type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER && type.bitWidth == 32 &&
+                 type.laneCount == 2);
+            sawSignedI8x2Divide =
+                sawSignedI8x2Divide || (operation.key.operation == SLANG_NVVM_VALUE_OP_DIVIDE &&
+                                        type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+                                        type.bitWidth == 8 && type.laneCount == 2);
+            sawSignedI8x2Remainder = sawSignedI8x2Remainder ||
+                                     (operation.key.operation == SLANG_NVVM_VALUE_OP_REMAINDER &&
+                                      type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+                                      type.bitWidth == 8 && type.laneCount == 2);
+            sawSignedI8x2LessThan = sawSignedI8x2LessThan ||
+                                    (operation.key.operation == SLANG_NVVM_VALUE_OP_LESS_THAN &&
+                                     type.kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
+                                     type.bitWidth == 1 && type.laneCount == 2);
+            sawFloat32x3Add =
+                sawFloat32x3Add || (operation.key.operation == SLANG_NVVM_VALUE_OP_ADD &&
+                                    type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                                    type.bitWidth == 32 && type.laneCount == 3);
+            sawFloat32x3Remainder = sawFloat32x3Remainder ||
+                                    (operation.key.operation == SLANG_NVVM_VALUE_OP_REMAINDER &&
+                                     type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                                     type.bitWidth == 32 && type.laneCount == 3);
+        }
+        SLANG_CHECK(sawSignedI32x2RightShift);
+        SLANG_CHECK(sawSignedI8x2Divide);
+        SLANG_CHECK(sawSignedI8x2Remainder);
+        SLANG_CHECK(sawSignedI8x2LessThan);
+        SLANG_CHECK(sawFloat32x3Add);
+        SLANG_CHECK(sawFloat32x3Remainder);
+
+        bool sawIntegerExtract = false;
+        bool sawBooleanExtract = false;
+        bool sawFloatExtract = false;
+        for (FakeNVVMBuilderScalarTypeKind typeKind : gFakeNVVMBuilder.vectorElementTypeKinds)
+        {
+            sawIntegerExtract =
+                sawIntegerExtract || typeKind == FakeNVVMBuilderScalarTypeKind::Integer;
+            sawBooleanExtract =
+                sawBooleanExtract || typeKind == FakeNVVMBuilderScalarTypeKind::Boolean;
+            sawFloatExtract = sawFloatExtract || typeKind == FakeNVVMBuilderScalarTypeKind::Float;
+        }
+        SLANG_CHECK(sawIntegerExtract);
+        SLANG_CHECK(sawBooleanExtract);
+        SLANG_CHECK(sawFloatExtract);
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount > 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangScalarShiftDivideRemainderUseTypedOperations)
+{
+    struct OperationCase
+    {
+        const char* source;
+        SlangNVVMValueOperation operation;
+    };
+    const OperationCase cases[] = {
+        {kDirectNVVMIntegerLeftShiftSource, SLANG_NVVM_VALUE_OP_SHIFT_LEFT},
+        {kDirectNVVMIntegerRightShiftSource, SLANG_NVVM_VALUE_OP_SHIFT_RIGHT},
+        {kDirectNVVMIntegerDivideSource, SLANG_NVVM_VALUE_OP_DIVIDE},
+        {kDirectNVVMIntegerRemainderSource, SLANG_NVVM_VALUE_OP_REMAINDER},
+    };
+
+    for (const OperationCase& operationCase : cases)
+    {
+        _resetDirectNVVMFakes();
+        {
+            ComPtr<slang::IGlobalSession> globalSession;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            globalSession->setSharedLibraryLoader(loader);
+
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+                globalSession,
+                operationCase.source,
+                code,
+                diagnostics)));
+            SLANG_CHECK_ABORT(code != nullptr);
+            SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+            bool sawOperation = false;
+            for (const FakeNVVMBuilderScalarOperation& operation :
+                 gFakeNVVMBuilder.scalarOperations)
+            {
+                const SlangNVVMValueTypeDesc& type = operation.resultType;
+                sawOperation =
+                    sawOperation || (operation.key.operation == operationCase.operation &&
+                                     type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+                                     type.bitWidth == 32 && type.laneCount == 1);
+            }
+            SLANG_CHECK(sawOperation);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSlangRejectsDynamicVectorIndexBeforeProviderMutation)
 {
     _resetDirectNVVMFakes();
@@ -674,7 +837,7 @@ SLANG_UNIT_TEST(nvvmSlangRejectsDynamicVectorIndexBeforeProviderMutation)
             diagnostics);
         SLANG_CHECK(SLANG_FAILED(result));
         SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("32-bit numeric vector operation") >= 0);
+        SLANG_CHECK(_getBlobText(diagnostics).indexOf("selected value vector operation") >= 0);
         SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
@@ -4324,10 +4487,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedNestedConstantBufferSource,
          "'conventional global parameter field address'"},
         {kDirectNVVMFloatingSineSource, "'GenericAsm'"},
-        {kDirectNVVMIntegerLeftShiftSource, "'shl'"},
-        {kDirectNVVMIntegerRightShiftSource, "'shr'"},
-        {kDirectNVVMIntegerDivideSource, "'div'"},
-        {kDirectNVVMIntegerRemainderSource, "'irem'"},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
         {kDirectNVVMUnsignedAtomicAddSource, "'relaxed global signed i32 atomic add'"},
         {kDirectNVVMWideAtomicAddSource, "'relaxed global signed i32 atomic add'"},
@@ -4344,7 +4503,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     };
 
     // The direct subset retains scalar-only runtime helper/value policy. Noncanonical layout,
-    // local memory, logical NOT/shifts/division/remainder, libdevice calls, atomic-add ABI
+    // local memory, logical NOT, libdevice calls, atomic-add ABI
     // variants, non-relaxed atomic-add order, adjacent atomic operations, group-shared atomic add,
     // non-i32 shared arrays, pointer comparisons, unsigned indices, and helper-array-pointer
     // shapes remain deterministic before builder discovery.

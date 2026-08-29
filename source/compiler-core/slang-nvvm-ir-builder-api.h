@@ -135,7 +135,10 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_INTEGER_CONVERT ((SlangNVVMValueOperation)29u)
 #define SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT ((SlangNVVMValueOperation)30u)
 #define SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER ((SlangNVVMValueOperation)31u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT 32u
+#define SLANG_NVVM_VALUE_OP_REMAINDER ((SlangNVVMValueOperation)32u)
+#define SLANG_NVVM_VALUE_OP_SHIFT_LEFT ((SlangNVVMValueOperation)33u)
+#define SLANG_NVVM_VALUE_OP_SHIFT_RIGHT ((SlangNVVMValueOperation)34u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT 35u
 
     /** Describes one complete semantic value-operation overload. */
     typedef struct SlangNVVMValueOperationDesc

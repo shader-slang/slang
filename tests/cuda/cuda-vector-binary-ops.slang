@@ -7,6 +7,8 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST:SIMPLE(filecheck=CHECK_NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -14,6 +16,12 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    // CHECK_NVVM: .visible .const .align 8 .b8 SLANG_globalParams[16]
+    // CHECK_NVVM: .visible .entry computeMain()
+    // CHECK_NVVM: ld.const.u64 {{.*}}, [SLANG_globalParams]
+    // CHECK_NVVM: mov.u32 {{.*}}, -3
+    // CHECK_NVVM: st.global.u32 [{{.*}}+144]
+
     // Negative operands and asymmetric values per component: a body that assigned the wrong
     // component, or reused one component's result for another, would not reproduce these outputs.
     int2 a2 = int2(7, -3);

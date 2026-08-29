@@ -14,6 +14,7 @@ enum class ValueOperationFamily : uint32_t
     IntegerUnary,
     IntegerBinary,
     IntegerCompare,
+    FloatBinary,
     IntegerConvert,
     IntegerToFloat,
     FloatToInteger,
@@ -497,6 +498,18 @@ inline bool isSelectedIntegerValue(const SlangNVVMValueTypeDesc& type)
     return isInteger && isSelectedWidth && type.laneCount >= 1 && type.laneCount <= 4;
 }
 
+inline bool isSelectedFloatValue(const SlangNVVMValueTypeDesc& type)
+{
+    return type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 32 &&
+           type.laneCount >= 1 && type.laneCount <= 4;
+}
+
+inline bool isSelectedBoolValue(const SlangNVVMValueTypeDesc& type)
+{
+    return type.kind == SLANG_NVVM_VALUE_TYPE_BOOL && type.bitWidth == 1 && type.laneCount >= 1 &&
+           type.laneCount <= 4;
+}
+
 /// Resolves the bounded, dimensioned numeric families added after the frozen exact catalog.
 inline bool resolveValueOperationFamily(
     const SlangNVVMValueOperationDesc& desc,
@@ -525,9 +538,13 @@ inline bool resolveValueOperationFamily(
     if (isBinaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_ADD ||
                             desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT ||
                             desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_DIVIDE ||
                             desc.operation == SLANG_NVVM_VALUE_OP_BIT_AND ||
                             desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_XOR))
+                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_XOR ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_REMAINDER ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_LEFT ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT))
     {
         outResolution = {
             ValueOperationFamily::IntegerBinary,
@@ -535,13 +552,29 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
-    const bool isIntegerCompare = desc.operandCount == 2 && areSameType(desc.resultType, kBool) &&
-                                  isSelectedScalarInteger(desc.operandTypes[0]) &&
-                                  areSameType(desc.operandTypes[0], desc.operandTypes[1]);
+    const bool isIntegerCompare = desc.operandCount == 2 && isSelectedBoolValue(desc.resultType) &&
+                                  isSelectedIntegerValue(desc.operandTypes[0]) &&
+                                  areSameType(desc.operandTypes[0], desc.operandTypes[1]) &&
+                                  desc.resultType.laneCount == desc.operandTypes[0].laneCount;
     if (isIntegerCompare && desc.operation >= SLANG_NVVM_VALUE_OP_EQUAL &&
         desc.operation <= SLANG_NVVM_VALUE_OP_GREATER_EQUAL)
     {
         outResolution = {ValueOperationFamily::IntegerCompare, "parameterized integer comparison"};
+        return true;
+    }
+
+    const bool isBinaryFloat = desc.operandCount == 2 && isSelectedFloatValue(desc.resultType) &&
+                               areSameType(desc.resultType, desc.operandTypes[0]) &&
+                               areSameType(desc.resultType, desc.operandTypes[1]);
+    if (isBinaryFloat && (desc.operation == SLANG_NVVM_VALUE_OP_ADD ||
+                          desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT ||
+                          desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY ||
+                          desc.operation == SLANG_NVVM_VALUE_OP_DIVIDE ||
+                          desc.operation == SLANG_NVVM_VALUE_OP_REMAINDER))
+    {
+        outResolution = {
+            ValueOperationFamily::FloatBinary,
+            "parameterized float32 binary operation"};
         return true;
     }
 

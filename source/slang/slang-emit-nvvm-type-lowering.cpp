@@ -71,22 +71,51 @@ bool isNVVMBoolType(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Bool;
 }
 
-IRVectorType* asNVVMSupported32BitNumericVectorType(IRInst* type, uint32_t* outElementCount)
+static IRVectorType* _asNVVMSupportedVectorType(
+    IRInst* type,
+    bool allowBool,
+    uint32_t* outElementCount)
 {
     if (outElementCount)
         *outElementCount = 0;
 
     auto vectorType = as<IRVectorType>(type);
     auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
+    IRType* elementType = vectorType ? vectorType->getElementType() : nullptr;
     if (!vectorType ||
-        (!isNVVMInteger32Type(vectorType->getElementType()) &&
-         !isNVVMFloat32Type(vectorType->getElementType())) ||
+        (!isNVVMSupportedIntegerScalarType(elementType) && !isNVVMFloat32Type(elementType) &&
+         !(allowBool && isNVVMBoolType(elementType))) ||
         !elementCount || elementCount->getValue() < 2 || elementCount->getValue() > 4)
     {
         return nullptr;
     }
     if (outElementCount)
         *outElementCount = uint32_t(elementCount->getValue());
+    return vectorType;
+}
+
+IRVectorType* asNVVMSupportedValueVectorType(IRInst* type, uint32_t* outElementCount)
+{
+    return _asNVVMSupportedVectorType(type, true, outElementCount);
+}
+
+IRVectorType* asNVVMSupportedNumericVectorType(IRInst* type, uint32_t* outElementCount)
+{
+    return _asNVVMSupportedVectorType(type, false, outElementCount);
+}
+
+IRVectorType* asNVVMSupported32BitNumericVectorType(IRInst* type, uint32_t* outElementCount)
+{
+    if (outElementCount)
+        *outElementCount = 0;
+
+    uint32_t elementCount = 0;
+    auto vectorType = asNVVMSupportedNumericVectorType(type, &elementCount);
+    if (!vectorType || (!isNVVMInteger32Type(vectorType->getElementType()) &&
+                        !isNVVMFloat32Type(vectorType->getElementType())))
+        return nullptr;
+    if (outElementCount)
+        *outElementCount = elementCount;
     return vectorType;
 }
 
@@ -721,9 +750,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isInteger = isNVVMSupportedIntegerScalarType(type, &integerBitWidth);
     const bool isFloat32 = isNVVMFloat32Type(type);
     const bool isBool = isNVVMBoolType(type);
-    uint32_t numericVectorElementCount = 0;
-    IRVectorType* numericVectorType =
-        asNVVMSupported32BitNumericVectorType(type, &numericVectorElementCount);
+    uint32_t valueVectorElementCount = 0;
+    IRVectorType* valueVectorType = asNVVMSupportedValueVectorType(type, &valueVectorElementCount);
     bool vectorIsSigned = false;
     uint32_t vectorElementCount = 0;
     IRVectorType* integerVectorType =
@@ -763,7 +791,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter && (isInteger || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
-         (isInteger || isFloat32 || isBool || numericVectorType || scalarStructType ||
+         (isInteger || isFloat32 || isBool || valueVectorType || scalarStructType ||
           fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
           isBufferDataPointer || parameterGroup || resourceElementPointer ||
           sharedElementPointer)) ||
@@ -820,14 +848,14 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             "float32 type",
             m_builder.getFloatingPointType(m_module, 32u, outType)));
     }
-    else if (numericVectorType)
+    else if (valueVectorType)
     {
         SlangNVVMTypeHandle elementType = nullptr;
         SLANG_RETURN_ON_FAIL(
-            lowerType(numericVectorType->getElementType(), NVVMTypeUse::Value, elementType));
+            lowerType(valueVectorType->getElementType(), NVVMTypeUse::Value, elementType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "fixed 32-bit numeric vector type",
-            m_builder.getVectorType(m_module, elementType, numericVectorElementCount, outType)));
+            "selected value vector type",
+            m_builder.getVectorType(m_module, elementType, valueVectorElementCount, outType)));
     }
     else if (fixedNumericArrayType)
     {
