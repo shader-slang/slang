@@ -1115,8 +1115,7 @@ SlangResult _validateI32Value(
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
-// Checks sign-independent transport of a canonical 32-bit integer value. Unsigned constants are
-// admitted only by operation-specific contracts such as wave masks.
+// Checks sign-independent transport of a canonical 32-bit integer value.
 SlangResult _validateInteger32Value(
     CodeGenContext* codeGenContext,
     IRInst* value,
@@ -1130,6 +1129,8 @@ SlangResult _validateInteger32Value(
     }
     if (!value || !isNVVMUnsignedI32Type(value->getDataType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("32-bit integer value"));
+    if (_asExecutableSelectedIntegerConstant(value))
+        return SLANG_OK;
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
@@ -2263,7 +2264,7 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree));
-                    SLANG_RETURN_ON_FAIL(_validateI32Value(
+                    SLANG_RETURN_ON_FAIL(_validateInteger32Value(
                         codeGenContext,
                         elementIndex,
                         inst,

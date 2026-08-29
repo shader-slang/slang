@@ -7485,6 +7485,20 @@ void computeMain(
     destination[ticket] = sharedValues[63 - ticket];
 }
 )";
+static const char kDirectNVVMUnsignedSharedArrayIndexSource[] = R"(
+groupshared int sharedValues[4];
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform uint writeIndex,
+    uniform uint readIndex)
+{
+    sharedValues[writeIndex] = int(writeIndex) + 1;
+    GroupMemoryBarrierWithGroupSync();
+    destination[writeIndex] = sharedValues[readIndex];
+}
+)";
 static const char kDirectNVVMUnsupportedSharedFloatArraySource[] = R"(
 groupshared float sharedValues[64];
 

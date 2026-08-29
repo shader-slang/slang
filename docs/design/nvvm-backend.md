@@ -4765,6 +4765,35 @@ evidence intentionally remains at the unoptimized provider boundary. CUDA 12.9.8
 `ptxas -arch=sm_70` accepts the direct module. Release host and standalone-provider builds pass,
 four focused/adjacent units pass 4/4, and the complete NVVM prefix passes 358/358.
 
+### Slice 88: Sign-independent pointer indexing and shared-memory corpus
+
+Every already-admitted scalar-pointer, raw-buffer, and fixed-array relation now accepts canonical
+signed or unsigned 32-bit SSA and literal indices. `_validateInteger32Value` remains the single
+transport contract: Int delegates to its established executable-constant/SSA policy, while UInt
+accepts the same exact 32-bit literal or an available dominating value. The fixed-array GEP branch
+now uses that common validator instead of retaining its historical signed-only call.
+
+This is a consumer-side generalization over canonical final IR, not a cast insertion. CUDA varying
+legalization produces UInt execution indices directly, and Slice 68 already established exact
+UInt32 constants. Array base/result validation still proves the admitted element, address space,
+access qualifier, and fixed shape before the index is considered. The existing generic provider
+GEP consumes physical LLVM i32, whose type has no signedness. No builder callback, descriptor,
+provider code, compatible-text rule, or ABI revision changes.
+
+The focused fake boundary now observes two UInt parameters feeding the write and read GEPs of one
+`groupshared int[4]`. A second parameterized test moves the former UInt-literal pointer-offset and
+fixed-array controls into positive coverage and proves their exact constant identity. Float and
+other shared element types, nested/local arrays, helper array pointers, wider indices, and
+group-shared atomics retain their established pre-provider boundaries.
+
+Three existing shared-memory shaders now supply ordinary-suite evidence. Their six new direct
+runtime/PTX lanes pass 6/6: `groupshared.slang` returns `1, 0, 3, 2`; the single-barrier functional
+test returns `10, 20, 30, 0`; and the three-barrier test returns `2, 3, 0, 1`. At the suite's `-O0`
+level, ordinary barrier helpers remain as calls and one physical `bar.sync 0` definition; the PTX
+checks preserve that call topology alongside shared loads/stores. Optimized direct PTX inlines the
+barriers. CUDA 12.9.86 `ptxas -arch=sm_70` accepts all three optimized modules and produces cubins
+of 3,040, 3,168, and 3,168 bytes respectively.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4784,7 +4813,7 @@ The following remain open until their named slice supplies evidence:
   and vector or matrix operations beyond bounded selected-integer/float32 construction,
   extraction, binary arithmetic, integer shifts/division/remainder/comparison, Boolean comparison
   results, float32 remainder, and same-lane integer conversion;
-- pointer and runtime aggregate addressing beyond signed-i32 scalar offsets on selected numeric
+- pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected numeric
   device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a flat
   by-value entry struct, plus direct scalar indexing of canonical structured/byte-address data
   pointers, including other `IRGetElementPtr` shapes, pointer escape through helpers or SSA,

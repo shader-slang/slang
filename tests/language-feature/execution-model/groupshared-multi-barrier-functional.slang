@@ -17,7 +17,9 @@
 //   Thread 3 reads sharedData[0] = 1
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 
 RWStructuredBuffer<int> outputBuffer;
@@ -54,3 +56,16 @@ void computeMain(uint idx : SV_GroupIndex)
 // CHECK: 3
 // CHECK: 0
 // CHECK: 1
+
+// NVVM: .shared .align 4 .b8 {{.*}}[16]
+// The suite's -O0 level retains three calls to one barrier helper; that helper contains the single
+// physical bar.sync definition below the entry.
+// NVVM: st.shared.u32
+// NVVM: call.uni
+// NVVM: ld.shared.u32
+// NVVM: call.uni
+// NVVM: st.shared.u32
+// NVVM: call.uni
+// NVVM: ld.shared.u32
+// NVVM: st.global.u32
+// NVVM: bar.sync 0

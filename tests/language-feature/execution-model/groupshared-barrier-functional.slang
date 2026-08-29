@@ -6,9 +6,11 @@
 
 // Functional test requires GPU (barriers not available on CPU target)
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 // Emission test verifiable without GPU
 //TEST:SIMPLE(filecheck=EMIT): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 
@@ -41,3 +43,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID, uint idx : SV_GroupIndex)
 // CHECK: 20
 // CHECK: 30
 // CHECK: 0
+
+// NVVM: .shared .align 4 .b8 {{.*}}[16]
+// NVVM-DAG: st.shared.u32
+// NVVM-DAG: bar.sync 0
+// NVVM-DAG: ld.shared.u32
+// NVVM-DAG: st.global.u32

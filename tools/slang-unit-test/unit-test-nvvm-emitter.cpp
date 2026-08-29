@@ -1341,6 +1341,47 @@ SLANG_UNIT_TEST(nvvmSlangSharedMemoryUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMUnsignedSharedArrayIndexSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareGlobalStorageCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageAddressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED);
+        SLANG_CHECK(gFakeNVVMBuilder.arrayElementCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitArrayElementPointerCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.arrayElementPointerIndexValueRefs.getCount() == 2);
+        for (Index elementIndex = 0; elementIndex < 2; ++elementIndex)
+        {
+            const FakeNVVMBuilderValueRef index =
+                gFakeNVVMBuilder.arrayElementPointerIndexValueRefs[elementIndex];
+            SLANG_CHECK(index.kind == FakeNVVMBuilderValueKind::Parameter);
+            SLANG_CHECK(index.functionIndex == 0);
+            SLANG_CHECK(index.index == size_t(elementIndex + 1));
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.workgroupBarrierCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 2);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangWaveLaneCountUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -3330,6 +3371,58 @@ SLANG_UNIT_TEST(nvvmSlangFixedDeviceArrayUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangUnsignedConstantPointerIndicesUseDirectPipeline)
+{
+    struct IndexCase
+    {
+        const char* source;
+        bool isArray;
+    };
+    const IndexCase cases[] = {
+        {kDirectNVVMUnsignedPointerOffsetSource, false},
+        {kDirectNVVMUnsignedFixedArrayIndexSource, true},
+    };
+
+    for (const IndexCase& indexCase : cases)
+    {
+        _resetDirectNVVMFakes();
+        {
+            ComPtr<slang::IGlobalSession> globalSession;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            globalSession->setSharedLibraryLoader(loader);
+
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                _compileSlangWithDirectNVVM(globalSession, indexCase.source, code, diagnostics)));
+            SLANG_CHECK_ABORT(code != nullptr);
+            SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+            const List<FakeNVVMBuilderValueRef>& indices =
+                indexCase.isArray ? gFakeNVVMBuilder.arrayElementPointerIndexValueRefs
+                                  : gFakeNVVMBuilder.pointerOffsetElementValueRefs;
+            SLANG_CHECK(indices.getCount() == 2);
+            for (const FakeNVVMBuilderValueRef index : indices)
+            {
+                SLANG_CHECK(index.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+                SLANG_CHECK(
+                    index.index < size_t(gFakeNVVMBuilder.integerConstantValues.getCount()));
+                SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[index.index] == 1);
+                SLANG_CHECK(gFakeNVVMBuilder.integerConstantBitWidths[index.index] == 32);
+            }
+            SLANG_CHECK(
+                gFakeNVVMBuilder.emitArrayElementPointerCallCount == (indexCase.isArray ? 2 : 0));
+            SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == (indexCase.isArray ? 0 : 2));
+            SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSlangRawRWStructuredBufferI32StoreUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -4469,8 +4562,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedCallSource, "'CUDA kernel decoration'"},
         {kDirectNVVMUnsupportedPointerHelperParameterSource, "'helper function parameter'"},
         {kDirectNVVMUnsupportedPointerHelperResultSource, "'helper function result type'"},
-        {kDirectNVVMUnsignedPointerOffsetSource, "'integer_constant'"},
-        {kDirectNVVMUnsignedFixedArrayIndexSource, "'signed i32 value'"},
         {kDirectNVVMUnsupportedFloatArraySource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedHalfAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedDoubleAddSource, "'entry-point parameter'"},
@@ -4505,7 +4596,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     // The direct subset retains scalar-only runtime helper/value policy. Noncanonical layout,
     // local memory, logical NOT, libdevice calls, atomic-add ABI
     // variants, non-relaxed atomic-add order, adjacent atomic operations, group-shared atomic add,
-    // non-i32 shared arrays, pointer comparisons, unsigned indices, and helper-array-pointer
+    // non-i32 shared arrays, pointer comparisons, and helper-array-pointer
     // shapes remain deterministic before builder discovery.
     for (const auto& unsupported : kCases)
     {
