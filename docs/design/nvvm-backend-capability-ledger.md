@@ -42,6 +42,8 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/language-feature/operator-overload/builtin-operator-fastpath-uint.slang` | CPU + Vulkan + direct NVVM runtime/PTX | Pass | Unsigned vector/scalar shifts accept signless physical shift counts and preserve logical right-shift results; all ten values agree and direct PTX passes `ptxas` |
 | `tests/language-feature/operator-overload/builtin-operator-fastpath-bool.slang` | CPU + Vulkan + direct NVVM runtime/PTX | Pass | Scalar and Bool4 equality/inequality, explicit Boolean-vector construction, negation, and extraction produce all eight expected values; direct PTX passes `ptxas` |
 | `tests/cuda/nvvm-float-matrix-values.slang` | Direct NVVM runtime/PTX | Pass | Float2x2 construction, matrix/scalar and matrix/matrix addition, branch/aggregate-phi transport, and constant row/column extraction produce `8, 15`; direct PTX passes `ptxas` |
+| `tests/compute/row-major.slang` | CUDA + direct NVVM runtime/PTX | Pass | A legalized Float4x4 constant-buffer value crosses generated matrix/vector helpers and local row/lane addresses; direct output is `11, 22, 33, 1` and PTX passes `ptxas` |
+| `tests/compute/column-major.slang` | Direct NVVM PTX | Pass | The same legalized Float4x4 memory/helper graph emits verified PTX and passes `ptxas`; direct runtime remains unregistered because it currently returns `0` instead of `1` |
 | `tests/compute/groupshared.slang` | CUDA + direct NVVM runtime/PTX | Pass | The established helper-based Int shared-array workload returns `1, 0, 3, 2`; direct PTX preserves shared load/store and synchronization and passes `ptxas` |
 | `tests/language-feature/execution-model/groupshared-barrier-functional.slang` | CUDA + direct NVVM runtime/PTX | Pass | An unsigned execution index writes shared Int storage, synchronizes, and reads its neighbor with results `10, 20, 30, 0`; direct PTX passes `ptxas` |
 | `tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang` | CUDA + direct NVVM runtime/PTX | Pass | Three barrier calls preserve two rounds of shared communication with results `2, 3, 0, 1`; direct PTX passes `ptxas` |
@@ -1606,3 +1608,19 @@ NVRTC lane has an independent pre-existing CUDA-source failure because CUDA 12.9
 not expose `.xyz`; it is not evidence about this direct path. The remaining adjacent direct
 boundary is the scalar-struct result plus `BorrowInOutParam<Values>` stateful helper in
 `half-vector-compare.slang`.
+
+Slice 110 carries the canonical Float32 array-of-vector matrix representation through generated
+helpers and memory. Numeric-array constant-buffer fields use the established conventional global
+parameter block, immutable array-element addresses, and whole-array loads. Local numeric arrays
+and vectors share one exact sequential element-pointer relation; the provider's ABI revision 17
+accepts only a typed pointer to a nonempty fixed array or vector and an available integer index.
+The same generic operation closes the adjacent dynamic local Half-vector lane store.
+
+Reachable anonymous generated helpers receive deterministic internal physical names. Entry,
+export, and mangled names remain authoritative, and collision validation happens before module
+creation. Focused fake coverage observes two generated helpers, the numeric-array parameter-group
+field, whole-array and immutable loads, array-row and vector-lane addresses, and the Half lane
+store. The real `row-major.slang` runtime/PTX lanes pass, while `column-major.slang` is registered
+for PTX only because its direct runtime probe returns `0`. CUDA 12.9.86 `ptxas -arch=sm_70`
+accepts the 1,435-byte row-major and 2,951-byte column-major modules and emits 3,048-byte and
+3,688-byte cubins. Release host/provider builds pass and the complete NVVM prefix passes 380/380.

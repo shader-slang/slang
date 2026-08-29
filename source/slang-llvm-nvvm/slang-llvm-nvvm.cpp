@@ -1770,9 +1770,9 @@ static SlangResult SLANG_NVVM_CALL _emitByteOffsetPointer(
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
+static SlangResult SLANG_NVVM_CALL _emitSequentialElementPointer(
     SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle baseArrayPointer,
+    SlangNVVMValueHandle baseSequentialPointer,
     SlangNVVMValueHandle elementIndex,
     SlangNVVMValueHandle* outPointer)
 {
@@ -1780,21 +1780,24 @@ static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
         *outPointer = nullptr;
 
     ModuleState* state = _getModule(module);
-    llvm::Value* llvmBaseArrayPointer = _getValue(baseArrayPointer);
+    llvm::Value* llvmBaseSequentialPointer = _getValue(baseSequentialPointer);
     llvm::Value* llvmElementIndex = _getValue(elementIndex);
     llvm::PointerType* pointerType =
-        llvmBaseArrayPointer ? llvm::dyn_cast<llvm::PointerType>(llvmBaseArrayPointer->getType())
-                             : nullptr;
+        llvmBaseSequentialPointer
+            ? llvm::dyn_cast<llvm::PointerType>(llvmBaseSequentialPointer->getType())
+            : nullptr;
     llvm::Type* pointeeType = pointerType && !pointerType->isOpaque()
                                   ? pointerType->getNonOpaquePointerElementType()
                                   : nullptr;
     llvm::ArrayType* arrayType = llvm::dyn_cast_or_null<llvm::ArrayType>(pointeeType);
+    llvm::FixedVectorType* vectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(pointeeType);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     if (!state || !outPointer || !insertionBlock || !pointerType || pointerType->isOpaque() ||
         !_isNVVMAddressSpace(static_cast<SlangNVVMAddressSpace>(pointerType->getAddressSpace())) ||
-        !arrayType || !arrayType->getNumElements() || !arrayType->isSized() || !llvmElementIndex ||
-        !llvm::isa<llvm::IntegerType>(llvmElementIndex->getType()) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmBaseArrayPointer) ||
+        ((!arrayType || !arrayType->getNumElements() || !arrayType->isSized()) &&
+         (!vectorType || !vectorType->getNumElements())) ||
+        !llvmElementIndex || !llvm::isa<llvm::IntegerType>(llvmElementIndex->getType()) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmBaseSequentialPointer) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmElementIndex))
     {
         return SLANG_E_INVALID_ARG;
@@ -1804,7 +1807,7 @@ static SlangResult SLANG_NVVM_CALL _emitArrayElementPointer(
         llvm::ConstantInt::get(llvm::Type::getInt32Ty(state->context), 0),
         llvmElementIndex};
     // A Slang subscript does not establish LLVM's stronger inbounds provenance contract.
-    llvm::Value* result = state->builder.CreateGEP(arrayType, llvmBaseArrayPointer, indices);
+    llvm::Value* result = state->builder.CreateGEP(pointeeType, llvmBaseSequentialPointer, indices);
     *outPointer = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
@@ -3688,7 +3691,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitReturnVoid = _emitReturnVoid;
     api.emitPointerOffset = _emitPointerOffset;
     api.emitByteOffsetPointer = _emitByteOffsetPointer;
-    api.emitArrayElementPointer = _emitArrayElementPointer;
+    api.emitSequentialElementPointer = _emitSequentialElementPointer;
     api.emitStructFieldPointer = _emitStructFieldPointer;
     api.emitAggregateConstruct = _emitAggregateConstruct;
     api.emitAggregateElementExtract = _emitAggregateElementExtract;

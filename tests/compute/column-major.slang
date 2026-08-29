@@ -7,6 +7,9 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -emit-spirv-via-glsl -Xslang -matrix-layout-column-major
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -Xslang -matrix-layout-column-major
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-mtl -compute -shaderobj -Xslang -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -matrix-layout-column-major -o -
+
+// NVVM: .visible .entry computeMain
 
 // This data is in column major layout order.... 
 //TEST_INPUT:cbuffer(data=[1.0 0.0 0.0 10.0  0.0 1.0 0.0 20.0  0.0 0.0 1.0 30.0  0.0 0.0 0.0 1.0]):name matrixBuffer

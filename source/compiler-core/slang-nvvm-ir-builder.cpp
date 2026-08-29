@@ -39,11 +39,11 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
            api.emitConditionalBranch && api.emitSwitch && api.getIntegerConstant &&
            api.getFloatingPointConstant && api.emitPhi && api.addPhiIncoming && api.emitCall &&
            api.emitValueReturn && api.emitReturnVoid && api.emitPointerOffset &&
-           api.emitByteOffsetPointer && api.emitArrayElementPointer && api.emitStructFieldPointer &&
-           api.emitAggregateConstruct && api.emitAggregateElementExtract &&
-           api.emitVectorConstruct && api.emitVectorElementExtract &&
-           api.emitRelaxedGlobalI32AtomicAdd && api.declareGlobalStorage &&
-           api.markFunctionAsKernel;
+           api.emitByteOffsetPointer && api.emitSequentialElementPointer &&
+           api.emitStructFieldPointer && api.emitAggregateConstruct &&
+           api.emitAggregateElementExtract && api.emitVectorConstruct &&
+           api.emitVectorElementExtract && api.emitRelaxedGlobalI32AtomicAdd &&
+           api.declareGlobalStorage && api.markFunctionAsKernel;
 }
 
 static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI& api)
@@ -955,17 +955,20 @@ SlangResult NVVMIRBuilder::emitVectorElementExtract(
     return _validateHandleResult(result, outValue);
 }
 
-SlangResult NVVMIRBuilder::emitArrayElementPointer(
+SlangResult NVVMIRBuilder::emitSequentialElementPointer(
     SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle baseArrayPointer,
+    SlangNVVMValueHandle baseSequentialPointer,
     SlangNVVMValueHandle elementIndex,
     SlangNVVMValueHandle& outPointer) const
 {
     outPointer = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    const SlangNVVMResult result =
-        m_construction.emitArrayElementPointer(module, baseArrayPointer, elementIndex, &outPointer);
+    const SlangNVVMResult result = m_construction.emitSequentialElementPointer(
+        module,
+        baseSequentialPointer,
+        elementIndex,
+        &outPointer);
     return _validateHandleResult(result, outPointer);
 }
 

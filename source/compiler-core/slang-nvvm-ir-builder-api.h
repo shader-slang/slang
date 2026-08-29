@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 16u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 17u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -372,9 +372,9 @@ extern "C"
             SlangNVVMValueHandle byteOffset,
             SlangNVVMTypeHandle resultPointeeType,
             SlangNVVMValueHandle* outPointer);
-        SlangNVVMResult(SLANG_NVVM_CALL* emitArrayElementPointer)(
+        SlangNVVMResult(SLANG_NVVM_CALL* emitSequentialElementPointer)(
             SlangNVVMModuleHandle module,
-            SlangNVVMValueHandle baseArrayPointer,
+            SlangNVVMValueHandle baseSequentialPointer,
             SlangNVVMValueHandle elementIndex,
             SlangNVVMValueHandle* outPointer);
         SlangNVVMResult(SLANG_NVVM_CALL* emitStructFieldPointer)(

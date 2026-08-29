@@ -124,10 +124,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->emitLocalStorage != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitByteOffsetPointer != nullptr);
+        SLANG_CHECK(builder.getConstructionAPI()->emitSequentialElementPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=16") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=17") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -1783,7 +1784,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage)
     SlangNVVMValueHandle loaded = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerConstant(scope.module, i32Type, 7, index)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitArrayElementPointer(scope.module, storage, index, elementPointer)));
+        builder.emitSequentialElementPointer(scope.module, storage, index, elementPointer)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(scope.module, index, elementPointer, 4)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitLoad(scope.module, elementPointer, 4, SLANG_NVVM_LOAD_FLAG_NONE, loaded)));
@@ -4955,7 +4956,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerAddressingOperations)
     SLANG_CHECK(assembly.indexOf("getelementptr inbounds") < 0);
 }
 
-SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
+SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidSequentialAddressingOperations)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
@@ -4963,18 +4964,21 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
 
     ScopedNVVMBuilderModule module;
     module.builder = &builder;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.createModule(toSlice("invalid-array-addressing"), module.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("invalid-sequential-addressing"), module.module)));
     ScopedNVVMBuilderModule foreignModule;
     foreignModule.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createModule(toSlice("invalid-array-addressing-foreign"), foreignModule.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(
+        toSlice("invalid-sequential-addressing-foreign"),
+        foreignModule.module)));
 
     SlangNVVMTypeHandle voidType = nullptr;
     SlangNVVMTypeHandle integerType = nullptr;
     SlangNVVMTypeHandle arrayType = nullptr;
     SlangNVVMTypeHandle arrayPointerType = nullptr;
     SlangNVVMTypeHandle scalarPointerType = nullptr;
+    SlangNVVMTypeHandle vectorType = nullptr;
+    SlangNVVMTypeHandle vectorPointerType = nullptr;
     SlangNVVMTypeHandle foreignIntegerType = nullptr;
     SlangNVVMTypeHandle foreignArrayType = nullptr;
     SlangNVVMTypeHandle foreignArrayPointerType = nullptr;
@@ -4992,6 +4996,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
         integerType,
         SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
         scalarPointerType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getVectorType(module.module, integerType, 4, vectorType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        module.module,
+        vectorType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        vectorPointerType)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getIntegerType(foreignModule.module, 32, foreignIntegerType)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -5031,6 +5042,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
         arrayPointerType,
         scalarPointerType,
         integerType,
+        vectorPointerType,
     };
     SlangNVVMTypeHandle functionType = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
@@ -5046,20 +5058,21 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
         functionType,
         SLANG_NVVM_LINKAGE_EXTERNAL,
         SLANG_NVVM_FUNCTION_FLAG_NONE,
-        toSlice("invalidArrayAddressing"),
+        toSlice("invalidSequentialAddressing"),
         function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
         SLANG_NVVM_LINKAGE_EXTERNAL,
         SLANG_NVVM_FUNCTION_FLAG_NONE,
-        toSlice("otherArrayAddressing"),
+        toSlice("otherSequentialAddressing"),
         otherFunction)));
 
     SlangNVVMValueHandle destination = nullptr;
     SlangNVVMValueHandle source = nullptr;
     SlangNVVMValueHandle scalarPointer = nullptr;
     SlangNVVMValueHandle index = nullptr;
+    SlangNVVMValueHandle vectorPointer = nullptr;
     SlangNVVMValueHandle otherDestination = nullptr;
     SlangNVVMValueHandle otherIndex = nullptr;
     SLANG_CHECK_ABORT(
@@ -5070,6 +5083,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
         SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 2, scalarPointer)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 3, index)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 4, vectorPointer)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.getFunctionParameter(module.module, otherFunction, 0, otherDestination)));
     SLANG_CHECK_ABORT(
@@ -5096,7 +5111,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
         foreignFunctionType,
         SLANG_NVVM_LINKAGE_EXTERNAL,
         SLANG_NVVM_FUNCTION_FLAG_NONE,
-        toSlice("foreignArrayAddressing"),
+        toSlice("foreignSequentialAddressing"),
         foreignFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.getFunctionParameter(foreignModule.module, foreignFunction, 0, foreignBase)));
@@ -5109,7 +5124,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
     {
         SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
         SLANG_CHECK(
-            builder.emitArrayElementPointer(targetModule, base, elementIndex, rejected) ==
+            builder.emitSequentialElementPointer(targetModule, base, elementIndex, rejected) ==
             SLANG_E_INVALID_ARG);
         SLANG_CHECK(rejected == nullptr);
     };
@@ -5117,9 +5132,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
     expectRejectedElement(module.module, destination, index);
     SlangNVVMValueHandle rawRejectedElement = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.getConstructionAPI()
-            ->emitArrayElementPointer(module.module, destination, index, &rawRejectedElement) ==
-        SLANG_E_INVALID_ARG);
+        builder.getConstructionAPI()->emitSequentialElementPointer(
+            module.module,
+            destination,
+            index,
+            &rawRejectedElement) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rawRejectedElement == nullptr);
     expectRejectedElement(nullptr, destination, index);
     expectRejectedElement(foreignModule.module, destination, index);
@@ -5162,7 +5179,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, consumerBlock)));
     SLANG_CHECK(
         builder.getConstructionAPI()
-            ->emitArrayElementPointer(module.module, destination, index, nullptr) ==
+            ->emitSequentialElementPointer(module.module, destination, index, nullptr) ==
         SLANG_E_INVALID_ARG);
     expectRejectedElement(module.module, scalarPointer, index);
     expectRejectedElement(module.module, destination, source);
@@ -5174,12 +5191,17 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
 
     SlangNVVMValueHandle destinationElement = nullptr;
     SlangNVVMValueHandle sourceElement = nullptr;
+    SlangNVVMValueHandle vectorElement = nullptr;
     SlangNVVMValueHandle ordinaryValue = nullptr;
     SlangNVVMValueHandle invariantValue = nullptr;
+    SlangNVVMValueHandle vectorValue = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitArrayElementPointer(module.module, destination, index, destinationElement)));
+        builder
+            .emitSequentialElementPointer(module.module, destination, index, destinationElement)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitArrayElementPointer(module.module, source, index, sourceElement)));
+        builder.emitSequentialElementPointer(module.module, source, index, sourceElement)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitSequentialElementPointer(module.module, vectorPointer, index, vectorElement)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder
             .emitLoad(module.module, sourceElement, 4, SLANG_NVVM_LOAD_FLAG_NONE, ordinaryValue)));
@@ -5189,8 +5211,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
         4,
         SLANG_NVVM_LOAD_FLAG_INVARIANT,
         invariantValue)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitLoad(module.module, vectorElement, 4, SLANG_NVVM_LOAD_FLAG_NONE, vectorValue)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.emitStore(module.module, invariantValue, destinationElement, 4)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitStore(module.module, vectorValue, destinationElement, 4)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(module.module, mergeBlock)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, mergeBlock)));
@@ -5212,12 +5238,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
     SLANG_CHECK(
         _countOccurrences(assembly.getUnownedSlice(), toSlice("getelementptr [4 x i32]")) == 2);
     SLANG_CHECK(
-        _countOccurrences(assembly.getUnownedSlice(), toSlice("i32 0, i32 %slangParameter3")) == 2);
+        _countOccurrences(assembly.getUnownedSlice(), toSlice("getelementptr <4 x i32>")) == 1);
+    SLANG_CHECK(
+        _countOccurrences(assembly.getUnownedSlice(), toSlice("i32 0, i32 %slangParameter3")) == 3);
     SLANG_CHECK(assembly.indexOf("getelementptr inbounds") < 0);
     SLANG_CHECK(assembly.indexOf("addrspacecast") < 0);
-    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("load i32")) == 2);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("load i32")) == 3);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("!invariant.load")) == 1);
-    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("store i32")) == 1);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("store i32")) == 2);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)

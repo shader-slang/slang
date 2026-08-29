@@ -824,9 +824,7 @@ IRUnsizedArrayType* asNVVMSupportedUnsizedSamplerArrayStorageType(IRInst* type)
                                                                                        : nullptr;
 }
 
-IRParameterGroupType* asNVVMSupportedScalarParameterGroupType(
-    IRInst* type,
-    IRStructType** outElementType)
+IRParameterGroupType* asNVVMSupportedParameterGroupType(IRInst* type, IRType** outElementType)
 {
     if (outElementType)
         *outElementType = nullptr;
@@ -838,8 +836,9 @@ IRParameterGroupType* asNVVMSupportedScalarParameterGroupType(
         return nullptr;
     }
 
-    auto elementType = asNVVMSupportedScalarStructType(parameterGroupType->getElementType());
-    if (!elementType)
+    IRType* elementType = parameterGroupType->getElementType();
+    if (!asNVVMSupportedScalarStructType(elementType) &&
+        !asNVVMSupportedNumericArrayType(elementType))
         return nullptr;
 
     if (outElementType)
@@ -855,7 +854,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
     SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
     IRType* type = field ? field->getFieldType() : nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupportedScalarParameterGroupType(type) ||
+           asNVVMSupportedParameterGroupType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceField(field, surfaceType, storageFormat) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
@@ -1044,9 +1043,9 @@ SlangResult NVVMTypeLoweringContext::_lowerRawBufferType(
     return SLANG_OK;
 }
 
-SlangResult NVVMTypeLoweringContext::_lowerScalarParameterGroupType(
+SlangResult NVVMTypeLoweringContext::_lowerParameterGroupType(
     IRParameterGroupType* type,
-    IRStructType* elementType,
+    IRType* elementType,
     SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
@@ -1063,7 +1062,7 @@ SlangResult NVVMTypeLoweringContext::_lowerScalarParameterGroupType(
     else
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "scalar parameter-group pointer type",
+            "parameter-group pointer type",
             m_builder.getPointerType(
                 m_module,
                 loweredElementType,
@@ -1157,9 +1156,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     NVVMBufferDataPointerType bufferDataPointerType;
     const bool isBufferDataPointer =
         getNVVMSupportedBufferDataPointerType(type, bufferDataPointerType);
-    IRStructType* parameterGroupElementType = nullptr;
+    IRType* parameterGroupElementType = nullptr;
     IRParameterGroupType* parameterGroup =
-        asNVVMSupportedScalarParameterGroupType(type, &parameterGroupElementType);
+        asNVVMSupportedParameterGroupType(type, &parameterGroupElementType);
     IRSamplerStateTypeBase* samplerStorage = asNVVMSupportedSamplerStorageType(type);
     IRSamplerStateTypeBase* samplerValue = asNVVMSupportedSamplerValueType(type);
     IRUnsizedArrayType* unsizedSamplerArrayStorage =
@@ -1188,8 +1187,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           isBufferDataPointer || parameterGroup || isSurface || isSampledTexture || samplerValue ||
           resourceElementPointer || sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
-         (isInteger || isFloat32 || structType || isRawBuffer || parameterGroup || isSurface ||
-          isSampledTexture || samplerStorage || unsizedSamplerArrayStorage));
+         (isInteger || isFloat32 || structType || fixedNumericArrayType || isRawBuffer ||
+          parameterGroup || isSurface || isSampledTexture || samplerStorage ||
+          unsizedSamplerArrayStorage));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -1310,7 +1310,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
     else if (parameterGroup)
     {
-        return _lowerScalarParameterGroupType(parameterGroup, parameterGroupElementType, outType);
+        return _lowerParameterGroupType(parameterGroup, parameterGroupElementType, outType);
     }
     else if (isSurface || isSampledTexture)
     {

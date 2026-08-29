@@ -4,6 +4,10 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -matrix-layout-row-major
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -matrix-layout-row-major -o -
+
+// NVVM: .visible .entry computeMain
 
 //TEST_INPUT:cbuffer(data=[1.0 0.0 0.0 0.0  0.0 1.0 0.0 0.0  0.0 0.0 1.0 0.0 10.0 20.0 30.0 1.0]):name matrixBuffer
 ConstantBuffer<float4x4> matrixBuffer;

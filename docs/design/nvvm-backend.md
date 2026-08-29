@@ -5399,6 +5399,31 @@ lanes with output `1, 1, 1, 1`. The PTX module is 645 bytes; CUDA 12.9.86
 `ptxas -arch=sm_70` accepts it and emits a 2,792-byte cubin. The complete NVVM unit-test prefix
 passes 378/378.
 
+### Slice 110: Legalized matrix storage and generated helpers
+
+The direct route now carries Slang's canonical legalized Float32 matrix representation through
+memory and generated multiplication helpers. Matrix legalization remains the sole semantic source
+of truth: the emitter sees only a nonempty fixed array of numeric vectors. Numeric-array constant
+buffers use the established parameter-group ABI, whole arrays are ordinary first-class loads and
+stores, and local row and lane addresses preserve their exact array/vector pointee, access,
+address-space, and CUDA scalar-layout relation.
+
+Forward-only builder ABI revision 17 generalizes the old array-only element-address operation to a
+sequential element address. A typed pointer to either a fixed array or fixed vector selects the
+same non-`inbounds` LLVM GEP shape; the provider validates ownership, availability, the integer
+index, and the aggregate pointee before mutation. This also admits the neighboring dynamic local
+`half4` lane store without a Half- or matrix-specific callback. Generated reachable helpers that
+have no canonical export or mangled name receive deterministic collision-free
+`__slang_nvvm_internal_N` symbols with internal linkage, while explicit names remain authoritative.
+
+`row-major.slang` now passes direct CUDA runtime comparison with `11, 22, 33, 1` and a direct PTX
+check. Its PTX is 1,435 bytes and CUDA 12.9.86 `ptxas -arch=sm_70` emits a 3,048-byte cubin.
+`column-major.slang` passes direct PTX checking; its 2,951-byte module assembles to a 3,688-byte
+cubin. Direct column-major execution currently returns `0` instead of the fixture's expected `1`,
+so that runtime lane is deliberately not registered. The focused fake-provider tests prove the
+numeric-array parameter group, whole-array load, local array/vector addresses, generated helper
+names, and dynamic Half lane store. The complete NVVM unit-test prefix passes 380/380.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5434,7 +5459,8 @@ The following remain open until their named slice supplies evidence:
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical
   structured/byte-address data pointers and constant-lane structured-buffer vector swizzled stores,
-  plus selected-element indexing of fixed numeric local arrays, including other `IRGetElementPtr`
+  plus selected-element indexing of fixed numeric local arrays and vectors, including other
+  `IRGetElementPtr`
   shapes, pointer escape through helpers beyond the exact selected-scalar-struct, numeric-value,
   and fixed-numeric-array helper subsets or through SSA, nested or dynamically indexed aggregate
   values, mutable aggregate families beyond layout-compatible first-level

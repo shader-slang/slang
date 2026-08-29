@@ -380,10 +380,10 @@ public:
         SlangNVVMValueHandle elementIndex,
         SlangNVVMValueHandle& outValue) const;
 
-    /// Emits a non-inbounds address of one element of a typed array pointer.
-    SlangResult emitArrayElementPointer(
+    /// Emits a non-inbounds address of one element of a typed fixed-array or vector pointer.
+    SlangResult emitSequentialElementPointer(
         SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle baseArrayPointer,
+        SlangNVVMValueHandle baseSequentialPointer,
         SlangNVVMValueHandle elementIndex,
         SlangNVVMValueHandle& outPointer) const;
 
