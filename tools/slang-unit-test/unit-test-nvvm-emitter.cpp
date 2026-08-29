@@ -922,6 +922,87 @@ SLANG_UNIT_TEST(nvvmSlangMatrixMemoryUsesSequentialPointerContract)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangStructuredMatrixMemoryUsesPhysicalResourceStorage)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMStructuredMatrixMemorySource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+            StringBuilder trace;
+            trace << "structured-matrix fake trace: arrays "
+                  << gFakeNVVMBuilder.getArrayTypeCallCount << "; structs "
+                  << gFakeNVVMBuilder.getStructTypeCallCount << "; field pointers "
+                  << gFakeNVVMBuilder.emitStructFieldPointerCallCount << "; sequential pointers "
+                  << gFakeNVVMBuilder.emitSequentialElementPointerCallCount << "; pointer offsets "
+                  << gFakeNVVMBuilder.emitPointerOffsetCallCount << "; loads "
+                  << gFakeNVVMBuilder.emitLoadCallCount << "; stores "
+                  << gFakeNVVMBuilder.emitStoreCallCount << "; operations "
+                  << gFakeNVVMBuilder.scalarOperations.getCount();
+            getTestReporter()->message(TestMessageType::TestFailure, trace.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.getArrayTypeCallCount >= 1);
+        SLANG_CHECK(gFakeNVVMBuilder.arrayElementCount == 4);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.arrayElementType ==
+            _getFakeNVVMBuilderVectorType(4, FakeNVVMBuilderScalarTypeKind::Float));
+
+        bool sawPhysicalArrayField = false;
+        for (auto fieldType : gFakeNVVMBuilder.scalarStructFieldTypes)
+            sawPhysicalArrayField |= fieldType == _getFakeNVVMBuilderArrayType();
+        SLANG_CHECK(sawPhysicalArrayField);
+
+        bool sawRowPointer = false;
+        bool sawLanePointer = false;
+        for (auto resultTypeKind : gFakeNVVMBuilder.sequentialElementPointerTypeKinds)
+        {
+            sawRowPointer |= resultTypeKind == FakeNVVMBuilderScalarTypeKind::Float4;
+            sawLanePointer |= resultTypeKind == FakeNVVMBuilderScalarTypeKind::Float;
+        }
+        SLANG_CHECK(sawRowPointer);
+        SLANG_CHECK(sawLanePointer);
+
+        bool sawFloatToSignedI32Bits = false;
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            sawFloatToSignedI32Bits |=
+                operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET &&
+                operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+                operation.resultType.bitWidth == 32 && operation.resultType.laneCount == 1 &&
+                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                operation.operandTypes[0].bitWidth == 32 &&
+                operation.operandTypes[0].laneCount == 1;
+        }
+        SLANG_CHECK(sawFloatToSignedI32Bits);
+        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount >= 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount >= 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount >= 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangDynamicLocalVectorStoreUsesSequentialPointerContract)
 {
     _resetDirectNVVMFakes();
@@ -5442,6 +5523,7 @@ SLANG_UNIT_TEST(nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMuta
         kDirectNVVMRawRWStructuredBufferI32AtomicAddSource,
         kDirectNVVMUnsupportedNestedAggregateParameterSource,
         kDirectNVVMIncompatibleStructuredBufferAggregateLayoutSource,
+        kDirectNVVMUnsupportedStructuredMatrixWriteSource,
     };
     for (const char* source : kUnsupportedSources)
     {

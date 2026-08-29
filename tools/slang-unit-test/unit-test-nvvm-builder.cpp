@@ -128,7 +128,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=18") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=19") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -3130,6 +3130,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("zext i8")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("sitofp i8")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fptoui float")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("bitcast float")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("bitcast i32")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("sitofp i8")) < text.indexOf(toSlice("to half")));
         SLANG_CHECK(text.indexOf(toSlice("fadd half")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fsub half")) >= 0);
@@ -3311,6 +3313,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_COUNT_OF(sameWidthFloatOperands),
     };
     SLANG_CHECK(!builder.supportsValueOperation(sameWidthFloatConvert));
+
+    const SlangNVVMValueTypeDesc sameBitTypeOperands[] = {float32};
+    const SlangNVVMValueOperationDesc sameTypeBitReinterpret = {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        float32,
+        sameBitTypeOperands,
+        SLANG_COUNT_OF(sameBitTypeOperands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(sameTypeBitReinterpret));
 
     const SlangNVVMValueTypeDesc float16x2 = {
         SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,

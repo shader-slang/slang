@@ -243,11 +243,8 @@ IRStructType* asNVVMSupportedScalarStructType(IRInst* type)
     return hasField ? structType : nullptr;
 }
 
-IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type)
+IRStructType* asNVVMSupportedPhysicalArrayStructType(IRInst* type)
 {
-    if (auto scalarStructType = asNVVMSupportedScalarStructType(type))
-        return scalarStructType;
-
     auto structType = as<IRStructType>(type);
     if (!structType || !structType->findDecoration<IRPhysicalTypeDecoration>())
         return nullptr;
@@ -260,6 +257,13 @@ IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type)
         onlyField = field;
     }
     return onlyField ? structType : nullptr;
+}
+
+IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type)
+{
+    if (auto scalarStructType = asNVVMSupportedScalarStructType(type))
+        return scalarStructType;
+    return asNVVMSupportedPhysicalArrayStructType(type);
 }
 
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type)
@@ -562,7 +566,8 @@ IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type)
 static bool _isNVVMSupportedResourceElementType(IRInst* type)
 {
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupported32BitNumericVectorType(type) || asNVVMSupportedCopyableStructType(type);
+           asNVVMSupported32BitNumericVectorType(type) || asNVVMSupportedCopyableStructType(type) ||
+           asNVVMSupportedPhysicalArrayStructType(type);
 }
 
 bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType)
@@ -1161,6 +1166,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRStructType* structType = as<IRStructType>(type);
     IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
     IRStructType* copyableStructType = asNVVMSupportedCopyableStructType(type);
+    IRStructType* physicalArrayStructType = asNVVMSupportedPhysicalArrayStructType(type);
     IRStructType* localScalarStructValueType = nullptr;
     IRPtrTypeBase* localScalarStructPointer =
         asNVVMSupportedLocalScalarStructPointerType(type, &localScalarStructValueType);
@@ -1211,9 +1217,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
-          fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
-          isBufferDataPointer || parameterGroup || isSurface || isSampledTexture || samplerValue ||
-          resourceElementPointer || sharedElementPointer)) ||
+          physicalArrayStructType || fixedNumericArrayType || deviceNumericPointer ||
+          deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup || isSurface ||
+          isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
          (isInteger || isFloat32 || structType || fixedNumericArrayType || isRawBuffer ||
           parameterGroup || isSurface || isSampledTexture || samplerStorage ||

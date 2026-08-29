@@ -1641,3 +1641,17 @@ direct runtime with `12, 16`; its 881-byte PTX assembles to a 2,920-byte cubin. 
 column-major remains an exact adjacent stop because its physical array has a 12-byte Float3 stride,
 whereas LLVM's `<3 x float>` array element has 16-byte natural alignment and allocation size.
 Release host/provider builds pass and the complete NVVM unit-test prefix remains 380/380.
+
+Slice 112 admits the same canonical sole-array `[PhysicalType]` wrapper as a selected raw
+`RWStructuredBuffer` element for read-only logical matrix access. The existing early LLVM storage
+pass remains the producer. Resource element, physical field, dynamic fixed-array row, and dynamic
+vector-lane pointers use the generic struct and recursive sequential-pointer contracts; immutable
+ownership follows the complete chain and rejects writes.
+
+Forward-only builder ABI revision 19 adds typed bit reinterpretation for the first exposed
+GenericAsm stop. Exact scalar `asint`, `asuint`, and `asfloat` catalog entries lower through the
+generic family to LLVM `bitcast` or a signless integer identity. The existing
+`structured-buffer-of-matrices.slang` and `matrix-layout-structured-buffer.slang` fixtures pass
+direct CUDA runtime and PTX lanes with unchanged 64-byte and 48-byte strides. Their 971-byte and
+2,017-byte PTX modules assemble with CUDA 12.9.86 to 2,920-byte and 3,304-byte cubins.
+Release host/provider builds pass, and the complete NVVM unit-test prefix passes 381/381.

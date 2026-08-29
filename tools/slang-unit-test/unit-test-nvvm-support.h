@@ -4170,33 +4170,15 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitStructFieldPointer(
     {
         fieldType = gFakeNVVMBuilder.structFieldTypes[fieldIndex];
     }
-    else if (baseRef.kind == FakeNVVMBuilderValueKind::Parameter)
+    else
     {
-        FakeNVVMBuilderParameterTypeKind parameterTypeKind;
-        if (_getFakeNVVMBuilderParameterTypeKind(baseRef, parameterTypeKind) &&
-            parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ScalarStructPointer &&
+        FakeNVVMBuilderScalarTypeKind basePointeeTypeKind;
+        if (_getFakeNVVMBuilderPointerScalarTypeKind(baseRef, basePointeeTypeKind) &&
+            basePointeeTypeKind == FakeNVVMBuilderScalarTypeKind::ScalarStruct &&
             fieldIndex < uint32_t(gFakeNVVMBuilder.scalarStructFieldTypes.getCount()))
         {
             fieldType = gFakeNVVMBuilder.scalarStructFieldTypes[fieldIndex];
         }
-    }
-    else if (
-        baseRef.kind == FakeNVVMBuilderValueKind::LocalStorage && baseRef.index >= 0 &&
-        baseRef.index < gFakeNVVMBuilder.localStorageValueTypes.getCount() &&
-        gFakeNVVMBuilder.localStorageValueTypes[baseRef.index] ==
-            _getFakeNVVMBuilderScalarStructType() &&
-        fieldIndex < uint32_t(gFakeNVVMBuilder.scalarStructFieldTypes.getCount()))
-    {
-        fieldType = gFakeNVVMBuilder.scalarStructFieldTypes[fieldIndex];
-    }
-    else if (
-        baseRef.kind == FakeNVVMBuilderValueKind::Load && baseRef.index >= 0 &&
-        baseRef.index < gFakeNVVMBuilder.loadResultTypeKinds.getCount() &&
-        gFakeNVVMBuilder.loadResultTypeKinds[baseRef.index] ==
-            FakeNVVMBuilderScalarTypeKind::ScalarStructPointer &&
-        fieldIndex < uint32_t(gFakeNVVMBuilder.scalarStructFieldTypes.getCount()))
-    {
-        fieldType = gFakeNVVMBuilder.scalarStructFieldTypes[fieldIndex];
     }
     FakeNVVMBuilderScalarTypeKind fieldTypeKind;
     if (!fieldType || !_getFakeNVVMBuilderTypeKind(fieldType, fieldTypeKind))
@@ -5164,6 +5146,26 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
         (!operands && operandCount))
     {
         return SLANG_E_INVALID_ARG;
+    }
+
+    if (operation->operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET)
+    {
+        NVVMSemantics::ValueOperationFamilyResolution resolution;
+        if (!NVVMSemantics::resolveValueOperationFamily(*operation, resolution) ||
+            resolution.family != NVVMSemantics::ValueOperationFamily::BitReinterpret)
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+        gFakeNVVMBuilder.emittedValueOperations.add(
+            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)});
+        return _recordFakeNVVMBuilderScalarOperation(
+            module,
+            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)},
+            operands,
+            uint32_t(operandCount),
+            outValue,
+            &operation->resultType,
+            operation->operandTypes);
     }
 
     const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::find(*operation);
@@ -8398,6 +8400,28 @@ void computeMain()
 }
 )";
 
+static const char kDirectNVVMStructuredMatrixMemorySource[] = R"(
+RWStructuredBuffer<float4x4> matrixBuffer;
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    int value = int(tid.x);
+    outputBuffer[tid.x] = asint(matrixBuffer[0][(value + 1) & 3][(value + 3) & 3]);
+}
+)";
+
+static const char kDirectNVVMUnsupportedStructuredMatrixWriteSource[] = R"(
+RWStructuredBuffer<float4x4> matrixBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    matrixBuffer[0][tid.x & 3][tid.y & 3] = float(tid.x);
+}
+)";
+
 static SlangResult _populateNumericFamilyFunction(
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module)
@@ -8578,6 +8602,21 @@ static SlangResult _populateNumericFamilyFunction(
         unsignedI16,
         operandTypes,
         parameters + 2,
+        1,
+        ignored));
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        signedI32,
+        operandTypes,
+        parameters + 2,
+        1,
+        ignored));
+    operandTypes[0] = signedI32;
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        float32,
+        operandTypes,
+        parameters + 9,
         1,
         ignored));
 

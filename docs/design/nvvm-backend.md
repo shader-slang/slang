@@ -5462,6 +5462,36 @@ diagnostic until a generic padded sequential-storage representation exists. Rele
 builds pass, the focused ABI/builder/emitter checks pass, and the complete NVVM prefix remains
 380/380.
 
+### Slice 112: Structured-buffer physical matrix storage
+
+The direct route now carries the same canonical matrix storage through selected read-only logical
+accesses to `RWStructuredBuffer` elements. The early LLVM buffer-storage pass was already the
+correct producer: for a row-major `float4x4`, it rewrites the resource element to a
+`[PhysicalType]` struct whose only field is `Array<Float4, 4>`. The final IR then takes the resource
+element pointer, selects that physical field, and dynamically indexes its array row and vector
+lane. No matrix type, source dimensions, layout option, or transpose decision reaches the NVVM
+emitter.
+
+One structural classifier now names that sole-array physical struct independently of parameter
+groups. Raw structured-buffer elements, value type lowering, exact CUDA-versus-LLVM layout checks,
+and field addressing reuse it. The former local and parameter-group element-address recognizers
+are one recursive sequential-pointer contract. It admits fixed arrays and vectors from mutable
+local storage or immutable parameter-group/physical-resource storage, and carries immutability
+through nested row/lane indexing so only a final load is legal for the new resource shape.
+
+The first newly exposed semantic operation was CUDA GenericAsm `asint`. Forward-only builder ABI
+revision 19 adds generic typed bit reinterpretation rather than a source-builtin callback. The
+catalog maps the exact scalar `asint`, `asuint`, and `asfloat` overloads, while the reusable family
+requires different integer/floating kinds with identical bit width and lane count. LLVM emission
+uses `bitcast`, or preserves the value when signed and unsigned descriptors share the same
+signless physical type.
+
+`structured-buffer-of-matrices.slang` now passes direct runtime with its unchanged 64-byte stride
+and results `7, 8, D, 2`; `matrix-layout-structured-buffer.slang` passes with its unchanged 48-byte
+stride. Both have direct PTX checks for global loads/stores. Their 971-byte and 2,017-byte PTX
+modules assemble with CUDA 12.9.86 `ptxas -arch=sm_70` to 2,920-byte and 3,304-byte cubins. Release
+host/provider builds pass, and the complete NVVM unit-test prefix passes 381/381.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5472,7 +5502,8 @@ The following remain open until their named slice supplies evidence:
   global parameter fields beyond selected integer/float32 scalars and selected 32-bit numeric
   vector resource elements, flat selected-scalar parameter blocks and constant buffers,
   selected integer/float32 scalar, 32-bit numeric-vector, and layout-compatible first-level
-  numeric-field aggregate structured buffers,
+  numeric-field aggregate structured buffers, plus read-only logical access to selected
+  sole-array physical matrix elements in read-write structured buffers,
   read-only/read-write byte-address buffers, selected read-only texture elements with scalar Float
   sampling/queries and bounded integer-coordinate fetches, ordinary sampler values, and storage-only
   comparison-sampler/unsized-sampler-array placeholders, and raw

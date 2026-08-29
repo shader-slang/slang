@@ -3040,6 +3040,11 @@ static SlangResult _emitValueOperationFamily(
                      ? state->builder.CreateFPTrunc(llvmOperands[0], resultType)
                      : state->builder.CreateFPExt(llvmOperands[0], resultType);
         break;
+    case Slang::NVVMSemantics::ValueOperationFamily::BitReinterpret:
+        result = llvmOperands[0]->getType() == resultType
+                     ? llvmOperands[0]
+                     : state->builder.CreateBitCast(llvmOperands[0], resultType);
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }

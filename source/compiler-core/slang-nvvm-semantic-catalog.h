@@ -24,6 +24,7 @@ enum class ValueOperationFamily : uint32_t
     IntegerToFloat,
     FloatToInteger,
     FloatConvert,
+    BitReinterpret,
 };
 
 struct ValueOperationFamilyResolution
@@ -300,6 +301,54 @@ inline constexpr CatalogEntry kCatalog[] = {
         1,
         "floating-point width conversion",
         "__half2float($0)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        kSignedI32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "32-bit value reinterpretation",
+        "$P_asint($0)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        kSignedI32,
+        {kUnsignedI32, kNoType, kNoType},
+        1,
+        "32-bit value reinterpretation",
+        "$P_asint($0)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        kUnsignedI32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "32-bit value reinterpretation",
+        "$P_asuint($0)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        kUnsignedI32,
+        {kSignedI32, kNoType, kNoType},
+        1,
+        "32-bit value reinterpretation",
+        "$P_asuint($0)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        kFloat32,
+        {kSignedI32, kNoType, kNoType},
+        1,
+        "32-bit value reinterpretation",
+        "$P_asfloat($0)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        kFloat32,
+        {kUnsignedI32, kNoType, kNoType},
+        1,
+        "32-bit value reinterpretation",
+        "$P_asfloat($0)",
     },
     {
         SLANG_NVVM_VALUE_OP_SQRT,
@@ -767,6 +816,20 @@ inline bool resolveValueOperationFamily(
         desc.resultType.bitWidth != desc.operandTypes[0].bitWidth)
     {
         outResolution = {ValueOperationFamily::FloatConvert, "floating-point width conversion"};
+        return true;
+    }
+
+    const bool hasBitResult =
+        isSelectedIntegerValue(desc.resultType) || isSelectedFloatValue(desc.resultType);
+    const bool hasBitOperand =
+        desc.operandCount == 1 && (isSelectedIntegerValue(desc.operandTypes[0]) ||
+                                   isSelectedFloatValue(desc.operandTypes[0]));
+    if (desc.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET && hasBitResult && hasBitOperand &&
+        desc.resultType.kind != desc.operandTypes[0].kind &&
+        desc.resultType.bitWidth == desc.operandTypes[0].bitWidth &&
+        desc.resultType.laneCount == desc.operandTypes[0].laneCount)
+    {
+        outResolution = {ValueOperationFamily::BitReinterpret, "bitwise value reinterpretation"};
         return true;
     }
 
