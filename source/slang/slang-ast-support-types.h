@@ -1632,7 +1632,53 @@ FIDDLE() namespace Slang
         Val* m_val = nullptr;
     };
 
+    /// Identifies one requirement entry in a specific, already known interface witness table.
+    ///
+    /// The key intentionally carries no substitution context: the table's interface type provides
+    /// that context. Under the current AST representation a generic requirement is stored under
+    /// its innermost non-generic declaration rather than its wrapping `GenericDecl`; construction
+    /// performs that normalization in one place. Code that identifies a requirement independently
+    /// of one known table must keep its `DeclRef` instead of using this key.
+    struct InterfaceRequirementKey
+    {
+        explicit InterfaceRequirementKey(Decl* requirementDecl);
+
+        Decl* getDecl() const { return m_decl; }
+
+    private:
+        Decl* m_decl;
+    };
+
     typedef OrderedDictionary<Decl*, RequirementWitness> RequirementDictionary;
+
+    /// Records the semantic-checking state of one requirement in a witness table.
+    ///
+    /// Ordinary checking follows `Unchecked -> Checking -> Succeeded|Failed`. An inherited-
+    /// interface requirement may instead follow `Unchecked -> WitnessReady -> Checking` so that
+    /// lookup can traverse its nested table before every requirement in that table has been
+    /// validated. A `Succeeded` or `WitnessReady` requirement always has a dictionary entry;
+    /// `Failed` never does. `Unchecked` may already have an entry synthesized by another semantic
+    /// operation, which the per-requirement checker adopts as a successful result.
+    ///
+    /// This state cannot be encoded by `RequirementWitness::Flavor`: `Flavor::none` is also the
+    /// valid dictionary value of a successfully satisfied optional requirement.
+    enum class RequirementCheckState
+    {
+        /// No per-requirement check has started.
+        Unchecked,
+
+        /// An inherited-interface table is available for lookup but has not been validated.
+        WitnessReady,
+
+        /// One semantic operation owns the attempt to produce or validate this entry.
+        Checking,
+
+        /// The requirement was satisfied and its dictionary entry is final.
+        Succeeded,
+
+        /// The requirement could not be satisfied and has no dictionary entry.
+        Failed,
+    };
 
     FIDDLE()
     class WitnessTable : public RefObject
@@ -1641,6 +1687,25 @@ FIDDLE() namespace Slang
         const RequirementDictionary& getRequirementDictionary() { return m_requirementDictionary; }
 
         void add(Decl* decl, RequirementWitness const& witness);
+
+        /// Adds the witness for `key` using the table-local requirement identity.
+        void addRequirement(InterfaceRequirementKey key, RequirementWitness const& witness);
+
+        /// Returns whether this table contains a witness for `key`.
+        bool containsRequirement(InterfaceRequirementKey key) const
+        {
+            return m_requirementDictionary.containsKey(key.getDecl());
+        }
+
+        /// Looks up the witness for `key` without performing semantic checking.
+        bool tryGetRequirementWitness(InterfaceRequirementKey key, RequirementWitness& outWitness)
+            const
+        {
+            return m_requirementDictionary.tryGetValue(key.getDecl(), outWitness);
+        }
+
+        /// Removes a requirement witness and forgets its semantic-checking state.
+        void removeRequirement(InterfaceRequirementKey key);
 
         // The type that the witness table witnesses conformance to (e.g. an Interface)
         FIDDLE() Type* baseType;
@@ -1653,6 +1718,24 @@ FIDDLE() namespace Slang
 
         // Cached dictionary for looking up satisfying values.
         FIDDLE() RequirementDictionary m_requirementDictionary;
+
+        /// Returns the semantic-checking state for `key`.
+        RequirementCheckState getRequirementCheckState(InterfaceRequirementKey key) const
+        {
+            if (auto state = m_requirementCheckStates.tryGetValue(key.getDecl()))
+                return *state;
+            return RequirementCheckState::Unchecked;
+        }
+
+        /// Updates the semantic-checking state for `key`.
+        void setRequirementCheckState(InterfaceRequirementKey key, RequirementCheckState state)
+        {
+            m_requirementCheckStates[key.getDecl()] = state;
+        }
+
+        // Semantic-checking state is deliberately not serialized. A serialized witness table is
+        // already complete, while a specialized copy can derive completion from its entries.
+        Dictionary<Decl*, RequirementCheckState> m_requirementCheckStates;
 
         RefPtr<WitnessTable> specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst);
     };
