@@ -371,7 +371,8 @@ IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type)
 
 static bool _isNVVMSupportedResourceElementType(IRInst* type)
 {
-    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type);
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+           asNVVMSupported32BitNumericVectorType(type);
 }
 
 bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType)

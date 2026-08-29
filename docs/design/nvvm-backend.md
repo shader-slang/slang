@@ -4794,6 +4794,39 @@ checks preserve that call topology alongside shared loads/stores. Optimized dire
 barriers. CUDA 12.9.86 `ptxas -arch=sm_70` accepts all three optimized modules and produces cubins
 of 3,040, 3,168, and 3,168 bytes respectively.
 
+### Slice 89: Selected vector structured buffers and swizzled stores
+
+Structured and read-write structured buffers now admit the established two- through four-lane
+Int32, UInt32, and Float32 vector family as exact elements. One resource-element classifier feeds
+raw-view recognition, data-pointer recognition, RW element-pointer recognition, conventional
+global fields, and type lowering. The existing provider representation remains
+`{ element addrspace(1)*, i64 count }`, and whole-vector loads/stores reuse the generic pointer and
+memory callbacks with the established 8-byte two-lane and 16-byte three/four-lane alignment.
+Read-write `.Load()` reaches its distinct canonical `rwstructuredBufferLoad` opcode, so this slice
+also applies the same typed relation with mutable rather than invariant load semantics.
+
+Canonical `swizzledStore` remains an emitter composition rather than becoming a builder callback.
+Preflight requires an RW structured-buffer pointer to one selected vector, an exact scalar or
+same-element vector source, and one to four unique literal destination lanes. Emission extracts
+each source lane, forms a typed scalar pointer at `destinationLane * 4` through the existing
+byte-offset operation, and performs a four-byte scalar store. This matches generic LLVM emission's
+partial-store semantics without loading untouched lanes or reconstructing the source l-value.
+
+The fake provider now records one generic `ResourceView` parameter kind plus its exact resource
+element type, replacing the former integer/float resource-view parameter variants. Its vector
+pointer/view identity derives from the already-existing numeric type family; no production ABI,
+capability descriptor, compatible-text rule, provider code, or ABI revision changed. The focused
+positive test observes Int4 and Float4 views, two 16-byte vector loads, the exact `12, 8, 4, 0`
+swizzle offsets, six extracts, and five scalar stores. A Double2 resource still stops before
+provider mutation.
+
+The two existing shader files pass five selected CUDA/direct-PTX lanes. Structured-buffer loads
+produce `0x40, 0x40, 0x37` and direct PTX contains `ld.global.nc.v4.u32`; four Float4 swizzle
+permutations produce `4`, with scalar component stores and `ld.global.v4.f32` reloads. CUDA 12.9.86
+`ptxas -arch=sm_70` accepts both optimized modules, producing 2,920- and 3,176-byte cubins. The
+Release host build passes, three focused/adjacent units pass 3/3, and the complete NVVM prefix
+passes 362/362.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4801,24 +4834,25 @@ The following remain open until their named slice supplies evidence:
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
-  global parameter fields beyond selected integer/float32 scalars, flat selected-scalar parameter
-  blocks and constant buffers, selected-scalar read-only/read-write structured buffers,
+  global parameter fields beyond selected integer/float32 scalars and selected 32-bit numeric
+  vector resource elements, flat selected-scalar parameter blocks and constant buffers,
+  selected integer/float32 scalar and 32-bit numeric-vector structured buffers,
   read-only/read-write byte-address buffers, and storage-only sampler/unsized-sampler-array
   placeholders, and raw CUDA parameters beyond selected integer and float32 scalars, flat
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
-  signed-i32x2 device pointers, and selected-scalar raw read-only/read-write structured and
+  signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;
 - external/indirect calls, richer helper ABI, calling conventions and function attributes beyond
   no-inline, saturating or overflow-decorated arithmetic, float64/low-precision scalar families,
   and vector or matrix operations beyond bounded selected-integer/float32 construction,
   extraction, binary arithmetic, integer shifts/division/remainder/comparison, Boolean comparison
   results, float32 remainder, and same-lane integer conversion;
-- pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected numeric
-  device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a flat
-  by-value entry struct, plus direct scalar indexing of canonical structured/byte-address data
-  pointers, including other `IRGetElementPtr` shapes, pointer escape through helpers or SSA,
-  array values, mutable structs, general globals, additional shared-memory shapes, and address
-  spaces;
+- pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
+  numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
+  flat by-value entry struct, plus direct selected-element indexing of canonical
+  structured/byte-address data pointers and constant-lane structured-buffer vector swizzled stores,
+  including other `IRGetElementPtr` shapes, pointer escape through helpers or SSA, array values,
+  mutable structs, general globals, additional shared-memory shapes, and address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;

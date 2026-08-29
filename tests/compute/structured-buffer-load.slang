@@ -4,6 +4,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-wgpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-mtl -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST:SIMPLE(filecheck=CHECK_NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 // readBuffer.Load(0)=3, readBuffer[1]=5, readWriteBuffer.Load(2)=7, readWriteBuffer[3]=49 -> sum=64=0x40
 //TEST_INPUT:ubuffer(data=[3 5 0 0], stride=4):name=readBuffer
@@ -39,3 +41,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[2] = uint(a.x + b.y);
     //CHK-NEXT:37
 }
+
+// CHECK_NVVM: ld.global.nc.v4.u32
+// CHECK_NVVM: st.global.u32

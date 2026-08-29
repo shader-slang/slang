@@ -518,6 +518,89 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
     return true;
 }
 
+struct NVVMVectorSwizzledStore
+{
+    IRInst* destination = nullptr;
+    IRInst* source = nullptr;
+    IRVectorType* destinationType = nullptr;
+    IRType* elementType = nullptr;
+    uint32_t sourceElementCount = 0;
+    uint32_t destinationIndices[4] = {};
+};
+
+// Resolves the canonical constant-lane store to an accepted RWStructuredBuffer vector element.
+// Final IR owns the exact destination mapping, so emission can consume it without reconstructing
+// the source l-value swizzle.
+bool _getNVVMVectorSwizzledStore(IRInst* inst, NVVMVectorSwizzledStore& outStore)
+{
+    outStore = {};
+
+    auto swizzledStore = as<IRSwizzledStore>(inst);
+    if (!swizzledStore || swizzledStore->getOperandCount() < 3)
+        return false;
+
+    IRInst* destination = swizzledStore->getOperand(0);
+    IRInst* source = swizzledStore->getOperand(1);
+    auto destinationPointerType =
+        destination
+            ? asNVVMSupportedRWStructuredBufferElementPointerType(destination->getDataType())
+            : nullptr;
+    uint32_t destinationElementCount = 0;
+    auto destinationType = destinationPointerType ? asNVVMSupported32BitNumericVectorType(
+                                                        destinationPointerType->getValueType(),
+                                                        &destinationElementCount)
+                                                  : nullptr;
+    const uint32_t sourceElementCount = uint32_t(swizzledStore->getElementCount());
+    if (!destinationType || !source || sourceElementCount == 0 ||
+        sourceElementCount > destinationElementCount)
+    {
+        return false;
+    }
+
+    IRType* elementType = destinationType->getElementType();
+    if (sourceElementCount == 1)
+    {
+        if (!isTypeEqual(source->getDataType(), elementType))
+            return false;
+    }
+    else
+    {
+        uint32_t sourceVectorElementCount = 0;
+        auto sourceType =
+            asNVVMSupported32BitNumericVectorType(source->getDataType(), &sourceVectorElementCount);
+        if (!sourceType || sourceVectorElementCount != sourceElementCount ||
+            !isTypeEqual(sourceType->getElementType(), elementType))
+        {
+            return false;
+        }
+    }
+
+    uint32_t usedDestinationLanes = 0;
+    for (uint32_t sourceIndex = 0; sourceIndex < sourceElementCount; ++sourceIndex)
+    {
+        auto destinationIndex =
+            _asExecutableInteger32Constant(swizzledStore->getElementIndex(sourceIndex));
+        if (!destinationIndex || destinationIndex->getValue() < 0 ||
+            destinationIndex->getValue() >= destinationElementCount)
+        {
+            return false;
+        }
+        const uint32_t lane = uint32_t(destinationIndex->getValue());
+        const uint32_t laneMask = 1u << lane;
+        if (usedDestinationLanes & laneMask)
+            return false;
+        usedDestinationLanes |= laneMask;
+        outStore.destinationIndices[sourceIndex] = lane;
+    }
+
+    outStore.destination = destination;
+    outStore.source = source;
+    outStore.destinationType = destinationType;
+    outStore.elementType = elementType;
+    outStore.sourceElementCount = sourceElementCount;
+    return true;
+}
+
 struct ScopedNVVMModule
 {
     const NVVMIRBuilder* builder = nullptr;
@@ -1331,11 +1414,11 @@ SlangResult _validatePointerValue(
     if (!expectedPointeeType || !isTypeEqual(actualPointeeType, expectedPointeeType))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device pointer pointee type"));
     if (resourceElementPtrType && consumer->getOp() != kIROp_Load &&
-        consumer->getOp() != kIROp_Store)
+        consumer->getOp() != kIROp_Store && consumer->getOp() != kIROp_SwizzledStore)
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
-            toSlice("raw RWStructuredBuffer scalar load or store consumer"));
+            toSlice("raw RWStructuredBuffer numeric load or store consumer"));
     }
     if (fieldPtrType && (consumer->getOp() != kIROp_Load || requireWriteAccess))
     {
@@ -1730,6 +1813,18 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_SwizzledStore:
+                {
+                    NVVMVectorSwizzledStore store;
+                    if (!_getNVVMVectorSwizzledStore(inst, store))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("RWStructuredBuffer numeric vector swizzled store"));
+                    }
+                }
+                break;
+
             case kIROp_Add:
             case kIROp_Sub:
             case kIROp_Mul:
@@ -1889,11 +1984,12 @@ SlangResult _validateNVVMFunction(
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
-                        toSlice("raw RWStructuredBuffer scalar element pointer"));
+                        toSlice("raw RWStructuredBuffer numeric element pointer"));
                 }
                 break;
 
             case kIROp_StructuredBufferLoad:
+            case kIROp_RWStructuredBufferLoad:
                 {
                     NVVMRawBufferType bufferType;
                     if (inst->getOperandCount() != 2 ||
@@ -1906,7 +2002,7 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("raw StructuredBuffer scalar load"));
+                            toSlice("raw structured-buffer numeric load"));
                     }
                 }
                 break;
@@ -2007,6 +2103,27 @@ SlangResult _validateNVVMFunction(
                         codeGenContext,
                         store->getVal(),
                         store,
+                        availableValues,
+                        dominatorTree));
+                }
+                break;
+
+            case kIROp_SwizzledStore:
+                {
+                    NVVMVectorSwizzledStore store;
+                    SLANG_RELEASE_ASSERT(_getNVVMVectorSwizzledStore(inst, store));
+                    SLANG_RETURN_ON_FAIL(_validatePointerValue(
+                        codeGenContext,
+                        store.destination,
+                        inst,
+                        availableValues,
+                        dominatorTree,
+                        true,
+                        store.destinationType));
+                    SLANG_RETURN_ON_FAIL(_validateNumericValue(
+                        codeGenContext,
+                        store.source,
+                        inst,
                         availableValues,
                         dominatorTree));
                 }
@@ -2320,6 +2437,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_StructuredBufferLoad:
+            case kIROp_RWStructuredBufferLoad:
                 {
                     IRInst* buffer = inst->getOperand(0);
                     IRInst* elementIndex = inst->getOperand(1);
@@ -2327,12 +2445,14 @@ SlangResult _validateNVVMFunction(
                     if (!buffer ||
                         !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
                         bufferType.kind != NVVMRawBufferKind::Structured ||
-                        bufferType.access != NVVMBufferAccess::ReadOnly ||
+                        bufferType.access != (inst->getOp() == kIROp_StructuredBufferLoad
+                                                  ? NVVMBufferAccess::ReadOnly
+                                                  : NVVMBufferAccess::ReadWrite) ||
                         !isNVVMRawBufferElementType(bufferType, inst->getDataType()))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("raw StructuredBuffer scalar relation"));
+                            toSlice("raw structured-buffer numeric relation"));
                     }
                     SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                         codeGenContext,
@@ -2399,7 +2519,7 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("raw RWStructuredBuffer scalar relation"));
+                            toSlice("raw RWStructuredBuffer numeric relation"));
                     }
                     SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                         codeGenContext,
@@ -3249,6 +3369,86 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_SwizzledStore:
+                    {
+                        NVVMVectorSwizzledStore store;
+                        SLANG_RELEASE_ASSERT(_getNVVMVectorSwizzledStore(inst, store));
+                        SlangNVVMValueHandle loweredDestination = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            store.destination,
+                            valueMap,
+                            typeContext,
+                            loweredDestination));
+                        SlangNVVMValueHandle loweredSource = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            store.source,
+                            valueMap,
+                            typeContext,
+                            loweredSource));
+                        SlangNVVMTypeHandle loweredElementType = nullptr;
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            store.elementType,
+                            NVVMTypeUse::Value,
+                            loweredElementType));
+                        SlangNVVMTypeHandle loweredIndexType = nullptr;
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            cast<IRSwizzledStore>(inst)->getElementIndex(0)->getDataType(),
+                            NVVMTypeUse::Value,
+                            loweredIndexType));
+
+                        for (uint32_t sourceIndex = 0; sourceIndex < store.sourceElementCount;
+                             ++sourceIndex)
+                        {
+                            SlangNVVMValueHandle loweredSourceElement = loweredSource;
+                            if (store.sourceElementCount > 1)
+                            {
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "numeric vector swizzled-store extraction",
+                                    builder.emitVectorElementExtract(
+                                        moduleScope.module,
+                                        loweredSource,
+                                        sourceIndex,
+                                        loweredSourceElement)));
+                            }
+
+                            SlangNVVMValueHandle loweredByteOffset = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "numeric vector swizzled-store byte offset",
+                                builder.getIntegerConstant(
+                                    moduleScope.module,
+                                    loweredIndexType,
+                                    int64_t(store.destinationIndices[sourceIndex] * 4),
+                                    loweredByteOffset)));
+                            SlangNVVMValueHandle loweredElementPointer = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "numeric vector swizzled-store element pointer",
+                                builder.emitByteOffsetPointer(
+                                    moduleScope.module,
+                                    loweredDestination,
+                                    loweredByteOffset,
+                                    loweredElementType,
+                                    loweredElementPointer)));
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "numeric vector swizzled-store element",
+                                builder.emitStore(
+                                    moduleScope.module,
+                                    loweredSourceElement,
+                                    loweredElementPointer,
+                                    kNVVMScalar32Alignment)));
+                        }
+                    }
+                    break;
+
                 case kIROp_Add:
                 case kIROp_Sub:
                 case kIROp_Mul:
@@ -3687,6 +3887,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     break;
 
                 case kIROp_StructuredBufferLoad:
+                case kIROp_RWStructuredBufferLoad:
                     {
                         SlangNVVMValueHandle loweredBuffer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -3718,7 +3919,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredElementPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "raw StructuredBuffer scalar element pointer",
+                            "raw StructuredBuffer numeric element pointer",
                             builder.emitPointerOffset(
                                 moduleScope.module,
                                 loweredDataPointer,
@@ -3730,12 +3931,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "raw StructuredBuffer scalar load",
+                            "raw structured-buffer numeric load",
                             builder.emitLoad(
                                 moduleScope.module,
                                 loweredElementPointer,
                                 alignment,
-                                SLANG_NVVM_LOAD_FLAG_INVARIANT,
+                                inst->getOp() == kIROp_StructuredBufferLoad
+                                    ? SLANG_NVVM_LOAD_FLAG_INVARIANT
+                                    : SLANG_NVVM_LOAD_FLAG_NONE,
                                 loweredValue)));
                         valueMap[inst] = loweredValue;
                     }
@@ -3864,7 +4067,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredElementPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "raw RWStructuredBuffer scalar element pointer",
+                            "raw RWStructuredBuffer numeric element pointer",
                             builder.emitPointerOffset(
                                 moduleScope.module,
                                 loweredPointer,

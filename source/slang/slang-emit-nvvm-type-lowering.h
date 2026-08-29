@@ -106,7 +106,7 @@ enum class NVVMRawBufferKind
     ByteAddress,
 };
 
-/// Describes one exact raw CUDA buffer view and its physical scalar element.
+/// Describes one exact raw CUDA buffer view and its physical element.
 struct NVVMRawBufferType
 {
     IRType* canonicalType = nullptr;
@@ -118,7 +118,7 @@ struct NVVMRawBufferType
 /// Resolves an exact structured or byte-address raw CUDA buffer view.
 bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType);
 
-/// Returns whether `elementType` is the physical scalar selected by `bufferType`.
+/// Returns whether `elementType` is the physical element selected by `bufferType`.
 bool isNVVMRawBufferElementType(const NVVMRawBufferType& bufferType, IRType* elementType);
 
 /// Describes the exact pointer-to-unsized-array spelling produced for raw buffer data.
@@ -129,7 +129,7 @@ struct NVVMBufferDataPointerType
     IRType* elementType = nullptr;
 };
 
-/// Resolves an exact selected-scalar raw-buffer data pointer.
+/// Resolves an exact selected raw-buffer data pointer.
 bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerType& outType);
 
 /// Returns an accepted storage-only CUDA sampler placeholder.
@@ -146,7 +146,7 @@ IRParameterGroupType* asNVVMSupportedScalarParameterGroupType(
 /// Returns whether `type` is one field admitted in the conventional CUDA parameter block.
 bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type);
 
-/// Returns the canonical pointer produced by selected-scalar structured-buffer element addressing.
+/// Returns the canonical pointer produced by selected structured-buffer element addressing.
 IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type);
 
 /// Returns whether `type` has an accepted direct CUDA launch-parameter representation.
