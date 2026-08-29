@@ -193,13 +193,13 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType);
 }
 
-// Resolves one scalar field extraction by canonical struct key and verifies its result type.
+// Resolves one copyable field extraction by canonical struct key and verifies its result type.
 bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructField& outField)
 {
     outField = {};
-    auto structType = fieldExtract
-                          ? asNVVMSupportedScalarStructType(fieldExtract->getBase()->getDataType())
-                          : nullptr;
+    auto structType =
+        fieldExtract ? asNVVMSupportedCopyableStructType(fieldExtract->getBase()->getDataType())
+                     : nullptr;
     if (!structType || !_findNVVMStructField(
                            structType,
                            fieldExtract->getField(),
@@ -2429,7 +2429,7 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
     return as<IRVoidType>(type) || isNVVMSupportedValueType(type) ||
-           asNVVMSupportedScalarStructType(type);
+           asNVVMSupportedCopyableStructType(type);
 }
 
 // Returns whether one exact canonical type can cross a selected helper parameter boundary.
@@ -2437,7 +2437,8 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
 {
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return isNVVMSupportedValueType(type) || asNVVMSupportedLocalScalarStructPointerType(type) ||
+    return isNVVMSupportedValueType(type) || asNVVMSupportedCopyableStructType(type) ||
+           asNVVMSupportedLocalScalarStructPointerType(type) ||
            asNVVMSupportedLocalNumericPointerType(type) ||
            getNVVMSupportedSurfaceType(type, surfaceType) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
@@ -2470,9 +2471,11 @@ bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterT
         asNVVMSupportedLocalNumericPointerType(argumentType, &argumentNumericType);
     auto parameterNumericPointer =
         asNVVMSupportedLocalNumericPointerType(parameterType, &parameterNumericType);
+    const bool isMutableNumericParameter =
+        parameterNumericPointer && (parameterNumericPointer->getOp() == kIROp_OutParamType ||
+                                    parameterNumericPointer->getOp() == kIROp_BorrowInOutParamType);
     return argumentNumericPointer && argumentNumericPointer->getOp() == kIROp_PtrType &&
-           parameterNumericPointer && parameterNumericPointer->getOp() == kIROp_OutParamType &&
-           isTypeEqual(argumentNumericType, parameterNumericType);
+           isMutableNumericParameter && isTypeEqual(argumentNumericType, parameterNumericType);
 }
 
 // Returns whether a canonical helper signature needs the generic construction path.
@@ -3372,7 +3375,8 @@ SlangResult _validateNVVMFunction(
                         {
                             NVVMSurfaceType surfaceType;
                             NVVMReadOnlyTextureType sampledTextureType;
-                            if (getNVVMSupportedSurfaceType(argument->getDataType(), surfaceType) ||
+                            if (asNVVMSupportedCopyableStructType(argument->getDataType()) ||
+                                getNVVMSupportedSurfaceType(argument->getDataType(), surfaceType) ||
                                 getNVVMSupportedReadOnlyTextureType(
                                     argument->getDataType(),
                                     sampledTextureType) ||
@@ -3622,16 +3626,17 @@ SlangResult _validateNVVMFunction(
             case kIROp_FieldExtract:
                 {
                     auto fieldExtract = cast<IRFieldExtract>(inst);
-                    auto parameter = as<IRParam>(fieldExtract->getBase());
-                    if (!isEntryPoint || !parameter || parameter->getParent() != entryBlock)
+                    auto entryParameter = as<IRParam>(fieldExtract->getBase());
+                    if (isEntryPoint &&
+                        (!entryParameter || entryParameter->getParent() != entryBlock))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("scalar struct field base"));
+                            toSlice("copyable struct field base"));
                     }
                     SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                         codeGenContext,
-                        parameter,
+                        fieldExtract->getBase(),
                         inst,
                         availableValues,
                         dominatorTree));
@@ -3771,7 +3776,7 @@ SlangResult _validateNVVMFunction(
                         }
                         else
                         {
-                            if (asNVVMSupportedScalarStructType(function->getResultType()))
+                            if (asNVVMSupportedCopyableStructType(function->getResultType()))
                             {
                                 SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                                     codeGenContext,
@@ -4278,11 +4283,11 @@ SlangResult validateNVVMSupportedIR(
 
     for (auto function : functions)
     {
-        if (auto resultType = asNVVMSupportedScalarStructType(function->getResultType()))
+        if (auto resultType = asNVVMSupportedCopyableStructType(function->getResultType()))
             selectedReachableStructTypes.add(resultType);
         for (auto parameter : function->getParams())
         {
-            if (auto parameterType = asNVVMSupportedScalarStructType(parameter->getDataType()))
+            if (auto parameterType = asNVVMSupportedCopyableStructType(parameter->getDataType()))
                 selectedReachableStructTypes.add(parameterType);
             IRStructType* pointerValueType = nullptr;
             if (asNVVMSupportedLocalScalarStructPointerType(
@@ -5693,28 +5698,45 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredBase));
-                        SlangNVVMValueHandle loweredFieldPointer = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "by-value aggregate field pointer",
-                            builder.emitStructFieldPointer(
-                                moduleScope.module,
-                                loweredBase,
-                                resolvedField.fieldIndex,
-                                loweredFieldPointer)));
-                        const uint32_t alignment =
-                            getNVVMNumericValueAlignment(fieldExtract->getDataType());
-                        SLANG_RELEASE_ASSERT(alignment);
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "by-value aggregate field load",
-                            builder.emitLoad(
-                                moduleScope.module,
-                                loweredFieldPointer,
-                                alignment,
-                                SLANG_NVVM_LOAD_FLAG_INVARIANT,
-                                loweredValue)));
+                        // CUDA kernel structs are pointer-backed `byval` parameters. Helper structs
+                        // are ordinary first-class aggregate parameters, matching their canonical
+                        // value type and every aggregate load or call result.
+                        if (function == entryPoint)
+                        {
+                            SlangNVVMValueHandle loweredFieldPointer = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "by-value aggregate field pointer",
+                                builder.emitStructFieldPointer(
+                                    moduleScope.module,
+                                    loweredBase,
+                                    resolvedField.fieldIndex,
+                                    loweredFieldPointer)));
+                            const uint32_t alignment =
+                                getNVVMNumericValueAlignment(fieldExtract->getDataType());
+                            SLANG_RELEASE_ASSERT(alignment);
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "by-value aggregate field load",
+                                builder.emitLoad(
+                                    moduleScope.module,
+                                    loweredFieldPointer,
+                                    alignment,
+                                    SLANG_NVVM_LOAD_FLAG_INVARIANT,
+                                    loweredValue)));
+                        }
+                        else
+                        {
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "first-class aggregate field extraction",
+                                builder.emitAggregateElementExtract(
+                                    moduleScope.module,
+                                    loweredBase,
+                                    resolvedField.fieldIndex,
+                                    loweredValue)));
+                        }
                         valueMap[inst] = loweredValue;
                     }
                     break;

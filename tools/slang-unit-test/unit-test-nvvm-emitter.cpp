@@ -2743,6 +2743,79 @@ SLANG_UNIT_TEST(nvvmSlangStatefulAggregateHelpersUseGenericLocalPointers)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangCopyableValuesAndNumericBorrowsCrossHelperBoundaries)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMCopyableValueHelperSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool sawCopyableValueResult = false;
+        bool sawCopyableValueParameter = false;
+        bool sawMutableNumericParameter = false;
+        for (Index functionTypeIndex = 0;
+             functionTypeIndex < gFakeNVVMBuilder.functionTypeResultKinds.getCount();
+             ++functionTypeIndex)
+        {
+            sawCopyableValueResult |= gFakeNVVMBuilder.functionTypeResultKinds[functionTypeIndex] ==
+                                      FakeNVVMBuilderResultTypeKind::ScalarStruct;
+            const Index parameterOffset =
+                gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionTypeIndex];
+            const size_t parameterCount =
+                gFakeNVVMBuilder.functionTypeParameterCounts[functionTypeIndex];
+            for (size_t parameterIndex = 0; parameterIndex < parameterCount; ++parameterIndex)
+            {
+                const FakeNVVMBuilderParameterTypeKind parameterKind =
+                    gFakeNVVMBuilder
+                        .functionParameterTypeKinds[parameterOffset + Index(parameterIndex)];
+                sawCopyableValueParameter |=
+                    parameterKind == FakeNVVMBuilderParameterTypeKind::ScalarStruct;
+                sawMutableNumericParameter |=
+                    parameterKind == FakeNVVMBuilderParameterTypeKind::Pointer;
+            }
+        }
+        SLANG_CHECK(sawCopyableValueResult);
+        SLANG_CHECK(sawCopyableValueParameter);
+        SLANG_CHECK(sawMutableNumericParameter);
+
+        bool passedNumericLocalStorage = false;
+        for (const FakeNVVMBuilderValueRef argument : gFakeNVVMBuilder.callArgumentValueRefs)
+        {
+            passedNumericLocalStorage |=
+                argument.kind == FakeNVVMBuilderValueKind::LocalStorage && argument.index >= 0 &&
+                argument.index < gFakeNVVMBuilder.localStorageValueTypes.getCount() &&
+                gFakeNVVMBuilder.localStorageValueTypes[argument.index] ==
+                    _getFakeNVVMBuilderIntegerType();
+        }
+        SLANG_CHECK(passedNumericLocalStorage);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount >= 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangCopyableStructLocalStoresToStructuredBuffer)
 {
     _resetDirectNVVMFakes();
@@ -5474,6 +5547,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedSharedFloatArraySource, "'device i32 array element pointer'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
+        {kDirectNVVMUnsupportedNestedStructHelperSource, "'helper function parameter'"},
         {kDirectNVVMNonCanonicalCUDAOffsetSource, "'CUDA layout query'"},
         {kDirectNVVMUnsupportedFixedSamplerArrayStorageSource,
          "'conventional global parameter field address'"},

@@ -1,5 +1,11 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+// NVVM: .visible .entry computeMain()
+// NVVM: ld.global.u32
+// NVVM: st.global.u32
 
 // CHECK:      2
 // CHECK-NEXT: 1

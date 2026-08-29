@@ -5343,6 +5343,37 @@ Broad filename-prefix runs also select automatically synthesized WebGPU lanes on
 Those unrelated lanes fail before dispatch because Dawn rejects an empty bind-group-layout entry;
 the exact new CUDA/PTX lanes isolate and pass the direct backend contract.
 
+### Slice 108: Copyable-value helper ABI
+
+Flat nonempty structs whose fields are selected numeric scalars or vectors now use the backend's
+existing first-class aggregate representation in helper parameters and results. This is the same
+`asNVVMSupportedCopyableStructType` family already used by checked local and structured-buffer
+loads/stores; the helper ABI does not introduce a narrower duplicate classifier or another builder
+operation. Nested, empty, array, matrix, and resource-bearing aggregates remain rejected during
+call-graph preflight.
+
+The canonical IR has two intentional physical parameter representations. An ordinary helper
+parameter is an LLVM aggregate value, so `IRFieldExtract` maps to the existing descriptor-free
+aggregate-element extraction operation. A CUDA entry-point aggregate parameter carries LLVM
+`byval` and is therefore a generic pointer; its field extraction retains the established typed
+field pointer plus invariant load. The emitter chooses between those shapes from the function that
+produced the parameter rather than guessing from an opaque provider handle or spilling a helper
+value.
+
+Mutable numeric `BorrowInOutParam` joins `OutParam` in the existing local numeric pointer family.
+A canonical local `Ptr` argument may satisfy either ownership spelling when the selected pointee
+type is exactly equal; all three lower to one typed generic pointer. The fake provider now validates
+generic call pointers by pointee type and models numeric local storage and first-class aggregate
+parameter/extraction values, removing its former struct-pointer-only call assumption.
+
+`structured-buffer-of-struct.slang`, `typedef-member.slang`, and
+`mutating-and-inout.slang` now pass optimized direct runtime and PTX checks. Their PTX modules are
+720, 674, and 685 bytes, and CUDA 12.9.86 `ptxas -arch=sm_70` emits 2,792-byte cubins for each. The
+focused fake-provider test composes a struct with an Int32 and Float32x4 field, a by-value
+struct-returning helper, first-class field extraction, and numeric `inout`. Array and
+resource-bearing helper fixtures still diagnose `helper function parameter` before provider
+discovery.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5361,9 +5392,10 @@ The following remain open until their named slice supplies evidence:
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;
-- external/indirect calls, helper pointer/aggregate ABI beyond exact selected-scalar-struct local
-  pointers and `BorrowInOutParam` parameters plus selected numeric local pointers and exact
-  `OutParam` parameters, calling conventions and function
+- external/indirect calls, helper pointer/aggregate ABI beyond flat first-level numeric-field
+  structs passed and returned by value, exact selected-scalar-struct local pointers and
+  `BorrowInOutParam` parameters, plus selected numeric local pointers and exact `OutParam` or
+  `BorrowInOutParam` parameters, calling conventions and function
   attributes beyond no-inline, saturating or overflow-decorated arithmetic, Float64/BFloat16/FP8
   scalar families, Float16 storage and unoptimized vector execution,
   and vector or matrix operations beyond bounded selected-numeric construction, constant-indexed
@@ -5380,7 +5412,8 @@ The following remain open until their named slice supplies evidence:
   selected-scalar-struct and numeric-output helper subsets or through SSA, nested or dynamically
   indexed aggregate values, mutable aggregate families beyond layout-compatible first-level
   numeric-field structs,
-  aggregate layouts requiring padding, general globals, additional shared-memory shapes, and
+  first-class aggregate field reads beyond flat copyable helper values, aggregate layouts requiring
+  padding, general globals, additional shared-memory shapes, and
   address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text

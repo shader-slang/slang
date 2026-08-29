@@ -257,7 +257,8 @@ IRPtrTypeBase* asNVVMSupportedLocalNumericPointerType(IRInst* type, IRType** out
     auto pointerType = as<IRPtrTypeBase>(type);
     IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
     if (!pointerType || !isNVVMSupportedNumericValueType(valueType) ||
-        (pointerType->getOp() != kIROp_PtrType && pointerType->getOp() != kIROp_OutParamType) ||
+        (pointerType->getOp() != kIROp_PtrType && pointerType->getOp() != kIROp_OutParamType &&
+         pointerType->getOp() != kIROp_BorrowInOutParamType) ||
         pointerType->getOperandCount() != 1 ||
         pointerType->getAddressSpace() != AddressSpace::Generic)
     {
@@ -1138,13 +1139,13 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isLegal =
         (use == NVVMTypeUse::EntryPointResult && isVoid) ||
         (use == NVVMTypeUse::HelperResult &&
-         (isVoid || isNVVMSupportedValueType(type) || scalarStructType)) ||
+         (isVoid || isNVVMSupportedValueType(type) || copyableStructType)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
-         (isNVVMSupportedValueType(type) || localScalarStructPointer || localNumericPointer ||
-          isSurface || isSampledTexture || samplerValue)) ||
+         (isNVVMSupportedValueType(type) || copyableStructType || localScalarStructPointer ||
+          localNumericPointer || isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
           fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
