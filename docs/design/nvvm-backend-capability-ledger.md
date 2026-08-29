@@ -1769,3 +1769,19 @@ PTX/FileCheck coverage. Its 645-byte PTX stores `3` and assembles with CUDA 12.9
 `ptxas -arch=sm_70` to a 2,792-byte cubin. Release builds pass and the complete NVVM prefix remains
 397/397. Five neighboring harness probes retain independent resource-field, helper-aggregate, and
 array-construction boundaries rather than being registered from misleading unbound compiles.
+
+Slice 129 replaces parameter-group-only array/struct admission with one recursive, cycle-safe
+aggregate-storage algebra. Established numeric leaves and raw-buffer views compose natural-stride
+fixed arrays and keyed structs; the existing compact 12-byte Float3 array remains an exact physical
+case. Provider size/alignment and CUDA size/alignment must agree, every struct offset is checked,
+and explicit non-numeric padding remains rejected before builder discovery.
+
+The builder ABI remains revision 24. Resource arrays and resource-bearing parameter groups use only
+the existing generic LLVM array, struct, pointer, load, field/element address, and aggregate-extract
+operations. Focused fake coverage observes that exact topology, while fixed sampler arrays and
+nested immutable struct-address chains remain pre-provider E52017 neighbors.
+
+`array-existential-parameter.slang`, `loop-unroll.slang`, and `parameter-block.slang` pass all six
+new direct runtime/PTX lanes. Their 863-, 960-, and 793-byte PTX modules assemble with CUDA 12.9.86
+`ptxas -arch=sm_70` to 2,920-, 2,792-, and 2,920-byte cubins. Release host/provider builds pass and
+the complete NVVM prefix passes 398/398.

@@ -219,7 +219,8 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
                getNVVMSupportedSurfaceField(outAddress.field, surfaceType, storageFormat) ||
                getNVVMSupportedReadOnlyTextureType(fieldType, sampledTextureType) ||
                asNVVMSupportedSamplerValueType(fieldType) ||
-               getNVVMSupportedRawBufferType(fieldType, rawBufferType);
+               getNVVMSupportedRawBufferType(fieldType, rawBufferType) ||
+               asNVVMSupportedAggregateStorageArrayType(fieldType);
     }
 
     if (outAddress.isMutable)
@@ -227,9 +228,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         return getNVVMResourceValueAlignment(fieldType) != 0;
     }
 
-    return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
-           asNVVMSupported32BitNumericVectorType(fieldType) ||
-           asNVVMSupportedParameterGroupArrayType(fieldType);
+    return isNVVMSupportedAggregateStorageType(fieldType);
 }
 
 // Resolves one resource-capable field extraction by canonical struct key and exact result type.
@@ -524,16 +523,16 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         const bool hasParameterGroupBase =
             asNVVMSupportedParameterGroupType(base->getDataType(), &parameterGroupElementType);
         arrayType = hasParameterGroupBase
-                        ? asNVVMSupportedParameterGroupArrayType(parameterGroupElementType)
+                        ? asNVVMSupportedAggregateStorageArrayType(parameterGroupElementType)
                         : nullptr;
         if (!arrayType && base->getOp() == kIROp_FieldAddress)
         {
             NVVMStructField fieldAddress;
             if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress) &&
-                !fieldAddress.isConventionalGlobal && !fieldAddress.isMutable)
+                !fieldAddress.isMutable)
             {
                 arrayType =
-                    asNVVMSupportedParameterGroupArrayType(fieldAddress.field->getFieldType());
+                    asNVVMSupportedAggregateStorageArrayType(fieldAddress.field->getFieldType());
                 baseType = as<IRPtrTypeBase>(base->getDataType());
             }
         }
@@ -593,8 +592,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     if (!aggregateType || !resultType || resultType->getOp() != kIROp_PtrType ||
         !hasCanonicalLocalLayout || resultType->getAddressSpace() != expectedAddressSpace ||
         resultType->getAccessQualifier() != expectedAccess ||
-        (!isNVVMSupportedNumericValueType(resultType->getValueType()) &&
-         !asNVVMSupportedCopyableStructType(resultType->getValueType())) ||
+        !getNVVMResourceValueAlignment(resultType->getValueType()) ||
         !isTypeEqual(expectedElementType, resultType->getValueType()) ||
         !isNVVMInteger32Type(index->getDataType()))
     {
@@ -633,7 +631,7 @@ IRVectorType* _getNVVMCompactParameterGroupVectorPointer(IRInst* value)
     NVVMSequentialElementPointer elementPointer;
     if (!_getNVVMSequentialElementPointer(value, elementPointer) || !elementPointer.isImmutable ||
         asNVVMSupportedNumericArrayType(elementPointer.aggregateType) ||
-        !asNVVMSupportedParameterGroupArrayType(elementPointer.aggregateType))
+        !asNVVMSupportedAggregateStorageArrayType(elementPointer.aggregateType))
     {
         return nullptr;
     }
@@ -724,10 +722,11 @@ IRIntegerValue _alignNVVMStorageSize(IRIntegerValue size, IRIntegerValue alignme
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
-// Computes the provider layout selected for one parameter-group storage type. Three-lane 32-bit
-// vectors are scalar arrays; every other leaf keeps its ordinary LLVM representation. Struct
-// offsets are checked against CUDA while walking the canonical direct-field declaration.
-bool _getNVVMParameterGroupStorageLayout(
+// Computes the provider layout selected for one aggregate-storage type. Three-lane 32-bit vectors
+// are scalar arrays, raw-buffer views are pointer/count pairs, and every other leaf keeps its
+// ordinary LLVM representation. Struct offsets are checked against CUDA while walking the
+// canonical direct-field declaration.
+bool _getNVVMAggregateStorageLayout(
     CodeGenContext* codeGenContext,
     IRType* type,
     IRSizeAndAlignment& outLayout)
@@ -743,23 +742,33 @@ bool _getNVVMParameterGroupStorageLayout(
         return true;
     }
 
-    if (auto arrayType = asNVVMSupportedParameterGroupArrayType(type))
+    if (auto arrayType = asNVVMSupportedAggregateStorageArrayType(type))
     {
-        if (!asNVVMSupportedNumericArrayType(arrayType))
+        if (asNVVMSupportedCompactParameterGroupVectorType(arrayType->getElementType()))
         {
             auto elementCount = cast<IRIntLit>(arrayType->getElementCount())->getValue();
             outLayout.size = elementCount * 12;
             outLayout.alignment = 4;
             return true;
         }
-        return SLANG_SUCCEEDED(getSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            IRTypeLayoutRules::getLLVM(),
-            type,
-            &outLayout));
+
+        IRSizeAndAlignment elementLayout;
+        if (!_getNVVMAggregateStorageLayout(
+                codeGenContext,
+                arrayType->getElementType(),
+                elementLayout) ||
+            elementLayout.size <= 0 || elementLayout.alignment <= 0)
+        {
+            return false;
+        }
+        const auto elementCount = cast<IRIntLit>(arrayType->getElementCount())->getValue();
+        outLayout.size =
+            elementCount * _alignNVVMStorageSize(elementLayout.size, elementLayout.alignment);
+        outLayout.alignment = elementLayout.alignment;
+        return true;
     }
 
-    if (auto structType = asNVVMSupportedParameterGroupStructType(type))
+    if (auto structType = asNVVMSupportedAggregateStorageStructType(type))
     {
         IRIntegerValue size = 0;
         int alignment = 1;
@@ -767,7 +776,7 @@ bool _getNVVMParameterGroupStorageLayout(
         {
             IRSizeAndAlignment fieldLayout;
             IRIntegerValue cudaOffset = 0;
-            if (!_getNVVMParameterGroupStorageLayout(
+            if (!_getNVVMAggregateStorageLayout(
                     codeGenContext,
                     field->getFieldType(),
                     fieldLayout) ||
@@ -791,6 +800,14 @@ bool _getNVVMParameterGroupStorageLayout(
         return true;
     }
 
+    NVVMRawBufferType rawBufferType;
+    if (getNVVMSupportedRawBufferType(type, rawBufferType))
+    {
+        outLayout.size = 16;
+        outLayout.alignment = 8;
+        return true;
+    }
+
     if (!isNVVMSupportedIntegerScalarType(type) && !isNVVMFloat32Type(type) &&
         !asNVVMSupported32BitNumericVectorType(type))
     {
@@ -803,11 +820,11 @@ bool _getNVVMParameterGroupStorageLayout(
         &outLayout));
 }
 
-bool _hasNVVMCompatibleParameterGroupStorageLayout(CodeGenContext* codeGenContext, IRType* type)
+bool _hasNVVMCompatibleAggregateStorageLayout(CodeGenContext* codeGenContext, IRType* type)
 {
     IRSizeAndAlignment providerLayout;
     IRSizeAndAlignment cudaLayout;
-    return _getNVVMParameterGroupStorageLayout(codeGenContext, type, providerLayout) &&
+    return _getNVVMAggregateStorageLayout(codeGenContext, type, providerLayout) &&
            SLANG_SUCCEEDED(getSizeAndAlignment(
                codeGenContext->getTargetReq(),
                IRTypeLayoutRules::getCUDA(),
@@ -817,9 +834,10 @@ bool _hasNVVMCompatibleParameterGroupStorageLayout(CodeGenContext* codeGenContex
            providerLayout.alignment == cudaLayout.alignment;
 }
 
-// Retains the canonical declaration closure of a selected struct. Nested aggregate fields are
-// semantic type dependencies of their parent even when no independent local or signature mentions
-// them, so validation must accept the complete tree that type lowering will visit.
+// Retains the canonical declaration closure of a selected struct. Nested aggregate fields and
+// fixed-array elements are semantic type dependencies of their parent even when no independent
+// local or signature mentions them, so validation must accept the complete tree that type
+// lowering will visit.
 void _addNVVMReachableStructTypes(IRStructType* type, HashSet<IRInst*>& reachableTypes)
 {
     if (!type || reachableTypes.contains(type))
@@ -827,8 +845,18 @@ void _addNVVMReachableStructTypes(IRStructType* type, HashSet<IRInst*>& reachabl
     reachableTypes.add(type);
     for (auto field : type->getFields())
     {
-        if (auto nestedType = asNVVMSupportedResourceStructType(field->getFieldType()))
+        IRType* fieldType = field->getFieldType();
+        auto nestedType = asNVVMSupportedResourceStructType(fieldType);
+        if (!nestedType)
+            nestedType = asNVVMSupportedAggregateStorageStructType(fieldType);
+        if (nestedType)
             _addNVVMReachableStructTypes(nestedType, reachableTypes);
+        if (auto arrayType = asNVVMSupportedAggregateStorageArrayType(fieldType))
+        {
+            auto elementStruct = as<IRStructType>(arrayType->getElementType());
+            if (elementStruct)
+                _addNVVMReachableStructTypes(elementStruct, reachableTypes);
+        }
     }
 }
 
@@ -5027,11 +5055,23 @@ SlangResult validateNVVMSupportedIR(
     {
         for (auto field : conventionalGlobalParams.elementType->getFields())
         {
+            IRType* fieldType = field->getFieldType();
+            if (auto storageArray = asNVVMSupportedAggregateStorageArrayType(fieldType))
+            {
+                if (!_hasNVVMCompatibleAggregateStorageLayout(codeGenContext, storageArray))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("aggregate storage layout"));
+                }
+                if (auto elementStruct = as<IRStructType>(storageArray->getElementType()))
+                {
+                    _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
+                }
+            }
             IRType* parameterGroupElementType = nullptr;
-            if (asNVVMSupportedParameterGroupType(
-                    field->getFieldType(),
-                    &parameterGroupElementType) &&
-                !_hasNVVMCompatibleParameterGroupStorageLayout(
+            if (asNVVMSupportedParameterGroupType(fieldType, &parameterGroupElementType) &&
+                !_hasNVVMCompatibleAggregateStorageLayout(
                     codeGenContext,
                     parameterGroupElementType))
             {
@@ -5039,8 +5079,11 @@ SlangResult validateNVVMSupportedIR(
                     codeGenContext,
                     toSlice("parameter-group storage layout"));
             }
-            IRStructType* elementStruct =
-                _getNVVMRawBufferAggregateElementType(field->getFieldType());
+            if (auto parameterGroupStruct = as<IRStructType>(parameterGroupElementType))
+            {
+                _addNVVMReachableStructTypes(parameterGroupStruct, selectedReachableStructTypes);
+            }
+            IRStructType* elementStruct = _getNVVMRawBufferAggregateElementType(fieldType);
             if (elementStruct)
             {
                 if (!_hasNVVMCompatibleStructLayout(codeGenContext, elementStruct))
@@ -5160,8 +5203,11 @@ SlangResult validateNVVMSupportedIR(
             _requireValueOperation(outRequirements.valueOperations, desc, semantic->diagnosticName);
             continue;
         }
-        if (as<IRDecoration>(globalInst) || as<IRConstant>(globalInst) ||
-            as<IRStructKey>(globalInst) || getIROpInfo(globalInst->getOp()).isHoistable())
+        // Hashed string literals are module reflection metadata. Like the C-family emitters, direct
+        // NVVM preserves them in the linked module but emits no executable or storage declaration.
+        if (as<IRGlobalHashedStringLiterals>(globalInst) || as<IRDecoration>(globalInst) ||
+            as<IRConstant>(globalInst) || as<IRStructKey>(globalInst) ||
+            getIROpInfo(globalInst->getOp()).isHoistable())
         {
             continue;
         }

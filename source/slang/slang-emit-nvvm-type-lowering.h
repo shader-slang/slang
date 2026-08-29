@@ -77,13 +77,16 @@ IRStructType* asNVVMSupportedPhysicalArrayStructType(IRInst* type);
 /// Returns an exact compact three-lane 32-bit numeric parameter-group storage vector.
 IRVectorType* asNVVMSupportedCompactParameterGroupVectorType(IRInst* type);
 
-/// Returns a selected parameter-group array, including an exact compact vector stride.
-IRArrayType* asNVVMSupportedParameterGroupArrayType(
+/// Returns a fixed aggregate-storage array with the exact provider representation.
+IRArrayType* asNVVMSupportedAggregateStorageArrayType(
     IRInst* type,
     uint32_t* outElementCount = nullptr);
 
-/// Returns a selected direct-field parameter-group struct or canonical physical array wrapper.
-IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type);
+/// Returns a recursively selected aggregate-storage struct or physical array wrapper.
+IRStructType* asNVVMSupportedAggregateStorageStructType(IRInst* type);
+
+/// Returns whether a type is in the recursive aggregate-storage algebra.
+bool isNVVMSupportedAggregateStorageType(IRInst* type);
 
 /// Returns an exact nonempty struct whose leaves are selected numeric values.
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type);
@@ -326,7 +329,7 @@ private:
     const NVVMIRBuilder& m_builder;
     SlangNVVMModuleHandle m_module = nullptr;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_typeMap;
-    Dictionary<IRType*, SlangNVVMTypeHandle> m_parameterGroupStorageTypeMap;
+    Dictionary<IRType*, SlangNVVMTypeHandle> m_aggregateStorageTypeMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_entryParameterRepresentationMap;
     Dictionary<PointerTypeKey, SlangNVVMTypeHandle> m_pointerRepresentationMap;
 };

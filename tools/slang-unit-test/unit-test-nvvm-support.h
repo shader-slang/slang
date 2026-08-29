@@ -2656,6 +2656,16 @@ static bool _getFakeNVVMBuilderResourceViewElementTypeKind(
 
     const FakeNVVMBuilderValueRef& pointerRef =
         gFakeNVVMBuilder.loadPointerValueRefs[valueRef.index];
+    if (pointerRef.kind == FakeNVVMBuilderValueKind::SequentialElementPointer &&
+        pointerRef.index >= 0 &&
+        pointerRef.index < gFakeNVVMBuilder.sequentialElementPointerTypeKinds.getCount() &&
+        gFakeNVVMBuilder.sequentialElementPointerTypeKinds[pointerRef.index] ==
+            FakeNVVMBuilderScalarTypeKind::ResourceView)
+    {
+        return _getFakeNVVMBuilderResourceViewElementTypeKind(
+            gFakeNVVMBuilder.arrayElementType,
+            outElementTypeKind);
+    }
     if (pointerRef.kind != FakeNVVMBuilderValueKind::StructFieldPointer || pointerRef.index < 0 ||
         pointerRef.index >= gFakeNVVMBuilder.structFieldPointerIndices.getCount())
     {
@@ -2922,6 +2932,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetStructType(
         else if (
             fieldTypes[i] != _getFakeNVVMBuilderIntegerType() &&
             fieldTypes[i] != _getFakeNVVMBuilderFloatType() &&
+            fieldTypes[i] != _getFakeNVVMBuilderArrayType() &&
             fieldTypes[i] != _getFakeNVVMBuilderArrayPointerType() &&
             fieldTypes[i] != _getFakeNVVMBuilderScalarStructPointerType())
         {
@@ -3375,7 +3386,6 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetArrayType(
     if (module != _getFakeNVVMBuilderModule() ||
         !_getFakeNVVMBuilderTypeKind(elementType, elementTypeKind) ||
         elementTypeKind == FakeNVVMBuilderScalarTypeKind::NumericArray ||
-        elementTypeKind == FakeNVVMBuilderScalarTypeKind::ResourceView ||
         elementTypeKind == FakeNVVMBuilderScalarTypeKind::ScalarStructPointer ||
         elementCount == 0 || !outType)
     {
@@ -8562,6 +8572,17 @@ void computeMain()
     value.sampler = sampler;
     value.base = -0.5;
     destination[0] = sampleResource(value).x;
+}
+)";
+
+static const char kDirectNVVMResourceArrayStorageSource[] = R"(
+RWStructuredBuffer<int> sources[2];
+RWStructuredBuffer<int> destination;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    destination[0] = sources[1][0];
 }
 )";
 

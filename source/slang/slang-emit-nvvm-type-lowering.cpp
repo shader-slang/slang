@@ -281,7 +281,12 @@ IRVectorType* asNVVMSupportedCompactParameterGroupVectorType(IRInst* type)
     return elementCount == 3 ? vectorType : nullptr;
 }
 
-IRArrayType* asNVVMSupportedParameterGroupArrayType(IRInst* type, uint32_t* outElementCount)
+static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>& activeTypes);
+
+static IRArrayType* _asNVVMSupportedAggregateStorageArrayType(
+    IRInst* type,
+    uint32_t* outElementCount,
+    HashSet<IRInst*>& activeTypes)
 {
     if (outElementCount)
         *outElementCount = 0;
@@ -291,12 +296,30 @@ IRArrayType* asNVVMSupportedParameterGroupArrayType(IRInst* type, uint32_t* outE
     auto arrayType = as<IRArrayType>(type);
     auto elementCount = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
     auto stride = arrayType ? as<IRIntLit>(arrayType->getArrayStride()) : nullptr;
-    if (!arrayType ||
-        !asNVVMSupportedCompactParameterGroupVectorType(arrayType->getElementType()) ||
-        !elementCount || elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX ||
-        !stride || stride->getValue() != 12)
+    if (!arrayType || arrayType->getOp() != kIROp_ArrayType || !elementCount ||
+        elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX)
     {
         return nullptr;
+    }
+
+    if (asNVVMSupportedCompactParameterGroupVectorType(arrayType->getElementType()))
+    {
+        if (!stride || stride->getValue() != 12)
+            return nullptr;
+    }
+    else
+    {
+        // Generic LLVM arrays select their natural element stride. An explicit non-numeric stride
+        // would require a padded physical element type, which this storage algebra does not invent.
+        if (arrayType->getOperandCount() != 2 || activeTypes.contains(arrayType))
+            return nullptr;
+        activeTypes.add(arrayType);
+        if (!_isNVVMSupportedAggregateStorageType(arrayType->getElementType(), activeTypes))
+        {
+            activeTypes.remove(arrayType);
+            return nullptr;
+        }
+        activeTypes.remove(arrayType);
     }
 
     if (outElementCount)
@@ -304,36 +327,83 @@ IRArrayType* asNVVMSupportedParameterGroupArrayType(IRInst* type, uint32_t* outE
     return arrayType;
 }
 
-IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type)
+IRArrayType* asNVVMSupportedAggregateStorageArrayType(IRInst* type, uint32_t* outElementCount)
 {
+    HashSet<IRInst*> activeTypes;
+    return _asNVVMSupportedAggregateStorageArrayType(type, outElementCount, activeTypes);
+}
+
+static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>& activeTypes)
+{
+    if (isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+        asNVVMSupported32BitNumericVectorType(type))
+    {
+        return true;
+    }
+
+    NVVMRawBufferType rawBufferType;
+    if (getNVVMSupportedRawBufferType(type, rawBufferType))
+        return true;
+
+    if (activeTypes.contains(type))
+        return false;
+
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        uint32_t elementCount = 0;
+        auto supportedArray =
+            _asNVVMSupportedAggregateStorageArrayType(arrayType, &elementCount, activeTypes);
+        return supportedArray && elementCount;
+    }
+
     auto structType = as<IRStructType>(type);
     if (!structType)
-        return nullptr;
+        return false;
 
+    activeTypes.add(type);
     if (structType->findDecoration<IRPhysicalTypeDecoration>())
     {
         IRStructField* onlyField = nullptr;
         for (auto field : structType->getFields())
         {
-            if (onlyField || !asNVVMSupportedParameterGroupArrayType(field->getFieldType()))
-                return nullptr;
+            if (onlyField || !_asNVVMSupportedAggregateStorageArrayType(
+                                 field->getFieldType(),
+                                 nullptr,
+                                 activeTypes))
+            {
+                activeTypes.remove(type);
+                return false;
+            }
             onlyField = field;
         }
-        return onlyField ? structType : nullptr;
+        activeTypes.remove(type);
+        return onlyField != nullptr;
     }
 
     bool hasField = false;
     for (auto field : structType->getFields())
     {
-        IRType* fieldType = field->getFieldType();
-        if (!isNVVMSupportedIntegerScalarType(fieldType) && !isNVVMFloat32Type(fieldType) &&
-            !asNVVMSupported32BitNumericVectorType(fieldType))
+        if (!_isNVVMSupportedAggregateStorageType(field->getFieldType(), activeTypes))
         {
-            return nullptr;
+            activeTypes.remove(type);
+            return false;
         }
         hasField = true;
     }
-    return hasField ? structType : nullptr;
+    activeTypes.remove(type);
+    return hasField;
+}
+
+bool isNVVMSupportedAggregateStorageType(IRInst* type)
+{
+    HashSet<IRInst*> activeTypes;
+    return _isNVVMSupportedAggregateStorageType(type, activeTypes);
+}
+
+IRStructType* asNVVMSupportedAggregateStorageStructType(IRInst* type)
+{
+    auto structType = as<IRStructType>(type);
+    return structType && isNVVMSupportedAggregateStorageType(type) ? structType : nullptr;
 }
 
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type)
@@ -1107,8 +1177,8 @@ IRParameterGroupType* asNVVMSupportedParameterGroupType(IRInst* type, IRType** o
     }
 
     IRType* elementType = parameterGroupType->getElementType();
-    if (!asNVVMSupportedParameterGroupStructType(elementType) &&
-        !asNVVMSupportedNumericArrayType(elementType))
+    if (!asNVVMSupportedAggregateStorageStructType(elementType) &&
+        !asNVVMSupportedAggregateStorageArrayType(elementType))
         return nullptr;
 
     if (outElementType)
@@ -1129,7 +1199,8 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
            getNVVMSupportedSurfaceField(field, surfaceType, storageFormat) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
            asNVVMSupportedSamplerStorageType(type) ||
-           asNVVMSupportedUnsizedSamplerArrayStorageType(type);
+           asNVVMSupportedUnsizedSamplerArrayStorageType(type) ||
+           asNVVMSupportedAggregateStorageArrayType(type);
 }
 
 IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
@@ -1192,7 +1263,7 @@ SlangResult NVVMTypeLoweringContext::_reportUnsupportedType(NVVMTypeUse use) con
         break;
     case NVVMTypeUse::Storage:
     case NVVMTypeUse::ParameterGroupStorage:
-        construct = "conventional global storage field type";
+        construct = "aggregate storage type";
         break;
     }
     m_codeGenContext->getSink()->diagnose(
@@ -1206,8 +1277,9 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
-    auto& typeMap =
-        use == NVVMTypeUse::ParameterGroupStorage ? m_parameterGroupStorageTypeMap : m_typeMap;
+    const bool isAggregateStorage =
+        use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
+    auto& typeMap = isAggregateStorage ? m_aggregateStorageTypeMap : m_typeMap;
     if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
@@ -1215,18 +1287,19 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     }
 
     uint32_t elementCount = 0;
-    IRArrayType* supportedType = use == NVVMTypeUse::ParameterGroupStorage
-                                     ? asNVVMSupportedParameterGroupArrayType(type, &elementCount)
-                                     : asNVVMSupportedCopyableArrayType(type, &elementCount);
+    IRArrayType* supportedType =
+        use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage
+            ? asNVVMSupportedAggregateStorageArrayType(type, &elementCount)
+            : asNVVMSupportedCopyableArrayType(type, &elementCount);
     SLANG_RELEASE_ASSERT(supportedType);
     SlangNVVMTypeHandle elementType = nullptr;
-    const NVVMTypeUse elementUse =
-        use == NVVMTypeUse::ParameterGroupStorage && !asNVVMSupportedNumericArrayType(type)
-            ? NVVMTypeUse::ParameterGroupStorage
-            : NVVMTypeUse::Value;
+    const NVVMTypeUse elementUse = use == NVVMTypeUse::ParameterGroupStorage
+                                       ? NVVMTypeUse::ParameterGroupStorage
+                                   : use == NVVMTypeUse::Storage ? NVVMTypeUse::Storage
+                                                                 : NVVMTypeUse::Value;
     SLANG_RETURN_ON_FAIL(lowerType(type->getElementType(), elementUse, elementType));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        "fixed copyable array type",
+        isAggregateStorage ? "fixed aggregate storage array type" : "fixed copyable array type",
         m_builder.getArrayType(m_module, elementType, elementCount, outType)));
     typeMap[type] = outType;
     return SLANG_OK;
@@ -1238,8 +1311,9 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
     SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
-    auto& typeMap =
-        use == NVVMTypeUse::ParameterGroupStorage ? m_parameterGroupStorageTypeMap : m_typeMap;
+    const bool isAggregateStorage =
+        use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
+    auto& typeMap = isAggregateStorage ? m_aggregateStorageTypeMap : m_typeMap;
     if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
@@ -1443,10 +1517,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
     IRArrayType* fixedCopyableArrayType = asNVVMSupportedCopyableArrayType(type);
-    IRArrayType* parameterGroupArrayType = asNVVMSupportedParameterGroupArrayType(type);
+    IRArrayType* aggregateStorageArrayType = asNVVMSupportedAggregateStorageArrayType(type);
     IRVectorType* compactParameterGroupVectorType =
         asNVVMSupportedCompactParameterGroupVectorType(type);
-    IRStructType* parameterGroupStructType = asNVVMSupportedParameterGroupStructType(type);
     IRArrayType* deviceArrayType = nullptr;
     IRPtrTypeBase* deviceArrayPointer =
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
@@ -1490,12 +1563,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup || isSurface ||
           isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
-         (isInteger || isFloat32 || structType || fixedNumericArrayType || isRawBuffer ||
-          parameterGroup || isSurface || isSampledTexture || samplerStorage ||
-          unsizedSamplerArrayStorage)) ||
-        (use == NVVMTypeUse::ParameterGroupStorage &&
-         (isInteger || isFloat32 || asNVVMSupported32BitNumericVectorType(type) ||
-          parameterGroupArrayType || parameterGroupStructType));
+         (isInteger || isFloat32 || asNVVMSupported32BitNumericVectorType(type) || structType ||
+          aggregateStorageArrayType || isRawBuffer || parameterGroup || isSurface ||
+          isSampledTexture || samplerStorage || unsizedSamplerArrayStorage)) ||
+        (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -1559,8 +1630,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         return lowerType(type, NVVMTypeUse::Value, outType);
     }
 
-    auto& typeMap =
-        use == NVVMTypeUse::ParameterGroupStorage ? m_parameterGroupStorageTypeMap : m_typeMap;
+    const bool isAggregateStorage =
+        use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
+    auto& typeMap = isAggregateStorage ? m_aggregateStorageTypeMap : m_typeMap;
     if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
@@ -1592,17 +1664,20 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         SLANG_RETURN_ON_FAIL(
             lowerType(valueVectorType->getElementType(), NVVMTypeUse::Value, elementType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            compactParameterGroupVectorType && use == NVVMTypeUse::ParameterGroupStorage
-                ? "compact parameter-group vector storage type"
+            compactParameterGroupVectorType &&
+                    (use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage)
+                ? "compact aggregate vector storage type"
                 : "selected value vector type",
-            compactParameterGroupVectorType && use == NVVMTypeUse::ParameterGroupStorage
+            compactParameterGroupVectorType &&
+                    (use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage)
                 ? m_builder.getArrayType(m_module, elementType, valueVectorElementCount, outType)
                 : m_builder
                       .getVectorType(m_module, elementType, valueVectorElementCount, outType)));
     }
     else if (
         fixedCopyableArrayType ||
-        (use == NVVMTypeUse::ParameterGroupStorage && parameterGroupArrayType))
+        ((use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage) &&
+         aggregateStorageArrayType))
     {
         return _lowerArrayType(cast<IRArrayType>(type), use, outType);
     }

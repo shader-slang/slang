@@ -5949,6 +5949,36 @@ field address` producers; `dynamic-dispatch-7.slang` stops at an aggregate helpe
 `struct-default-init.slang` stops at array construction. The first three form the next larger
 producer audit instead of being hidden inside this specialization proof.
 
+### Slice 129: Resource-capable aggregate storage
+
+Direct NVVM now uses one recursive, cycle-safe aggregate-storage algebra for fixed arrays and
+parameter-group structs. Its leaves are the established integer/Float32/32-bit-vector values and
+raw structured/byte-address buffer views. Natural-stride arrays compose those leaves and other
+admitted storage aggregates; the established explicit 12-byte Float3 array representation remains
+the one special physical form. This replaces the former parameter-group-only array/struct
+classifiers instead of adding resource-array or parameter-block interfaces.
+
+Storage admission remains distinct from first-class value admission. Before provider creation, the
+emitter recursively computes the provider size/alignment, checks every keyed struct offset and
+array stride against CUDA layout, and retains the exact nested struct declaration closure. Field
+and element addresses preserve immutable conventional-global or parameter-group provenance. A
+selected resource view is then loaded and consumed through the existing generic LLVM array,
+struct, pointer, load, and aggregate-extract operations. Builder ABI revision 24 is unchanged.
+
+The specialized `array-existential-parameter.slang` program reaches this path as two constant
+buffers containing fixed arrays of concrete `MyImpl { Int val; }` payloads; no interface or witness
+reconstruction occurs. `loop-unroll.slang` selects one of three two-word RWStructuredBuffer views
+from a fixed conventional-global array. `parameter-block.slang` loads a parameter-group pointer,
+then its raw-buffer field. Hashed-string reflection metadata retained by the existential module is
+treated like the C-family emitters treat it: it has no executable NVVM declaration.
+
+All six new direct runtime/PTX lanes pass. The 863-byte existential, 960-byte resource-array, and
+793-byte parameter-block PTX modules assemble with CUDA 12.9.86 `ptxas -arch=sm_70` to 2,920-byte,
+2,792-byte, and 2,920-byte cubins. Focused fake coverage proves resource-array transport through
+only generic aggregate operations, existing nested-struct and fixed-sampler arrays remain adjacent
+pre-provider rejections, Release host/provider builds pass, and the complete NVVM prefix passes
+398/398.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5956,9 +5986,10 @@ The following remain open until their named slice supplies evidence:
 - the CUDA toolkit and GPU CI matrix;
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
-  global parameter fields beyond selected integer/float32 scalars and selected 32-bit numeric
-  vector resource elements, flat selected-scalar/vector parameter blocks and constant buffers plus
-  exact compact three-lane physical matrix arrays,
+  global parameter fields beyond selected integer/float32 scalars, selected fixed natural-layout
+  aggregate arrays, and selected 32-bit numeric-vector resource elements; parameter blocks and
+  constant buffers beyond selected recursive numeric/raw-buffer storage aggregates plus exact
+  compact three-lane physical matrix arrays,
   selected integer/float32 scalar, 32-bit numeric-vector, layout-compatible recursively
   numeric-field aggregate, and selected resource-bearing aggregate structured buffers, plus
   read-only logical access to selected
@@ -5993,8 +6024,8 @@ The following remain open until their named slice supplies evidence:
   structured/byte-address data pointers, constant-lane structured-buffer vector swizzled stores,
   and direct keyed numeric-field/vector-lane access to layout-compatible copyable read-write
   structured-buffer elements, immutable component reads from direct parameter-group vectors and
-  exact compact three-lane arrays, plus selected-element indexing of fixed copyable local arrays
-  and numeric vectors, including other
+  exact compact three-lane arrays, plus selected-element indexing of fixed storage/local arrays and
+  numeric vectors, including other
   `IRGetElementPtr`
   shapes, pointer escape through helpers beyond the exact selected-scalar-struct, numeric-value,
   and fixed-numeric-array helper subsets or through SSA, dynamically indexed aggregate values,
