@@ -1785,3 +1785,20 @@ nested immutable struct-address chains remain pre-provider E52017 neighbors.
 new direct runtime/PTX lanes. Their 863-, 960-, and 793-byte PTX modules assemble with CUDA 12.9.86
 `ptxas -arch=sm_70` to 2,920-, 2,792-, and 2,920-byte cubins. Release host/provider builds pass and
 the complete NVVM prefix passes 398/398.
+
+Slice 130 consolidates the former scalar-struct and resource-struct local pointer paths. Compact
+local `Ptr` and canonical `BorrowInOutParam` may now point to any already-selected resource-capable
+struct, while the explicit CUDA thread-local-context spelling retains its established scalar-struct
+boundary. Exact pointee matching and the generic pointer/call interfaces remain authoritative;
+device struct pointers remain unsupported.
+
+The existing copyable fixed-array type now drives explicit aggregate construction and dynamic
+value extraction as well as storage. The provider already implements these shapes with generic
+LLVM array construction and bounded sequential extraction, so builder ABI revision 24 is unchanged.
+Focused fake coverage crosses a mutable non-scalar aggregate helper, constructs an array of those
+values, dynamically selects one, and extracts its field without an aggregate-specific callback.
+
+`dynamic-dispatch-7.slang` and `struct-default-init.slang` pass all four new direct runtime/PTX
+lanes. Their 645- and 1,222-byte PTX modules assemble with CUDA 12.9.86 `ptxas -arch=sm_70` to
+2,792- and 3,048-byte cubins. Release host/provider builds pass and the complete NVVM prefix passes
+399/399.

@@ -2,6 +2,13 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+// NVVM: .visible .const .align 8 .b8 SLANG_globalParams[16]
+// NVVM: .visible .entry computeMain()
+// NVVM-COUNT-3: shl.b32
+// NVVM: st.global.u32
 
 struct Test
 {

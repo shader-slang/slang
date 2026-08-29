@@ -524,39 +524,6 @@ IRPtrTypeBase* asNVVMSupportedLocalCopyableArrayPointerType(
     return pointerType;
 }
 
-IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
-    IRInst* type,
-    IRStructType** outValueType)
-{
-    if (outValueType)
-        *outValueType = nullptr;
-    auto pointerType = as<IRPtrTypeBase>(type);
-    auto valueType =
-        pointerType ? asNVVMSupportedScalarStructType(pointerType->getValueType()) : nullptr;
-    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
-    const bool isLocalPointer =
-        pointerType && pointerType->getOp() == kIROp_PtrType && pointerType->getOperandCount() == 1;
-    const bool isMutableBorrow = pointerType &&
-                                 pointerType->getOp() == kIROp_BorrowInOutParamType &&
-                                 pointerType->getOperandCount() == 1;
-    // Explicit-global-context lowering spells its helper parameter with the complete CUDA local
-    // pointer contract, while the entry-point `var` passed to it retains the compact local-pointer
-    // spelling. Both are the canonical producer shapes for the same per-invocation storage.
-    const bool isThreadLocalContextPointer =
-        pointerType && pointerType->getOp() == kIROp_PtrType &&
-        pointerType->getOperandCount() == 4 &&
-        pointerType->getAccessQualifier() == AccessQualifier::ReadWrite &&
-        pointerType->getAddressSpace() == AddressSpace::ThreadLocal && dataLayout &&
-        dataLayout->getOp() == kIROp_DefaultBufferLayoutType;
-    if (!valueType || (!isLocalPointer && !isMutableBorrow && !isThreadLocalContextPointer))
-    {
-        return nullptr;
-    }
-    if (outValueType)
-        *outValueType = valueType;
-    return pointerType;
-}
-
 IRPtrTypeBase* asNVVMSupportedLocalResourceStructPointerType(
     IRInst* type,
     IRStructType** outValueType)
@@ -566,8 +533,23 @@ IRPtrTypeBase* asNVVMSupportedLocalResourceStructPointerType(
     auto pointerType = as<IRPtrTypeBase>(type);
     auto valueType =
         pointerType ? asNVVMSupportedResourceStructType(pointerType->getValueType()) : nullptr;
-    if (!pointerType || !valueType || pointerType->getOp() != kIROp_PtrType ||
-        pointerType->getOperandCount() != 1)
+    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    const bool isLocalPointer =
+        pointerType && pointerType->getOp() == kIROp_PtrType && pointerType->getOperandCount() == 1;
+    const bool isMutableBorrow = pointerType &&
+                                 pointerType->getOp() == kIROp_BorrowInOutParamType &&
+                                 pointerType->getOperandCount() == 1;
+    // Consider `void set(inout Outer value)`: the helper receives `BorrowInOutParam<Outer>`, while
+    // its caller passes the `Ptr<Outer>` produced by a local `var`. Both point at the same selected
+    // resource-capable aggregate representation. Explicit-global-context lowering adds the complete
+    // CUDA thread-local pointer spelling, but that established producer remains scalar-struct-only.
+    const bool isThreadLocalContextPointer =
+        asNVVMSupportedScalarStructType(valueType) && pointerType &&
+        pointerType->getOp() == kIROp_PtrType && pointerType->getOperandCount() == 4 &&
+        pointerType->getAccessQualifier() == AccessQualifier::ReadWrite &&
+        pointerType->getAddressSpace() == AddressSpace::ThreadLocal && dataLayout &&
+        dataLayout->getOp() == kIROp_DefaultBufferLayoutType;
+    if (!valueType || (!isLocalPointer && !isMutableBorrow && !isThreadLocalContextPointer))
     {
         return nullptr;
     }
@@ -1505,9 +1487,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRStructType* copyableStructType = asNVVMSupportedCopyableStructType(type);
     IRStructType* resourceStructType = asNVVMSupportedResourceStructType(type);
     IRStructType* physicalArrayStructType = asNVVMSupportedPhysicalArrayStructType(type);
-    IRStructType* localScalarStructValueType = nullptr;
-    IRPtrTypeBase* localScalarStructPointer =
-        asNVVMSupportedLocalScalarStructPointerType(type, &localScalarStructValueType);
+    IRStructType* localResourceStructValueType = nullptr;
+    IRPtrTypeBase* localResourceStructPointer =
+        asNVVMSupportedLocalResourceStructPointerType(type, &localResourceStructValueType);
     IRType* localNumericPointerValueType = nullptr;
     IRPtrTypeBase* localNumericPointer =
         asNVVMSupportedLocalNumericPointerType(type, &localNumericPointerValueType);
@@ -1555,7 +1537,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
          (isNVVMSupportedValueType(type) || fixedNumericArrayType || resourceStructType ||
-          localScalarStructPointer || localNumericPointer || localNumericArrayPointer ||
+          localResourceStructPointer || localNumericPointer || localNumericArrayPointer ||
           isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || resourceStructType ||
@@ -1594,11 +1576,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         return SLANG_OK;
     }
 
-    if (use == NVVMTypeUse::HelperParameter && localScalarStructPointer)
+    if (use == NVVMTypeUse::HelperParameter && localResourceStructPointer)
     {
         return _lowerPointerType(
             type,
-            localScalarStructValueType,
+            localResourceStructValueType,
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType);
     }

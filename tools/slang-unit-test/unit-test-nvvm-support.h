@@ -4467,6 +4467,14 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitAggregateElementExtract(
                             ? _getFakeNVVMBuilderScalarStructType()
                             : nullptr;
     }
+    else if (
+        baseRef.kind == FakeNVVMBuilderValueKind::VectorElement && baseRef.index >= 0 &&
+        baseRef.index < gFakeNVVMBuilder.vectorElementTypeKinds.getCount() &&
+        gFakeNVVMBuilder.vectorElementTypeKinds[baseRef.index] ==
+            FakeNVVMBuilderScalarTypeKind::ScalarStruct)
+    {
+        aggregateType = _getFakeNVVMBuilderScalarStructType();
+    }
 
     SlangNVVMTypeHandle elementType = nullptr;
     bool isAggregateElement = false;
@@ -8572,6 +8580,30 @@ void computeMain()
     value.sampler = sampler;
     value.base = -0.5;
     destination[0] = sampleResource(value).x;
+}
+)";
+
+static const char kDirectNVVMAggregateValueArraySource[] = R"(
+struct Payload
+{
+    int2 lanes;
+};
+
+void setFirstLane(inout Payload value, int lane)
+{
+    value.lanes.x = lane;
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int index)
+{
+    Payload first = { int2(1, 2) };
+    setFirstLane(first, 3);
+    Payload second = { int2(7, 11) };
+    Payload values[2] = { first, second };
+    *destination = values[index].lanes.x;
 }
 )";
 

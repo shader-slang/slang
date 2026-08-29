@@ -171,14 +171,8 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
                  fieldAddress->getBase()->getDataType(),
                  &structType))
     {
-        outAddress.isMutable = true;
-    }
-    else if (asNVVMSupportedLocalScalarStructPointerType(
-                 fieldAddress->getBase()->getDataType(),
-                 &structType))
-    {
         // A canonical BorrowInOutParam is not itself a local Ptr, but it shares the exact selected
-        // scalar-struct pointee and mutable field contract established for helper parameters.
+        // resource-capable struct pointee and mutable field contract established for helpers.
         outAddress.isMutable = true;
     }
     else
@@ -922,9 +916,9 @@ struct NVVMSequentialElement
     IRInst* index = nullptr;
 };
 
-// Resolves an integer-indexed element read from one accepted ordinary vector or fixed-array value.
-// Constant indices are checked here; a dynamic index retains the source IR value for provider
-// lowering.
+// Resolves an integer-indexed element read from one accepted ordinary vector or copyable fixed-
+// array value. Constant indices are checked here; a dynamic index retains the source IR value for
+// provider lowering.
 bool _getNVVMSequentialElement(IRInst* inst, NVVMSequentialElement& outElement)
 {
     outElement = {};
@@ -957,7 +951,7 @@ bool _getNVVMSequentialElement(IRInst* inst, NVVMSequentialElement& outElement)
     }
     else if (!as<IRSwizzle>(inst))
     {
-        if (auto baseArrayType = asNVVMSupportedNumericArrayType(
+        if (auto baseArrayType = asNVVMSupportedCopyableArrayType(
                 base ? base->getDataType() : nullptr,
                 &baseElementCount))
         {
@@ -1185,7 +1179,7 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     if (inst->getOp() == kIROp_MakeArray)
     {
         uint32_t elementCount = 0;
-        auto resultType = asNVVMSupportedNumericArrayType(inst->getDataType(), &elementCount);
+        auto resultType = asNVVMSupportedCopyableArrayType(inst->getDataType(), &elementCount);
         if (!resultType || inst->getOperandCount() != elementCount)
             return false;
         for (uint32_t i = 0; i < elementCount; ++i)
@@ -2983,8 +2977,6 @@ SlangResult _validatePointerValue(
         value && _getNVVMSequentialElementPointer(value, sequentialElement)
             ? sequentialElement.resultType
             : nullptr;
-    auto borrowedStructPtrType =
-        value ? asNVVMSupportedLocalScalarStructPointerType(value->getDataType()) : nullptr;
     auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
     NVVMStructField fieldAddress;
     if (!fieldPtrType || value->getOp() != kIROp_FieldAddress ||
@@ -3001,7 +2993,6 @@ SlangResult _validatePointerValue(
                                      : localArrayPtrType        ? localArrayPtrType
                                      : sequentialElementPtrType ? sequentialElementPtrType
                                      : localStructPtrType       ? localStructPtrType
-                                     : borrowedStructPtrType    ? borrowedStructPtrType
                                                                 : fieldPtrType;
     if (!acceptedPtrType)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
@@ -3142,7 +3133,7 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     NVVMReadOnlyTextureType sampledTextureType;
     return isNVVMSupportedValueType(type) || asNVVMSupportedNumericArrayType(type) ||
            asNVVMSupportedResourceStructType(type) ||
-           asNVVMSupportedLocalScalarStructPointerType(type) ||
+           asNVVMSupportedLocalResourceStructPointerType(type) ||
            asNVVMSupportedLocalNumericPointerType(type) ||
            asNVVMSupportedLocalNumericArrayPointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
@@ -3162,9 +3153,9 @@ bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterT
     IRStructType* argumentValueType = nullptr;
     IRStructType* parameterValueType = nullptr;
     auto argumentPointer =
-        asNVVMSupportedLocalScalarStructPointerType(argumentType, &argumentValueType);
+        asNVVMSupportedLocalResourceStructPointerType(argumentType, &argumentValueType);
     auto parameterPointer =
-        asNVVMSupportedLocalScalarStructPointerType(parameterType, &parameterValueType);
+        asNVVMSupportedLocalResourceStructPointerType(parameterType, &parameterValueType);
     const bool isMutableStructParameter =
         parameterPointer && (parameterPointer->getOp() == kIROp_BorrowInOutParamType ||
                              parameterPointer->getAddressSpace() == AddressSpace::ThreadLocal);
@@ -4127,7 +4118,8 @@ SlangResult _validateNVVMFunction(
                                 codeGenContext,
                                 toSlice("call argument type"));
                         }
-                        if (asNVVMSupportedLocalScalarStructPointerType(argument->getDataType()) ||
+                        if (asNVVMSupportedLocalResourceStructPointerType(
+                                argument->getDataType()) ||
                             asNVVMSupportedLocalNumericPointerType(argument->getDataType()) ||
                             asNVVMSupportedLocalNumericArrayPointerType(argument->getDataType()))
                         {
@@ -5133,7 +5125,7 @@ SlangResult validateNVVMSupportedIR(
                 _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
             }
             IRStructType* pointerValueType = nullptr;
-            if (asNVVMSupportedLocalScalarStructPointerType(
+            if (asNVVMSupportedLocalResourceStructPointerType(
                     parameter->getDataType(),
                     &pointerValueType))
             {
@@ -6070,7 +6062,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             SlangNVVMValueHandle loweredValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                "value vector element extraction",
+                                "sequential value element extraction",
                                 builder.emitSequentialElementExtract(
                                     moduleScope.module,
                                     loweredBase,

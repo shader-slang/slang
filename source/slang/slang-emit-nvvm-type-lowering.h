@@ -114,12 +114,8 @@ IRPtrTypeBase* asNVVMSupportedLocalCopyableArrayPointerType(
     IRArrayType** outValueType = nullptr,
     uint32_t* outElementCount = nullptr);
 
-/// Returns an exact generic local or borrowed mutable pointer to a selected scalar struct.
-IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
-    IRInst* type,
-    IRStructType** outValueType = nullptr);
-
-/// Returns an exact generic local pointer to a selected resource-capable struct.
+/// Returns an exact local, borrowed mutable, or thread-local pointer to a selected
+/// resource-capable struct.
 IRPtrTypeBase* asNVVMSupportedLocalResourceStructPointerType(
     IRInst* type,
     IRStructType** outValueType = nullptr);

@@ -5979,6 +5979,34 @@ only generic aggregate operations, existing nested-struct and fixed-sampler arra
 pre-provider rejections, Release host/provider builds pass, and the complete NVVM prefix passes
 398/398.
 
+### Slice 130: Aggregate value arrays and mutable helper transport
+
+Direct NVVM now uses one resource-capable local-struct pointer classifier for compact local `Ptr`,
+canonical `BorrowInOutParam`, and the established scalar-only explicit thread-local-context
+spelling. This removes the older split where local storage accepted recursively nested or
+resource-bearing structs but mutable helper parameters accepted only structs with direct scalar
+fields. Exact pointee identity and the existing helper argument relation still connect caller and
+callee; device struct pointers and unsupported pointer forms remain rejected.
+
+The existing copyable fixed-array contract now also owns explicit `makeArray` construction and
+integer-indexed value extraction. LLVM arrays can already be constructed from first-class aggregate
+elements, and the provider's generic sequential extraction implements a bounded dynamic array index
+as constant `extractvalue` operations plus typed selects. No array-of-struct or mutable-helper
+callback was added, and builder ABI revision 24 is unchanged.
+
+After specialization, `dynamic-dispatch-7.slang` contains only concrete `Impl` and nested
+`Impl.TAssoc` structs, ordinary helpers, local storage, and one `BorrowInOutParam<Impl>` mutation;
+the backend does not see its source interfaces or witnesses. `struct-default-init.slang` contains
+four explicit `Test` values, `makeArray : Array<Test, 4>`, a dynamic `getElement`, and keyed field
+extracts; the backend does not reconstruct default-initializer syntax.
+
+Both fixtures pass their new direct runtime and PTX/FileCheck lanes with unchanged results. The
+645-byte specialized-dispatch PTX stores constant `4` and assembles with CUDA 12.9.86
+`ptxas -arch=sm_70` to a 2,792-byte cubin. The 1,222-byte default-initializer PTX selects the four
+struct payloads, computes the packed result, and assembles to a 3,048-byte cubin. Focused fake
+coverage proves generic mutable-pointer, aggregate-construction, sequential-extraction, and call
+operations; Release host/provider builds pass and the complete NVVM prefix passes 399/399.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -6004,7 +6032,7 @@ The following remain open until their named slice supplies evidence:
   byte-address buffers;
 - external/indirect calls, helper pointer/aggregate ABI beyond selected raw-buffer views and
   resource-bearing structs passed by value, recursively nested numeric-field structs passed and
-  returned by value, exact selected-scalar-struct local pointers and
+  returned by value, selected resource-capable aggregate local pointers and
   `BorrowInOutParam` parameters, plus selected numeric local pointers and exact `OutParam` or
   `BorrowInOutParam` parameters, and fixed numeric local-array pointers with exact `OutParam` or
   `BorrowInOutParam` parameters, calling conventions and function
@@ -6032,7 +6060,8 @@ The following remain open until their named slice supplies evidence:
   mutable aggregate families beyond layout-compatible recursively numeric/resource-field structs,
   first-class aggregate field reads beyond admitted resource-capable values, aggregate layouts
   requiring
-  padding, true mutable device globals beyond the established actual-global atomic subset,
+  padding, dynamic aggregate-value indexing beyond selected copyable fixed arrays, true mutable
+  device globals beyond the established actual-global atomic subset,
   thread-local contexts beyond flat scalar fields, shared-memory shapes beyond canonical
   uninitialized scalar/fixed-array Int32/UInt32 storage, and address spaces;
 - atomics beyond relaxed global/shared scalar Int32/UInt32 add and relaxed global scalar UInt64
