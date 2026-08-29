@@ -5470,7 +5470,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedDoubleAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedNestedArraySource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedLocalArraySource, "'var'"},
-        {kDirectNVVMUnsupportedDynamicLocalVectorStoreSource, "'var'"},
+        {kDirectNVVMUnsupportedDynamicLocalVectorStoreSource, "'device i32 array element pointer'"},
         {kDirectNVVMUnsupportedSharedFloatArraySource, "'device i32 array element pointer'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},

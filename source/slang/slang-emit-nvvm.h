@@ -34,11 +34,14 @@ struct NVVMSurfaceOperationRequirement
     const char* diagnosticName = nullptr;
 };
 
-/// Owns one exact typed sampled-texture operation required by accepted linked IR.
+/// Owns the ordered typed texture operations required by one accepted helper.
 struct NVVMTextureOperationRequirement
 {
     IRFunc* function = nullptr;
-    SlangNVVMTextureOperationDesc desc = {};
+    SlangNVVMTextureOperationDesc operations[3] = {};
+    uint32_t operationCount = 0;
+    uint32_t outputParameterCount = 0;
+    bool writesTrailingZero = false;
     const char* diagnosticName = nullptr;
 };
 

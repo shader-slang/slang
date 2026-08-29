@@ -36,10 +36,10 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
            api.getStructType && api.declareFunction && api.getFunctionParameter &&
            api.setFunctionParameterAttributes && api.createBlock && api.setInsertBlock &&
            api.emitLoad && api.emitStore && api.emitLocalStorage && api.emitBranch &&
-           api.emitConditionalBranch && api.getIntegerConstant && api.getFloatingPointConstant &&
-           api.emitPhi && api.addPhiIncoming && api.emitCall && api.emitValueReturn &&
-           api.emitReturnVoid && api.emitPointerOffset && api.emitByteOffsetPointer &&
-           api.emitArrayElementPointer && api.emitStructFieldPointer &&
+           api.emitConditionalBranch && api.emitSwitch && api.getIntegerConstant &&
+           api.getFloatingPointConstant && api.emitPhi && api.addPhiIncoming && api.emitCall &&
+           api.emitValueReturn && api.emitReturnVoid && api.emitPointerOffset &&
+           api.emitByteOffsetPointer && api.emitArrayElementPointer && api.emitStructFieldPointer &&
            api.emitAggregateConstruct && api.emitAggregateElementExtract &&
            api.emitVectorConstruct && api.emitVectorElementExtract &&
            api.emitRelaxedGlobalI32AtomicAdd && api.declareGlobalStorage &&
@@ -208,7 +208,10 @@ SlangResult NVVMIRBuilder::emitTextureOperation(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (operation.operation != SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL || operandCount != 3 || !operands)
+    const size_t expectedOperandCount =
+        operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ? 3 : 1;
+    if (operation.operation > SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH ||
+        operandCount != expectedOperandCount || !operands)
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -745,6 +748,20 @@ SlangResult NVVMIRBuilder::emitConditionalBranch(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
     return m_construction.emitConditionalBranch(module, condition, trueBlock, falseBlock);
+}
+
+SlangResult NVVMIRBuilder::emitSwitch(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle condition,
+    const SlangNVVMValueHandle* caseValues,
+    const SlangNVVMBlockHandle* caseBlocks,
+    size_t caseCount,
+    SlangNVVMBlockHandle defaultBlock) const
+{
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    return m_construction
+        .emitSwitch(module, condition, caseValues, caseBlocks, caseCount, defaultBlock);
 }
 
 SlangResult NVVMIRBuilder::getIntegerConstant(

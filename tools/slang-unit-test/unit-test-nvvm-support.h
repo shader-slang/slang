@@ -421,6 +421,8 @@ struct FakeNVVMBuilderState
         emitLocalStorageCallCount = 0;
         emitBranchCallCount = 0;
         emitConditionalBranchCallCount = 0;
+        emitSwitchCallCount = 0;
+        lastSwitchCaseCount = 0;
         getIntegerConstantCallCount = 0;
         getFloatingPointConstantCallCount = 0;
         emitPhiCallCount = 0;
@@ -749,6 +751,8 @@ struct FakeNVVMBuilderState
     int emitLocalStorageCallCount = 0;
     int emitBranchCallCount = 0;
     int emitConditionalBranchCallCount = 0;
+    int emitSwitchCallCount = 0;
+    size_t lastSwitchCaseCount = 0;
     int getIntegerConstantCallCount = 0;
     int getFloatingPointConstantCallCount = 0;
     int emitPhiCallCount = 0;
@@ -2010,6 +2014,18 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
                     SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                 gFakeNVVMBuilder.intrinsicResultTypes[valueRef.index].kind ==
                     SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
+    case FakeNVVMBuilderValueKind::TextureOperation:
+        if (valueRef.index < 0 || valueRef.index >= gFakeNVVMBuilder.textureOperations.getCount())
+            return false;
+        switch (gFakeNVVMBuilder.textureOperations[valueRef.index].operation)
+        {
+        case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
+        case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
+        case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
+            return true;
+        default:
+            return false;
+        }
     case FakeNVVMBuilderValueKind::PointerOffset:
     case FakeNVVMBuilderValueKind::ByteOffsetPointer:
     case FakeNVVMBuilderValueKind::ArrayElementPointer:
@@ -3496,6 +3512,36 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitConditionalBranch(
     gFakeNVVMBuilder.conditionalSourceBlockIndex = gFakeNVVMBuilder.currentInsertBlockIndex;
     gFakeNVVMBuilder.conditionalTrueBlockIndex = trueIndex;
     gFakeNVVMBuilder.conditionalFalseBlockIndex = falseIndex;
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitSwitch(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle condition,
+    const SlangNVVMValueHandle* caseValues,
+    const SlangNVVMBlockHandle* caseBlocks,
+    size_t caseCount,
+    SlangNVVMBlockHandle defaultBlock)
+{
+    ++gFakeNVVMBuilder.emitSwitchCallCount;
+    Index defaultIndex = -1;
+    if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
+        !_isFakeNVVMBuilderIntegerValue(condition) ||
+        !_getFakeNVVMBuilderBlockIndex(defaultBlock, defaultIndex) ||
+        (caseCount && (!caseValues || !caseBlocks)))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+    for (size_t i = 0; i < caseCount; ++i)
+    {
+        Index caseBlockIndex = -1;
+        if (!_isFakeNVVMBuilderIntegerValue(caseValues[i]) ||
+            !_getFakeNVVMBuilderBlockIndex(caseBlocks[i], caseBlockIndex))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+    }
+    gFakeNVVMBuilder.lastSwitchCaseCount = caseCount;
     return SLANG_OK;
 }
 
@@ -5107,6 +5153,7 @@ static SlangNVVMBuilderConstructionAPI _makeFakeNVVMBuilderConstructionAPI()
     api.emitLocalStorage = _fakeNVVMBuilderEmitLocalStorage;
     api.emitBranch = _fakeNVVMBuilderEmitBranch;
     api.emitConditionalBranch = _fakeNVVMBuilderEmitConditionalBranch;
+    api.emitSwitch = _fakeNVVMBuilderEmitSwitch;
     api.getIntegerConstant = _fakeNVVMBuilderGetIntegerConstant;
     api.getFloatingPointConstant = _fakeNVVMBuilderGetFloatingPointConstant;
     api.emitPhi = _fakeNVVMBuilderEmitPhi;
@@ -5235,20 +5282,38 @@ static SlangNVVMBuilderSurfaceOperationsAPI _makeFakeNVVMBuilderSurfaceOperation
 
 static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperationDesc& operation)
 {
-    if (operation.operation != SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL || operation.isArray > 1 ||
+    if (operation.isArray > 1 ||
         operation.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
         operation.elementType.bitWidth != 32 || operation.elementType.laneCount != 1)
     {
         return false;
     }
+    bool isValidShape = false;
     switch (operation.shape)
     {
     case SLANG_NVVM_TEXTURE_SHAPE_1D:
     case SLANG_NVVM_TEXTURE_SHAPE_2D:
     case SLANG_NVVM_TEXTURE_SHAPE_CUBE:
-        return true;
+        isValidShape = true;
+        break;
     case SLANG_NVVM_TEXTURE_SHAPE_3D:
-        return operation.isArray == 0;
+        isValidShape = operation.isArray == 0;
+        break;
+    default:
+        return false;
+    }
+    if (!isValidShape)
+        return false;
+
+    switch (operation.operation)
+    {
+    case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
+    case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
+        return true;
+    case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
+        return operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
+    case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
+        return operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
     default:
         return false;
     }
@@ -5275,42 +5340,49 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitTextureOperation(
 {
     if (outValue)
         *outValue = nullptr;
+    const size_t expectedOperandCount =
+        operation && operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ? 3 : 1;
     if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
-        !operation || !operands || operandCount != 3 || !outValue ||
+        !operation || !operands || operandCount != expectedOperandCount || !outValue ||
         !_isFakeNVVMTextureOperationSupported(*operation) ||
         gFakeNVVMBuilder.textureOperations.getCount() >=
             SLANG_COUNT_OF(gFakeNVVMBuilder.textureOperationStorage) ||
-        !_isFakeNVVMBuilderIntegerValue(operands[0]) ||
-        !_isFakeNVVMBuilderFloatingPointValue(operands[2], 32))
+        !_isFakeNVVMBuilderIntegerValue(operands[0]))
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    uint32_t coordinateLaneCount = 0;
-    switch (operation->shape)
+    if (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL)
     {
-    case SLANG_NVVM_TEXTURE_SHAPE_1D:
-        coordinateLaneCount = 1;
-        break;
-    case SLANG_NVVM_TEXTURE_SHAPE_2D:
-        coordinateLaneCount = 2;
-        break;
-    case SLANG_NVVM_TEXTURE_SHAPE_3D:
-    case SLANG_NVVM_TEXTURE_SHAPE_CUBE:
-        coordinateLaneCount = 3;
-        break;
-    default:
-        return SLANG_E_INVALID_ARG;
+        if (!_isFakeNVVMBuilderFloatingPointValue(operands[2], 32))
+            return SLANG_E_INVALID_ARG;
+
+        uint32_t coordinateLaneCount = 0;
+        switch (operation->shape)
+        {
+        case SLANG_NVVM_TEXTURE_SHAPE_1D:
+            coordinateLaneCount = 1;
+            break;
+        case SLANG_NVVM_TEXTURE_SHAPE_2D:
+            coordinateLaneCount = 2;
+            break;
+        case SLANG_NVVM_TEXTURE_SHAPE_3D:
+        case SLANG_NVVM_TEXTURE_SHAPE_CUBE:
+            coordinateLaneCount = 3;
+            break;
+        default:
+            return SLANG_E_INVALID_ARG;
+        }
+        coordinateLaneCount += operation->isArray;
+        const bool hasCoordinate = coordinateLaneCount == 1
+                                       ? _isFakeNVVMBuilderFloatingPointValue(operands[1], 32)
+                                       : _isFakeNVVMBuilderVectorValue(
+                                             operands[1],
+                                             FakeNVVMBuilderScalarTypeKind::Float,
+                                             coordinateLaneCount);
+        if (!hasCoordinate)
+            return SLANG_E_INVALID_ARG;
     }
-    coordinateLaneCount += operation->isArray;
-    const bool hasCoordinate = coordinateLaneCount == 1
-                                   ? _isFakeNVVMBuilderFloatingPointValue(operands[1], 32)
-                                   : _isFakeNVVMBuilderVectorValue(
-                                         operands[1],
-                                         FakeNVVMBuilderScalarTypeKind::Float,
-                                         coordinateLaneCount);
-    if (!hasCoordinate)
-        return SLANG_E_INVALID_ARG;
 
     const Index resultIndex = gFakeNVVMBuilder.textureOperations.getCount();
     gFakeNVVMBuilder.textureOperations.add(*operation);

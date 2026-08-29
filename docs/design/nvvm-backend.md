@@ -5191,6 +5191,35 @@ libNVVM runtime, and direct PTX checks for all seven `tex.level` rows. The 2,093
 passes CUDA 12.9.86 `ptxas -arch=sm_70` and produces a 6,632-byte cubin. A neighboring
 `Texture2D<float2>` fixture proves unsupported result shapes stop during compiler preflight.
 
+### Slice 103: Texture dimensions, local numeric outputs, and integer switches
+
+Forward-only builder ABI revision 15 adds one structural integer-switch callback. It accepts a
+typed integer selector, parallel constant/target arrays, and a default target, and maps directly to
+LLVM `switch`. Compiler preflight admits only selected integer selectors, same-typed literal case
+values, unique labels, and non-parameterized case/default targets. This preserves the canonical
+control flow retained by `texture-get-dimensions-cuda.slang` without synthesizing compare blocks or
+making switch construction texture-specific.
+
+Canonical generic-address-space `Ptr<T>` locals and `OutParam<T>` helper parameters now carry
+selected numeric values through typed local storage, loads, stores, and direct calls. The producer
+remains part of the invariant: only a local `var` or helper parameter can claim this local-pointer
+role, because a module-scope groupshared value can expose the same `Ptr<T>` spelling. Pointer SSA,
+pointer results, dynamic local element addressing, and other pointer producers remain closed.
+
+The sampled-texture descriptor now includes width, height, and depth queries. Exact retained
+`GetDimensions` helpers map their ordered query sequence to LLVM's `llvm.nvvm.txq.*` intrinsics,
+then store the UInt32 results through checked output pointers. The 2D-array and cube-array helpers
+preserve the CUDA source helper's explicit zero for the trailing array-size output; they do not
+invent a `txq.array_size` query. LLVM 7 and LLVM 14 give these query declarations the same i32(i64)
+signature and `nounwind readnone` attributes, so the compatibility writer validates them without a
+textual attribute rewrite.
+
+The existing fixture passes ordinary CUDA runtime, direct libNVVM runtime, and direct PTX checking.
+Its seven outputs are `4, 2056, 131586, 4112, 1028, 4112, 0`. The 3,165-byte optimized PTX contains
+six width, five height, and one depth query; CUDA 12.9.86 `ptxas -arch=sm_70` accepts it and produces
+a 4,328-byte cubin. A neighboring `Texture2D<float2>.GetDimensions` fixture stops before provider
+discovery, and the complete NVVM unit-test prefix passes 375/375.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5209,7 +5238,8 @@ The following remain open until their named slice supplies evidence:
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;
 - external/indirect calls, helper pointer/aggregate ABI beyond exact selected-scalar-struct local
-  pointers and `BorrowInOutParam` parameters, calling conventions and function
+  pointers and `BorrowInOutParam` parameters plus selected numeric local pointers and exact
+  `OutParam` parameters, calling conventions and function
   attributes beyond no-inline, saturating or overflow-decorated arithmetic, Float64/BFloat16/FP8
   scalar families, Float16 storage and unoptimized vector execution,
   and vector or matrix operations beyond bounded selected-numeric construction, constant-indexed
@@ -5223,8 +5253,9 @@ The following remain open until their named slice supplies evidence:
   flat by-value entry struct, plus direct selected-element indexing of canonical
   structured/byte-address data pointers and constant-lane structured-buffer vector swizzled stores,
   including other `IRGetElementPtr` shapes, pointer escape through helpers beyond the exact
-  selected-scalar-struct helper subset or through SSA, nested or dynamically indexed aggregate
-  values, mutable aggregate families beyond layout-compatible first-level numeric-field structs,
+  selected-scalar-struct and numeric-output helper subsets or through SSA, nested or dynamically
+  indexed aggregate values, mutable aggregate families beyond layout-compatible first-level
+  numeric-field structs,
   aggregate layouts requiring padding, general globals, additional shared-memory shapes, and
   address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a

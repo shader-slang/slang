@@ -71,6 +71,11 @@ IRStructType* asNVVMSupportedScalarStructType(IRInst* type);
 /// Returns an exact nonempty struct whose direct fields are selected numeric values.
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type);
 
+/// Returns an exact generic local pointer or output parameter to a selected numeric value.
+IRPtrTypeBase* asNVVMSupportedLocalNumericPointerType(
+    IRInst* type,
+    IRType** outValueType = nullptr);
+
 /// Returns an exact generic local or borrowed mutable pointer to a selected scalar struct.
 IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
     IRInst* type,

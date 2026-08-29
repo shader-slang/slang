@@ -250,6 +250,24 @@ IRStructType* asNVVMSupportedCopyableStructType(IRInst* type)
     return hasField ? structType : nullptr;
 }
 
+IRPtrTypeBase* asNVVMSupportedLocalNumericPointerType(IRInst* type, IRType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    auto pointerType = as<IRPtrTypeBase>(type);
+    IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
+    if (!pointerType || !isNVVMSupportedNumericValueType(valueType) ||
+        (pointerType->getOp() != kIROp_PtrType && pointerType->getOp() != kIROp_OutParamType) ||
+        pointerType->getOperandCount() != 1 ||
+        pointerType->getAddressSpace() != AddressSpace::Generic)
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
 IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
     IRInst* type,
     IRStructType** outValueType)
@@ -1020,6 +1038,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRStructType* localScalarStructValueType = nullptr;
     IRPtrTypeBase* localScalarStructPointer =
         asNVVMSupportedLocalScalarStructPointerType(type, &localScalarStructValueType);
+    IRType* localNumericPointerValueType = nullptr;
+    IRPtrTypeBase* localNumericPointer =
+        asNVVMSupportedLocalNumericPointerType(type, &localNumericPointerValueType);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
     IRArrayType* deviceArrayType = nullptr;
@@ -1056,8 +1077,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
-         (isNVVMSupportedValueType(type) || localScalarStructPointer || isSurface ||
-          isSampledTexture || samplerValue)) ||
+         (isNVVMSupportedValueType(type) || localScalarStructPointer || localNumericPointer ||
+          isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
           fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
@@ -1098,6 +1119,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         return _lowerPointerType(
             type,
             localScalarStructValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            outType);
+    }
+
+    if (use == NVVMTypeUse::HelperParameter && localNumericPointer)
+    {
+        return _lowerPointerType(
+            type,
+            localNumericPointerValueType,
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType);
     }

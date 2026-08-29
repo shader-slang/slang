@@ -1219,7 +1219,10 @@ const NVVMSurfaceOperationRequirement* _findSurfaceOperationRequirement(
 
 struct NVVMResolvedTextureOperation
 {
-    SlangNVVMTextureOperationDesc desc = {};
+    SlangNVVMTextureOperationDesc operations[3] = {};
+    uint32_t operationCount = 0;
+    uint32_t outputParameterCount = 0;
+    bool writesTrailingZero = false;
     IRParam* texture = nullptr;
     IRParam* coordinate = nullptr;
     IRParam* level = nullptr;
@@ -1300,36 +1303,162 @@ bool _resolveNVVMTextureGenericAsm(
         }
     }
 
-    outOperation.desc = {
+    outOperation.operations[0] = {
         SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL,
         shape,
         isArray ? 1u : 0u,
         textureType.elementType,
     };
+    outOperation.operationCount = 1;
     outOperation.texture = texture;
     outOperation.coordinate = coordinate;
     outOperation.level = level;
     return true;
 }
 
-void _requireTextureOperation(
+// Resolves the finalized CUDA texture dimension helpers. Array helpers deliberately write zero to
+// their final element-count output because that is the behavior encoded by the CUDA prelude.
+bool _resolveNVVMTextureDimensionsGenericAsm(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMResolvedTextureOperation& outOperation)
+{
+    outOperation = {};
+    if (!genericAsm || !function || genericAsm->getOperandCount() != 1 ||
+        !as<IRVoidType>(function->getResultType()) || function->getParamCount() < 2 ||
+        function->getParamCount() > 4)
+    {
+        return false;
+    }
+
+    IRParam* texture = function->getFirstParam();
+    NVVMSampledTextureType textureType;
+    if (!getNVVMSupportedSampledTextureType(texture->getDataType(), textureType))
+        return false;
+
+    uint32_t outputParameterCount = 0;
+    uint32_t operationCount = 0;
+    bool writesTrailingZero = false;
+    const UnownedStringSlice assembly = genericAsm->getAsm();
+    if (assembly == toSlice("{uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : "
+                            "\"l\"($0)); *($1) = width;}"))
+    {
+        if (textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_1D || textureType.isArray)
+            return false;
+        outputParameterCount = 1;
+        operationCount = 1;
+    }
+    else if (
+        assembly == toSlice("{uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, "
+                            "[%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}"))
+    {
+        if ((textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D &&
+             textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_CUBE) ||
+            textureType.isArray)
+        {
+            return false;
+        }
+        outputParameterCount = 2;
+        operationCount = 2;
+    }
+    else if (
+        assembly == toSlice("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 "
+                            "%1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), "
+                            "\"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}"))
+    {
+        if (textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_3D || textureType.isArray)
+            return false;
+        outputParameterCount = 3;
+        operationCount = 3;
+    }
+    else if (
+        assembly == toSlice("{uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, "
+                            "[%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = "
+                            "h;/* txq.array_size not available in CUDA */ *($3) = 0;}"))
+    {
+        if ((textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D &&
+             textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_CUBE) ||
+            !textureType.isArray)
+        {
+            return false;
+        }
+        outputParameterCount = 3;
+        operationCount = 2;
+        writesTrailingZero = true;
+    }
+    else
+        return false;
+
+    if (function->getParamCount() != outputParameterCount + 1)
+        return false;
+    IRParam* output = texture->getNextParam();
+    for (uint32_t i = 0; i < outputParameterCount; ++i, output = output->getNextParam())
+    {
+        IRType* valueType = nullptr;
+        auto pointerType =
+            asNVVMSupportedLocalNumericPointerType(output->getDataType(), &valueType);
+        if (!pointerType || pointerType->getOp() != kIROp_OutParamType ||
+            !isNVVMUnsignedI32Type(valueType))
+        {
+            return false;
+        }
+    }
+
+    const SlangNVVMTextureOperation queryOperations[] = {
+        SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH,
+        SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT,
+        SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH,
+    };
+    for (uint32_t i = 0; i < operationCount; ++i)
+    {
+        outOperation.operations[i] = {
+            queryOperations[i],
+            textureType.shape,
+            textureType.isArray ? 1u : 0u,
+            textureType.elementType,
+        };
+    }
+    outOperation.operationCount = operationCount;
+    outOperation.outputParameterCount = outputParameterCount;
+    outOperation.writesTrailingZero = writesTrailingZero;
+    outOperation.texture = texture;
+    return true;
+}
+
+void _requireTextureOperations(
     List<NVVMTextureOperationRequirement>& requirements,
     IRFunc* function,
-    const SlangNVVMTextureOperationDesc& desc,
+    const NVVMResolvedTextureOperation& operations,
     const char* diagnosticName)
 {
     for (const auto& requirement : requirements)
     {
         if (requirement.function != function)
             continue;
-        const auto& existing = requirement.desc;
         SLANG_RELEASE_ASSERT(
-            existing.operation == desc.operation && existing.shape == desc.shape &&
-            existing.isArray == desc.isArray &&
-            NVVMSemantics::areSameType(existing.elementType, desc.elementType));
+            requirement.operationCount == operations.operationCount &&
+            requirement.outputParameterCount == operations.outputParameterCount &&
+            requirement.writesTrailingZero == operations.writesTrailingZero);
+        for (uint32_t i = 0; i < operations.operationCount; ++i)
+        {
+            const auto& existing = requirement.operations[i];
+            const auto& operation = operations.operations[i];
+            SLANG_RELEASE_ASSERT(
+                existing.operation == operation.operation && existing.shape == operation.shape &&
+                existing.isArray == operation.isArray &&
+                NVVMSemantics::areSameType(existing.elementType, operation.elementType));
+        }
         return;
     }
-    requirements.add({function, desc, diagnosticName});
+    NVVMTextureOperationRequirement requirement;
+    requirement.function = function;
+    requirement.operationCount = operations.operationCount;
+    requirement.outputParameterCount = operations.outputParameterCount;
+    requirement.writesTrailingZero = operations.writesTrailingZero;
+    requirement.diagnosticName = diagnosticName;
+    for (uint32_t i = 0; i < operations.operationCount; ++i)
+        requirement.operations[i] = operations.operations[i];
+    requirements.add(requirement);
 }
 
 const NVVMTextureOperationRequirement* _findTextureOperationRequirement(
@@ -1989,6 +2118,12 @@ SlangResult _validatePointerValue(
         value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
     auto localStructPtrType =
         value ? asNVVMSupportedLocalCopyableStructPointerType(value->getDataType()) : nullptr;
+    // A local `var T` and a module-scope groupshared value can both expose the canonical
+    // `Ptr<T>` spelling here. The value producer, rather than that shared type, owns the local
+    // storage role. Helper parameters are the only other producer admitted by this slice.
+    auto localNumericPtrType = value && (value->getOp() == kIROp_Var || as<IRParam>(value))
+                                   ? asNVVMSupportedLocalNumericPointerType(value->getDataType())
+                                   : nullptr;
     auto borrowedStructPtrType =
         value ? asNVVMSupportedLocalScalarStructPointerType(value->getDataType()) : nullptr;
     auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
@@ -2002,6 +2137,7 @@ SlangResult _validatePointerValue(
     IRPtrTypeBase* acceptedPtrType = devicePtrType            ? devicePtrType
                                      : sharedElementPtrType   ? sharedElementPtrType
                                      : resourceElementPtrType ? resourceElementPtrType
+                                     : localNumericPtrType    ? localNumericPtrType
                                      : localStructPtrType     ? localStructPtrType
                                      : borrowedStructPtrType  ? borrowedStructPtrType
                                                               : fieldPtrType;
@@ -2138,6 +2274,7 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     NVVMSurfaceType surfaceType;
     NVVMSampledTextureType sampledTextureType;
     return isNVVMSupportedValueType(type) || asNVVMSupportedLocalScalarStructPointerType(type) ||
+           asNVVMSupportedLocalNumericPointerType(type) ||
            getNVVMSupportedSurfaceType(type, surfaceType) ||
            getNVVMSupportedSampledTextureType(type, sampledTextureType) ||
            asNVVMSupportedSamplerValueType(type);
@@ -2156,9 +2293,22 @@ bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterT
         asNVVMSupportedLocalScalarStructPointerType(argumentType, &argumentValueType);
     auto parameterPointer =
         asNVVMSupportedLocalScalarStructPointerType(parameterType, &parameterValueType);
-    return argumentPointer && argumentPointer->getOp() == kIROp_PtrType && parameterPointer &&
-           parameterPointer->getOp() == kIROp_BorrowInOutParamType &&
-           isTypeEqual(argumentValueType, parameterValueType);
+    if (argumentPointer && argumentPointer->getOp() == kIROp_PtrType && parameterPointer &&
+        parameterPointer->getOp() == kIROp_BorrowInOutParamType &&
+        isTypeEqual(argumentValueType, parameterValueType))
+    {
+        return true;
+    }
+
+    IRType* argumentNumericType = nullptr;
+    IRType* parameterNumericType = nullptr;
+    auto argumentNumericPointer =
+        asNVVMSupportedLocalNumericPointerType(argumentType, &argumentNumericType);
+    auto parameterNumericPointer =
+        asNVVMSupportedLocalNumericPointerType(parameterType, &parameterNumericType);
+    return argumentNumericPointer && argumentNumericPointer->getOp() == kIROp_PtrType &&
+           parameterNumericPointer && parameterNumericPointer->getOp() == kIROp_OutParamType &&
+           isTypeEqual(argumentNumericType, parameterNumericType);
 }
 
 // Returns whether a canonical helper signature needs the generic construction path.
@@ -2430,7 +2580,14 @@ SlangResult _validateNVVMFunction(
             {
             case kIROp_Var:
                 {
+                    IRType* numericValueType = nullptr;
                     IRStructType* valueType = nullptr;
+                    if (asNVVMSupportedLocalNumericPointerType(
+                            inst->getDataType(),
+                            &numericValueType))
+                    {
+                        break;
+                    }
                     if (!asNVVMSupportedLocalCopyableStructPointerType(
                             inst->getDataType(),
                             &valueType))
@@ -2630,7 +2787,15 @@ SlangResult _validateNVVMFunction(
                                                   : "native Half surface store"));
                         break;
                     }
+                    const char* textureDiagnosticName = nullptr;
                     if (_resolveNVVMTextureGenericAsm(genericAsm, function, textureOperation))
+                        textureDiagnosticName = "scalar Float sampled texture level operation";
+                    else if (_resolveNVVMTextureDimensionsGenericAsm(
+                                 genericAsm,
+                                 function,
+                                 textureOperation))
+                        textureDiagnosticName = "sampled texture dimension query";
+                    if (textureDiagnosticName)
                     {
                         auto genericBlock = as<IRBlock>(genericAsm->getParent());
                         auto entryBranch = as<IRUnconditionalBranch>(entryBlock->getTerminator());
@@ -2643,11 +2808,11 @@ SlangResult _validateNVVMFunction(
                         {
                             return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                         }
-                        _requireTextureOperation(
+                        _requireTextureOperations(
                             requirements.textureOperations,
                             function,
-                            textureOperation.desc,
-                            "scalar Float sampled texture level operation");
+                            textureOperation,
+                            textureDiagnosticName);
                         break;
                     }
                     if (functionBlocks.getCount() != 1 || genericAsm->getOperandCount() != 1 ||
@@ -2786,6 +2951,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_UnconditionalBranch:
             case kIROp_Loop:
             case kIROp_IfElse:
+            case kIROp_Switch:
                 break;
 
             default:
@@ -2968,7 +3134,8 @@ SlangResult _validateNVVMFunction(
                                 codeGenContext,
                                 toSlice("call argument type"));
                         }
-                        if (asNVVMSupportedLocalScalarStructPointerType(argument->getDataType()))
+                        if (asNVVMSupportedLocalScalarStructPointerType(argument->getDataType()) ||
+                            asNVVMSupportedLocalNumericPointerType(argument->getDataType()))
                         {
                             SLANG_RETURN_ON_FAIL(_validatePointerValue(
                                 codeGenContext,
@@ -3488,6 +3655,78 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_Switch:
+                {
+                    auto switchInst = cast<IRSwitch>(inst);
+                    if (switchInst != terminator)
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("switch position"));
+                    if (!switchInst->getCondition() ||
+                        !isNVVMSupportedIntegerScalarType(
+                            switchInst->getCondition()->getDataType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("integer switch condition"));
+                    }
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        switchInst->getCondition(),
+                        switchInst,
+                        availableValues,
+                        dominatorTree));
+                    SLANG_RETURN_ON_FAIL(_validateBlockTarget(
+                        codeGenContext,
+                        switchInst->getBreakLabel(),
+                        functionBlocks));
+
+                    IRBlock* defaultBlock = switchInst->getDefaultLabel();
+                    if (!defaultBlock)
+                        defaultBlock = switchInst->getBreakLabel();
+                    SLANG_RETURN_ON_FAIL(
+                        _validateBlockTarget(codeGenContext, defaultBlock, functionBlocks));
+                    if (defaultBlock->getFirstParam())
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("switch default target parameter"));
+                    }
+
+                    for (UInt caseIndex = 0; caseIndex < switchInst->getCaseCount(); ++caseIndex)
+                    {
+                        auto caseValue = _asExecutableSelectedIntegerConstant(
+                            switchInst->getCaseValue(caseIndex));
+                        IRBlock* caseBlock = switchInst->getCaseLabel(caseIndex);
+                        if (!caseValue || !isTypeEqual(
+                                              caseValue->getDataType(),
+                                              switchInst->getCondition()->getDataType()))
+                        {
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("integer switch case value"));
+                        }
+                        SLANG_RETURN_ON_FAIL(
+                            _validateBlockTarget(codeGenContext, caseBlock, functionBlocks));
+                        if (caseBlock->getFirstParam())
+                        {
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("switch case target parameter"));
+                        }
+                        for (UInt previousIndex = 0; previousIndex < caseIndex; ++previousIndex)
+                        {
+                            auto previousValue =
+                                cast<IRIntLit>(switchInst->getCaseValue(previousIndex));
+                            if (previousValue->getValue() == caseValue->getValue())
+                            {
+                                return _diagnoseUnsupportedIR(
+                                    codeGenContext,
+                                    toSlice("duplicate integer switch case"));
+                            }
+                        }
+                    }
+                }
+                break;
+
             default:
                 SLANG_UNEXPECTED("NVVM validation reached an unclassified instruction");
             }
@@ -3932,12 +4171,15 @@ SlangResult emitNVVMIRFromLinkedIR(
     }
     for (const auto& requirement : requirements.textureOperations)
     {
-        if (!builder.supportsTextureOperation(requirement.desc))
+        for (uint32_t i = 0; i < requirement.operationCount; ++i)
         {
-            return _requireBuilderOperation(
-                codeGenContext,
-                requirement.diagnosticName,
-                SLANG_E_NOT_AVAILABLE);
+            if (!builder.supportsTextureOperation(requirement.operations[i]))
+            {
+                return _requireBuilderOperation(
+                    codeGenContext,
+                    requirement.diagnosticName,
+                    SLANG_E_NOT_AVAILABLE);
+            }
         }
     }
 
@@ -4194,10 +4436,17 @@ SlangResult emitNVVMIRFromLinkedIR(
                 {
                 case kIROp_Var:
                     {
-                        IRStructType* valueType = nullptr;
-                        SLANG_RELEASE_ASSERT(asNVVMSupportedLocalCopyableStructPointerType(
-                            inst->getDataType(),
-                            &valueType));
+                        IRType* valueType = nullptr;
+                        if (!asNVVMSupportedLocalNumericPointerType(
+                                inst->getDataType(),
+                                &valueType))
+                        {
+                            IRStructType* structValueType = nullptr;
+                            SLANG_RELEASE_ASSERT(asNVVMSupportedLocalCopyableStructPointerType(
+                                inst->getDataType(),
+                                &structValueType));
+                            valueType = structValueType;
+                        }
                         SlangNVVMTypeHandle loweredValueType = nullptr;
                         SLANG_RETURN_ON_FAIL(
                             typeContext.lowerType(valueType, NVVMTypeUse::Value, loweredValueType));
@@ -4206,7 +4455,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredStorage = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "local copyable-struct storage",
+                            "local copyable storage",
                             builder.emitLocalStorage(
                                 moduleScope.module,
                                 loweredValueType,
@@ -4770,14 +5019,103 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 function))
                         {
                             IRParam* texture = function->getFirstParam();
+                            SlangNVVMValueHandle loweredTexture = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                texture,
+                                valueMap,
+                                typeContext,
+                                loweredTexture));
+                            if (textureRequirement->outputParameterCount)
+                            {
+                                IRParam* output = texture->getNextParam();
+                                for (uint32_t i = 0; i < textureRequirement->operationCount;
+                                     ++i, output = output->getNextParam())
+                                {
+                                    SlangNVVMValueHandle loweredValue = nullptr;
+                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                        codeGenContext,
+                                        textureRequirement->diagnosticName,
+                                        builder.emitTextureOperation(
+                                            moduleScope.module,
+                                            textureRequirement->operations[i],
+                                            &loweredTexture,
+                                            1,
+                                            loweredValue)));
+                                    SlangNVVMValueHandle loweredOutput = nullptr;
+                                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                        codeGenContext,
+                                        builder,
+                                        moduleScope.module,
+                                        output,
+                                        valueMap,
+                                        typeContext,
+                                        loweredOutput));
+                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                        codeGenContext,
+                                        "texture dimension output store",
+                                        builder.emitStore(
+                                            moduleScope.module,
+                                            loweredValue,
+                                            loweredOutput,
+                                            4)));
+                                }
+                                if (textureRequirement->writesTrailingZero)
+                                {
+                                    SLANG_RELEASE_ASSERT(output);
+                                    SlangNVVMTypeHandle uintType = nullptr;
+                                    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                                        cast<IRPtrTypeBase>(output->getDataType())->getValueType(),
+                                        NVVMTypeUse::Value,
+                                        uintType));
+                                    SlangNVVMValueHandle zero = nullptr;
+                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                        codeGenContext,
+                                        "texture array-size zero",
+                                        builder.getIntegerConstant(
+                                            moduleScope.module,
+                                            uintType,
+                                            0,
+                                            zero)));
+                                    SlangNVVMValueHandle loweredOutput = nullptr;
+                                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                        codeGenContext,
+                                        builder,
+                                        moduleScope.module,
+                                        output,
+                                        valueMap,
+                                        typeContext,
+                                        loweredOutput));
+                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                        codeGenContext,
+                                        "texture array-size zero store",
+                                        builder.emitStore(
+                                            moduleScope.module,
+                                            zero,
+                                            loweredOutput,
+                                            4)));
+                                }
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "void return",
+                                    builder.emitReturnVoid(moduleScope.module)));
+                                break;
+                            }
+
                             IRParam* coordinate = texture->getNextParam()->getNextParam();
                             IRInst* semanticOperands[] = {
                                 texture,
                                 coordinate,
                                 coordinate->getNextParam(),
                             };
-                            SlangNVVMValueHandle loweredOperands[3] = {};
-                            for (size_t i = 0; i < SLANG_COUNT_OF(semanticOperands); ++i)
+                            SlangNVVMValueHandle loweredOperands[] = {
+                                loweredTexture,
+                                nullptr,
+                                nullptr,
+                            };
+                            for (size_t i = 1; i < SLANG_COUNT_OF(semanticOperands); ++i)
                             {
                                 SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                     codeGenContext,
@@ -4794,7 +5132,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 textureRequirement->diagnosticName,
                                 builder.emitTextureOperation(
                                     moduleScope.module,
-                                    textureRequirement->desc,
+                                    textureRequirement->operations[0],
                                     loweredOperands,
                                     SLANG_COUNT_OF(loweredOperands),
                                     loweredValue)));
@@ -5277,6 +5615,53 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 loweredCondition,
                                 blockMap.getValue(ifElse->getTrueBlock()),
                                 blockMap.getValue(ifElse->getFalseBlock()))));
+                    }
+                    break;
+
+                case kIROp_Switch:
+                    {
+                        auto switchInst = cast<IRSwitch>(inst);
+                        SlangNVVMValueHandle loweredCondition = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            switchInst->getCondition(),
+                            valueMap,
+                            typeContext,
+                            loweredCondition));
+
+                        List<SlangNVVMValueHandle> loweredCaseValues;
+                        List<SlangNVVMBlockHandle> loweredCaseBlocks;
+                        for (UInt caseIndex = 0; caseIndex < switchInst->getCaseCount();
+                             ++caseIndex)
+                        {
+                            SlangNVVMValueHandle loweredCaseValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                switchInst->getCaseValue(caseIndex),
+                                valueMap,
+                                typeContext,
+                                loweredCaseValue));
+                            loweredCaseValues.add(loweredCaseValue);
+                            loweredCaseBlocks.add(
+                                blockMap.getValue(switchInst->getCaseLabel(caseIndex)));
+                        }
+                        IRBlock* defaultBlock = switchInst->getDefaultLabel();
+                        if (!defaultBlock)
+                            defaultBlock = switchInst->getBreakLabel();
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "integer switch",
+                            builder.emitSwitch(
+                                moduleScope.module,
+                                loweredCondition,
+                                loweredCaseValues.getBuffer(),
+                                loweredCaseBlocks.getBuffer(),
+                                size_t(loweredCaseValues.getCount()),
+                                blockMap.getValue(defaultBlock))));
                     }
                     break;
 

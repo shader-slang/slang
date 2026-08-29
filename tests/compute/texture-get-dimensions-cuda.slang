@@ -1,4 +1,10 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+//NVVM-DAG: txq.width.b32
+//NVVM-DAG: txq.height.b32
+//NVVM-DAG: txq.depth.b32
 
 // Only testing the dimensions available in CUDA via txq:
 // - txq.width.b32
@@ -83,4 +89,4 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             break;
         }
     }
-} 
+}

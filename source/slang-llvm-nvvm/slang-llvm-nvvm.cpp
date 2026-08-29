@@ -1147,6 +1147,56 @@ static SlangResult SLANG_NVVM_CALL _emitConditionalBranch(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitSwitch(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle condition,
+    const SlangNVVMValueHandle* caseValues,
+    const SlangNVVMBlockHandle* caseBlocks,
+    size_t caseCount,
+    SlangNVVMBlockHandle defaultBlock)
+{
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmCondition = _getValue(condition);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::BasicBlock* llvmDefaultBlock = _getBlock(defaultBlock);
+    if (!insertionBlock || !llvmCondition || !llvmCondition->getType()->isIntegerTy() ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmCondition) ||
+        !llvmDefaultBlock || llvmDefaultBlock->getParent() != insertionBlock->getParent() ||
+        caseCount > UINT32_MAX || (caseCount && (!caseValues || !caseBlocks)))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    for (size_t i = 0; i < caseCount; ++i)
+    {
+        llvm::ConstantInt* caseValue =
+            llvm::dyn_cast_or_null<llvm::ConstantInt>(_getValue(caseValues[i]));
+        llvm::BasicBlock* caseBlock = _getBlock(caseBlocks[i]);
+        if (!caseValue || caseValue->getType() != llvmCondition->getType() || !caseBlock ||
+            caseBlock->getParent() != insertionBlock->getParent())
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+        for (size_t j = 0; j < i; ++j)
+        {
+            llvm::ConstantInt* previousValue =
+                llvm::dyn_cast_or_null<llvm::ConstantInt>(_getValue(caseValues[j]));
+            if (previousValue && previousValue->getValue() == caseValue->getValue())
+                return SLANG_E_INVALID_ARG;
+        }
+    }
+
+    llvm::SwitchInst* switchInst =
+        state->builder.CreateSwitch(llvmCondition, llvmDefaultBlock, unsigned(caseCount));
+    for (size_t i = 0; i < caseCount; ++i)
+    {
+        switchInst->addCase(
+            llvm::cast<llvm::ConstantInt>(_getValue(caseValues[i])),
+            _getBlock(caseBlocks[i]));
+    }
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _getIntegerConstant(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle integerType,
@@ -2152,6 +2202,23 @@ static SlangResult _writeLegacyNVVMAssembly(
                 return SLANG_E_NOT_AVAILABLE;
             }
             _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
+        }
+        else if (
+            intrinsicID == llvm::Intrinsic::nvvm_txq_width ||
+            intrinsicID == llvm::Intrinsic::nvvm_txq_height ||
+            intrinsicID == llvm::Intrinsic::nvvm_txq_depth)
+        {
+            const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
+            llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
+            llvm::Type* int64Type = llvm::Type::getInt64Ty(state->context);
+            if (!function.isDeclaration() || function.getReturnType() != int32Type ||
+                function.arg_size() != 1 || function.arg_begin()->getType() != int64Type ||
+                functionAttributes.getNumAttributes() != 2 ||
+                !function.hasFnAttribute(llvm::Attribute::NoUnwind) ||
+                !function.hasFnAttribute(llvm::Attribute::ReadNone))
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
         }
         for (llvm::BasicBlock& block : function)
         {
@@ -3286,11 +3353,25 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
                                   operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
                                   operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D ||
                                   operation.shape == SLANG_NVVM_TEXTURE_SHAPE_CUBE;
-    return operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL && isSupportedShape &&
-           operation.isArray <= 1 &&
-           !(operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && operation.isArray) &&
-           operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-           operation.elementType.bitWidth == 32 && operation.elementType.laneCount == 1;
+    if (!isSupportedShape || operation.isArray > 1 ||
+        (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && operation.isArray) ||
+        operation.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
+        operation.elementType.bitWidth != 32 || operation.elementType.laneCount != 1)
+    {
+        return false;
+    }
+    switch (operation.operation)
+    {
+    case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
+    case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
+        return true;
+    case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
+        return operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
+    case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
+        return operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
+    default:
+        return false;
+    }
 }
 
 static SlangResult SLANG_NVVM_CALL
@@ -3308,6 +3389,16 @@ static llvm::Intrinsic::ID _getTextureIntrinsicID(const SlangNVVMTextureOperatio
 {
     if (!_isTextureOperationSupported(operation))
         return llvm::Intrinsic::not_intrinsic;
+
+    switch (operation.operation)
+    {
+    case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
+        return llvm::Intrinsic::nvvm_txq_width;
+    case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
+        return llvm::Intrinsic::nvvm_txq_height;
+    case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
+        return llvm::Intrinsic::nvvm_txq_depth;
+    }
 
     if (operation.isArray)
     {
@@ -3349,33 +3440,47 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
         *outValue = nullptr;
     ModuleState* state = _getModule(module);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!state || !insertionBlock || !operation || !operands || operandCount != 3 || !outValue ||
+    const size_t expectedOperandCount =
+        operation && operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ? 3 : 1;
+    if (!state || !insertionBlock || !operation || !operands ||
+        operandCount != expectedOperandCount || !outValue ||
         !_isTextureOperationSupported(*operation))
     {
         return SLANG_E_INVALID_ARG;
     }
 
     llvm::Value* texture = _getValue(operands[0]);
-    llvm::Value* coordinate = _getValue(operands[1]);
-    llvm::Value* level = _getValue(operands[2]);
+    const bool isSampleLevel = operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL;
+    llvm::Value* coordinate = isSampleLevel ? _getValue(operands[1]) : nullptr;
+    llvm::Value* level = isSampleLevel ? _getValue(operands[2]) : nullptr;
     llvm::Type* floatType = llvm::Type::getFloatTy(state->context);
     const uint32_t coordinateLaneCount = _getTextureCoordinateLaneCount(*operation);
     llvm::Type* expectedCoordinateType =
         coordinateLaneCount == 1 ? floatType
                                  : llvm::FixedVectorType::get(floatType, coordinateLaneCount);
     const llvm::Intrinsic::ID intrinsicID = _getTextureIntrinsicID(*operation);
-    if (!texture || !texture->getType()->isIntegerTy(64) || !coordinate ||
-        coordinate->getType() != expectedCoordinateType || !level ||
-        level->getType() != floatType || intrinsicID == llvm::Intrinsic::not_intrinsic ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, texture) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, coordinate) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, level))
+    if (!texture || !texture->getType()->isIntegerTy(64) ||
+        (isSampleLevel && (!coordinate || coordinate->getType() != expectedCoordinateType ||
+                           !level || level->getType() != floatType ||
+                           !_isValueUsableAtInsertionPoint(state, insertionBlock, coordinate) ||
+                           !_isValueUsableAtInsertionPoint(state, insertionBlock, level))) ||
+        intrinsicID == llvm::Intrinsic::not_intrinsic ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, texture))
     {
         return SLANG_E_INVALID_ARG;
     }
 
     llvm::SmallVector<llvm::Value*, 6> arguments;
     arguments.push_back(texture);
+    if (!isSampleLevel)
+    {
+        llvm::Function* intrinsic =
+            llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
+        *outValue =
+            reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(intrinsic, arguments));
+        return SLANG_OK;
+    }
+
     const uint32_t ordinaryCoordinateLaneCount = coordinateLaneCount - operation->isArray;
     if (operation->isArray)
     {
@@ -3430,6 +3535,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitLocalStorage = _emitLocalStorage;
     api.emitBranch = _emitBranch;
     api.emitConditionalBranch = _emitConditionalBranch;
+    api.emitSwitch = _emitSwitch;
     api.getIntegerConstant = _getIntegerConstant;
     api.getFloatingPointConstant = _getFloatingPointConstant;
     api.emitPhi = _emitPhi;

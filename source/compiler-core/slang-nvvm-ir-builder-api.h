@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 14u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 15u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -176,6 +176,9 @@ extern "C"
 
     typedef uint32_t SlangNVVMTextureOperation;
 #define SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ((SlangNVVMTextureOperation)0u)
+#define SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH ((SlangNVVMTextureOperation)1u)
+#define SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT ((SlangNVVMTextureOperation)2u)
+#define SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH ((SlangNVVMTextureOperation)3u)
 
     typedef uint32_t SlangNVVMTextureShape;
 #define SLANG_NVVM_TEXTURE_SHAPE_1D ((SlangNVVMTextureShape)1u)
@@ -317,6 +320,13 @@ extern "C"
             SlangNVVMValueHandle condition,
             SlangNVVMBlockHandle trueBlock,
             SlangNVVMBlockHandle falseBlock);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitSwitch)(
+            SlangNVVMModuleHandle module,
+            SlangNVVMValueHandle condition,
+            const SlangNVVMValueHandle* caseValues,
+            const SlangNVVMBlockHandle* caseBlocks,
+            size_t caseCount,
+            SlangNVVMBlockHandle defaultBlock);
         SlangNVVMResult(SLANG_NVVM_CALL* getIntegerConstant)(
             SlangNVVMModuleHandle module,
             SlangNVVMTypeHandle integerType,

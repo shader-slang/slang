@@ -278,6 +278,15 @@ public:
         SlangNVVMBlockHandle trueBlock,
         SlangNVVMBlockHandle falseBlock) const;
 
+    /// Terminates the current block with a typed integer switch.
+    SlangResult emitSwitch(
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle condition,
+        const SlangNVVMValueHandle* caseValues,
+        const SlangNVVMBlockHandle* caseBlocks,
+        size_t caseCount,
+        SlangNVVMBlockHandle defaultBlock) const;
+
     /// Gets an exactly representable signed integer constant of the requested type.
     SlangResult getIntegerConstant(
         SlangNVVMModuleHandle module,
