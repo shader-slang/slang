@@ -2350,6 +2350,81 @@ struct NVVMResolvedValueOperation
     const char* diagnosticName = nullptr;
 };
 
+struct NVVMResolvedAtomicOperation
+{
+    SlangNVVMAtomicOperationDesc desc = {};
+    IRInst* pointer = nullptr;
+    IRInst* value = nullptr;
+    const char* diagnosticName = nullptr;
+};
+
+// Returns an exact writable producer whose provider representation is a typed global pointer.
+IRPtrTypeBase* _asNVVMSupportedAtomicGlobalPointer(IRInst* value)
+{
+    if (!value)
+        return nullptr;
+    if (as<IRGlobalVar>(value) || as<IRParam>(value))
+        return asNVVMSupportedDeviceNumericPointerType(value->getDataType());
+    if (value->getOp() == kIROp_RWStructuredBufferGetElementPtr)
+        return asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType());
+    return nullptr;
+}
+
+// Resolves one canonical integer atomic to the complete descriptor consumed by both preflight and
+// emission. The memory-order literal is semantic metadata and is not a provider SSA operand.
+bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMResolvedAtomicOperation& outOperation)
+{
+    outOperation = {};
+    if (!inst || inst->getOp() != kIROp_AtomicAdd || inst->getOperandCount() != 3)
+        return false;
+
+    IRInst* pointer = inst->getOperand(0);
+    IRInst* value = inst->getOperand(1);
+    auto memoryOrder = _asExecutableI32Constant(inst->getOperand(2));
+    auto pointerType = _asNVVMSupportedAtomicGlobalPointer(pointer);
+    SlangNVVMValueTypeDesc valueType = {};
+    if (!pointerType || pointerType->getAccessQualifier() != AccessQualifier::ReadWrite || !value ||
+        !isTypeEqual(pointerType->getValueType(), inst->getDataType()) ||
+        !isTypeEqual(value->getDataType(), inst->getDataType()) ||
+        !_getNVVMSemanticType(inst->getDataType(), valueType) || !memoryOrder ||
+        memoryOrder->getValue() != kIRMemoryOrder_Relaxed)
+    {
+        return false;
+    }
+
+    outOperation.desc = {
+        SLANG_NVVM_ATOMIC_OP_ADD,
+        valueType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        SLANG_NVVM_MEMORY_ORDER_RELAXED,
+    };
+    if (!NVVMSemantics::isSupported(outOperation.desc))
+        return false;
+    outOperation.pointer = pointer;
+    outOperation.value = value;
+    outOperation.diagnosticName = "relaxed global i32 atomic add";
+    return true;
+}
+
+// Records one exact atomic overload, deduplicating identical semantic descriptors.
+void _requireAtomicOperation(
+    List<NVVMAtomicOperationRequirement>& requirements,
+    const SlangNVVMAtomicOperationDesc& desc,
+    const char* diagnosticName)
+{
+    for (const auto& requirement : requirements)
+    {
+        if (requirement.desc.operation == desc.operation &&
+            NVVMSemantics::areSameType(requirement.desc.valueType, desc.valueType) &&
+            requirement.desc.addressSpace == desc.addressSpace &&
+            requirement.desc.memoryOrder == desc.memoryOrder)
+        {
+            return;
+        }
+    }
+    requirements.add({desc, diagnosticName});
+}
+
 // Records one exact typed provider operation, deduplicating identical overloads.
 void _requireValueOperation(
     NVVMValueOperationRequirements& requirements,
@@ -2722,7 +2797,8 @@ SlangResult _validatePointerValue(
     if (!expectedPointeeType || !isTypeEqual(actualPointeeType, expectedPointeeType))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device pointer pointee type"));
     if (resourceElementPtrType && consumer->getOp() != kIROp_Load &&
-        consumer->getOp() != kIROp_Store && consumer->getOp() != kIROp_SwizzledStore)
+        consumer->getOp() != kIROp_Store && consumer->getOp() != kIROp_SwizzledStore &&
+        consumer->getOp() != kIROp_AtomicAdd)
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
@@ -3331,19 +3407,15 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_AtomicAdd:
                 {
-                    if (inst->getOperandCount() != 3 || !isNVVMSignedI32Type(inst->getDataType()))
-                    {
+                    NVVMResolvedAtomicOperation operation;
+                    if (!_resolveNVVMAtomicOperation(inst, operation))
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("relaxed global signed i32 atomic add"));
-                    }
-                    auto memoryOrder = _asExecutableI32Constant(inst->getOperand(2));
-                    if (!memoryOrder || memoryOrder->getValue() != kIRMemoryOrder_Relaxed)
-                    {
-                        return _diagnoseUnsupportedIR(
-                            codeGenContext,
-                            toSlice("relaxed atomic-add memory order"));
-                    }
+                            toSlice("selected atomic operation"));
+                    _requireAtomicOperation(
+                        requirements.atomicOperations,
+                        operation.desc,
+                        operation.diagnosticName);
                 }
                 break;
 
@@ -3792,23 +3864,25 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_AtomicAdd:
-                // Operand two is the literal Relaxed policy validated in the shape pass, not an
-                // SSA value that the provider should receive.
-                SLANG_RETURN_ON_FAIL(_validatePointerValue(
-                    codeGenContext,
-                    inst->getOperand(0),
-                    inst,
-                    availableValues,
-                    dominatorTree,
-                    true,
-                    inst->getDataType()));
-                SLANG_RETURN_ON_FAIL(_validateI32Value(
-                    codeGenContext,
-                    inst->getOperand(1),
-                    inst,
-                    availableValues,
-                    dominatorTree));
-                availableValues.add(inst);
+                {
+                    NVVMResolvedAtomicOperation operation;
+                    SLANG_RELEASE_ASSERT(_resolveNVVMAtomicOperation(inst, operation));
+                    SLANG_RETURN_ON_FAIL(_validatePointerValue(
+                        codeGenContext,
+                        operation.pointer,
+                        inst,
+                        availableValues,
+                        dominatorTree,
+                        true,
+                        inst->getDataType()));
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        operation.value,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    availableValues.add(inst);
+                }
                 break;
 
             case kIROp_Call:
@@ -4937,6 +5011,16 @@ SlangResult emitNVVMIRFromLinkedIR(
                 SLANG_E_NOT_AVAILABLE);
         }
     }
+    for (const auto& requirement : requirements.atomicOperations)
+    {
+        if (!builder.supportsAtomicOperation(requirement.desc))
+        {
+            return _requireBuilderOperation(
+                codeGenContext,
+                requirement.diagnosticName,
+                SLANG_E_NOT_AVAILABLE);
+        }
+    }
     for (const auto& requirement : requirements.surfaceOperations)
     {
         if (!builder.supportsSurfaceOperation(requirement.desc))
@@ -5573,12 +5657,14 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_AtomicAdd:
                     {
+                        NVVMResolvedAtomicOperation operation;
+                        SLANG_RELEASE_ASSERT(_resolveNVVMAtomicOperation(inst, operation));
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            inst->getOperand(0),
+                            operation.pointer,
                             valueMap,
                             typeContext,
                             loweredPointer));
@@ -5587,16 +5673,17 @@ SlangResult emitNVVMIRFromLinkedIR(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            inst->getOperand(1),
+                            operation.value,
                             valueMap,
                             typeContext,
                             loweredValue));
                         SlangNVVMValueHandle loweredOriginalValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "relaxed global signed i32 atomic add",
-                            builder.emitRelaxedGlobalI32AtomicAdd(
+                            operation.diagnosticName,
+                            builder.emitAtomicOperation(
                                 moduleScope.module,
+                                operation.desc,
                                 loweredPointer,
                                 loweredValue,
                                 loweredOriginalValue)));

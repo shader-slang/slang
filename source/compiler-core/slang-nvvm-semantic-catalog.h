@@ -857,5 +857,16 @@ inline bool isSupported(const SlangNVVMValueOperationDesc& desc)
     return find(desc) || resolveValueOperationFamily(desc, resolution);
 }
 
+/// Returns whether an atomic descriptor is in the currently established direct-NVVM family.
+inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
+{
+    const bool isI32 = (desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                        desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+                       desc.valueType.bitWidth == 32 && desc.valueType.laneCount == 1;
+    return desc.operation == SLANG_NVVM_ATOMIC_OP_ADD && isI32 &&
+           desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
+           desc.memoryOrder == SLANG_NVVM_MEMORY_ORDER_RELAXED;
+}
+
 } // namespace NVVMSemantics
 } // namespace Slang

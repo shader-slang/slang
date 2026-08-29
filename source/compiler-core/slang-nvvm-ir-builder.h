@@ -37,6 +37,10 @@ public:
     {
         return &m_valueOperations;
     }
+    const SlangNVVMBuilderAtomicOperationsAPI* getAtomicOperationsAPI() const
+    {
+        return &m_atomicOperations;
+    }
     const SlangNVVMBuilderSurfaceOperationsAPI* getSurfaceOperationsAPI() const
     {
         return &m_surfaceOperations;
@@ -56,6 +60,17 @@ public:
         const SlangNVVMValueHandle* operands,
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
+
+    /// Queries one complete typed atomic read-modify-write operation.
+    bool supportsAtomicOperation(const SlangNVVMAtomicOperationDesc& operation) const;
+
+    /// Emits one complete typed atomic read-modify-write operation.
+    SlangResult emitAtomicOperation(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMAtomicOperationDesc& operation,
+        SlangNVVMValueHandle pointer,
+        SlangNVVMValueHandle value,
+        SlangNVVMValueHandle& outOriginalValue) const;
 
     /// Queries one complete typed surface-resource operation.
     bool supportsSurfaceOperation(const SlangNVVMSurfaceOperationDesc& operation) const;
@@ -449,13 +464,6 @@ public:
         SlangNVVMValueHandle value,
         SlangNVVMValueHandle& outValue) const;
 
-    /// Emits relaxed device-scope atomic add through a naturally aligned global i32 pointer.
-    SlangResult emitRelaxedGlobalI32AtomicAdd(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle pointer,
-        SlangNVVMValueHandle value,
-        SlangNVVMValueHandle& outOriginalValue) const;
-
     /// Emits scalar integer equality and returns an i1 value.
     SlangResult emitIntegerEqual(
         SlangNVVMModuleHandle module,
@@ -516,6 +524,7 @@ private:
     SlangNVVMBuilderFoundationAPI m_foundation = {};
     SlangNVVMBuilderConstructionAPI m_construction = {};
     SlangNVVMBuilderValueOperationsAPI m_valueOperations = {};
+    SlangNVVMBuilderAtomicOperationsAPI m_atomicOperations = {};
     SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
     SlangNVVMBuilderTextureOperationsAPI m_textureOperations = {};
     ComPtr<ISlangSharedLibrary> m_library;

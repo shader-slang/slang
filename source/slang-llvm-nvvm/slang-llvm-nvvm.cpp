@@ -856,8 +856,9 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerNegate(
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _emitRelaxedGlobalI32AtomicAdd(
+static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     SlangNVVMModuleHandle module,
+    const SlangNVVMAtomicOperationDesc* operation,
     SlangNVVMValueHandle pointer,
     SlangNVVMValueHandle value,
     SlangNVVMValueHandle* outOriginalValue)
@@ -871,9 +872,9 @@ static SlangResult SLANG_NVVM_CALL _emitRelaxedGlobalI32AtomicAdd(
     llvm::PointerType* pointerType = _getLoadablePointerType(state, llvmPointer);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     llvm::Type* pointeeType = pointerType ? pointerType->getNonOpaquePointerElementType() : nullptr;
-    if (!outOriginalValue || !pointerType ||
-        pointerType->getAddressSpace() != SLANG_NVVM_ADDRESS_SPACE_GLOBAL || !pointeeType ||
-        !pointeeType->isIntegerTy(32) || !insertionBlock || !llvmValue ||
+    if (!operation || !Slang::NVVMSemantics::isSupported(*operation) || !outOriginalValue ||
+        !pointerType || pointerType->getAddressSpace() != operation->addressSpace || !pointeeType ||
+        !pointeeType->isIntegerTy(operation->valueType.bitWidth) || !insertionBlock || !llvmValue ||
         llvmValue->getType() != pointeeType ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue))
@@ -885,7 +886,7 @@ static SlangResult SLANG_NVVM_CALL _emitRelaxedGlobalI32AtomicAdd(
         llvm::AtomicRMWInst::Add,
         llvmPointer,
         llvmValue,
-        llvm::Align(4),
+        llvm::Align(operation->valueType.bitWidth / 8),
         llvm::AtomicOrdering::Monotonic,
         llvm::SyncScope::System);
     *outOriginalValue = reinterpret_cast<SlangNVVMValueHandle>(originalValue);
@@ -2620,6 +2621,17 @@ _isOperationSupported(const SlangNVVMValueOperationDesc* operation, uint32_t* ou
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL
+_isAtomicOperationSupported(const SlangNVVMAtomicOperationDesc* operation, uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!operation || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported = Slang::NVVMSemantics::isSupported(*operation) ? 1u : 0u;
+    return SLANG_OK;
+}
+
 static bool _getExecutionRegisterIntrinsicIDs(
     SlangNVVMValueOperation operation,
     llvm::Intrinsic::ID (&outIntrinsicIDs)[3])
@@ -3729,7 +3741,6 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitAggregateElementExtract = _emitAggregateElementExtract;
     api.emitVectorConstruct = _emitVectorConstruct;
     api.emitSequentialElementExtract = _emitSequentialElementExtract;
-    api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;
     api.declareGlobalStorage = _declareGlobalStorage;
     api.markFunctionAsKernel = _markFunctionAsKernel;
 }
@@ -3739,6 +3750,13 @@ static void _fillBuilderValueOperationsAPI(SlangNVVMBuilderValueOperationsAPI& a
     api = {};
     api.isOperationSupported = _isOperationSupported;
     api.emitOperation = _emitOperation;
+}
+
+static void _fillBuilderAtomicOperationsAPI(SlangNVVMBuilderAtomicOperationsAPI& api)
+{
+    api = {};
+    api.isOperationSupported = _isAtomicOperationSupported;
+    api.emitOperation = _emitAtomicOperation;
 }
 
 static void _fillBuilderSurfaceOperationsAPI(SlangNVVMBuilderSurfaceOperationsAPI& api)
@@ -3781,6 +3799,12 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         _fillBuilderValueOperationsAPI(api);
         return api;
     }();
+    static const SlangNVVMBuilderAtomicOperationsAPI atomicOperations = []
+    {
+        SlangNVVMBuilderAtomicOperationsAPI api;
+        _fillBuilderAtomicOperationsAPI(api);
+        return api;
+    }();
     static const SlangNVVMBuilderSurfaceOperationsAPI surfaceOperations = []
     {
         SlangNVVMBuilderSurfaceOperationsAPI api;
@@ -3804,6 +3828,9 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS:
         *outInterface = &valueOperations;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_ATOMIC_OPERATIONS:
+        *outInterface = &atomicOperations;
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS:
         *outInterface = &surfaceOperations;

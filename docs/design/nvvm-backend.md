@@ -5725,6 +5725,30 @@ bit reinterpretation. Its 1,447-byte PTX uses native Float64 instructions and as
 5,096-byte cubin. Focused boundary tests preserve Double-vector and raw-entry rejection, and the
 complete NVVM unit-test prefix passes 387/387.
 
+### Slice 121: Generic integer atomic interface
+
+Forward-only builder ABI revision 21 replaces the construction table's bespoke relaxed global
+signed-i32 atomic-add callback with one queried atomic-operation interface. Its descriptor carries
+the operation, exact value type, physical address space, and memory order. Compiler preflight,
+provider capability discovery, and emission all use that descriptor and the shared semantic
+catalog; there is no compatibility alias or second support table.
+
+The first catalog rows admit scalar Int32 and UInt32 add with relaxed ordering in global memory.
+The destination must be an established writable device-pointer parameter/global or a direct
+`rwstructuredBufferGetElementPtr` result whose pointee exactly matches the atomic value/result.
+Shared memory, stronger orders, wider and floating values, other pointer producers, and other RMW
+operations remain rejected before provider mutation. LLVM integer signedness is not physical, so
+both admitted source types lower to the same naturally aligned monotonic system-scope
+`atomicrmw add i32`. The existing semantic LLVM 14-to-LLVM 7 compatibility serializer validates
+each such instruction without needing another textual rewrite.
+
+`tests/compute/atomics.slang` now passes its unchanged four-thread CUDA runtime result and a direct
+PTX lane. Its 880-byte PTX contains exactly three `atom.global.add.u32` instructions and assembles
+with CUDA 12.9.86 `ptxas -arch=sm_70` to a 2,920-byte cubin. Focused real/fake-provider tests cover
+both signed device pointers and unsigned structured-buffer elements, invalid descriptor
+dimensions, pointer/value mismatches, unavailable values, and missing provider interfaces.
+Release host/provider builds pass, and the complete NVVM unit-test prefix passes 388/388.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5776,7 +5800,9 @@ The following remain open until their named slice supplies evidence:
   padding, true mutable device globals beyond the established actual-global atomic subset,
   thread-local contexts beyond flat scalar fields, additional shared-memory shapes, and
   address spaces;
-- every other atomic operation, memory order, value type, pointer shape, and address space, plus a
+- atomics beyond relaxed global scalar Int32/UInt32 add through established writable device
+  pointers and direct structured-buffer elements, including every other operation, memory order,
+  value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float

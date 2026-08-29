@@ -26,6 +26,13 @@ struct NVVMValueOperationRequirement
 
 using NVVMValueOperationRequirements = List<NVVMValueOperationRequirement>;
 
+/// Owns one exact typed atomic-operation overload required by accepted linked IR.
+struct NVVMAtomicOperationRequirement
+{
+    SlangNVVMAtomicOperationDesc desc = {};
+    const char* diagnosticName = nullptr;
+};
+
 /// Owns one exact typed surface-operation overload required by accepted linked IR.
 struct NVVMSurfaceOperationRequirement
 {
@@ -49,6 +56,7 @@ struct NVVMTextureOperationRequirement
 struct NVVMOperationRequirements
 {
     NVVMValueOperationRequirements valueOperations;
+    List<NVVMAtomicOperationRequirement> atomicOperations;
     List<NVVMSurfaceOperationRequirement> surfaceOperations;
     List<NVVMTextureOperationRequirement> textureOperations;
 };

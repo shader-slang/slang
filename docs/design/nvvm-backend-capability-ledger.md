@@ -1685,3 +1685,22 @@ records the exact three typed operands, while the direct emitter maps only canon
 `logic-no-short-circuit-evaluation.slang` probe advances through select and stops at its independent
 mutable module-scope `static int` pointer, which requires an initializer-preserving global-storage
 contract. Release host/provider builds pass, and the complete NVVM unit-test prefix passes 382/382.
+
+Slice 121 replaces the construction API's bespoke signed-i32 atomic-add callback with one queried,
+descriptor-driven atomic-operation interface in forward-only builder ABI revision 21. The
+descriptor's independent operation, value-type, physical-address-space, and memory-order fields
+are resolved once and checked by the compiler, shared semantic catalog, real/fake providers, and
+emission. No compatibility callback or duplicate support table remains.
+
+The initial exact family is relaxed global scalar Int32/UInt32 add. Accepted pointers are
+established writable device-pointer parameters/globals and direct structured-buffer element
+pointers with an exactly matching pointee. The provider emits naturally aligned monotonic
+system-scope LLVM `atomicrmw add i32`; LLVM's signless integer type covers both catalog rows, and
+the existing semantic LLVM 7 compatibility serializer validates the instruction unchanged.
+Other operations, orders, value types, pointer producers, and address spaces remain unsupported.
+
+The unchanged `tests/compute/atomics.slang` result passes direct CUDA execution. Its 880-byte PTX
+contains exactly three `atom.global.add.u32` instructions and CUDA 12.9.86
+`ptxas -arch=sm_70` emits a 2,920-byte cubin. Release host/provider builds pass, focused tests cover
+both admitted signedness rows and adjacent invalid dimensions, and the complete NVVM prefix passes
+388/388.

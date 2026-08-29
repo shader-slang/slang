@@ -128,7 +128,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=20") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=21") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -638,6 +638,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsCurrentABIMismatches)
 SLANG_UNIT_TEST(nvvmIRBuilderRequiresCompleteCurrentInterfaces)
 {
     _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.omittedInterface = SLANG_NVVM_BUILDER_INTERFACE_ATOMIC_OPERATIONS;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+    }
+
+    _resetDirectNVVMFakes();
     gFakeNVVMBuilder.omittedInterface = SLANG_NVVM_BUILDER_INTERFACE_TEXTURE_OPERATIONS;
     {
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
@@ -711,6 +719,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderRequiresCompleteCurrentInterfaces)
 
     _resetDirectNVVMFakes();
     gFakeNVVMBuilder.valueOperations.isOperationSupported = nullptr;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+    }
+
+    _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.atomicOperationsAPI.emitOperation = nullptr;
     {
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
         NVVMIRBuilder builder;
@@ -6106,7 +6122,7 @@ NVVM_SCALAR_INVALID_TEST(nvvmIRBuilderRejectsInvalidIntegerBitOrOperations, BitO
 NVVM_SCALAR_INVALID_TEST(nvvmIRBuilderRejectsInvalidIntegerBitXorOperations, BitXor)
 NVVM_SCALAR_INVALID_TEST(nvvmIRBuilderRejectsInvalidIntegerBitNotOperations, BitNot)
 NVVM_SCALAR_INVALID_TEST(nvvmIRBuilderRejectsInvalidIntegerNegateOperations, Negate)
-SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRelaxedGlobalI32AtomicAddOperations)
+SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidAtomicOperations)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
@@ -6278,13 +6294,53 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRelaxedGlobalI32AtomicAddOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(foreignModule.module, foreignBlock)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(foreignModule.module)));
 
+    const SlangNVVMAtomicOperationDesc atomicOperation = {
+        SLANG_NVVM_ATOMIC_OP_ADD,
+        NVVMSemantics::kSignedI32,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        SLANG_NVVM_MEMORY_ORDER_RELAXED,
+    };
+    SLANG_CHECK(builder.supportsAtomicOperation(atomicOperation));
+    SlangNVVMAtomicOperationDesc unsignedAtomicOperation = atomicOperation;
+    unsignedAtomicOperation.valueType = NVVMSemantics::kUnsignedI32;
+    SLANG_CHECK(builder.supportsAtomicOperation(unsignedAtomicOperation));
+
+    SlangNVVMAtomicOperationDesc unsupportedAtomicOperation = atomicOperation;
+    unsupportedAtomicOperation.operation = SLANG_NVVM_ATOMIC_OP_SUBTRACT;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    unsupportedAtomicOperation = atomicOperation;
+    unsupportedAtomicOperation.operation =
+        SlangNVVMAtomicOperation(SLANG_NVVM_ATOMIC_OPERATION_COUNT);
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    unsupportedAtomicOperation = atomicOperation;
+    unsupportedAtomicOperation.valueType.bitWidth = 64;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    unsupportedAtomicOperation = atomicOperation;
+    unsupportedAtomicOperation.valueType.laneCount = 2;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    unsupportedAtomicOperation = atomicOperation;
+    unsupportedAtomicOperation.valueType.kind = SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    unsupportedAtomicOperation = atomicOperation;
+    unsupportedAtomicOperation.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    unsupportedAtomicOperation = atomicOperation;
+    unsupportedAtomicOperation.addressSpace = SlangNVVMAddressSpace(99);
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    unsupportedAtomicOperation = atomicOperation;
+    unsupportedAtomicOperation.memoryOrder = SLANG_NVVM_MEMORY_ORDER_ACQUIRE;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    unsupportedAtomicOperation = atomicOperation;
+    unsupportedAtomicOperation.memoryOrder = SlangNVVMMemoryOrder(SLANG_NVVM_MEMORY_ORDER_COUNT);
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+
     auto expectRejected = [&](SlangNVVMModuleHandle targetModule,
                               SlangNVVMValueHandle pointer,
                               SlangNVVMValueHandle addend)
     {
         SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
         SLANG_CHECK(
-            builder.emitRelaxedGlobalI32AtomicAdd(targetModule, pointer, addend, rejected) ==
+            builder.emitAtomicOperation(targetModule, atomicOperation, pointer, addend, rejected) ==
             SLANG_E_INVALID_ARG);
         SLANG_CHECK(rejected == nullptr);
     };
@@ -6335,10 +6391,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRelaxedGlobalI32AtomicAddOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(module.module, mergeBlock)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, consumerBlock)));
-    const SlangNVVMBuilderConstructionAPI* api = builder.getConstructionAPI();
+    const SlangNVVMBuilderAtomicOperationsAPI* api = builder.getAtomicOperationsAPI();
     SLANG_CHECK_ABORT(api != nullptr);
     SLANG_CHECK(
-        api->emitRelaxedGlobalI32AtomicAdd(module.module, destination, value, nullptr) ==
+        api->emitOperation(module.module, &atomicOperation, destination, value, nullptr) ==
         SLANG_E_INVALID_ARG);
     expectRejected(module.module, nullptr, value);
     expectRejected(module.module, destination, nullptr);
@@ -6359,7 +6415,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidRelaxedGlobalI32AtomicAddOperations)
 
     SlangNVVMValueHandle oldValue = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitRelaxedGlobalI32AtomicAdd(module.module, destination, value, oldValue)));
+        builder.emitAtomicOperation(module.module, atomicOperation, destination, value, oldValue)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.emitStore(module.module, oldValue, oldValueDestination, 4)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(module.module, mergeBlock)));
