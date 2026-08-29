@@ -269,6 +269,36 @@ IRPtrTypeBase* asNVVMSupportedLocalNumericPointerType(IRInst* type, IRType** out
     return pointerType;
 }
 
+IRPtrTypeBase* asNVVMSupportedLocalNumericArrayPointerType(
+    IRInst* type,
+    IRArrayType** outValueType,
+    uint32_t* outElementCount)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    if (outElementCount)
+        *outElementCount = 0;
+
+    auto pointerType = as<IRPtrTypeBase>(type);
+    uint32_t elementCount = 0;
+    auto valueType =
+        pointerType ? asNVVMSupportedNumericArrayType(pointerType->getValueType(), &elementCount)
+                    : nullptr;
+    if (!pointerType || !valueType ||
+        (pointerType->getOp() != kIROp_PtrType && pointerType->getOp() != kIROp_OutParamType &&
+         pointerType->getOp() != kIROp_BorrowInOutParamType) ||
+        pointerType->getOperandCount() != 1 ||
+        pointerType->getAddressSpace() != AddressSpace::Generic)
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    if (outElementCount)
+        *outElementCount = elementCount;
+    return pointerType;
+}
+
 IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
     IRInst* type,
     IRStructType** outValueType)
@@ -332,6 +362,8 @@ uint32_t getNVVMCopyableValueAlignment(IRInst* type)
 {
     if (const uint32_t numericAlignment = getNVVMNumericValueAlignment(type))
         return numericAlignment;
+    if (auto arrayType = asNVVMSupportedNumericArrayType(type))
+        return getNVVMNumericValueAlignment(arrayType->getElementType());
     auto structType = asNVVMSupportedCopyableStructType(type);
     if (!structType)
         return 0;
@@ -1108,6 +1140,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRType* localNumericPointerValueType = nullptr;
     IRPtrTypeBase* localNumericPointer =
         asNVVMSupportedLocalNumericPointerType(type, &localNumericPointerValueType);
+    IRArrayType* localNumericArrayPointerValueType = nullptr;
+    IRPtrTypeBase* localNumericArrayPointer =
+        asNVVMSupportedLocalNumericArrayPointerType(type, &localNumericArrayPointerValueType);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
     IRArrayType* deviceArrayType = nullptr;
@@ -1145,7 +1180,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
          (isNVVMSupportedValueType(type) || copyableStructType || localScalarStructPointer ||
-          localNumericPointer || isSurface || isSampledTexture || samplerValue)) ||
+          localNumericPointer || localNumericArrayPointer || isSurface || isSampledTexture ||
+          samplerValue)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
           fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
@@ -1195,6 +1231,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         return _lowerPointerType(
             type,
             localNumericPointerValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            outType);
+    }
+
+    if (use == NVVMTypeUse::HelperParameter && localNumericArrayPointer)
+    {
+        return _lowerPointerType(
+            type,
+            localNumericArrayPointerValueType,
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType);
     }

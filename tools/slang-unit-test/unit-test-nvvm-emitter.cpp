@@ -2816,6 +2816,68 @@ SLANG_UNIT_TEST(nvvmSlangCopyableValuesAndNumericBorrowsCrossHelperBoundaries)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangLocalArraysCrossHelperReferenceBoundaries)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMLocalArrayHelperSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.getArrayTypeCallCount == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.arrayElementType ==
+            _getFakeNVVMBuilderVectorType(3, FakeNVVMBuilderScalarTypeKind::Float));
+        SLANG_CHECK(gFakeNVVMBuilder.arrayElementCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLocalStorageCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.localStorageValueTypes.getCount() == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.localStorageValueTypes[0] == _getFakeNVVMBuilderArrayType());
+        SLANG_CHECK(gFakeNVVMBuilder.localStorageAlignments[0] == 16);
+
+        bool sawArrayPointerParameter = false;
+        for (const auto parameterTypeKind : gFakeNVVMBuilder.functionParameterTypeKinds)
+        {
+            sawArrayPointerParameter |=
+                parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ArrayPointer;
+        }
+        SLANG_CHECK(sawArrayPointerParameter);
+
+        bool passedLocalArray = false;
+        for (const FakeNVVMBuilderValueRef argument : gFakeNVVMBuilder.callArgumentValueRefs)
+        {
+            passedLocalArray |=
+                argument.kind == FakeNVVMBuilderValueKind::LocalStorage && argument.index == 0;
+        }
+        SLANG_CHECK(passedLocalArray);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitArrayElementPointerCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangCopyableStructLocalStoresToStructuredBuffer)
 {
     _resetDirectNVVMFakes();
@@ -5542,7 +5604,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedHalfAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedDoubleAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedNestedArraySource, "'entry-point parameter'"},
-        {kDirectNVVMUnsupportedLocalArraySource, "'var'"},
+        {kDirectNVVMUnsupportedNestedLocalArraySource, "'var'"},
         {kDirectNVVMUnsupportedDynamicLocalVectorStoreSource, "'device i32 array element pointer'"},
         {kDirectNVVMUnsupportedSharedFloatArraySource, "'device i32 array element pointer'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},

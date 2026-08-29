@@ -360,6 +360,48 @@ bool _getNVVMRawBufferElementPointer(IRInst* inst, NVVMRawBufferElementPointer& 
     return true;
 }
 
+struct NVVMLocalArrayElementPointer
+{
+    IRInst* base = nullptr;
+    IRInst* index = nullptr;
+    IRArrayType* arrayType = nullptr;
+    IRPtrTypeBase* resultType = nullptr;
+};
+
+// Resolves one selected element address rooted in an exact generic local numeric-array pointer.
+bool _getNVVMLocalArrayElementPointer(IRInst* inst, NVVMLocalArrayElementPointer& outPointer)
+{
+    outPointer = {};
+    if (!inst || inst->getOp() != kIROp_GetElementPtr || inst->getOperandCount() != 2)
+        return false;
+
+    IRInst* base = inst->getOperand(0);
+    IRInst* index = inst->getOperand(1);
+    IRArrayType* arrayType = nullptr;
+    auto baseType =
+        base ? asNVVMSupportedLocalNumericArrayPointerType(base->getDataType(), &arrayType)
+             : nullptr;
+    auto resultType = as<IRPtrTypeBase>(inst->getDataType());
+    IRType* resultLayout = resultType ? resultType->getDataLayout() : nullptr;
+    if (!baseType || !arrayType || !resultType || resultType->getOp() != kIROp_PtrType ||
+        resultType->getOperandCount() != 4 || !resultLayout ||
+        resultLayout->getOp() != kIROp_ScalarBufferLayoutType ||
+        resultType->getAddressSpace() != baseType->getAddressSpace() ||
+        resultType->getAccessQualifier() != baseType->getAccessQualifier() ||
+        !isNVVMSupportedNumericValueType(resultType->getValueType()) ||
+        !isTypeEqual(arrayType->getElementType(), resultType->getValueType()) ||
+        !isNVVMInteger32Type(index->getDataType()))
+    {
+        return false;
+    }
+
+    outPointer.base = base;
+    outPointer.index = index;
+    outPointer.arrayType = arrayType;
+    outPointer.resultType = resultType;
+    return true;
+}
+
 // Gets the natural CUDA alignment carried by one physical LLVM `byval` entry parameter.
 bool _getNVVMByValueParameterAlignment(
     CodeGenContext* codeGenContext,
@@ -2288,6 +2330,15 @@ SlangResult _validatePointerValue(
     auto localNumericPtrType = value && (value->getOp() == kIROp_Var || as<IRParam>(value))
                                    ? asNVVMSupportedLocalNumericPointerType(value->getDataType())
                                    : nullptr;
+    auto localNumericArrayPtrType =
+        value && (value->getOp() == kIROp_Var || as<IRParam>(value))
+            ? asNVVMSupportedLocalNumericArrayPointerType(value->getDataType())
+            : nullptr;
+    NVVMLocalArrayElementPointer localArrayElement;
+    auto localArrayElementPtrType =
+        value && _getNVVMLocalArrayElementPointer(value, localArrayElement)
+            ? localArrayElement.resultType
+            : nullptr;
     auto borrowedStructPtrType =
         value ? asNVVMSupportedLocalScalarStructPointerType(value->getDataType()) : nullptr;
     auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
@@ -2298,13 +2349,15 @@ SlangResult _validatePointerValue(
         fieldPtrType = nullptr;
     }
     IRPtrTypeBase* devicePtrType = numericPtrType;
-    IRPtrTypeBase* acceptedPtrType = devicePtrType            ? devicePtrType
-                                     : sharedElementPtrType   ? sharedElementPtrType
-                                     : resourceElementPtrType ? resourceElementPtrType
-                                     : localNumericPtrType    ? localNumericPtrType
-                                     : localStructPtrType     ? localStructPtrType
-                                     : borrowedStructPtrType  ? borrowedStructPtrType
-                                                              : fieldPtrType;
+    IRPtrTypeBase* acceptedPtrType = devicePtrType              ? devicePtrType
+                                     : sharedElementPtrType     ? sharedElementPtrType
+                                     : resourceElementPtrType   ? resourceElementPtrType
+                                     : localNumericPtrType      ? localNumericPtrType
+                                     : localNumericArrayPtrType ? localNumericArrayPtrType
+                                     : localArrayElementPtrType ? localArrayElementPtrType
+                                     : localStructPtrType       ? localStructPtrType
+                                     : borrowedStructPtrType    ? borrowedStructPtrType
+                                                                : fieldPtrType;
     if (!acceptedPtrType)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
     IRType* actualPointeeType = acceptedPtrType->getValueType();
@@ -2440,6 +2493,7 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     return isNVVMSupportedValueType(type) || asNVVMSupportedCopyableStructType(type) ||
            asNVVMSupportedLocalScalarStructPointerType(type) ||
            asNVVMSupportedLocalNumericPointerType(type) ||
+           asNVVMSupportedLocalNumericArrayPointerType(type) ||
            getNVVMSupportedSurfaceType(type, surfaceType) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
            asNVVMSupportedSamplerValueType(type);
@@ -2474,8 +2528,23 @@ bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterT
     const bool isMutableNumericParameter =
         parameterNumericPointer && (parameterNumericPointer->getOp() == kIROp_OutParamType ||
                                     parameterNumericPointer->getOp() == kIROp_BorrowInOutParamType);
-    return argumentNumericPointer && argumentNumericPointer->getOp() == kIROp_PtrType &&
-           isMutableNumericParameter && isTypeEqual(argumentNumericType, parameterNumericType);
+    if (argumentNumericPointer && argumentNumericPointer->getOp() == kIROp_PtrType &&
+        isMutableNumericParameter && isTypeEqual(argumentNumericType, parameterNumericType))
+    {
+        return true;
+    }
+
+    IRArrayType* argumentArrayType = nullptr;
+    IRArrayType* parameterArrayType = nullptr;
+    auto argumentArrayPointer =
+        asNVVMSupportedLocalNumericArrayPointerType(argumentType, &argumentArrayType);
+    auto parameterArrayPointer =
+        asNVVMSupportedLocalNumericArrayPointerType(parameterType, &parameterArrayType);
+    const bool isMutableArrayParameter =
+        parameterArrayPointer && (parameterArrayPointer->getOp() == kIROp_OutParamType ||
+                                  parameterArrayPointer->getOp() == kIROp_BorrowInOutParamType);
+    return argumentArrayPointer && argumentArrayPointer->getOp() == kIROp_PtrType &&
+           isMutableArrayParameter && isTypeEqual(argumentArrayType, parameterArrayType);
 }
 
 // Returns whether a canonical helper signature needs the generic construction path.
@@ -2755,6 +2824,8 @@ SlangResult _validateNVVMFunction(
                     {
                         break;
                     }
+                    if (asNVVMSupportedLocalNumericArrayPointerType(inst->getDataType()))
+                        break;
                     if (!asNVVMSupportedLocalCopyableStructPointerType(
                             inst->getDataType(),
                             &valueType))
@@ -3046,9 +3117,11 @@ SlangResult _validateNVVMFunction(
             case kIROp_GetElementPtr:
                 {
                     NVVMRawBufferElementPointer bufferElementPointer;
+                    NVVMLocalArrayElementPointer localArrayElementPointer;
                     if (inst->getOperandCount() != 2 ||
                         (!asNVVMSupportedDevicePointerType(inst->getDataType()) &&
                          !asNVVMSupportedSharedI32ElementPointerType(inst->getDataType()) &&
+                         !_getNVVMLocalArrayElementPointer(inst, localArrayElementPointer) &&
                          !_getNVVMRawBufferElementPointer(inst, bufferElementPointer)))
                     {
                         return _diagnoseUnsupportedIR(
@@ -3360,7 +3433,8 @@ SlangResult _validateNVVMFunction(
                                 toSlice("call argument type"));
                         }
                         if (asNVVMSupportedLocalScalarStructPointerType(argument->getDataType()) ||
-                            asNVVMSupportedLocalNumericPointerType(argument->getDataType()))
+                            asNVVMSupportedLocalNumericPointerType(argument->getDataType()) ||
+                            asNVVMSupportedLocalNumericArrayPointerType(argument->getDataType()))
                         {
                             SLANG_RETURN_ON_FAIL(_validatePointerValue(
                                 codeGenContext,
@@ -3544,6 +3618,26 @@ SlangResult _validateNVVMFunction(
                             inst,
                             availableValues,
                             dominatorTree));
+                        SLANG_RETURN_ON_FAIL(_validateInteger32Value(
+                            codeGenContext,
+                            elementIndex,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                        availableValues.add(inst);
+                        break;
+                    }
+                    NVVMLocalArrayElementPointer localArrayElementPointer;
+                    if (_getNVVMLocalArrayElementPointer(inst, localArrayElementPointer))
+                    {
+                        SLANG_RETURN_ON_FAIL(_validatePointerValue(
+                            codeGenContext,
+                            basePointer,
+                            inst,
+                            availableValues,
+                            dominatorTree,
+                            false,
+                            localArrayElementPointer.arrayType));
                         SLANG_RETURN_ON_FAIL(_validateInteger32Value(
                             codeGenContext,
                             elementIndex,
@@ -4668,11 +4762,21 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 inst->getDataType(),
                                 &valueType))
                         {
-                            IRStructType* structValueType = nullptr;
-                            SLANG_RELEASE_ASSERT(asNVVMSupportedLocalCopyableStructPointerType(
-                                inst->getDataType(),
-                                &structValueType));
-                            valueType = structValueType;
+                            IRArrayType* arrayValueType = nullptr;
+                            if (asNVVMSupportedLocalNumericArrayPointerType(
+                                    inst->getDataType(),
+                                    &arrayValueType))
+                            {
+                                valueType = arrayValueType;
+                            }
+                            else
+                            {
+                                IRStructType* structValueType = nullptr;
+                                SLANG_RELEASE_ASSERT(asNVVMSupportedLocalCopyableStructPointerType(
+                                    inst->getDataType(),
+                                    &structValueType));
+                                valueType = structValueType;
+                            }
                         }
                         SlangNVVMTypeHandle loweredValueType = nullptr;
                         SLANG_RETURN_ON_FAIL(
@@ -5587,6 +5691,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         NVVMRawBufferElementPointer bufferElementPointer;
                         const bool isBufferElement =
                             _getNVVMRawBufferElementPointer(inst, bufferElementPointer);
+                        NVVMLocalArrayElementPointer localArrayElementPointer;
+                        const bool isLocalArrayElement =
+                            _getNVVMLocalArrayElementPointer(inst, localArrayElementPointer);
                         SlangNVVMValueHandle loweredBasePointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -5621,8 +5728,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                             codeGenContext,
                             asNVVMSupportedSharedI32ArrayGlobal(inst->getOperand(0))
                                 ? "shared i32 array element pointer"
-                            : isBufferElement ? "raw buffer scalar element pointer"
-                                              : "device i32 array element pointer",
+                            : isBufferElement     ? "raw buffer scalar element pointer"
+                            : isLocalArrayElement ? "local numeric array element pointer"
+                                                  : "device i32 array element pointer",
                             pointerResult));
                         valueMap[inst] = loweredPointer;
                     }

@@ -76,6 +76,12 @@ IRPtrTypeBase* asNVVMSupportedLocalNumericPointerType(
     IRInst* type,
     IRType** outValueType = nullptr);
 
+/// Returns an exact generic local, output, or borrowed mutable pointer to a fixed numeric array.
+IRPtrTypeBase* asNVVMSupportedLocalNumericArrayPointerType(
+    IRInst* type,
+    IRArrayType** outValueType = nullptr,
+    uint32_t* outElementCount = nullptr);
+
 /// Returns an exact generic local or borrowed mutable pointer to a selected scalar struct.
 IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
     IRInst* type,

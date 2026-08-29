@@ -1131,6 +1131,11 @@ static bool _getFakeNVVMBuilderPointerElementTypeKind(
         outElementTypeKind = FakeNVVMBuilderScalarTypeKind::ScalarStruct;
         return true;
     }
+    if (type == _getFakeNVVMBuilderArrayPointerType())
+    {
+        outElementTypeKind = FakeNVVMBuilderScalarTypeKind::NumericArray;
+        return true;
+    }
     const FakeNVVMBuilderScalarTypeKind elementTypeKinds[] = {
         FakeNVVMBuilderScalarTypeKind::Integer,
         FakeNVVMBuilderScalarTypeKind::Float,
@@ -2516,6 +2521,7 @@ static bool _isFakeNVVMBuilderPointerValue(SlangNVVMValueHandle value)
     return _getFakeNVVMBuilderParameterTypeKind(valueRef, parameterTypeKind) &&
            (parameterTypeKind == FakeNVVMBuilderParameterTypeKind::Pointer ||
             parameterTypeKind == FakeNVVMBuilderParameterTypeKind::FloatPointer ||
+            parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ArrayPointer ||
             parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ScalarStructPointer);
 }
 
@@ -2578,6 +2584,11 @@ static bool _getFakeNVVMBuilderPointerScalarTypeKind(
                 outTypeKind = FakeNVVMBuilderScalarTypeKind::ScalarStruct;
                 return true;
             }
+            if (parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ArrayPointer)
+            {
+                outTypeKind = FakeNVVMBuilderScalarTypeKind::NumericArray;
+                return true;
+            }
             return false;
         }
     case FakeNVVMBuilderValueKind::LocalStorage:
@@ -2604,8 +2615,9 @@ static bool _getFakeNVVMBuilderPointerScalarTypeKind(
         outTypeKind = gFakeNVVMBuilder.byteOffsetPointerTypeKinds[pointerRef.index];
         return true;
     case FakeNVVMBuilderValueKind::ArrayElementPointer:
-        outTypeKind = FakeNVVMBuilderScalarTypeKind::Integer;
-        return true;
+        return pointerRef.index >= 0 &&
+               pointerRef.index < gFakeNVVMBuilder.arrayElementPointerBaseValueRefs.getCount() &&
+               _getFakeNVVMBuilderTypeKind(gFakeNVVMBuilder.arrayElementType, outTypeKind);
     case FakeNVVMBuilderValueKind::AggregateElement:
         if (pointerRef.index < 0 ||
             pointerRef.index >= gFakeNVVMBuilder.aggregateElementTypeKinds.getCount())
@@ -2636,9 +2648,9 @@ static bool _isFakeNVVMBuilderArrayPointerValue(SlangNVVMValueHandle value)
     if (valueRef.kind == FakeNVVMBuilderValueKind::GlobalStorage)
         return true;
 
-    FakeNVVMBuilderParameterTypeKind parameterTypeKind;
-    return _getFakeNVVMBuilderParameterTypeKind(valueRef, parameterTypeKind) &&
-           parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ArrayPointer;
+    FakeNVVMBuilderScalarTypeKind pointeeTypeKind;
+    return _getFakeNVVMBuilderPointerScalarTypeKind(valueRef, pointeeTypeKind) &&
+           pointeeTypeKind == FakeNVVMBuilderScalarTypeKind::NumericArray;
 }
 
 static bool _isFakeNVVMBuilderResourceViewValue(SlangNVVMValueHandle value)
@@ -3409,7 +3421,6 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitLocalStorage(
     FakeNVVMBuilderScalarTypeKind valueTypeKind;
     if (module != _getFakeNVVMBuilderModule() ||
         !_getFakeNVVMBuilderTypeKind(valueType, valueTypeKind) ||
-        valueTypeKind == FakeNVVMBuilderScalarTypeKind::NumericArray ||
         valueTypeKind == FakeNVVMBuilderScalarTypeKind::ResourceView ||
         valueTypeKind == FakeNVVMBuilderScalarTypeKind::ScalarStructPointer || !alignment ||
         (alignment & (alignment - 1)) || (!name && nameSize) || !outStorage ||
@@ -8160,6 +8171,30 @@ void computeMain(
 }
 )";
 
+static const char kDirectNVVMLocalArrayHelperSource[] = R"(
+void initializeArray(out float3 values[4])
+{
+    values[0] = float3(1.0, 1.0, 1.0);
+    values[1] = float3(2.0, 2.0, 2.0);
+    values[2] = float3(3.0, 3.0, 3.0);
+    values[3] = float3(4.0, 4.0, 4.0);
+}
+
+void updateArray(inout float3 values[4])
+{
+    values[0] = float3(5.0, 5.0, 5.0);
+}
+
+[CUDAKernel]
+void computeMain(uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination)
+{
+    float3 values[4];
+    initializeArray(values);
+    updateArray(values);
+    *destination = values[0].x;
+}
+)";
+
 static const char kDirectNVVMCopyableStructuredBufferAggregateSource[] = R"(
 struct Thing
 {
@@ -10611,18 +10646,15 @@ void computeMain(
     (*destination)[index][0] = (*source)[index][0];
 }
 )";
-static const char kDirectNVVMUnsupportedLocalArraySource[] = R"(
+static const char kDirectNVVMUnsupportedNestedLocalArraySource[] = R"(
 [CUDAKernel]
 void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
-    uniform int index,
-    uniform int x,
-    uniform int y)
+    uniform int x)
 {
-    int values[2];
-    values[0] = x;
-    values[1] = y;
-    *destination = values[index];
+    int values[2][2];
+    values[0][0] = x;
+    *destination = values[0][0];
 }
 )";
 static const char kDirectNVVMUnsupportedStructPointerSource[] = R"(

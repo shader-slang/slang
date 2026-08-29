@@ -5370,9 +5370,34 @@ parameter/extraction values, removing its former struct-pointer-only call assump
 `mutating-and-inout.slang` now pass optimized direct runtime and PTX checks. Their PTX modules are
 720, 674, and 685 bytes, and CUDA 12.9.86 `ptxas -arch=sm_70` emits 2,792-byte cubins for each. The
 focused fake-provider test composes a struct with an Int32 and Float32x4 field, a by-value
-struct-returning helper, first-class field extraction, and numeric `inout`. Array and
+struct-returning helper, first-class field extraction, and numeric `inout`. Device-array and
 resource-bearing helper fixtures still diagnose `helper function parameter` before provider
 discovery.
+
+### Slice 109: Fixed numeric local-array references
+
+Nonempty fixed arrays whose direct element is an established byte-address numeric scalar or vector
+can now use generic local storage and cross helper boundaries through exact `out` and `inout`
+references. One classifier owns the canonical compact `Ptr`, `OutParam`, and
+`BorrowInOutParam` forms. A local `Ptr` satisfies either mutable helper spelling only when the
+array pointee is exactly equal; all three lower through the existing typed generic-pointer API.
+Nested arrays, first-class array helper values, resource arrays, and array-valued entry parameters
+remain rejected.
+
+The canonical element address has a distinct, intentional shape: `IRGetElementPtr` produces a
+read-write generic `Ptr` carrying CUDA `ScalarLayout`. The resolver checks that layout, the base
+array pointer, exact direct element, access qualifier, address space, and i32 index together before
+provider mutation. It then uses the existing typed array-element-pointer operation. This preserves
+the compact helper ABI classifier instead of broadly accepting every decorated numeric pointer.
+Local allocation similarly reuses the established first-class array type and derives alignment
+from its direct numeric element; no builder ABI change or array-specific callback is needed.
+
+The fake-provider test composes both `out float3[4]` and `inout float3[4]` helpers with one local
+array, typed element stores, a load, and a device result store. A nested local array remains a
+preflight negative. `array-param.slang` now passes its exact optimized direct CUDA runtime and PTX
+lanes with output `1, 1, 1, 1`. The PTX module is 645 bytes; CUDA 12.9.86
+`ptxas -arch=sm_70` accepts it and emits a 2,792-byte cubin. The complete NVVM unit-test prefix
+passes 378/378.
 
 The following remain open until their named slice supplies evidence:
 
@@ -5395,6 +5420,7 @@ The following remain open until their named slice supplies evidence:
 - external/indirect calls, helper pointer/aggregate ABI beyond flat first-level numeric-field
   structs passed and returned by value, exact selected-scalar-struct local pointers and
   `BorrowInOutParam` parameters, plus selected numeric local pointers and exact `OutParam` or
+  `BorrowInOutParam` parameters, and fixed numeric local-array pointers with exact `OutParam` or
   `BorrowInOutParam` parameters, calling conventions and function
   attributes beyond no-inline, saturating or overflow-decorated arithmetic, Float64/BFloat16/FP8
   scalar families, Float16 storage and unoptimized vector execution,
@@ -5408,9 +5434,10 @@ The following remain open until their named slice supplies evidence:
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical
   structured/byte-address data pointers and constant-lane structured-buffer vector swizzled stores,
-  including other `IRGetElementPtr` shapes, pointer escape through helpers beyond the exact
-  selected-scalar-struct and numeric-output helper subsets or through SSA, nested or dynamically
-  indexed aggregate values, mutable aggregate families beyond layout-compatible first-level
+  plus selected-element indexing of fixed numeric local arrays, including other `IRGetElementPtr`
+  shapes, pointer escape through helpers beyond the exact selected-scalar-struct, numeric-value,
+  and fixed-numeric-array helper subsets or through SSA, nested or dynamically indexed aggregate
+  values, mutable aggregate families beyond layout-compatible first-level
   numeric-field structs,
   first-class aggregate field reads beyond flat copyable helper values, aggregate layouts requiring
   padding, general globals, additional shared-memory shapes, and
