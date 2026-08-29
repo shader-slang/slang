@@ -2490,6 +2490,49 @@ SLANG_UNIT_TEST(nvvmSlangFloat16ValuesUseGenericTypedPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangLocalVectorSwizzlePromotesToGenericValues)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMLocalVectorSwizzleSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        // The fake interface deliberately has no local-allocation callback. Successful emission
+        // proves the source variable was promoted, while these calls prove the pure lane update
+        // was flattened through the generic vector value path.
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount >= 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount >= 7);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+        for (FakeNVVMBuilderScalarTypeKind elementKind : gFakeNVVMBuilder.vectorElementTypeKinds)
+        {
+            SLANG_CHECK(elementKind == FakeNVVMBuilderScalarTypeKind::Half);
+        }
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangEmptyComputeUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -5137,6 +5180,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedDoubleAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedNestedArraySource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedLocalArraySource, "'var'"},
+        {kDirectNVVMUnsupportedDynamicLocalVectorStoreSource, "'var'"},
         {kDirectNVVMUnsupportedSharedFloatArraySource, "'device i32 array element pointer'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
@@ -5163,8 +5207,8 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMPointerGreaterEqualSource, "'cmpGE'"},
     };
 
-    // The direct subset retains scalar-only runtime helper/value policy. Noncanonical layout,
-    // local memory, logical NOT, libdevice calls, atomic-add ABI
+    // Noncanonical layout, escaping or dynamically addressed local memory, logical NOT, libdevice
+    // calls, atomic-add ABI
     // variants, non-relaxed atomic-add order, adjacent atomic operations, group-shared atomic add,
     // non-i32 shared arrays, pointer comparisons, and helper-array-pointer
     // shapes remain deterministic before builder discovery.

@@ -7364,6 +7364,35 @@ void computeMain(
 }
 )";
 
+static const char kDirectNVVMLocalVectorSwizzleSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float input)
+{
+    half4 value = half4(
+        half(input),
+        half(input + 1.0),
+        half(input + 2.0),
+        half(input + 3.0));
+    value.xyz = -value.zwx;
+    *destination = float(value.x + value.y + value.z + value.w);
+}
+)";
+
+static const char kDirectNVVMUnsupportedDynamicLocalVectorStoreSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float input,
+    uniform int index)
+{
+    half4 value = half4(1.0h, 2.0h, 3.0h, 4.0h);
+    value[index & 3] = half(input);
+    *destination = float(value.x + value.y + value.z + value.w);
+}
+)";
+
 static const char kDirectNVVMFloatMatrixValueSource[] = R"(
 [CUDAKernel]
 void computeMain(

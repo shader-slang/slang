@@ -358,6 +358,8 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies` | Dimensioned descriptors emit selected scalar/vector integer arithmetic/comparison, Float16/Float32 arithmetic, all six floating comparisons, Boolean equality/inequality, lane-preserving integer/floating conversions, and Float16/Float32 width conversions in normal and compatible assembly; mixed signedness, i24, float64, same-width conversion, Boolean arithmetic/ordering, mismatched lanes, and five-lane vectors remain unsupported | Pass |
 | `slang-unit-test-tool/nvvmSlangFloat16ValuesUseGenericTypedPipeline` | The fake boundary records exact Half/Half2 constants, construction/extraction, arithmetic/comparison/conversion descriptors, helper signatures, calls/returns, and phi transport through the generic APIs | Pass |
 | `tests/cuda/nvvm-half-values.slang` | Optimized direct CUDA and PTX lanes exercise Half/Half2 arithmetic, comparison, integer and Float32 conversion, helper/phi transport, and dynamic extraction with outputs `-8, -5, 1, -5`; CUDA 12.9 `ptxas` accepts the module | Pass |
+| `slang-unit-test-tool/nvvmSlangLocalVectorSwizzlePromotesToGenericValues` | A local Half4 partial assignment reaches the fake boundary only as generic vector extractions/construction; the interface has no local-allocation callback, and a dynamic local-element store remains rejected before builder discovery | Pass |
+| `tests/compute/half-vector-calc.slang.3/.4` | Optimized direct runtime/PTX lanes exercise the existing Half2/Half3/Half4 calculation including `.xyz` partial assignment, with outputs `75, 220.5, 565, 1108` | Pass |
 | `slang-unit-test-tool/nvvmSlangVectorOperationFamiliesUseTypedDescriptors` | Narrow/32-bit integer, Float32-comparison, and Boolean-operation producers retain exact kind/width/lane descriptors through generic operations, Boolean construction, and scalar extraction | Pass |
 | `slang-unit-test-tool/nvvmSlangScalarShiftDivideRemainderUseTypedOperations` | The four former scalar E52017 controls now compile independently through exact signed-i32 left/right shift, division, and remainder descriptors | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderBuildsConventionalGlobalParameterStorage` | Exact ABI revision 3 structurally constructs an unpacked resource view and one-field global block, extracts the resource pointer value, applies a typed pointer offset, and emits verified normal and NVVM-2.0-compatible assembly | Pass |
@@ -1581,3 +1583,26 @@ native `f16`/`f16x2` conversions and arithmetic, and CUDA 12.9.86 `ptxas -arch=s
 lanes therefore request `-O3` and preserve this toolkit limitation explicitly. The broader
 `half-vector-calc.slang` and `half-vector-compare.slang` fixtures next stop at their independent
 mutable local `var` and aggregate helper-result boundaries.
+
+Slice 95 closes the local-vector half of that boundary at its producer. `constructSSA` now treats a
+direct local-vector `swizzledStore` as a partial assignment to the complete tracked value and emits
+canonical `swizzleSet`. It does not promote a variable whose pointer escapes, whose partial store
+uses an address chain or dynamic l-value index, whose type is noncopyable, or whose lifetime crosses
+switch fallthrough. The motivating final IR therefore has no local Half4 pointer or memory
+operations; its one retained `swizzleSet(%old, %replacement, 0, 1, 2)` is the exact semantic value.
+
+Direct emission flattens that selected two- through four-lane value using its existing generic
+vector extraction/construction callbacks. Exact base/source/result types, source width, unique
+bounded constant destinations, dominance, and availability are checked before provider mutation.
+Builder ABI stays at revision 10, and neither the facade nor real LLVM provider adds an alloca,
+local-variable, swizzle, or Half-specific operation.
+
+The focused fake test proves the positive path uses only generic vector values and that a dynamic
+local element store remains E52017 `var` before builder discovery. The existing
+`half-vector-calc.slang` direct runtime and PTX lanes produce `75, 220.5, 565, 1108` and native
+f16/f16x2 PTX. The PTX is 3,495 bytes, `ptxas -arch=sm_70` emits a 3,688-byte cubin, and the full
+NVVM prefix passes 367/367. Those direct lanes request O3 for CUDA 12.9 libNVVM. The file's older
+NVRTC lane has an independent pre-existing CUDA-source failure because CUDA 12.9 `__half4` does
+not expose `.xyz`; it is not evidence about this direct path. The remaining adjacent direct
+boundary is the scalar-struct result plus `BorrowInOutParam<Values>` stateful helper in
+`half-vector-compare.slang`.

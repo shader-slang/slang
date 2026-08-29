@@ -4981,6 +4981,33 @@ rejects that Half2-heavy module at `-O0` with "unsupported operation" even thoug
 `-O0` succeeds, so the focused vector test explicitly requests `-O3`. The next broader Half-suite
 boundary is mutable local `var`/aggregate-pointer lowering, not numeric typing.
 
+### Slice 95: Local vector swizzle updates as SSA values
+
+Copyable local vectors no longer remain memory merely because source code assigns a fixed swizzle.
+The generic `constructSSA` pass now recognizes a direct `swizzledStore` use of a local vector,
+reads the complete value already tracked for that variable, and records the canonical pure
+`swizzleSet(base, replacement, lanes...)` result. The existing CFG algorithm carries that value
+through later reads and phis. Escaping pointers, address-chain stores, dynamic l-value indexing,
+noncopyable values, and switch-fallthrough variables retain the conservative memory path.
+
+Direct NVVM accepts selected constant-lane `swizzleSet` as one more producer of the existing
+generic vector-construction shape. It validates the exact result/base/source element types,
+replacement width, unique bounded lanes, and value availability, then extracts the retained and
+replacement lanes and constructs the complete result vector. This composes existing provider
+operations; builder ABI revision 10 is unchanged and the LLVM shield gains no local-variable,
+alloca, swizzle, or Half-specific callback.
+
+The final linked IR for `half-vector-calc.slang` now contains a Half4 `swizzleSet` and no local
+Half4 pointer, load, store, or `swizzledStore`. Its new direct runtime lane produces
+`75, 220.5, 565, 1108`; its 3,495-byte direct PTX retains native f16/f16x2 arithmetic, and
+`ptxas -arch=sm_70` produces a 3,688-byte cubin. The registered direct lanes request O3 because the
+test-harness module is rejected by CUDA 12.9 libNVVM at its default level. The fixture's older
+CUDA-source/NVRTC lane independently fails on this machine because CUDA 12.9's `__half4` has no
+`.xyz` member; that pre-existing source-emission boundary is not part of direct NVVM. Release
+host/provider builds and the complete 367/367 NVVM prefix pass. The next direct-NVVM stop remains
+the scalar-struct result and `BorrowInOutParam<Values>` helper ABI in
+`half-vector-compare.slang`.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production

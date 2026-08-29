@@ -500,6 +500,9 @@ bool isPromotableVar(ConstructSSAContext* context, IRVar* var, HashSet<IRBlock*>
     // or `getFieldAddress` operations that terminates
     // with a load.
     //
+    // A direct vector `swizzledStore` is also promotable: unlike an address-chain store, it already
+    // describes a complete pure-value update as `swizzleSet(oldValue, replacement, lanes...)`.
+    //
     // An even more powerful option (which we do not yet
     // implement) would be to handle cases where there are
     // "chains" that end with stores, and to treat these
@@ -543,6 +546,22 @@ bool isPromotableVar(ConstructSSAContext* context, IRVar* var, HashSet<IRBlock*>
                 // as the destination for the store, and
                 // that is okay by us.
                 SLANG_ASSERT(u == &storeInst->ptr);
+            }
+            break;
+
+        case kIROp_SwizzledStore:
+            {
+                auto swizzledStore = cast<IRSwizzledStore>(user);
+
+                // A swizzled store is a partial assignment to one complete vector value. It can
+                // participate in SSA promotion when the variable itself is the destination; an
+                // address chain or any other pointer use still follows the conservative path.
+                if (u != &swizzledStore->getOperands()[0] ||
+                    !as<IRVectorType>(var->getDataType()->getValueType()) ||
+                    swizzledStore->getElementCount() == 0)
+                {
+                    return false;
+                }
             }
             break;
 
@@ -1227,6 +1246,40 @@ void processBlock(ConstructSSAContext* context, IRBlock* block, SSABlockInfo* bl
                     // Also eliminate the load instruction,
                     // since it is no longer needed.
                     loadInst->removeAndDeallocate();
+                }
+            }
+            break;
+
+        case kIROp_SwizzledStore:
+            {
+                auto swizzledStore = cast<IRSwizzledStore>(ii);
+                auto ptrArg = swizzledStore->getOperand(0);
+                if (auto var = asPromotableVar(context, ptrArg))
+                {
+                    // Consider this example:
+                    //
+                    //     float4 value = ...;
+                    //     value.xyz = replacement;
+                    //
+                    // Lowering represents the second line as a swizzled store to `value`. The
+                    // variable's current SSA value already carries the untouched `w` lane, so a
+                    // pure swizzle-set value preserves the complete assignment without retaining
+                    // local memory. The normal read/write bookkeeping then carries that value
+                    // through subsequent blocks and phis.
+                    auto baseValue = readVar(context, blockInfo, var);
+                    List<IRInst*> elementIndices;
+                    for (UInt i = 0; i < swizzledStore->getElementCount(); ++i)
+                        elementIndices.add(swizzledStore->getElementIndex(i));
+                    auto updatedValue = blockInfo->builder.emitSwizzleSet(
+                        var->getDataType()->getValueType(),
+                        baseValue,
+                        swizzledStore->getOperand(1),
+                        UInt(elementIndices.getCount()),
+                        elementIndices.getBuffer());
+                    updatedValue->sourceLoc = swizzledStore->sourceLoc;
+                    cloneRelevantDecorations(var, updatedValue);
+                    writeVar(context, blockInfo, var, updatedValue);
+                    swizzledStore->removeAndDeallocate();
                 }
             }
             break;

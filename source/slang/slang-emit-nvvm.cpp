@@ -448,7 +448,8 @@ bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
 struct NVVMVectorConstructElement
 {
     IRInst* value = nullptr;
-    NVVMVectorElement extracted;
+    IRInst* extractedBase = nullptr;
+    uint32_t extractedIndex = 0;
 };
 
 struct NVVMVectorConstruction
@@ -507,10 +508,75 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
             auto index = _asExecutableInteger32Constant(swizzle->getElementIndex(i));
             if (!index || index->getValue() < 0 || index->getValue() >= baseElementCount)
                 return false;
-            outConstruction.elements[i].extracted = {
-                base,
-                index,
-            };
+            outConstruction.elements[i].extractedBase = base;
+            outConstruction.elements[i].extractedIndex = uint32_t(index->getValue());
+        }
+    }
+    else if (auto swizzleSet = as<IRSwizzleSet>(inst))
+    {
+        IRInst* base = swizzleSet->getBase();
+        IRInst* source = swizzleSet->getSource();
+        uint32_t baseElementCount = 0;
+        auto baseType =
+            asNVVMSupportedValueVectorType(base ? base->getDataType() : nullptr, &baseElementCount);
+        const uint32_t sourceElementCount = uint32_t(swizzleSet->getElementCount());
+        if (!baseType || !isTypeEqual(baseType, resultType) || !source || sourceElementCount == 0 ||
+            sourceElementCount > elementCount)
+        {
+            return false;
+        }
+
+        IRVectorType* sourceType = nullptr;
+        if (sourceElementCount == 1)
+        {
+            if (!isTypeEqual(source->getDataType(), resultType->getElementType()))
+                return false;
+        }
+        else
+        {
+            uint32_t actualSourceElementCount = 0;
+            sourceType =
+                asNVVMSupportedValueVectorType(source->getDataType(), &actualSourceElementCount);
+            if (!sourceType || actualSourceElementCount != sourceElementCount ||
+                !isTypeEqual(sourceType->getElementType(), resultType->getElementType()))
+            {
+                return false;
+            }
+        }
+
+        for (uint32_t i = 0; i < elementCount; ++i)
+        {
+            outConstruction.elements[i].extractedBase = base;
+            outConstruction.elements[i].extractedIndex = i;
+        }
+
+        uint32_t updatedLaneMask = 0;
+        for (uint32_t sourceIndex = 0; sourceIndex < sourceElementCount; ++sourceIndex)
+        {
+            auto destinationIndex =
+                _asExecutableInteger32Constant(swizzleSet->getElementIndex(sourceIndex));
+            if (!destinationIndex || destinationIndex->getValue() < 0 ||
+                destinationIndex->getValue() >= elementCount)
+            {
+                return false;
+            }
+            const uint32_t destinationLane = uint32_t(destinationIndex->getValue());
+            const uint32_t laneMask = 1u << destinationLane;
+            if (updatedLaneMask & laneMask)
+                return false;
+            updatedLaneMask |= laneMask;
+
+            NVVMVectorConstructElement& destination = outConstruction.elements[destinationLane];
+            if (sourceElementCount == 1)
+            {
+                destination.value = source;
+                destination.extractedBase = nullptr;
+            }
+            else
+            {
+                destination.extractedBase = source;
+                destination.extractedIndex = sourceIndex;
+            }
         }
     }
     else
@@ -1990,6 +2056,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_MakeVectorFromScalar:
             case kIROp_MakeArray:
             case kIROp_Swizzle:
+            case kIROp_SwizzleSet:
             case kIROp_GetElement:
                 {
                     NVVMVectorElement element;
@@ -2330,6 +2397,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_MakeVectorFromScalar:
             case kIROp_MakeArray:
             case kIROp_Swizzle:
+            case kIROp_SwizzleSet:
             case kIROp_GetElement:
                 {
                     NVVMVectorElement element;
@@ -2363,7 +2431,7 @@ SlangResult _validateNVVMFunction(
                             {
                                 SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                                     codeGenContext,
-                                    source.extracted.base,
+                                    source.extractedBase,
                                     inst,
                                     availableValues,
                                     dominatorTree));
@@ -3723,6 +3791,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_MakeVectorFromScalar:
                 case kIROp_MakeArray:
                 case kIROp_Swizzle:
+                case kIROp_SwizzleSet:
                 case kIROp_GetElement:
                     {
                         NVVMAggregateElement aggregateElement;
@@ -3844,19 +3913,25 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     codeGenContext,
                                     builder,
                                     moduleScope.module,
-                                    source.extracted.base,
+                                    source.extractedBase,
                                     valueMap,
                                     typeContext,
                                     loweredBase));
-                                SlangNVVMValueHandle loweredIndex = nullptr;
-                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                SlangNVVMTypeHandle loweredIndexType = nullptr;
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                     codeGenContext,
-                                    builder,
-                                    moduleScope.module,
-                                    source.extracted.index,
-                                    valueMap,
-                                    typeContext,
-                                    loweredIndex));
+                                    "vector extraction index type",
+                                    builder
+                                        .getIntegerType(moduleScope.module, 32, loweredIndexType)));
+                                SlangNVVMValueHandle loweredIndex = nullptr;
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "vector extraction index",
+                                    builder.getIntegerConstant(
+                                        moduleScope.module,
+                                        loweredIndexType,
+                                        source.extractedIndex,
+                                        loweredIndex)));
                                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                     codeGenContext,
                                     "numeric vector swizzle extraction",
