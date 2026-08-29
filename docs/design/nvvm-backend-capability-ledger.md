@@ -41,6 +41,7 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/language-feature/operator-overload/builtin-operator-fastpath.slang` | CPU + Vulkan + direct NVVM runtime/PTX | Pass | Signed scalar and vector arithmetic, comparisons, bitwise operations, Boolean lane logic, and scalar broadcast produce all 16 expected values; direct PTX passes `ptxas` |
 | `tests/language-feature/operator-overload/builtin-operator-fastpath-uint.slang` | CPU + Vulkan + direct NVVM runtime/PTX | Pass | Unsigned vector/scalar shifts accept signless physical shift counts and preserve logical right-shift results; all ten values agree and direct PTX passes `ptxas` |
 | `tests/language-feature/operator-overload/builtin-operator-fastpath-bool.slang` | CPU + Vulkan + direct NVVM runtime/PTX | Pass | Scalar and Bool4 equality/inequality, explicit Boolean-vector construction, negation, and extraction produce all eight expected values; direct PTX passes `ptxas` |
+| `tests/cuda/nvvm-float-matrix-values.slang` | Direct NVVM runtime/PTX | Pass | Float2x2 construction, matrix/scalar and matrix/matrix addition, branch/aggregate-phi transport, and constant row/column extraction produce `8, 15`; direct PTX passes `ptxas` |
 | `tests/compute/groupshared.slang` | CUDA + direct NVVM runtime/PTX | Pass | The established helper-based Int shared-array workload returns `1, 0, 3, 2`; direct PTX preserves shared load/store and synchronization and passes `ptxas` |
 | `tests/language-feature/execution-model/groupshared-barrier-functional.slang` | CUDA + direct NVVM runtime/PTX | Pass | An unsigned execution index writes shared Int storage, synchronizes, and reads its neighbor with results `10, 20, 30, 0`; direct PTX passes `ptxas` |
 | `tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang` | CUDA + direct NVVM runtime/PTX | Pass | Three barrier calls preserve two rounds of shared communication with results `2, 3, 0, 1`; direct PTX passes `ptxas` |
@@ -358,7 +359,9 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangVectorOperationFamiliesUseTypedDescriptors` | Narrow/32-bit integer, Float32-comparison, and Boolean-operation producers retain exact kind/width/lane descriptors through generic operations, Boolean construction, and scalar extraction | Pass |
 | `slang-unit-test-tool/nvvmSlangScalarShiftDivideRemainderUseTypedOperations` | The four former scalar E52017 controls now compile independently through exact signed-i32 left/right shift, division, and remainder descriptors | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderBuildsConventionalGlobalParameterStorage` | Exact ABI revision 3 structurally constructs an unpacked resource view and one-field global block, extracts the resource pointer value, applies a typed pointer offset, and emits verified normal and NVVM-2.0-compatible assembly | Pass |
-| `slang-unit-test-tool/nvvmIRBuilderRejectsInvalidStructFieldValueOperations` | Generic aggregate extraction rejects null, foreign, non-struct, out-of-range, unavailable, and post-termination operands without module mutation | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderBuildsGenericAggregateValues` | Exact ABI revision 9 constructs and extracts fixed arrays through `insertvalue`/`extractvalue` in normal and compatible assembly; null, foreign, wrong-type/count, unavailable, out-of-range, and post-termination shapes fail without mutation | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderRejectsInvalidAggregateElementOperations` | Generic aggregate extraction preserves the established resource-view struct path while rejecting null, foreign, non-aggregate, out-of-range, unavailable, and post-termination operands without module mutation | Pass |
+| `slang-unit-test-tool/nvvmSlangFloatMatrixValuesUseLegalizedAggregates` | The fake boundary observes Float2 row arrays, ordered aggregate construction, exact array phis/incoming values, constant row extraction, vector column extraction, and the final Float store | Pass |
 | `slang-unit-test-tool/nvvmSlangConventionalComputeUsesDirectPipeline` | The fake provider observes a zero-parameter kernel, external `SLANG_globalParams`, UInt3 block/thread arithmetic, structural field/resource loads, pointer extraction/offset, and a structured-buffer store from ordinary source | Pass |
 | `slang-unit-test-tool/nvvmSlangMultidimensionalWaveUsesDirectPipeline` | The exact existing shader graph performs five canonical UInt3 component extractions, two float resource pointer extractions/offsets/stores, and the established wave operations without resource-specific builder callbacks | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesNumericFamilyCapability` | A static-catalog-only V4 provider is discovered once but reports E52018 for the mixed numeric family before module creation or libNVVM program creation | Pass |
@@ -1517,7 +1520,7 @@ existing unpacked global-pointer/count provider struct, so builder ABI revision 
 The canonical `getStructuredBufferPtr` and `getUntypedBufferPtr` producers return ordinary
 read-write-qualified pointers to unsized arrays. Direct lowering does not infer resource access
 from that pointer spelling: it validates the exact producer/resource/element relation, extracts
-view field zero with generic struct-value extraction, represents the result physically as the
+view field zero with generic aggregate-element extraction, represents the result physically as the
 existing scalar global pointer, and lowers its direct `getElementPtr` consumer with generic pointer
 offsetting. Fixed-array GEP correctly rejected that scalar base during development and is not used.
 
@@ -1531,3 +1534,23 @@ store rooted in the same read-only resource stops before provider discovery. Dir
 loads view pointers at byte offsets 0, 16, and 32, then performs two global scalar loads and two
 stores. CUDA 12.9 `ptxas -arch=sm_70` accepts that module and a separate read-only probe. Release
 host and isolated-provider builds pass, and the complete NVVM prefix passes 351/351.
+
+Slice 93 lowers every matrix type on the direct-libNVVM route through Slang's existing matrix
+legalizer. The canonical physical value is a fixed array of row vectors, so matrix construction,
+componentwise arithmetic, constant row/column extraction, and control-flow transport reuse the
+ordinary vector operations plus one generic aggregate-value path. CUDA-source/NVRTC emission keeps
+its established matrix policy.
+
+Exact builder ABI revision 9 replaces the struct-only value-extraction callback with generic
+aggregate construction and element extraction. The real provider maps arrays and structs to
+`insertvalue`/`extractvalue`, recursively accepts bounded aggregate function values for phi
+transport, and rejects null, foreign, mismatched, unavailable, out-of-range, and post-termination
+inputs before mutating its module. The compiler currently admits only canonical nonempty fixed
+numeric arrays as first-class aggregate SSA values; dynamic indexing, nested aggregate values, and
+broader helper signatures remain outside this slice.
+
+`tests/cuda/nvvm-float-matrix-values.slang` passes direct CUDA execution and direct PTX checking
+with `8, 15`. The branch-sensitive case proves that the row array crosses an aggregate phi instead
+of being optimized entirely into local row vectors. CUDA 12.9 `ptxas -arch=sm_70` accepts the
+module. Release host and isolated-provider builds pass, and the complete NVVM prefix passes
+365/365.

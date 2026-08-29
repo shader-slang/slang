@@ -39,7 +39,8 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
            api.getIntegerConstant && api.getFloatingPointConstant && api.emitPhi &&
            api.addPhiIncoming && api.emitCall && api.emitValueReturn && api.emitReturnVoid &&
            api.emitPointerOffset && api.emitByteOffsetPointer && api.emitArrayElementPointer &&
-           api.emitStructFieldPointer && api.emitStructFieldValue && api.emitVectorConstruct &&
+           api.emitStructFieldPointer && api.emitAggregateConstruct &&
+           api.emitAggregateElementExtract && api.emitVectorConstruct &&
            api.emitVectorElementExtract && api.emitRelaxedGlobalI32AtomicAdd &&
            api.declareGlobalStorage && api.markFunctionAsKernel;
 }
@@ -847,17 +848,33 @@ SlangResult NVVMIRBuilder::emitStructFieldPointer(
     return _validateHandleResult(result, outPointer);
 }
 
-SlangResult NVVMIRBuilder::emitStructFieldValue(
+SlangResult NVVMIRBuilder::emitAggregateConstruct(
     SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle structValue,
-    uint32_t fieldIndex,
+    SlangNVVMTypeHandle aggregateType,
+    const SlangNVVMValueHandle* elements,
+    size_t elementCount,
     SlangNVVMValueHandle& outValue) const
 {
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
     const SlangNVVMResult result =
-        m_construction.emitStructFieldValue(module, structValue, fieldIndex, &outValue);
+        m_construction
+            .emitAggregateConstruct(module, aggregateType, elements, elementCount, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitAggregateElementExtract(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle aggregateValue,
+    uint32_t elementIndex,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    const SlangNVVMResult result =
+        m_construction.emitAggregateElementExtract(module, aggregateValue, elementIndex, &outValue);
     return _validateHandleResult(result, outValue);
 }
 

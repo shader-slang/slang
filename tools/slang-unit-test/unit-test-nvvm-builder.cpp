@@ -124,7 +124,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitByteOffsetPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=8") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=9") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -1303,8 +1303,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsConventionalGlobalParameterStorage)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getIntegerConstant(module.module, integerType, 0, index)));
     SlangNVVMValueHandle dataPointer = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitStructFieldValue(module.module, buffer, 0, dataPointer)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitAggregateElementExtract(module.module, buffer, 0, dataPointer)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitPointerOffset(module.module, dataPointer, index, elementPointer)));
     SLANG_CHECK_ABORT(
@@ -4534,7 +4534,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidArrayAddressingOperations)
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("store i32")) == 1);
 }
 
-SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
@@ -4544,10 +4544,259 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
     ScopedNVVMBuilderModule foreignModule;
     module.builder = &builder;
     foreignModule.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("generic-aggregate-values"), module.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createModule(toSlice("invalid-struct-field-value"), module.module)));
+        builder.createModule(toSlice("generic-aggregate-values-foreign"), foreignModule.module)));
+
+    auto getTypes = [&](SlangNVVMModuleHandle targetModule,
+                        SlangNVVMTypeHandle& outVoidType,
+                        SlangNVVMTypeHandle& outFloatType,
+                        SlangNVVMTypeHandle& outFloat2Type,
+                        SlangNVVMTypeHandle& outArrayType)
+    {
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(targetModule, outVoidType)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFloatingPointType(targetModule, 32, outFloatType)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getVectorType(targetModule, outFloatType, 2, outFloat2Type)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getArrayType(targetModule, outFloat2Type, 2, outArrayType)));
+    };
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle floatType = nullptr;
+    SlangNVVMTypeHandle float2Type = nullptr;
+    SlangNVVMTypeHandle arrayType = nullptr;
+    getTypes(module.module, voidType, floatType, float2Type, arrayType);
+    const SlangNVVMTypeHandle parameterTypes[] = {float2Type, float2Type, floatType};
+    SlangNVVMTypeHandle functionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        module.module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType)));
+    SlangNVVMValueHandle function = nullptr;
+    SlangNVVMValueHandle otherFunction = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("genericAggregateValues"),
+        function)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("otherGenericAggregateValues"),
+        otherFunction)));
+
+    SlangNVVMValueHandle firstRow = nullptr;
+    SlangNVVMValueHandle secondRow = nullptr;
+    SlangNVVMValueHandle scalar = nullptr;
+    SlangNVVMValueHandle otherFirstRow = nullptr;
+    SlangNVVMValueHandle otherSecondRow = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, firstRow)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 1, secondRow)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 2, scalar)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createModule(toSlice("invalid-struct-field-value-foreign"), foreignModule.module)));
+        builder.getFunctionParameter(module.module, otherFunction, 0, otherFirstRow)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionParameter(module.module, otherFunction, 1, otherSecondRow)));
+
+    SlangNVVMBlockHandle otherBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, otherFunction, toSlice("other.entry"), otherBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, otherBlock)));
+    const SlangNVVMValueHandle otherRows[] = {otherFirstRow, otherSecondRow};
+    SlangNVVMValueHandle otherAggregate = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAggregateConstruct(
+        module.module,
+        arrayType,
+        otherRows,
+        SLANG_COUNT_OF(otherRows),
+        otherAggregate)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+
+    SlangNVVMTypeHandle foreignVoidType = nullptr;
+    SlangNVVMTypeHandle foreignFloatType = nullptr;
+    SlangNVVMTypeHandle foreignFloat2Type = nullptr;
+    SlangNVVMTypeHandle foreignArrayType = nullptr;
+    getTypes(
+        foreignModule.module,
+        foreignVoidType,
+        foreignFloatType,
+        foreignFloat2Type,
+        foreignArrayType);
+    const SlangNVVMTypeHandle foreignParameterTypes[] = {foreignFloat2Type, foreignFloat2Type};
+    SlangNVVMTypeHandle foreignFunctionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        foreignModule.module,
+        foreignVoidType,
+        foreignParameterTypes,
+        SLANG_COUNT_OF(foreignParameterTypes),
+        foreignFunctionType)));
+    SlangNVVMValueHandle foreignFunction = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        foreignModule.module,
+        foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("foreignGenericAggregateValues"),
+        foreignFunction)));
+    SlangNVVMValueHandle foreignFirstRow = nullptr;
+    SlangNVVMValueHandle foreignSecondRow = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionParameter(foreignModule.module, foreignFunction, 0, foreignFirstRow)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionParameter(foreignModule.module, foreignFunction, 1, foreignSecondRow)));
+    SlangNVVMBlockHandle foreignBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder
+            .createBlock(foreignModule.module, foreignFunction, toSlice("entry"), foreignBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(foreignModule.module, foreignBlock)));
+    const SlangNVVMValueHandle foreignRows[] = {foreignFirstRow, foreignSecondRow};
+    SlangNVVMValueHandle foreignAggregate = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAggregateConstruct(
+        foreignModule.module,
+        foreignArrayType,
+        foreignRows,
+        SLANG_COUNT_OF(foreignRows),
+        foreignAggregate)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(foreignModule.module)));
+
+    SlangNVVMBlockHandle block = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createBlock(module.module, function, toSlice("entry"), block)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, block)));
+    const SlangNVVMValueHandle rows[] = {firstRow, secondRow};
+    const SlangNVVMValueHandle wrongRows[] = {firstRow, scalar};
+
+    auto expectRejectedConstruction = [&](SlangNVVMModuleHandle targetModule,
+                                          SlangNVVMTypeHandle targetType,
+                                          const SlangNVVMValueHandle* elements,
+                                          size_t elementCount)
+    {
+        SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitAggregateConstruct(
+                targetModule,
+                targetType,
+                elements,
+                elementCount,
+                rejected) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejected == nullptr);
+    };
+    SLANG_CHECK(
+        builder.getConstructionAPI()->emitAggregateConstruct(
+            module.module,
+            arrayType,
+            rows,
+            SLANG_COUNT_OF(rows),
+            nullptr) == SLANG_E_INVALID_ARG);
+    expectRejectedConstruction(nullptr, arrayType, rows, SLANG_COUNT_OF(rows));
+    expectRejectedConstruction(foreignModule.module, arrayType, rows, SLANG_COUNT_OF(rows));
+    expectRejectedConstruction(module.module, nullptr, rows, SLANG_COUNT_OF(rows));
+    expectRejectedConstruction(module.module, float2Type, rows, SLANG_COUNT_OF(rows));
+    expectRejectedConstruction(module.module, arrayType, nullptr, SLANG_COUNT_OF(rows));
+    expectRejectedConstruction(module.module, arrayType, rows, 1);
+    expectRejectedConstruction(module.module, arrayType, wrongRows, SLANG_COUNT_OF(wrongRows));
+    expectRejectedConstruction(module.module, foreignArrayType, rows, SLANG_COUNT_OF(rows));
+    expectRejectedConstruction(module.module, arrayType, foreignRows, SLANG_COUNT_OF(foreignRows));
+    expectRejectedConstruction(module.module, arrayType, otherRows, SLANG_COUNT_OF(otherRows));
+
+    SlangNVVMValueHandle aggregate = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAggregateConstruct(
+        module.module,
+        arrayType,
+        rows,
+        SLANG_COUNT_OF(rows),
+        aggregate)));
+
+    auto expectRejectedExtraction = [&](SlangNVVMModuleHandle targetModule,
+                                        SlangNVVMValueHandle targetValue,
+                                        uint32_t elementIndex)
+    {
+        SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+        SLANG_CHECK(
+            builder
+                .emitAggregateElementExtract(targetModule, targetValue, elementIndex, rejected) ==
+            SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejected == nullptr);
+    };
+    SLANG_CHECK(
+        builder.getConstructionAPI()
+            ->emitAggregateElementExtract(module.module, aggregate, 0, nullptr) ==
+        SLANG_E_INVALID_ARG);
+    expectRejectedExtraction(nullptr, aggregate, 0);
+    expectRejectedExtraction(foreignModule.module, aggregate, 0);
+    expectRejectedExtraction(module.module, nullptr, 0);
+    expectRejectedExtraction(module.module, firstRow, 0);
+    expectRejectedExtraction(module.module, aggregate, 2);
+    expectRejectedExtraction(module.module, otherAggregate, 0);
+    expectRejectedExtraction(module.module, foreignAggregate, 0);
+
+    SlangNVVMValueHandle extractedRow = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitAggregateElementExtract(module.module, aggregate, 1, extractedRow)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+
+    String diagnostics;
+    ComPtr<ISlangBlob> assemblyBlob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        module.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        assemblyBlob,
+        diagnostics)));
+    SLANG_CHECK_ABORT(assemblyBlob != nullptr);
+    SLANG_CHECK(diagnostics.getLength() == 0);
+    const String assembly = _getBlobText(assemblyBlob);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("insertvalue")) == 4);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("extractvalue")) == 1);
+    SLANG_CHECK(assembly.indexOf("poison") < 0);
+
+    expectRejectedConstruction(module.module, arrayType, rows, SLANG_COUNT_OF(rows));
+    expectRejectedExtraction(module.module, aggregate, 0);
+    ComPtr<ISlangBlob> afterTerminationBlob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        module.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        afterTerminationBlob,
+        diagnostics)));
+    SLANG_CHECK(_getBlobText(afterTerminationBlob) == assembly);
+
+    ComPtr<ISlangBlob> compatibleBlob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        module.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+        compatibleBlob,
+        diagnostics)));
+    const String compatible = _getBlobText(compatibleBlob);
+    SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("insertvalue")) == 4);
+    SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("extractvalue")) == 1);
+    SLANG_CHECK(compatible.indexOf("poison") < 0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidAggregateElementOperations)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.isInitialized());
+
+    ScopedNVVMBuilderModule module;
+    ScopedNVVMBuilderModule foreignModule;
+    module.builder = &builder;
+    foreignModule.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("invalid-aggregate-element"), module.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("invalid-aggregate-element-foreign"), foreignModule.module)));
 
     auto makeResourceType = [&](SlangNVVMModuleHandle targetModule,
                                 SlangNVVMTypeHandle& outVoidType,
@@ -4592,14 +4841,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
         functionType,
         SLANG_NVVM_LINKAGE_EXTERNAL,
         SLANG_NVVM_FUNCTION_FLAG_NONE,
-        toSlice("invalidStructFieldValue"),
+        toSlice("invalidAggregateElement"),
         function)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
         SLANG_NVVM_LINKAGE_EXTERNAL,
         SLANG_NVVM_FUNCTION_FLAG_NONE,
-        toSlice("otherStructFieldValue"),
+        toSlice("otherAggregateElement"),
         otherFunction)));
 
     SlangNVVMValueHandle buffer = nullptr;
@@ -4638,7 +4887,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
         foreignFunctionType,
         SLANG_NVVM_LINKAGE_EXTERNAL,
         SLANG_NVVM_FUNCTION_FLAG_NONE,
-        toSlice("foreignStructFieldValue"),
+        toSlice("foreignAggregateElement"),
         foreignFunction)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.getFunctionParameter(foreignModule.module, foreignFunction, 0, foreignBuffer)));
@@ -4654,12 +4903,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
     {
         SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
         SLANG_CHECK(
-            builder.emitStructFieldValue(targetModule, targetValue, fieldIndex, rejected) ==
+            builder.emitAggregateElementExtract(targetModule, targetValue, fieldIndex, rejected) ==
             SLANG_E_INVALID_ARG);
         SLANG_CHECK(rejected == nullptr);
     };
     SLANG_CHECK(
-        builder.getConstructionAPI()->emitStructFieldValue(module.module, buffer, 0, nullptr) ==
+        builder.getConstructionAPI()
+            ->emitAggregateElementExtract(module.module, buffer, 0, nullptr) ==
         SLANG_E_INVALID_ARG);
     expectRejected(nullptr, buffer, 0);
     expectRejected(foreignModule.module, buffer, 0);
@@ -4672,8 +4922,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
     SlangNVVMValueHandle dataPointer = nullptr;
     SlangNVVMValueHandle elementPointer = nullptr;
     SlangNVVMValueHandle value = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitStructFieldValue(module.module, buffer, 0, dataPointer)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitAggregateElementExtract(module.module, buffer, 0, dataPointer)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitPointerOffset(module.module, dataPointer, index, elementPointer)));
     SLANG_CHECK_ABORT(
@@ -4699,7 +4949,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidStructFieldValueOperations)
     SLANG_CHECK(_getBlobText(afterTerminatedBlob) == complete);
 
     SLANG_CHECK(
-        complete.indexOf("define void @invalidStructFieldValue({ i32 addrspace(1)*, i64 } "
+        complete.indexOf("define void @invalidAggregateElement({ i32 addrspace(1)*, i64 } "
                          "%slangParameter0, i32 %slangParameter1)") >= 0);
     SLANG_CHECK(_countOccurrences(complete.getUnownedSlice(), toSlice("extractvalue")) == 1);
     SLANG_CHECK(_countOccurrences(complete.getUnownedSlice(), toSlice("getelementptr i32")) == 1);

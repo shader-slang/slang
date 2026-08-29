@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 8u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 9u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -319,10 +319,16 @@ extern "C"
             SlangNVVMValueHandle baseStructPointer,
             uint32_t fieldIndex,
             SlangNVVMValueHandle* outPointer);
-        SlangNVVMResult(SLANG_NVVM_CALL* emitStructFieldValue)(
+        SlangNVVMResult(SLANG_NVVM_CALL* emitAggregateConstruct)(
             SlangNVVMModuleHandle module,
-            SlangNVVMValueHandle structValue,
-            uint32_t fieldIndex,
+            SlangNVVMTypeHandle aggregateType,
+            const SlangNVVMValueHandle* elements,
+            size_t elementCount,
+            SlangNVVMValueHandle* outValue);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitAggregateElementExtract)(
+            SlangNVVMModuleHandle module,
+            SlangNVVMValueHandle aggregateValue,
+            uint32_t elementIndex,
             SlangNVVMValueHandle* outValue);
         SlangNVVMResult(SLANG_NVVM_CALL* emitVectorConstruct)(
             SlangNVVMModuleHandle module,

@@ -4278,7 +4278,8 @@ stops, rather than the removed entry-parameter boundary, select subsequent work.
 ### Slice 73: Generic scalar resource views and multidimensional wave execution
 
 The current exact builder ABI is revision 3. It removes the two callbacks named for
-`RWStructuredBuffer<int>` and adds one generic `emitStructFieldValue` construction operation.
+`RWStructuredBuffer<int>` and uses the generic `emitAggregateElementExtract` construction
+operation.
 Slang now builds a selected scalar resource view structurally as
 `{ ptr addrspace(1) element, i64 }`; resource addressing extracts field zero and applies the
 existing typed pointer-offset operation. The real provider therefore owns only LLVM aggregate
@@ -4564,7 +4565,7 @@ outputBuffer[tid.x + 4] = int((*bptr)[tid.x]) + 2;
 
 The linked IR keeps `getStructuredBufferPtr` and `getUntypedBufferPtr`, each followed by an
 ordinary unsized-array `getElementPtr`. Direct lowering extracts field zero of the resource view
-with generic struct-value extraction, represents the escaped array pointer physically as the
+with generic aggregate-element extraction, represents the escaped array pointer physically as the
 existing global scalar pointer, and indexes it with the generic pointer-offset operation. An
 initial attempt to use fixed-array addressing was rejected by the provider because field zero is
 already a scalar pointer; that rejection confirmed that no LLVM unsized-array value or
@@ -4922,6 +4923,35 @@ CPU, CUDA/NVRTC, and direct-libNVVM lanes. The broader Float32 builtin suite adv
 vector comparison to the independent `makeMatrix` boundary. Release host/provider builds pass and
 the complete NVVM prefix remains 363/363.
 
+### Slice 93: Float32 matrices as generic aggregate values
+
+The direct emission path now requests full matrix legalization from the existing target IR pass.
+CUDA source and NVRTC retain their native matrix representation, while direct NVVM lowers
+`matrix<T,R,C>` to `Array<Vector<T,C>,R>`. Construction, component-wise operations, and row access
+are therefore defined by the same producer-side matrix legalization used by other structural
+targets. The direct emitter never reconstructs matrix semantics or exposes a matrix operation to
+the LLVM provider.
+
+Exact forward-only builder ABI revision 9 replaces the struct-only value extractor with
+`emitAggregateElementExtract` and adds `emitAggregateConstruct`. Both callbacks operate on LLVM
+arrays or structs, validate the complete ordered type/value/index relation before mutation, and
+emit `insertvalue`/`extractvalue`. Fixed arrays can also cross generic phis. The provider's
+first-class value predicate recursively validates selected arrays and structs; vectors retain
+their separate `insertelement`/`extractelement` path because their indices may be dynamic.
+
+Direct preflight admits only canonical nonempty fixed numeric arrays with explicit `makeArray`,
+constant `getElement`, or exact block-parameter/branch transport. The fixed array remains a
+first-class SSA value: no local spill, operand-graph walk, or matrix-specific callback is required.
+Unsupported dynamic aggregate indices, nested arrays, matrix memory/function ABI, and nonselected
+element families remain deterministic boundaries.
+
+`tests/cuda/nvvm-float-matrix-values.slang` runs selected Float2x2 construction,
+matrix/scalar and matrix/matrix addition, branch/phi transport, and row/column extraction through
+direct libNVVM. It produces `8, 15`; its direct PTX passes `ptxas -arch=sm_70`. The broader existing
+Float32 builtin-operator suite advances from `makeMatrix` to the independent `floatCast` boundary
+in its half/mixed-type section. Release host/provider builds pass, the complete NVVM prefix passes
+365/365, and the matrix shader passes both registered lanes.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4940,16 +4970,19 @@ The following remain open until their named slice supplies evidence:
 - external/indirect calls, pointer/aggregate helper ABI, calling conventions and function
   attributes beyond no-inline, saturating or overflow-decorated arithmetic, float64/low-precision
   scalar families,
-  and vector or matrix operations beyond bounded selected-numeric construction and integer-indexed
-  selected-value extraction, selected integer/Float32 scalar-broadcast binary arithmetic, integer
+  and vector or matrix operations beyond bounded selected-numeric construction, constant-indexed
+  selected Float32 matrix row-array construction/extraction and component-wise arithmetic,
+  integer-indexed selected-value extraction, selected integer/Float32 scalar-broadcast binary
+  arithmetic, integer
   and Float32 comparisons, Boolean logic and equality/inequality, integer shifts/division/remainder,
   Float32 remainder, and same-lane integer conversion;
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical
   structured/byte-address data pointers and constant-lane structured-buffer vector swizzled stores,
-  including other `IRGetElementPtr` shapes, pointer escape through helpers or SSA, array values,
-  mutable structs, general globals, additional shared-memory shapes, and address spaces;
+  including other `IRGetElementPtr` shapes, pointer escape through helpers or SSA, nested or
+  dynamically indexed aggregate values, mutable structs, general globals, additional shared-memory
+  shapes, and address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;

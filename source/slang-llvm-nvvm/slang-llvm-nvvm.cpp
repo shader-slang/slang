@@ -1151,9 +1151,28 @@ static bool _isSupportedFunctionValueType(llvm::Type* type)
 {
     if (type && (type->isIntegerTy() || type->isFloatTy()))
         return true;
-    auto vectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(type);
-    return vectorType && vectorType->getNumElements() >= 2 && vectorType->getNumElements() <= 4 &&
-           _isSupportedFunctionValueType(vectorType->getElementType());
+    if (auto vectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(type))
+    {
+        return vectorType->getNumElements() >= 2 && vectorType->getNumElements() <= 4 &&
+               _isSupportedFunctionValueType(vectorType->getElementType());
+    }
+    if (auto arrayType = llvm::dyn_cast_or_null<llvm::ArrayType>(type))
+    {
+        return arrayType->getNumElements() > 0 &&
+               _isSupportedFunctionValueType(arrayType->getElementType());
+    }
+    if (auto structType = llvm::dyn_cast_or_null<llvm::StructType>(type))
+    {
+        if (structType->getNumElements() == 0)
+            return false;
+        for (llvm::Type* elementType : structType->elements())
+        {
+            if (!_isSupportedFunctionValueType(elementType))
+                return false;
+        }
+        return true;
+    }
+    return false;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitPhi(
@@ -1704,28 +1723,93 @@ static SlangResult SLANG_NVVM_CALL _emitStructFieldPointer(
     return SLANG_OK;
 }
 
-static SlangResult SLANG_NVVM_CALL _emitStructFieldValue(
+static size_t _getAggregateElementCount(llvm::Type* aggregateType)
+{
+    if (auto arrayType = llvm::dyn_cast_or_null<llvm::ArrayType>(aggregateType))
+        return size_t(arrayType->getNumElements());
+    if (auto structType = llvm::dyn_cast_or_null<llvm::StructType>(aggregateType))
+        return size_t(structType->getNumElements());
+    return 0;
+}
+
+static llvm::Type* _getAggregateElementType(llvm::Type* aggregateType, size_t elementIndex)
+{
+    if (auto arrayType = llvm::dyn_cast_or_null<llvm::ArrayType>(aggregateType))
+    {
+        return elementIndex < arrayType->getNumElements() ? arrayType->getElementType() : nullptr;
+    }
+    if (auto structType = llvm::dyn_cast_or_null<llvm::StructType>(aggregateType))
+    {
+        return elementIndex < structType->getNumElements()
+                   ? structType->getElementType(unsigned(elementIndex))
+                   : nullptr;
+    }
+    return nullptr;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitAggregateConstruct(
     SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle structValue,
-    uint32_t fieldIndex,
+    SlangNVVMTypeHandle aggregateType,
+    const SlangNVVMValueHandle* elements,
+    size_t elementCount,
     SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
 
     ModuleState* state = _getModule(module);
-    llvm::Value* llvmStructValue = _getValue(structValue);
-    llvm::StructType* structType =
-        llvmStructValue ? llvm::dyn_cast<llvm::StructType>(llvmStructValue->getType()) : nullptr;
+    llvm::Type* llvmAggregateType = _getType(aggregateType);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!state || !outValue || !insertionBlock || !structType ||
-        fieldIndex >= structType->getNumElements() ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmStructValue))
+    if (!state || !outValue || !insertionBlock || !llvmAggregateType ||
+        (!llvm::isa<llvm::ArrayType>(llvmAggregateType) &&
+         !llvm::isa<llvm::StructType>(llvmAggregateType)) ||
+        &llvmAggregateType->getContext() != &state->context ||
+        elementCount != _getAggregateElementCount(llvmAggregateType) || (!elements && elementCount))
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    llvm::Value* result = state->builder.CreateExtractValue(llvmStructValue, {fieldIndex});
+    llvm::SmallVector<llvm::Value*, 4> llvmElements;
+    llvmElements.reserve(elementCount);
+    for (size_t i = 0; i < elementCount; ++i)
+    {
+        llvm::Value* element = _getValue(elements[i]);
+        if (!element || element->getType() != _getAggregateElementType(llvmAggregateType, i) ||
+            !_isValueUsableAtInsertionPoint(state, insertionBlock, element))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+        llvmElements.push_back(element);
+    }
+
+    llvm::Value* result = llvm::UndefValue::get(llvmAggregateType);
+    for (size_t i = 0; i < elementCount; ++i)
+        result = state->builder.CreateInsertValue(result, llvmElements[i], {unsigned(i)});
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitAggregateElementExtract(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle aggregateValue,
+    uint32_t elementIndex,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Value* llvmAggregateValue = _getValue(aggregateValue);
+    llvm::Type* aggregateType = llvmAggregateValue ? llvmAggregateValue->getType() : nullptr;
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !outValue || !insertionBlock ||
+        !_getAggregateElementType(aggregateType, elementIndex) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmAggregateValue))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* result = state->builder.CreateExtractValue(llvmAggregateValue, {elementIndex});
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
@@ -2846,7 +2930,8 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitByteOffsetPointer = _emitByteOffsetPointer;
     api.emitArrayElementPointer = _emitArrayElementPointer;
     api.emitStructFieldPointer = _emitStructFieldPointer;
-    api.emitStructFieldValue = _emitStructFieldValue;
+    api.emitAggregateConstruct = _emitAggregateConstruct;
+    api.emitAggregateElementExtract = _emitAggregateElementExtract;
     api.emitVectorConstruct = _emitVectorConstruct;
     api.emitVectorElementExtract = _emitVectorElementExtract;
     api.emitRelaxedGlobalI32AtomicAdd = _emitRelaxedGlobalI32AtomicAdd;

@@ -522,6 +522,65 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
     return true;
 }
 
+struct NVVMAggregateConstruction
+{
+    IRArrayType* resultType = nullptr;
+    uint32_t elementCount = 0;
+};
+
+// Resolves a canonical fixed-array value whose complete ordered element sequence is explicit in
+// final IR. Matrix legalization is one producer of this shape, but the provider operation remains
+// aggregate-generic and does not recover matrix semantics.
+bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outConstruction)
+{
+    outConstruction = {};
+    uint32_t elementCount = 0;
+    auto resultType =
+        asNVVMSupportedNumericArrayType(inst ? inst->getDataType() : nullptr, &elementCount);
+    if (!resultType || inst->getOp() != kIROp_MakeArray || inst->getOperandCount() != elementCount)
+    {
+        return false;
+    }
+    for (uint32_t i = 0; i < elementCount; ++i)
+    {
+        IRInst* element = inst->getOperand(i);
+        if (!element || !isTypeEqual(element->getDataType(), resultType->getElementType()))
+            return false;
+    }
+    outConstruction.resultType = resultType;
+    outConstruction.elementCount = elementCount;
+    return true;
+}
+
+struct NVVMAggregateElement
+{
+    IRInst* base = nullptr;
+    IRArrayType* baseType = nullptr;
+    uint32_t index = 0;
+};
+
+// Resolves one statically selected element from a canonical fixed-array value. LLVM aggregate
+// extraction is structurally indexed, so dynamic source indexing remains outside this contract.
+bool _getNVVMAggregateElement(IRInst* inst, NVVMAggregateElement& outElement)
+{
+    outElement = {};
+    auto getElement = as<IRGetElement>(inst);
+    IRInst* base = getElement ? getElement->getBase() : nullptr;
+    uint32_t elementCount = 0;
+    auto baseType =
+        asNVVMSupportedNumericArrayType(base ? base->getDataType() : nullptr, &elementCount);
+    auto index = getElement ? _asExecutableInteger32Constant(getElement->getIndex()) : nullptr;
+    if (!baseType || !isTypeEqual(inst->getDataType(), baseType->getElementType()) || !index ||
+        index->getValue() < 0 || index->getValue() >= elementCount)
+    {
+        return false;
+    }
+    outElement.base = base;
+    outElement.baseType = baseType;
+    outElement.index = uint32_t(index->getValue());
+    return true;
+}
+
 struct NVVMVectorSwizzledStore
 {
     IRInst* destination = nullptr;
@@ -1370,7 +1429,7 @@ SlangResult _validateScalarValue(
     return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar value"));
 }
 
-// Checks a selected scalar or fixed value vector admitted by preflight.
+// Checks a selected scalar, fixed value vector, or fixed numeric aggregate admitted by preflight.
 SlangResult _validateSelectedValue(
     CodeGenContext* codeGenContext,
     IRInst* value,
@@ -1378,7 +1437,8 @@ SlangResult _validateSelectedValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (value && asNVVMSupportedValueVectorType(value->getDataType()))
+    if (value && (asNVVMSupportedValueVectorType(value->getDataType()) ||
+                  asNVVMSupportedNumericArrayType(value->getDataType())))
         return _validateAvailableValue(
             codeGenContext,
             value,
@@ -1795,7 +1855,8 @@ SlangResult _validateNVVMFunction(
         {
             for (auto param : block->getParams())
             {
-                if (!isNVVMSupportedValueType(param->getDataType()))
+                if (!isNVVMSupportedValueType(param->getDataType()) &&
+                    !asNVVMSupportedNumericArrayType(param->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
                 }
@@ -1919,17 +1980,22 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_MakeVector:
             case kIROp_MakeVectorFromScalar:
+            case kIROp_MakeArray:
             case kIROp_Swizzle:
             case kIROp_GetElement:
                 {
                     NVVMVectorElement element;
                     NVVMVectorConstruction construction;
+                    NVVMAggregateElement aggregateElement;
+                    NVVMAggregateConstruction aggregateConstruction;
                     if (!_getNVVMVectorElement(inst, element) &&
-                        !_getNVVMVectorConstruction(inst, construction))
+                        !_getNVVMVectorConstruction(inst, construction) &&
+                        !_getNVVMAggregateElement(inst, aggregateElement) &&
+                        !_getNVVMAggregateConstruction(inst, aggregateConstruction))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("selected value vector operation"));
+                            toSlice("selected value construction or extraction"));
                     }
                 }
                 break;
@@ -2253,11 +2319,14 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_MakeVector:
             case kIROp_MakeVectorFromScalar:
+            case kIROp_MakeArray:
             case kIROp_Swizzle:
             case kIROp_GetElement:
                 {
                     NVVMVectorElement element;
                     NVVMVectorConstruction construction;
+                    NVVMAggregateElement aggregateElement;
+                    NVVMAggregateConstruction aggregateConstruction;
                     if (_getNVVMVectorElement(inst, element))
                     {
                         SLANG_RETURN_ON_FAIL(_validateAvailableValue(
@@ -2267,9 +2336,8 @@ SlangResult _validateNVVMFunction(
                             availableValues,
                             dominatorTree));
                     }
-                    else
+                    else if (_getNVVMVectorConstruction(inst, construction))
                     {
-                        SLANG_RELEASE_ASSERT(_getNVVMVectorConstruction(inst, construction));
                         for (uint32_t i = 0; i < construction.elementCount; ++i)
                         {
                             const NVVMVectorConstructElement& source = construction.elements[i];
@@ -2291,6 +2359,29 @@ SlangResult _validateNVVMFunction(
                                     availableValues,
                                     dominatorTree));
                             }
+                        }
+                    }
+                    else if (_getNVVMAggregateElement(inst, aggregateElement))
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                            codeGenContext,
+                            aggregateElement.base,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                    }
+                    else
+                    {
+                        SLANG_RELEASE_ASSERT(
+                            _getNVVMAggregateConstruction(inst, aggregateConstruction));
+                        for (uint32_t i = 0; i < aggregateConstruction.elementCount; ++i)
+                        {
+                            SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                                codeGenContext,
+                                inst->getOperand(i),
+                                inst,
+                                availableValues,
+                                dominatorTree));
                         }
                     }
                     availableValues.add(inst);
@@ -3614,9 +3705,71 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_MakeVector:
                 case kIROp_MakeVectorFromScalar:
+                case kIROp_MakeArray:
                 case kIROp_Swizzle:
                 case kIROp_GetElement:
                     {
+                        NVVMAggregateElement aggregateElement;
+                        if (_getNVVMAggregateElement(inst, aggregateElement))
+                        {
+                            SlangNVVMValueHandle loweredBase = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                aggregateElement.base,
+                                valueMap,
+                                typeContext,
+                                loweredBase));
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "fixed aggregate element extraction",
+                                builder.emitAggregateElementExtract(
+                                    moduleScope.module,
+                                    loweredBase,
+                                    aggregateElement.index,
+                                    loweredValue)));
+                            valueMap[inst] = loweredValue;
+                            break;
+                        }
+
+                        NVVMAggregateConstruction aggregateConstruction;
+                        if (_getNVVMAggregateConstruction(inst, aggregateConstruction))
+                        {
+                            List<SlangNVVMValueHandle> loweredElements;
+                            for (uint32_t i = 0; i < aggregateConstruction.elementCount; ++i)
+                            {
+                                SlangNVVMValueHandle loweredElement = nullptr;
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    inst->getOperand(i),
+                                    valueMap,
+                                    typeContext,
+                                    loweredElement));
+                                loweredElements.add(loweredElement);
+                            }
+                            SlangNVVMTypeHandle loweredResultType = nullptr;
+                            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                                aggregateConstruction.resultType,
+                                NVVMTypeUse::Value,
+                                loweredResultType));
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "fixed aggregate construction",
+                                builder.emitAggregateConstruct(
+                                    moduleScope.module,
+                                    loweredResultType,
+                                    loweredElements.getBuffer(),
+                                    size_t(loweredElements.getCount()),
+                                    loweredValue)));
+                            valueMap[inst] = loweredValue;
+                            break;
+                        }
+
                         NVVMVectorElement element;
                         NVVMVectorConstruction construction;
                         if (_getNVVMVectorElement(inst, element))
@@ -3878,7 +4031,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "raw buffer data pointer",
-                            builder.emitStructFieldValue(
+                            builder.emitAggregateElementExtract(
                                 moduleScope.module,
                                 loweredBuffer,
                                 0,
@@ -3971,7 +4124,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "raw StructuredBuffer data pointer",
-                            builder.emitStructFieldValue(
+                            builder.emitAggregateElementExtract(
                                 moduleScope.module,
                                 loweredBuffer,
                                 0,
@@ -4032,7 +4185,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "raw byte-address buffer data pointer",
-                            builder.emitStructFieldValue(
+                            builder.emitAggregateElementExtract(
                                 moduleScope.module,
                                 loweredBuffer,
                                 0,
@@ -4128,7 +4281,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "raw RWStructuredBuffer data pointer",
-                            builder.emitStructFieldValue(
+                            builder.emitAggregateElementExtract(
                                 moduleScope.module,
                                 loweredBuffer,
                                 0,

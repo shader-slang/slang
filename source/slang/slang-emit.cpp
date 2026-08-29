@@ -1958,7 +1958,9 @@ Result linkAndOptimizeIR(
             bufferElementTypeLoweringOptions);
     }
 
-    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
+    MatrixTypeLoweringOptions matrixTypeLoweringOptions = {};
+    matrixTypeLoweringOptions.lowerAllMatrixTypes = emitNVVMDirectly;
+    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink, matrixTypeLoweringOptions);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,

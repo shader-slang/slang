@@ -643,10 +643,81 @@ SLANG_UNIT_TEST(nvvmSlangIntegerVectorSwizzleUsesGenericConstruction)
         SLANG_CHECK(sawSignedVectorConversion);
 
         SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount == 4);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.loadFlags[0] == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangFloatMatrixValuesUseLegalizedAggregates)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMFloatMatrixValueSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+            StringBuilder trace;
+            trace << "matrix fake trace: modules " << gFakeNVVMBuilder.createModuleCallCount
+                  << "; arrays " << gFakeNVVMBuilder.getArrayTypeCallCount << "; aggregate makes "
+                  << gFakeNVVMBuilder.emitAggregateConstructCallCount << "; aggregate extracts "
+                  << gFakeNVVMBuilder.emitAggregateElementExtractCallCount << "; vector makes "
+                  << gFakeNVVMBuilder.emitVectorConstructCallCount << "; vector extracts "
+                  << gFakeNVVMBuilder.emitVectorElementExtractCallCount << "; phis "
+                  << gFakeNVVMBuilder.emitPhiCallCount << "; phi incoming "
+                  << gFakeNVVMBuilder.addPhiIncomingCallCount << "; value ops "
+                  << gFakeNVVMBuilder.emittedValueOperations.getCount();
+            getTestReporter()->message(TestMessageType::TestFailure, trace.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.getArrayTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.arrayElementCount == 2);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.arrayElementType ==
+            _getFakeNVVMBuilderVectorType(2, FakeNVVMBuilderScalarTypeKind::Float));
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateConstructCallCount >= 2);
+        for (auto resultType : gFakeNVVMBuilder.aggregateConstructResultTypes)
+            SLANG_CHECK(resultType == _getFakeNVVMBuilderArrayType());
+
+        bool sawArrayPhi = false;
+        for (auto phiType : gFakeNVVMBuilder.scalarPhiTypes)
+            sawArrayPhi = sawArrayPhi || phiType == _getFakeNVVMBuilderArrayType();
+        SLANG_CHECK(sawArrayPhi);
+
+        bool sawSelectedRow = false;
+        for (Index i = 0; i < gFakeNVVMBuilder.aggregateElementBaseValueRefs.getCount(); ++i)
+        {
+            const FakeNVVMBuilderValueRef base = gFakeNVVMBuilder.aggregateElementBaseValueRefs[i];
+            sawSelectedRow = sawSelectedRow || (base.kind == FakeNVVMBuilderValueKind::ScalarPhi &&
+                                                gFakeNVVMBuilder.aggregateElementIndices[i] == 1 &&
+                                                gFakeNVVMBuilder.aggregateElementTypeKinds[i] ==
+                                                    FakeNVVMBuilderScalarTypeKind::Float2);
+        }
+        SLANG_CHECK(sawSelectedRow);
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[0] == 1);
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
     }
@@ -1084,8 +1155,8 @@ SLANG_UNIT_TEST(nvvmSlangConventionalComputeUsesDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.loadAlignment == 8);
         SLANG_CHECK(
             gFakeNVVMBuilder.loadResultTypeKinds[0] == FakeNVVMBuilderScalarTypeKind::ResourceView);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.structFieldValueIndices[0] == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.aggregateElementIndices[0] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
@@ -1292,7 +1363,7 @@ SLANG_UNIT_TEST(nvvmSlangConventionalSamplerStorageUsesDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
         SLANG_CHECK(
             gFakeNVVMBuilder.loadResultTypeKinds[0] == FakeNVVMBuilderScalarTypeKind::ResourceView);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
@@ -1344,12 +1415,12 @@ SLANG_UNIT_TEST(nvvmSlangMultidimensionalWaveUsesDirectPipeline)
 
         SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.structFieldValueTypeKinds.getCount() == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.aggregateElementTypeKinds.getCount() == 2);
         SLANG_CHECK(
-            gFakeNVVMBuilder.structFieldValueTypeKinds[0] == FakeNVVMBuilderScalarTypeKind::Float);
+            gFakeNVVMBuilder.aggregateElementTypeKinds[0] == FakeNVVMBuilderScalarTypeKind::Float);
         SLANG_CHECK(
-            gFakeNVVMBuilder.structFieldValueTypeKinds[1] == FakeNVVMBuilderScalarTypeKind::Float);
+            gFakeNVVMBuilder.aggregateElementTypeKinds[1] == FakeNVVMBuilderScalarTypeKind::Float);
         SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
@@ -3696,18 +3767,18 @@ SLANG_UNIT_TEST(nvvmSlangRawRWStructuredBufferI32StoreUsesDirectPipeline)
             gFakeNVVMBuilder.functionParameterTypeKinds[parameterKindOffset + 1] ==
             FakeNVVMBuilderParameterTypeKind::Integer);
 
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.structFieldValueBaseValueRefs.getCount() == 1);
-        const FakeNVVMBuilderValueRef buffer = gFakeNVVMBuilder.structFieldValueBaseValueRefs[0];
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.aggregateElementBaseValueRefs.getCount() == 1);
+        const FakeNVVMBuilderValueRef buffer = gFakeNVVMBuilder.aggregateElementBaseValueRefs[0];
         SLANG_CHECK(buffer.kind == FakeNVVMBuilderValueKind::Parameter);
         SLANG_CHECK(buffer.functionIndex == 0);
         SLANG_CHECK(buffer.index == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.structFieldValueIndices[0] == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.aggregateElementIndices[0] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.pointerOffsetBaseValueRefs.getCount() == 1);
         SLANG_CHECK(
             gFakeNVVMBuilder.pointerOffsetBaseValueRefs[0].kind ==
-            FakeNVVMBuilderValueKind::StructFieldValue);
+            FakeNVVMBuilderValueKind::AggregateElement);
         const FakeNVVMBuilderValueRef index = gFakeNVVMBuilder.pointerOffsetElementValueRefs[0];
         SLANG_CHECK(index.kind == FakeNVVMBuilderValueKind::Parameter);
         SLANG_CHECK(index.functionIndex == 0);
@@ -3784,17 +3855,17 @@ SLANG_UNIT_TEST(nvvmSlangRawBufferDataPointersUseGenericPipeline)
             gFakeNVVMBuilder.functionParameterTypeKinds[parameterOffset + 3] ==
             FakeNVVMBuilderParameterTypeKind::Integer);
 
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 3);
         bool sawBufferParameters[3] = {};
         for (Index fieldValueIndex = 0; fieldValueIndex < 3; ++fieldValueIndex)
         {
             const FakeNVVMBuilderValueRef base =
-                gFakeNVVMBuilder.structFieldValueBaseValueRefs[fieldValueIndex];
+                gFakeNVVMBuilder.aggregateElementBaseValueRefs[fieldValueIndex];
             SLANG_CHECK(base.kind == FakeNVVMBuilderValueKind::Parameter);
             SLANG_CHECK(base.functionIndex == 0);
             SLANG_CHECK(base.index >= 0 && base.index < 3);
             sawBufferParameters[base.index] = true;
-            SLANG_CHECK(gFakeNVVMBuilder.structFieldValueIndices[fieldValueIndex] == 0);
+            SLANG_CHECK(gFakeNVVMBuilder.aggregateElementIndices[fieldValueIndex] == 0);
         }
         for (bool sawParameter : sawBufferParameters)
             SLANG_CHECK(sawParameter);
@@ -3804,7 +3875,7 @@ SLANG_UNIT_TEST(nvvmSlangRawBufferDataPointersUseGenericPipeline)
         {
             SLANG_CHECK(
                 gFakeNVVMBuilder.pointerOffsetBaseValueRefs[pointerIndex].kind ==
-                FakeNVVMBuilderValueKind::StructFieldValue);
+                FakeNVVMBuilderValueKind::AggregateElement);
             const FakeNVVMBuilderValueRef index =
                 gFakeNVVMBuilder.pointerOffsetElementValueRefs[pointerIndex];
             SLANG_CHECK(index.kind == FakeNVVMBuilderValueKind::Parameter);
@@ -3859,7 +3930,7 @@ SLANG_UNIT_TEST(nvvmSlangReadOnlyByteAddressDataPointerIsInvariant)
         SLANG_CHECK_ABORT(code != nullptr);
         SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
 
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.loadFlags[0] == SLANG_NVVM_LOAD_FLAG_INVARIANT);
@@ -4201,10 +4272,10 @@ SLANG_UNIT_TEST(nvvmSlangAggregateAndReadOnlyResourceUsesDirectPipeline)
                 expectedAggregateFieldIndices[fieldIndex]);
         }
 
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 2);
         bool sawDestinationView = false;
         bool sawSourceView = false;
-        for (const FakeNVVMBuilderValueRef base : gFakeNVVMBuilder.structFieldValueBaseValueRefs)
+        for (const FakeNVVMBuilderValueRef base : gFakeNVVMBuilder.aggregateElementBaseValueRefs)
         {
             SLANG_CHECK(base.kind == FakeNVVMBuilderValueKind::Parameter);
             SLANG_CHECK(base.functionIndex == 0);
@@ -4612,7 +4683,7 @@ SLANG_UNIT_TEST(nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMuta
             SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
             SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
             SLANG_CHECK(gFakeNVVMBuilder.getStructTypeCallCount == 0);
-            SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldValueCallCount == 0);
+            SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 0);
             SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
         }
         SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);

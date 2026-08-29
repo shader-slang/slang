@@ -347,11 +347,19 @@ public:
         uint32_t fieldIndex,
         SlangNVVMValueHandle& outPointer) const;
 
-    /// Extracts one statically selected field from a struct value.
-    SlangResult emitStructFieldValue(
+    /// Constructs an array or struct from its complete ordered element sequence.
+    SlangResult emitAggregateConstruct(
         SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle structValue,
-        uint32_t fieldIndex,
+        SlangNVVMTypeHandle aggregateType,
+        const SlangNVVMValueHandle* elements,
+        size_t elementCount,
+        SlangNVVMValueHandle& outValue) const;
+
+    /// Extracts one statically selected element from an array or struct value.
+    SlangResult emitAggregateElementExtract(
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle aggregateValue,
+        uint32_t elementIndex,
         SlangNVVMValueHandle& outValue) const;
 
     /// Emits multiplication for same-typed scalar integer values.

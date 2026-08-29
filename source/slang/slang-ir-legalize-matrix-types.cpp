@@ -36,14 +36,22 @@ struct MatrixTypeLoweringContext
     TargetProgram* targetProgram;
     IRModule* module;
     DiagnosticSink* sink;
+    MatrixTypeLoweringOptions options;
 
     InstWorkList workList;
     InstHashSet workListSet;
 
     Dictionary<IRInst*, IRInst*> replacements;
 
-    MatrixTypeLoweringContext(TargetProgram* targetProgram, IRModule* module)
-        : targetProgram(targetProgram), module(module), workList(module), workListSet(module)
+    MatrixTypeLoweringContext(
+        TargetProgram* targetProgram,
+        IRModule* module,
+        MatrixTypeLoweringOptions options)
+        : targetProgram(targetProgram)
+        , module(module)
+        , options(options)
+        , workList(module)
+        , workListSet(module)
     {
     }
 
@@ -64,7 +72,10 @@ struct MatrixTypeLoweringContext
 
     bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
-        SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram));
+        SLANG_ASSERT(options.lowerAllMatrixTypes || targetLegalizesMatrixTypes(targetProgram));
+
+        if (options.lowerAllMatrixTypes)
+            return true;
 
         if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
         {
@@ -711,14 +722,18 @@ struct MatrixTypeLoweringContext
     }
 };
 
-void legalizeMatrixTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
+void legalizeMatrixTypes(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink,
+    MatrixTypeLoweringOptions options)
 {
     // Early-out #1 (O(1)): targets that never lower matrices (HLSL, DXIL, CUDA, C++/host, ...) make
     // this whole pass a guaranteed no-op — skip without walking the module.
-    if (!targetLegalizesMatrixTypes(targetProgram))
+    if (!options.lowerAllMatrixTypes && !targetLegalizesMatrixTypes(targetProgram))
         return;
 
-    MatrixTypeLoweringContext context(targetProgram, module);
+    MatrixTypeLoweringContext context(targetProgram, module, options);
     context.sink = sink;
 
     // Early-out #2: on a lowering target, if the module contains no matrix that actually needs
