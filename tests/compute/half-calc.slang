@@ -1,6 +1,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -compute -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-vk -compute -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cuda -compute -render-features half -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features half -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
 
 // Test for doing a calculation using half
 

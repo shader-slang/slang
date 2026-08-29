@@ -4952,6 +4952,35 @@ Float32 builtin-operator suite advances from `makeMatrix` to the independent `fl
 in its half/mixed-type section. Release host/provider builds pass, the complete NVVM prefix passes
 365/365, and the matrix shader passes both registered lanes.
 
+### Slice 94: Float16 values and width-generic conversions
+
+Float16 is now a selected first-class value type under CUDA 12.9's NVVM IR 2.0 contract. Scalars
+and two- through four-lane vectors use native LLVM `half`; literals preserve their exact 16-bit
+payload, and ordinary arithmetic, all six comparisons, vector construction/extraction,
+helper/call/return, and phi transport reuse the existing typed value APIs. This is intentionally a
+value-role change: Half pointers, entry parameters, conventional global fields, resource storage,
+matrices, and mutable local aggregate storage remain unsupported.
+
+Exact forward-only builder ABI revision 10 adds `FLOAT_CONVERT`, not a Float16 callback family.
+The existing semantic descriptor carries kind, bit width, and lane count, so the same generic
+operation callback handles same-lane selected integer-to-floating and floating-to-integer
+conversions plus Float16-to-Float32 `fpext` and Float32-to-Float16 `fptrunc`. Same-width,
+mixed-lane, Float64, BFloat16, and FP8 requests fail during exact capability preflight.
+
+Generic floating negation is emitted as typed negative-zero subtraction in the LLVM graph. This
+works for Half/Float scalars and vectors in both textual dialects and avoids asking the compatibility
+writer to reconstruct an operand type while replacing LLVM 14's unsupported-by-LLVM-7 `fneg`
+token. The existing compatibility rewrite remains only for the older exact scalar path.
+
+The complete Float builtin fixture now passes direct CUDA and PTX lanes, and the existing scalar
+Half calculation passes direct CUDA at the suite's default optimization level. The focused
+`tests/cuda/nvvm-half-values.slang` covers Half2 arithmetic/comparison, every conversion direction,
+helpers, a phi, and dynamic extraction, producing `-8, -5, 1, -5`. Its 1,608-byte optimized PTX
+uses native `f16`/`f16x2`; CUDA 12.9.86 `ptxas -arch=sm_70` emits a 3,176-byte cubin. libNVVM
+rejects that Half2-heavy module at `-O0` with "unsupported operation" even though scalar Half at
+`-O0` succeeds, so the focused vector test explicitly requests `-O3`. The next broader Half-suite
+boundary is mutable local `var`/aggregate-pointer lowering, not numeric typing.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4968,14 +4997,14 @@ The following remain open until their named slice supplies evidence:
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;
 - external/indirect calls, pointer/aggregate helper ABI, calling conventions and function
-  attributes beyond no-inline, saturating or overflow-decorated arithmetic, float64/low-precision
-  scalar families,
+  attributes beyond no-inline, saturating or overflow-decorated arithmetic, Float64/BFloat16/FP8
+  scalar families, Float16 storage and unoptimized vector execution,
   and vector or matrix operations beyond bounded selected-numeric construction, constant-indexed
   selected Float32 matrix row-array construction/extraction and component-wise arithmetic,
-  integer-indexed selected-value extraction, selected integer/Float32 scalar-broadcast binary
-  arithmetic, integer
-  and Float32 comparisons, Boolean logic and equality/inequality, integer shifts/division/remainder,
-  Float32 remainder, and same-lane integer conversion;
+  integer-indexed selected-value extraction, selected integer/Float16/Float32 scalar-broadcast
+  binary arithmetic, integer and Float16/Float32 comparisons, Boolean logic and
+  equality/inequality, integer shifts/division/remainder, Float16/Float32 remainder, and same-lane
+  integer/floating conversion;
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical

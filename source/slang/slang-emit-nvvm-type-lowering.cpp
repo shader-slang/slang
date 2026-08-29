@@ -65,6 +65,31 @@ bool isNVVMFloat32Type(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Float;
 }
 
+bool isNVVMFloat16Type(IRInst* type)
+{
+    auto basicType = as<IRBasicType>(type);
+    return basicType && basicType->getBaseType() == BaseType::Half;
+}
+
+bool isNVVMSupportedFloatingPointScalarType(IRInst* type, uint32_t* outBitWidth)
+{
+    if (outBitWidth)
+        *outBitWidth = 0;
+    if (isNVVMFloat16Type(type))
+    {
+        if (outBitWidth)
+            *outBitWidth = 16;
+        return true;
+    }
+    if (isNVVMFloat32Type(type))
+    {
+        if (outBitWidth)
+            *outBitWidth = 32;
+        return true;
+    }
+    return false;
+}
+
 bool isNVVMBoolType(IRInst* type)
 {
     auto basicType = as<IRBasicType>(type);
@@ -83,7 +108,8 @@ static IRVectorType* _asNVVMSupportedVectorType(
     auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
     IRType* elementType = vectorType ? vectorType->getElementType() : nullptr;
     if (!vectorType ||
-        (!isNVVMSupportedIntegerScalarType(elementType) && !isNVVMFloat32Type(elementType) &&
+        (!isNVVMSupportedIntegerScalarType(elementType) &&
+         !isNVVMSupportedFloatingPointScalarType(elementType) &&
          !(allowBool && isNVVMBoolType(elementType))) ||
         !elementCount || elementCount->getValue() < 2 || elementCount->getValue() > 4)
     {
@@ -101,7 +127,7 @@ IRVectorType* asNVVMSupportedValueVectorType(IRInst* type, uint32_t* outElementC
 
 bool isNVVMSupportedValueType(IRInst* type)
 {
-    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMSupportedFloatingPointScalarType(type) ||
            isNVVMBoolType(type) || asNVVMSupportedValueVectorType(type);
 }
 
@@ -149,8 +175,8 @@ IRVectorType* asNVVMSupportedI32VectorType(
 
 bool isNVVMSupportedNumericValueType(IRInst* type)
 {
-    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupported32BitNumericVectorType(type);
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMSupportedFloatingPointScalarType(type) ||
+           asNVVMSupportedNumericVectorType(type);
 }
 
 // Returns the non-aggregate byte payload family shared by direct values and array elements.
@@ -755,7 +781,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isVoid = as<IRVoidType>(type) != nullptr;
     uint32_t integerBitWidth = 0;
     const bool isInteger = isNVVMSupportedIntegerScalarType(type, &integerBitWidth);
-    const bool isFloat32 = isNVVMFloat32Type(type);
+    uint32_t floatingPointBitWidth = 0;
+    const bool isFloatingPoint =
+        isNVVMSupportedFloatingPointScalarType(type, &floatingPointBitWidth);
+    const bool isFloat32 = floatingPointBitWidth == 32;
     const bool isBool = isNVVMBoolType(type);
     uint32_t valueVectorElementCount = 0;
     IRVectorType* valueVectorType = asNVVMSupportedValueVectorType(type, &valueVectorElementCount);
@@ -792,7 +821,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter && isNVVMSupportedValueType(type)) ||
         (use == NVVMTypeUse::Value &&
-         (isInteger || isFloat32 || isBool || valueVectorType || scalarStructType ||
+         (isInteger || isFloatingPoint || isBool || valueVectorType || scalarStructType ||
           fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
           isBufferDataPointer || parameterGroup || resourceElementPointer ||
           sharedElementPointer)) ||
@@ -843,11 +872,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             isInteger ? "selected integer type" : "Boolean type",
             m_builder.getIntegerType(m_module, isInteger ? integerBitWidth : 1u, outType)));
     }
-    else if (isFloat32)
+    else if (isFloatingPoint)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "float32 type",
-            m_builder.getFloatingPointType(m_module, 32u, outType)));
+            floatingPointBitWidth == 16 ? "float16 type" : "float32 type",
+            m_builder.getFloatingPointType(m_module, floatingPointBitWidth, outType)));
     }
     else if (valueVectorType)
     {

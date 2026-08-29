@@ -545,7 +545,7 @@ SlangResult NVVMIRBuilder::getFloatingPointConstant(
     outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (bitWidth != 32 || (bitPattern >> 32) != 0)
+    if ((bitWidth != 16 && bitWidth != 32) || (bitWidth < 64 && (bitPattern >> bitWidth) != 0))
         return SLANG_E_INVALID_ARG;
     const SlangNVVMResult result =
         m_construction

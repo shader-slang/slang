@@ -4,6 +4,7 @@
 #include "compiler-core/slang-artifact-util.h"
 #include "compiler-core/slang-nvvm-semantic-catalog.h"
 #include "core/slang-dictionary.h"
+#include "core/slang-math.h"
 #include "slang-code-gen.h"
 #include "slang-diagnostics.h"
 #include "slang-emit-nvvm-type-lowering.h"
@@ -757,11 +758,12 @@ IRBoolLit* _asExecutableBoolConstant(IRInst* value)
     return boolLit && isNVVMBoolType(boolLit->getDataType()) ? boolLit : nullptr;
 }
 
-// Returns an executable scalar float32 literal, excluding layout and other module constants.
-IRFloatLit* _asExecutableFloat32Constant(IRInst* value)
+// Returns an executable selected floating-point literal, excluding layout and module constants.
+IRFloatLit* _asExecutableFloatingPointConstant(IRInst* value)
 {
     auto floatLit = as<IRFloatLit>(value);
-    return floatLit && isNVVMFloat32Type(floatLit->getDataType()) ? floatLit : nullptr;
+    return floatLit && isNVVMSupportedFloatingPointScalarType(floatLit->getDataType()) ? floatLit
+                                                                                       : nullptr;
 }
 
 // Matches one canonical Slang type against a provider-owned semantic type role.
@@ -1034,8 +1036,9 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
                 bitWidth,
                 elementCount,
             };
-        else if (isNVVMFloat32Type(elementType))
-            outType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, elementCount};
+        else if (uint32_t floatingPointBitWidth = 0;
+                 isNVVMSupportedFloatingPointScalarType(elementType, &floatingPointBitWidth))
+            outType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, floatingPointBitWidth, elementCount};
         else
         {
             SLANG_RELEASE_ASSERT(isNVVMBoolType(elementType));
@@ -1057,8 +1060,9 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
                 1,
             };
         }
-        else if (isNVVMFloat32Type(type))
-            outType = NVVMSemantics::kFloat32;
+        else if (uint32_t floatingPointBitWidth = 0;
+                 isNVVMSupportedFloatingPointScalarType(type, &floatingPointBitWidth))
+            outType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, floatingPointBitWidth, 1};
         else
             return false;
     }
@@ -1141,6 +1145,9 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation& outOperation)
         return true;
     case kIROp_CastFloatToInt:
         outOperation = SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER;
+        return true;
+    case kIROp_FloatCast:
+        outOperation = SLANG_NVVM_VALUE_OP_FLOAT_CONVERT;
         return true;
     case kIROp_WaveMaskBallot:
         outOperation = SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT;
@@ -1372,18 +1379,18 @@ SlangResult _validateBooleanValue(
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
-// Checks that an executable operand is an available canonical float32 value.
-SlangResult _validateFloat32Value(
+// Checks that an executable operand is an available selected floating-point value.
+SlangResult _validateFloatingPointValue(
     CodeGenContext* codeGenContext,
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (!value || !isNVVMFloat32Type(value->getDataType()))
-        return _diagnoseUnsupportedIR(codeGenContext, toSlice("float32 value"));
+    if (!value || !isNVVMSupportedFloatingPointScalarType(value->getDataType()))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("floating-point value"));
 
-    if (_asExecutableFloat32Constant(value))
+    if (_asExecutableFloatingPointConstant(value))
     {
         return SLANG_OK;
     }
@@ -1408,9 +1415,9 @@ SlangResult _validateScalarValue(
             availableValues,
             dominatorTree);
     }
-    if (value && isNVVMFloat32Type(value->getDataType()))
+    if (value && isNVVMSupportedFloatingPointScalarType(value->getDataType()))
     {
-        return _validateFloat32Value(
+        return _validateFloatingPointValue(
             codeGenContext,
             value,
             consumer,
@@ -1924,6 +1931,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_IntCast:
             case kIROp_CastIntToFloat:
             case kIROp_CastFloatToInt:
+            case kIROp_FloatCast:
                 {
                     NVVMResolvedValueOperation operation;
                     if (!_resolveNVVMValueOperation(inst, operation))
@@ -2244,6 +2252,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_IntCast:
             case kIROp_CastIntToFloat:
             case kIROp_CastFloatToInt:
+            case kIROp_FloatCast:
                 {
                     NVVMResolvedValueOperation operation;
                     SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
@@ -2880,16 +2889,22 @@ SlangResult _getLoweredNVVMValue(
         return SLANG_OK;
     }
 
-    auto floatLit = _asExecutableFloat32Constant(irValue);
+    auto floatLit = _asExecutableFloatingPointConstant(irValue);
     SLANG_RELEASE_ASSERT(floatLit);
     SlangNVVMTypeHandle floatingPointType = nullptr;
     SLANG_RETURN_ON_FAIL(
         typeContext.lowerType(floatLit->getDataType(), NVVMTypeUse::Value, floatingPointType));
-    const uint32_t bitPattern = uint32_t(FloatAsInt(float(floatLit->getValue())));
+    uint32_t bitWidth = 0;
+    SLANG_RELEASE_ASSERT(
+        isNVVMSupportedFloatingPointScalarType(floatLit->getDataType(), &bitWidth));
+    const uint64_t bitPattern = bitWidth == 16
+                                    ? uint64_t(FloatToHalf(float(floatLit->getValue())))
+                                    : uint64_t(uint32_t(FloatAsInt(float(floatLit->getValue()))));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
-        "float32 constant",
-        builder.getFloatingPointConstant(module, floatingPointType, 32, bitPattern, outValue)));
+        bitWidth == 16 ? "float16 constant" : "float32 constant",
+        builder
+            .getFloatingPointConstant(module, floatingPointType, bitWidth, bitPattern, outValue)));
     valueMap[irValue] = outValue;
     return SLANG_OK;
 }
@@ -3593,6 +3608,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_IntCast:
                 case kIROp_CastIntToFloat:
                 case kIROp_CastFloatToInt:
+                case kIROp_FloatCast:
                 case kIROp_WaveMaskBallot:
                     {
                         NVVMResolvedValueOperation operation;

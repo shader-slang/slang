@@ -27,16 +27,22 @@ bool isNVVMSupportedIntegerScalarType(
 /// Returns whether `type` is the canonical IEEE 32-bit float accepted by direct NVVM.
 bool isNVVMFloat32Type(IRInst* type);
 
+/// Returns whether `type` is the canonical IEEE 16-bit float accepted as a direct NVVM value.
+bool isNVVMFloat16Type(IRInst* type);
+
+/// Returns whether `type` is a selected floating-point scalar and reports its exact bit width.
+bool isNVVMSupportedFloatingPointScalarType(IRInst* type, uint32_t* outBitWidth = nullptr);
+
 /// Returns whether `type` is the canonical Boolean result produced by an accepted comparison.
 bool isNVVMBoolType(IRInst* type);
 
-/// Returns an exact two- through four-lane selected integer, float32, or Boolean vector.
+/// Returns an exact two- through four-lane selected integer, floating-point, or Boolean vector.
 IRVectorType* asNVVMSupportedValueVectorType(IRInst* type, uint32_t* outElementCount = nullptr);
 
 /// Returns whether `type` is a selected scalar or two- through four-lane value vector.
 bool isNVVMSupportedValueType(IRInst* type);
 
-/// Returns an exact two- through four-lane selected integer or float32 vector.
+/// Returns an exact two- through four-lane selected integer or floating-point vector.
 IRVectorType* asNVVMSupportedNumericVectorType(IRInst* type, uint32_t* outElementCount = nullptr);
 
 /// Returns an exact two- through four-lane 32-bit Int, UInt, or Float vector.

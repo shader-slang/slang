@@ -14,6 +14,7 @@ enum class ValueOperationFamily : uint32_t
     IntegerUnary,
     IntegerBinary,
     IntegerCompare,
+    FloatUnary,
     FloatBinary,
     FloatCompare,
     BooleanUnary,
@@ -22,6 +23,7 @@ enum class ValueOperationFamily : uint32_t
     IntegerConvert,
     IntegerToFloat,
     FloatToInteger,
+    FloatConvert,
 };
 
 struct ValueOperationFamilyResolution
@@ -66,6 +68,11 @@ inline constexpr SlangNVVMValueTypeDesc kUnsignedI32x3 = {
 inline constexpr SlangNVVMValueTypeDesc kFloat32 = {
     SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
     32,
+    1,
+};
+inline constexpr SlangNVVMValueTypeDesc kFloat16 = {
+    SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+    16,
     1,
 };
 inline constexpr SlangNVVMValueTypeDesc kSignedI32x2 = {
@@ -504,8 +511,9 @@ inline bool isSelectedIntegerValue(const SlangNVVMValueTypeDesc& type)
 
 inline bool isSelectedFloatValue(const SlangNVVMValueTypeDesc& type)
 {
-    return type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 32 &&
-           type.laneCount >= 1 && type.laneCount <= 4;
+    return type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+           (type.bitWidth == 16 || type.bitWidth == 32) && type.laneCount >= 1 &&
+           type.laneCount <= 4;
 }
 
 inline bool isSelectedBoolValue(const SlangNVVMValueTypeDesc& type)
@@ -632,7 +640,19 @@ inline bool resolveValueOperationFamily(
     if (isFloatCompare && desc.operation >= SLANG_NVVM_VALUE_OP_EQUAL &&
         desc.operation <= SLANG_NVVM_VALUE_OP_GREATER_EQUAL)
     {
-        outResolution = {ValueOperationFamily::FloatCompare, "parameterized float32 comparison"};
+        outResolution = {
+            ValueOperationFamily::FloatCompare,
+            "parameterized floating-point comparison"};
+        return true;
+    }
+
+    const bool isUnaryFloat = desc.operandCount == 1 && isSelectedFloatValue(desc.resultType) &&
+                              areSameType(desc.resultType, desc.operandTypes[0]);
+    if (isUnaryFloat && desc.operation == SLANG_NVVM_VALUE_OP_NEGATE)
+    {
+        outResolution = {
+            ValueOperationFamily::FloatUnary,
+            "parameterized floating-point unary operation"};
         return true;
     }
 
@@ -648,7 +668,7 @@ inline bool resolveValueOperationFamily(
     {
         outResolution = {
             ValueOperationFamily::FloatBinary,
-            "parameterized float32 binary operation"};
+            "parameterized floating-point binary operation"};
         return true;
     }
 
@@ -690,15 +710,29 @@ inline bool resolveValueOperationFamily(
         return true;
     }
     if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT && desc.operandCount == 1 &&
-        areSameType(desc.resultType, kFloat32) && isSelectedScalarInteger(desc.operandTypes[0]))
+        isSelectedFloatValue(desc.resultType) && isSelectedIntegerValue(desc.operandTypes[0]) &&
+        desc.resultType.laneCount == desc.operandTypes[0].laneCount)
     {
-        outResolution = {ValueOperationFamily::IntegerToFloat, "integer-to-float32 conversion"};
+        outResolution = {
+            ValueOperationFamily::IntegerToFloat,
+            "integer-to-floating-point conversion"};
         return true;
     }
     if (desc.operation == SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER && desc.operandCount == 1 &&
-        isSelectedScalarInteger(desc.resultType) && areSameType(desc.operandTypes[0], kFloat32))
+        isSelectedIntegerValue(desc.resultType) && isSelectedFloatValue(desc.operandTypes[0]) &&
+        desc.resultType.laneCount == desc.operandTypes[0].laneCount)
     {
-        outResolution = {ValueOperationFamily::FloatToInteger, "float32-to-integer conversion"};
+        outResolution = {
+            ValueOperationFamily::FloatToInteger,
+            "floating-point-to-integer conversion"};
+        return true;
+    }
+    if (desc.operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT && desc.operandCount == 1 &&
+        isSelectedFloatValue(desc.resultType) && isSelectedFloatValue(desc.operandTypes[0]) &&
+        desc.resultType.laneCount == desc.operandTypes[0].laneCount &&
+        desc.resultType.bitWidth != desc.operandTypes[0].bitWidth)
+    {
+        outResolution = {ValueOperationFamily::FloatConvert, "floating-point width conversion"};
         return true;
     }
 

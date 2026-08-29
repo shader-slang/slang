@@ -355,7 +355,9 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangNegotiatesCUDAExecutionCapability` | An exact V4 construction-version-1 provider is discovered but reports E52018 for required extended construction before module creation or operation emission | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesSharedGlobalStorage` | V4 construction version 3 preserves versions 1 and 2, rejects invalid type/address-space/alignment/name/output and duplicate-name cases without mutation, then emits exact normal and LLVM-7-compatible address-space-3 storage/GEP/load/store forms | Pass |
 | `slang-unit-test-tool/nvvmSlangNegotiatesSharedGlobalStorageCapability` | An exact V4 construction-version-2 provider retains Slice 66 programs but reports E52018 for shared storage before module creation | Pass |
-| `slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies` | Dimensioned descriptors emit selected scalar/vector integer arithmetic/comparison, all six Float32 comparisons, Boolean equality/inequality, conversions, and vector arithmetic/remainder in normal and compatible assembly; mixed signedness, i24, float64, Boolean arithmetic/ordering, mismatched comparison lanes, and five-lane vectors remain unsupported | Pass |
+| `slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies` | Dimensioned descriptors emit selected scalar/vector integer arithmetic/comparison, Float16/Float32 arithmetic, all six floating comparisons, Boolean equality/inequality, lane-preserving integer/floating conversions, and Float16/Float32 width conversions in normal and compatible assembly; mixed signedness, i24, float64, same-width conversion, Boolean arithmetic/ordering, mismatched lanes, and five-lane vectors remain unsupported | Pass |
+| `slang-unit-test-tool/nvvmSlangFloat16ValuesUseGenericTypedPipeline` | The fake boundary records exact Half/Half2 constants, construction/extraction, arithmetic/comparison/conversion descriptors, helper signatures, calls/returns, and phi transport through the generic APIs | Pass |
+| `tests/cuda/nvvm-half-values.slang` | Optimized direct CUDA and PTX lanes exercise Half/Half2 arithmetic, comparison, integer and Float32 conversion, helper/phi transport, and dynamic extraction with outputs `-8, -5, 1, -5`; CUDA 12.9 `ptxas` accepts the module | Pass |
 | `slang-unit-test-tool/nvvmSlangVectorOperationFamiliesUseTypedDescriptors` | Narrow/32-bit integer, Float32-comparison, and Boolean-operation producers retain exact kind/width/lane descriptors through generic operations, Boolean construction, and scalar extraction | Pass |
 | `slang-unit-test-tool/nvvmSlangScalarShiftDivideRemainderUseTypedOperations` | The four former scalar E52017 controls now compile independently through exact signed-i32 left/right shift, division, and remainder descriptors | Pass |
 | `slang-unit-test-tool/nvvmIRBuilderBuildsConventionalGlobalParameterStorage` | Exact ABI revision 3 structurally constructs an unpacked resource view and one-field global block, extracts the resource pointer value, applies a typed pointer offset, and emits verified normal and NVVM-2.0-compatible assembly | Pass |
@@ -1554,3 +1556,28 @@ with `8, 15`. The branch-sensitive case proves that the row array crosses an agg
 of being optimized entirely into local row vectors. CUDA 12.9 `ptxas -arch=sm_70` accepts the
 module. Release host and isolated-provider builds pass, and the complete NVVM prefix passes
 365/365.
+
+Slice 94 admits native Float16 as a selected first-class SSA value under CUDA 12.9's NVVM IR 2.0
+contract. Exact forward-only builder ABI revision 10 adds only the `FLOAT_CONVERT` semantic
+operation ID; the existing descriptor and generic operation callback carry floating kind, 16/32
+bit width, signedness where relevant, and one through four lanes. Integer-to-floating,
+floating-to-integer, and Float16/Float32 conversions preserve lane count. Same-width, mixed-lane,
+Float64, BFloat16, and FP8 descriptors remain unsupported.
+
+The real provider maps Half to LLVM `half`, exact 16-bit constants, native floating arithmetic and
+comparison, `fptrunc`/`fpext`, and the existing vector/helper/phi construction paths. Generic
+floating negation is built as typed negative-zero subtraction in the LLVM graph because LLVM 14's
+`fneg` token cannot be consumed by libNVVM's LLVM 7 reader; the compatibility writer does not
+infer Half or vector types from text. Half remains a value/helper role only: entry parameters,
+pointers, resource storage, conventional global fields, matrices, and memory-backed local
+aggregates are not admitted by this slice.
+
+The complete Float builtin fixture now passes direct runtime and PTX lanes, and the existing scalar
+`half-calc.slang` passes its new direct runtime lane at the suite's default optimization level. The
+focused `nvvm-half-values.slang` produces `-8, -5, 1, -5`; its 1,608-byte optimized PTX contains
+native `f16`/`f16x2` conversions and arithmetic, and CUDA 12.9.86 `ptxas -arch=sm_70` emits a
+3,176-byte cubin. The same Half2-heavy module is rejected by libNVVM at `-O0` with its generic
+"unsupported operation" diagnostic, while scalar Half succeeds at `-O0`; the registered focused
+lanes therefore request `-O3` and preserve this toolkit limitation explicitly. The broader
+`half-vector-calc.slang` and `half-vector-compare.slang` fixtures next stop at their independent
+mutable local `var` and aggregate helper-result boundaries.

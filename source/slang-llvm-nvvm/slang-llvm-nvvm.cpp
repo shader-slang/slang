@@ -306,10 +306,12 @@ _getFloatingPointType(SlangNVVMModuleHandle module, uint32_t bitWidth, SlangNVVM
         *outType = nullptr;
 
     ModuleState* state = _getModule(module);
-    if (!state || !outType || bitWidth != 32)
+    if (!state || !outType || (bitWidth != 16 && bitWidth != 32))
         return SLANG_E_INVALID_ARG;
 
-    *outType = reinterpret_cast<SlangNVVMTypeHandle>(llvm::Type::getFloatTy(state->context));
+    *outType = reinterpret_cast<SlangNVVMTypeHandle>(
+        bitWidth == 16 ? llvm::Type::getHalfTy(state->context)
+                       : llvm::Type::getFloatTy(state->context));
     return SLANG_OK;
 }
 
@@ -1133,14 +1135,19 @@ static SlangResult SLANG_NVVM_CALL _getFloatingPointConstant(
 
     ModuleState* state = _getModule(module);
     llvm::Type* llvmFloatingPointType = _getType(floatingPointType);
-    if (!state || !llvmFloatingPointType || !llvmFloatingPointType->isFloatTy() || bitWidth != 32 ||
-        (bitPattern >> 32) != 0 || &llvmFloatingPointType->getContext() != &state->context ||
+    const bool isHalf = llvmFloatingPointType && llvmFloatingPointType->isHalfTy();
+    const bool isFloat = llvmFloatingPointType && llvmFloatingPointType->isFloatTy();
+    if (!state || (!isHalf && !isFloat) || (bitWidth != 16 && bitWidth != 32) ||
+        (bitWidth < 64 && (bitPattern >> bitWidth) != 0) || isHalf != (bitWidth == 16) ||
+        isFloat != (bitWidth == 32) || &llvmFloatingPointType->getContext() != &state->context ||
         !outValue)
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    const llvm::APFloat value(llvm::APFloat::IEEEsingle(), llvm::APInt(32, uint32_t(bitPattern)));
+    const llvm::fltSemantics& semantics =
+        bitWidth == 16 ? llvm::APFloat::IEEEhalf() : llvm::APFloat::IEEEsingle();
+    const llvm::APFloat value(semantics, llvm::APInt(bitWidth, bitPattern));
     *outValue =
         reinterpret_cast<SlangNVVMValueHandle>(llvm::ConstantFP::get(llvmFloatingPointType, value));
     return SLANG_OK;
@@ -1149,7 +1156,7 @@ static SlangResult SLANG_NVVM_CALL _getFloatingPointConstant(
 // Returns whether a first-class value can cross the generic function and control-flow boundary.
 static bool _isSupportedFunctionValueType(llvm::Type* type)
 {
-    if (type && (type->isIntegerTy() || type->isFloatTy()))
+    if (type && (type->isIntegerTy() || type->isHalfTy() || type->isFloatTy()))
         return true;
     if (auto vectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(type))
     {
@@ -2610,7 +2617,9 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
         }
         break;
     case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT:
-        if (type.bitWidth == 32)
+        if (type.bitWidth == 16)
+            scalarType = llvm::Type::getHalfTy(state->context);
+        else if (type.bitWidth == 32)
             scalarType = llvm::Type::getFloatTy(state->context);
         break;
     default:
@@ -2753,6 +2762,14 @@ static SlangResult _emitValueOperationFamily(
             return SLANG_E_INVALID_ARG;
         }
         break;
+    case Slang::NVVMSemantics::ValueOperationFamily::FloatUnary:
+        // LLVM 14 prints `fneg`, which libNVVM's LLVM 7 reader cannot parse. Use the equivalent
+        // typed subtraction directly so scalar/vector Half and Float negation need no fragile
+        // text-level type reconstruction in the NVVM IR 2.0 serializer.
+        result = state->builder.CreateFSub(
+            llvm::ConstantFP::getNegativeZero(resultType),
+            llvmOperands[0]);
+        break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatBinary:
         switch (operation.operation)
         {
@@ -2857,6 +2874,11 @@ static SlangResult _emitValueOperationFamily(
         result = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
                      ? state->builder.CreateFPToSI(llvmOperands[0], resultType)
                      : state->builder.CreateFPToUI(llvmOperands[0], resultType);
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::FloatConvert:
+        result = operation.resultType.bitWidth < operation.operandTypes[0].bitWidth
+                     ? state->builder.CreateFPTrunc(llvmOperands[0], resultType)
+                     : state->builder.CreateFPExt(llvmOperands[0], resultType);
         break;
     default:
         return SLANG_E_INVALID_ARG;

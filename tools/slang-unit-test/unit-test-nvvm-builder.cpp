@@ -124,7 +124,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitByteOffsetPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=9") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=10") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -1351,7 +1351,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
         builder.createModule(toSlice("invalid-float32-foreign"), foreignScope.module)));
 
     SlangNVVMTypeHandle invalidType = reinterpret_cast<SlangNVVMTypeHandle>(uintptr_t(1));
-    SLANG_CHECK(builder.getFloatingPointType(scope.module, 16, invalidType) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.getFloatingPointType(scope.module, 64, invalidType) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(invalidType == nullptr);
 
     SlangNVVMTypeHandle voidType = nullptr;
@@ -1505,7 +1505,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
         static_cast<const char*>(assemblyBlob->getBufferPointer()),
         assemblyBlob->getBufferSize());
     SLANG_CHECK(_countOccurrences(assembly, toSlice("fadd float")) == 2);
-    SLANG_CHECK(_countOccurrences(assembly, toSlice("fneg float")) == 1);
+    SLANG_CHECK(_countOccurrences(assembly, toSlice("fsub float -0.000000e+00,")) == 1);
     SLANG_CHECK(_countOccurrences(assembly, toSlice("fcmp oeq float")) == 1);
 }
 
@@ -1562,7 +1562,7 @@ static void _runNVVMIRBuilderBuildsFloat32ArithmeticKernel(
             StringBuilder instruction;
             instruction << arithmeticCase.llvmOpcode << " float";
             Index expectedCount = &arithmeticCase == &testCase ? 1 : 0;
-            if (testOperation == NVVMFloat32ArithmeticTestOperation::Negate && textIndex == 1)
+            if (testOperation == NVVMFloat32ArithmeticTestOperation::Negate)
             {
                 if (arithmeticCase.testOperation == NVVMFloat32ArithmeticTestOperation::Negate)
                     expectedCount = 0;
@@ -1576,8 +1576,7 @@ static void _runNVVMIRBuilderBuildsFloat32ArithmeticKernel(
         }
         SLANG_CHECK(
             _countOccurrences(text.getUnownedSlice(), toSlice("fsub float -0.000000e+00,")) ==
-            (testOperation == NVVMFloat32ArithmeticTestOperation::Negate && textIndex == 1 ? 1
-                                                                                           : 0));
+            (testOperation == NVVMFloat32ArithmeticTestOperation::Negate ? 1 : 0));
         SLANG_CHECK(text.indexOf("store float") >= 0);
         SLANG_CHECK(text.indexOf("align 4") >= 0);
         SLANG_CHECK(text.indexOf("fast") < 0);
@@ -2488,6 +2487,20 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("zext i8")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("sitofp i8")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fptoui float")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("sitofp i8")) < text.indexOf(toSlice("to half")));
+        SLANG_CHECK(text.indexOf(toSlice("fadd half")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fsub half")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fcmp olt half")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fpext half")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fptrunc float")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fptosi half")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("sitofp <2 x i32>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fadd <2 x half>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fsub <2 x half>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fcmp oge <2 x half>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fpext <2 x half>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fptrunc <2 x float>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fptosi <2 x half>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("add <2 x i32>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("shl <2 x i32>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("lshr <2 x i32>")) >= 0);
@@ -2512,6 +2525,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("icmp ne <2 x i1>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("insertelement <2 x i1>")) >= 0);
         SLANG_CHECK(_countOccurrences(text, toSlice("extractelement <2 x i1>")) >= 2);
+        SLANG_CHECK(_countOccurrences(text, toSlice("insertelement <2 x half>")) == 2);
+        SLANG_CHECK(_countOccurrences(text, toSlice("extractelement <2 x half>")) == 1);
         SLANG_CHECK(_countOccurrences(text, toSlice("select i1")) >= 2);
         SLANG_CHECK(_countOccurrences(text, toSlice("insertelement")) >= 20);
         SLANG_CHECK(text.indexOf(toSlice("poison")) < 0);
@@ -2642,6 +2657,40 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_COUNT_OF(float64x2Operands),
     };
     SLANG_CHECK(!builder.supportsValueOperation(unsupportedFloatRemainder));
+
+    const SlangNVVMValueTypeDesc float16 = NVVMSemantics::kFloat16;
+    const SlangNVVMValueTypeDesc float32 = NVVMSemantics::kFloat32;
+    const SlangNVVMValueTypeDesc sameWidthFloatOperands[] = {float16};
+    const SlangNVVMValueOperationDesc sameWidthFloatConvert = {
+        SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+        float16,
+        sameWidthFloatOperands,
+        SLANG_COUNT_OF(sameWidthFloatOperands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(sameWidthFloatConvert));
+
+    const SlangNVVMValueTypeDesc float16x2 = {
+        SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+        16,
+        2,
+    };
+    const SlangNVVMValueTypeDesc mismatchedFloatConvertOperands[] = {float16x2};
+    const SlangNVVMValueOperationDesc mismatchedFloatConvertLanes = {
+        SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+        float32,
+        mismatchedFloatConvertOperands,
+        SLANG_COUNT_OF(mismatchedFloatConvertOperands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(mismatchedFloatConvertLanes));
+    invalidResult = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitValueOperation(
+            scope.module,
+            mismatchedFloatConvertLanes,
+            invalidOperands,
+            1,
+            invalidResult) == SLANG_E_NOT_AVAILABLE);
+    SLANG_CHECK(invalidResult == nullptr);
 
     const SlangNVVMValueTypeDesc float32x2 = {
         SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
