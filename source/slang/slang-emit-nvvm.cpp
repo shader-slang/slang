@@ -363,6 +363,39 @@ bool _getNVVMByteAddressAccess(IRInst* inst, NVVMByteAddressAccess& outAccess)
     return true;
 }
 
+struct NVVMEquivalentStructuredBuffer
+{
+    IRInst* buffer = nullptr;
+    NVVMRawBufferType sourceType;
+    NVVMRawBufferType resultType;
+};
+
+// Resolves the representation-preserving UInt32 structured view used by byte-address legalization.
+bool _getNVVMEquivalentStructuredBuffer(IRInst* inst, NVVMEquivalentStructuredBuffer& outConversion)
+{
+    outConversion = {};
+    if (!inst || inst->getOp() != kIROp_GetEquivalentStructuredBuffer ||
+        inst->getOperandCount() != 1)
+    {
+        return false;
+    }
+
+    IRInst* buffer = inst->getOperand(0);
+    if (!buffer ||
+        !getNVVMSupportedRawBufferType(buffer->getDataType(), outConversion.sourceType) ||
+        !getNVVMSupportedRawBufferType(inst->getDataType(), outConversion.resultType) ||
+        outConversion.sourceType.kind != NVVMRawBufferKind::ByteAddress ||
+        outConversion.resultType.kind != NVVMRawBufferKind::Structured ||
+        outConversion.sourceType.access != outConversion.resultType.access ||
+        !isNVVMUnsignedI32Type(outConversion.resultType.structuredElementType))
+    {
+        return false;
+    }
+
+    outConversion.buffer = buffer;
+    return true;
+}
+
 struct NVVMRawBufferElementPointer
 {
     IRInst* base = nullptr;
@@ -2971,6 +3004,7 @@ bool _isSupportedNVVMHelperResultType(IRInst* type)
 // Returns whether one exact canonical type can cross a selected helper parameter boundary.
 bool _isSupportedNVVMHelperParameterType(IRInst* type)
 {
+    NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
     return isNVVMSupportedValueType(type) || asNVVMSupportedNumericArrayType(type) ||
@@ -2978,6 +3012,7 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
            asNVVMSupportedLocalScalarStructPointerType(type) ||
            asNVVMSupportedLocalNumericPointerType(type) ||
            asNVVMSupportedLocalNumericArrayPointerType(type) ||
+           getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceType(type, surfaceType) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
            asNVVMSupportedSamplerValueType(type);
@@ -3707,6 +3742,18 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_GetEquivalentStructuredBuffer:
+                {
+                    NVVMEquivalentStructuredBuffer conversion;
+                    if (!_getNVVMEquivalentStructuredBuffer(inst, conversion))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("equivalent structured-buffer view"));
+                    }
+                }
+                break;
+
             case kIROp_FieldExtract:
                 {
                     NVVMStructField field;
@@ -3972,9 +4019,13 @@ SlangResult _validateNVVMFunction(
                         }
                         else
                         {
+                            NVVMRawBufferType rawBufferType;
                             NVVMSurfaceType surfaceType;
                             NVVMReadOnlyTextureType sampledTextureType;
                             if (asNVVMSupportedCopyableStructType(argument->getDataType()) ||
+                                getNVVMSupportedRawBufferType(
+                                    argument->getDataType(),
+                                    rawBufferType) ||
                                 getNVVMSupportedSurfaceType(argument->getDataType(), surfaceType) ||
                                 getNVVMSupportedReadOnlyTextureType(
                                     argument->getDataType(),
@@ -4340,6 +4391,20 @@ SlangResult _validateNVVMFunction(
                     {
                         availableValues.add(inst);
                     }
+                }
+                break;
+
+            case kIROp_GetEquivalentStructuredBuffer:
+                {
+                    NVVMEquivalentStructuredBuffer conversion;
+                    SLANG_RELEASE_ASSERT(_getNVVMEquivalentStructuredBuffer(inst, conversion));
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        conversion.buffer,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    availableValues.add(inst);
                 }
                 break;
 
@@ -6689,6 +6754,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     loweredValue)));
                             valueMap[inst] = loweredValue;
                         }
+                    }
+                    break;
+
+                case kIROp_GetEquivalentStructuredBuffer:
+                    {
+                        NVVMEquivalentStructuredBuffer conversion;
+                        SLANG_RELEASE_ASSERT(_getNVVMEquivalentStructuredBuffer(inst, conversion));
+                        SlangNVVMValueHandle loweredBuffer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            conversion.buffer,
+                            valueMap,
+                            typeContext,
+                            loweredBuffer));
+                        valueMap[inst] = loweredBuffer;
                     }
                     break;
 

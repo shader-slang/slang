@@ -5774,6 +5774,36 @@ signed scalar shared atomic, UInt32 array indexing/load/store, both signedness c
 the preserved floating/shared and invalid atomic boundaries. Release host/provider builds pass,
 and the complete NVVM prefix passes 389/389.
 
+### Slice 123: Raw-buffer helper parameter ABI
+
+Every canonical raw-buffer view already supported by direct NVVM—read-only and read-write
+StructuredBuffer plus ByteAddressBuffer—can now cross an ordinary helper parameter by value. The
+compiler reuses `getNVVMSupportedRawBufferType` in signature, call-availability, and type-lowering
+gates, so kind, access, element type, and default-layout admission remain in one classifier. Helper
+results, block parameters, phis, and nested resource aggregates remain outside this contract.
+
+Raw views use the established physical `{typed global data pointer, i64 count}` struct. The real
+provider's generic call validation now recursively accepts supported aggregate parameter
+representations containing NVVM address-space pointers while still requiring the argument's exact
+declared LLVM type, module ownership, and dominance. This is a generic physical-ABI rule rather
+than a resource-specific provider callback, and builder ABI remains revision 21.
+
+Byte-address atomic legalization produces `getEquivalentStructuredBuffer` before forming a typed
+element pointer. Direct NVVM admits only the canonical representation-neutral case: a byte-address
+input, a scalar UInt32 structured result, identical read/read-write access, and default layouts.
+Emission reuses the already-lowered view handle, preserving pointer/count provenance and creating
+no provider aggregate. Focused fake coverage carries all four view kinds through calls and proves
+the conversion adds no aggregate construction; a real-provider test serializes the physical view
+call directly.
+
+`func-resource-param.slang` passes its exact direct NVVM CUDA runtime and PTX lanes with result
+`0, 11, 22, 33`. Its 758-byte PTX has one global load and one global store and assembles with CUDA
+12.9.86 `ptxas -arch=sm_70` to a 2,792-byte cubin. The fixture's whole prefix remains 6/7 plus one
+ignored DX12 lane because its unrelated Dawn/WebGPU lane fails bind-group validation.
+`byte-address-buffer-atomic-via-helper-12265.slang` passes 5/5 with result `103`; its 577-byte PTX
+has one global load, one `atom.global.add.u32`, and one global store and assembles to a 2,920-byte
+cubin. Release host/provider builds pass, and the complete NVVM prefix passes 391/391.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5794,7 +5824,8 @@ The following remain open until their named slice supplies evidence:
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;
-- external/indirect calls, helper pointer/aggregate ABI beyond recursively nested numeric-field
+- external/indirect calls, helper pointer/aggregate ABI beyond selected raw-buffer views passed by
+  value, recursively nested numeric-field
   structs passed and returned by value, exact selected-scalar-struct local pointers and
   `BorrowInOutParam` parameters, plus selected numeric local pointers and exact `OutParam` or
   `BorrowInOutParam` parameters, and fixed numeric local-array pointers with exact `OutParam` or

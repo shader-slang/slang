@@ -2372,6 +2372,15 @@ static bool _isFakeNVVMBuilderValueOfTypeKind(
 // Checks a generic function/control-flow value against the exact type handle supplied by the API.
 static bool _isFakeNVVMBuilderValueOfType(SlangNVVMValueHandle value, SlangNVVMTypeHandle type)
 {
+    FakeNVVMBuilderScalarTypeKind resourceElementTypeKind;
+    if (_getFakeNVVMBuilderResourceViewElementTypeKind(type, resourceElementTypeKind))
+    {
+        FakeNVVMBuilderValueRef valueRef;
+        SlangNVVMTypeHandle parameterType = nullptr;
+        return _getFakeNVVMBuilderValueRef(value, valueRef) &&
+               valueRef.kind == FakeNVVMBuilderValueKind::Parameter &&
+               _getFakeNVVMBuilderParameterType(valueRef, parameterType) && parameterType == type;
+    }
     FakeNVVMBuilderScalarTypeKind expectedPointerElementTypeKind;
     if (_getFakeNVVMBuilderPointerElementTypeKind(type, expectedPointerElementTypeKind))
     {
@@ -11045,6 +11054,41 @@ static const char kDirectNVVMRawRWStructuredBufferU32AtomicAddSource[] = R"(
 void computeMain(RWStructuredBuffer<uint> destination, uniform uint index)
 {
     InterlockedAdd(destination[index], 1u);
+}
+)";
+static const char kDirectNVVMRawBufferHelperSource[] = R"(
+uint preserveStructured(StructuredBuffer<int> source, uint value)
+{
+    return value;
+}
+
+uint preserveByte(ByteAddressBuffer source, uint value)
+{
+    return value;
+}
+
+void writeStructured(RWStructuredBuffer<uint> destination, uint index, uint value)
+{
+    destination[index] = value;
+}
+
+void incrementByte(RWByteAddressBuffer destination, uint offset)
+{
+    uint originalValue;
+    destination.InterlockedAdd(offset, 1u, originalValue);
+}
+
+[CUDAKernel]
+void computeMain(
+    StructuredBuffer<int> structuredSource,
+    ByteAddressBuffer byteSource,
+    RWStructuredBuffer<uint> destination,
+    RWByteAddressBuffer counter,
+    uniform uint index)
+{
+    uint value = preserveStructured(structuredSource, index) + preserveByte(byteSource, index);
+    writeStructured(destination, index, value);
+    incrementByte(counter, 0);
 }
 )";
 static const char kDirectNVVMUnsignedFixedArrayIndexSource[] = R"(

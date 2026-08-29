@@ -1348,7 +1348,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         (use == NVVMTypeUse::HelperParameter &&
          (isNVVMSupportedValueType(type) || fixedNumericArrayType || copyableStructType ||
           localScalarStructPointer || localNumericPointer || localNumericArrayPointer ||
-          isSurface || isSampledTexture || samplerValue)) ||
+          isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
           physicalArrayStructType || fixedNumericArrayType || deviceNumericPointer ||

@@ -1292,10 +1292,30 @@ static bool _isSupportedFunctionParameterType(llvm::Type* type)
 {
     if (_isSupportedFunctionValueType(type))
         return true;
-    auto pointerType = llvm::dyn_cast_or_null<llvm::PointerType>(type);
-    return pointerType && !pointerType->isOpaque() &&
-           pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_GENERIC &&
-           _isSupportedFunctionValueType(pointerType->getNonOpaquePointerElementType());
+    if (auto pointerType = llvm::dyn_cast_or_null<llvm::PointerType>(type))
+    {
+        return !pointerType->isOpaque() &&
+               _isNVVMAddressSpace(
+                   static_cast<SlangNVVMAddressSpace>(pointerType->getAddressSpace())) &&
+               _isSupportedFunctionParameterType(pointerType->getNonOpaquePointerElementType());
+    }
+    if (auto arrayType = llvm::dyn_cast_or_null<llvm::ArrayType>(type))
+    {
+        return arrayType->getNumElements() > 0 &&
+               _isSupportedFunctionParameterType(arrayType->getElementType());
+    }
+    if (auto structType = llvm::dyn_cast_or_null<llvm::StructType>(type))
+    {
+        if (structType->getNumElements() == 0)
+            return false;
+        for (llvm::Type* elementType : structType->elements())
+        {
+            if (!_isSupportedFunctionParameterType(elementType))
+                return false;
+        }
+        return true;
+    }
+    return false;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitPhi(

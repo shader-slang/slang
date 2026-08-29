@@ -1139,6 +1139,91 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsLocalAggregatePointerCalls)
     }
 }
 
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsRawViewValueCalls)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("raw-view-value-calls"), scope.module)));
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle integerType = nullptr;
+    SlangNVVMTypeHandle countType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, integerType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 64, countType)));
+
+    SlangNVVMTypeHandle dataPointerType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        scope.module,
+        integerType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        dataPointerType)));
+    const SlangNVVMTypeHandle viewFieldTypes[] = {dataPointerType, countType};
+    SlangNVVMTypeHandle viewType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getStructType(
+        scope.module,
+        viewFieldTypes,
+        SLANG_COUNT_OF(viewFieldTypes),
+        viewType)));
+
+    SlangNVVMTypeHandle functionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionType(scope.module, voidType, &viewType, 1, functionType)));
+    SlangNVVMValueHandle helper = nullptr;
+    SlangNVVMValueHandle caller = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        scope.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_INTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("consumeRawView"),
+        helper)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        scope.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("forwardRawView"),
+        caller)));
+
+    SlangNVVMBlockHandle helperBlock = nullptr;
+    SlangNVVMBlockHandle callerBlock = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createBlock(scope.module, helper, toSlice("entry"), helperBlock)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createBlock(scope.module, caller, toSlice("entry"), callerBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, helperBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+
+    SlangNVVMValueHandle callerView = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, caller, 0, callerView)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, callerBlock)));
+    SlangNVVMValueHandle call = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitCall(scope.module, helper, &callerView, 1, call)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        const String text = _getBlobText(assembly);
+        SLANG_CHECK(
+            text.indexOf("define internal void @consumeRawView({ i32 addrspace(1)*, i64 }") >= 0);
+        SLANG_CHECK(text.indexOf("define void @forwardRawView({ i32 addrspace(1)*, i64 }") >= 0);
+        SLANG_CHECK(text.indexOf("call void @consumeRawView({ i32 addrspace(1)*, i64 }") >= 0);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderRejectsUnknownOperationsWithoutMutation)
 {
     NVVMIRBuilder builder;
