@@ -259,11 +259,66 @@ IRStructType* asNVVMSupportedPhysicalArrayStructType(IRInst* type)
     return onlyField ? structType : nullptr;
 }
 
+IRVectorType* asNVVMSupportedCompactParameterGroupVectorType(IRInst* type)
+{
+    uint32_t elementCount = 0;
+    auto vectorType = asNVVMSupported32BitNumericVectorType(type, &elementCount);
+    return elementCount == 3 ? vectorType : nullptr;
+}
+
+IRArrayType* asNVVMSupportedParameterGroupArrayType(IRInst* type, uint32_t* outElementCount)
+{
+    if (outElementCount)
+        *outElementCount = 0;
+    if (auto arrayType = asNVVMSupportedNumericArrayType(type, outElementCount))
+        return arrayType;
+
+    auto arrayType = as<IRArrayType>(type);
+    auto elementCount = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
+    auto stride = arrayType ? as<IRIntLit>(arrayType->getArrayStride()) : nullptr;
+    if (!arrayType ||
+        !asNVVMSupportedCompactParameterGroupVectorType(arrayType->getElementType()) ||
+        !elementCount || elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX ||
+        !stride || stride->getValue() != 12)
+    {
+        return nullptr;
+    }
+
+    if (outElementCount)
+        *outElementCount = uint32_t(elementCount->getValue());
+    return arrayType;
+}
+
 IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type)
 {
-    if (auto scalarStructType = asNVVMSupportedScalarStructType(type))
-        return scalarStructType;
-    return asNVVMSupportedPhysicalArrayStructType(type);
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return nullptr;
+
+    if (structType->findDecoration<IRPhysicalTypeDecoration>())
+    {
+        IRStructField* onlyField = nullptr;
+        for (auto field : structType->getFields())
+        {
+            if (onlyField || !asNVVMSupportedParameterGroupArrayType(field->getFieldType()))
+                return nullptr;
+            onlyField = field;
+        }
+        return onlyField ? structType : nullptr;
+    }
+
+    bool hasField = false;
+    for (auto field : structType->getFields())
+    {
+        IRType* fieldType = field->getFieldType();
+        if (!isNVVMSupportedIntegerScalarType(fieldType) && !isNVVMFloat32Type(fieldType) &&
+            !asNVVMSupported32BitNumericVectorType(fieldType))
+        {
+            return nullptr;
+        }
+        hasField = true;
+    }
+    return hasField ? structType : nullptr;
 }
 
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type)
@@ -969,6 +1024,7 @@ SlangResult NVVMTypeLoweringContext::_reportUnsupportedType(NVVMTypeUse use) con
     case NVVMTypeUse::Value:
         break;
     case NVVMTypeUse::Storage:
+    case NVVMTypeUse::ParameterGroupStorage:
         construct = "conventional global storage field type";
         break;
     }
@@ -979,33 +1035,54 @@ SlangResult NVVMTypeLoweringContext::_reportUnsupportedType(NVVMTypeUse use) con
 
 SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     IRArrayType* type,
+    NVVMTypeUse use,
     SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
-    if (auto mappedType = m_typeMap.tryGetValue(type))
+    auto& typeMap =
+        use == NVVMTypeUse::ParameterGroupStorage ? m_parameterGroupStorageTypeMap : m_typeMap;
+    if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
         return SLANG_OK;
     }
 
     uint32_t elementCount = 0;
-    SLANG_RELEASE_ASSERT(asNVVMSupportedNumericArrayType(type, &elementCount));
+    IRArrayType* supportedType = use == NVVMTypeUse::ParameterGroupStorage
+                                     ? asNVVMSupportedParameterGroupArrayType(type, &elementCount)
+                                     : asNVVMSupportedNumericArrayType(type, &elementCount);
+    SLANG_RELEASE_ASSERT(supportedType);
     SlangNVVMTypeHandle elementType = nullptr;
-    SLANG_RETURN_ON_FAIL(lowerType(type->getElementType(), NVVMTypeUse::Value, elementType));
+    const NVVMTypeUse elementUse =
+        use == NVVMTypeUse::ParameterGroupStorage && !asNVVMSupportedNumericArrayType(type)
+            ? NVVMTypeUse::ParameterGroupStorage
+            : NVVMTypeUse::Value;
+    SLANG_RETURN_ON_FAIL(lowerType(type->getElementType(), elementUse, elementType));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         "fixed numeric array type",
         m_builder.getArrayType(m_module, elementType, elementCount, outType)));
-    m_typeMap[type] = outType;
+    typeMap[type] = outType;
     return SLANG_OK;
 }
 
 SlangResult NVVMTypeLoweringContext::_lowerStructType(
     IRStructType* type,
+    NVVMTypeUse use,
     SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
-    const NVVMTypeUse fieldUse =
-        asNVVMSupportedCopyableStructType(type) ? NVVMTypeUse::Value : NVVMTypeUse::Storage;
+    auto& typeMap =
+        use == NVVMTypeUse::ParameterGroupStorage ? m_parameterGroupStorageTypeMap : m_typeMap;
+    if (auto mappedType = typeMap.tryGetValue(type))
+    {
+        outType = *mappedType;
+        return SLANG_OK;
+    }
+
+    const NVVMTypeUse fieldUse = use == NVVMTypeUse::ParameterGroupStorage
+                                     ? NVVMTypeUse::ParameterGroupStorage
+                                 : asNVVMSupportedCopyableStructType(type) ? NVVMTypeUse::Value
+                                                                           : NVVMTypeUse::Storage;
     List<SlangNVVMTypeHandle> fieldTypes;
     for (auto field : type->getFields())
     {
@@ -1020,7 +1097,7 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
             fieldTypes.getCount() ? fieldTypes.getBuffer() : nullptr,
             size_t(fieldTypes.getCount()),
             outType)));
-    m_typeMap[type] = outType;
+    typeMap[type] = outType;
     return SLANG_OK;
 }
 
@@ -1101,7 +1178,8 @@ SlangResult NVVMTypeLoweringContext::_lowerParameterGroupType(
     SLANG_RELEASE_ASSERT(type && elementType);
 
     SlangNVVMTypeHandle loweredElementType = nullptr;
-    SLANG_RETURN_ON_FAIL(lowerType(elementType, NVVMTypeUse::Storage, loweredElementType));
+    SLANG_RETURN_ON_FAIL(
+        lowerType(elementType, NVVMTypeUse::ParameterGroupStorage, loweredElementType));
 
     const PointerTypeKey key = {elementType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL};
     if (auto mappedRepresentation = m_pointerRepresentationMap.tryGetValue(key))
@@ -1133,7 +1211,7 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
     SlangNVVMTypeHandle loweredPointeeType = nullptr;
     if (auto arrayType = as<IRArrayType>(pointeeType))
     {
-        SLANG_RETURN_ON_FAIL(_lowerArrayType(arrayType, loweredPointeeType));
+        SLANG_RETURN_ON_FAIL(_lowerArrayType(arrayType, NVVMTypeUse::Value, loweredPointeeType));
     }
     else
     {
@@ -1194,6 +1272,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         asNVVMSupportedLocalNumericArrayPointerType(type, &localNumericArrayPointerValueType);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
+    IRArrayType* parameterGroupArrayType = asNVVMSupportedParameterGroupArrayType(type);
+    IRVectorType* compactParameterGroupVectorType =
+        asNVVMSupportedCompactParameterGroupVectorType(type);
+    IRStructType* parameterGroupStructType = asNVVMSupportedParameterGroupStructType(type);
     IRArrayType* deviceArrayType = nullptr;
     IRPtrTypeBase* deviceArrayPointer =
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
@@ -1239,7 +1321,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         (use == NVVMTypeUse::Storage &&
          (isInteger || isFloat32 || structType || fixedNumericArrayType || isRawBuffer ||
           parameterGroup || isSurface || isSampledTexture || samplerStorage ||
-          unsizedSamplerArrayStorage));
+          unsizedSamplerArrayStorage)) ||
+        (use == NVVMTypeUse::ParameterGroupStorage &&
+         (isInteger || isFloat32 || asNVVMSupported32BitNumericVectorType(type) ||
+          parameterGroupArrayType || parameterGroupStructType));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -1294,7 +1379,18 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             outType);
     }
 
-    if (auto mappedType = m_typeMap.tryGetValue(type))
+    if (use == NVVMTypeUse::ParameterGroupStorage &&
+        (isInteger || isFloat32 ||
+         (asNVVMSupported32BitNumericVectorType(type) && !compactParameterGroupVectorType) ||
+         fixedNumericArrayType || asNVVMSupportedScalarStructType(type) ||
+         asNVVMSupportedPhysicalArrayStructType(type)))
+    {
+        return lowerType(type, NVVMTypeUse::Value, outType);
+    }
+
+    auto& typeMap =
+        use == NVVMTypeUse::ParameterGroupStorage ? m_parameterGroupStorageTypeMap : m_typeMap;
+    if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
         return SLANG_OK;
@@ -1323,16 +1419,23 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         SLANG_RETURN_ON_FAIL(
             lowerType(valueVectorType->getElementType(), NVVMTypeUse::Value, elementType));
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "selected value vector type",
-            m_builder.getVectorType(m_module, elementType, valueVectorElementCount, outType)));
+            compactParameterGroupVectorType && use == NVVMTypeUse::ParameterGroupStorage
+                ? "compact parameter-group vector storage type"
+                : "selected value vector type",
+            compactParameterGroupVectorType && use == NVVMTypeUse::ParameterGroupStorage
+                ? m_builder.getArrayType(m_module, elementType, valueVectorElementCount, outType)
+                : m_builder
+                      .getVectorType(m_module, elementType, valueVectorElementCount, outType)));
     }
-    else if (fixedNumericArrayType)
+    else if (
+        fixedNumericArrayType ||
+        (use == NVVMTypeUse::ParameterGroupStorage && parameterGroupArrayType))
     {
-        return _lowerArrayType(fixedNumericArrayType, outType);
+        return _lowerArrayType(cast<IRArrayType>(type), use, outType);
     }
     else if (structType)
     {
-        return _lowerStructType(structType, outType);
+        return _lowerStructType(structType, use, outType);
     }
     else if (deviceNumericPointer)
     {
@@ -1396,7 +1499,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             outType);
     }
 
-    m_typeMap[type] = outType;
+    typeMap[type] = outType;
     return SLANG_OK;
 }
 

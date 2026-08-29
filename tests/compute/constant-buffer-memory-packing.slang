@@ -3,7 +3,9 @@
 // Metal/CPP/CUDA do not deal with packing currently, different results will occur.
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -xslang -DTARGET_WITHOUT_PACKING
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -xslang -DTARGET_WITHOUT_PACKING
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -xslang -DTARGET_WITHOUT_PACKING -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-llvm -compute -xslang -DTARGET_WITHOUT_PACKING
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -DTARGET_WITHOUT_PACKING -o -
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -emit-spirv-via-glsl
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute
@@ -41,6 +43,10 @@ cbuffer NeedsPadding
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name output
 RWStructuredBuffer<uint> output;
+
+// NVVM: .visible .entry computeMain
+// NVVM: ld.global.f32
+// NVVM: st.global.u32
 
 bool floatCheck(float data, float valueToCheckFor)
 {

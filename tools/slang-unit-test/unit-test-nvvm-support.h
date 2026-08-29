@@ -9376,6 +9376,26 @@ void computeMain()
     outputBuffer[0] = params.value;
 }
 )";
+static const char kDirectNVVMCompactParameterGroupVectorSource[] = R"(
+cbuffer VectorParams
+{
+    float3 first;
+    float3 second;
+};
+
+RWStructuredBuffer<float> outputBuffer;
+
+float sumLanes(float3 value)
+{
+    return value.x + value.y + value.z;
+}
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    outputBuffer[0] = sumLanes(first) + second.z;
+}
+)";
 static const char kDirectNVVMUnsupportedNestedParameterBlockSource[] = R"(
 struct Inner
 {

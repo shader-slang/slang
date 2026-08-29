@@ -5662,9 +5662,41 @@ pass, and the complete NVVM unit-test prefix remains 385/385. The whole fixture 
 one ignored because its unrelated WebGPU lane fails Dawn bind-group validation; both CUDA lanes
 pass.
 
-The next bounded corpus probes are independent: `constant-buffer-memory-packing.slang` stops at a
-different struct-field shape, and `bitcast-64bit.slang` stops at a wide helper parameter. They
-remain prioritization choices rather than reasons to widen this nested aggregate contract.
+### Slice 119: Compact CUDA parameter-group vector storage
+
+Direct constant buffers and parameter blocks now admit direct selected 32-bit numeric-vector
+fields and the canonical physical matrix wrapper whose sole array has an explicit 12-byte
+three-lane-vector stride. This is a storage contract, not a change to Slang's value semantics.
+LLVM represents an SSA `float3` as `<3 x float>`, while CUDA naturally places the fixture's
+`float3` fields and matrix rows in 12 bytes at 4-byte alignment. Reusing one provider type handle
+for both roles would therefore make the next row or field start at the wrong byte.
+
+Parameter-group type lowering now has its own role and cache. An exact three-lane Int, UInt, or
+Float32 storage value becomes `[3 x scalar]`; ordinary SSA values remain provider vectors. A whole
+compact load extracts the three aggregate elements and immediately constructs the canonical
+vector expected by arithmetic and helper signatures. Component access instead follows the exact
+immutable parameter-group field or compact-array element producer, so arbitrary explicit pointers
+and mutable compact stores remain rejected.
+
+Acceptance is also guarded by an independent layout proof. The emitter derives the provider
+size, alignment, and every direct struct-field offset from the selected storage representation and
+compares them with CUDA layout. Exact compact arrays require a literal stride of 12, nested user
+structs and nested parameter groups remain outside the family, and a cache lookup cannot broaden
+either boundary. The implementation composes existing array, aggregate-extract, vector-construct,
+field-pointer, and sequential-pointer operations; the builder ABI is unchanged.
+
+`constant-buffer-memory-packing.slang` passes its unchanged CUDA-natural result through direct
+runtime and PTX lanes. Its 4,742-byte PTX assembles with CUDA 12.9.86 `ptxas -arch=sm_70` to a
+4,328-byte cubin. The generated matrix loads use offsets 0 through 32 in 4-byte steps for row-major
+storage and the corresponding 0/12/24 column strides, while the ordinary two-`float3` buffer uses
+field offsets 0 and 12. The whole fixture prefix is 8/9 plus two ignored; the only failure is an
+unrelated WebGPU Dawn bind-group validation error, and both CUDA lanes pass. Focused fake coverage
+proves distinct scalar-array storage and vector-value types, whole-load reconstruction, helper
+transport, and no new provider feature. Adjacent scalar parameter groups and unsupported nested
+groups pass, and the complete NVVM unit-test prefix passes 386/386.
+
+The next bounded corpus probe is `bitcast-64bit.slang`, whose current boundary is a wide helper
+parameter rather than parameter-group layout.
 
 The following remain open until their named slice supplies evidence:
 
@@ -5674,7 +5706,8 @@ The following remain open until their named slice supplies evidence:
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
   global parameter fields beyond selected integer/float32 scalars and selected 32-bit numeric
-  vector resource elements, flat selected-scalar parameter blocks and constant buffers,
+  vector resource elements, flat selected-scalar/vector parameter blocks and constant buffers plus
+  exact compact three-lane physical matrix arrays,
   selected integer/float32 scalar, 32-bit numeric-vector, and layout-compatible recursively
   numeric-field aggregate structured buffers, plus read-only logical access to selected
   sole-array physical matrix elements in read-write structured buffers,
@@ -5704,7 +5737,8 @@ The following remain open until their named slice supplies evidence:
   flat by-value entry struct, plus direct selected-element indexing of canonical
   structured/byte-address data pointers, constant-lane structured-buffer vector swizzled stores,
   and direct keyed numeric-field/vector-lane access to layout-compatible copyable read-write
-  structured-buffer elements, plus selected-element indexing of fixed numeric local arrays and
+  structured-buffer elements, immutable component reads from direct parameter-group vectors and
+  exact compact three-lane arrays, plus selected-element indexing of fixed numeric local arrays and
   vectors, including other
   `IRGetElementPtr`
   shapes, pointer escape through helpers beyond the exact selected-scalar-struct, numeric-value,

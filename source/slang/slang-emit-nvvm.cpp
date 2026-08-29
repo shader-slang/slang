@@ -229,7 +229,8 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     }
 
     return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
-           asNVVMSupportedNumericArrayType(fieldType);
+           asNVVMSupported32BitNumericVectorType(fieldType) ||
+           asNVVMSupportedParameterGroupArrayType(fieldType);
 }
 
 // Resolves one copyable field extraction by canonical struct key and verifies its result type.
@@ -431,7 +432,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         const bool hasParameterGroupBase =
             asNVVMSupportedParameterGroupType(base->getDataType(), &parameterGroupElementType);
         arrayType = hasParameterGroupBase
-                        ? asNVVMSupportedNumericArrayType(parameterGroupElementType)
+                        ? asNVVMSupportedParameterGroupArrayType(parameterGroupElementType)
                         : nullptr;
         if (!arrayType && base->getOp() == kIROp_FieldAddress)
         {
@@ -439,7 +440,8 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
             if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress) &&
                 !fieldAddress.isConventionalGlobal && !fieldAddress.isMutable)
             {
-                arrayType = asNVVMSupportedNumericArrayType(fieldAddress.field->getFieldType());
+                arrayType =
+                    asNVVMSupportedParameterGroupArrayType(fieldAddress.field->getFieldType());
                 baseType = as<IRPtrTypeBase>(base->getDataType());
             }
         }
@@ -460,10 +462,13 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         {
             NVVMStructField fieldAddress;
             if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress) &&
-                fieldAddress.isMutable)
+                !fieldAddress.isConventionalGlobal &&
+                (fieldAddress.isMutable ||
+                 asNVVMSupported32BitNumericVectorType(fieldAddress.field->getFieldType())))
             {
                 numericPointer = as<IRPtrTypeBase>(base->getDataType());
                 valueType = numericPointer ? numericPointer->getValueType() : nullptr;
+                isImmutable = !fieldAddress.isMutable;
             }
         }
         NVVMSequentialElementPointer parentElement;
@@ -509,6 +514,37 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     outPointer.resultType = resultType;
     outPointer.isImmutable = isImmutable;
     return true;
+}
+
+// Returns the exact immutable pointer producers whose three-lane semantic vector is represented by
+// a compact scalar array in parameter-group storage. Direct fields and elements of an explicit
+// 12-byte-stride physical array are the only canonical producers of this representation.
+IRVectorType* _getNVVMCompactParameterGroupVectorPointer(IRInst* value)
+{
+    auto pointerType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
+    auto vectorType =
+        pointerType ? asNVVMSupportedCompactParameterGroupVectorType(pointerType->getValueType())
+                    : nullptr;
+    if (!pointerType || !vectorType)
+        return nullptr;
+
+    if (auto fieldAddress = as<IRFieldAddress>(value))
+    {
+        NVVMStructField field;
+        return _getNVVMStructFieldAddress(fieldAddress, field) && !field.isConventionalGlobal &&
+                       !field.isMutable
+                   ? vectorType
+                   : nullptr;
+    }
+
+    NVVMSequentialElementPointer elementPointer;
+    if (!_getNVVMSequentialElementPointer(value, elementPointer) || !elementPointer.isImmutable ||
+        asNVVMSupportedNumericArrayType(elementPointer.aggregateType) ||
+        !asNVVMSupportedParameterGroupArrayType(elementPointer.aggregateType))
+    {
+        return nullptr;
+    }
+    return vectorType;
 }
 
 // Gets the natural CUDA alignment carried by one physical LLVM `byval` entry parameter.
@@ -587,6 +623,105 @@ bool _hasNVVMCompatibleStructLayout(CodeGenContext* codeGenContext, IRStructType
         }
     }
     return true;
+}
+
+IRIntegerValue _alignNVVMStorageSize(IRIntegerValue size, IRIntegerValue alignment)
+{
+    SLANG_RELEASE_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0);
+    return (size + alignment - 1) & ~(alignment - 1);
+}
+
+// Computes the provider layout selected for one parameter-group storage type. Three-lane 32-bit
+// vectors are scalar arrays; every other leaf keeps its ordinary LLVM representation. Struct
+// offsets are checked against CUDA while walking the canonical direct-field declaration.
+bool _getNVVMParameterGroupStorageLayout(
+    CodeGenContext* codeGenContext,
+    IRType* type,
+    IRSizeAndAlignment& outLayout)
+{
+    outLayout = {};
+    if (!codeGenContext || !type)
+        return false;
+
+    if (asNVVMSupportedCompactParameterGroupVectorType(type))
+    {
+        outLayout.size = 12;
+        outLayout.alignment = 4;
+        return true;
+    }
+
+    if (auto arrayType = asNVVMSupportedParameterGroupArrayType(type))
+    {
+        if (!asNVVMSupportedNumericArrayType(arrayType))
+        {
+            auto elementCount = cast<IRIntLit>(arrayType->getElementCount())->getValue();
+            outLayout.size = elementCount * 12;
+            outLayout.alignment = 4;
+            return true;
+        }
+        return SLANG_SUCCEEDED(getSizeAndAlignment(
+            codeGenContext->getTargetReq(),
+            IRTypeLayoutRules::getLLVM(),
+            type,
+            &outLayout));
+    }
+
+    if (auto structType = asNVVMSupportedParameterGroupStructType(type))
+    {
+        IRIntegerValue size = 0;
+        int alignment = 1;
+        for (auto field : structType->getFields())
+        {
+            IRSizeAndAlignment fieldLayout;
+            IRIntegerValue cudaOffset = 0;
+            if (!_getNVVMParameterGroupStorageLayout(
+                    codeGenContext,
+                    field->getFieldType(),
+                    fieldLayout) ||
+                fieldLayout.size <= 0 || fieldLayout.alignment <= 0 ||
+                SLANG_FAILED(getOffset(
+                    codeGenContext->getTargetReq(),
+                    IRTypeLayoutRules::getCUDA(),
+                    field,
+                    &cudaOffset)))
+            {
+                return false;
+            }
+            size = _alignNVVMStorageSize(size, fieldLayout.alignment);
+            if (cudaOffset != size)
+                return false;
+            size += fieldLayout.size;
+            alignment = Math::Max(alignment, fieldLayout.alignment);
+        }
+        outLayout.size = _alignNVVMStorageSize(size, alignment);
+        outLayout.alignment = alignment;
+        return true;
+    }
+
+    if (!isNVVMSupportedIntegerScalarType(type) && !isNVVMFloat32Type(type) &&
+        !asNVVMSupported32BitNumericVectorType(type))
+    {
+        return false;
+    }
+    return SLANG_SUCCEEDED(getSizeAndAlignment(
+        codeGenContext->getTargetReq(),
+        IRTypeLayoutRules::getLLVM(),
+        type,
+        &outLayout));
+}
+
+bool _hasNVVMCompatibleParameterGroupStorageLayout(CodeGenContext* codeGenContext, IRType* type)
+{
+    IRSizeAndAlignment providerLayout;
+    IRSizeAndAlignment cudaLayout;
+    return _getNVVMParameterGroupStorageLayout(codeGenContext, type, providerLayout) &&
+           SLANG_SUCCEEDED(getSizeAndAlignment(
+               codeGenContext->getTargetReq(),
+               IRTypeLayoutRules::getCUDA(),
+               type,
+               &cudaLayout)) &&
+           providerLayout.size == cudaLayout.size &&
+           providerLayout.alignment == cudaLayout.alignment;
 }
 
 // Retains the canonical declaration closure of a selected struct. Nested copyable fields are
@@ -4635,6 +4770,18 @@ SlangResult validateNVVMSupportedIR(
     {
         for (auto field : conventionalGlobalParams.elementType->getFields())
         {
+            IRType* parameterGroupElementType = nullptr;
+            if (asNVVMSupportedParameterGroupType(
+                    field->getFieldType(),
+                    &parameterGroupElementType) &&
+                !_hasNVVMCompatibleParameterGroupStorageLayout(
+                    codeGenContext,
+                    parameterGroupElementType))
+            {
+                return _diagnoseUnsupportedIR(
+                    codeGenContext,
+                    toSlice("parameter-group storage layout"));
+            }
             IRStructType* elementStruct =
                 _getNVVMRawBufferAggregateElementType(field->getFieldType());
             if (elementStruct)
@@ -5110,6 +5257,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Load:
                     {
                         auto load = cast<IRLoad>(inst);
+                        IRVectorType* compactStorageVector =
+                            _getNVVMCompactParameterGroupVectorPointer(load->getPtr());
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -5120,7 +5269,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        uint32_t alignment = getNVVMCopyableValueAlignment(load->getDataType());
+                        uint32_t alignment =
+                            compactStorageVector
+                                ? getNVVMNumericValueAlignment(
+                                      compactStorageVector->getElementType())
+                                : getNVVMCopyableValueAlignment(load->getDataType());
                         NVVMRawBufferType rawBufferType;
                         NVVMSurfaceType surfaceType;
                         NVVMReadOnlyTextureType sampledTextureType;
@@ -5148,6 +5301,41 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 alignment,
                                 loadFlags,
                                 loweredValue)));
+                        if (compactStorageVector)
+                        {
+                            uint32_t elementCount = 0;
+                            SLANG_RELEASE_ASSERT(asNVVMSupported32BitNumericVectorType(
+                                compactStorageVector,
+                                &elementCount));
+                            SLANG_RELEASE_ASSERT(elementCount == 3);
+                            SlangNVVMValueHandle loweredElements[4] = {};
+                            for (uint32_t elementIndex = 0; elementIndex < elementCount;
+                                 ++elementIndex)
+                            {
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "compact parameter-group vector element extraction",
+                                    builder.emitAggregateElementExtract(
+                                        moduleScope.module,
+                                        loweredValue,
+                                        elementIndex,
+                                        loweredElements[elementIndex])));
+                            }
+                            SlangNVVMTypeHandle loweredVectorType = nullptr;
+                            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                                compactStorageVector,
+                                NVVMTypeUse::Value,
+                                loweredVectorType));
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "compact parameter-group vector reconstruction",
+                                builder.emitVectorConstruct(
+                                    moduleScope.module,
+                                    loweredVectorType,
+                                    loweredElements,
+                                    elementCount,
+                                    loweredValue)));
+                        }
                         valueMap[load] = loweredValue;
                     }
                     break;

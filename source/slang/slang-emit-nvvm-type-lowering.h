@@ -71,7 +71,15 @@ IRStructType* asNVVMSupportedScalarStructType(IRInst* type);
 /// Returns a canonical physical struct containing exactly one selected fixed numeric array.
 IRStructType* asNVVMSupportedPhysicalArrayStructType(IRInst* type);
 
-/// Returns a selected parameter-group struct, including a canonical physical array wrapper.
+/// Returns an exact compact three-lane 32-bit numeric parameter-group storage vector.
+IRVectorType* asNVVMSupportedCompactParameterGroupVectorType(IRInst* type);
+
+/// Returns a selected parameter-group array, including an exact compact vector stride.
+IRArrayType* asNVVMSupportedParameterGroupArrayType(
+    IRInst* type,
+    uint32_t* outElementCount = nullptr);
+
+/// Returns a selected direct-field parameter-group struct or canonical physical array wrapper.
 IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type);
 
 /// Returns an exact nonempty struct whose leaves are selected numeric values.
@@ -238,6 +246,7 @@ enum class NVVMTypeUse
     HelperParameter,
     Value,
     Storage,
+    ParameterGroupStorage,
 };
 
 /// Maps canonical linked-IR types to module-owned provider handles and caches each representation.
@@ -272,8 +281,8 @@ private:
         }
     };
 
-    SlangResult _lowerArrayType(IRArrayType* type, SlangNVVMTypeHandle& outType);
-    SlangResult _lowerStructType(IRStructType* type, SlangNVVMTypeHandle& outType);
+    SlangResult _lowerArrayType(IRArrayType* type, NVVMTypeUse use, SlangNVVMTypeHandle& outType);
+    SlangResult _lowerStructType(IRStructType* type, NVVMTypeUse use, SlangNVVMTypeHandle& outType);
     SlangResult _lowerRawBufferType(const NVVMRawBufferType& type, SlangNVVMTypeHandle& outType);
     SlangResult _lowerParameterGroupType(
         IRParameterGroupType* type,
@@ -294,6 +303,7 @@ private:
     const NVVMIRBuilder& m_builder;
     SlangNVVMModuleHandle m_module = nullptr;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_typeMap;
+    Dictionary<IRType*, SlangNVVMTypeHandle> m_parameterGroupStorageTypeMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_entryParameterRepresentationMap;
     Dictionary<PointerTypeKey, SlangNVVMTypeHandle> m_pointerRepresentationMap;
 };
