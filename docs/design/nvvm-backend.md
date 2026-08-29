@@ -5828,6 +5828,39 @@ cubin. Focused fake coverage proves that only the UInt64 path constructs a typed
 UInt32 path remains identity; real-provider coverage proves exact LLVM and legacy assembly. Release
 host/provider builds pass, and the complete NVVM prefix passes 392/392.
 
+### Slice 125: Aggregate-backed dynamic dispatch
+
+Direct NVVM now compiles the concrete IR produced when CUDA varying legalization resolves
+interface values carried in structured buffers. The emitter does not recover interfaces or witness
+tables: `dynamic-dispatch-13.slang` and `dynamic-dispatch-15.slang` reach it as layout-compatible
+copyable payload structs, UInt dispatch tags, ordinary direct helpers, and integer switches.
+
+Structured-buffer loads use one exact resolver for buffer kind/access, element equality, natural
+copyable alignment, and read-only invariant policy. A loaded struct remains a first-class value.
+Field reads therefore use aggregate extraction unless their base is an actual pointer-backed
+`byval` entry parameter; merely being emitted inside the entry function no longer changes a value's
+physical representation. The generic aggregate constructor now accepts exact `makeStruct` as well
+as `makeArray`, and local fixed arrays can contain either established numeric values or
+layout-compatible copyable structs. Byte-address payloads, device arrays, parameter-group arrays,
+and helper array-pointer ABIs retain their narrower classifiers.
+
+Any-value marshalling can generate complex bit casts after the common required-pass inventory has
+been computed. The direct-NVVM handoff now runs the existing complex-bit-cast lowering so LLVM sees
+only legal leaf casts and explicit aggregate reconstruction. `IRBuilder::emitBitCast` also returns
+its operand for an identity cast, preventing lowering from creating a second spelling of the same
+typed value.
+
+Forward-only builder ABI revision 22 adds the one genuinely missing generic operation:
+`emitUnreachable`. The provider requires an active unterminated block owned by the module and emits
+LLVM `unreachable`; the dispatch switch's impossible default is not modeled as a fake return.
+
+Both promoted fixtures pass all lanes: 6/6 for `dynamic-dispatch-13.slang` and 5/5 for
+`dynamic-dispatch-15.slang`, including unchanged CUDA results and direct PTX checks. Their 1,150-byte
+and 4,793-byte PTX assemble with CUDA 12.9.86 `ptxas -arch=sm_70` to 2,920-byte and 4,968-byte
+cubins. Focused fake coverage proves a first-class structured load feeding field extraction and a
+dynamically indexed local array of copyable structs. Release host/provider builds and the complete
+NVVM prefix pass 393/393.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5870,13 +5903,13 @@ The following remain open until their named slice supplies evidence:
   structured/byte-address data pointers, constant-lane structured-buffer vector swizzled stores,
   and direct keyed numeric-field/vector-lane access to layout-compatible copyable read-write
   structured-buffer elements, immutable component reads from direct parameter-group vectors and
-  exact compact three-lane arrays, plus selected-element indexing of fixed numeric local arrays and
-  vectors, including other
+  exact compact three-lane arrays, plus selected-element indexing of fixed copyable local arrays
+  and numeric vectors, including other
   `IRGetElementPtr`
   shapes, pointer escape through helpers beyond the exact selected-scalar-struct, numeric-value,
   and fixed-numeric-array helper subsets or through SSA, dynamically indexed aggregate values,
   mutable aggregate families beyond layout-compatible recursively numeric-field structs,
-  first-class aggregate field reads beyond copyable helper values, aggregate layouts requiring
+  first-class aggregate field reads beyond admitted copyable values, aggregate layouts requiring
   padding, true mutable device globals beyond the established actual-global atomic subset,
   thread-local contexts beyond flat scalar fields, shared-memory shapes beyond canonical
   uninitialized scalar/fixed-array Int32/UInt32 storage, and address spaces;

@@ -1998,6 +1998,20 @@ static SlangResult SLANG_NVVM_CALL _emitReturnVoid(SlangNVVMModuleHandle module)
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitUnreachable(SlangNVVMModuleHandle module)
+{
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* block = state ? state->builder.GetInsertBlock() : nullptr;
+    if (!state || !block || block->getTerminator() || !block->getParent() ||
+        block->getParent()->getParent() != state->module.get())
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    state->builder.CreateUnreachable();
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL
 _markFunctionAsKernel(SlangNVVMModuleHandle module, SlangNVVMValueHandle function)
 {
@@ -3768,6 +3782,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitCall = _emitCall;
     api.emitValueReturn = _emitValueReturn;
     api.emitReturnVoid = _emitReturnVoid;
+    api.emitUnreachable = _emitUnreachable;
     api.emitPointerOffset = _emitPointerOffset;
     api.emitByteOffsetPointer = _emitByteOffsetPointer;
     api.emitSequentialElementPointer = _emitSequentialElementPointer;

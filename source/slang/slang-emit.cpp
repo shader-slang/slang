@@ -3640,6 +3640,15 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
     SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(this, linkingAndOptimizationOptions, linkedIR));
+
+    // Any-value marshalling is generated after the common lowering-pass inventory is calculated,
+    // and it can introduce aggregate bit casts that were therefore absent from that inventory.
+    // Normalize those generated helpers at the direct-NVVM handoff so the emitter sees the same
+    // leaf-level casts promised by lowerBitCast's canonical form.
+    lowerBitCast(linkedIR.module, getTargetProgram(), getSink());
+    if (getSink()->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     SLANG_RETURN_ON_FAIL(foldNVVMCompileTimeLayoutQueries(this, linkedIR));
     NVVMOperationRequirements requirements;
     SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requirements));

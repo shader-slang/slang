@@ -413,6 +413,7 @@ struct FakeNVVMBuilderState
         createBlockCallCount = 0;
         setInsertBlockCallCount = 0;
         emitReturnVoidCallCount = 0;
+        emitUnreachableCallCount = 0;
         markFunctionAsKernelCallCount = 0;
         serializeQueryCallCount = 0;
         serializeWriteCallCount = 0;
@@ -750,6 +751,7 @@ struct FakeNVVMBuilderState
     int createBlockCallCount = 0;
     int setInsertBlockCallCount = 0;
     int emitReturnVoidCallCount = 0;
+    int emitUnreachableCallCount = 0;
     int markFunctionAsKernelCallCount = 0;
     int serializeQueryCallCount = 0;
     int serializeWriteCallCount = 0;
@@ -3147,6 +3149,16 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitReturnVoid(SlangNVVMModul
                : SLANG_E_INVALID_ARG;
 }
 
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitUnreachable(SlangNVVMModuleHandle module)
+{
+    ++gFakeNVVMBuilder.emitUnreachableCallCount;
+    return module == _getFakeNVVMBuilderModule() && gFakeNVVMBuilder.currentInsertBlockIndex >= 0 &&
+                   gFakeNVVMBuilder.currentInsertBlockIndex <
+                       gFakeNVVMBuilder.blockFunctionIndices.getCount()
+               ? SLANG_OK
+               : SLANG_E_INVALID_ARG;
+}
+
 static SlangResult SLANG_NVVM_CALL
 _fakeNVVMBuilderMarkFunctionAsKernel(SlangNVVMModuleHandle module, SlangNVVMValueHandle function)
 {
@@ -5526,6 +5538,7 @@ static SlangNVVMBuilderConstructionAPI _makeFakeNVVMBuilderConstructionAPI()
     api.emitCall = _fakeNVVMBuilderEmitCall;
     api.emitValueReturn = _fakeNVVMBuilderEmitValueReturn;
     api.emitReturnVoid = _fakeNVVMBuilderEmitReturnVoid;
+    api.emitUnreachable = _fakeNVVMBuilderEmitUnreachable;
     api.emitPointerOffset = _fakeNVVMBuilderEmitPointerOffset;
     api.emitByteOffsetPointer = _fakeNVVMBuilderEmitByteOffsetPointer;
     api.emitSequentialElementPointer = _fakeNVVMBuilderEmitSequentialElementPointer;
@@ -8560,6 +8573,28 @@ void computeMain(RWStructuredBuffer<Thing> destination, uniform uint index)
     value.radius = float(index);
     value.color = half4(1.0h, 2.0h, 3.0h, 4.0h);
     destination[index] = value;
+}
+)";
+
+static const char kDirectNVVMCopyableStructArraySource[] = R"(
+struct Payload
+{
+    int value;
+    float weight;
+};
+
+[CUDAKernel]
+void computeMain(
+    StructuredBuffer<Payload> source,
+    RWStructuredBuffer<int> destination,
+    uniform uint index)
+{
+    Payload loaded = source.Load(0);
+    Payload values[2];
+    values[0] = loaded;
+    values[1] = loaded;
+    Payload selected = values[index & 1];
+    destination[0] = loaded.value + selected.value;
 }
 )";
 

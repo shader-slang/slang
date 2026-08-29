@@ -502,6 +502,9 @@ public:
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle module) const;
 
+    /// Terminates the current insertion block as unreachable.
+    SlangResult emitUnreachable(SlangNVVMModuleHandle module) const;
+
     /// Adds the NVVM kernel annotation for a module-owned function.
     SlangResult markFunctionAsKernel(SlangNVVMModuleHandle module, SlangNVVMValueHandle function)
         const;

@@ -128,7 +128,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=21") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=22") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -489,7 +489,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsIntegerSwitchAndTextureQueries)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
     }
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, defaultBlock)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitUnreachable(module.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(module.module, function)));
 
     const SlangNVVMSerializationFormat formats[] = {
@@ -504,6 +504,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsIntegerSwitchAndTextureQueries)
         const String assembly = _getBlobText(assemblyBlob);
         const UnownedStringSlice assemblySlice = assembly.getUnownedSlice();
         SLANG_CHECK(assembly.indexOf("switch i32 ") >= 0);
+        SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("unreachable")) == 1);
         SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("call i32 @llvm.nvvm.txq.")) == 3);
         SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.width(i64") >= 0);
         SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.height(i64") >= 0);

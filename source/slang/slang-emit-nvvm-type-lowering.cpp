@@ -356,6 +356,27 @@ IRStructType* asNVVMSupportedCopyableStructType(IRInst* type)
     return hasField ? structType : nullptr;
 }
 
+IRArrayType* asNVVMSupportedCopyableArrayType(IRInst* type, uint32_t* outElementCount)
+{
+    if (outElementCount)
+        *outElementCount = 0;
+    if (auto numericArray = asNVVMSupportedNumericArrayType(type, outElementCount))
+        return numericArray;
+
+    auto arrayType = as<IRArrayType>(type);
+    auto elementCount = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
+    if (!arrayType || arrayType->getOp() != kIROp_ArrayType || arrayType->getOperandCount() != 2 ||
+        !asNVVMSupportedCopyableStructType(arrayType->getElementType()) || !elementCount ||
+        elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX)
+    {
+        return nullptr;
+    }
+
+    if (outElementCount)
+        *outElementCount = uint32_t(elementCount->getValue());
+    return arrayType;
+}
+
 IRPtrTypeBase* asNVVMSupportedLocalNumericPointerType(IRInst* type, IRType** outValueType)
 {
     if (outValueType)
@@ -393,6 +414,34 @@ IRPtrTypeBase* asNVVMSupportedLocalNumericArrayPointerType(
     if (!pointerType || !valueType ||
         (pointerType->getOp() != kIROp_PtrType && pointerType->getOp() != kIROp_OutParamType &&
          pointerType->getOp() != kIROp_BorrowInOutParamType) ||
+        pointerType->getOperandCount() != 1 ||
+        pointerType->getAddressSpace() != AddressSpace::Generic)
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    if (outElementCount)
+        *outElementCount = elementCount;
+    return pointerType;
+}
+
+IRPtrTypeBase* asNVVMSupportedLocalCopyableArrayPointerType(
+    IRInst* type,
+    IRArrayType** outValueType,
+    uint32_t* outElementCount)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    if (outElementCount)
+        *outElementCount = 0;
+
+    auto pointerType = as<IRPtrTypeBase>(type);
+    uint32_t elementCount = 0;
+    auto valueType =
+        pointerType ? asNVVMSupportedCopyableArrayType(pointerType->getValueType(), &elementCount)
+                    : nullptr;
+    if (!pointerType || !valueType || pointerType->getOp() != kIROp_PtrType ||
         pointerType->getOperandCount() != 1 ||
         pointerType->getAddressSpace() != AddressSpace::Generic)
     {
@@ -480,8 +529,8 @@ uint32_t getNVVMCopyableValueAlignment(IRInst* type)
 {
     if (const uint32_t numericAlignment = getNVVMNumericValueAlignment(type))
         return numericAlignment;
-    if (auto arrayType = asNVVMSupportedNumericArrayType(type))
-        return getNVVMNumericValueAlignment(arrayType->getElementType());
+    if (auto arrayType = asNVVMSupportedCopyableArrayType(type))
+        return getNVVMCopyableValueAlignment(arrayType->getElementType());
     auto structType = asNVVMSupportedCopyableStructType(type);
     if (!structType)
         return 0;
@@ -1086,7 +1135,7 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     uint32_t elementCount = 0;
     IRArrayType* supportedType = use == NVVMTypeUse::ParameterGroupStorage
                                      ? asNVVMSupportedParameterGroupArrayType(type, &elementCount)
-                                     : asNVVMSupportedNumericArrayType(type, &elementCount);
+                                     : asNVVMSupportedCopyableArrayType(type, &elementCount);
     SLANG_RELEASE_ASSERT(supportedType);
     SlangNVVMTypeHandle elementType = nullptr;
     const NVVMTypeUse elementUse =
@@ -1095,7 +1144,7 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
             : NVVMTypeUse::Value;
     SLANG_RETURN_ON_FAIL(lowerType(type->getElementType(), elementUse, elementType));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        "fixed numeric array type",
+        "fixed copyable array type",
         m_builder.getArrayType(m_module, elementType, elementCount, outType)));
     typeMap[type] = outType;
     return SLANG_OK;
@@ -1308,6 +1357,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         asNVVMSupportedLocalNumericArrayPointerType(type, &localNumericArrayPointerValueType);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
+    IRArrayType* fixedCopyableArrayType = asNVVMSupportedCopyableArrayType(type);
     IRArrayType* parameterGroupArrayType = asNVVMSupportedParameterGroupArrayType(type);
     IRVectorType* compactParameterGroupVectorType =
         asNVVMSupportedCompactParameterGroupVectorType(type);
@@ -1351,7 +1401,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
-          physicalArrayStructType || fixedNumericArrayType || deviceNumericPointer ||
+          physicalArrayStructType || fixedCopyableArrayType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup || isSurface ||
           isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
@@ -1466,7 +1516,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                       .getVectorType(m_module, elementType, valueVectorElementCount, outType)));
     }
     else if (
-        fixedNumericArrayType ||
+        fixedCopyableArrayType ||
         (use == NVVMTypeUse::ParameterGroupStorage && parameterGroupArrayType))
     {
         return _lowerArrayType(cast<IRArrayType>(type), use, outType);

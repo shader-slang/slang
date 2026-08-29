@@ -38,8 +38,8 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
            api.emitLoad && api.emitStore && api.emitLocalStorage && api.emitBranch &&
            api.emitConditionalBranch && api.emitSwitch && api.getIntegerConstant &&
            api.getFloatingPointConstant && api.emitPhi && api.addPhiIncoming && api.emitCall &&
-           api.emitValueReturn && api.emitReturnVoid && api.emitPointerOffset &&
-           api.emitByteOffsetPointer && api.emitSequentialElementPointer &&
+           api.emitValueReturn && api.emitReturnVoid && api.emitUnreachable &&
+           api.emitPointerOffset && api.emitByteOffsetPointer && api.emitSequentialElementPointer &&
            api.emitStructFieldPointer && api.emitAggregateConstruct &&
            api.emitAggregateElementExtract && api.emitVectorConstruct &&
            api.emitSequentialElementExtract && api.declareGlobalStorage && api.markFunctionAsKernel;
@@ -1194,6 +1194,13 @@ SlangResult NVVMIRBuilder::emitReturnVoid(SlangNVVMModuleHandle module) const
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
     return m_construction.emitReturnVoid(module);
+}
+
+SlangResult NVVMIRBuilder::emitUnreachable(SlangNVVMModuleHandle module) const
+{
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    return m_construction.emitUnreachable(module);
 }
 
 SlangResult NVVMIRBuilder::markFunctionAsKernel(

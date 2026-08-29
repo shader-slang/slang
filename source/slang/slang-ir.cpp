@@ -6654,6 +6654,9 @@ IRInst* IRBuilder::emitCountOf(IRType* type, IRInst* sizedType)
 
 IRInst* IRBuilder::emitBitCast(IRType* type, IRInst* val)
 {
+    if (isTypeEqual(type, val->getDataType()))
+        return val;
+
     auto inst = createInst<IRInst>(this, kIROp_BitCast, type, val);
     addInst(inst);
     return inst;

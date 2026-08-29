@@ -88,6 +88,9 @@ IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type);
 /// Returns an exact nonempty struct whose leaves are selected numeric values.
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type);
 
+/// Returns an exact nonempty fixed array of selected numeric values or copyable structs.
+IRArrayType* asNVVMSupportedCopyableArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
+
 /// Returns an exact generic local pointer or output parameter to a selected numeric value.
 IRPtrTypeBase* asNVVMSupportedLocalNumericPointerType(
     IRInst* type,
@@ -95,6 +98,12 @@ IRPtrTypeBase* asNVVMSupportedLocalNumericPointerType(
 
 /// Returns an exact generic local, output, or borrowed mutable pointer to a fixed numeric array.
 IRPtrTypeBase* asNVVMSupportedLocalNumericArrayPointerType(
+    IRInst* type,
+    IRArrayType** outValueType = nullptr,
+    uint32_t* outElementCount = nullptr);
+
+/// Returns an exact compact generic local pointer to a copyable fixed array.
+IRPtrTypeBase* asNVVMSupportedLocalCopyableArrayPointerType(
     IRInst* type,
     IRArrayType** outValueType = nullptr,
     uint32_t* outElementCount = nullptr);
