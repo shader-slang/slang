@@ -30,7 +30,10 @@ bool isNVVMFloat32Type(IRInst* type);
 /// Returns whether `type` is the canonical IEEE 16-bit float accepted as a direct NVVM value.
 bool isNVVMFloat16Type(IRInst* type);
 
-/// Returns whether `type` is a selected floating-point scalar and reports its exact bit width.
+/// Returns whether `type` is the canonical IEEE 64-bit float accepted as a direct NVVM value.
+bool isNVVMFloat64Type(IRInst* type);
+
+/// Returns whether `type` is a selected 16-, 32-, or 64-bit floating-point scalar.
 bool isNVVMSupportedFloatingPointScalarType(IRInst* type, uint32_t* outBitWidth = nullptr);
 
 /// Returns whether `type` is the canonical Boolean result produced by an accepted comparison.

@@ -1752,6 +1752,122 @@ SLANG_UNIT_TEST(nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresent
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangFloat64ValueFamilyUsesGenericTypedOperations)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult compileResult = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMFloat64ValueFamilySource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(compileResult))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool sawFloat64Type = false;
+        for (uint32_t bitWidth : gFakeNVVMBuilder.floatingPointTypeBitWidths)
+            sawFloat64Type |= bitWidth == 64;
+        SLANG_CHECK(sawFloat64Type);
+
+        SLANG_CHECK(
+            gFakeNVVMBuilder.floatingPointConstantBitWidths.getCount() ==
+            gFakeNVVMBuilder.floatingPointConstantBitPatterns.getCount());
+        bool sawFloat64Constant = false;
+        bool sawExactThreeConstant = false;
+        for (Index i = 0; i < gFakeNVVMBuilder.floatingPointConstantBitWidths.getCount(); ++i)
+        {
+            if (gFakeNVVMBuilder.floatingPointConstantBitWidths[i] == 64)
+            {
+                sawFloat64Constant = true;
+                sawExactThreeConstant |= gFakeNVVMBuilder.floatingPointConstantBitPatterns[i] ==
+                                         UINT64_C(0x4008000000000000);
+            }
+        }
+        SLANG_CHECK(sawFloat64Constant);
+        SLANG_CHECK(sawExactThreeConstant);
+
+        bool sawDoubleParameter = false;
+        for (auto parameterKind : gFakeNVVMBuilder.functionParameterTypeKinds)
+            sawDoubleParameter |= parameterKind == FakeNVVMBuilderParameterTypeKind::Double;
+        SLANG_CHECK(sawDoubleParameter);
+
+        bool sawDoubleResult = false;
+        for (auto resultKind : gFakeNVVMBuilder.functionTypeResultKinds)
+            sawDoubleResult |= resultKind == FakeNVVMBuilderResultTypeKind::Double;
+        SLANG_CHECK(sawDoubleResult);
+
+        bool sawFloat64Unary = false;
+        bool sawFloat64Binary = false;
+        bool sawFloat64Compare = false;
+        bool sawIntegerToFloat64 = false;
+        bool sawFloat64ToInteger = false;
+        bool sawFloat64WidthConversion = false;
+        bool sawFloat64Select = false;
+        bool sawFloat64BitReinterpret = false;
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            const bool hasFloat64Result =
+                operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                operation.resultType.bitWidth == 64 && operation.resultType.laneCount == 1;
+            const bool hasFloat64Operand =
+                operation.operandCount > 0 &&
+                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                operation.operandTypes[0].bitWidth == 64 &&
+                operation.operandTypes[0].laneCount == 1;
+            sawFloat64Unary |= operation.key.family == FakeNVVMBuilderScalarFamily::FloatingUnary &&
+                               operation.key.operation == SLANG_NVVM_VALUE_OP_NEGATE &&
+                               hasFloat64Result;
+            sawFloat64Binary |=
+                operation.key.family == FakeNVVMBuilderScalarFamily::FloatingBinary &&
+                hasFloat64Result;
+            sawFloat64Compare |=
+                operation.key.family == FakeNVVMBuilderScalarFamily::FloatingCompare &&
+                hasFloat64Operand;
+            sawIntegerToFloat64 |=
+                operation.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT && hasFloat64Result;
+            sawFloat64ToInteger |=
+                operation.key.operation == SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER &&
+                hasFloat64Operand;
+            sawFloat64WidthConversion |=
+                operation.key.operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT &&
+                (hasFloat64Result || hasFloat64Operand);
+            sawFloat64Select |=
+                operation.key.family == FakeNVVMBuilderScalarFamily::Select && hasFloat64Result;
+            sawFloat64BitReinterpret |=
+                operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET &&
+                (hasFloat64Result || hasFloat64Operand);
+        }
+        SLANG_CHECK(sawFloat64Unary);
+        SLANG_CHECK(sawFloat64Binary);
+        SLANG_CHECK(sawFloat64Compare);
+        SLANG_CHECK(sawIntegerToFloat64);
+        SLANG_CHECK(sawFloat64ToInteger);
+        SLANG_CHECK(sawFloat64WidthConversion);
+        SLANG_CHECK(sawFloat64Select);
+        SLANG_CHECK(sawFloat64BitReinterpret);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount >= 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount >= 1);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangConventionalSamplerStorageUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();

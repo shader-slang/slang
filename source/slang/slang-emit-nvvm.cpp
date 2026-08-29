@@ -2327,6 +2327,9 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation& outOperation)
     case kIROp_FloatCast:
         outOperation = SLANG_NVVM_VALUE_OP_FLOAT_CONVERT;
         return true;
+    case kIROp_BitCast:
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_REINTERPRET;
+        return true;
     case kIROp_Select:
         outOperation = SLANG_NVVM_VALUE_OP_SELECT;
         return true;
@@ -3311,6 +3314,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_CastIntToFloat:
             case kIROp_CastFloatToInt:
             case kIROp_FloatCast:
+            case kIROp_BitCast:
             case kIROp_Select:
                 {
                     NVVMResolvedValueOperation operation;
@@ -3768,6 +3772,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_CastIntToFloat:
             case kIROp_CastFloatToInt:
             case kIROp_FloatCast:
+            case kIROp_BitCast:
             case kIROp_Select:
                 {
                     NVVMResolvedValueOperation operation;
@@ -4566,12 +4571,15 @@ SlangResult _getLoweredNVVMValue(
     uint32_t bitWidth = 0;
     SLANG_RELEASE_ASSERT(
         isNVVMSupportedFloatingPointScalarType(floatLit->getDataType(), &bitWidth));
-    const uint64_t bitPattern = bitWidth == 16
-                                    ? uint64_t(FloatToHalf(float(floatLit->getValue())))
-                                    : uint64_t(uint32_t(FloatAsInt(float(floatLit->getValue()))));
+    const uint64_t bitPattern = bitWidth == 16 ? uint64_t(FloatToHalf(float(floatLit->getValue())))
+                                : bitWidth == 32
+                                    ? uint64_t(uint32_t(FloatAsInt(float(floatLit->getValue()))))
+                                    : uint64_t(DoubleAsInt64(floatLit->getValue()));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
-        bitWidth == 16 ? "float16 constant" : "float32 constant",
+        bitWidth == 16   ? "float16 constant"
+        : bitWidth == 32 ? "float32 constant"
+                         : "float64 constant",
         builder
             .getFloatingPointConstant(module, floatingPointType, bitWidth, bitPattern, outValue)));
     valueMap[irValue] = outValue;
@@ -5529,6 +5537,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_CastIntToFloat:
                 case kIROp_CastFloatToInt:
                 case kIROp_FloatCast:
+                case kIROp_BitCast:
                 case kIROp_Select:
                 case kIROp_WaveMaskBallot:
                     {

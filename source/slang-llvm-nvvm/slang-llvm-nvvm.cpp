@@ -307,12 +307,13 @@ _getFloatingPointType(SlangNVVMModuleHandle module, uint32_t bitWidth, SlangNVVM
         *outType = nullptr;
 
     ModuleState* state = _getModule(module);
-    if (!state || !outType || (bitWidth != 16 && bitWidth != 32))
+    if (!state || !outType || (bitWidth != 16 && bitWidth != 32 && bitWidth != 64))
         return SLANG_E_INVALID_ARG;
 
     *outType = reinterpret_cast<SlangNVVMTypeHandle>(
-        bitWidth == 16 ? llvm::Type::getHalfTy(state->context)
-                       : llvm::Type::getFloatTy(state->context));
+        bitWidth == 16   ? llvm::Type::getHalfTy(state->context)
+        : bitWidth == 32 ? llvm::Type::getFloatTy(state->context)
+                         : llvm::Type::getDoubleTy(state->context));
     return SLANG_OK;
 }
 
@@ -1236,16 +1237,19 @@ static SlangResult SLANG_NVVM_CALL _getFloatingPointConstant(
     llvm::Type* llvmFloatingPointType = _getType(floatingPointType);
     const bool isHalf = llvmFloatingPointType && llvmFloatingPointType->isHalfTy();
     const bool isFloat = llvmFloatingPointType && llvmFloatingPointType->isFloatTy();
-    if (!state || (!isHalf && !isFloat) || (bitWidth != 16 && bitWidth != 32) ||
+    const bool isDouble = llvmFloatingPointType && llvmFloatingPointType->isDoubleTy();
+    if (!state || (!isHalf && !isFloat && !isDouble) ||
+        (bitWidth != 16 && bitWidth != 32 && bitWidth != 64) ||
         (bitWidth < 64 && (bitPattern >> bitWidth) != 0) || isHalf != (bitWidth == 16) ||
-        isFloat != (bitWidth == 32) || &llvmFloatingPointType->getContext() != &state->context ||
-        !outValue)
+        isFloat != (bitWidth == 32) || isDouble != (bitWidth == 64) ||
+        &llvmFloatingPointType->getContext() != &state->context || !outValue)
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    const llvm::fltSemantics& semantics =
-        bitWidth == 16 ? llvm::APFloat::IEEEhalf() : llvm::APFloat::IEEEsingle();
+    const llvm::fltSemantics& semantics = bitWidth == 16   ? llvm::APFloat::IEEEhalf()
+                                          : bitWidth == 32 ? llvm::APFloat::IEEEsingle()
+                                                           : llvm::APFloat::IEEEdouble();
     const llvm::APFloat value(semantics, llvm::APInt(bitWidth, bitPattern));
     *outValue =
         reinterpret_cast<SlangNVVMValueHandle>(llvm::ConstantFP::get(llvmFloatingPointType, value));
@@ -1255,7 +1259,8 @@ static SlangResult SLANG_NVVM_CALL _getFloatingPointConstant(
 // Returns whether a first-class value can cross the generic function and control-flow boundary.
 static bool _isSupportedFunctionValueType(llvm::Type* type)
 {
-    if (type && (type->isIntegerTy() || type->isHalfTy() || type->isFloatTy()))
+    if (type &&
+        (type->isIntegerTy() || type->isHalfTy() || type->isFloatTy() || type->isDoubleTy()))
         return true;
     if (auto vectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(type))
     {
@@ -2781,6 +2786,8 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
             scalarType = llvm::Type::getHalfTy(state->context);
         else if (type.bitWidth == 32)
             scalarType = llvm::Type::getFloatTy(state->context);
+        else if (type.bitWidth == 64)
+            scalarType = llvm::Type::getDoubleTy(state->context);
         break;
     default:
         break;

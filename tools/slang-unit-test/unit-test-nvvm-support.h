@@ -183,6 +183,9 @@ struct FakeNVVMBuilderBooleanTypeStorage
 struct FakeNVVMBuilderFloatTypeStorage
 {
 };
+struct FakeNVVMBuilderDoubleTypeStorage
+{
+};
 struct FakeNVVMBuilderHalfTypeStorage
 {
 };
@@ -348,6 +351,7 @@ enum class FakeNVVMBuilderResultTypeKind
     Boolean,
     Half,
     Float,
+    Double,
     ValueVector,
     ScalarStruct,
 };
@@ -359,6 +363,7 @@ enum class FakeNVVMBuilderParameterTypeKind
     Pointer,
     Half,
     Float,
+    Double,
     FloatPointer,
     ArrayPointer,
     ScalarStructPointer,
@@ -379,6 +384,7 @@ enum class FakeNVVMBuilderScalarTypeKind
     Float2,
     Float3,
     Float4,
+    Double,
     NumericArray,
     NumericArrayPointer,
     ResourceView,
@@ -460,6 +466,7 @@ struct FakeNVVMBuilderState
         }
         integerBitWidth = 0;
         floatingPointBitWidth = 0;
+        floatingPointTypeBitWidths.clear();
         arrayElementCount = 0;
         arrayElementType = nullptr;
         vectorElementType = nullptr;
@@ -696,6 +703,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderBooleanTypeStorage booleanTypeStorage;
     FakeNVVMBuilderHalfTypeStorage halfTypeStorage;
     FakeNVVMBuilderFloatTypeStorage floatTypeStorage;
+    FakeNVVMBuilderDoubleTypeStorage doubleTypeStorage;
     FakeNVVMBuilderPointerTypeStorage pointerTypeStorage;
     FakeNVVMBuilderFloatPointerTypeStorage floatPointerTypeStorage;
     FakeNVVMBuilderArrayTypeStorage arrayTypeStorage;
@@ -786,6 +794,7 @@ struct FakeNVVMBuilderState
                                  [SLANG_NVVM_VALUE_OPERATION_COUNT] = {};
     uint32_t integerBitWidth = 0;
     uint32_t floatingPointBitWidth = 0;
+    List<uint32_t> floatingPointTypeBitWidths;
     uint32_t arrayElementCount = 0;
     SlangNVVMTypeHandle arrayElementType = nullptr;
     SlangNVVMTypeHandle vectorElementType = nullptr;
@@ -1033,6 +1042,11 @@ static SlangNVVMTypeHandle _getFakeNVVMBuilderFloatType()
     return reinterpret_cast<SlangNVVMTypeHandle>(&gFakeNVVMBuilder.floatTypeStorage);
 }
 
+static SlangNVVMTypeHandle _getFakeNVVMBuilderDoubleType()
+{
+    return reinterpret_cast<SlangNVVMTypeHandle>(&gFakeNVVMBuilder.doubleTypeStorage);
+}
+
 static SlangNVVMTypeHandle _getFakeNVVMBuilderHalfType()
 {
     return reinterpret_cast<SlangNVVMTypeHandle>(&gFakeNVVMBuilder.halfTypeStorage);
@@ -1230,6 +1244,8 @@ static bool _getFakeNVVMBuilderTypeKind(
         outTypeKind = FakeNVVMBuilderScalarTypeKind::Half;
     else if (type == _getFakeNVVMBuilderFloatType())
         outTypeKind = FakeNVVMBuilderScalarTypeKind::Float;
+    else if (type == _getFakeNVVMBuilderDoubleType())
+        outTypeKind = FakeNVVMBuilderScalarTypeKind::Double;
     else if (type == _getFakeNVVMBuilderArrayType())
         outTypeKind = FakeNVVMBuilderScalarTypeKind::NumericArray;
     else if (type == _getFakeNVVMBuilderArrayPointerType())
@@ -2264,6 +2280,8 @@ static bool _isFakeNVVMBuilderValueOfTypeKind(
         return _isFakeNVVMBuilderFloatingPointValue(value, 16);
     case FakeNVVMBuilderScalarTypeKind::Float:
         return _isFakeNVVMBuilderFloatingPointValue(value, 32);
+    case FakeNVVMBuilderScalarTypeKind::Double:
+        return _isFakeNVVMBuilderFloatingPointValue(value, 64);
     case FakeNVVMBuilderScalarTypeKind::UInt2:
         return _isFakeNVVMBuilderIntegerVectorValue(value, 2);
     case FakeNVVMBuilderScalarTypeKind::UInt3:
@@ -2380,17 +2398,20 @@ static bool _isFakeNVVMBuilderFloatingPointValue(
     SlangNVVMValueHandle value,
     uint32_t expectedBitWidth)
 {
-    if (expectedBitWidth != 16 && expectedBitWidth != 32)
+    if (expectedBitWidth != 16 && expectedBitWidth != 32 && expectedBitWidth != 64)
         return false;
     FakeNVVMBuilderValueRef valueRef;
     if (!_getFakeNVVMBuilderValueRef(value, valueRef))
         return false;
 
-    const SlangNVVMTypeHandle expectedType =
-        expectedBitWidth == 16 ? _getFakeNVVMBuilderHalfType() : _getFakeNVVMBuilderFloatType();
+    const SlangNVVMTypeHandle expectedType = expectedBitWidth == 16 ? _getFakeNVVMBuilderHalfType()
+                                             : expectedBitWidth == 32
+                                                 ? _getFakeNVVMBuilderFloatType()
+                                                 : _getFakeNVVMBuilderDoubleType();
     const FakeNVVMBuilderScalarTypeKind expectedTypeKind =
-        expectedBitWidth == 16 ? FakeNVVMBuilderScalarTypeKind::Half
-                               : FakeNVVMBuilderScalarTypeKind::Float;
+        expectedBitWidth == 16   ? FakeNVVMBuilderScalarTypeKind::Half
+        : expectedBitWidth == 32 ? FakeNVVMBuilderScalarTypeKind::Float
+                                 : FakeNVVMBuilderScalarTypeKind::Double;
 
     if (valueRef.kind == FakeNVVMBuilderValueKind::Parameter)
     {
@@ -2907,6 +2928,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
                                     resultType == _getFakeNVVMBuilderBooleanType() ||
                                     resultType == _getFakeNVVMBuilderHalfType() ||
                                     resultType == _getFakeNVVMBuilderFloatType() ||
+                                    resultType == _getFakeNVVMBuilderDoubleType() ||
                                     resultType == _getFakeNVVMBuilderScalarStructType() ||
                                     isVectorResult;
     if (module != _getFakeNVVMBuilderModule() || !hasSupportedResult ||
@@ -2921,6 +2943,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
         : resultType == _getFakeNVVMBuilderBooleanType() ? FakeNVVMBuilderResultTypeKind::Boolean
         : resultType == _getFakeNVVMBuilderHalfType()    ? FakeNVVMBuilderResultTypeKind::Half
         : resultType == _getFakeNVVMBuilderFloatType()   ? FakeNVVMBuilderResultTypeKind::Float
+        : resultType == _getFakeNVVMBuilderDoubleType()  ? FakeNVVMBuilderResultTypeKind::Double
         : resultType == _getFakeNVVMBuilderScalarStructType()
             ? FakeNVVMBuilderResultTypeKind::ScalarStruct
             : FakeNVVMBuilderResultTypeKind::ValueVector);
@@ -2937,6 +2960,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
             parameterTypes[i] != _getFakeNVVMBuilderBooleanType() &&
             parameterTypes[i] != _getFakeNVVMBuilderHalfType() &&
             parameterTypes[i] != _getFakeNVVMBuilderFloatType() &&
+            parameterTypes[i] != _getFakeNVVMBuilderDoubleType() &&
             parameterTypes[i] != _getFakeNVVMBuilderPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderFloatPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderArrayPointerType() &&
@@ -2975,6 +2999,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
                 ? FakeNVVMBuilderParameterTypeKind::Half
             : parameterTypes[i] == _getFakeNVVMBuilderFloatType()
                 ? FakeNVVMBuilderParameterTypeKind::Float
+            : parameterTypes[i] == _getFakeNVVMBuilderDoubleType()
+                ? FakeNVVMBuilderParameterTypeKind::Double
             : parameterTypes[i] == _getFakeNVVMBuilderPointerType()
                 ? FakeNVVMBuilderParameterTypeKind::Pointer
             : parameterTypes[i] == _getFakeNVVMBuilderFloatPointerType()
@@ -3272,11 +3298,14 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFloatingPointType(
     gFakeNVVMBuilder.floatingPointBitWidth = bitWidth;
     if (outType)
         *outType = nullptr;
-    if (module != _getFakeNVVMBuilderModule() || (bitWidth != 16 && bitWidth != 32) || !outType)
+    if (module != _getFakeNVVMBuilderModule() ||
+        (bitWidth != 16 && bitWidth != 32 && bitWidth != 64) || !outType)
         return SLANG_E_INVALID_ARG;
+    gFakeNVVMBuilder.floatingPointTypeBitWidths.add(bitWidth);
     *outType = gFakeNVVMBuilder.returnNullFloatingPointType ? nullptr
                : bitWidth == 16                             ? _getFakeNVVMBuilderHalfType()
-                                                            : _getFakeNVVMBuilderFloatType();
+               : bitWidth == 32                             ? _getFakeNVVMBuilderFloatType()
+                                                            : _getFakeNVVMBuilderDoubleType();
     return gFakeNVVMBuilder.failFloatingPointTypeAfterWrite ? SLANG_FAIL : SLANG_OK;
 }
 
@@ -3852,6 +3881,7 @@ static SlangResult _fakeNVVMBuilderEmitCallImpl(
                                  resultKind == FakeNVVMBuilderResultTypeKind::Boolean ||
                                  resultKind == FakeNVVMBuilderResultTypeKind::Half ||
                                  resultKind == FakeNVVMBuilderResultTypeKind::Float ||
+                                 resultKind == FakeNVVMBuilderResultTypeKind::Double ||
                                  resultKind == FakeNVVMBuilderResultTypeKind::ValueVector ||
                                  resultKind == FakeNVVMBuilderResultTypeKind::ScalarStruct;
     if ((requireInteger ? resultKind != FakeNVVMBuilderResultTypeKind::Integer
@@ -4765,9 +4795,10 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFloatingPointConstant(
     ++gFakeNVVMBuilder.getFloatingPointConstantCallCount;
     const bool isSupportedTypeAndWidth =
         (floatingPointType == _getFakeNVVMBuilderHalfType() && bitWidth == 16) ||
-        (floatingPointType == _getFakeNVVMBuilderFloatType() && bitWidth == 32);
+        (floatingPointType == _getFakeNVVMBuilderFloatType() && bitWidth == 32) ||
+        (floatingPointType == _getFakeNVVMBuilderDoubleType() && bitWidth == 64);
     if (module != _getFakeNVVMBuilderModule() || !isSupportedTypeAndWidth ||
-        (bitPattern >> bitWidth) != 0 || !outValue ||
+        (bitWidth < 64 && (bitPattern >> bitWidth) != 0) || !outValue ||
         gFakeNVVMBuilder.floatingPointConstantBitPatterns.getCount() >=
             SLANG_COUNT_OF(gFakeNVVMBuilder.floatingPointConstantStorage))
     {
@@ -9394,6 +9425,28 @@ float sumLanes(float3 value)
 void computeMain()
 {
     outputBuffer[0] = sumLanes(first) + second.z;
+}
+)";
+static const char kDirectNVVMFloat64ValueFamilySource[] = R"(
+RWStructuredBuffer<uint64_t> outputBuffer;
+
+double transformDouble(double x, int64_t y)
+{
+    double value = ((-x + double(y)) * 3.0 - 1.0) / 2.0;
+    double remainder = value % 5.0;
+    double selected = select(remainder > x, remainder, x);
+    int64_t integral = int64_t(selected);
+    float narrowed = float(selected);
+    return double(narrowed) + double(integral);
+}
+
+[numthreads(1, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    double source = double(dispatchThreadID.x) + 1.0;
+    double transformed = transformDouble(source, 4);
+    outputBuffer[0] = bit_cast<uint64_t>(transformed);
+    outputBuffer[1] = bit_cast<uint64_t>(bit_cast<int64_t>(3.0));
 }
 )";
 static const char kDirectNVVMUnsupportedNestedParameterBlockSource[] = R"(

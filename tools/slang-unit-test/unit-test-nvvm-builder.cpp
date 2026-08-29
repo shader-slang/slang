@@ -1993,7 +1993,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
         builder.createModule(toSlice("invalid-float32-foreign"), foreignScope.module)));
 
     SlangNVVMTypeHandle invalidType = reinterpret_cast<SlangNVVMTypeHandle>(uintptr_t(1));
-    SLANG_CHECK(builder.getFloatingPointType(scope.module, 64, invalidType) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.getFloatingPointType(scope.module, 80, invalidType) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(invalidType == nullptr);
 
     SlangNVVMTypeHandle voidType = nullptr;

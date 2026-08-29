@@ -593,9 +593,10 @@ inline bool isSelectedIntegerValue(const SlangNVVMValueTypeDesc& type)
 
 inline bool isSelectedFloatValue(const SlangNVVMValueTypeDesc& type)
 {
-    return type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-           (type.bitWidth == 16 || type.bitWidth == 32) && type.laneCount >= 1 &&
-           type.laneCount <= 4;
+    const bool isSelectedWidth =
+        type.bitWidth == 16 || type.bitWidth == 32 || (type.bitWidth == 64 && type.laneCount == 1);
+    return type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && isSelectedWidth &&
+           type.laneCount >= 1 && type.laneCount <= 4;
 }
 
 inline bool isSelectedBoolValue(const SlangNVVMValueTypeDesc& type)

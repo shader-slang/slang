@@ -5695,8 +5695,35 @@ proves distinct scalar-array storage and vector-value types, whole-load reconstr
 transport, and no new provider feature. Adjacent scalar parameter groups and unsupported nested
 groups pass, and the complete NVVM unit-test prefix passes 386/386.
 
-The next bounded corpus probe is `bitcast-64bit.slang`, whose current boundary is a wide helper
-parameter rather than parameter-group layout.
+### Slice 120: Scalar Float64 values and exact bit reinterpretation
+
+Direct NVVM now carries canonical scalar `Double` values through ordinary helper parameters,
+results, calls, and returns. Scalar Float64 uses the generic semantic descriptor
+`{FloatingPoint, 64, 1}` and the existing typed operation path; no builder ABI revision or
+Float64-specific callback was needed. Constants pass their exact IEEE-754 64-bit pattern to the
+provider rather than depending on decimal text round-tripping.
+
+The scalar and vector admission decisions are deliberately separate. Float64 is accepted as an
+SSA/helper value, while floating vectors remain limited to the established Float16 and Float32
+element widths. The mutable-local, aggregate, launch, parameter-group, device-pointer,
+byte-address, and resource-storage classifiers also remain unchanged. This keeps a first-class
+scalar value proof from silently changing vector layout or a CUDA-facing ABI.
+
+Canonical `IRBitCast` lowers through the generic `SLANG_NVVM_VALUE_OP_BIT_REINTERPRET` operation.
+The shared semantic resolver proves one operand, equal lane count and total width, and distinct
+integer/floating signedness kinds before either provider sees the request. The same dimensioned
+catalog now covers scalar Float64 negate, arithmetic, comparisons, integer/floating conversion,
+floating-width conversion, selection, and reinterpretation. The real and fake providers consume
+those descriptors through their existing generic interfaces.
+
+`bitcast-64bit.slang` passes its unchanged four-result CUDA runtime lane and a direct PTX lane. Its
+658-byte PTX stores the four expected 64-bit patterns and assembles with CUDA 12.9.86
+`ptxas -arch=sm_70` to a 2,920-byte cubin; the whole fixture prefix passes 6/6 plus one ignored
+DX12 lane. The file-backed `nvvm-float64-values.slang` regression exercises dynamic scalar Float64
+arithmetic, remainder, comparison, selection, width and integer conversion, helper transport, and
+bit reinterpretation. Its 1,447-byte PTX uses native Float64 instructions and assembles to a
+5,096-byte cubin. Focused boundary tests preserve Double-vector and raw-entry rejection, and the
+complete NVVM unit-test prefix passes 387/387.
 
 The following remain open until their named slice supplies evidence:
 
@@ -5723,12 +5750,13 @@ The following remain open until their named slice supplies evidence:
   `BorrowInOutParam` parameters, plus selected numeric local pointers and exact `OutParam` or
   `BorrowInOutParam` parameters, and fixed numeric local-array pointers with exact `OutParam` or
   `BorrowInOutParam` parameters, calling conventions and function
-  attributes beyond no-inline, saturating or overflow-decorated arithmetic, Float64/BFloat16/FP8
-  scalar families, Float16 storage and unoptimized vector execution,
+  attributes beyond no-inline, saturating or overflow-decorated arithmetic, BFloat16/FP8 scalar
+  families, Float64 vectors and storage, Float16 storage and unoptimized vector execution,
   and vector or matrix operations beyond bounded selected-numeric construction, constant-indexed
   selected Float32 matrix row-array construction/extraction and component-wise arithmetic,
   integer-indexed selected-value extraction, selected integer/Float16/Float32 scalar-broadcast
-  binary arithmetic, integer and Float16/Float32 comparisons, Boolean logic and
+  binary arithmetic, scalar Float64 arithmetic, integer and Float16/Float32 vector comparisons,
+  scalar Float64 comparisons and conversions, Boolean logic and
   equality/inequality, integer shifts/division/remainder, Float16/Float32 remainder, same-lane
   integer/floating conversion, exact same-lane typed selection, and canonical scalar truthiness
   plus vector `all`/`any` reduction over selected Bool/integer/Float16/Float32 values;

@@ -71,6 +71,12 @@ bool isNVVMFloat16Type(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Half;
 }
 
+bool isNVVMFloat64Type(IRInst* type)
+{
+    auto basicType = as<IRBasicType>(type);
+    return basicType && basicType->getBaseType() == BaseType::Double;
+}
+
 bool isNVVMSupportedFloatingPointScalarType(IRInst* type, uint32_t* outBitWidth)
 {
     if (outBitWidth)
@@ -85,6 +91,12 @@ bool isNVVMSupportedFloatingPointScalarType(IRInst* type, uint32_t* outBitWidth)
     {
         if (outBitWidth)
             *outBitWidth = 32;
+        return true;
+    }
+    if (isNVVMFloat64Type(type))
+    {
+        if (outBitWidth)
+            *outBitWidth = 64;
         return true;
     }
     return false;
@@ -107,9 +119,12 @@ static IRVectorType* _asNVVMSupportedVectorType(
     auto vectorType = as<IRVectorType>(type);
     auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
     IRType* elementType = vectorType ? vectorType->getElementType() : nullptr;
+    uint32_t floatingPointBitWidth = 0;
+    const bool isSupportedVectorFloat =
+        isNVVMSupportedFloatingPointScalarType(elementType, &floatingPointBitWidth) &&
+        floatingPointBitWidth <= 32;
     if (!vectorType ||
-        (!isNVVMSupportedIntegerScalarType(elementType) &&
-         !isNVVMSupportedFloatingPointScalarType(elementType) &&
+        (!isNVVMSupportedIntegerScalarType(elementType) && !isSupportedVectorFloat &&
          !(allowBool && isNVVMBoolType(elementType))) ||
         !elementCount || elementCount->getValue() < 2 || elementCount->getValue() > 4)
     {
@@ -175,8 +190,8 @@ IRVectorType* asNVVMSupportedI32VectorType(
 
 bool isNVVMSupportedNumericValueType(IRInst* type)
 {
-    return isNVVMSupportedIntegerScalarType(type) || isNVVMSupportedFloatingPointScalarType(type) ||
-           asNVVMSupportedNumericVectorType(type);
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat16Type(type) ||
+           isNVVMFloat32Type(type) || asNVVMSupportedNumericVectorType(type);
 }
 
 // Returns the non-aggregate byte payload family shared by direct values and array elements.
@@ -1410,7 +1425,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (isFloatingPoint)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            floatingPointBitWidth == 16 ? "float16 type" : "float32 type",
+            floatingPointBitWidth == 16   ? "float16 type"
+            : floatingPointBitWidth == 32 ? "float32 type"
+                                          : "float64 type",
             m_builder.getFloatingPointType(m_module, floatingPointBitWidth, outType)));
     }
     else if (valueVectorType)
