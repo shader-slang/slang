@@ -1765,20 +1765,6 @@ const NVVMTextureOperationRequirement* _findTextureOperationRequirement(
     return nullptr;
 }
 
-// Recognizes the canonical scalar `all(bool)` implementation selected by the CUDA prelude. Its
-// `bool($0)` body is an identity operation, so the direct backend can preserve the checked
-// parameter value without asking the provider to manufacture redundant IR.
-IRParam* _getNVVMBoolIdentityGenericAsmParameter(IRGenericAsm* genericAsm, IRFunc* function)
-{
-    if (!genericAsm || !function || genericAsm->getAsm() != toSlice("bool($0)") ||
-        genericAsm->getOperandCount() != 1 || function->getParamCount() != 1 ||
-        !isNVVMBoolType(function->getResultType()) || !isNVVMBoolType(function->getParamType(0)))
-    {
-        return nullptr;
-    }
-    return function->getFirstParam();
-}
-
 enum class NVVMCUDALayoutQueryKind
 {
     None,
@@ -1984,6 +1970,69 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
         else
             return false;
     }
+    return true;
+}
+
+struct NVVMScalarTruthiness
+{
+    IRParam* parameter = nullptr;
+    SlangNVVMValueTypeDesc operandTypes[2] = {};
+    const char* diagnosticName = nullptr;
+
+    SlangNVVMValueOperationDesc getOperationDesc() const
+    {
+        return {
+            SLANG_NVVM_VALUE_OP_NOT_EQUAL,
+            NVVMSemantics::kBool,
+            operandTypes,
+            SLANG_COUNT_OF(operandTypes),
+        };
+    }
+};
+
+// Recognizes the canonical selected-scalar `all`/`any` implementation chosen by the CUDA prelude.
+// Its `bool($0)` body has the same semantics as the prelude's LLVM and SPIR-V branches: compare the
+// original value with an exact typed zero.
+bool _resolveNVVMScalarTruthiness(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMScalarTruthiness& outTruthiness)
+{
+    outTruthiness = {};
+    IRBlock* block = function ? function->getFirstBlock() : nullptr;
+    if (!genericAsm || !block || block->getNextBlock() || genericAsm->getParent() != block ||
+        genericAsm->getAsm() != toSlice("bool($0)") || genericAsm->getOperandCount() != 1 ||
+        function->getParamCount() != 1 || !isNVVMBoolType(function->getResultType()))
+    {
+        return false;
+    }
+    for (auto inst : block->getOrdinaryInsts())
+    {
+        if (inst != genericAsm)
+            return false;
+    }
+
+    IRParam* parameter = function->getFirstParam();
+    SlangNVVMValueTypeDesc parameterType = {};
+    if (!parameter || !_getNVVMSemanticType(parameter->getDataType(), parameterType) ||
+        parameterType.laneCount != 1)
+    {
+        return false;
+    }
+
+    outTruthiness.parameter = parameter;
+    outTruthiness.operandTypes[0] = parameterType;
+    outTruthiness.operandTypes[1] = parameterType;
+    const SlangNVVMValueOperationDesc operation = outTruthiness.getOperationDesc();
+    if (const auto exactOperation = NVVMSemantics::find(operation))
+    {
+        outTruthiness.diagnosticName = exactOperation->diagnosticName;
+        return true;
+    }
+    NVVMSemantics::ValueOperationFamilyResolution family;
+    if (!NVVMSemantics::resolveValueOperationFamily(operation, family))
+        return false;
+    outTruthiness.diagnosticName = family.diagnosticName;
     return true;
 }
 
@@ -3146,10 +3195,17 @@ SlangResult _validateNVVMFunction(
                     }
                     const NVVMSemantics::CatalogEntry* semantic =
                         _findNVVMGenericAsmSemantic(genericAsm, function);
+                    NVVMScalarTruthiness truthiness;
                     NVVMResolvedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
-                    if (_getNVVMBoolIdentityGenericAsmParameter(genericAsm, function))
+                    if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
+                    {
+                        _requireValueOperation(
+                            requirements.valueOperations,
+                            truthiness.getOperationDesc(),
+                            truthiness.diagnosticName);
                         break;
+                    }
                     if (_resolveNVVMSurfaceGenericAsm(genericAsm, function, surfaceOperation))
                     {
                         auto genericBlock = as<IRBlock>(genericAsm->getParent());
@@ -5483,21 +5539,65 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_GenericAsm:
                     {
                         auto genericAsm = as<IRGenericAsm>(inst);
-                        if (auto identityParameter =
-                                _getNVVMBoolIdentityGenericAsmParameter(genericAsm, function))
+                        NVVMScalarTruthiness truthiness;
+                        if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
                         {
-                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SlangNVVMValueHandle loweredParameter = nullptr;
                             SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
-                                identityParameter,
+                                truthiness.parameter,
                                 valueMap,
                                 typeContext,
-                                loweredValue));
+                                loweredParameter));
+                            SlangNVVMTypeHandle loweredParameterType = nullptr;
+                            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                                truthiness.parameter->getDataType(),
+                                NVVMTypeUse::Value,
+                                loweredParameterType));
+                            const SlangNVVMValueTypeDesc parameterType = truthiness.operandTypes[0];
+                            SlangNVVMValueHandle loweredZero = nullptr;
+                            if (parameterType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
+                            {
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "floating-point truthiness zero",
+                                    builder.getFloatingPointConstant(
+                                        moduleScope.module,
+                                        loweredParameterType,
+                                        parameterType.bitWidth,
+                                        0,
+                                        loweredZero)));
+                            }
+                            else
+                            {
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "integer truthiness zero",
+                                    builder.getIntegerConstant(
+                                        moduleScope.module,
+                                        loweredParameterType,
+                                        0,
+                                        loweredZero)));
+                            }
+                            const SlangNVVMValueHandle operands[] = {
+                                loweredParameter,
+                                loweredZero,
+                            };
+                            SlangNVVMValueHandle loweredValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                "Boolean identity return",
+                                truthiness.diagnosticName,
+                                builder.emitValueOperation(
+                                    moduleScope.module,
+                                    truthiness.getOperationDesc(),
+                                    operands,
+                                    SLANG_COUNT_OF(operands),
+                                    loweredValue)));
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "scalar truthiness return",
                                 builder.emitValueReturn(moduleScope.module, loweredValue)));
                             break;
                         }

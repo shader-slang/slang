@@ -7,7 +7,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-vk -compute  -shaderobj -output-using-type -xslang -Wno-30056
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-mtl -compute  -shaderobj -output-using-type -xslang -Wno-30056
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cuda -compute -shaderobj -output-using-type -xslang -Wno-30056
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3 -Xslang -Wno-30056
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cpu -compute -shaderobj -output-using-type -xslang -Wno-30056
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -Wno-30056 -o -
 
 // Testnig logical-AND, logical-OR and ternary operator with non-scalar operands
 
@@ -21,6 +23,9 @@ bool2 assignFunc(int index)
     result += 10;
     return bool2(true);
 }
+
+// NVVM: .visible .entry computeMain
+// NVVM: st.global.u32
 
 [numthreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)

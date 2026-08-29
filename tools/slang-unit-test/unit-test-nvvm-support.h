@@ -5054,6 +5054,25 @@ static SlangResult _fakeNVVMBuilderEmitBarrier(
     return SLANG_OK;
 }
 
+static SlangResult _recordFakeNVVMBuilderCatalogScalarOperation(
+    SlangNVVMModuleHandle module,
+    FakeNVVMBuilderScalarFamily family,
+    const SlangNVVMValueOperationDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    SlangNVVMValueHandle* outValue)
+{
+    ++gFakeNVVMBuilder.valueOperationFamilyCallCounts[Index(family)];
+    gFakeNVVMBuilder.emittedValueOperations.add({family, uint32_t(operation.operation)});
+    return _recordFakeNVVMBuilderScalarOperation(
+        module,
+        {family, uint32_t(operation.operation)},
+        operands,
+        operation.operandCount,
+        outValue,
+        &operation.resultType,
+        operation.operandTypes);
+}
+
 static SlangResult _fakeNVVMBuilderEmitCatalogOperation(
     SlangNVVMModuleHandle module,
     const NVVMSemantics::CatalogEntry& entry,
@@ -5076,52 +5095,40 @@ static SlangResult _fakeNVVMBuilderEmitCatalogOperation(
     }
     if (entry.operandCount && entry.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
     {
-        if (entry.operandCount == 1)
-            return _fakeNVVMBuilderEmitFloatingUnary(
-                module,
-                entry.operation,
-                operands[0],
-                outValue);
-        if (entry.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL)
-        {
-            return _fakeNVVMBuilderEmitFloatingCompare(
-                module,
-                entry.operation,
-                operands[0],
-                operands[1],
-                outValue);
-        }
-        return _fakeNVVMBuilderEmitFloatingBinary(
+        const FakeNVVMBuilderScalarFamily family =
+            entry.operandCount == 1 ? FakeNVVMBuilderScalarFamily::FloatingUnary
+            : entry.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL
+                ? FakeNVVMBuilderScalarFamily::FloatingCompare
+                : FakeNVVMBuilderScalarFamily::FloatingBinary;
+        return _recordFakeNVVMBuilderCatalogScalarOperation(
             module,
-            entry.operation,
-            operands[0],
-            operands[1],
+            family,
+            operation,
+            operands,
             outValue);
     }
 
     if (entry.operation >= SLANG_NVVM_VALUE_OP_EQUAL &&
         entry.operation <= SLANG_NVVM_VALUE_OP_GREATER_EQUAL)
     {
-        return _fakeNVVMBuilderEmitIntegerCompare(
+        return _recordFakeNVVMBuilderCatalogScalarOperation(
             module,
-            entry.operation,
-            operands[0],
-            operands[1],
+            FakeNVVMBuilderScalarFamily::Compare,
+            operation,
+            operands,
             outValue);
     }
     if (entry.operation <= SLANG_NVVM_VALUE_OP_NEGATE)
     {
-        return entry.operandCount == 1 ? _fakeNVVMBuilderEmitIntegerUnary(
-                                             module,
-                                             entry.operation,
-                                             operands[0],
-                                             outValue)
-                                       : _fakeNVVMBuilderEmitIntegerBinaryOperation(
-                                             module,
-                                             entry.operation,
-                                             operands[0],
-                                             operands[1],
-                                             outValue);
+        const FakeNVVMBuilderScalarFamily family = entry.operandCount == 1
+                                                       ? FakeNVVMBuilderScalarFamily::Unary
+                                                       : FakeNVVMBuilderScalarFamily::Binary;
+        return _recordFakeNVVMBuilderCatalogScalarOperation(
+            module,
+            family,
+            operation,
+            operands,
+            outValue);
     }
 
     switch (entry.operation)
@@ -8296,6 +8303,46 @@ void computeMain(
     *destination = accumulate(value);
 }
 )";
+
+static const char kDirectNVVMScalarTruthinessSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int integerValue,
+    uniform float floatingPointValue)
+{
+    uint unsignedValue = uint(integerValue);
+    half halfValue = half(floatingPointValue);
+    bool boolValue = integerValue != 0;
+    destination[0] =
+        (all(integerValue) ? 1 : 0) +
+        (any(unsignedValue) ? 2 : 0) +
+        (all(floatingPointValue) ? 4 : 0) +
+        (any(halfValue) ? 8 : 0) +
+        (all(boolValue) ? 16 : 0);
+}
+)";
+
+static const char kDirectNVVMUnsupportedScalarTruthinessSignatureSource[] = R"SLANG(
+bool malformedTruthiness(int value, int extra)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "bool($0)";
+    default:
+        return extra != 0;
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int value)
+{
+    *destination = malformedTruthiness(value, 0) ? 1 : 0;
+}
+)SLANG";
 
 static const char kDirectNVVMCopyableValueHelperSource[] = R"(
 struct Payload

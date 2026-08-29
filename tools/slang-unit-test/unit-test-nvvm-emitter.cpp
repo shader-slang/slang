@@ -3110,6 +3110,75 @@ SLANG_UNIT_TEST(nvvmSlangThreadLocalGlobalUsesExplicitContext)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangSelectedScalarTruthinessUsesTypedInequality)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMScalarTruthinessSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool sawSignedInteger = false;
+        bool sawUnsignedInteger = false;
+        bool sawFloat16 = false;
+        bool sawFloat32 = false;
+        bool sawBool = false;
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_NOT_EQUAL ||
+                operation.resultType.kind != SLANG_NVVM_VALUE_TYPE_BOOL ||
+                operation.resultType.laneCount != 1 || operation.operandCount != 2 ||
+                !NVVMSemantics::areSameType(operation.operandTypes[0], operation.operandTypes[1]))
+            {
+                continue;
+            }
+            SLANG_CHECK(operation.operands[0].kind == FakeNVVMBuilderValueKind::Parameter);
+            const SlangNVVMValueTypeDesc& operandType = operation.operandTypes[0];
+            const bool hasIntegerZero =
+                operation.operands[1].kind == FakeNVVMBuilderValueKind::IntegerConstant;
+            const bool hasFloatingPointZero =
+                operation.operands[1].kind == FakeNVVMBuilderValueKind::FloatingPointConstant;
+            sawSignedInteger |= operandType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+                                operandType.bitWidth == 32 && hasIntegerZero;
+            sawUnsignedInteger |= operandType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER &&
+                                  operandType.bitWidth == 32 && hasIntegerZero;
+            sawFloat16 |= operandType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                          operandType.bitWidth == 16 && hasFloatingPointZero;
+            sawFloat32 |= operandType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                          operandType.bitWidth == 32 && hasFloatingPointZero;
+            sawBool |= operandType.kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
+                       operandType.bitWidth == 1 && hasIntegerZero;
+        }
+        SLANG_CHECK(sawSignedInteger);
+        SLANG_CHECK(sawUnsignedInteger);
+        SLANG_CHECK(sawFloat16);
+        SLANG_CHECK(sawFloat32);
+        SLANG_CHECK(sawBool);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangCopyableValuesAndNumericBorrowsCrossHelperBoundaries)
 {
     _resetDirectNVVMFakes();
@@ -5987,6 +6056,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedNestedConstantBufferSource,
          "'conventional global parameter field address'"},
         {kDirectNVVMFloatingSineSource, "'GenericAsm'"},
+        {kDirectNVVMUnsupportedScalarTruthinessSignatureSource, "'GenericAsm'"},
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm'"},
         {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm'"},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},

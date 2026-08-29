@@ -5571,6 +5571,29 @@ local context storage, helper threading, and all field accesses. Its next indepe
 intrinsic lowering is the measured boundary for the next slice rather than part of global-context
 semantics.
 
+### Slice 116: Selected scalar truthiness
+
+The direct route now lowers the CUDA prelude's canonical selected-scalar `all` and `any` helper.
+Its complete shape is one parameter, one block, a Bool result, and the sole
+`GenericAsm("bool($0)")` terminator. Bool, signed/unsigned integer, Float16, and Float32
+specializations all use the established typed value-operation contract: the emitter constructs an
+exact zero of the input type and requests `NOT_EQUAL`. This replaces the former Bool-only identity
+special case, so preflight and emission now share one descriptor and provider capability check.
+Malformed signatures and unsupported scalar types remain ordinary unsupported GenericAsm rather
+than being inferred from source names or partially parsed text.
+
+`logic-no-short-circuit-evaluation.slang` now permanently exercises the complete chain added in
+Slices 114 through 116: selected Boolean-vector operations, per-invocation global context and
+helper threading, dynamic vector reduction, and scalar truthiness. Its direct runtime lane retains
+the output `30, 31, 32, 33`, and its direct PTX lane checks the selected kernel and global store.
+The 872-byte PTX module assembles with CUDA 12.9.86 `ptxas -arch=sm_70` to a 2,920-byte cubin.
+
+Focused fake-provider coverage proves `all` and `any` over signed/unsigned i32, Float16, Float32,
+and Bool use typed zero plus typed inequality. Exact catalog operations now retain the same full
+descriptor evidence as family-resolved operations in the test double; this changes no production
+ABI. A two-parameter malformed helper is rejected before provider mutation. Release host builds
+pass, and the complete NVVM unit-test prefix passes 384/384.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5601,8 +5624,9 @@ The following remain open until their named slice supplies evidence:
   selected Float32 matrix row-array construction/extraction and component-wise arithmetic,
   integer-indexed selected-value extraction, selected integer/Float16/Float32 scalar-broadcast
   binary arithmetic, integer and Float16/Float32 comparisons, Boolean logic and
-  equality/inequality, integer shifts/division/remainder, Float16/Float32 remainder, and same-lane
-  integer/floating conversion, plus exact same-lane typed selection;
+  equality/inequality, integer shifts/division/remainder, Float16/Float32 remainder, same-lane
+  integer/floating conversion, exact same-lane typed selection, and canonical scalar truthiness
+  plus vector `all`/`any` reduction over selected Bool/integer/Float16/Float32 values;
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical
