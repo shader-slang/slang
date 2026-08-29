@@ -1,6 +1,13 @@
 // Test for verifying subscript operator support with uint types in cuda.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+//NVVM-DAG: tex.level.2d.v4.u32.s32
+//NVVM-DAG: tex.level.3d.v4.u32.s32
+//NVVM-DAG: tex.level.a2d.v4.u32.s32
+
 //TEST_INPUT: Texture1D(size=4, content = one):name cudaT1D_u
 Texture1D<uint> cudaT1D_u;
 //TEST_INPUT: Texture2D(size=8, content = one):name cudaT2D_u

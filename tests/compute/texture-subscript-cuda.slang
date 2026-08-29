@@ -1,6 +1,17 @@
 // Test for verifying subscript operator support in cuda.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+//NVVM-DAG: tex.level.2d.v4.f32.s32
+//NVVM-DAG: tex.level.2d.v4.s32.s32
+//NVVM-DAG: tex.level.2d.v4.u32.s32
+//NVVM-DAG: tex.level.3d.v4.f32.s32
+//NVVM-DAG: tex.level.3d.v4.s32.s32
+//NVVM-DAG: tex.level.3d.v4.u32.s32
+//NVVM-DAG: tex.level.a2d.v4.f32.s32
+
 //TEST_INPUT: Texture1D(size=4, content = one):name cudaT1D
 Texture1D<float> cudaT1D;
 //TEST_INPUT: Texture2D(size=8, content = one):name cudaT2D
@@ -201,4 +212,4 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         }
     break;
     }
-} 
+}

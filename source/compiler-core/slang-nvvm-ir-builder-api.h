@@ -179,6 +179,7 @@ extern "C"
 #define SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH ((SlangNVVMTextureOperation)1u)
 #define SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT ((SlangNVVMTextureOperation)2u)
 #define SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH ((SlangNVVMTextureOperation)3u)
+#define SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL ((SlangNVVMTextureOperation)4u)
 
     typedef uint32_t SlangNVVMTextureShape;
 #define SLANG_NVVM_TEXTURE_SHAPE_1D ((SlangNVVMTextureShape)1u)

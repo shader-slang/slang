@@ -14,4 +14,4 @@ void computeMain()
     outputBuffer[0] = inputTexture.SampleLevel(samplerState, float2(0.0f), 0.0f);
 }
 
-//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter'
+//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm'

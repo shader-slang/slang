@@ -658,18 +658,49 @@ bool getNVVMSupportedSurfaceField(
     return true;
 }
 
-bool getNVVMSupportedSampledTextureType(IRInst* type, NVVMSampledTextureType& outType)
+bool getNVVMSupportedReadOnlyTextureType(IRInst* type, NVVMReadOnlyTextureType& outType)
 {
     outType = {};
     auto textureType = as<IRTextureTypeBase>(type);
     if (!textureType || textureType->getOp() != kIROp_TextureType ||
         textureType->getOperandCount() < 9 || textureType->isMultisample() ||
         textureType->isShadow() || textureType->isCombined() ||
-        textureType->getAccess() != SLANG_RESOURCE_ACCESS_READ ||
-        !isNVVMFloat32Type(textureType->getElementType()))
+        textureType->getAccess() != SLANG_RESOURCE_ACCESS_READ)
     {
         return false;
     }
+
+    IRType* scalarElementType = textureType->getElementType();
+    uint32_t elementLaneCount = 1;
+    uint32_t vectorLaneCount = 0;
+    if (auto vectorType =
+            asNVVMSupported32BitNumericVectorType(scalarElementType, &vectorLaneCount))
+    {
+        if (vectorLaneCount != 2 && vectorLaneCount != 4)
+            return false;
+        elementLaneCount = vectorLaneCount;
+        scalarElementType = vectorType->getElementType();
+    }
+
+    SlangNVVMValueTypeDesc elementType = {};
+    uint32_t integerBitWidth = 0;
+    bool isSigned = false;
+    if (isNVVMSupportedIntegerScalarType(scalarElementType, &integerBitWidth, &isSigned) &&
+        integerBitWidth == 32)
+    {
+        elementType = {
+            isSigned ? SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                     : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+            32,
+            elementLaneCount,
+        };
+    }
+    else if (isNVVMFloat32Type(scalarElementType))
+    {
+        elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, elementLaneCount};
+    }
+    else
+        return false;
 
     SlangNVVMTextureShape shape = 0;
     uint32_t coordinateLaneCount = 0;
@@ -703,7 +734,7 @@ bool getNVVMSupportedSampledTextureType(IRInst* type, NVVMSampledTextureType& ou
     outType.shape = shape;
     outType.isArray = isArray;
     outType.coordinateLaneCount = coordinateLaneCount + (isArray ? 1u : 0u);
-    outType.elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 1};
+    outType.elementType = elementType;
     return true;
 }
 
@@ -752,14 +783,14 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
 {
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
-    NVVMSampledTextureType sampledTextureType;
+    NVVMReadOnlyTextureType sampledTextureType;
     SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
     IRType* type = field ? field->getFieldType() : nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedScalarParameterGroupType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceField(field, surfaceType, storageFormat) ||
-           getNVVMSupportedSampledTextureType(type, sampledTextureType) ||
+           getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
            asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type);
 }
@@ -1050,8 +1081,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isRawBuffer = getNVVMSupportedRawBufferType(type, rawBufferType);
     NVVMSurfaceType surfaceType;
     const bool isSurface = getNVVMSupportedSurfaceType(type, surfaceType);
-    NVVMSampledTextureType sampledTextureType;
-    const bool isSampledTexture = getNVVMSupportedSampledTextureType(type, sampledTextureType);
+    NVVMReadOnlyTextureType sampledTextureType;
+    const bool isSampledTexture = getNVVMSupportedReadOnlyTextureType(type, sampledTextureType);
     NVVMBufferDataPointerType bufferDataPointerType;
     const bool isBufferDataPointer =
         getNVVMSupportedBufferDataPointerType(type, bufferDataPointerType);

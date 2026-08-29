@@ -5220,6 +5220,35 @@ six width, five height, and one depth query; CUDA 12.9.86 `ptxas -arch=sm_70` ac
 a 4,328-byte cubin. A neighboring `Texture2D<float2>.GetDimensions` fixture stops before provider
 discovery, and the complete NVVM unit-test prefix passes 375/375.
 
+### Slice 104: Integer-coordinate texture fetches
+
+Read-only texture classification now records the complete selected element type: scalar, two-lane,
+or four-lane Float32, Int32, or UInt32. Operation-specific resolution remains narrower. SampleLevel
+and dimension queries still require scalar Float32, while exact retained `Texture.Load` helpers can
+select the new fetch-level operation. This separation admits integer and vector fetch results
+without changing the contracts already proved for sampling and queries.
+
+The fetch resolver recognizes only the finalized 2D, 3D, and 2D-array CUDA-prelude GenericAsm
+strings. It checks the exact result/resource identity and signed integer packed-location width, then
+splits the final mip lane from the semantic coordinate through existing generic vector operations.
+The builder receives texture, integer coordinate, and integer level as separate typed operands.
+Forward-only ABI revision 15 remains unchanged because the existing descriptor-driven texture
+interface already capability-negotiates operations and complete element types.
+
+LLVM 7.0.1 and LLVM 14.0.6 do not expose an intrinsic for integer-coordinate texture fetch with an
+explicit integer mip. The shielded provider therefore selects fixed `tex.level.2d`,
+`tex.level.3d`, or `tex.level.a2d` inline PTX from the checked descriptor, following the established
+formatted-surface-store boundary. PTX always produces four physical registers; the provider returns
+lane zero or reconstructs the selected two-/four-lane semantic result. Source GenericAsm text never
+crosses the builder ABI, and a retained 1D fetch remains an explicit unsupported boundary.
+
+Both existing texture-subscript fixtures now pass ordinary CUDA runtime, direct libNVVM runtime,
+and direct PTX checks. Their direct results are respectively
+`0, 0, 40E00000, 40E00000, 40E00000, 4FDE4000, 4FDE4000, 4FDE4000, 4FDE4000, 0, 0`
+and `FE000000, FE000000, FE000000`. The optimized modules contain 21 and 9 fetch rows across the
+selected shape/data families. Their 8,138-byte and 2,997-byte PTX modules pass CUDA 12.9.86
+`ptxas -arch=sm_70`, producing 5,800-byte and 3,432-byte cubins.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5231,8 +5260,9 @@ The following remain open until their named slice supplies evidence:
   vector resource elements, flat selected-scalar parameter blocks and constant buffers,
   selected integer/float32 scalar, 32-bit numeric-vector, and layout-compatible first-level
   numeric-field aggregate structured buffers,
-  read-only/read-write byte-address buffers, selected scalar Float sampled textures with ordinary
-  sampler values, and storage-only comparison-sampler/unsized-sampler-array placeholders, and raw
+  read-only/read-write byte-address buffers, selected read-only texture elements with scalar Float
+  sampling/queries and bounded integer-coordinate fetches, ordinary sampler values, and storage-only
+  comparison-sampler/unsized-sampler-array placeholders, and raw
   CUDA parameters beyond selected integer and float32 scalars, flat
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and

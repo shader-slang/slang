@@ -2015,16 +2015,27 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
                 gFakeNVVMBuilder.intrinsicResultTypes[valueRef.index].kind ==
                     SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
     case FakeNVVMBuilderValueKind::TextureOperation:
-        if (valueRef.index < 0 || valueRef.index >= gFakeNVVMBuilder.textureOperations.getCount())
-            return false;
-        switch (gFakeNVVMBuilder.textureOperations[valueRef.index].operation)
         {
-        case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
-        case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
-        case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
-            return true;
-        default:
-            return false;
+            if (valueRef.index < 0 ||
+                valueRef.index >= gFakeNVVMBuilder.textureOperations.getCount())
+                return false;
+            const SlangNVVMTextureOperationDesc& textureOperation =
+                gFakeNVVMBuilder.textureOperations[valueRef.index];
+            switch (textureOperation.operation)
+            {
+            case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
+            case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
+            case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
+                return true;
+            case SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL:
+                return (textureOperation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                        textureOperation.elementType.kind ==
+                            SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+                       textureOperation.elementType.bitWidth == 32 &&
+                       textureOperation.elementType.laneCount == 1;
+            default:
+                return false;
+            }
         }
     case FakeNVVMBuilderValueKind::PointerOffset:
     case FakeNVVMBuilderValueKind::ByteOffsetPointer:
@@ -2117,6 +2128,21 @@ static bool _isFakeNVVMBuilderVectorValue(
         return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD && expectedBitWidth != 0 &&
                operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
                operation.elementType.bitWidth == expectedBitWidth &&
+               operation.elementType.laneCount == expectedElementCount;
+    }
+    if (valueRef.kind == FakeNVVMBuilderValueKind::TextureOperation && valueRef.index >= 0 &&
+        valueRef.index < gFakeNVVMBuilder.textureOperations.getCount())
+    {
+        const SlangNVVMTextureOperationDesc& operation =
+            gFakeNVVMBuilder.textureOperations[valueRef.index];
+        const bool isExpectedKind =
+            expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Integer
+                ? operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                      operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER
+                : expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Float &&
+                      operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+        return operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL && isExpectedKind &&
+               operation.elementType.bitWidth == 32 &&
                operation.elementType.laneCount == expectedElementCount;
     }
     if (valueRef.kind == FakeNVVMBuilderValueKind::ScalarOperation && valueRef.index >= 0 &&
@@ -2338,7 +2364,8 @@ static bool _isFakeNVVMBuilderFloatingPointValue(
             return false;
         const SlangNVVMTextureOperationDesc& operation =
             gFakeNVVMBuilder.textureOperations[valueRef.index];
-        return operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL &&
+        return (operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
+                operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL) &&
                operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
                operation.elementType.bitWidth == expectedBitWidth &&
                operation.elementType.laneCount == 1;
@@ -5282,9 +5309,7 @@ static SlangNVVMBuilderSurfaceOperationsAPI _makeFakeNVVMBuilderSurfaceOperation
 
 static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperationDesc& operation)
 {
-    if (operation.isArray > 1 ||
-        operation.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
-        operation.elementType.bitWidth != 32 || operation.elementType.laneCount != 1)
+    if (operation.isArray > 1)
     {
         return false;
     }
@@ -5305,15 +5330,30 @@ static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperation
     if (!isValidShape)
         return false;
 
+    const bool isScalarFloat = operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                               operation.elementType.bitWidth == 32 &&
+                               operation.elementType.laneCount == 1;
+    const bool isFetchElement =
+        (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
+         operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+         operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+        operation.elementType.bitWidth == 32 &&
+        (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
+         operation.elementType.laneCount == 4);
     switch (operation.operation)
     {
     case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
+        return isScalarFloat;
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
-        return true;
+        return isScalarFloat;
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
-        return operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
+        return isScalarFloat && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
     case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
-        return operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
+        return isScalarFloat && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
+    case SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL:
+        return isFetchElement &&
+               (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
+                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && !operation.isArray));
     default:
         return false;
     }
@@ -5341,7 +5381,10 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitTextureOperation(
     if (outValue)
         *outValue = nullptr;
     const size_t expectedOperandCount =
-        operation && operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ? 3 : 1;
+        operation && (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
+                      operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
+            ? 3
+            : 1;
     if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
         !operation || !operands || operandCount != expectedOperandCount || !outValue ||
         !_isFakeNVVMTextureOperationSupported(*operation) ||
@@ -5352,9 +5395,12 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitTextureOperation(
         return SLANG_E_INVALID_ARG;
     }
 
-    if (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL)
+    if (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
+        operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
     {
-        if (!_isFakeNVVMBuilderFloatingPointValue(operands[2], 32))
+        const bool isFetchLevel = operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL;
+        if (isFetchLevel ? !_isFakeNVVMBuilderIntegerValue(operands[2])
+                         : !_isFakeNVVMBuilderFloatingPointValue(operands[2], 32))
             return SLANG_E_INVALID_ARG;
 
         uint32_t coordinateLaneCount = 0;
@@ -5374,12 +5420,17 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitTextureOperation(
             return SLANG_E_INVALID_ARG;
         }
         coordinateLaneCount += operation->isArray;
-        const bool hasCoordinate = coordinateLaneCount == 1
-                                       ? _isFakeNVVMBuilderFloatingPointValue(operands[1], 32)
-                                       : _isFakeNVVMBuilderVectorValue(
-                                             operands[1],
-                                             FakeNVVMBuilderScalarTypeKind::Float,
-                                             coordinateLaneCount);
+        const FakeNVVMBuilderScalarTypeKind coordinateElementType =
+            isFetchLevel ? FakeNVVMBuilderScalarTypeKind::Integer
+                         : FakeNVVMBuilderScalarTypeKind::Float;
+        const bool hasCoordinate =
+            coordinateLaneCount == 1
+                ? (isFetchLevel ? _isFakeNVVMBuilderIntegerValue(operands[1])
+                                : _isFakeNVVMBuilderFloatingPointValue(operands[1], 32))
+                : _isFakeNVVMBuilderVectorValue(
+                      operands[1],
+                      coordinateElementType,
+                      coordinateLaneCount);
         if (!hasCoordinate)
             return SLANG_E_INVALID_ARG;
     }

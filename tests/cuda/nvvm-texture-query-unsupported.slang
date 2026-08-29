@@ -16,4 +16,4 @@ void computeMain()
     outputBuffer[0] = uint2(width, height);
 }
 
-//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter'
+//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm'
