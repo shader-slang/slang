@@ -2349,6 +2349,18 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    // Plain HLSL/Slang globals have per-invocation semantics on CUDA. The CUDA-source route moves
+    // their initializers into each entry point and carries their storage through an explicit local
+    // context. Direct NVVM requests a PTX artifact, so it does not enter the CUDA-source cases
+    // below; run the same producer explicitly with CUDA classification policy. In particular, that
+    // policy preserves groupshared and actual globals instead of treating every PTX global as a
+    // thread-local context field.
+    if (emitNVVMDirectly)
+    {
+        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
+        SLANG_PASS(introduceExplicitGlobalContext, CodeGenTarget::CUDASource);
+    }
+
     switch (target)
     {
     default:

@@ -8279,6 +8279,24 @@ void computeMain(
 }
 )";
 
+static const char kDirectNVVMThreadLocalGlobalContextSource[] = R"(
+static int accumulator = 7;
+
+int accumulate(int value)
+{
+    accumulator += value;
+    return accumulator;
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int value)
+{
+    *destination = accumulate(value);
+}
+)";
+
 static const char kDirectNVVMCopyableValueHelperSource[] = R"(
 struct Payload
 {

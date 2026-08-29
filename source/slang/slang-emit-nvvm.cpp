@@ -2601,8 +2601,9 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
 }
 
 // Returns whether one canonical call argument satisfies an exact helper parameter. A mutable
-// borrow deliberately has a distinct source type from the local pointer passed to it, while both
-// preserve the same selected aggregate and lower to one typed generic pointer.
+// borrow and an explicit thread-local context parameter deliberately have distinct source types
+// from the local pointer passed to them, while each preserves the same selected aggregate and
+// lowers to one typed generic pointer.
 bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterType)
 {
     if (isTypeEqual(argumentType, parameterType))
@@ -2613,8 +2614,11 @@ bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterT
         asNVVMSupportedLocalScalarStructPointerType(argumentType, &argumentValueType);
     auto parameterPointer =
         asNVVMSupportedLocalScalarStructPointerType(parameterType, &parameterValueType);
-    if (argumentPointer && argumentPointer->getOp() == kIROp_PtrType && parameterPointer &&
-        parameterPointer->getOp() == kIROp_BorrowInOutParamType &&
+    const bool isMutableStructParameter =
+        parameterPointer && (parameterPointer->getOp() == kIROp_BorrowInOutParamType ||
+                             parameterPointer->getAddressSpace() == AddressSpace::ThreadLocal);
+    if (argumentPointer && argumentPointer->getOp() == kIROp_PtrType &&
+        argumentPointer->getOperandCount() == 1 && isMutableStructParameter &&
         isTypeEqual(argumentValueType, parameterValueType))
     {
         return true;

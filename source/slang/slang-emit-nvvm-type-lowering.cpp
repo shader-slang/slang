@@ -340,10 +340,22 @@ IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
     auto pointerType = as<IRPtrTypeBase>(type);
     auto valueType =
         pointerType ? asNVVMSupportedScalarStructType(pointerType->getValueType()) : nullptr;
-    if (!pointerType || !valueType ||
-        (pointerType->getOp() != kIROp_PtrType &&
-         pointerType->getOp() != kIROp_BorrowInOutParamType) ||
-        pointerType->getOperandCount() != 1)
+    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    const bool isLocalPointer =
+        pointerType && pointerType->getOp() == kIROp_PtrType && pointerType->getOperandCount() == 1;
+    const bool isMutableBorrow = pointerType &&
+                                 pointerType->getOp() == kIROp_BorrowInOutParamType &&
+                                 pointerType->getOperandCount() == 1;
+    // Explicit-global-context lowering spells its helper parameter with the complete CUDA local
+    // pointer contract, while the entry-point `var` passed to it retains the compact local-pointer
+    // spelling. Both are the canonical producer shapes for the same per-invocation storage.
+    const bool isThreadLocalContextPointer =
+        pointerType && pointerType->getOp() == kIROp_PtrType &&
+        pointerType->getOperandCount() == 4 &&
+        pointerType->getAccessQualifier() == AccessQualifier::ReadWrite &&
+        pointerType->getAddressSpace() == AddressSpace::ThreadLocal && dataLayout &&
+        dataLayout->getOp() == kIROp_DefaultBufferLayoutType;
+    if (!valueType || (!isLocalPointer && !isMutableBorrow && !isThreadLocalContextPointer))
     {
         return nullptr;
     }

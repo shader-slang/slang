@@ -3049,6 +3049,67 @@ SLANG_UNIT_TEST(nvvmSlangStatefulAggregateHelpersUseGenericLocalPointers)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangThreadLocalGlobalUsesExplicitContext)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMThreadLocalGlobalContextSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        // The source global is per invocation. It must become one entry-local context, not one
+        // provider global shared by every CUDA thread.
+        SLANG_CHECK(gFakeNVVMBuilder.declareGlobalStorageCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLocalStorageCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.localStorageValueTypes.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.localStorageValueTypes[0] == _getFakeNVVMBuilderScalarStructType());
+        SLANG_CHECK(gFakeNVVMBuilder.localStorageAlignments[0] == 4);
+
+        bool sawContextPointerParameter = false;
+        for (const auto parameterTypeKind : gFakeNVVMBuilder.functionParameterTypeKinds)
+        {
+            sawContextPointerParameter |=
+                parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ScalarStructPointer;
+        }
+        SLANG_CHECK(sawContextPointerParameter);
+
+        bool passedEntryLocalContext = false;
+        for (const FakeNVVMBuilderValueRef argument : gFakeNVVMBuilder.callArgumentValueRefs)
+        {
+            passedEntryLocalContext |= argument.kind == FakeNVVMBuilderValueKind::LocalStorage;
+        }
+        SLANG_CHECK(passedEntryLocalContext);
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangCopyableValuesAndNumericBorrowsCrossHelperBoundaries)
 {
     _resetDirectNVVMFakes();

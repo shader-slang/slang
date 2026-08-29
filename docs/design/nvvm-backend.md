@@ -5540,6 +5540,37 @@ pointer. That global needs an initializer-preserving storage contract and remain
 boundary rather than being silently emitted through the existing `undef` global declaration.
 Release host/provider builds pass, and the complete NVVM unit-test prefix passes 382/382.
 
+### Slice 115: Per-invocation global context
+
+Plain HLSL/Slang module variables now retain their CUDA per-invocation semantics on the direct
+route. Before this slice, PTX selection skipped the established CUDA-source producer and exposed a
+plain `IRGlobalVar` to direct preflight. Emitting that object through the provider's global-storage
+operation would have made it device-wide and discarded its initializer. The direct route instead
+runs `moveGlobalVarInitializationToEntryPoints` followed by `introduceExplicitGlobalContext` with
+CUDA-source classification policy. Initializers therefore execute in each entry point, ordinary
+globals become fields of one local `KernelContext`, and reachable helpers receive that context
+explicitly. Groupshared and actual device globals keep their existing storage representations.
+
+The context producer deliberately relates two canonical pointer spellings: the entry point owns a
+compact local `Ptr<KernelContext>`, while a reachable helper receives
+`Ptr<KernelContext, ReadWrite, ThreadLocal, DefaultLayout>`. The selected scalar-struct helper
+pointer classifier accepts that exact explicit CUDA-local form, and call compatibility requires the
+same context pointee before both lower to one typed generic LLVM pointer. No builder ABI or LLVM
+provider operation changed.
+
+`tests/cuda/nvvm-thread-local-global-context.slang` passes direct runtime with independent thread
+results `7, 8, 9, 10` and direct PTX checking. Its 650-byte module contains no device-global
+accumulator; CUDA 12.9.86 `ptxas -arch=sm_70` accepts it and emits a 2,792-byte cubin. Focused fake
+coverage also proves that the source global produces one aligned local context, zero provider
+global declarations, and a context pointer passed to the helper. Existing shared-memory and actual
+global regressions pass, and the complete NVVM unit-test prefix passes 383/383.
+
+The original `logic-no-short-circuit-evaluation.slang` probe now advances through initialization,
+local context storage, helper threading, and all field accesses. Its next independent stop is the
+`GenericAsm("bool($0)")` body produced for scalar `all(int)` and `all(bool)` specializations. That
+intrinsic lowering is the measured boundary for the next slice rather than part of global-context
+semantics.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5583,7 +5614,8 @@ The following remain open until their named slice supplies evidence:
   values, mutable aggregate families beyond layout-compatible first-level
   numeric-field structs,
   first-class aggregate field reads beyond flat copyable helper values, aggregate layouts requiring
-  padding, general globals, additional shared-memory shapes, and
+  padding, true mutable device globals beyond the established actual-global atomic subset,
+  thread-local contexts beyond flat scalar fields, additional shared-memory shapes, and
   address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
