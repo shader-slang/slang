@@ -1,5 +1,10 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -shaderobj -cuda
+//TEST(compute):COMPARE_COMPUTE: -shaderobj -cuda -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+// NVVM: .visible .entry computeMain()
+// NVVM: st.global.f32
 
 // Confirm that a struct type defined in a generic parent works
 

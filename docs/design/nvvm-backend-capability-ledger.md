@@ -1655,3 +1655,15 @@ generic family to LLVM `bitcast` or a signless integer identity. The existing
 direct CUDA runtime and PTX lanes with unchanged 64-byte and 48-byte strides. Their 971-byte and
 2,017-byte PTX modules assemble with CUDA 12.9.86 to 2,920-byte and 3,304-byte cubins.
 Release host/provider builds pass, and the complete NVVM unit-test prefix passes 381/381.
+
+Slice 113 promotes fourteen existing specialized compute fixtures without changing production
+code or builder ABI. Generic dot, nine static/interface/existential dispatch cases, basic dynamic
+generics, kernel-context threading, nested generic structs, and transitive interfaces all reduce
+before direct preflight to the established generic NVVM contracts. Their 28 exact runtime/PTX
+lanes pass unchanged.
+
+The PTX modules are 478, 688, 685, 688, 645, 680, 645, 688, 688, 712, 685, 1,233, 674, and
+645 bytes in plan order. CUDA 12.9.86 `ptxas -arch=sm_70` emits one 2,664-byte cubin, twelve
+2,792-byte cubins, and one 3,048-byte cubin. The adjacent zero-index bounds fixture compiles but
+reproduces its documented CUDA runtime mismatch, so no direct lane is registered. Release
+compiler/provider builds pass, and the complete NVVM unit-test prefix remains 381/381.

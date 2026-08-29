@@ -5492,6 +5492,31 @@ stride. Both have direct PTX checks for global loads/stores. Their 971-byte and 
 modules assemble with CUDA 12.9.86 `ptxas -arch=sm_70` to 2,920-byte and 3,304-byte cubins. Release
 host/provider builds pass, and the complete NVVM unit-test prefix passes 381/381.
 
+### Slice 113: Specialized real-suite fixture promotion
+
+Fourteen existing compute fixtures now permanently exercise the optimized direct route without a
+production or builder-ABI change. They include one-lane generic dot, nine interface/existential
+dynamic-dispatch cases, basic dynamic generics, kernel-context threading through matrix/resource
+helpers, a nested struct in a generic, and transitive interface inheritance. This is an important
+pipeline boundary: all of those high-level source constructs specialize before direct preflight,
+so libNVVM receives only the established scalar/vector, helper/control-flow, parameter-group, and
+structured-buffer operations.
+
+The 28 new exact runtime/PTX lanes pass 28/28 with unchanged fixture inputs and results. The
+dynamic-dispatch outputs cover `1+x*x`, associated-type static members, generic static methods,
+mutating generic locals, `This` parameters, generic returns, existential parameters/conversions,
+and an existential specialized into another generic. `kernel-context-threading.slang` preserves
+the four input matrix rows through nested writers; `dot1-generic.slang` remains `20`;
+`struct-in-generic.slang` remains `0, 1, 2, 3`; and `transitive-interface.slang` remains four
+copies of `3`.
+
+The PTX modules range from 478 to 1,233 bytes and all assemble with CUDA 12.9.86
+`ptxas -arch=sm_70`. Thirteen cubins are 2,664 or 2,792 bytes; the matrix/context module is 3,048
+bytes. A broad corpus probe also compiled `bound-check-zero-index.slang`, but its direct runtime
+reproduced the file's documented CUDA bounds-semantics defect. Its tentative lane was removed
+instead of treating successful PTX generation as semantic coverage. Release compiler/provider
+builds pass, and the complete NVVM unit-test prefix remains 381/381.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
