@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 12u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 13u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -158,6 +158,10 @@ extern "C"
     typedef uint32_t SlangNVVMSurfaceBoundaryMode;
 #define SLANG_NVVM_SURFACE_BOUNDARY_ZERO ((SlangNVVMSurfaceBoundaryMode)0u)
 
+    typedef uint32_t SlangNVVMSurfaceStorageFormat;
+#define SLANG_NVVM_SURFACE_STORAGE_NATIVE ((SlangNVVMSurfaceStorageFormat)0u)
+#define SLANG_NVVM_SURFACE_STORAGE_FLOAT16 ((SlangNVVMSurfaceStorageFormat)1u)
+
     /** Describes one complete typed surface-resource operation. */
     typedef struct SlangNVVMSurfaceOperationDesc
     {
@@ -165,6 +169,7 @@ extern "C"
         uint32_t dimensionCount;
         SlangNVVMValueTypeDesc elementType;
         SlangNVVMSurfaceBoundaryMode boundaryMode;
+        SlangNVVMSurfaceStorageFormat storageFormat;
     } SlangNVVMSurfaceOperationDesc;
 
     /** Owns module lifetime and verified serialization. */

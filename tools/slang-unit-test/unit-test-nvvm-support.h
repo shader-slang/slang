@@ -2061,10 +2061,13 @@ static bool _isFakeNVVMBuilderVectorValue(
     {
         const SlangNVVMSurfaceOperationDesc& operation =
             gFakeNVVMBuilder.surfaceOperations[valueRef.index];
-        return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD &&
-               expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Half &&
+        const uint32_t expectedBitWidth =
+            expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Half    ? 16
+            : expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Float ? 32
+                                                                              : 0;
+        return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD && expectedBitWidth != 0 &&
                operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-               operation.elementType.bitWidth == 16 &&
+               operation.elementType.bitWidth == expectedBitWidth &&
                operation.elementType.laneCount == expectedElementCount;
     }
     if (valueRef.kind == FakeNVVMBuilderValueKind::ScalarOperation && valueRef.index >= 0 &&
@@ -5091,14 +5094,20 @@ static SlangNVVMBuilderValueOperationsAPI _makeFakeNVVMBuilderValueOperationsAPI
 
 static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& operation)
 {
-    return (operation.operation == SLANG_NVVM_SURFACE_OP_LOAD ||
-            operation.operation == SLANG_NVVM_SURFACE_OP_STORE) &&
-           (operation.dimensionCount == 1 || operation.dimensionCount == 2) &&
-           operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-           operation.elementType.bitWidth == 16 &&
-           (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
-            operation.elementType.laneCount == 4) &&
-           operation.boundaryMode == SLANG_NVVM_SURFACE_BOUNDARY_ZERO;
+    if ((operation.operation != SLANG_NVVM_SURFACE_OP_LOAD &&
+         operation.operation != SLANG_NVVM_SURFACE_OP_STORE) ||
+        (operation.dimensionCount != 1 && operation.dimensionCount != 2) ||
+        operation.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
+        (operation.elementType.laneCount != 1 && operation.elementType.laneCount != 2 &&
+         operation.elementType.laneCount != 4) ||
+        operation.boundaryMode != SLANG_NVVM_SURFACE_BOUNDARY_ZERO)
+    {
+        return false;
+    }
+    return (operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_NATIVE &&
+            operation.elementType.bitWidth == 16) ||
+           (operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16 &&
+            operation.elementType.bitWidth == 32);
 }
 
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsSurfaceOperationSupported(
@@ -5149,12 +5158,17 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitSurfaceOperation(
     }
     if (operation->operation == SLANG_NVVM_SURFACE_OP_STORE)
     {
-        const bool hasExpectedValue = operation->elementType.laneCount == 1
-                                          ? _isFakeNVVMBuilderFloatingPointValue(operands[2], 16)
-                                          : _isFakeNVVMBuilderVectorValue(
-                                                operands[2],
-                                                FakeNVVMBuilderScalarTypeKind::Half,
-                                                operation->elementType.laneCount);
+        const uint32_t semanticBitWidth = operation->elementType.bitWidth;
+        const FakeNVVMBuilderScalarTypeKind semanticScalarKind =
+            semanticBitWidth == 16 ? FakeNVVMBuilderScalarTypeKind::Half
+                                   : FakeNVVMBuilderScalarTypeKind::Float;
+        const bool hasExpectedValue =
+            operation->elementType.laneCount == 1
+                ? _isFakeNVVMBuilderFloatingPointValue(operands[2], semanticBitWidth)
+                : _isFakeNVVMBuilderVectorValue(
+                      operands[2],
+                      semanticScalarKind,
+                      operation->elementType.laneCount);
         if (!hasExpectedValue)
             return SLANG_E_INVALID_ARG;
     }

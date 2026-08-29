@@ -51,7 +51,7 @@ bool _getNVVMConventionalGlobalParams(IRInst* inst, NVVMConventionalGlobalParams
     bool hasField = false;
     for (auto field : elementType->getFields())
     {
-        if (!isNVVMSupportedConventionalGlobalFieldType(field->getFieldType()))
+        if (!isNVVMSupportedConventionalGlobalFieldType(field))
             return false;
         hasField = true;
     }
@@ -115,6 +115,7 @@ struct NVVMStructField
 {
     IRStructField* field = nullptr;
     uint32_t fieldIndex = 0;
+    bool isConventionalGlobal = false;
     bool isMutableLocal = false;
 };
 
@@ -134,6 +135,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     if (isConventionalGlobal)
     {
         structType = globalParams.elementType;
+        outAddress.isConventionalGlobal = true;
     }
     else if (asNVVMSupportedLocalCopyableStructPointerType(
                  fieldAddress->getBase()->getDataType(),
@@ -174,11 +176,12 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     if (isConventionalGlobal)
     {
         NVVMRawBufferType rawBufferType;
-        NVVMNativeHalfSurfaceType surfaceType;
+        NVVMSurfaceType surfaceType;
+        SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
         // Sampler fields are ABI storage only. They intentionally have no executable value form.
         return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
                asNVVMSupportedScalarParameterGroupType(fieldType) ||
-               getNVVMSupportedNativeHalfSurfaceType(fieldType, surfaceType) ||
+               getNVVMSupportedSurfaceField(outAddress.field, surfaceType, storageFormat) ||
                getNVVMSupportedRawBufferType(fieldType, rawBufferType);
     }
 
@@ -1038,6 +1041,29 @@ struct NVVMResolvedSurfaceOperation
     IRParam* value = nullptr;
 };
 
+// Resolves the storage selected at one exact direct call site. The CUDA intrinsic expander uses
+// this same canonical load-from-collected-global shape: the field key remains the source of truth
+// for `[format]`, while an arbitrary helper parameter intentionally carries no such provenance.
+bool _getNVVMSurfaceCallStorageFormat(
+    IRInst* resource,
+    const NVVMSurfaceType& expectedType,
+    SlangNVVMSurfaceStorageFormat& outStorageFormat)
+{
+    outStorageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
+    auto load = as<IRLoad>(resource);
+    auto fieldAddress = load ? as<IRFieldAddress>(load->getPtr()) : nullptr;
+    NVVMStructField resolvedField;
+    NVVMSurfaceType actualType;
+    if (!fieldAddress || !_getNVVMStructFieldAddress(fieldAddress, resolvedField) ||
+        !resolvedField.isConventionalGlobal ||
+        !getNVVMSupportedSurfaceField(resolvedField.field, actualType, outStorageFormat) ||
+        !isTypeEqual(actualType.textureType, expectedType.textureType))
+    {
+        return false;
+    }
+    return true;
+}
+
 // Maps one complete canonical CUDA-prelude surface helper to typed provider semantics.
 bool _resolveNVVMSurfaceGenericAsm(
     IRGenericAsm* genericAsm,
@@ -1084,8 +1110,8 @@ bool _resolveNVVMSurfaceGenericAsm(
     if (function->getParamCount() != expectedParameterCount)
         return false;
 
-    NVVMNativeHalfSurfaceType surfaceType;
-    if (!getNVVMSupportedNativeHalfSurfaceType(function->getParamType(0), surfaceType) ||
+    NVVMSurfaceType surfaceType;
+    if (!getNVVMSupportedSurfaceType(function->getParamType(0), surfaceType) ||
         surfaceType.dimensionCount != dimensionCount)
     {
         return false;
@@ -1122,11 +1148,30 @@ bool _resolveNVVMSurfaceGenericAsm(
         return false;
     }
 
+    SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
+    bool hasCallSite = false;
+    for (auto use = function->firstUse; use; use = use->nextUse)
+    {
+        auto call = as<IRCall>(use->getUser());
+        SlangNVVMSurfaceStorageFormat callStorageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
+        if (!call || use != call->getCalleeUse() || call->getArgCount() != expectedParameterCount ||
+            !_getNVVMSurfaceCallStorageFormat(call->getArg(0), surfaceType, callStorageFormat) ||
+            (hasCallSite && callStorageFormat != storageFormat))
+        {
+            return false;
+        }
+        storageFormat = callStorageFormat;
+        hasCallSite = true;
+    }
+    if (!hasCallSite)
+        return false;
+
     outOperation.desc = {
         operation,
         dimensionCount,
         surfaceType.elementType,
         SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
+        storageFormat,
     };
     outOperation.surface = function->getFirstParam();
     outOperation.coordinate = outOperation.surface->getNextParam();
@@ -1138,21 +1183,36 @@ bool _resolveNVVMSurfaceGenericAsm(
 
 void _requireSurfaceOperation(
     List<NVVMSurfaceOperationRequirement>& requirements,
+    IRFunc* function,
     const SlangNVVMSurfaceOperationDesc& desc,
     const char* diagnosticName)
 {
     for (const auto& requirement : requirements)
     {
+        if (requirement.function != function)
+            continue;
         const auto& existing = requirement.desc;
-        if (existing.operation == desc.operation &&
+        SLANG_RELEASE_ASSERT(
+            existing.operation == desc.operation &&
             existing.dimensionCount == desc.dimensionCount &&
             existing.boundaryMode == desc.boundaryMode &&
-            NVVMSemantics::areSameType(existing.elementType, desc.elementType))
-        {
-            return;
-        }
+            existing.storageFormat == desc.storageFormat &&
+            NVVMSemantics::areSameType(existing.elementType, desc.elementType));
+        return;
     }
-    requirements.add({desc, diagnosticName});
+    requirements.add({function, desc, diagnosticName});
+}
+
+const NVVMSurfaceOperationRequirement* _findSurfaceOperationRequirement(
+    const List<NVVMSurfaceOperationRequirement>& requirements,
+    IRFunc* function)
+{
+    for (const auto& requirement : requirements)
+    {
+        if (requirement.function == function)
+            return &requirement;
+    }
+    return nullptr;
 }
 
 // Recognizes the canonical scalar `all(bool)` implementation selected by the CUDA prelude. Its
@@ -1946,9 +2006,9 @@ bool _isSupportedNVVMHelperResultType(IRInst* type)
 // Returns whether one exact canonical type can cross a selected helper parameter boundary.
 bool _isSupportedNVVMHelperParameterType(IRInst* type)
 {
-    NVVMNativeHalfSurfaceType surfaceType;
+    NVVMSurfaceType surfaceType;
     return isNVVMSupportedValueType(type) || asNVVMSupportedLocalScalarStructPointerType(type) ||
-           getNVVMSupportedNativeHalfSurfaceType(type, surfaceType);
+           getNVVMSupportedSurfaceType(type, surfaceType);
 }
 
 // Returns whether one canonical call argument satisfies an exact helper parameter. A mutable
@@ -2257,10 +2317,10 @@ SlangResult _validateNVVMFunction(
             case kIROp_Load:
                 {
                     NVVMRawBufferType rawBufferType;
-                    NVVMNativeHalfSurfaceType surfaceType;
+                    NVVMSurfaceType surfaceType;
                     if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
                         !getNVVMSupportedRawBufferType(inst->getDataType(), rawBufferType) &&
-                        !getNVVMSupportedNativeHalfSurfaceType(inst->getDataType(), surfaceType) &&
+                        !getNVVMSupportedSurfaceType(inst->getDataType(), surfaceType) &&
                         !asNVVMSupportedScalarParameterGroupType(inst->getDataType()) &&
                         !asNVVMSupportedCopyableStructType(inst->getDataType()))
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
@@ -2418,12 +2478,18 @@ SlangResult _validateNVVMFunction(
                         {
                             return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
                         }
+                        const bool isFormatted = surfaceOperation.desc.storageFormat ==
+                                                 SLANG_NVVM_SURFACE_STORAGE_FLOAT16;
+                        const bool isLoad =
+                            surfaceOperation.desc.operation == SLANG_NVVM_SURFACE_OP_LOAD;
                         _requireSurfaceOperation(
                             requirements.surfaceOperations,
+                            function,
                             surfaceOperation.desc,
-                            surfaceOperation.desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
-                                ? "native Half surface load"
-                                : "native Half surface store");
+                            isFormatted ? (isLoad ? "formatted Half surface load"
+                                                  : "formatted Half surface store")
+                                        : (isLoad ? "native Half surface load"
+                                                  : "native Half surface store"));
                         break;
                     }
                     if (functionBlocks.getCount() != 1 || genericAsm->getOperandCount() != 1 ||
@@ -2755,10 +2821,8 @@ SlangResult _validateNVVMFunction(
                                 false,
                                 cast<IRPtrTypeBase>(argument->getDataType())->getValueType()));
                         }
-                        else if (NVVMNativeHalfSurfaceType surfaceType;
-                                 getNVVMSupportedNativeHalfSurfaceType(
-                                     argument->getDataType(),
-                                     surfaceType))
+                        else if (NVVMSurfaceType surfaceType;
+                                 getNVVMSupportedSurfaceType(argument->getDataType(), surfaceType))
                         {
                             SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                                 codeGenContext,
@@ -3992,11 +4056,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredValue = nullptr;
                         uint32_t alignment = getNVVMCopyableValueAlignment(load->getDataType());
                         NVVMRawBufferType rawBufferType;
-                        NVVMNativeHalfSurfaceType surfaceType;
+                        NVVMSurfaceType surfaceType;
                         if (getNVVMSupportedRawBufferType(load->getDataType(), rawBufferType) ||
-                            getNVVMSupportedNativeHalfSurfaceType(
-                                load->getDataType(),
-                                surfaceType) ||
+                            getNVVMSupportedSurfaceType(load->getDataType(), surfaceType) ||
                             asNVVMSupportedScalarParameterGroupType(load->getDataType()))
                         {
                             alignment = kNVVMPointerAlignment;
@@ -4472,18 +4534,24 @@ SlangResult emitNVVMIRFromLinkedIR(
                             break;
                         }
 
-                        NVVMResolvedSurfaceOperation surfaceOperation;
-                        if (_resolveNVVMSurfaceGenericAsm(genericAsm, function, surfaceOperation))
+                        if (auto surfaceRequirement = _findSurfaceOperationRequirement(
+                                requirements.surfaceOperations,
+                                function))
                         {
                             SlangNVVMValueHandle loweredOperands[3] = {};
+                            IRParam* surface = function->getFirstParam();
+                            IRParam* coordinate = surface->getNextParam();
                             IRInst* semanticOperands[] = {
-                                surfaceOperation.surface,
-                                surfaceOperation.coordinate,
-                                surfaceOperation.value,
+                                surface,
+                                coordinate,
+                                surfaceRequirement->desc.operation == SLANG_NVVM_SURFACE_OP_STORE
+                                    ? coordinate->getNextParam()
+                                    : nullptr,
                             };
                             const size_t operandCount =
-                                surfaceOperation.desc.operation == SLANG_NVVM_SURFACE_OP_LOAD ? 2
-                                                                                              : 3;
+                                surfaceRequirement->desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
+                                    ? 2
+                                    : 3;
                             for (size_t i = 0; i < operandCount; ++i)
                             {
                                 SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
@@ -4498,21 +4566,19 @@ SlangResult emitNVVMIRFromLinkedIR(
                             SlangNVVMValueHandle loweredValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                surfaceOperation.desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
-                                    ? "native Half surface load"
-                                    : "native Half surface store",
+                                surfaceRequirement->diagnosticName,
                                 builder.emitSurfaceOperation(
                                     moduleScope.module,
-                                    surfaceOperation.desc,
+                                    surfaceRequirement->desc,
                                     loweredOperands,
                                     operandCount,
                                     loweredValue)));
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                surfaceOperation.desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
+                                surfaceRequirement->desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
                                     ? "surface value return"
                                     : "void return",
-                                surfaceOperation.desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
+                                surfaceRequirement->desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
                                     ? builder.emitValueReturn(moduleScope.module, loweredValue)
                                     : builder.emitReturnVoid(moduleScope.module)));
                             break;

@@ -126,7 +126,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->emitByteOffsetPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=12") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=13") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -144,6 +144,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
         2,
         {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, 4},
         SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
+        SLANG_NVVM_SURFACE_STORAGE_NATIVE,
     };
     SLANG_CHECK(builder.supportsSurfaceOperation(load2D));
 
@@ -155,6 +156,20 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported = load2D;
     unsupported.boundaryMode = SlangNVVMSurfaceBoundaryMode(1);
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+    const SlangNVVMSurfaceOperationDesc formattedStore2D = {
+        SLANG_NVVM_SURFACE_OP_STORE,
+        2,
+        {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 4},
+        SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
+        SLANG_NVVM_SURFACE_STORAGE_FLOAT16,
+    };
+    SLANG_CHECK(builder.supportsSurfaceOperation(formattedStore2D));
+    unsupported = formattedStore2D;
+    unsupported.elementType.bitWidth = 16;
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+    unsupported = load2D;
+    unsupported.storageFormat = SLANG_NVVM_SURFACE_STORAGE_FLOAT16;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
 }
 

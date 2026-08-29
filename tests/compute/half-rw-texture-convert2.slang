@@ -7,6 +7,15 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -output-using-type -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+// NVVM: sust.p.2d.b32.zero
+// NVVM: sust.p.2d.v2.b32.zero
+// NVVM: sust.p.2d.v4.b32.zero
+// NVVM: suld.b.2d.v4.b16.zero
+// NVVM: suld.b.2d.v2.b16.zero
+// NVVM: suld.b.2d.b16.zero
 
 //TEST_INPUT: RWTexture2D(format=R16Float, size=4, content = one, mipMaps = 1):name rwt2D
 [format("r16f")]

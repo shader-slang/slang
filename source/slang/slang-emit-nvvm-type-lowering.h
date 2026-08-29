@@ -157,16 +157,22 @@ struct NVVMBufferDataPointerType
 /// Resolves an exact selected raw-buffer data pointer.
 bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerType& outType);
 
-/// Describes one exact native-Half read-write CUDA surface object.
-struct NVVMNativeHalfSurfaceType
+/// Describes one exact read-write CUDA surface object selected by direct NVVM.
+struct NVVMSurfaceType
 {
     IRTextureTypeBase* textureType = nullptr;
     uint32_t dimensionCount = 0;
     SlangNVVMValueTypeDesc elementType = {};
 };
 
-/// Resolves a non-arrayed 1D/2D read-write surface with scalar, two-, or four-lane Half elements.
-bool getNVVMSupportedNativeHalfSurfaceType(IRInst* type, NVVMNativeHalfSurfaceType& outType);
+/// Resolves a non-arrayed 1D/2D read-write surface with selected floating-point elements.
+bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType);
+
+/// Resolves the physical storage selected by a conventional-global surface field.
+bool getNVVMSupportedSurfaceField(
+    IRStructField* field,
+    NVVMSurfaceType& outType,
+    SlangNVVMSurfaceStorageFormat& outStorageFormat);
 
 /// Returns an accepted storage-only CUDA sampler placeholder.
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type);
@@ -179,8 +185,8 @@ IRParameterGroupType* asNVVMSupportedScalarParameterGroupType(
     IRInst* type,
     IRStructType** outElementType = nullptr);
 
-/// Returns whether `type` is one field admitted in the conventional CUDA parameter block.
-bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type);
+/// Returns whether `field` is admitted in the conventional CUDA parameter block.
+bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field);
 
 /// Returns the canonical pointer produced by selected structured-buffer element addressing.
 IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type);

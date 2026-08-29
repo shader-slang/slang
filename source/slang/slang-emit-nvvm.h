@@ -29,6 +29,7 @@ using NVVMValueOperationRequirements = List<NVVMValueOperationRequirement>;
 /// Owns one exact typed surface-operation overload required by accepted linked IR.
 struct NVVMSurfaceOperationRequirement
 {
+    IRFunc* function = nullptr;
     SlangNVVMSurfaceOperationDesc desc = {};
     const char* diagnosticName = nullptr;
 };

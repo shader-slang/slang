@@ -556,7 +556,7 @@ bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerTy
     return true;
 }
 
-bool getNVVMSupportedNativeHalfSurfaceType(IRInst* type, NVVMNativeHalfSurfaceType& outType)
+bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType)
 {
     outType = {};
     auto textureType = as<IRTextureTypeBase>(type);
@@ -591,12 +591,52 @@ bool getNVVMSupportedNativeHalfSurfaceType(IRInst* type, NVVMNativeHalfSurfaceTy
         scalarType = vectorType->getElementType();
         laneCount = uint32_t(count->getValue());
     }
-    if (!isNVVMFloat16Type(scalarType))
+    uint32_t bitWidth = 0;
+    if (!isNVVMSupportedFloatingPointScalarType(scalarType, &bitWidth) ||
+        (bitWidth != 16 && bitWidth != 32))
         return false;
 
     outType.textureType = textureType;
     outType.dimensionCount = dimensionCount;
-    outType.elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, laneCount};
+    outType.elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, bitWidth, laneCount};
+    return true;
+}
+
+bool getNVVMSupportedSurfaceField(
+    IRStructField* field,
+    NVVMSurfaceType& outType,
+    SlangNVVMSurfaceStorageFormat& outStorageFormat)
+{
+    outType = {};
+    outStorageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
+    if (!field || !getNVVMSupportedSurfaceType(field->getFieldType(), outType))
+        return false;
+
+    ImageFormat expectedFormat = ImageFormat::unknown;
+    switch (outType.elementType.laneCount)
+    {
+    case 1:
+        expectedFormat = ImageFormat::r16f;
+        break;
+    case 2:
+        expectedFormat = ImageFormat::rg16f;
+        break;
+    case 4:
+        expectedFormat = ImageFormat::rgba16f;
+        break;
+    default:
+        SLANG_UNEXPECTED("selected NVVM surface has an unsupported lane count");
+    }
+
+    auto formatDecoration = field->getKey()->findDecoration<IRFormatDecoration>();
+    if (formatDecoration && formatDecoration->getFormat() != expectedFormat)
+        return false;
+    if (outType.elementType.bitWidth == 16)
+        return true;
+    if (!formatDecoration)
+        return false;
+
+    outStorageFormat = SLANG_NVVM_SURFACE_STORAGE_FLOAT16;
     return true;
 }
 
@@ -635,14 +675,16 @@ IRParameterGroupType* asNVVMSupportedScalarParameterGroupType(
     return parameterGroupType;
 }
 
-bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type)
+bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
 {
     NVVMRawBufferType rawBufferType;
-    NVVMNativeHalfSurfaceType surfaceType;
+    NVVMSurfaceType surfaceType;
+    SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
+    IRType* type = field ? field->getFieldType() : nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedScalarParameterGroupType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
-           getNVVMSupportedNativeHalfSurfaceType(type, surfaceType) ||
+           getNVVMSupportedSurfaceField(field, surfaceType, storageFormat) ||
            asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type);
 }
@@ -928,8 +970,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
     NVVMRawBufferType rawBufferType;
     const bool isRawBuffer = getNVVMSupportedRawBufferType(type, rawBufferType);
-    NVVMNativeHalfSurfaceType surfaceType;
-    const bool isNativeHalfSurface = getNVVMSupportedNativeHalfSurfaceType(type, surfaceType);
+    NVVMSurfaceType surfaceType;
+    const bool isSurface = getNVVMSupportedSurfaceType(type, surfaceType);
     NVVMBufferDataPointerType bufferDataPointerType;
     const bool isBufferDataPointer =
         getNVVMSupportedBufferDataPointerType(type, bufferDataPointerType);
@@ -954,15 +996,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
-         (isNVVMSupportedValueType(type) || localScalarStructPointer || isNativeHalfSurface)) ||
+         (isNVVMSupportedValueType(type) || localScalarStructPointer || isSurface)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
           fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
-          isBufferDataPointer || parameterGroup || isNativeHalfSurface || resourceElementPointer ||
+          isBufferDataPointer || parameterGroup || isSurface || resourceElementPointer ||
           sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
-         (isInteger || isFloat32 || structType || isRawBuffer || parameterGroup ||
-          isNativeHalfSurface || samplerStorage || unsizedSamplerArrayStorage));
+         (isInteger || isFloat32 || structType || isRawBuffer || parameterGroup || isSurface ||
+          samplerStorage || unsizedSamplerArrayStorage));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -1067,10 +1109,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     {
         return _lowerScalarParameterGroupType(parameterGroup, parameterGroupElementType, outType);
     }
-    else if (isNativeHalfSurface)
+    else if (isSurface)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "native Half CUDA surface handle type",
+            "CUDA surface handle type",
             m_builder.getIntegerType(m_module, 64, outType)));
     }
     else if (samplerStorage)

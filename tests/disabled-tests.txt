@@ -42,12 +42,6 @@ They will need to wait until the shader object implementation(s) are updated to 
 * compute/interface-shader-param-in-struct.slang
 * compute/interface-shader-param-legalization.slang
 
-### Gfx Limitation
-
-These tests are disabled due to other limitations of gfx layer.
-
-* compute/half-rw-texture-convert.slang
-
 ### Temporary Language Limitation
 
 This test is disabled due to temporary compiler implementation limitations.

@@ -5135,6 +5135,33 @@ all six `suld.b.2d.*.zero`/`sust.b.2d.*.zero` rows, and CUDA 12.9.86
 `ptxas -arch=sm_70` accepts it as a 3,176-byte cubin. Formatted Float resources backed by Half
 surface formats and sampled Texture/Sampler operations remain separate resource families.
 
+### Slice 101: Formatted Float-to-Half surface conversion
+
+Forward-only builder ABI revision 13 adds storage representation to the typed surface descriptor.
+Native storage remains exact Half/Half2/Half4. The new Float16 storage row carries semantic
+Float/Float2/Float4 values backed by matching R16F/RG16F/RGBA16F channels, so provider capability
+queries describe conversion explicitly instead of inferring it from a Float resource type.
+
+The field key on the collected conventional global remains the source of truth for `[format]`.
+Preflight accepts only the canonical `load(fieldAddress(globalParams, key))` resource argument at
+every call to a retained CUDA-prelude surface helper. It resolves the complete descriptor once and
+stores it with the helper identity for emission. A Float surface without a format, a resource
+passed through an arbitrary user helper, or call sites that do not agree remain unsupported. This
+is deliberately the same bounded producer shape used by CUDA intrinsic expansion; direct NVVM
+does not walk arbitrary operand graphs or guess physical storage from semantic type.
+
+Formatted reads reuse LLVM's native i16 `suld` intrinsics, reconstruct Half lanes, and widen each
+lane to Float. LLVM 7 and LLVM 14 expose only trap-boundary IDs for formatted stores, so the
+shielded provider selects fixed descriptor-owned `sust.p.1d/2d[.v2/.v4].b32.zero` inline PTX.
+Those stores consume Float lanes and pixel coordinates directly, while reads retain byte-scaled x
+coordinates. No source GenericAsm text crosses the builder ABI.
+
+The re-enabled `half-rw-texture-convert.slang` fixture and all four enabled lanes of
+`half-rw-texture-convert2.slang` pass, including direct CUDA runtime comparison and PTX checks for
+all scalar/v2/v4 2D load/store rows. A focused 1D fixture covers the corresponding six 1D rows;
+negative fixtures prove that missing format and smuggled provenance are rejected. The 1,956-byte
+optimized 2D PTX passes CUDA 12.9.86 `ptxas -arch=sm_70` and produces a 3,304-byte cubin.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
