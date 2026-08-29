@@ -302,6 +302,14 @@ inline constexpr CatalogEntry kCatalog[] = {
         "__half2float($0)",
     },
     {
+        SLANG_NVVM_VALUE_OP_SQRT,
+        kFloat32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "float32 square root",
+        "$P_sqrt($0)",
+    },
+    {
         SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
         kUnsignedI32,
         {kNoType, kNoType, kNoType},

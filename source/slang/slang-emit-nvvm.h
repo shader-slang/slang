@@ -34,11 +34,20 @@ struct NVVMSurfaceOperationRequirement
     const char* diagnosticName = nullptr;
 };
 
+/// Owns one exact typed sampled-texture operation required by accepted linked IR.
+struct NVVMTextureOperationRequirement
+{
+    IRFunc* function = nullptr;
+    SlangNVVMTextureOperationDesc desc = {};
+    const char* diagnosticName = nullptr;
+};
+
 /// Owns every provider capability required before module creation.
 struct NVVMOperationRequirements
 {
     NVVMValueOperationRequirements valueOperations;
     List<NVVMSurfaceOperationRequirement> surfaceOperations;
+    List<NVVMTextureOperationRequirement> textureOperations;
 };
 
 /// Replaces exact CUDA layout-query calls with constants and removes their compile-time-only IR.

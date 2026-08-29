@@ -640,6 +640,61 @@ bool getNVVMSupportedSurfaceField(
     return true;
 }
 
+bool getNVVMSupportedSampledTextureType(IRInst* type, NVVMSampledTextureType& outType)
+{
+    outType = {};
+    auto textureType = as<IRTextureTypeBase>(type);
+    if (!textureType || textureType->getOp() != kIROp_TextureType ||
+        textureType->getOperandCount() < 9 || textureType->isMultisample() ||
+        textureType->isShadow() || textureType->isCombined() ||
+        textureType->getAccess() != SLANG_RESOURCE_ACCESS_READ ||
+        !isNVVMFloat32Type(textureType->getElementType()))
+    {
+        return false;
+    }
+
+    SlangNVVMTextureShape shape = 0;
+    uint32_t coordinateLaneCount = 0;
+    switch (textureType->GetBaseShape())
+    {
+    case SLANG_TEXTURE_1D:
+        shape = SLANG_NVVM_TEXTURE_SHAPE_1D;
+        coordinateLaneCount = 1;
+        break;
+    case SLANG_TEXTURE_2D:
+        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
+        coordinateLaneCount = 2;
+        break;
+    case SLANG_TEXTURE_3D:
+        shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
+        coordinateLaneCount = 3;
+        break;
+    case SLANG_TEXTURE_CUBE:
+        shape = SLANG_NVVM_TEXTURE_SHAPE_CUBE;
+        coordinateLaneCount = 3;
+        break;
+    default:
+        return false;
+    }
+
+    const bool isArray = textureType->isArray();
+    if (isArray && shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
+        return false;
+
+    outType.textureType = textureType;
+    outType.shape = shape;
+    outType.isArray = isArray;
+    outType.coordinateLaneCount = coordinateLaneCount + (isArray ? 1u : 0u);
+    outType.elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 1};
+    return true;
+}
+
+IRSamplerStateTypeBase* asNVVMSupportedSamplerValueType(IRInst* type)
+{
+    return type && type->getOp() == kIROp_SamplerStateType ? as<IRSamplerStateTypeBase>(type)
+                                                           : nullptr;
+}
+
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type)
 {
     return as<IRSamplerStateTypeBase>(type);
@@ -679,12 +734,14 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
 {
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
+    NVVMSampledTextureType sampledTextureType;
     SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
     IRType* type = field ? field->getFieldType() : nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedScalarParameterGroupType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceField(field, surfaceType, storageFormat) ||
+           getNVVMSupportedSampledTextureType(type, sampledTextureType) ||
            asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type);
 }
@@ -972,6 +1029,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isRawBuffer = getNVVMSupportedRawBufferType(type, rawBufferType);
     NVVMSurfaceType surfaceType;
     const bool isSurface = getNVVMSupportedSurfaceType(type, surfaceType);
+    NVVMSampledTextureType sampledTextureType;
+    const bool isSampledTexture = getNVVMSupportedSampledTextureType(type, sampledTextureType);
     NVVMBufferDataPointerType bufferDataPointerType;
     const bool isBufferDataPointer =
         getNVVMSupportedBufferDataPointerType(type, bufferDataPointerType);
@@ -979,6 +1038,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRParameterGroupType* parameterGroup =
         asNVVMSupportedScalarParameterGroupType(type, &parameterGroupElementType);
     IRSamplerStateTypeBase* samplerStorage = asNVVMSupportedSamplerStorageType(type);
+    IRSamplerStateTypeBase* samplerValue = asNVVMSupportedSamplerValueType(type);
     IRUnsizedArrayType* unsizedSamplerArrayStorage =
         asNVVMSupportedUnsizedSamplerArrayStorageType(type);
     IRPtrTypeBase* resourceElementPointer =
@@ -996,15 +1056,16 @@ SlangResult NVVMTypeLoweringContext::lowerType(
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
-         (isNVVMSupportedValueType(type) || localScalarStructPointer || isSurface)) ||
+         (isNVVMSupportedValueType(type) || localScalarStructPointer || isSurface ||
+          isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
           fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
-          isBufferDataPointer || parameterGroup || isSurface || resourceElementPointer ||
-          sharedElementPointer)) ||
+          isBufferDataPointer || parameterGroup || isSurface || isSampledTexture || samplerValue ||
+          resourceElementPointer || sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
          (isInteger || isFloat32 || structType || isRawBuffer || parameterGroup || isSurface ||
-          samplerStorage || unsizedSamplerArrayStorage));
+          isSampledTexture || samplerStorage || unsizedSamplerArrayStorage));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -1109,10 +1170,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     {
         return _lowerScalarParameterGroupType(parameterGroup, parameterGroupElementType, outType);
     }
-    else if (isSurface)
+    else if (isSurface || isSampledTexture)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "CUDA surface handle type",
+            isSurface ? "CUDA surface handle type" : "CUDA texture handle type",
             m_builder.getIntegerType(m_module, 64, outType)));
     }
     else if (samplerStorage)

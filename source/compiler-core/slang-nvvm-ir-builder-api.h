@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 13u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 14u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -87,6 +87,7 @@ extern "C"
 #define SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION ((SlangNVVMBuilderInterfaceID)1u)
 #define SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS ((SlangNVVMBuilderInterfaceID)2u)
 #define SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS ((SlangNVVMBuilderInterfaceID)3u)
+#define SLANG_NVVM_BUILDER_INTERFACE_TEXTURE_OPERATIONS ((SlangNVVMBuilderInterfaceID)4u)
 
     /** Semantic scalar and fixed-vector categories used by operation signatures. */
     typedef uint32_t SlangNVVMValueTypeKind;
@@ -140,7 +141,8 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_SHIFT_LEFT ((SlangNVVMValueOperation)33u)
 #define SLANG_NVVM_VALUE_OP_SHIFT_RIGHT ((SlangNVVMValueOperation)34u)
 #define SLANG_NVVM_VALUE_OP_FLOAT_CONVERT ((SlangNVVMValueOperation)35u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT 36u
+#define SLANG_NVVM_VALUE_OP_SQRT ((SlangNVVMValueOperation)36u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT 37u
 
     /** Describes one complete semantic value-operation overload. */
     typedef struct SlangNVVMValueOperationDesc
@@ -171,6 +173,24 @@ extern "C"
         SlangNVVMSurfaceBoundaryMode boundaryMode;
         SlangNVVMSurfaceStorageFormat storageFormat;
     } SlangNVVMSurfaceOperationDesc;
+
+    typedef uint32_t SlangNVVMTextureOperation;
+#define SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ((SlangNVVMTextureOperation)0u)
+
+    typedef uint32_t SlangNVVMTextureShape;
+#define SLANG_NVVM_TEXTURE_SHAPE_1D ((SlangNVVMTextureShape)1u)
+#define SLANG_NVVM_TEXTURE_SHAPE_2D ((SlangNVVMTextureShape)2u)
+#define SLANG_NVVM_TEXTURE_SHAPE_3D ((SlangNVVMTextureShape)3u)
+#define SLANG_NVVM_TEXTURE_SHAPE_CUBE ((SlangNVVMTextureShape)4u)
+
+    /** Describes one complete typed sampled-texture operation. */
+    typedef struct SlangNVVMTextureOperationDesc
+    {
+        SlangNVVMTextureOperation operation;
+        SlangNVVMTextureShape shape;
+        uint32_t isArray;
+        SlangNVVMValueTypeDesc elementType;
+    } SlangNVVMTextureOperationDesc;
 
     /** Owns module lifetime and verified serialization. */
     typedef struct SlangNVVMBuilderFoundationAPI
@@ -415,6 +435,19 @@ extern "C"
             size_t operandCount,
             SlangNVVMValueHandle* outValue);
     } SlangNVVMBuilderSurfaceOperationsAPI;
+
+    typedef struct SlangNVVMBuilderTextureOperationsAPI
+    {
+        SlangNVVMResult(SLANG_NVVM_CALL* isOperationSupported)(
+            const SlangNVVMTextureOperationDesc* operation,
+            uint32_t* outSupported);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitOperation)(
+            SlangNVVMModuleHandle module,
+            const SlangNVVMTextureOperationDesc* operation,
+            const SlangNVVMValueHandle* operands,
+            size_t operandCount,
+            SlangNVVMValueHandle* outValue);
+    } SlangNVVMBuilderTextureOperationsAPI;
 
     typedef SlangNVVMResult(SLANG_NVVM_CALL* SlangNVVMQueryBuilderInterface)(
         SlangNVVMBuilderInterfaceID interfaceID,

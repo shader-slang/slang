@@ -126,10 +126,58 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->emitByteOffsetPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=13") >= 0);
+        SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=14") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
+{
+    _resetDirectNVVMFakes();
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+    NVVMIRBuilder builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, builder)));
+
+    const SlangNVVMValueTypeDesc floatType = {
+        SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+        32,
+        1,
+    };
+    const SlangNVVMTextureShape shapes[] = {
+        SLANG_NVVM_TEXTURE_SHAPE_1D,
+        SLANG_NVVM_TEXTURE_SHAPE_2D,
+        SLANG_NVVM_TEXTURE_SHAPE_3D,
+        SLANG_NVVM_TEXTURE_SHAPE_CUBE,
+    };
+    for (const auto shape : shapes)
+    {
+        const SlangNVVMTextureOperationDesc operation = {
+            SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL,
+            shape,
+            0,
+            floatType,
+        };
+        SLANG_CHECK(builder.supportsTextureOperation(operation));
+        if (shape != SLANG_NVVM_TEXTURE_SHAPE_3D)
+        {
+            SlangNVVMTextureOperationDesc arrayOperation = operation;
+            arrayOperation.isArray = 1;
+            SLANG_CHECK(builder.supportsTextureOperation(arrayOperation));
+        }
+    }
+
+    SlangNVVMTextureOperationDesc unsupported = {
+        SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL,
+        SLANG_NVVM_TEXTURE_SHAPE_3D,
+        1,
+        floatType,
+    };
+    SLANG_CHECK(!builder.supportsTextureOperation(unsupported));
+    unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
+    unsupported.elementType.laneCount = 2;
+    SLANG_CHECK(!builder.supportsTextureOperation(unsupported));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
@@ -205,6 +253,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsCurrentABIMismatches)
 
 SLANG_UNIT_TEST(nvvmIRBuilderRequiresCompleteCurrentInterfaces)
 {
+    _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.omittedInterface = SLANG_NVVM_BUILDER_INTERFACE_TEXTURE_OPERATIONS;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+    }
+
     _resetDirectNVVMFakes();
     gFakeNVVMBuilder.omittedInterface = SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS;
     {

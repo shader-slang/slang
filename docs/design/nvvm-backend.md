@@ -5162,6 +5162,35 @@ all scalar/v2/v4 2D load/store rows. A focused 1D fixture covers the correspondi
 negative fixtures prove that missing format and smuggled provenance are rejected. The 1,956-byte
 optimized 2D PTX passes CUDA 12.9.86 `ptxas -arch=sm_70` and produces a 3,304-byte cubin.
 
+### Slice 102: Sampled texture level operations
+
+Forward-only builder ABI revision 14 adds one descriptor-driven sampled-texture interface. The
+descriptor carries operation, shape, arrayness, and complete semantic element type; one query and
+one emit callback cover scalar Float `SampleLevel` for 1D, 2D, 3D, cube, 1D array, 2D array, and
+cube array textures. Sampled textures remain semantically distinct from read-write surfaces even
+though both use CUDA's physical i64 object handle.
+
+Preflight recognizes only exact read-only, non-multisampled, non-shadow, non-combined scalar Float
+textures and the seven finalized CUDA-prelude GenericAsm strings. It verifies the complete helper
+signature, including the ordinary `SamplerState` placeholder, and persists one typed requirement
+per helper. CUDA texture objects already own sampling state and the canonical GenericAsm bodies do
+not reference their sampler parameter, so provider operations consume only the texture handle,
+semantic coordinate, and explicit level. No sampler operand or source assembly text crosses the
+LLVM boundary.
+
+The LLVM provider selects the matching `llvm.nvvm.tex.unified.*.level.v4f32.f32` intrinsic and
+extracts result lane zero. For array forms it converts only the final floating coordinate lane to
+signed i32 and places that layer immediately after the handle, matching LLVM's intrinsic ABI.
+Cube-coordinate normalization also adds exact scalar Float `sqrt` through the shared value
+catalog. The LLVM 7 text translator now validates scalar `llvm.sqrt.f32` and removes its
+LLVM-14-only optimization attributes using the same unique-attribute-set policy as other retained
+intrinsics.
+
+All enabled lanes of `half-texture-simple.slang` pass, including ordinary CUDA runtime, direct
+libNVVM runtime, and direct PTX checks for all seven `tex.level` rows. The 2,093-byte optimized PTX
+passes CUDA 12.9.86 `ptxas -arch=sm_70` and produces a 6,632-byte cubin. A neighboring
+`Texture2D<float2>` fixture proves unsupported result shapes stop during compiler preflight.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5173,8 +5202,9 @@ The following remain open until their named slice supplies evidence:
   vector resource elements, flat selected-scalar parameter blocks and constant buffers,
   selected integer/float32 scalar, 32-bit numeric-vector, and layout-compatible first-level
   numeric-field aggregate structured buffers,
-  read-only/read-write byte-address buffers, and storage-only sampler/unsized-sampler-array
-  placeholders, and raw CUDA parameters beyond selected integer and float32 scalars, flat
+  read-only/read-write byte-address buffers, selected scalar Float sampled textures with ordinary
+  sampler values, and storage-only comparison-sampler/unsized-sampler-array placeholders, and raw
+  CUDA parameters beyond selected integer and float32 scalars, flat
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;

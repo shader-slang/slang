@@ -41,6 +41,10 @@ public:
     {
         return &m_surfaceOperations;
     }
+    const SlangNVVMBuilderTextureOperationsAPI* getTextureOperationsAPI() const
+    {
+        return &m_textureOperations;
+    }
 
     /// Queries one complete typed operation.
     bool supportsValueOperation(const SlangNVVMValueOperationDesc& operation) const;
@@ -60,6 +64,17 @@ public:
     SlangResult emitSurfaceOperation(
         SlangNVVMModuleHandle module,
         const SlangNVVMSurfaceOperationDesc& operation,
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle& outValue) const;
+
+    /// Queries one complete typed sampled-texture operation.
+    bool supportsTextureOperation(const SlangNVVMTextureOperationDesc& operation) const;
+
+    /// Emits one complete typed sampled-texture operation.
+    SlangResult emitTextureOperation(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMTextureOperationDesc& operation,
         const SlangNVVMValueHandle* operands,
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
@@ -493,6 +508,7 @@ private:
     SlangNVVMBuilderConstructionAPI m_construction = {};
     SlangNVVMBuilderValueOperationsAPI m_valueOperations = {};
     SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
+    SlangNVVMBuilderTextureOperationsAPI m_textureOperations = {};
     ComPtr<ISlangSharedLibrary> m_library;
 };
 

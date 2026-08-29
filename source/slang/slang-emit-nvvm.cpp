@@ -177,11 +177,13 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     {
         NVVMRawBufferType rawBufferType;
         NVVMSurfaceType surfaceType;
+        NVVMSampledTextureType sampledTextureType;
         SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
-        // Sampler fields are ABI storage only. They intentionally have no executable value form.
         return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
                asNVVMSupportedScalarParameterGroupType(fieldType) ||
                getNVVMSupportedSurfaceField(outAddress.field, surfaceType, storageFormat) ||
+               getNVVMSupportedSampledTextureType(fieldType, sampledTextureType) ||
+               asNVVMSupportedSamplerValueType(fieldType) ||
                getNVVMSupportedRawBufferType(fieldType, rawBufferType);
     }
 
@@ -1215,6 +1217,133 @@ const NVVMSurfaceOperationRequirement* _findSurfaceOperationRequirement(
     return nullptr;
 }
 
+struct NVVMResolvedTextureOperation
+{
+    SlangNVVMTextureOperationDesc desc = {};
+    IRParam* texture = nullptr;
+    IRParam* coordinate = nullptr;
+    IRParam* level = nullptr;
+};
+
+// Maps one complete canonical CUDA-prelude SampleLevel helper to a unified texture-level
+// operation. A CUDA texture object already owns its sampling state, so the sampler parameter is
+// part of the checked Slang helper ABI but is intentionally absent from the provider operation.
+bool _resolveNVVMTextureGenericAsm(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMResolvedTextureOperation& outOperation)
+{
+    outOperation = {};
+    if (!genericAsm || !function || genericAsm->getOperandCount() != 1 ||
+        function->getParamCount() != 4 || !isNVVMFloat32Type(function->getResultType()))
+    {
+        return false;
+    }
+
+    SlangNVVMTextureShape shape = 0;
+    bool isArray = false;
+    const UnownedStringSlice assembly = genericAsm->getAsm();
+    if (assembly == toSlice("tex1DLod<$T0>($0, ($2), ($3))"))
+        shape = SLANG_NVVM_TEXTURE_SHAPE_1D;
+    else if (assembly == toSlice("tex2DLod<$T0>($0, ($2).x, ($2).y, ($3))"))
+        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
+    else if (assembly == toSlice("tex3DLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))"))
+        shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
+    else if (assembly == toSlice("texCubemapLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))"))
+        shape = SLANG_NVVM_TEXTURE_SHAPE_CUBE;
+    else if (assembly == toSlice("tex1DLayeredLod<$T0>($0, ($2).x, int(($2).y), ($3))"))
+    {
+        shape = SLANG_NVVM_TEXTURE_SHAPE_1D;
+        isArray = true;
+    }
+    else if (assembly == toSlice("tex2DLayeredLod<$T0>($0, ($2).x, ($2).y, int(($2).z), ($3))"))
+    {
+        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
+        isArray = true;
+    }
+    else if (
+        assembly == toSlice("texCubemapLayeredLod<$T0>($0, ($2).x, ($2).y, ($2).z, "
+                            "int(($2).w), ($3))"))
+    {
+        shape = SLANG_NVVM_TEXTURE_SHAPE_CUBE;
+        isArray = true;
+    }
+    else
+        return false;
+
+    IRParam* texture = function->getFirstParam();
+    IRParam* sampler = texture->getNextParam();
+    IRParam* coordinate = sampler->getNextParam();
+    IRParam* level = coordinate->getNextParam();
+    NVVMSampledTextureType textureType;
+    if (!getNVVMSupportedSampledTextureType(texture->getDataType(), textureType) ||
+        textureType.shape != shape || textureType.isArray != isArray ||
+        !asNVVMSupportedSamplerValueType(sampler->getDataType()) ||
+        !isNVVMFloat32Type(level->getDataType()))
+    {
+        return false;
+    }
+
+    if (textureType.coordinateLaneCount == 1)
+    {
+        if (!isNVVMFloat32Type(coordinate->getDataType()))
+            return false;
+    }
+    else
+    {
+        auto coordinateType = as<IRVectorType>(coordinate->getDataType());
+        auto laneCount = coordinateType ? as<IRIntLit>(coordinateType->getElementCount()) : nullptr;
+        if (!coordinateType || !isNVVMFloat32Type(coordinateType->getElementType()) || !laneCount ||
+            laneCount->getValue() != textureType.coordinateLaneCount)
+        {
+            return false;
+        }
+    }
+
+    outOperation.desc = {
+        SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL,
+        shape,
+        isArray ? 1u : 0u,
+        textureType.elementType,
+    };
+    outOperation.texture = texture;
+    outOperation.coordinate = coordinate;
+    outOperation.level = level;
+    return true;
+}
+
+void _requireTextureOperation(
+    List<NVVMTextureOperationRequirement>& requirements,
+    IRFunc* function,
+    const SlangNVVMTextureOperationDesc& desc,
+    const char* diagnosticName)
+{
+    for (const auto& requirement : requirements)
+    {
+        if (requirement.function != function)
+            continue;
+        const auto& existing = requirement.desc;
+        SLANG_RELEASE_ASSERT(
+            existing.operation == desc.operation && existing.shape == desc.shape &&
+            existing.isArray == desc.isArray &&
+            NVVMSemantics::areSameType(existing.elementType, desc.elementType));
+        return;
+    }
+    requirements.add({function, desc, diagnosticName});
+}
+
+const NVVMTextureOperationRequirement* _findTextureOperationRequirement(
+    const List<NVVMTextureOperationRequirement>& requirements,
+    IRFunc* function)
+{
+    for (const auto& requirement : requirements)
+    {
+        if (requirement.function == function)
+            return &requirement;
+    }
+    return nullptr;
+}
+
 // Recognizes the canonical scalar `all(bool)` implementation selected by the CUDA prelude. Its
 // `bool($0)` body is an identity operation, so the direct backend can preserve the checked
 // parameter value without asking the provider to manufacture redundant IR.
@@ -2007,8 +2136,11 @@ bool _isSupportedNVVMHelperResultType(IRInst* type)
 bool _isSupportedNVVMHelperParameterType(IRInst* type)
 {
     NVVMSurfaceType surfaceType;
+    NVVMSampledTextureType sampledTextureType;
     return isNVVMSupportedValueType(type) || asNVVMSupportedLocalScalarStructPointerType(type) ||
-           getNVVMSupportedSurfaceType(type, surfaceType);
+           getNVVMSupportedSurfaceType(type, surfaceType) ||
+           getNVVMSupportedSampledTextureType(type, sampledTextureType) ||
+           asNVVMSupportedSamplerValueType(type);
 }
 
 // Returns whether one canonical call argument satisfies an exact helper parameter. A mutable
@@ -2318,9 +2450,14 @@ SlangResult _validateNVVMFunction(
                 {
                     NVVMRawBufferType rawBufferType;
                     NVVMSurfaceType surfaceType;
+                    NVVMSampledTextureType sampledTextureType;
                     if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
                         !getNVVMSupportedRawBufferType(inst->getDataType(), rawBufferType) &&
                         !getNVVMSupportedSurfaceType(inst->getDataType(), surfaceType) &&
+                        !getNVVMSupportedSampledTextureType(
+                            inst->getDataType(),
+                            sampledTextureType) &&
+                        !asNVVMSupportedSamplerValueType(inst->getDataType()) &&
                         !asNVVMSupportedScalarParameterGroupType(inst->getDataType()) &&
                         !asNVVMSupportedCopyableStructType(inst->getDataType()))
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
@@ -2463,6 +2600,7 @@ SlangResult _validateNVVMFunction(
                     const NVVMSemantics::CatalogEntry* semantic =
                         _findNVVMGenericAsmSemantic(genericAsm, function);
                     NVVMResolvedSurfaceOperation surfaceOperation;
+                    NVVMResolvedTextureOperation textureOperation;
                     if (_getNVVMBoolIdentityGenericAsmParameter(genericAsm, function))
                         break;
                     if (_resolveNVVMSurfaceGenericAsm(genericAsm, function, surfaceOperation))
@@ -2490,6 +2628,26 @@ SlangResult _validateNVVMFunction(
                                                   : "formatted Half surface store")
                                         : (isLoad ? "native Half surface load"
                                                   : "native Half surface store"));
+                        break;
+                    }
+                    if (_resolveNVVMTextureGenericAsm(genericAsm, function, textureOperation))
+                    {
+                        auto genericBlock = as<IRBlock>(genericAsm->getParent());
+                        auto entryBranch = as<IRUnconditionalBranch>(entryBlock->getTerminator());
+                        const bool hasCanonicalTextureBody =
+                            functionBlocks.getCount() == 1 ||
+                            (functionBlocks.getCount() == 2 && genericBlock != entryBlock &&
+                             entryBranch && entryBranch->getTargetBlock() == genericBlock &&
+                             entryBranch->getArgCount() == 0);
+                        if (!hasCanonicalTextureBody)
+                        {
+                            return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
+                        }
+                        _requireTextureOperation(
+                            requirements.textureOperations,
+                            function,
+                            textureOperation.desc,
+                            "scalar Float sampled texture level operation");
                         break;
                     }
                     if (functionBlocks.getCount() != 1 || genericAsm->getOperandCount() != 1 ||
@@ -2821,24 +2979,32 @@ SlangResult _validateNVVMFunction(
                                 false,
                                 cast<IRPtrTypeBase>(argument->getDataType())->getValueType()));
                         }
-                        else if (NVVMSurfaceType surfaceType;
-                                 getNVVMSupportedSurfaceType(argument->getDataType(), surfaceType))
-                        {
-                            SLANG_RETURN_ON_FAIL(_validateAvailableValue(
-                                codeGenContext,
-                                argument,
-                                call,
-                                availableValues,
-                                dominatorTree));
-                        }
                         else
                         {
-                            SLANG_RETURN_ON_FAIL(_validateSelectedValue(
-                                codeGenContext,
-                                argument,
-                                call,
-                                availableValues,
-                                dominatorTree));
+                            NVVMSurfaceType surfaceType;
+                            NVVMSampledTextureType sampledTextureType;
+                            if (getNVVMSupportedSurfaceType(argument->getDataType(), surfaceType) ||
+                                getNVVMSupportedSampledTextureType(
+                                    argument->getDataType(),
+                                    sampledTextureType) ||
+                                asNVVMSupportedSamplerValueType(argument->getDataType()))
+                            {
+                                SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                                    codeGenContext,
+                                    argument,
+                                    call,
+                                    availableValues,
+                                    dominatorTree));
+                            }
+                            else
+                            {
+                                SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                                    codeGenContext,
+                                    argument,
+                                    call,
+                                    availableValues,
+                                    dominatorTree));
+                            }
                         }
                     }
                     if (!as<IRVoidType>(call->getDataType()))
@@ -3764,6 +3930,16 @@ SlangResult emitNVVMIRFromLinkedIR(
                 SLANG_E_NOT_AVAILABLE);
         }
     }
+    for (const auto& requirement : requirements.textureOperations)
+    {
+        if (!builder.supportsTextureOperation(requirement.desc))
+        {
+            return _requireBuilderOperation(
+                codeGenContext,
+                requirement.diagnosticName,
+                SLANG_E_NOT_AVAILABLE);
+        }
+    }
 
     IRFunc* entryPoint = linkedIR.entryPoints[0];
     auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>();
@@ -4057,8 +4233,13 @@ SlangResult emitNVVMIRFromLinkedIR(
                         uint32_t alignment = getNVVMCopyableValueAlignment(load->getDataType());
                         NVVMRawBufferType rawBufferType;
                         NVVMSurfaceType surfaceType;
+                        NVVMSampledTextureType sampledTextureType;
                         if (getNVVMSupportedRawBufferType(load->getDataType(), rawBufferType) ||
                             getNVVMSupportedSurfaceType(load->getDataType(), surfaceType) ||
+                            getNVVMSupportedSampledTextureType(
+                                load->getDataType(),
+                                sampledTextureType) ||
+                            asNVVMSupportedSamplerValueType(load->getDataType()) ||
                             asNVVMSupportedScalarParameterGroupType(load->getDataType()))
                         {
                             alignment = kNVVMPointerAlignment;
@@ -4581,6 +4762,46 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 surfaceRequirement->desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
                                     ? builder.emitValueReturn(moduleScope.module, loweredValue)
                                     : builder.emitReturnVoid(moduleScope.module)));
+                            break;
+                        }
+
+                        if (auto textureRequirement = _findTextureOperationRequirement(
+                                requirements.textureOperations,
+                                function))
+                        {
+                            IRParam* texture = function->getFirstParam();
+                            IRParam* coordinate = texture->getNextParam()->getNextParam();
+                            IRInst* semanticOperands[] = {
+                                texture,
+                                coordinate,
+                                coordinate->getNextParam(),
+                            };
+                            SlangNVVMValueHandle loweredOperands[3] = {};
+                            for (size_t i = 0; i < SLANG_COUNT_OF(semanticOperands); ++i)
+                            {
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    semanticOperands[i],
+                                    valueMap,
+                                    typeContext,
+                                    loweredOperands[i]));
+                            }
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                textureRequirement->diagnosticName,
+                                builder.emitTextureOperation(
+                                    moduleScope.module,
+                                    textureRequirement->desc,
+                                    loweredOperands,
+                                    SLANG_COUNT_OF(loweredOperands),
+                                    loweredValue)));
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "sampled texture value return",
+                                builder.emitValueReturn(moduleScope.module, loweredValue)));
                             break;
                         }
 

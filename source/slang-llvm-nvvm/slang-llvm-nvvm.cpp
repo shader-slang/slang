@@ -1031,14 +1031,28 @@ static SlangResult _emitFloatingUnary(
     ModuleState* state = _getModule(module);
     llvm::Value* llvmValue = _getValue(value);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!outValue || !insertionBlock || operation != SLANG_NVVM_VALUE_OP_NEGATE ||
+    if (!outValue || !insertionBlock ||
+        (operation != SLANG_NVVM_VALUE_OP_NEGATE && operation != SLANG_NVVM_VALUE_OP_SQRT) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue) ||
         llvmValue->getType() != llvm::Type::getFloatTy(state->context))
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    *outValue = reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateFNeg(llvmValue));
+    llvm::Value* result = nullptr;
+    if (operation == SLANG_NVVM_VALUE_OP_NEGATE)
+    {
+        result = state->builder.CreateFNeg(llvmValue);
+    }
+    else
+    {
+        llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(
+            state->module.get(),
+            llvm::Intrinsic::sqrt,
+            {llvmValue->getType()});
+        result = state->builder.CreateCall(intrinsic, {llvmValue});
+    }
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
 
@@ -1933,6 +1947,18 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat format)
 
 static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID);
 
+static void _addUniqueAttributeSet(
+    llvm::SmallVectorImpl<llvm::AttributeSet>& attributeSets,
+    llvm::AttributeSet attributeSet)
+{
+    for (const llvm::AttributeSet& existing : attributeSets)
+    {
+        if (existing == attributeSet)
+            return;
+    }
+    attributeSets.push_back(attributeSet);
+}
+
 // Writes the legacy LLVM textual dialect accepted by libNVVM's documented LLVM 7 reader.
 //
 // LLVM 14 made atomic alignment explicit in assembly, but LLVM 7 gives atomicrmw its natural
@@ -1940,9 +1966,10 @@ static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID);
 // libNVVM NVVM-2.0 reader rejects; the older dialect expresses finite scalar negation as
 // `fsub -0.0, value`. Finally, LLVM 14 gives NVVM special-register intrinsics function attributes
 // that the LLVM 7 parser does not know. Removing optimization-only attributes retains each
-// intrinsic's semantic name and type. LLVM may share one numbered attribute group between several
-// declarations, so count unique validated semantic attribute sets. LLVM 14's scalar shuffle and
-// synchronized-vote declarations already use the LLVM-7-compatible
+// intrinsic's semantic name and type. This applies to both NVVM intrinsics and generic intrinsics
+// such as scalar sqrt that survive into the module. LLVM may share one numbered attribute group
+// between several declarations, so count unique validated semantic attribute sets. LLVM 14's scalar
+// shuffle and synchronized-vote declarations already use the LLVM-7-compatible
 // convergent/inaccessible-memory/nounwind set, but validate their exact signatures and attributes
 // before serializing the mixed dialect. Generic count-trailing-zeros has the same LLVM 14-only
 // optimization attributes as the special-register declarations plus an `immarg` parameter marker;
@@ -1995,17 +2022,7 @@ static SlangResult _writeLegacyNVVMAssembly(
             {
                 return SLANG_E_NOT_AVAILABLE;
             }
-            bool hasAttributeSet = false;
-            for (const llvm::AttributeSet& attributeSet : semanticLegacyIntrinsicAttributeSets)
-            {
-                if (attributeSet == functionAttributes)
-                {
-                    hasAttributeSet = true;
-                    break;
-                }
-            }
-            if (!hasAttributeSet)
-                semanticLegacyIntrinsicAttributeSets.push_back(functionAttributes);
+            _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
         }
         else if (intrinsicID == llvm::Intrinsic::nvvm_barrier0)
         {
@@ -2115,18 +2132,26 @@ static SlangResult _writeLegacyNVVMAssembly(
             {
                 return SLANG_E_NOT_AVAILABLE;
             }
-            bool hasAttributeSet = false;
-            for (const llvm::AttributeSet& attributeSet : semanticLegacyIntrinsicAttributeSets)
-            {
-                if (attributeSet == functionAttributes)
-                {
-                    hasAttributeSet = true;
-                    break;
-                }
-            }
-            if (!hasAttributeSet)
-                semanticLegacyIntrinsicAttributeSets.push_back(functionAttributes);
+            _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
             ++semanticCountTrailingZerosDeclarationCount;
+        }
+        else if (intrinsicID == llvm::Intrinsic::sqrt)
+        {
+            const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
+            llvm::Type* floatType = llvm::Type::getFloatTy(state->context);
+            if (!function.isDeclaration() || function.getReturnType() != floatType ||
+                function.arg_size() != 1 || function.arg_begin()->getType() != floatType ||
+                functionAttributes.getNumAttributes() != 6 ||
+                !function.hasFnAttribute(llvm::Attribute::NoFree) ||
+                !function.hasFnAttribute(llvm::Attribute::NoSync) ||
+                !function.hasFnAttribute(llvm::Attribute::NoUnwind) ||
+                !function.hasFnAttribute(llvm::Attribute::ReadNone) ||
+                !function.hasFnAttribute(llvm::Attribute::Speculatable) ||
+                !function.hasFnAttribute(llvm::Attribute::WillReturn))
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+            _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
         }
         for (llvm::BasicBlock& block : function)
         {
@@ -3236,6 +3261,145 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
     return SLANG_OK;
 }
 
+static uint32_t _getTextureCoordinateLaneCount(const SlangNVVMTextureOperationDesc& operation)
+{
+    uint32_t coordinateLaneCount = 0;
+    switch (operation.shape)
+    {
+    case SLANG_NVVM_TEXTURE_SHAPE_1D:
+        coordinateLaneCount = 1;
+        break;
+    case SLANG_NVVM_TEXTURE_SHAPE_2D:
+        coordinateLaneCount = 2;
+        break;
+    case SLANG_NVVM_TEXTURE_SHAPE_3D:
+    case SLANG_NVVM_TEXTURE_SHAPE_CUBE:
+        coordinateLaneCount = 3;
+        break;
+    }
+    return coordinateLaneCount ? coordinateLaneCount + operation.isArray : 0;
+}
+
+static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& operation)
+{
+    const bool isSupportedShape = operation.shape == SLANG_NVVM_TEXTURE_SHAPE_1D ||
+                                  operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
+                                  operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D ||
+                                  operation.shape == SLANG_NVVM_TEXTURE_SHAPE_CUBE;
+    return operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL && isSupportedShape &&
+           operation.isArray <= 1 &&
+           !(operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && operation.isArray) &&
+           operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+           operation.elementType.bitWidth == 32 && operation.elementType.laneCount == 1;
+}
+
+static SlangResult SLANG_NVVM_CALL
+_isTextureOperationSupported(const SlangNVVMTextureOperationDesc* operation, uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!operation || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported = _isTextureOperationSupported(*operation) ? 1u : 0u;
+    return SLANG_OK;
+}
+
+static llvm::Intrinsic::ID _getTextureIntrinsicID(const SlangNVVMTextureOperationDesc& operation)
+{
+    if (!_isTextureOperationSupported(operation))
+        return llvm::Intrinsic::not_intrinsic;
+
+    if (operation.isArray)
+    {
+        switch (operation.shape)
+        {
+        case SLANG_NVVM_TEXTURE_SHAPE_1D:
+            return llvm::Intrinsic::nvvm_tex_unified_1d_array_level_v4f32_f32;
+        case SLANG_NVVM_TEXTURE_SHAPE_2D:
+            return llvm::Intrinsic::nvvm_tex_unified_2d_array_level_v4f32_f32;
+        case SLANG_NVVM_TEXTURE_SHAPE_CUBE:
+            return llvm::Intrinsic::nvvm_tex_unified_cube_array_level_v4f32_f32;
+        }
+    }
+    else
+    {
+        switch (operation.shape)
+        {
+        case SLANG_NVVM_TEXTURE_SHAPE_1D:
+            return llvm::Intrinsic::nvvm_tex_unified_1d_level_v4f32_f32;
+        case SLANG_NVVM_TEXTURE_SHAPE_2D:
+            return llvm::Intrinsic::nvvm_tex_unified_2d_level_v4f32_f32;
+        case SLANG_NVVM_TEXTURE_SHAPE_3D:
+            return llvm::Intrinsic::nvvm_tex_unified_3d_level_v4f32_f32;
+        case SLANG_NVVM_TEXTURE_SHAPE_CUBE:
+            return llvm::Intrinsic::nvvm_tex_unified_cube_level_v4f32_f32;
+        }
+    }
+    return llvm::Intrinsic::not_intrinsic;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMTextureOperationDesc* operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !insertionBlock || !operation || !operands || operandCount != 3 || !outValue ||
+        !_isTextureOperationSupported(*operation))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* texture = _getValue(operands[0]);
+    llvm::Value* coordinate = _getValue(operands[1]);
+    llvm::Value* level = _getValue(operands[2]);
+    llvm::Type* floatType = llvm::Type::getFloatTy(state->context);
+    const uint32_t coordinateLaneCount = _getTextureCoordinateLaneCount(*operation);
+    llvm::Type* expectedCoordinateType =
+        coordinateLaneCount == 1 ? floatType
+                                 : llvm::FixedVectorType::get(floatType, coordinateLaneCount);
+    const llvm::Intrinsic::ID intrinsicID = _getTextureIntrinsicID(*operation);
+    if (!texture || !texture->getType()->isIntegerTy(64) || !coordinate ||
+        coordinate->getType() != expectedCoordinateType || !level ||
+        level->getType() != floatType || intrinsicID == llvm::Intrinsic::not_intrinsic ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, texture) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, coordinate) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, level))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::SmallVector<llvm::Value*, 6> arguments;
+    arguments.push_back(texture);
+    const uint32_t ordinaryCoordinateLaneCount = coordinateLaneCount - operation->isArray;
+    if (operation->isArray)
+    {
+        llvm::Value* layer =
+            state->builder.CreateExtractElement(coordinate, uint64_t(coordinateLaneCount - 1));
+        arguments.push_back(
+            state->builder.CreateFPToSI(layer, llvm::Type::getInt32Ty(state->context)));
+    }
+    for (uint32_t lane = 0; lane < ordinaryCoordinateLaneCount; ++lane)
+    {
+        arguments.push_back(
+            coordinateLaneCount == 1
+                ? coordinate
+                : state->builder.CreateExtractElement(coordinate, uint64_t(lane)));
+    }
+    arguments.push_back(level);
+
+    llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
+    llvm::CallInst* call = state->builder.CreateCall(intrinsic, arguments);
+    llvm::Value* result = state->builder.CreateExtractValue(call, {0});
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
 static void _fillBuilderFoundationAPI(SlangNVVMBuilderFoundationAPI& api)
 {
     api = {};
@@ -3300,6 +3464,13 @@ static void _fillBuilderSurfaceOperationsAPI(SlangNVVMBuilderSurfaceOperationsAP
     api.emitOperation = _emitSurfaceOperation;
 }
 
+static void _fillBuilderTextureOperationsAPI(SlangNVVMBuilderTextureOperationsAPI& api)
+{
+    api = {};
+    api.isOperationSupported = _isTextureOperationSupported;
+    api.emitOperation = _emitTextureOperation;
+}
+
 static SlangResult SLANG_NVVM_CALL
 _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** outInterface)
 {
@@ -3332,6 +3503,12 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         _fillBuilderSurfaceOperationsAPI(api);
         return api;
     }();
+    static const SlangNVVMBuilderTextureOperationsAPI textureOperations = []
+    {
+        SlangNVVMBuilderTextureOperationsAPI api;
+        _fillBuilderTextureOperationsAPI(api);
+        return api;
+    }();
 
     switch (interfaceID)
     {
@@ -3346,6 +3523,9 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS:
         *outInterface = &surfaceOperations;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_TEXTURE_OPERATIONS:
+        *outInterface = &textureOperations;
         return SLANG_OK;
     default:
         return SLANG_E_NO_INTERFACE;

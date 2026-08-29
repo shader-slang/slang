@@ -5,6 +5,16 @@
 // TODO(JS): Doesn't work on vk currently
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+// NVVM: tex.level.1d.v4.f32.f32
+// NVVM: tex.level.2d.v4.f32.f32
+// NVVM: tex.level.3d.v4.f32.f32
+// NVVM: tex.level.cube.v4.f32.f32
+// NVVM: tex.level.a1d.v4.f32.f32
+// NVVM: tex.level.a2d.v4.f32.f32
+// NVVM: tex.level.acube.v4.f32.f32
 
 // Doesn't work on CUDA, not clear why yet
 //DISABLE_TEST_INPUT: Texture1D(format=R16Float, size=4, content = one, mipMaps=1):name tLoad1D

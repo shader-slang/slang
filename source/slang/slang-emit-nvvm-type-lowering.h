@@ -174,6 +174,22 @@ bool getNVVMSupportedSurfaceField(
     NVVMSurfaceType& outType,
     SlangNVVMSurfaceStorageFormat& outStorageFormat);
 
+/// Describes one exact read-only CUDA texture object selected by direct NVVM.
+struct NVVMSampledTextureType
+{
+    IRTextureTypeBase* textureType = nullptr;
+    SlangNVVMTextureShape shape = 0;
+    bool isArray = false;
+    uint32_t coordinateLaneCount = 0;
+    SlangNVVMValueTypeDesc elementType = {};
+};
+
+/// Resolves a scalar Float sampled texture supported by unified texture-level intrinsics.
+bool getNVVMSupportedSampledTextureType(IRInst* type, NVVMSampledTextureType& outType);
+
+/// Returns an accepted ordinary CUDA sampler value, excluding comparison samplers.
+IRSamplerStateTypeBase* asNVVMSupportedSamplerValueType(IRInst* type);
+
 /// Returns an accepted storage-only CUDA sampler placeholder.
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type);
 
