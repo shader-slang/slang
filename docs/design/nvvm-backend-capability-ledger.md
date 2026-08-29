@@ -1723,3 +1723,17 @@ CUDA execution. Its 1,333-byte PTX contains one 16-byte shared object, exactly t
 `ptxas -arch=sm_70` emits a 3,168-byte cubin. Focused fake coverage proves scalar shared atomic
 production and UInt32 shared-array access, real-provider coverage proves both descriptor address
 spaces, Release host/provider builds pass, and the complete NVVM prefix passes 389/389.
+
+Slice 126 admits the four exact scalar Float32/Float64 sine/cosine GenericAsm helper signatures as
+typed operations. Builder ABI revision 23 carries only sine/cosine IDs and typed descriptors; the
+provider maps them to exact `__nv_sinf`, `__nv_cosf`, `__nv_sin`, and `__nv_cos` declarations and
+calls. Mismatched types and vector neighbors remain unsupported.
+
+Accepted semantic requirements now request the selected CUDA toolkit's `libdevice.10.bc` only when
+one of those operations is present. Focused fake coverage proves one lazy library addition for a
+transcendental program and none for an ordinary program; real-provider coverage proves both LLVM
+14 and NVVM IR 2.0 assembly. The new direct runtime/PTX lanes in `transcendental.slang` and
+`transcendental-double.slang` pass unchanged. Their 8,717-byte and 12,663-byte PTX modules assemble
+with CUDA 12.9.86 `ptxas -arch=sm_70` to 6,328-byte and 8,112-byte cubins. Release builds pass and
+the complete NVVM prefix passes 395/395; the Float32 fixture's unrelated existing Dawn/WebGPU lane
+continues to fail bind-group validation.

@@ -254,7 +254,8 @@ protected:
         ComPtr<IArtifact>& outArtifact,
         PassThroughMode compilerOverride = PassThroughMode::None,
         IArtifact* sourceArtifactOverride = nullptr,
-        SourceLanguage sourceLanguageOverride = SourceLanguage::Unknown);
+        SourceLanguage sourceLanguageOverride = SourceLanguage::Unknown,
+        bool requiresCUDADeviceLibrary = false);
 
     /// Emits PTX through the direct NVVM route.
     ///

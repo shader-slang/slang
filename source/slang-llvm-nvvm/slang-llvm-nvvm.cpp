@@ -2776,6 +2776,60 @@ static SlangResult _emitBarrier(
     return SLANG_OK;
 }
 
+// Emits one exact scalar libdevice operation selected by the typed semantic catalog.
+static SlangResult _emitLibdeviceUnary(
+    SlangNVVMModuleHandle module,
+    const Slang::NVVMSemantics::CatalogEntry& entry,
+    SlangNVVMValueHandle operand,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::Value* llvmOperand = _getValue(operand);
+    const bool isFloat32 = entry.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                           entry.resultType.bitWidth == 32 && entry.resultType.laneCount == 1;
+    const bool isFloat64 = entry.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                           entry.resultType.bitWidth == 64 && entry.resultType.laneCount == 1;
+    if (!state || !insertionBlock || !llvmOperand || !outValue || entry.operandCount != 1 ||
+        !entry.requiresCUDADeviceLibrary || (!isFloat32 && !isFloat64) ||
+        !Slang::NVVMSemantics::areSameType(entry.resultType, entry.operandTypes[0]) ||
+        llvmOperand->getType() != (isFloat32 ? llvm::Type::getFloatTy(state->context)
+                                             : llvm::Type::getDoubleTy(state->context)) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmOperand))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    const char* functionName = nullptr;
+    if (entry.operation == SLANG_NVVM_VALUE_OP_SIN)
+        functionName = isFloat32 ? "__nv_sinf" : "__nv_sin";
+    else if (entry.operation == SLANG_NVVM_VALUE_OP_COS)
+        functionName = isFloat32 ? "__nv_cosf" : "__nv_cos";
+    else
+        return SLANG_E_INVALID_ARG;
+
+    llvm::FunctionType* functionType =
+        llvm::FunctionType::get(llvmOperand->getType(), {llvmOperand->getType()}, false);
+    llvm::Function* function = state->module->getFunction(functionName);
+    if (function && (function->getFunctionType() != functionType || !function->isDeclaration()))
+        return SLANG_E_INVALID_ARG;
+    if (!function)
+    {
+        function = llvm::Function::Create(
+            functionType,
+            llvm::GlobalValue::ExternalLinkage,
+            functionName,
+            state->module.get());
+    }
+
+    llvm::Value* result = state->builder.CreateCall(function, {llvmOperand});
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
 static SlangResult _emitCatalogOperation(
     SlangNVVMModuleHandle module,
     const Slang::NVVMSemantics::CatalogEntry& entry,
@@ -2783,6 +2837,8 @@ static SlangResult _emitCatalogOperation(
     SlangNVVMValueHandle* outValue)
 {
     const SlangNVVMValueOperationDesc operation = Slang::NVVMSemantics::getOperationDesc(entry);
+    if (entry.requiresCUDADeviceLibrary)
+        return _emitLibdeviceUnary(module, entry, operands[0], outValue);
     if (entry.operandCount && entry.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
     {
         if (entry.operandCount == 1)

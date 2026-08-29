@@ -361,7 +361,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
     ComPtr<IArtifact>& outArtifact,
     PassThroughMode compilerOverride,
     IArtifact* sourceArtifactOverride,
-    SourceLanguage sourceLanguageOverride)
+    SourceLanguage sourceLanguageOverride,
+    bool requiresCUDADeviceLibrary)
 {
     outArtifact.setNull();
 
@@ -369,6 +370,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
         !sourceArtifactOverride ||
         (!isPassThroughEnabled() && compilerOverride != PassThroughMode::None &&
          sourceLanguageOverride != SourceLanguage::Unknown));
+    SLANG_RELEASE_ASSERT(
+        !requiresCUDADeviceLibrary ||
+        (sourceArtifactOverride && compilerOverride == PassThroughMode::NVVM));
 
     auto sink = getSink();
     auto session = getSession();
@@ -431,6 +435,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
 
     typedef DownstreamCompileOptions CompileOptions;
     CompileOptions options;
+    options.requiresCUDADeviceLibrary = requiresCUDADeviceLibrary;
 
     List<DownstreamCompileOptions::CapabilityVersion> requiredCapabilityVersions;
     List<String> compilerSpecificArguments;

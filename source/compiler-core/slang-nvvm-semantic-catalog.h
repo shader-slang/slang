@@ -43,6 +43,7 @@ struct CatalogEntry
     uint32_t operandCount;
     const char* diagnosticName;
     const char* genericAsm;
+    bool requiresCUDADeviceLibrary = false;
 };
 
 inline constexpr SlangNVVMValueTypeDesc kNoType = {};
@@ -80,6 +81,11 @@ inline constexpr SlangNVVMValueTypeDesc kFloat32 = {
 inline constexpr SlangNVVMValueTypeDesc kFloat16 = {
     SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
     16,
+    1,
+};
+inline constexpr SlangNVVMValueTypeDesc kFloat64 = {
+    SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+    64,
     1,
 };
 inline constexpr SlangNVVMValueTypeDesc kSignedI32x2 = {
@@ -363,6 +369,42 @@ inline constexpr CatalogEntry kCatalog[] = {
         1,
         "float32 square root",
         "$P_sqrt($0)",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_SIN,
+        kFloat32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "float32 sine",
+        "$P_sin($0)",
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_COS,
+        kFloat32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "float32 cosine",
+        "$P_cos($0)",
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_SIN,
+        kFloat64,
+        {kFloat64, kNoType, kNoType},
+        1,
+        "float64 sine",
+        "$P_sin($0)",
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_COS,
+        kFloat64,
+        {kFloat64, kNoType, kNoType},
+        1,
+        "float64 cosine",
+        "$P_cos($0)",
+        true,
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,

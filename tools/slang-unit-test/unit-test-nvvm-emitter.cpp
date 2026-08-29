@@ -6607,6 +6607,124 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
     }
 }
 
+SLANG_UNIT_TEST(nvvmSlangTranscendentalsRequestExactLibdevice)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    static const uint8_t kLibdevice[] = {0x42, 0x43, 0xc0, 0xde, 0x7e, 0x12};
+    TempDirectory toolkit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createTempDirectory(toolkit)));
+    String candidatePath;
+    String libdevicePath;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createFakeNVVMToolkit(
+        toolkit.path,
+        kLibdevice,
+        sizeof(kLibdevice),
+        candidatePath,
+        libdevicePath)));
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        globalSession->setDownstreamCompilerPath(SLANG_PASS_THROUGH_NVVM, toolkit.path.getBuffer());
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMTranscendentalSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        uint32_t float32SineCount = 0;
+        uint32_t float32CosineCount = 0;
+        uint32_t float64SineCount = 0;
+        uint32_t float64CosineCount = 0;
+        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_SIN &&
+                operation.key.operation != SLANG_NVVM_VALUE_OP_COS)
+            {
+                continue;
+            }
+            SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::FloatingUnary);
+            SLANG_CHECK(operation.operandCount == 1);
+            SLANG_CHECK(
+                NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[0]));
+            if (operation.resultType.bitWidth == 32)
+            {
+                if (operation.key.operation == SLANG_NVVM_VALUE_OP_SIN)
+                    ++float32SineCount;
+                else
+                    ++float32CosineCount;
+            }
+            else if (operation.resultType.bitWidth == 64)
+            {
+                if (operation.key.operation == SLANG_NVVM_VALUE_OP_SIN)
+                    ++float64SineCount;
+                else
+                    ++float64CosineCount;
+            }
+        }
+        SLANG_CHECK(float32SineCount == 1);
+        SLANG_CHECK(float32CosineCount == 1);
+        SLANG_CHECK(float64SineCount == 1);
+        SLANG_CHECK(float64CosineCount == 1);
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds[0] == FakeModuleAddKind::Normal);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds[1] == FakeModuleAddKind::Lazy);
+        SLANG_CHECK(gFakeNVVM.addedLibraryModuleName == "libdevice.10.bc");
+        SLANG_CHECK(gFakeNVVM.addedLibraryModule.getLength() == sizeof(kLibdevice));
+        SLANG_CHECK(
+            ::memcmp(gFakeNVVM.addedLibraryModule.getBuffer(), kLibdevice, sizeof(kLibdevice)) ==
+            0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+
+    // The same selected toolkit must not be read for a module whose accepted semantic set does not
+    // contain a device-library operation.
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        globalSession->setDownstreamCompilerPath(SLANG_PASS_THROUGH_NVVM, toolkit.path.getBuffer());
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMEmptyComputeSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 1);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds[0] == FakeModuleAddKind::Normal);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
 SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 {
     struct UnsupportedCase
@@ -6630,7 +6748,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedFixedSamplerArrayStorageSource, "'struct field address'"},
         {kDirectNVVMUnsupportedNestedParameterBlockSource, "'struct field address'"},
         {kDirectNVVMUnsupportedNestedConstantBufferSource, "'struct field address'"},
-        {kDirectNVVMFloatingSineSource, "'GenericAsm'"},
         {kDirectNVVMUnsupportedScalarTruthinessSignatureSource, "'GenericAsm'"},
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm'"},
         {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm'"},
@@ -6647,8 +6764,8 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMPointerGreaterEqualSource, "'cmpGE'"},
     };
 
-    // Noncanonical layout, escaping or dynamically addressed local memory, logical NOT, libdevice
-    // calls, malformed-signature opaque-Half and surface helpers, atomic-add ABI variants,
+    // Noncanonical layout, escaping or dynamically addressed local memory, logical NOT,
+    // malformed-signature opaque-Half and surface helpers, atomic-add ABI variants,
     // non-relaxed atomic-add order, adjacent atomic operations, non-integer shared arrays, pointer
     // comparisons, and helper-array-pointer shapes remain deterministic
     // before builder discovery.

@@ -3678,7 +3678,8 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
         outArtifact,
         PassThroughMode::NVVM,
         sourceArtifact,
-        SourceLanguage::LLVM);
+        SourceLanguage::LLVM,
+        requirements.requiresCUDADeviceLibrary);
 }
 
 SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)

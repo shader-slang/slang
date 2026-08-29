@@ -10661,13 +10661,14 @@ void computeMain(
     *destination = int(x * y);
 }
 )";
-static const char kDirectNVVMFloatingSineSource[] = R"(
+static const char kDirectNVVMTranscendentalSource[] = R"(
 [CUDAKernel]
 void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
     uniform float x)
 {
-    *destination = int(sin(x));
+    double y = double(x);
+    *destination = int(sin(x) + cos(x) + sin(y) + cos(y));
 }
 )";
 static const char kDirectNVVMIntegerBitAndSource[] = R"(

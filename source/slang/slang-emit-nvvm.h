@@ -59,6 +59,7 @@ struct NVVMOperationRequirements
     List<NVVMAtomicOperationRequirement> atomicOperations;
     List<NVVMSurfaceOperationRequirement> surfaceOperations;
     List<NVVMTextureOperationRequirement> textureOperations;
+    bool requiresCUDADeviceLibrary = false;
 };
 
 /// Replaces exact CUDA layout-query calls with constants and removes their compile-time-only IR.

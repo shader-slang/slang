@@ -3756,6 +3756,7 @@ SlangResult _validateNVVMFunction(
                         requirements.valueOperations,
                         operation,
                         semantic->diagnosticName);
+                    requirements.requiresCUDADeviceLibrary |= semantic->requiresCUDADeviceLibrary;
                 }
                 break;
 

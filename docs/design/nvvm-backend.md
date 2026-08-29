@@ -5861,6 +5861,37 @@ cubins. Focused fake coverage proves a first-class structured load feeding field
 dynamically indexed local array of copyable structs. Release host/provider builds and the complete
 NVVM prefix pass 393/393.
 
+### Slice 126: Exact scalar transcendentals through libdevice
+
+Direct NVVM now recognizes the canonical scalar Float32 and Float64 `$P_sin($0)` and
+`$P_cos($0)` helpers as four exact typed value operations. The GenericAsm text remains
+compiler-side recognition metadata; no assembly spelling or external symbol crosses the builder
+interface. Forward-only builder ABI revision 23 adds sine and cosine operation IDs, while the
+shared semantic catalog retains the complete result and operand types and records whether an exact
+row requires the CUDA device library.
+
+The LLVM provider owns the physical mapping to `__nv_sinf`, `__nv_cosf`, `__nv_sin`, and
+`__nv_cos`. It accepts only scalar Float32/Float64 unary descriptors, requires an available operand
+of the exact LLVM type in the active block, validates any existing declaration, and emits one typed
+call. Focused real-provider coverage verifies each declaration and call exactly once in both LLVM
+14 assembly and the LLVM-7-era NVVM IR 2.0 assembly; vector and mismatched-type neighbors remain
+unsupported.
+
+Direct preflight aggregates device-library demand only after accepting an exact semantic row and
+passes that bit into the established NVVM downstream invocation. The downstream compiler therefore
+lazy-adds `libdevice.10.bc` from its selected CUDA toolkit for transcendental modules, while an
+ordinary module preserves the no-libdevice path. A fake end-to-end test selects a temporary toolkit
+through the public downstream-compiler path API and proves both behaviors without teaching the
+emitter about filesystem paths.
+
+The existing `transcendental.slang` and `transcendental-double.slang` fixtures each pass their new
+direct CUDA runtime and PTX lanes with unchanged results. Their 8,717-byte and 12,663-byte PTX
+modules assemble with CUDA 12.9.86 `ptxas -arch=sm_70` to 6,328-byte and 8,112-byte cubins. The
+Float64 PTX contains libdevice's shared sine/cosine coefficient data and slow range-reduction
+helper; the Float32 calls are fully inlined. The Float32 fixture's whole prefix still has an
+unrelated pre-existing Dawn/WebGPU bind-group failure, but both direct lanes pass. Release
+host/provider builds pass, and the complete NVVM prefix passes 395/395.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
