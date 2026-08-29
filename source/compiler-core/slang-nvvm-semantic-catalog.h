@@ -371,6 +371,15 @@ inline constexpr CatalogEntry kCatalog[] = {
         "$P_sqrt($0)",
     },
     {
+        SLANG_NVVM_VALUE_OP_TRUNC,
+        kFloat32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "float32 truncation",
+        "$P_trunc($0)",
+        true,
+    },
+    {
         SLANG_NVVM_VALUE_OP_SIN,
         kFloat32,
         {kFloat32, kNoType, kNoType},

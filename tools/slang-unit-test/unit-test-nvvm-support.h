@@ -2218,8 +2218,9 @@ static bool _isFakeNVVMBuilderVectorValue(
                       operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER
                 : expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Float &&
                       operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
-        return operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL && isExpectedKind &&
-               operation.elementType.bitWidth == 32 &&
+        return (operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
+                operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL) &&
+               isExpectedKind && operation.elementType.bitWidth == 32 &&
                operation.elementType.laneCount == expectedElementCount;
     }
     if (valueRef.kind == FakeNVVMBuilderValueKind::ScalarOperation && valueRef.index >= 0 &&
@@ -5709,9 +5710,12 @@ static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperation
     if (!isValidShape)
         return false;
 
-    const bool isScalarFloat = operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                               operation.elementType.bitWidth == 32 &&
-                               operation.elementType.laneCount == 1;
+    const bool isSampleElement =
+        operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+        operation.elementType.bitWidth == 32 &&
+        (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
+         operation.elementType.laneCount == 4);
+    const bool isScalarFloat = isSampleElement && operation.elementType.laneCount == 1;
     const bool isFetchElement =
         (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
          operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
@@ -5722,7 +5726,7 @@ static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperation
     switch (operation.operation)
     {
     case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
-        return isScalarFloat;
+        return isSampleElement;
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
         return isScalarFloat;
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
@@ -8533,6 +8537,34 @@ void computeMain(
 }
 )";
 
+static const char kDirectNVVMResourceStructHelperSource[] = R"(
+struct ResourceParam
+{
+    Texture2D texture;
+    SamplerState sampler;
+    float base;
+};
+
+Texture2D texture;
+SamplerState sampler;
+RWStructuredBuffer<float> destination;
+
+float4 sampleResource(ResourceParam value)
+{
+    return value.texture.SampleLevel(value.sampler, float2(0.0), 0.0) + value.base;
+}
+
+[CUDAKernel]
+void computeMain()
+{
+    ResourceParam value;
+    value.texture = texture;
+    value.sampler = sampler;
+    value.base = -0.5;
+    destination[0] = sampleResource(value).x;
+}
+)";
+
 static const char kDirectNVVMLocalArrayHelperSource[] = R"(
 void initializeArray(out float3 values[4])
 {
@@ -10661,14 +10693,14 @@ void computeMain(
     *destination = int(x * y);
 }
 )";
-static const char kDirectNVVMTranscendentalSource[] = R"(
+static const char kDirectNVVMExactLibdeviceUnarySource[] = R"(
 [CUDAKernel]
 void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
     uniform float x)
 {
     double y = double(x);
-    *destination = int(sin(x) + cos(x) + sin(y) + cos(y));
+    *destination = int(sin(x) + cos(x) + trunc(x) + sin(y) + cos(y));
 }
 )";
 static const char kDirectNVVMIntegerBitAndSource[] = R"(

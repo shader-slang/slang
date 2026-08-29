@@ -35,6 +35,8 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/cuda/cuda-vector-binary-ops.slang` | CPU + CUDA/NVRTC + direct NVVM runtime | Pass | Selected integer/float vectors exercise arithmetic, shifts, signed narrow division/remainder/comparison, Float32 comparison, Boolean extraction, and floating remainder across 40 asymmetric results; direct PTX passes `ptxas` |
 | `tests/compute/structured-buffer-load.slang` | CUDA + direct NVVM runtime/PTX | Pass | Scalar UInt and vector Int4 read-only/read-write resource loads produce `0x40, 0x40, 0x37`; direct PTX contains `ld.global.nc.v4.u32` and passes `ptxas` |
 | `tests/compute/structured-buffer-swizzle-store.slang` | CUDA + direct NVVM runtime/PTX | Pass | Four Float4 destination permutations preserve independent component stores and produce `4`; direct PTX reloads `v4.f32` after scalar lane stores and passes `ptxas` |
+| `tests/compute/dynamic-dispatch-bindless-texture.slang` | CPU + CUDA + direct NVVM runtime/PTX | Pass | A resource-bearing struct loaded from a structured buffer crosses a specialized helper; Float4 texture fetch and Float32 truncation produce the unchanged UInt result, and direct PTX passes `ptxas` |
+| `tests/compute/func-param-legalize.slang` | CUDA + direct NVVM runtime/PTX | Pass | Texture, sampler, and Float fields cross mutable local storage and a helper as one aggregate; Float4 level sampling produces four unchanged outputs, and direct PTX passes `ptxas` |
 | `tests/cuda/vector-dot-unroll.slang` | CUDA source + direct NVVM PTX | Pass | Float2/3/4 and Int3 fallback helpers cross the selected vector ABI; PTX retains scalarized dot arithmetic and passes `ptxas` |
 | `tests/hlsl-intrinsic/vector-dot-int.slang` | CUDA/NVRTC + direct NVVM runtime/PTX | Pass | Int3, UInt3, UInt64x2, and Int16x4 dot helpers produce `-14, 28, 20, 5`; direct PTX passes `ptxas` |
 | `tests/compute/vector-scalar-compare.slang` | CUDA/NVRTC + direct NVVM runtime/PTX | Pass | Integer vector/scalar bitwise and comparison operations feed `all(bool2)` through a dynamic Boolean extract; all 16 results agree and unoptimized PTX passes `ptxas` |
@@ -1737,3 +1739,20 @@ transcendental program and none for an ordinary program; real-provider coverage 
 with CUDA 12.9.86 `ptxas -arch=sm_70` to 6,328-byte and 8,112-byte cubins. Release builds pass and
 the complete NVVM prefix passes 395/395; the Float32 fixture's unrelated existing Dawn/WebGPU lane
 continues to fail bind-group validation.
+
+Slice 127 admits canonical nonempty resource-bearing structs as first-class values across selected
+structured-buffer loads, mutable locals, field access, and helper parameters/calls. One recursive,
+cycle-safe classifier and natural-alignment query compose the existing generic LLVM aggregate,
+memory, extraction, and function interfaces; byte payloads and helper results keep the narrower
+numeric copyable contract.
+
+The existing texture descriptor now admits Float2/Float4 sampling results and reconstructs the
+requested LLVM vector from NVVM's four-field texture result. Forward-only builder ABI revision 24
+adds exact Float32 truncation, mapped to `__nv_truncf` because CUDA 12.9 libNVVM rejects
+`llvm.trunc.f32`. Focused fake/real-provider tests cover resource transport, vector texture
+serialization, exact libdevice demand, and both LLVM dialects.
+
+`dynamic-dispatch-bindless-texture.slang` passes 3/3 lanes; its 919-byte PTX assembles to a
+2,792-byte cubin. The exact direct lane of `func-param-legalize.slang` passes; its 837-byte PTX
+assembles to a 2,920-byte cubin, while the whole fixture retains an unrelated Dawn/WebGPU failure.
+Release builds pass and the complete NVVM prefix passes 397/397.

@@ -119,7 +119,7 @@ struct NVVMStructField
 
 // Resolves the aggregate-address shapes with executable representations: a field in the collected
 // CUDA parameter block, a selected value in a loaded parameter group, the sole array field in
-// canonical physical resource storage, or a selected field in mutable copyable-struct storage.
+// canonical physical resource storage, or a selected field in mutable resource-struct storage.
 bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& outAddress)
 {
     outAddress = {};
@@ -139,12 +139,12 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     {
         // A nested field address carries the complete pointer spelling produced for its parent
         // field, which is intentionally more explicit than a local `Ptr<T>`. Resolve the producer
-        // recursively so only a field proven to belong to mutable copyable storage can introduce
+        // recursively so only a field proven to belong to mutable aggregate storage can introduce
         // another mutable aggregate address.
         NVVMStructField parentAddress;
         auto basePointerType = as<IRPtrTypeBase>(parentFieldAddress->getDataType());
         structType = basePointerType
-                         ? asNVVMSupportedCopyableStructType(basePointerType->getValueType())
+                         ? asNVVMSupportedResourceStructType(basePointerType->getValueType())
                          : nullptr;
         if (!structType || !_getNVVMStructFieldAddress(parentFieldAddress, parentAddress) ||
             !parentAddress.isMutable ||
@@ -161,13 +161,13 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         structType = asNVVMSupportedPhysicalArrayStructType(resourceElementPointer->getValueType());
         if (!structType)
         {
-            structType = asNVVMSupportedCopyableStructType(resourceElementPointer->getValueType());
+            structType = asNVVMSupportedResourceStructType(resourceElementPointer->getValueType());
             if (!structType)
                 return false;
             outAddress.isMutable = true;
         }
     }
-    else if (asNVVMSupportedLocalCopyableStructPointerType(
+    else if (asNVVMSupportedLocalResourceStructPointerType(
                  fieldAddress->getBase()->getDataType(),
                  &structType))
     {
@@ -224,8 +224,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
 
     if (outAddress.isMutable)
     {
-        return isNVVMSupportedNumericValueType(fieldType) ||
-               asNVVMSupportedCopyableStructType(fieldType);
+        return getNVVMResourceValueAlignment(fieldType) != 0;
     }
 
     return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
@@ -233,12 +232,12 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
            asNVVMSupportedParameterGroupArrayType(fieldType);
 }
 
-// Resolves one copyable field extraction by canonical struct key and verifies its result type.
+// Resolves one resource-capable field extraction by canonical struct key and exact result type.
 bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructField& outField)
 {
     outField = {};
     auto structType =
-        fieldExtract ? asNVVMSupportedCopyableStructType(fieldExtract->getBase()->getDataType())
+        fieldExtract ? asNVVMSupportedResourceStructType(fieldExtract->getBase()->getDataType())
                      : nullptr;
     if (!structType || !_findNVVMStructField(
                            structType,
@@ -318,7 +317,7 @@ bool _getNVVMStructuredBufferLoad(IRInst* inst, NVVMStructuredBufferLoad& outLoa
                                                 ? NVVMBufferAccess::ReadOnly
                                                 : NVVMBufferAccess::ReadWrite;
     IRType* resultType = inst->getDataType();
-    const uint32_t alignment = getNVVMCopyableValueAlignment(resultType);
+    const uint32_t alignment = getNVVMResourceValueAlignment(resultType);
     if (!buffer || !elementIndex || !isNVVMInteger32Type(elementIndex->getDataType()) ||
         !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
         bufferType.kind != NVVMRawBufferKind::Structured || bufferType.access != expectedAccess ||
@@ -710,7 +709,7 @@ bool _hasNVVMCompatibleStructLayout(CodeGenContext* codeGenContext, IRStructType
         {
             return false;
         }
-        if (auto nestedType = asNVVMSupportedCopyableStructType(field->getFieldType()))
+        if (auto nestedType = asNVVMSupportedResourceStructType(field->getFieldType()))
         {
             if (!_hasNVVMCompatibleStructLayout(codeGenContext, nestedType))
                 return false;
@@ -818,7 +817,7 @@ bool _hasNVVMCompatibleParameterGroupStorageLayout(CodeGenContext* codeGenContex
            providerLayout.alignment == cudaLayout.alignment;
 }
 
-// Retains the canonical declaration closure of a selected struct. Nested copyable fields are
+// Retains the canonical declaration closure of a selected struct. Nested aggregate fields are
 // semantic type dependencies of their parent even when no independent local or signature mentions
 // them, so validation must accept the complete tree that type lowering will visit.
 void _addNVVMReachableStructTypes(IRStructType* type, HashSet<IRInst*>& reachableTypes)
@@ -828,7 +827,7 @@ void _addNVVMReachableStructTypes(IRStructType* type, HashSet<IRInst*>& reachabl
     reachableTypes.add(type);
     for (auto field : type->getFields())
     {
-        if (auto nestedType = asNVVMSupportedCopyableStructType(field->getFieldType()))
+        if (auto nestedType = asNVVMSupportedResourceStructType(field->getFieldType()))
             _addNVVMReachableStructTypes(nestedType, reachableTypes);
     }
 }
@@ -844,10 +843,10 @@ IRStructType* _getNVVMRawBufferAggregateElementType(IRType* type)
     {
         return nullptr;
     }
-    if (auto copyableStruct =
-            asNVVMSupportedCopyableStructType(rawBufferType.structuredElementType))
+    if (auto resourceStruct =
+            asNVVMSupportedResourceStructType(rawBufferType.structuredElementType))
     {
-        return copyableStruct;
+        return resourceStruct;
     }
     return asNVVMSupportedPhysicalArrayStructType(rawBufferType.structuredElementType);
 }
@@ -1797,7 +1796,7 @@ bool _resolveNVVMTextureGenericAsm(
 {
     outOperation = {};
     if (!genericAsm || !function || genericAsm->getOperandCount() != 1 ||
-        function->getParamCount() != 4 || !isNVVMFloat32Type(function->getResultType()))
+        function->getParamCount() != 4)
     {
         return false;
     }
@@ -1841,7 +1840,9 @@ bool _resolveNVVMTextureGenericAsm(
     if (!getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType) ||
         textureType.shape != shape || textureType.isArray != isArray ||
         textureType.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
-        textureType.elementType.bitWidth != 32 || textureType.elementType.laneCount != 1 ||
+        textureType.elementType.bitWidth != 32 ||
+        (textureType.elementType.laneCount != 1 && textureType.elementType.laneCount != 2 &&
+         textureType.elementType.laneCount != 4) ||
         !isTypeEqual(function->getResultType(), textureType.textureType->getElementType()) ||
         !asNVVMSupportedSamplerValueType(sampler->getDataType()) ||
         !isNVVMFloat32Type(level->getDataType()))
@@ -2862,7 +2863,9 @@ SlangResult _validateScalarValue(
     return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar value"));
 }
 
-// Checks a selected scalar, fixed value vector, or fixed copyable aggregate admitted by preflight.
+// Checks a selected scalar or an available first-class resource-capable value admitted by
+// preflight. Scalars may be executable constants; every vector, aggregate, pointer-backed resource
+// view, and CUDA handle must already have a dominating producer.
 SlangResult _validateSelectedValue(
     CodeGenContext* codeGenContext,
     IRInst* value,
@@ -2870,15 +2873,22 @@ SlangResult _validateSelectedValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (value && (asNVVMSupportedValueVectorType(value->getDataType()) ||
-                  asNVVMSupportedNumericArrayType(value->getDataType()) ||
-                  asNVVMSupportedCopyableStructType(value->getDataType())))
+    IRType* valueType = value ? value->getDataType() : nullptr;
+    const bool requiresAvailability =
+        valueType &&
+        (asNVVMSupportedValueVectorType(valueType) ||
+         (getNVVMResourceValueAlignment(valueType) &&
+          !isNVVMSupportedIntegerScalarType(valueType) &&
+          !isNVVMSupportedFloatingPointScalarType(valueType) && !isNVVMBoolType(valueType)));
+    if (requiresAvailability)
+    {
         return _validateAvailableValue(
             codeGenContext,
             value,
             consumer,
             availableValues,
             dominatorTree);
+    }
     return _validateScalarValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
@@ -2927,7 +2937,7 @@ SlangResult _validatePointerValue(
                                    ? as<IRPtrTypeBase>(value->getDataType())
                                    : nullptr;
     auto localStructPtrType =
-        value ? asNVVMSupportedLocalCopyableStructPointerType(value->getDataType()) : nullptr;
+        value ? asNVVMSupportedLocalResourceStructPointerType(value->getDataType()) : nullptr;
     // A local `var T` and a module-scope groupshared value can both expose the canonical
     // `Ptr<T>` spelling here. The value producer, rather than that shared type, owns the local
     // storage role. Helper parameters are the only other producer admitted by this slice.
@@ -3103,7 +3113,7 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
     return isNVVMSupportedValueType(type) || asNVVMSupportedNumericArrayType(type) ||
-           asNVVMSupportedCopyableStructType(type) ||
+           asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalScalarStructPointerType(type) ||
            asNVVMSupportedLocalNumericPointerType(type) ||
            asNVVMSupportedLocalNumericArrayPointerType(type) ||
@@ -3403,7 +3413,7 @@ SlangResult _validateNVVMFunction(
             rawBufferType.kind == NVVMRawBufferKind::Structured)
         {
             if (auto elementStruct =
-                    asNVVMSupportedCopyableStructType(rawBufferType.structuredElementType))
+                    asNVVMSupportedResourceStructType(rawBufferType.structuredElementType))
             {
                 if (!_hasNVVMCompatibleStructLayout(codeGenContext, elementStruct))
                 {
@@ -3485,7 +3495,7 @@ SlangResult _validateNVVMFunction(
                         }
                         break;
                     }
-                    if (!asNVVMSupportedLocalCopyableStructPointerType(
+                    if (!asNVVMSupportedLocalResourceStructPointerType(
                             inst->getDataType(),
                             &valueType))
                     {
@@ -3495,26 +3505,15 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("local copyable-struct layout"));
+                            toSlice("local resource-struct layout"));
                     }
                 }
                 break;
 
             case kIROp_Load:
                 {
-                    NVVMRawBufferType rawBufferType;
-                    NVVMSurfaceType surfaceType;
-                    NVVMReadOnlyTextureType sampledTextureType;
-                    if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
-                        !getNVVMSupportedRawBufferType(inst->getDataType(), rawBufferType) &&
-                        !getNVVMSupportedSurfaceType(inst->getDataType(), surfaceType) &&
-                        !getNVVMSupportedReadOnlyTextureType(
-                            inst->getDataType(),
-                            sampledTextureType) &&
-                        !asNVVMSupportedSamplerValueType(inst->getDataType()) &&
-                        !asNVVMSupportedParameterGroupType(inst->getDataType()) &&
-                        !asNVVMSupportedNumericArrayType(inst->getDataType()) &&
-                        !asNVVMSupportedCopyableStructType(inst->getDataType()))
+                    if (!getNVVMResourceValueAlignment(inst->getDataType()) &&
+                        !asNVVMSupportedParameterGroupType(inst->getDataType()))
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 }
                 break;
@@ -3945,24 +3944,12 @@ SlangResult _validateNVVMFunction(
                         dominatorTree,
                         true,
                         store->getVal()->getDataType()));
-                    if (asNVVMSupportedCopyableStructType(store->getVal()->getDataType()))
-                    {
-                        SLANG_RETURN_ON_FAIL(_validateAvailableValue(
-                            codeGenContext,
-                            store->getVal(),
-                            store,
-                            availableValues,
-                            dominatorTree));
-                    }
-                    else
-                    {
-                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
-                            codeGenContext,
-                            store->getVal(),
-                            store,
-                            availableValues,
-                            dominatorTree));
-                    }
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        store->getVal(),
+                        store,
+                        availableValues,
+                        dominatorTree));
                 }
                 break;
 
@@ -4127,35 +4114,12 @@ SlangResult _validateNVVMFunction(
                         }
                         else
                         {
-                            NVVMRawBufferType rawBufferType;
-                            NVVMSurfaceType surfaceType;
-                            NVVMReadOnlyTextureType sampledTextureType;
-                            if (asNVVMSupportedCopyableStructType(argument->getDataType()) ||
-                                getNVVMSupportedRawBufferType(
-                                    argument->getDataType(),
-                                    rawBufferType) ||
-                                getNVVMSupportedSurfaceType(argument->getDataType(), surfaceType) ||
-                                getNVVMSupportedReadOnlyTextureType(
-                                    argument->getDataType(),
-                                    sampledTextureType) ||
-                                asNVVMSupportedSamplerValueType(argument->getDataType()))
-                            {
-                                SLANG_RETURN_ON_FAIL(_validateAvailableValue(
-                                    codeGenContext,
-                                    argument,
-                                    call,
-                                    availableValues,
-                                    dominatorTree));
-                            }
-                            else
-                            {
-                                SLANG_RETURN_ON_FAIL(_validateSelectedValue(
-                                    codeGenContext,
-                                    argument,
-                                    call,
-                                    availableValues,
-                                    dominatorTree));
-                            }
+                            SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                                codeGenContext,
+                                argument,
+                                call,
+                                availableValues,
+                                dominatorTree));
                         }
                     }
                     if (!as<IRVoidType>(call->getDataType()))
@@ -5104,13 +5068,13 @@ SlangResult validateNVVMSupportedIR(
         }
         for (auto parameter : function->getParams())
         {
-            if (auto parameterType = asNVVMSupportedCopyableStructType(parameter->getDataType()))
+            if (auto parameterType = asNVVMSupportedResourceStructType(parameter->getDataType()))
             {
                 if (!_hasNVVMCompatibleStructLayout(codeGenContext, parameterType))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
-                        toSlice("helper copyable-struct parameter layout"));
+                        toSlice("helper resource-struct parameter layout"));
                 }
                 _addNVVMReachableStructTypes(parameterType, selectedReachableStructTypes);
             }
@@ -5138,7 +5102,7 @@ SlangResult validateNVVMSupportedIR(
             for (auto inst : block->getOrdinaryInsts())
             {
                 IRStructType* localValueType = nullptr;
-                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalCopyableStructPointerType(
+                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalResourceStructPointerType(
                                                       inst->getDataType(),
                                                       &localValueType))
                 {
@@ -5550,7 +5514,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             else
                             {
                                 IRStructType* structValueType = nullptr;
-                                SLANG_RELEASE_ASSERT(asNVVMSupportedLocalCopyableStructPointerType(
+                                SLANG_RELEASE_ASSERT(asNVVMSupportedLocalResourceStructPointerType(
                                     inst->getDataType(),
                                     &structValueType));
                                 valueType = structValueType;
@@ -5559,7 +5523,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMTypeHandle loweredValueType = nullptr;
                         SLANG_RETURN_ON_FAIL(
                             typeContext.lowerType(valueType, NVVMTypeUse::Value, loweredValueType));
-                        const uint32_t alignment = getNVVMCopyableValueAlignment(valueType);
+                        const uint32_t alignment = getNVVMResourceValueAlignment(valueType);
                         SLANG_RELEASE_ASSERT(alignment);
                         SlangNVVMValueHandle loweredStorage = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -5594,7 +5558,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             compactStorageVector
                                 ? getNVVMNumericValueAlignment(
                                       compactStorageVector->getElementType())
-                                : getNVVMCopyableValueAlignment(load->getDataType());
+                                : getNVVMResourceValueAlignment(load->getDataType());
                         NVVMRawBufferType rawBufferType;
                         NVVMSurfaceType surfaceType;
                         NVVMReadOnlyTextureType sampledTextureType;
@@ -5689,7 +5653,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 loweredValue,
                                 loweredPointer,
-                                getNVVMCopyableValueAlignment(store->getVal()->getDataType()))));
+                                getNVVMResourceValueAlignment(store->getVal()->getDataType()))));
                     }
                     break;
 

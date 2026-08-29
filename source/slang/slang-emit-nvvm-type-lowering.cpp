@@ -487,7 +487,7 @@ IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
     return pointerType;
 }
 
-IRPtrTypeBase* asNVVMSupportedLocalCopyableStructPointerType(
+IRPtrTypeBase* asNVVMSupportedLocalResourceStructPointerType(
     IRInst* type,
     IRStructType** outValueType)
 {
@@ -495,7 +495,7 @@ IRPtrTypeBase* asNVVMSupportedLocalCopyableStructPointerType(
         *outValueType = nullptr;
     auto pointerType = as<IRPtrTypeBase>(type);
     auto valueType =
-        pointerType ? asNVVMSupportedCopyableStructType(pointerType->getValueType()) : nullptr;
+        pointerType ? asNVVMSupportedResourceStructType(pointerType->getValueType()) : nullptr;
     if (!pointerType || !valueType || pointerType->getOp() != kIROp_PtrType ||
         pointerType->getOperandCount() != 1)
     {
@@ -719,14 +719,88 @@ IRPtrTypeBase* asNVVMSupportedSharedIntegerElementPointerType(IRInst* type)
     return ptrType;
 }
 
-static bool _isNVVMSupportedResourceElementType(IRInst* type)
+static bool _getNVVMSupportedRawBufferType(
+    IRInst* type,
+    NVVMRawBufferType& outType,
+    HashSet<IRInst*>& activeTypes);
+
+// Returns the natural alignment of one canonical resource-capable value, or zero when the type is
+// outside the contract. The active set makes resource indirection cycle-safe. Consider this
+// example:
+//
+//     struct Node { StructuredBuffer<Node> children; }
+//
+// Classifying `Node` reaches the buffer element `Node` again. Such a recursive value is not an
+// executable finite LLVM aggregate, so reject it at the declaration boundary instead of recursing
+// indefinitely or relying on a later provider failure.
+static uint32_t _getNVVMResourceValueAlignment(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
-    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupported32BitNumericVectorType(type) || asNVVMSupportedCopyableStructType(type) ||
-           asNVVMSupportedPhysicalArrayStructType(type);
+    if (const uint32_t copyableAlignment = getNVVMCopyableValueAlignment(type))
+        return copyableAlignment;
+    if (isNVVMBoolType(type))
+        return 1;
+
+    NVVMRawBufferType rawBufferType;
+    NVVMSurfaceType surfaceType;
+    NVVMReadOnlyTextureType sampledTextureType;
+    if (_getNVVMSupportedRawBufferType(type, rawBufferType, activeTypes) ||
+        getNVVMSupportedSurfaceType(type, surfaceType) ||
+        getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
+        asNVVMSupportedSamplerValueType(type))
+    {
+        return 8;
+    }
+
+    auto structType = as<IRStructType>(type);
+    if (!structType || activeTypes.contains(type))
+        return 0;
+
+    activeTypes.add(type);
+    uint32_t alignment = 0;
+    bool hasField = false;
+    for (auto field : structType->getFields())
+    {
+        const uint32_t fieldAlignment =
+            _getNVVMResourceValueAlignment(field->getFieldType(), activeTypes);
+        if (!fieldAlignment)
+        {
+            activeTypes.remove(type);
+            return 0;
+        }
+        alignment = Math::Max(alignment, fieldAlignment);
+        hasField = true;
+    }
+    activeTypes.remove(type);
+    return hasField ? alignment : 0;
 }
 
-bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType)
+IRStructType* asNVVMSupportedResourceStructType(IRInst* type)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return nullptr;
+    HashSet<IRInst*> activeTypes;
+    return _getNVVMResourceValueAlignment(type, activeTypes) ? structType : nullptr;
+}
+
+uint32_t getNVVMResourceValueAlignment(IRInst* type)
+{
+    HashSet<IRInst*> activeTypes;
+    return _getNVVMResourceValueAlignment(type, activeTypes);
+}
+
+static bool _isNVVMSupportedResourceElementType(IRInst* type, HashSet<IRInst*>& activeTypes)
+{
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+           asNVVMSupported32BitNumericVectorType(type) ||
+           asNVVMSupportedPhysicalArrayStructType(type) ||
+           (as<IRStructType>(type) && _getNVVMResourceValueAlignment(type, activeTypes));
+}
+
+static bool _getNVVMSupportedRawBufferType(
+    IRInst* type,
+    NVVMRawBufferType& outType,
+    HashSet<IRInst*>& activeTypes)
 {
     outType = {};
 
@@ -735,7 +809,7 @@ bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType)
         (bufferType->getOp() == kIROp_HLSLStructuredBufferType ||
          bufferType->getOp() == kIROp_HLSLRWStructuredBufferType) &&
         bufferType->getOperandCount() == 3 &&
-        _isNVVMSupportedResourceElementType(bufferType->getElementType()))
+        _isNVVMSupportedResourceElementType(bufferType->getElementType(), activeTypes))
     {
         IRType* dataLayout = bufferType->getDataLayout();
         if (!dataLayout || dataLayout->getOp() != kIROp_DefaultBufferLayoutType)
@@ -765,6 +839,12 @@ bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType)
     return true;
 }
 
+bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType)
+{
+    HashSet<IRInst*> activeTypes;
+    return _getNVVMSupportedRawBufferType(type, outType, activeTypes);
+}
+
 bool isNVVMRawBufferElementType(const NVVMRawBufferType& bufferType, IRType* elementType)
 {
     return bufferType.kind == NVVMRawBufferKind::ByteAddress
@@ -778,9 +858,10 @@ bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerTy
     auto pointerType = as<IRPtrTypeBase>(type);
     auto arrayType = pointerType ? as<IRUnsizedArrayType>(pointerType->getValueType()) : nullptr;
     IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    HashSet<IRInst*> activeTypes;
     if (!pointerType || pointerType->getOp() != kIROp_PtrType ||
         pointerType->getOperandCount() != 4 || !arrayType || arrayType->getOperandCount() != 1 ||
-        !_isNVVMSupportedResourceElementType(arrayType->getElementType()) ||
+        !_isNVVMSupportedResourceElementType(arrayType->getElementType(), activeTypes) ||
         pointerType->getAddressSpace() != AddressSpace::UserPointer || !dataLayout ||
         dataLayout->getOp() != kIROp_DefaultBufferLayoutType)
     {
@@ -1055,8 +1136,9 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
 {
     auto ptrType = as<IRPtrTypeBase>(type);
     IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
+    HashSet<IRInst*> activeTypes;
     if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
-        !_isNVVMSupportedResourceElementType(ptrType->getValueType()) ||
+        !_isNVVMSupportedResourceElementType(ptrType->getValueType(), activeTypes) ||
         ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
         ptrType->getAddressSpace() != AddressSpace::Generic || !dataLayout ||
         dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
@@ -1164,10 +1246,12 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
         return SLANG_OK;
     }
 
-    const NVVMTypeUse fieldUse = use == NVVMTypeUse::ParameterGroupStorage
-                                     ? NVVMTypeUse::ParameterGroupStorage
-                                 : asNVVMSupportedCopyableStructType(type) ? NVVMTypeUse::Value
-                                                                           : NVVMTypeUse::Storage;
+    const NVVMTypeUse fieldUse =
+        use == NVVMTypeUse::ParameterGroupStorage ? NVVMTypeUse::ParameterGroupStorage
+        : asNVVMSupportedCopyableStructType(type) ||
+                (use != NVVMTypeUse::Storage && asNVVMSupportedResourceStructType(type))
+            ? NVVMTypeUse::Value
+            : NVVMTypeUse::Storage;
     List<SlangNVVMTypeHandle> fieldTypes;
     for (auto field : type->getFields())
     {
@@ -1345,6 +1429,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRStructType* structType = as<IRStructType>(type);
     IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
     IRStructType* copyableStructType = asNVVMSupportedCopyableStructType(type);
+    IRStructType* resourceStructType = asNVVMSupportedResourceStructType(type);
     IRStructType* physicalArrayStructType = asNVVMSupportedPhysicalArrayStructType(type);
     IRStructType* localScalarStructValueType = nullptr;
     IRPtrTypeBase* localScalarStructPointer =
@@ -1396,11 +1481,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
-         (isNVVMSupportedValueType(type) || fixedNumericArrayType || copyableStructType ||
+         (isNVVMSupportedValueType(type) || fixedNumericArrayType || resourceStructType ||
           localScalarStructPointer || localNumericPointer || localNumericArrayPointer ||
           isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::Value &&
-         (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
+         (isInteger || isFloatingPoint || isBool || valueVectorType || resourceStructType ||
           physicalArrayStructType || fixedCopyableArrayType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup || isSurface ||
           isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer)) ||

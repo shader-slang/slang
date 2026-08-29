@@ -3425,6 +3425,74 @@ SLANG_UNIT_TEST(nvvmSlangCopyableValuesAndNumericBorrowsCrossHelperBoundaries)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangResourceStructsCrossLocalAndHelperBoundaries)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMResourceStructHelperSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool sawResourceStructParameter = false;
+        for (Index functionTypeIndex = 0;
+             functionTypeIndex < gFakeNVVMBuilder.functionTypeResultKinds.getCount();
+             ++functionTypeIndex)
+        {
+            const Index parameterOffset =
+                gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionTypeIndex];
+            const size_t parameterCount =
+                gFakeNVVMBuilder.functionTypeParameterCounts[functionTypeIndex];
+            for (size_t parameterIndex = 0; parameterIndex < parameterCount; ++parameterIndex)
+            {
+                sawResourceStructParameter |=
+                    gFakeNVVMBuilder
+                        .functionParameterTypeKinds[parameterOffset + Index(parameterIndex)] ==
+                    FakeNVVMBuilderParameterTypeKind::ScalarStruct;
+            }
+        }
+        SLANG_CHECK(sawResourceStructParameter);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLocalStorageCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.localStorageValueTypes.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.localStorageValueTypes[0] == _getFakeNVVMBuilderScalarStructType());
+        SLANG_CHECK(gFakeNVVMBuilder.localStorageAlignments[0] == 8);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount >= 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.textureOperations.getCount() == 1);
+        const SlangNVVMTextureOperationDesc& textureOperation =
+            gFakeNVVMBuilder.textureOperations[0];
+        SLANG_CHECK(textureOperation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL);
+        SLANG_CHECK(textureOperation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D);
+        SLANG_CHECK(textureOperation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
+        SLANG_CHECK(textureOperation.elementType.bitWidth == 32);
+        SLANG_CHECK(textureOperation.elementType.laneCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount >= 4);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangLocalArraysCrossHelperReferenceBoundaries)
 {
     _resetDirectNVVMFakes();
@@ -6607,7 +6675,7 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
     }
 }
 
-SLANG_UNIT_TEST(nvvmSlangTranscendentalsRequestExactLibdevice)
+SLANG_UNIT_TEST(nvvmSlangExactUnaryOperationsRequestLibdevice)
 {
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
     static const uint8_t kLibdevice[] = {0x42, 0x43, 0xc0, 0xde, 0x7e, 0x12};
@@ -6634,7 +6702,7 @@ SLANG_UNIT_TEST(nvvmSlangTranscendentalsRequestExactLibdevice)
         ComPtr<slang::IBlob> diagnostics;
         const SlangResult result = _compileSlangWithDirectNVVM(
             globalSession,
-            kDirectNVVMTranscendentalSource,
+            kDirectNVVMExactLibdeviceUnarySource,
             code,
             diagnostics);
         if (SLANG_FAILED(result))
@@ -6648,12 +6716,14 @@ SLANG_UNIT_TEST(nvvmSlangTranscendentalsRequestExactLibdevice)
 
         uint32_t float32SineCount = 0;
         uint32_t float32CosineCount = 0;
+        uint32_t float32TruncationCount = 0;
         uint32_t float64SineCount = 0;
         uint32_t float64CosineCount = 0;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
         {
             if (operation.key.operation != SLANG_NVVM_VALUE_OP_SIN &&
-                operation.key.operation != SLANG_NVVM_VALUE_OP_COS)
+                operation.key.operation != SLANG_NVVM_VALUE_OP_COS &&
+                operation.key.operation != SLANG_NVVM_VALUE_OP_TRUNC)
             {
                 continue;
             }
@@ -6665,8 +6735,10 @@ SLANG_UNIT_TEST(nvvmSlangTranscendentalsRequestExactLibdevice)
             {
                 if (operation.key.operation == SLANG_NVVM_VALUE_OP_SIN)
                     ++float32SineCount;
-                else
+                else if (operation.key.operation == SLANG_NVVM_VALUE_OP_COS)
                     ++float32CosineCount;
+                else
+                    ++float32TruncationCount;
             }
             else if (operation.resultType.bitWidth == 64)
             {
@@ -6678,6 +6750,7 @@ SLANG_UNIT_TEST(nvvmSlangTranscendentalsRequestExactLibdevice)
         }
         SLANG_CHECK(float32SineCount == 1);
         SLANG_CHECK(float32CosineCount == 1);
+        SLANG_CHECK(float32TruncationCount == 1);
         SLANG_CHECK(float64SineCount == 1);
         SLANG_CHECK(float64CosineCount == 1);
         SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);

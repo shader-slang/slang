@@ -2808,6 +2808,8 @@ static SlangResult _emitLibdeviceUnary(
         functionName = isFloat32 ? "__nv_sinf" : "__nv_sin";
     else if (entry.operation == SLANG_NVVM_VALUE_OP_COS)
         functionName = isFloat32 ? "__nv_cosf" : "__nv_cos";
+    else if (entry.operation == SLANG_NVVM_VALUE_OP_TRUNC && isFloat32)
+        functionName = "__nv_truncf";
     else
         return SLANG_E_INVALID_ARG;
 
@@ -3557,9 +3559,12 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
     {
         return false;
     }
-    const bool isScalarFloat = operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                               operation.elementType.bitWidth == 32 &&
-                               operation.elementType.laneCount == 1;
+    const bool isSampleElement =
+        operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+        operation.elementType.bitWidth == 32 &&
+        (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
+         operation.elementType.laneCount == 4);
+    const bool isScalarFloat = isSampleElement && operation.elementType.laneCount == 1;
     const bool isFetchElement =
         (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
          operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
@@ -3570,7 +3575,7 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
     switch (operation.operation)
     {
     case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
-        return isScalarFloat;
+        return isSampleElement;
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
         return isScalarFloat;
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
@@ -3796,6 +3801,19 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
     llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
     llvm::CallInst* call = state->builder.CreateCall(intrinsic, arguments);
     llvm::Value* result = state->builder.CreateExtractValue(call, {0});
+    if (operation->elementType.laneCount > 1)
+    {
+        llvm::Type* resultType =
+            llvm::FixedVectorType::get(floatType, operation->elementType.laneCount);
+        result = llvm::UndefValue::get(resultType);
+        for (uint32_t lane = 0; lane < operation->elementType.laneCount; ++lane)
+        {
+            result = state->builder.CreateInsertElement(
+                result,
+                state->builder.CreateExtractValue(call, {lane}),
+                lane);
+        }
+    }
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }

@@ -1,6 +1,7 @@
 // Test using interface typed shader parameters with texture typed fields.
 //TEST(compute):COMPARE_COMPUTE:-cpu
 //TEST(compute):COMPARE_COMPUTE:-cuda
+//TEST(compute):COMPARE_COMPUTE:-cuda -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 // Type must be marked `public` to ensure it is visible in the generated DLL.
 

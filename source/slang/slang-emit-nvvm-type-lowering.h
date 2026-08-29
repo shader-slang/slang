@@ -88,6 +88,9 @@ IRStructType* asNVVMSupportedParameterGroupStructType(IRInst* type);
 /// Returns an exact nonempty struct whose leaves are selected numeric values.
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type);
 
+/// Returns a nonempty struct recursively composed of selected values and CUDA resource values.
+IRStructType* asNVVMSupportedResourceStructType(IRInst* type);
+
 /// Returns an exact nonempty fixed array of selected numeric values or copyable structs.
 IRArrayType* asNVVMSupportedCopyableArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
 
@@ -113,8 +116,8 @@ IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
     IRInst* type,
     IRStructType** outValueType = nullptr);
 
-/// Returns an exact generic local pointer to a selected copyable struct.
-IRPtrTypeBase* asNVVMSupportedLocalCopyableStructPointerType(
+/// Returns an exact generic local pointer to a selected resource-capable struct.
+IRPtrTypeBase* asNVVMSupportedLocalResourceStructPointerType(
     IRInst* type,
     IRStructType** outValueType = nullptr);
 
@@ -123,6 +126,9 @@ uint32_t getNVVMNumericValueAlignment(IRInst* type);
 
 /// Returns the natural alignment of a selected first-class value, including a copyable struct.
 uint32_t getNVVMCopyableValueAlignment(IRInst* type);
+
+/// Returns the natural alignment of a selected value or resource-capable struct field.
+uint32_t getNVVMResourceValueAlignment(IRInst* type);
 
 /// Returns an accepted nonempty fixed i32 array and optionally its exact element count.
 IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount = nullptr);

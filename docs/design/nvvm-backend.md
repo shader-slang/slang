@@ -5892,6 +5892,40 @@ helper; the Float32 calls are fully inlined. The Float32 fixture's whole prefix 
 unrelated pre-existing Dawn/WebGPU bind-group failure, but both direct lanes pass. Release
 host/provider builds pass, and the complete NVVM prefix passes 395/395.
 
+### Slice 127: Resource-bearing aggregate values
+
+Direct NVVM now transports canonical nonempty structs whose fields recursively contain established
+numeric values and CUDA resource values. One compiler-owned classifier and natural-alignment query
+cover structured-buffer elements and loads, mutable local storage, keyed field addresses and
+extraction, helper parameters and calls, reachable type declarations, and CUDA-versus-provider
+layout checks. An active-type set rejects recursive graphs such as a struct containing a
+`StructuredBuffer` of itself. Numeric byte payloads and helper results retain their narrower
+copyable contracts.
+
+The builder/provider already represented resources as typed handles, structs as LLVM aggregates,
+and all relevant memory, extraction, and call operations generically. Resource structs therefore
+add no provider callback and are never flattened or reconstructed from source declarations. The
+existing value-vector classifier also remains the source of truth for Boolean vectors; a complete-
+prefix regression found and corrected an intermediate availability check that had accidentally
+dropped that established family.
+
+The promoted fixtures exposed two adjacent typed operations after aggregate preflight. The existing
+texture descriptor now admits Float2/Float4 `SampleLevel` results in addition to Float32 scalar
+results. The provider rebuilds the requested vector from the corresponding fields of the NVVM
+texture intrinsic's four-component result. Float32 scalar `$P_trunc($0)` is an exact semantic row
+in forward-only builder ABI revision 24. CUDA 12.9 libNVVM rejects LLVM's `llvm.trunc.f32`
+intrinsic, so the provider maps the row to `__nv_truncf` and requests libdevice through the same
+catalog mechanism as sine and cosine. Optimized PTX contains native `cvt.rzi.f32.f32`.
+
+`dynamic-dispatch-bindless-texture.slang` passes all 3/3 lanes. Its 919-byte direct PTX contains a
+four-component integer-coordinate texture fetch, Float32 truncation, and the expected UInt32 store;
+CUDA 12.9.86 `ptxas -arch=sm_70` emits a 2,792-byte cubin. The exact direct lane of
+`func-param-legalize.slang` passes; its 837-byte PTX contains one four-component level sample, four
+Float32 additions, and four output stores, and assembles to a 2,920-byte cubin. Its whole fixture
+retains an unrelated pre-existing Dawn/WebGPU bind-group validation failure. Focused fake and real
+provider coverage passes, Release host/provider builds pass, and the complete NVVM prefix passes
+397/397.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5902,19 +5936,21 @@ The following remain open until their named slice supplies evidence:
   global parameter fields beyond selected integer/float32 scalars and selected 32-bit numeric
   vector resource elements, flat selected-scalar/vector parameter blocks and constant buffers plus
   exact compact three-lane physical matrix arrays,
-  selected integer/float32 scalar, 32-bit numeric-vector, and layout-compatible recursively
-  numeric-field aggregate structured buffers, plus read-only logical access to selected
+  selected integer/float32 scalar, 32-bit numeric-vector, layout-compatible recursively
+  numeric-field aggregate, and selected resource-bearing aggregate structured buffers, plus
+  read-only logical access to selected
   sole-array physical matrix elements in read-write structured buffers,
-  read-only/read-write byte-address buffers, selected read-only texture elements with scalar Float
-  sampling/queries and bounded integer-coordinate fetches, ordinary sampler values, and storage-only
+  read-only/read-write byte-address buffers, selected read-only texture elements with scalar,
+  two-lane, or four-lane Float sampling, scalar queries, and bounded selected integer-coordinate
+  fetches, ordinary sampler values, and storage-only
   comparison-sampler/unsized-sampler-array placeholders, and raw
   CUDA parameters beyond selected integer and float32 scalars, flat
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;
-- external/indirect calls, helper pointer/aggregate ABI beyond selected raw-buffer views passed by
-  value, recursively nested numeric-field
-  structs passed and returned by value, exact selected-scalar-struct local pointers and
+- external/indirect calls, helper pointer/aggregate ABI beyond selected raw-buffer views and
+  resource-bearing structs passed by value, recursively nested numeric-field structs passed and
+  returned by value, exact selected-scalar-struct local pointers and
   `BorrowInOutParam` parameters, plus selected numeric local pointers and exact `OutParam` or
   `BorrowInOutParam` parameters, and fixed numeric local-array pointers with exact `OutParam` or
   `BorrowInOutParam` parameters, calling conventions and function
@@ -5939,8 +5975,9 @@ The following remain open until their named slice supplies evidence:
   `IRGetElementPtr`
   shapes, pointer escape through helpers beyond the exact selected-scalar-struct, numeric-value,
   and fixed-numeric-array helper subsets or through SSA, dynamically indexed aggregate values,
-  mutable aggregate families beyond layout-compatible recursively numeric-field structs,
-  first-class aggregate field reads beyond admitted copyable values, aggregate layouts requiring
+  mutable aggregate families beyond layout-compatible recursively numeric/resource-field structs,
+  first-class aggregate field reads beyond admitted resource-capable values, aggregate layouts
+  requiring
   padding, true mutable device globals beyond the established actual-global atomic subset,
   thread-local contexts beyond flat scalar fields, shared-memory shapes beyond canonical
   uninitialized scalar/fixed-array Int32/UInt32 storage, and address spaces;

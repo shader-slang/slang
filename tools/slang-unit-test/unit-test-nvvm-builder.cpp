@@ -128,7 +128,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=23") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=24") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -178,6 +178,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
     SLANG_CHECK(!builder.supportsTextureOperation(unsupported));
     unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
     unsupported.elementType.laneCount = 2;
+    SLANG_CHECK(builder.supportsTextureOperation(unsupported));
+    unsupported.elementType.laneCount = 4;
+    SLANG_CHECK(builder.supportsTextureOperation(unsupported));
+    unsupported.elementType.laneCount = 3;
     SLANG_CHECK(!builder.supportsTextureOperation(unsupported));
 
     for (const auto shape : shapes)
@@ -248,6 +252,88 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
     unsupportedFetch.elementType.laneCount = 1;
     unsupportedFetch.elementType.bitWidth = 16;
     SLANG_CHECK(!builder.supportsTextureOperation(unsupportedFetch));
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderEmitsVectorTextureSamples)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+
+    ScopedNVVMBuilderModule module;
+    module.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("vector-texture-sample"), module.module)));
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle floatType = nullptr;
+    SlangNVVMTypeHandle int64Type = nullptr;
+    SlangNVVMTypeHandle float2Type = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, 32, floatType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 64, int64Type)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getVectorType(module.module, floatType, 2, float2Type)));
+
+    const SlangNVVMTypeHandle parameterTypes[] = {int64Type, float2Type, floatType};
+    SlangNVVMTypeHandle functionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        module.module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType)));
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("sample2DVector"),
+        function)));
+
+    SlangNVVMValueHandle operands[3] = {};
+    for (size_t parameterIndex = 0; parameterIndex < SLANG_COUNT_OF(operands); ++parameterIndex)
+    {
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionParameter(
+            module.module,
+            function,
+            parameterIndex,
+            operands[parameterIndex])));
+    }
+    SlangNVVMBlockHandle entryBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
+
+    const SlangNVVMTextureOperationDesc operation = {
+        SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL,
+        SLANG_NVVM_TEXTURE_SHAPE_2D,
+        0,
+        {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 4},
+    };
+    SlangNVVMValueHandle result = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitTextureOperation(
+        module.module,
+        operation,
+        operands,
+        SLANG_COUNT_OF(operands),
+        result)));
+    SLANG_CHECK_ABORT(result != nullptr);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (const auto format : formats)
+    {
+        ComPtr<ISlangBlob> assemblyBlob;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assemblyBlob)));
+        const String assembly = _getBlobText(assemblyBlob);
+        SLANG_CHECK(assembly.indexOf("@llvm.nvvm.tex.unified.2d.level.v4f32.f32") >= 0);
+        SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("insertelement")) == 4);
+    }
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderEmitsIntegerCoordinateTextureFetches)
@@ -6587,7 +6673,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     SLANG_CHECK(compatibleAssembly.indexOf("monotonic, align 8") < 0);
 }
 
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceTranscendentals)
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceUnaryOperations)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
@@ -6617,6 +6703,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceTranscendentals)
             SLANG_NVVM_VALUE_OP_COS,
             NVVMSemantics::kFloat64,
             float64Operands,
+            1,
+        },
+        {
+            SLANG_NVVM_VALUE_OP_TRUNC,
+            NVVMSemantics::kFloat32,
+            float32Operands,
             1,
         },
     };
@@ -6687,7 +6779,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceTranscendentals)
     SLANG_CHECK(rejected == nullptr);
 
     const SlangNVVMValueHandle operands[] =
-        {float32Value, float32Value, float64Value, float64Value};
+        {float32Value, float32Value, float64Value, float64Value, float32Value};
     for (Index i = 0; i < SLANG_COUNT_OF(operations); ++i)
     {
         SlangNVVMValueHandle result = nullptr;
@@ -6712,10 +6804,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceTranscendentals)
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare float @__nv_cosf(float)")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare double @__nv_sin(double)")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare double @__nv_cos(double)")) == 1);
+        SLANG_CHECK(
+            _countOccurrences(textSlice, toSlice("declare float @__nv_truncf(float)")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("call float @__nv_sinf")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("call float @__nv_cosf")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("call double @__nv_sin")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("call double @__nv_cos")) == 1);
+        SLANG_CHECK(_countOccurrences(textSlice, toSlice("call float @__nv_truncf")) == 1);
     }
 }
 
