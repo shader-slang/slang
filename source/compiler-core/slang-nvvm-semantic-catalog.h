@@ -62,6 +62,11 @@ inline constexpr SlangNVVMValueTypeDesc kUnsignedI32 = {
     32,
     1,
 };
+inline constexpr SlangNVVMValueTypeDesc kUnsignedI64 = {
+    SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+    64,
+    1,
+};
 inline constexpr SlangNVVMValueTypeDesc kUnsignedI32x3 = {
     SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
     32,
@@ -863,9 +868,14 @@ inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
     const bool isI32 = (desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                         desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
                        desc.valueType.bitWidth == 32 && desc.valueType.laneCount == 1;
-    const bool isAtomicAddressSpace = desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
-                                      desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
-    return desc.operation == SLANG_NVVM_ATOMIC_OP_ADD && isI32 && isAtomicAddressSpace &&
+    const bool isI32AtomicAddressSpace = desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+                                         desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
+    const bool isRelaxedI32Add =
+        desc.operation == SLANG_NVVM_ATOMIC_OP_ADD && isI32 && isI32AtomicAddressSpace;
+    const bool isRelaxedGlobalU64Max = desc.operation == SLANG_NVVM_ATOMIC_OP_MAX &&
+                                       areSameType(desc.valueType, kUnsignedI64) &&
+                                       desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
+    return (isRelaxedI32Add || isRelaxedGlobalU64Max) &&
            desc.memoryOrder == SLANG_NVVM_MEMORY_ORDER_RELAXED;
 }
 

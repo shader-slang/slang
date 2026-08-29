@@ -2,6 +2,8 @@
 // A 64-bit atomic through a helper on a `RWByteAddressBuffer` must not change the width or offset of
 // an unrelated 32-bit atomic on that same buffer.
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -compute -shaderobj
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -compute -shaderobj -capability cuda_sm_9_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_9_0 -O3 -o -
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buffer
 RWByteAddressBuffer buffer;
@@ -32,5 +34,9 @@ void computeMain()
 // CHECK-NEXT: 0
 // CHECK-NEXT: 0
 // CHECK-NEXT: 0
+
+// NVVM: .target sm_90
+// NVVM: atom.global.max.u64
+// NVVM: atom.global.add.u32
 // CHECK-NEXT: 0
 // CHECK-NEXT: 0

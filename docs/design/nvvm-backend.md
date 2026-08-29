@@ -5804,6 +5804,30 @@ ignored DX12 lane because its unrelated Dawn/WebGPU lane fails bind-group valida
 has one global load, one `atom.global.add.u32`, and one global store and assembles to a 2,920-byte
 cubin. Release host/provider builds pass, and the complete NVVM prefix passes 391/391.
 
+### Slice 124: Mixed-width byte-address atomics
+
+Byte-address atomic legalization now admits the exact unsigned UInt32 and UInt64 structured views
+that are proven by the corpus. UInt32 remains provider-handle identity because the established byte
+view already has physical type `{i32 addrspace(1)*, i64}`. UInt64 is resource identity but not
+aggregate identity: direct emission extracts the existing data pointer and count, retags the same
+address to `i64 addrspace(1)*` through a zero-byte pointer operation, and constructs the exact
+`{i64 addrspace(1)*, i64}` view. The count and access remain unchanged, while the typed pointer
+preserves correct element scaling and exact provider validation.
+
+The generic atomic catalog now also admits relaxed global scalar UInt64 max. No new callback or ABI
+revision is needed: the existing descriptor carries unsigned 64-bit type, global address space,
+relaxed order, and the already-defined max operation. The LLVM 14 provider maps that row to
+naturally aligned monotonic `atomicrmw umax i64`; its semantic NVVM IR 2.0 serializer validates the
+exact operation and removes only LLVM 14's explicit eight-byte alignment suffix. Neighboring signed,
+32-bit-max, shared, and stronger-order descriptors remain rejected.
+
+`byte-address-buffer-atomic-mixed-width-12265.slang` now passes all 3/3 lanes, including direct
+CUDA execution at SM90. Its 534-byte PTX contains both `atom.global.max.u64` at byte zero and
+`atom.global.add.u32` at byte 16, and CUDA 12.9.86 `ptxas -arch=sm_90` assembles it to a 3,488-byte
+cubin. Focused fake coverage proves that only the UInt64 path constructs a typed view and that the
+UInt32 path remains identity; real-provider coverage proves exact LLVM and legacy assembly. Release
+host/provider builds pass, and the complete NVVM prefix passes 392/392.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5856,10 +5880,10 @@ The following remain open until their named slice supplies evidence:
   padding, true mutable device globals beyond the established actual-global atomic subset,
   thread-local contexts beyond flat scalar fields, shared-memory shapes beyond canonical
   uninitialized scalar/fixed-array Int32/UInt32 storage, and address spaces;
-- atomics beyond relaxed global/shared scalar Int32/UInt32 add through established writable device
-  pointers, direct structured-buffer elements, groupshared scalar globals, and direct groupshared
-  array elements, including every other operation, memory order, value type, pointer shape, and
-  address space, plus a
+- atomics beyond relaxed global/shared scalar Int32/UInt32 add and relaxed global scalar UInt64
+  unsigned max through established writable device pointers, direct structured-buffer elements,
+  groupshared scalar globals, and direct groupshared array elements, including every other
+  operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float

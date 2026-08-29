@@ -882,8 +882,11 @@ static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
         return SLANG_E_INVALID_ARG;
     }
 
+    const llvm::AtomicRMWInst::BinOp llvmOperation =
+        operation->operation == SLANG_NVVM_ATOMIC_OP_ADD ? llvm::AtomicRMWInst::Add
+                                                         : llvm::AtomicRMWInst::UMax;
     llvm::Value* originalValue = state->builder.CreateAtomicRMW(
-        llvm::AtomicRMWInst::Add,
+        llvmOperation,
         llvmPointer,
         llvmValue,
         llvm::Align(operation->valueType.bitWidth / 8),
@@ -2287,11 +2290,16 @@ static SlangResult _writeLegacyNVVMAssembly(
 
                 ++semanticAtomicCount;
                 const unsigned addressSpace = atomic->getPointerAddressSpace();
-                if (atomic->getOperation() != llvm::AtomicRMWInst::Add ||
-                    !atomic->getType()->isIntegerTy(32) ||
-                    (addressSpace != SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
-                     addressSpace != SLANG_NVVM_ADDRESS_SPACE_SHARED) ||
-                    atomic->getAlign() != llvm::Align(4) ||
+                const bool isI32Add = atomic->getOperation() == llvm::AtomicRMWInst::Add &&
+                                      atomic->getType()->isIntegerTy(32) &&
+                                      (addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+                                       addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED) &&
+                                      atomic->getAlign() == llvm::Align(4);
+                const bool isGlobalU64Max = atomic->getOperation() == llvm::AtomicRMWInst::UMax &&
+                                            atomic->getType()->isIntegerTy(64) &&
+                                            addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
+                                            atomic->getAlign() == llvm::Align(8);
+                if ((!isI32Add && !isGlobalU64Max) ||
                     atomic->getOrdering() != llvm::AtomicOrdering::Monotonic ||
                     atomic->getSyncScopeID() != llvm::SyncScope::System || atomic->isVolatile())
                 {
@@ -2306,7 +2314,8 @@ static SlangResult _writeLegacyNVVMAssembly(
     state->module->print(llvm14Output, nullptr);
 
     const llvm::StringRef atomicMarker(" = atomicrmw ");
-    const llvm::StringRef llvm14AlignmentSuffix(", align 4");
+    const llvm::StringRef llvm14I32AlignmentSuffix(", align 4");
+    const llvm::StringRef llvm14I64AlignmentSuffix(", align 8");
     const llvm::StringRef floatNegateMarker(" = fneg float ");
     const llvm::StringRef legacyFloatNegateMarker(" = fsub float -0.000000e+00, ");
     const llvm::StringRef llvm14SpecialRegisterAttributeMarker(
@@ -2331,9 +2340,13 @@ static SlangResult _writeLegacyNVVMAssembly(
         const llvm::StringRef trimmedLine = line.ltrim();
         if (trimmedLine.startswith("%") && trimmedLine.contains(atomicMarker))
         {
-            if (!line.endswith(llvm14AlignmentSuffix))
+            const llvm::StringRef alignmentSuffix =
+                line.endswith(llvm14I32AlignmentSuffix)   ? llvm14I32AlignmentSuffix
+                : line.endswith(llvm14I64AlignmentSuffix) ? llvm14I64AlignmentSuffix
+                                                          : llvm::StringRef();
+            if (alignmentSuffix.empty())
                 return SLANG_E_NOT_AVAILABLE;
-            const llvm::StringRef legacyLine = line.drop_back(llvm14AlignmentSuffix.size());
+            const llvm::StringRef legacyLine = line.drop_back(alignmentSuffix.size());
             outSerializedData.append(legacyLine.begin(), legacyLine.end());
             ++rewrittenAtomicCount;
         }

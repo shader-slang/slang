@@ -370,7 +370,7 @@ struct NVVMEquivalentStructuredBuffer
     NVVMRawBufferType resultType;
 };
 
-// Resolves the representation-preserving UInt32 structured view used by byte-address legalization.
+// Resolves the selected unsigned-integer structured views used by byte-address legalization.
 bool _getNVVMEquivalentStructuredBuffer(IRInst* inst, NVVMEquivalentStructuredBuffer& outConversion)
 {
     outConversion = {};
@@ -386,8 +386,18 @@ bool _getNVVMEquivalentStructuredBuffer(IRInst* inst, NVVMEquivalentStructuredBu
         !getNVVMSupportedRawBufferType(inst->getDataType(), outConversion.resultType) ||
         outConversion.sourceType.kind != NVVMRawBufferKind::ByteAddress ||
         outConversion.resultType.kind != NVVMRawBufferKind::Structured ||
-        outConversion.sourceType.access != outConversion.resultType.access ||
-        !isNVVMUnsignedI32Type(outConversion.resultType.structuredElementType))
+        outConversion.sourceType.access != outConversion.resultType.access)
+    {
+        return false;
+    }
+
+    uint32_t bitWidth = 0;
+    bool isSigned = false;
+    if (!isNVVMSupportedIntegerScalarType(
+            outConversion.resultType.structuredElementType,
+            &bitWidth,
+            &isSigned) ||
+        isSigned || (bitWidth != 32 && bitWidth != 64))
     {
         return false;
     }
@@ -2446,7 +2456,8 @@ bool _resolveNVVMAtomicPointer(IRInst* value, NVVMResolvedAtomicPointer& outPoin
 bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMResolvedAtomicOperation& outOperation)
 {
     outOperation = {};
-    if (!inst || inst->getOp() != kIROp_AtomicAdd || inst->getOperandCount() != 3)
+    if (!inst || (inst->getOp() != kIROp_AtomicAdd && inst->getOp() != kIROp_AtomicMax) ||
+        inst->getOperandCount() != 3)
         return false;
 
     IRInst* pointer = inst->getOperand(0);
@@ -2465,7 +2476,7 @@ bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMResolvedAtomicOperation& outO
     }
 
     outOperation.desc = {
-        SLANG_NVVM_ATOMIC_OP_ADD,
+        inst->getOp() == kIROp_AtomicAdd ? SLANG_NVVM_ATOMIC_OP_ADD : SLANG_NVVM_ATOMIC_OP_MAX,
         valueType,
         resolvedPointer.addressSpace,
         SLANG_NVVM_MEMORY_ORDER_RELAXED,
@@ -2474,9 +2485,13 @@ bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMResolvedAtomicOperation& outO
         return false;
     outOperation.pointer = pointer;
     outOperation.value = value;
-    outOperation.diagnosticName = resolvedPointer.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED
-                                      ? "relaxed shared i32 atomic add"
-                                      : "relaxed global i32 atomic add";
+    if (inst->getOp() == kIROp_AtomicMax)
+        outOperation.diagnosticName = "relaxed global u64 atomic max";
+    else
+        outOperation.diagnosticName =
+            resolvedPointer.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED
+                ? "relaxed shared i32 atomic add"
+                : "relaxed global i32 atomic add";
     return true;
 }
 
@@ -2877,7 +2892,7 @@ SlangResult _validatePointerValue(
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device pointer pointee type"));
     if (resourceElementPtrType && consumer->getOp() != kIROp_Load &&
         consumer->getOp() != kIROp_Store && consumer->getOp() != kIROp_SwizzledStore &&
-        consumer->getOp() != kIROp_AtomicAdd)
+        consumer->getOp() != kIROp_AtomicAdd && consumer->getOp() != kIROp_AtomicMax)
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
@@ -3489,6 +3504,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_AtomicAdd:
+            case kIROp_AtomicMax:
                 {
                     NVVMResolvedAtomicOperation operation;
                     if (!_resolveNVVMAtomicOperation(inst, operation))
@@ -3959,6 +3975,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_AtomicAdd:
+            case kIROp_AtomicMax:
                 {
                     NVVMResolvedAtomicOperation operation;
                     SLANG_RELEASE_ASSERT(_resolveNVVMAtomicOperation(inst, operation));
@@ -5776,6 +5793,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     break;
 
                 case kIROp_AtomicAdd:
+                case kIROp_AtomicMax:
                     {
                         NVVMResolvedAtomicOperation operation;
                         SLANG_RELEASE_ASSERT(_resolveNVVMAtomicOperation(inst, operation));
@@ -6770,7 +6788,80 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredBuffer));
-                        valueMap[inst] = loweredBuffer;
+                        if (isNVVMUnsignedI32Type(conversion.resultType.structuredElementType))
+                        {
+                            valueMap[inst] = loweredBuffer;
+                            break;
+                        }
+
+                        SlangNVVMValueHandle loweredDataPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw byte-address buffer data pointer",
+                            builder.emitAggregateElementExtract(
+                                moduleScope.module,
+                                loweredBuffer,
+                                0,
+                                loweredDataPointer)));
+                        SlangNVVMValueHandle loweredCount = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw byte-address buffer element count",
+                            builder.emitAggregateElementExtract(
+                                moduleScope.module,
+                                loweredBuffer,
+                                1,
+                                loweredCount)));
+
+                        SlangNVVMTypeHandle loweredIndexType = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw buffer reinterpretation index type",
+                            builder.getIntegerType(moduleScope.module, 32, loweredIndexType)));
+                        SlangNVVMValueHandle loweredZero = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw buffer reinterpretation zero offset",
+                            builder.getIntegerConstant(
+                                moduleScope.module,
+                                loweredIndexType,
+                                0,
+                                loweredZero)));
+                        SlangNVVMTypeHandle loweredElementType = nullptr;
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            conversion.resultType.structuredElementType,
+                            NVVMTypeUse::Value,
+                            loweredElementType));
+                        SlangNVVMValueHandle loweredTypedPointer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw buffer reinterpretation pointer",
+                            builder.emitByteOffsetPointer(
+                                moduleScope.module,
+                                loweredDataPointer,
+                                loweredZero,
+                                loweredElementType,
+                                loweredTypedPointer)));
+                        SlangNVVMTypeHandle loweredResultType = nullptr;
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            inst->getDataType(),
+                            NVVMTypeUse::Value,
+                            loweredResultType));
+                        const SlangNVVMValueHandle loweredElements[] = {
+                            loweredTypedPointer,
+                            loweredCount,
+                        };
+                        SlangNVVMValueHandle loweredResult = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw buffer reinterpreted view",
+                            builder.emitAggregateConstruct(
+                                moduleScope.module,
+                                loweredResultType,
+                                loweredElements,
+                                SLANG_COUNT_OF(loweredElements),
+                                loweredResult)));
+                        valueMap[inst] = loweredResult;
                     }
                     break;
 

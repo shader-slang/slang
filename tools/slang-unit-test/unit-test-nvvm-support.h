@@ -1236,6 +1236,10 @@ static bool _getFakeNVVMBuilderResourceViewElementTypeKind(
     return false;
 }
 
+static bool _getFakeNVVMBuilderResourceViewElementTypeKind(
+    const FakeNVVMBuilderValueRef& valueRef,
+    FakeNVVMBuilderScalarTypeKind& outElementTypeKind);
+
 static bool _getFakeNVVMBuilderTypeKind(
     SlangNVVMTypeHandle type,
     FakeNVVMBuilderScalarTypeKind& outTypeKind)
@@ -2377,9 +2381,25 @@ static bool _isFakeNVVMBuilderValueOfType(SlangNVVMValueHandle value, SlangNVVMT
     {
         FakeNVVMBuilderValueRef valueRef;
         SlangNVVMTypeHandle parameterType = nullptr;
-        return _getFakeNVVMBuilderValueRef(value, valueRef) &&
-               valueRef.kind == FakeNVVMBuilderValueKind::Parameter &&
-               _getFakeNVVMBuilderParameterType(valueRef, parameterType) && parameterType == type;
+        if (!_getFakeNVVMBuilderValueRef(value, valueRef))
+            return false;
+        if (valueRef.kind == FakeNVVMBuilderValueKind::Parameter)
+        {
+            return _getFakeNVVMBuilderParameterType(valueRef, parameterType) &&
+                   parameterType == type;
+        }
+        if (valueRef.kind == FakeNVVMBuilderValueKind::Load)
+        {
+            FakeNVVMBuilderScalarTypeKind loadedElementTypeKind;
+            return _getFakeNVVMBuilderResourceViewElementTypeKind(
+                       valueRef,
+                       loadedElementTypeKind) &&
+                   loadedElementTypeKind == resourceElementTypeKind;
+        }
+        return valueRef.kind == FakeNVVMBuilderValueKind::AggregateConstruct &&
+               valueRef.index >= 0 &&
+               valueRef.index < gFakeNVVMBuilder.aggregateConstructResultTypes.getCount() &&
+               gFakeNVVMBuilder.aggregateConstructResultTypes[valueRef.index] == type;
     }
     FakeNVVMBuilderScalarTypeKind expectedPointerElementTypeKind;
     if (_getFakeNVVMBuilderPointerElementTypeKind(type, expectedPointerElementTypeKind))
@@ -2613,6 +2633,14 @@ static bool _getFakeNVVMBuilderResourceViewElementTypeKind(
         SlangNVVMTypeHandle parameterType = nullptr;
         return _getFakeNVVMBuilderParameterType(valueRef, parameterType) &&
                _getFakeNVVMBuilderResourceViewElementTypeKind(parameterType, outElementTypeKind);
+    }
+    if (valueRef.kind == FakeNVVMBuilderValueKind::AggregateConstruct)
+    {
+        return valueRef.index >= 0 &&
+               valueRef.index < gFakeNVVMBuilder.aggregateConstructResultTypes.getCount() &&
+               _getFakeNVVMBuilderResourceViewElementTypeKind(
+                   gFakeNVVMBuilder.aggregateConstructResultTypes[valueRef.index],
+                   outElementTypeKind);
     }
     if (valueRef.kind != FakeNVVMBuilderValueKind::Load || valueRef.index < 0 ||
         valueRef.index >= gFakeNVVMBuilder.loadResultTypeKinds.getCount() ||
@@ -4249,6 +4277,42 @@ static bool _getFakeNVVMBuilderAggregateElementType(
     SlangNVVMTypeHandle& outElementType)
 {
     outElementType = nullptr;
+    FakeNVVMBuilderScalarTypeKind resourceElementTypeKind;
+    if (_getFakeNVVMBuilderResourceViewElementTypeKind(aggregateType, resourceElementTypeKind))
+    {
+        if (elementIndex == 1)
+        {
+            outElementType = _getFakeNVVMBuilderIntegerType();
+            return true;
+        }
+        if (elementIndex != 0)
+            return false;
+        if (resourceElementTypeKind == FakeNVVMBuilderScalarTypeKind::Integer)
+            outElementType = _getFakeNVVMBuilderPointerType();
+        else if (resourceElementTypeKind == FakeNVVMBuilderScalarTypeKind::Float)
+            outElementType = _getFakeNVVMBuilderFloatPointerType();
+        else if (resourceElementTypeKind == FakeNVVMBuilderScalarTypeKind::ScalarStruct)
+            outElementType = _getFakeNVVMBuilderScalarStructPointerType();
+        else if (
+            resourceElementTypeKind >= FakeNVVMBuilderScalarTypeKind::UInt2 &&
+            resourceElementTypeKind <= FakeNVVMBuilderScalarTypeKind::UInt4)
+        {
+            outElementType = _getFakeNVVMBuilderVectorPointerType(
+                uint32_t(resourceElementTypeKind) - uint32_t(FakeNVVMBuilderScalarTypeKind::UInt2) +
+                    2,
+                FakeNVVMBuilderScalarTypeKind::Integer);
+        }
+        else if (
+            resourceElementTypeKind >= FakeNVVMBuilderScalarTypeKind::Float2 &&
+            resourceElementTypeKind <= FakeNVVMBuilderScalarTypeKind::Float4)
+        {
+            outElementType = _getFakeNVVMBuilderVectorPointerType(
+                uint32_t(resourceElementTypeKind) -
+                    uint32_t(FakeNVVMBuilderScalarTypeKind::Float2) + 2,
+                FakeNVVMBuilderScalarTypeKind::Float);
+        }
+        return outElementType != nullptr;
+    }
     if (aggregateType == _getFakeNVVMBuilderArrayType())
     {
         if (elementIndex >= gFakeNVVMBuilder.arrayElementCount)
@@ -4282,8 +4346,13 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitAggregateConstruct(
     if (outValue)
         *outValue = nullptr;
 
+    FakeNVVMBuilderScalarTypeKind resourceElementTypeKind;
+    const bool isResourceView =
+        _getFakeNVVMBuilderResourceViewElementTypeKind(aggregateType, resourceElementTypeKind);
     const size_t expectedElementCount =
-        aggregateType == _getFakeNVVMBuilderArrayType() ? size_t(gFakeNVVMBuilder.arrayElementCount)
+        isResourceView ? 2
+        : aggregateType == _getFakeNVVMBuilderArrayType()
+            ? size_t(gFakeNVVMBuilder.arrayElementCount)
         : aggregateType == _getFakeNVVMBuilderStructType()
             ? size_t(gFakeNVVMBuilder.structFieldTypes.getCount())
         : aggregateType == _getFakeNVVMBuilderScalarStructType()
@@ -4378,7 +4447,14 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitAggregateElementExtract(
 
     SlangNVVMTypeHandle elementType = nullptr;
     bool isAggregateElement = false;
-    if (aggregateType &&
+    FakeNVVMBuilderScalarTypeKind resourceElementTypeKind;
+    if (aggregateType && elementIndex == 0 &&
+        _getFakeNVVMBuilderResourceViewElementTypeKind(aggregateType, resourceElementTypeKind))
+    {
+        elementTypeKind = resourceElementTypeKind;
+    }
+    else if (
+        aggregateType &&
         _getFakeNVVMBuilderAggregateElementType(aggregateType, elementIndex, elementType) &&
         _getFakeNVVMBuilderTypeKind(elementType, elementTypeKind))
     {
@@ -11056,6 +11132,22 @@ void computeMain(RWStructuredBuffer<uint> destination, uniform uint index)
     InterlockedAdd(destination[index], 1u);
 }
 )";
+static const char kDirectNVVMMixedWidthByteAddressAtomicSource[] = R"(
+RWByteAddressBuffer buffer;
+
+void doMax(RWByteAddressBuffer uav)
+{
+    uav.InterlockedMaxU64(0, 5);
+}
+
+[CUDAKernel]
+void computeMain()
+{
+    doMax(buffer);
+    uint previous;
+    buffer.InterlockedAdd(16, 3, previous);
+}
+)";
 static const char kDirectNVVMRawBufferHelperSource[] = R"(
 uint preserveStructured(StructuredBuffer<int> source, uint value)
 {
@@ -11714,6 +11806,7 @@ static SlangResult _createSlangPTXLinkedProgram(
     slang::IGlobalSession* globalSession,
     const char* source,
     SlangEmitCUDAMethod emissionMethod,
+    const char* capabilityName,
     ComPtr<slang::ISession>& outSession,
     ComPtr<slang::IComponentType>& outProgram,
     ComPtr<slang::IBlob>& outDiagnostics)
@@ -11724,8 +11817,8 @@ static SlangResult _createSlangPTXLinkedProgram(
     if (!globalSession || !source)
         return SLANG_E_INVALID_ARG;
 
-    const SlangCapabilityID cudaSM70 = globalSession->findCapability("cuda_sm_7_0");
-    if (cudaSM70 == SLANG_CAPABILITY_UNKNOWN)
+    const SlangCapabilityID capability = globalSession->findCapability(capabilityName);
+    if (capability == SLANG_CAPABILITY_UNKNOWN)
         return SLANG_E_NOT_FOUND;
 
     slang::CompilerOptionEntry targetOptions[2] = {};
@@ -11734,7 +11827,7 @@ static SlangResult _createSlangPTXLinkedProgram(
     targetOptions[0].value.intValue0 = emissionMethod;
     targetOptions[1].name = slang::CompilerOptionName::Capability;
     targetOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
-    targetOptions[1].value.intValue0 = int32_t(cudaSM70);
+    targetOptions[1].value.intValue0 = int32_t(capability);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_PTX;
@@ -12477,12 +12570,14 @@ static SlangResult _createDirectNVVMLinkedProgram(
     const char* source,
     ComPtr<slang::ISession>& outSession,
     ComPtr<slang::IComponentType>& outProgram,
-    ComPtr<slang::IBlob>& outDiagnostics)
+    ComPtr<slang::IBlob>& outDiagnostics,
+    const char* capabilityName = "cuda_sm_7_0")
 {
     return _createSlangPTXLinkedProgram(
         globalSession,
         source,
         SLANG_EMIT_CUDA_VIA_NVVM,
+        capabilityName,
         outSession,
         outProgram,
         outDiagnostics);
@@ -12494,7 +12589,8 @@ static SlangResult _compileSlangWithDirectNVVM(
     slang::IGlobalSession* globalSession,
     const char* source,
     ComPtr<slang::IBlob>& outCode,
-    ComPtr<slang::IBlob>& outDiagnostics)
+    ComPtr<slang::IBlob>& outDiagnostics,
+    const char* capabilityName = "cuda_sm_7_0")
 {
     outCode.setNull();
     ComPtr<slang::ISession> session;
@@ -12504,7 +12600,8 @@ static SlangResult _compileSlangWithDirectNVVM(
         source,
         session,
         linkedProgram,
-        outDiagnostics));
+        outDiagnostics,
+        capabilityName));
     return linkedProgram->getEntryPointCode(0, 0, outCode.writeRef(), outDiagnostics.writeRef());
 }
 
@@ -12522,6 +12619,7 @@ static SlangResult _compileSlangWithPTXMethod(
         globalSession,
         source,
         emissionMethod,
+        "cuda_sm_7_0",
         session,
         linkedProgram,
         outDiagnostics));
