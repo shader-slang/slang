@@ -808,7 +808,7 @@ SlangResult NVVMIRBuilder::emitVectorConstruct(
 SlangResult NVVMIRBuilder::emitVectorElementExtract(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle vector,
-    uint32_t elementIndex,
+    SlangNVVMValueHandle elementIndex,
     SlangNVVMValueHandle& outValue) const
 {
     outValue = nullptr;

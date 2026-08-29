@@ -397,27 +397,28 @@ IRIntLit* _asExecutableInteger32Constant(IRInst* value);
 struct NVVMVectorElement
 {
     IRInst* base = nullptr;
-    uint32_t index = 0;
+    IRInst* index = nullptr;
 };
 
-// Resolves an exact constant-index scalar read from one accepted ordinary value vector.
+// Resolves an integer-indexed scalar read from one accepted ordinary value vector. Constant
+// indices are checked here; a dynamic index retains the source IR value for provider lowering.
 bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
 {
     outElement = {};
 
     IRInst* base = nullptr;
-    IRIntLit* elementIndex = nullptr;
+    IRInst* elementIndex = nullptr;
     if (auto swizzle = as<IRSwizzle>(inst))
     {
         if (swizzle->getElementCount() != 1)
             return false;
         base = swizzle->getBase();
-        elementIndex = _asExecutableInteger32Constant(swizzle->getElementIndex(0));
+        elementIndex = swizzle->getElementIndex(0);
     }
     else if (auto getElement = as<IRGetElement>(inst))
     {
         base = getElement->getBase();
-        elementIndex = _asExecutableInteger32Constant(getElement->getIndex());
+        elementIndex = getElement->getIndex();
     }
     else
     {
@@ -428,14 +429,18 @@ bool _getNVVMVectorElement(IRInst* inst, NVVMVectorElement& outElement)
     auto baseType =
         asNVVMSupportedValueVectorType(base ? base->getDataType() : nullptr, &baseElementCount);
     if (!baseType || !isTypeEqual(inst->getDataType(), baseType->getElementType()) ||
-        !elementIndex || elementIndex->getValue() < 0 ||
-        elementIndex->getValue() >= baseElementCount)
+        !elementIndex || !isNVVMSupportedIntegerScalarType(elementIndex->getDataType()))
     {
         return false;
     }
+    if (auto constantIndex = _asExecutableInteger32Constant(elementIndex))
+    {
+        if (constantIndex->getValue() < 0 || constantIndex->getValue() >= baseElementCount)
+            return false;
+    }
 
     outElement.base = base;
-    outElement.index = uint32_t(elementIndex->getValue());
+    outElement.index = elementIndex;
     return true;
 }
 
@@ -504,7 +509,7 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
                 return false;
             outConstruction.elements[i].extracted = {
                 base,
-                uint32_t(index->getValue()),
+                index,
             };
         }
     }
@@ -782,6 +787,20 @@ const NVVMSemantics::CatalogEntry* _findNVVMGenericAsmSemantic(
     return nullptr;
 }
 
+// Recognizes the canonical scalar `all(bool)` implementation selected by the CUDA prelude. Its
+// `bool($0)` body is an identity operation, so the direct backend can preserve the checked
+// parameter value without asking the provider to manufacture redundant IR.
+IRParam* _getNVVMBoolIdentityGenericAsmParameter(IRGenericAsm* genericAsm, IRFunc* function)
+{
+    if (!genericAsm || !function || genericAsm->getAsm() != toSlice("bool($0)") ||
+        genericAsm->getOperandCount() != 1 || function->getParamCount() != 1 ||
+        !isNVVMBoolType(function->getResultType()) || !isNVVMBoolType(function->getParamType(0)))
+    {
+        return nullptr;
+    }
+    return function->getFirstParam();
+}
+
 enum class NVVMCUDALayoutQueryKind
 {
     None,
@@ -1024,6 +1043,15 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation& outOperation)
         outOperation = SLANG_NVVM_VALUE_OP_BIT_XOR;
         return true;
     case kIROp_BitNot:
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_NOT;
+        return true;
+    case kIROp_And:
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_AND;
+        return true;
+    case kIROp_Or:
+        outOperation = SLANG_NVVM_VALUE_OP_BIT_OR;
+        return true;
+    case kIROp_Not:
         outOperation = SLANG_NVVM_VALUE_OP_BIT_NOT;
         return true;
     case kIROp_Neg:
@@ -1829,6 +1857,9 @@ SlangResult _validateNVVMFunction(
             case kIROp_BitOr:
             case kIROp_BitXor:
             case kIROp_BitNot:
+            case kIROp_And:
+            case kIROp_Or:
+            case kIROp_Not:
             case kIROp_Neg:
             case kIROp_IntCast:
             case kIROp_CastIntToFloat:
@@ -1913,6 +1944,8 @@ SlangResult _validateNVVMFunction(
                     }
                     const NVVMSemantics::CatalogEntry* semantic =
                         _findNVVMGenericAsmSemantic(genericAsm, function);
+                    if (_getNVVMBoolIdentityGenericAsmParameter(genericAsm, function))
+                        break;
                     if (genericAsm->getOperandCount() != 1 || !semantic)
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("GenericAsm"));
@@ -2133,6 +2166,9 @@ SlangResult _validateNVVMFunction(
             case kIROp_BitOr:
             case kIROp_BitXor:
             case kIROp_BitNot:
+            case kIROp_And:
+            case kIROp_Or:
+            case kIROp_Not:
             case kIROp_Neg:
             case kIROp_Less:
             case kIROp_Eql:
@@ -3392,13 +3428,22 @@ SlangResult emitNVVMIRFromLinkedIR(
                             SlangNVVMValueHandle loweredSourceElement = loweredSource;
                             if (store.sourceElementCount > 1)
                             {
+                                SlangNVVMValueHandle loweredSourceIndex = nullptr;
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "numeric vector swizzled-store source index",
+                                    builder.getIntegerConstant(
+                                        moduleScope.module,
+                                        loweredIndexType,
+                                        sourceIndex,
+                                        loweredSourceIndex)));
                                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                     codeGenContext,
                                     "numeric vector swizzled-store extraction",
                                     builder.emitVectorElementExtract(
                                         moduleScope.module,
                                         loweredSource,
-                                        sourceIndex,
+                                        loweredSourceIndex,
                                         loweredSourceElement)));
                             }
 
@@ -3445,6 +3490,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_BitOr:
                 case kIROp_BitXor:
                 case kIROp_BitNot:
+                case kIROp_And:
+                case kIROp_Or:
+                case kIROp_Not:
                 case kIROp_Neg:
                 case kIROp_Less:
                 case kIROp_Eql:
@@ -3583,14 +3631,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 valueMap,
                                 typeContext,
                                 loweredBase));
+                            SlangNVVMValueHandle loweredIndex = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                element.index,
+                                valueMap,
+                                typeContext,
+                                loweredIndex));
                             SlangNVVMValueHandle loweredValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                "numeric vector element extraction",
+                                "value vector element extraction",
                                 builder.emitVectorElementExtract(
                                     moduleScope.module,
                                     loweredBase,
-                                    element.index,
+                                    loweredIndex,
                                     loweredValue)));
                             valueMap[inst] = loweredValue;
                             break;
@@ -3623,13 +3680,22 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     valueMap,
                                     typeContext,
                                     loweredBase));
+                                SlangNVVMValueHandle loweredIndex = nullptr;
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    source.extracted.index,
+                                    valueMap,
+                                    typeContext,
+                                    loweredIndex));
                                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                     codeGenContext,
                                     "numeric vector swizzle extraction",
                                     builder.emitVectorElementExtract(
                                         moduleScope.module,
                                         loweredBase,
-                                        source.extracted.index,
+                                        loweredIndex,
                                         loweredElements[i])));
                             }
                         }
@@ -3654,8 +3720,28 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_GenericAsm:
                     {
+                        auto genericAsm = as<IRGenericAsm>(inst);
+                        if (auto identityParameter =
+                                _getNVVMBoolIdentityGenericAsmParameter(genericAsm, function))
+                        {
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                identityParameter,
+                                valueMap,
+                                typeContext,
+                                loweredValue));
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "Boolean identity return",
+                                builder.emitValueReturn(moduleScope.module, loweredValue)));
+                            break;
+                        }
+
                         const NVVMSemantics::CatalogEntry* semantic =
-                            _findNVVMGenericAsmSemantic(as<IRGenericAsm>(inst), function);
+                            _findNVVMGenericAsmSemantic(genericAsm, function);
                         SLANG_RELEASE_ASSERT(semantic);
                         List<SlangNVVMValueHandle> loweredArguments;
                         for (auto parameter : function->getParams())

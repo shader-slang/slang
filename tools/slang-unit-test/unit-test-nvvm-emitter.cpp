@@ -699,11 +699,17 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
         SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
 
         bool sawSignedI32x2RightShift = false;
+        bool sawSignedI32x2VectorScalarAdd = false;
+        bool sawSignedI32x2ScalarVectorSubtract = false;
         bool sawSignedI8x2Divide = false;
         bool sawSignedI8x2Remainder = false;
         bool sawSignedI8x2LessThan = false;
         bool sawFloat32x3Add = false;
         bool sawFloat32x3Remainder = false;
+        bool sawFloat32x3VectorScalarAdd = false;
+        bool sawBooleanVectorNot = false;
+        bool sawBooleanVectorScalarAnd = false;
+        bool sawBooleanVectorOr = false;
         for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
         {
             const SlangNVVMValueTypeDesc& type = operation.resultType;
@@ -711,7 +717,20 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
                 sawSignedI32x2RightShift ||
                 (operation.key.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT &&
                  type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER && type.bitWidth == 32 &&
-                 type.laneCount == 2);
+                 type.laneCount == 2 && operation.operandTypes[0].laneCount == 2 &&
+                 operation.operandTypes[1].laneCount == 1);
+            sawSignedI32x2VectorScalarAdd =
+                sawSignedI32x2VectorScalarAdd ||
+                (operation.key.operation == SLANG_NVVM_VALUE_OP_ADD &&
+                 type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER && type.bitWidth == 32 &&
+                 type.laneCount == 2 && operation.operandTypes[0].laneCount == 2 &&
+                 operation.operandTypes[1].laneCount == 1);
+            sawSignedI32x2ScalarVectorSubtract =
+                sawSignedI32x2ScalarVectorSubtract ||
+                (operation.key.operation == SLANG_NVVM_VALUE_OP_SUBTRACT &&
+                 type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER && type.bitWidth == 32 &&
+                 type.laneCount == 2 && operation.operandTypes[0].laneCount == 1 &&
+                 operation.operandTypes[1].laneCount == 2);
             sawSignedI8x2Divide =
                 sawSignedI8x2Divide || (operation.key.operation == SLANG_NVVM_VALUE_OP_DIVIDE &&
                                         type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
@@ -720,10 +739,12 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
                                      (operation.key.operation == SLANG_NVVM_VALUE_OP_REMAINDER &&
                                       type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
                                       type.bitWidth == 8 && type.laneCount == 2);
-            sawSignedI8x2LessThan = sawSignedI8x2LessThan ||
-                                    (operation.key.operation == SLANG_NVVM_VALUE_OP_LESS_THAN &&
-                                     type.kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
-                                     type.bitWidth == 1 && type.laneCount == 2);
+            sawSignedI8x2LessThan =
+                sawSignedI8x2LessThan ||
+                (operation.key.operation == SLANG_NVVM_VALUE_OP_LESS_THAN &&
+                 type.kind == SLANG_NVVM_VALUE_TYPE_BOOL && type.bitWidth == 1 &&
+                 type.laneCount == 2 && operation.operandTypes[0].laneCount == 2 &&
+                 operation.operandTypes[1].laneCount == 1);
             sawFloat32x3Add =
                 sawFloat32x3Add || (operation.key.operation == SLANG_NVVM_VALUE_OP_ADD &&
                                     type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
@@ -732,13 +753,40 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
                                     (operation.key.operation == SLANG_NVVM_VALUE_OP_REMAINDER &&
                                      type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
                                      type.bitWidth == 32 && type.laneCount == 3);
+            sawFloat32x3VectorScalarAdd =
+                sawFloat32x3VectorScalarAdd ||
+                (operation.key.operation == SLANG_NVVM_VALUE_OP_ADD &&
+                 type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 32 &&
+                 type.laneCount == 3 && operation.operandTypes[0].laneCount == 3 &&
+                 operation.operandTypes[1].laneCount == 1);
+            sawBooleanVectorNot = sawBooleanVectorNot ||
+                                  (operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_NOT &&
+                                   type.kind == SLANG_NVVM_VALUE_TYPE_BOOL && type.bitWidth == 1 &&
+                                   type.laneCount == 2 && operation.operandTypes[0].laneCount == 2);
+            sawBooleanVectorScalarAnd =
+                sawBooleanVectorScalarAnd ||
+                (operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_AND &&
+                 type.kind == SLANG_NVVM_VALUE_TYPE_BOOL && type.bitWidth == 1 &&
+                 type.laneCount == 2 && operation.operandTypes[0].laneCount == 2 &&
+                 operation.operandTypes[1].laneCount == 1);
+            sawBooleanVectorOr = sawBooleanVectorOr ||
+                                 (operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_OR &&
+                                  type.kind == SLANG_NVVM_VALUE_TYPE_BOOL && type.bitWidth == 1 &&
+                                  type.laneCount == 2 && operation.operandTypes[0].laneCount == 2 &&
+                                  operation.operandTypes[1].laneCount == 2);
         }
         SLANG_CHECK(sawSignedI32x2RightShift);
+        SLANG_CHECK(sawSignedI32x2VectorScalarAdd);
+        SLANG_CHECK(sawSignedI32x2ScalarVectorSubtract);
         SLANG_CHECK(sawSignedI8x2Divide);
         SLANG_CHECK(sawSignedI8x2Remainder);
         SLANG_CHECK(sawSignedI8x2LessThan);
         SLANG_CHECK(sawFloat32x3Add);
         SLANG_CHECK(sawFloat32x3Remainder);
+        SLANG_CHECK(sawFloat32x3VectorScalarAdd);
+        SLANG_CHECK(sawBooleanVectorNot);
+        SLANG_CHECK(sawBooleanVectorScalarAnd);
+        SLANG_CHECK(sawBooleanVectorOr);
 
         bool sawIntegerExtract = false;
         bool sawBooleanExtract = false;
@@ -755,8 +803,8 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
         SLANG_CHECK(sawBooleanExtract);
         SLANG_CHECK(sawFloatExtract);
         SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount > 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount == 6);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount >= 8);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 8);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
     }
@@ -817,7 +865,7 @@ SLANG_UNIT_TEST(nvvmSlangScalarShiftDivideRemainderUseTypedOperations)
     }
 }
 
-SLANG_UNIT_TEST(nvvmSlangRejectsDynamicVectorIndexBeforeProviderMutation)
+SLANG_UNIT_TEST(nvvmSlangDynamicVectorIndexUsesValueHandle)
 {
     _resetDirectNVVMFakes();
     {
@@ -834,12 +882,19 @@ SLANG_UNIT_TEST(nvvmSlangRejectsDynamicVectorIndexBeforeProviderMutation)
             kDirectNVVMDynamicVectorIndexSource,
             code,
             diagnostics);
-        SLANG_CHECK(SLANG_FAILED(result));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("selected value vector operation") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+        SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndexValueRefs.getCount() == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices.getCount() == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[0] == UINT32_MAX);
+        const FakeNVVMBuilderValueRef indexRef = gFakeNVVMBuilder.vectorElementIndexValueRefs[0];
+        SLANG_CHECK(indexRef.kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(indexRef.functionIndex == 0);
+        SLANG_CHECK(indexRef.index == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);

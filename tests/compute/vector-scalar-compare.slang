@@ -1,6 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE:-dx12 -compute -shaderobj 
 //TEST(compute):COMPARE_COMPUTE:-vk -compute  -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cuda -compute  -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST:SIMPLE(filecheck=CHECK_NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 // Test doing vector comparisons 
 
@@ -25,3 +27,5 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     int index = threadInGroup.x + threadInGroup.y * 4; 
     outputBuffer[index] = r;
 }
+
+// CHECK_NVVM: .visible .entry

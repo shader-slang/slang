@@ -326,11 +326,11 @@ public:
         size_t elementCount,
         SlangNVVMValueHandle& outValue) const;
 
-    /// Extracts one statically selected element from a fixed vector.
+    /// Extracts the integer-indexed element of a fixed vector.
     SlangResult emitVectorElementExtract(
         SlangNVVMModuleHandle module,
         SlangNVVMValueHandle vector,
-        uint32_t elementIndex,
+        SlangNVVMValueHandle elementIndex,
         SlangNVVMValueHandle& outValue) const;
 
     /// Emits a non-inbounds address of one element of a typed array pointer.

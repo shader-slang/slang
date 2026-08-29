@@ -15,6 +15,8 @@ enum class ValueOperationFamily : uint32_t
     IntegerBinary,
     IntegerCompare,
     FloatBinary,
+    BooleanUnary,
+    BooleanBinary,
     IntegerConvert,
     IntegerToFloat,
     FloatToInteger,
@@ -510,6 +512,39 @@ inline bool isSelectedBoolValue(const SlangNVVMValueTypeDesc& type)
            type.laneCount <= 4;
 }
 
+/// Returns whether both values have the same semantic element type, ignoring lane count.
+inline bool haveSameElementType(
+    const SlangNVVMValueTypeDesc& left,
+    const SlangNVVMValueTypeDesc& right)
+{
+    return left.kind == right.kind && left.bitWidth == right.bitWidth;
+}
+
+/// Returns whether an operand has either the result width or the scalar width used for broadcast.
+inline bool hasComponentWiseLanes(
+    const SlangNVVMValueTypeDesc& resultType,
+    const SlangNVVMValueTypeDesc& operandType)
+{
+    return operandType.laneCount == 1 || operandType.laneCount == resultType.laneCount;
+}
+
+/// Checks a canonical component-wise binary shape, including one scalar-broadcast operand.
+inline bool isComponentWiseBinary(
+    const SlangNVVMValueTypeDesc& resultType,
+    const SlangNVVMValueTypeDesc& leftType,
+    const SlangNVVMValueTypeDesc& rightType)
+{
+    if (!haveSameElementType(resultType, leftType) || !haveSameElementType(resultType, rightType))
+    {
+        return false;
+    }
+    const bool hasResultWidth = resultType.laneCount == 1 ||
+                                leftType.laneCount == resultType.laneCount ||
+                                rightType.laneCount == resultType.laneCount;
+    return hasComponentWiseLanes(resultType, leftType) &&
+           hasComponentWiseLanes(resultType, rightType) && hasResultWidth;
+}
+
 /// Resolves the bounded, dimensioned numeric families added after the frozen exact catalog.
 inline bool resolveValueOperationFamily(
     const SlangNVVMValueOperationDesc& desc,
@@ -531,20 +566,27 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
-    const bool isBinaryInteger = desc.operandCount == 2 &&
-                                 isSelectedIntegerValue(desc.resultType) &&
-                                 areSameType(desc.resultType, desc.operandTypes[0]) &&
-                                 areSameType(desc.resultType, desc.operandTypes[1]);
-    if (isBinaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_ADD ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_DIVIDE ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_AND ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_XOR ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_REMAINDER ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_LEFT ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT))
+    const bool isOrdinaryBinaryInteger =
+        desc.operandCount == 2 && isSelectedIntegerValue(desc.resultType) &&
+        isSelectedIntegerValue(desc.operandTypes[0]) &&
+        isSelectedIntegerValue(desc.operandTypes[1]) &&
+        isComponentWiseBinary(desc.resultType, desc.operandTypes[0], desc.operandTypes[1]);
+    const bool isIntegerShift = desc.operandCount == 2 && isSelectedIntegerValue(desc.resultType) &&
+                                isSelectedIntegerValue(desc.operandTypes[0]) &&
+                                isSelectedIntegerValue(desc.operandTypes[1]) &&
+                                areSameType(desc.resultType, desc.operandTypes[0]) &&
+                                desc.resultType.bitWidth == desc.operandTypes[1].bitWidth &&
+                                hasComponentWiseLanes(desc.resultType, desc.operandTypes[1]);
+    if ((isOrdinaryBinaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_ADD ||
+                                     desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT ||
+                                     desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY ||
+                                     desc.operation == SLANG_NVVM_VALUE_OP_DIVIDE ||
+                                     desc.operation == SLANG_NVVM_VALUE_OP_BIT_AND ||
+                                     desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR ||
+                                     desc.operation == SLANG_NVVM_VALUE_OP_BIT_XOR ||
+                                     desc.operation == SLANG_NVVM_VALUE_OP_REMAINDER)) ||
+        (isIntegerShift && (desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_LEFT ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT)))
     {
         outResolution = {
             ValueOperationFamily::IntegerBinary,
@@ -552,10 +594,19 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
+    SlangNVVMValueTypeDesc integerCompareResultElement = {};
+    if (desc.operandCount == 2)
+    {
+        integerCompareResultElement = desc.operandTypes[0];
+        integerCompareResultElement.laneCount = desc.resultType.laneCount;
+    }
     const bool isIntegerCompare = desc.operandCount == 2 && isSelectedBoolValue(desc.resultType) &&
                                   isSelectedIntegerValue(desc.operandTypes[0]) &&
-                                  areSameType(desc.operandTypes[0], desc.operandTypes[1]) &&
-                                  desc.resultType.laneCount == desc.operandTypes[0].laneCount;
+                                  isSelectedIntegerValue(desc.operandTypes[1]) &&
+                                  isComponentWiseBinary(
+                                      integerCompareResultElement,
+                                      desc.operandTypes[0],
+                                      desc.operandTypes[1]);
     if (isIntegerCompare && desc.operation >= SLANG_NVVM_VALUE_OP_EQUAL &&
         desc.operation <= SLANG_NVVM_VALUE_OP_GREATER_EQUAL)
     {
@@ -563,9 +614,10 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
-    const bool isBinaryFloat = desc.operandCount == 2 && isSelectedFloatValue(desc.resultType) &&
-                               areSameType(desc.resultType, desc.operandTypes[0]) &&
-                               areSameType(desc.resultType, desc.operandTypes[1]);
+    const bool isBinaryFloat =
+        desc.operandCount == 2 && isSelectedFloatValue(desc.resultType) &&
+        isSelectedFloatValue(desc.operandTypes[0]) && isSelectedFloatValue(desc.operandTypes[1]) &&
+        isComponentWiseBinary(desc.resultType, desc.operandTypes[0], desc.operandTypes[1]);
     if (isBinaryFloat && (desc.operation == SLANG_NVVM_VALUE_OP_ADD ||
                           desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT ||
                           desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY ||
@@ -575,6 +627,29 @@ inline bool resolveValueOperationFamily(
         outResolution = {
             ValueOperationFamily::FloatBinary,
             "parameterized float32 binary operation"};
+        return true;
+    }
+
+    const bool isUnaryBoolean = desc.operandCount == 1 && isSelectedBoolValue(desc.resultType) &&
+                                areSameType(desc.resultType, desc.operandTypes[0]);
+    if (isUnaryBoolean && desc.operation == SLANG_NVVM_VALUE_OP_BIT_NOT)
+    {
+        outResolution = {
+            ValueOperationFamily::BooleanUnary,
+            "parameterized Boolean unary operation"};
+        return true;
+    }
+
+    const bool isBinaryBoolean =
+        desc.operandCount == 2 && isSelectedBoolValue(desc.resultType) &&
+        isSelectedBoolValue(desc.operandTypes[0]) && isSelectedBoolValue(desc.operandTypes[1]) &&
+        isComponentWiseBinary(desc.resultType, desc.operandTypes[0], desc.operandTypes[1]);
+    if (isBinaryBoolean && (desc.operation == SLANG_NVVM_VALUE_OP_BIT_AND ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR))
+    {
+        outResolution = {
+            ValueOperationFamily::BooleanBinary,
+            "parameterized Boolean binary operation"};
         return true;
     }
 

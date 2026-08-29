@@ -4858,6 +4858,42 @@ other reprobes now reach independent later boundaries: vector logical `and`, can
 prefix passes 363/363, and the CUDA-scoped shader regressions pass 12/12 with five unrelated lanes
 ignored.
 
+### Slice 91: Scalar-broadcast operations and dynamic vector extraction
+
+Canonical component-wise operations may retain one scalar operand after final linking. The shared
+semantic catalog now accepts that exact relation for selected integer binary operations, integer
+comparisons, Float32 binary operations, and Boolean `And`/`Or`; Boolean `Not` remains same-typed.
+The result and both operand descriptors cross the existing value-operation interface unchanged.
+After validating each original handle against its descriptor, the LLVM provider splats only a
+scalar operand to the result width. Shift counts additionally accept the canonical opposite
+integer signedness at the same bit width because signedness selects the left/result operation,
+while LLVM's physical shift-count type is signless.
+
+The construction interface's vector extraction index is now an integer value handle rather than
+a host `uint32_t`. Constant indices retain eager bounds validation, while dynamic indices preserve
+the source SSA value. This forward-only generalization supports the loop used by `all(bool2)`
+without an index-shaped callback or operation enum. CUDA 12.9 libNVVM produces invalid unoptimized
+PTX for LLVM's direct dynamic extraction from `<N x i1>`: the generated `selp` consumes a byte
+register instead of a predicate. The provider therefore expands only that physical shape into at
+most four constant extracts, integer index comparisons, and typed selects. An out-of-range index
+retains an undefined result, and `ptxas` accepts the resulting `-O0` module.
+
+The CUDA prelude implements scalar `all(bool)` as the exact one-parameter
+`GenericAsm("bool($0)")` identity helper. Direct emission recognizes that checked canonical body
+and returns its existing Boolean parameter; no provider operation or synthetic value is needed.
+The fake provider records exact heterogeneous operand descriptors and dynamic index identity.
+Real-provider tests preserve both scalar-broadcast directions, mixed-signedness shift counts,
+integer comparisons, Float32 broadcast, Boolean vector logic, and the Boolean dynamic-extract
+workaround in LLVM 14 and NVVM-2.0-compatible text.
+
+`vector-scalar-compare.slang` now runs through direct libNVVM and produces its established 16
+results through `all(bool2)`. The signed and unsigned builtin-operator fast-path suites also run
+through direct libNVVM, covering vector/scalar arithmetic and logical versus arithmetic shifts.
+All three emit direct PTX accepted by CUDA 12.9.86 `ptxas -arch=sm_70`. The Release host/provider
+builds pass, the complete NVVM prefix passes 363/363, and the combined changed-shader prefixes pass
+24/24 with five unrelated lanes ignored. Float32 operator-suite probing advances to the independent
+vector floating-point comparison boundary.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4876,9 +4912,10 @@ The following remain open until their named slice supplies evidence:
 - external/indirect calls, pointer/aggregate helper ABI, calling conventions and function
   attributes beyond no-inline, saturating or overflow-decorated arithmetic, float64/low-precision
   scalar families,
-  and vector or matrix operations beyond bounded selected-integer/float32 construction,
-  extraction, binary arithmetic, integer shifts/division/remainder/comparison, Boolean comparison
-  results, float32 remainder, and same-lane integer conversion;
+  and vector or matrix operations beyond bounded selected-numeric construction and integer-indexed
+  selected-value extraction, selected integer/Float32 scalar-broadcast binary arithmetic, integer
+  shifts/division/remainder/comparison, Boolean logic/comparison results, Float32 remainder, and
+  same-lane integer conversion;
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical

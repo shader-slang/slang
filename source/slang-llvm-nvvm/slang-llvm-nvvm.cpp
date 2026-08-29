@@ -1290,7 +1290,7 @@ _emitValueReturn(SlangNVVMModuleHandle module, SlangNVVMValueHandle value)
 static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle vector,
-    uint32_t elementIndex,
+    SlangNVVMValueHandle elementIndex,
     SlangNVVMValueHandle* outValue)
 {
     if (outValue)
@@ -1298,17 +1298,44 @@ static SlangResult SLANG_NVVM_CALL _emitVectorElementExtract(
 
     ModuleState* state = _getModule(module);
     llvm::Value* llvmVector = _getValue(vector);
+    llvm::Value* llvmElementIndex = _getValue(elementIndex);
     auto vectorType =
         llvmVector ? llvm::dyn_cast<llvm::FixedVectorType>(llvmVector->getType()) : nullptr;
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!state || !outValue || !insertionBlock || !vectorType ||
-        elementIndex >= vectorType->getNumElements() ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmVector))
+    if (!state || !outValue || !insertionBlock || !vectorType || !llvmElementIndex ||
+        !llvm::isa<llvm::IntegerType>(llvmElementIndex->getType()) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmVector) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmElementIndex))
     {
         return SLANG_E_INVALID_ARG;
     }
+    auto constantIndex = llvm::dyn_cast<llvm::ConstantInt>(llvmElementIndex);
+    if (constantIndex)
+    {
+        if (constantIndex->getValue().uge(vectorType->getNumElements()))
+            return SLANG_E_INVALID_ARG;
+    }
 
-    llvm::Value* result = state->builder.CreateExtractElement(llvmVector, elementIndex);
+    llvm::Value* result = nullptr;
+    if (!constantIndex && vectorType->getElementType()->isIntegerTy(1))
+    {
+        // CUDA 12.9's libNVVM lowers a dynamic extract from `<N x i1>` to invalid PTX: it feeds
+        // the byte loaded from its temporary vector spill directly to `selp` as a predicate. A
+        // fixed vector has at most four lanes in this ABI, so preserve the operation with constant
+        // extracts and typed selects. An out-of-range index retains LLVM's undefined result.
+        result = llvm::UndefValue::get(vectorType->getElementType());
+        for (uint32_t lane = 0; lane < vectorType->getNumElements(); ++lane)
+        {
+            llvm::Value* laneValue = state->builder.CreateExtractElement(llvmVector, lane);
+            llvm::Value* laneIndex = llvm::ConstantInt::get(llvmElementIndex->getType(), lane);
+            llvm::Value* isLane = state->builder.CreateICmpEQ(llvmElementIndex, laneIndex);
+            result = state->builder.CreateSelect(isLane, laneValue, result);
+        }
+    }
+    else
+    {
+        result = state->builder.CreateExtractElement(llvmVector, llvmElementIndex);
+    }
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
@@ -2522,7 +2549,23 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
     return nullptr;
 }
 
-static SlangResult _emitNumericFamily(
+// Materializes the physical vector operand required by LLVM for one validated scalar broadcast.
+static llvm::Value* _materializeBroadcastOperand(
+    ModuleState* state,
+    llvm::Value* value,
+    const SlangNVVMValueTypeDesc& declaredType,
+    uint32_t operationLaneCount)
+{
+    if (!state || !value)
+        return nullptr;
+    if (declaredType.laneCount == operationLaneCount)
+        return value;
+    if (declaredType.laneCount != 1 || operationLaneCount < 2 || operationLaneCount > 4)
+        return nullptr;
+    return state->builder.CreateVectorSplat(operationLaneCount, value);
+}
+
+static SlangResult _emitValueOperationFamily(
     SlangNVVMModuleHandle module,
     const SlangNVVMValueOperationDesc& operation,
     Slang::NVVMSemantics::ValueOperationFamily family,
@@ -2546,6 +2589,25 @@ static SlangResult _emitNumericFamily(
             !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmOperands[i]))
         {
             return SLANG_E_INVALID_ARG;
+        }
+    }
+
+    const bool isBroadcastFamily =
+        family == Slang::NVVMSemantics::ValueOperationFamily::IntegerBinary ||
+        family == Slang::NVVMSemantics::ValueOperationFamily::IntegerCompare ||
+        family == Slang::NVVMSemantics::ValueOperationFamily::FloatBinary ||
+        family == Slang::NVVMSemantics::ValueOperationFamily::BooleanBinary;
+    if (isBroadcastFamily)
+    {
+        for (size_t i = 0; i < operation.operandCount; ++i)
+        {
+            llvmOperands[i] = _materializeBroadcastOperand(
+                state,
+                llvmOperands[i],
+                operation.operandTypes[i],
+                operation.resultType.laneCount);
+            if (!llvmOperands[i])
+                return SLANG_E_INVALID_ARG;
         }
     }
 
@@ -2653,6 +2715,14 @@ static SlangResult _emitNumericFamily(
             result = state->builder.CreateICmp(predicate, llvmOperands[0], llvmOperands[1]);
         }
         break;
+    case Slang::NVVMSemantics::ValueOperationFamily::BooleanUnary:
+        result = state->builder.CreateNot(llvmOperands[0]);
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::BooleanBinary:
+        result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_AND
+                     ? state->builder.CreateAnd(llvmOperands[0], llvmOperands[1])
+                     : state->builder.CreateOr(llvmOperands[0], llvmOperands[1]);
+        break;
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerConvert:
         if (operation.resultType.bitWidth == operation.operandTypes[0].bitWidth)
         {
@@ -2708,7 +2778,7 @@ static SlangResult SLANG_NVVM_CALL _emitOperation(
 
     Slang::NVVMSemantics::ValueOperationFamilyResolution resolution;
     if (Slang::NVVMSemantics::resolveValueOperationFamily(*operation, resolution))
-        return _emitNumericFamily(module, *operation, resolution.family, operands, outValue);
+        return _emitValueOperationFamily(module, *operation, resolution.family, operands, outValue);
 
     const Slang::NVVMSemantics::CatalogEntry* entry = Slang::NVVMSemantics::find(*operation);
     return entry ? _emitCatalogOperation(module, *entry, operands, outValue) : SLANG_E_INVALID_ARG;

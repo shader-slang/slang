@@ -333,7 +333,7 @@ extern "C"
         SlangNVVMResult(SLANG_NVVM_CALL* emitVectorElementExtract)(
             SlangNVVMModuleHandle module,
             SlangNVVMValueHandle vector,
-            uint32_t elementIndex,
+            SlangNVVMValueHandle elementIndex,
             SlangNVVMValueHandle* outValue);
         SlangNVVMResult(SLANG_NVVM_CALL* emitRelaxedGlobalI32AtomicAdd)(
             SlangNVVMModuleHandle module,
