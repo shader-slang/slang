@@ -35,6 +35,8 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/cuda/cuda-vector-binary-ops.slang` | CPU + CUDA/NVRTC + direct NVVM runtime | Pass | Selected integer/float vectors exercise arithmetic, shifts, signed narrow division/remainder/comparison, Boolean extraction, and floating remainder across 37 asymmetric results; direct PTX passes `ptxas` |
 | `tests/compute/structured-buffer-load.slang` | CUDA + direct NVVM runtime/PTX | Pass | Scalar UInt and vector Int4 read-only/read-write resource loads produce `0x40, 0x40, 0x37`; direct PTX contains `ld.global.nc.v4.u32` and passes `ptxas` |
 | `tests/compute/structured-buffer-swizzle-store.slang` | CUDA + direct NVVM runtime/PTX | Pass | Four Float4 destination permutations preserve independent component stores and produce `4`; direct PTX reloads `v4.f32` after scalar lane stores and passes `ptxas` |
+| `tests/cuda/vector-dot-unroll.slang` | CUDA source + direct NVVM PTX | Pass | Float2/3/4 and Int3 fallback helpers cross the selected vector ABI; PTX retains scalarized dot arithmetic and passes `ptxas` |
+| `tests/hlsl-intrinsic/vector-dot-int.slang` | CUDA/NVRTC + direct NVVM runtime/PTX | Pass | Int3, UInt3, UInt64x2, and Int16x4 dot helpers produce `-14, 28, 20, 5`; direct PTX passes `ptxas` |
 | `tests/compute/groupshared.slang` | CUDA + direct NVVM runtime/PTX | Pass | The established helper-based Int shared-array workload returns `1, 0, 3, 2`; direct PTX preserves shared load/store and synchronization and passes `ptxas` |
 | `tests/language-feature/execution-model/groupshared-barrier-functional.slang` | CUDA + direct NVVM runtime/PTX | Pass | An unsigned execution index writes shared Int storage, synchronizes, and reads its neighbor with results `10, 20, 30, 0`; direct PTX passes `ptxas` |
 | `tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang` | CUDA + direct NVVM runtime/PTX | Pass | Three barrier calls preserve two rounds of shared communication with results `2, 3, 0, 1`; direct PTX passes `ptxas` |
@@ -370,6 +372,7 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangRejectsNestedArrayByteAddressAccessBeforeProviderMutation` | A nested numeric array remains outside the nonrecursive byte payload family and reaches E52017 before builder discovery or mutation | Pass |
 | `slang-unit-test-tool/nvvmSlangVectorStructuredBuffersUseGenericTransport` | Exact Int4/Float4 resource-view identity reaches whole-vector loads; one canonical `wzyx` store composes four existing vector extracts, byte offsets `12, 8, 4, 0`, and scalar stores without a new callback | Pass |
 | `slang-unit-test-tool/nvvmSlangRejectsDoubleVectorStructuredBufferBeforeProviderMutation` | Double2 remains outside the selected 32-bit vector resource family and reaches E52017 at the entry-parameter boundary before builder discovery or mutation | Pass |
+| `slang-unit-test-tool/nvvmSlangVectorFunctionsUseExactGenericTypes` | Exact Int4, Float3, and comparison-produced Bool2 types cross helper parameters/results, calls/returns, and an Int4 block-parameter phi; Double2 and invalid five-lane sources stop before builder discovery | Pass |
 
 Slice 9 extends Bucket 2 through a finite DAG of canonical direct `IRFunc`
 callees with signed-i32 parameters/results and valued returns. Complex and aggregate types, pointer

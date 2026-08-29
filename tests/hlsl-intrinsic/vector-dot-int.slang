@@ -2,12 +2,14 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
 //TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj -output-using-type
 
 // No 16-bit and 64-bit integer support on DX11.
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -xslang -DDX11
 
 //TEST(compute, vulkan):SIMPLE(filecheck=CHECK_SPV): -stage compute -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK_NVVM): -stage compute -entry computeMain -target ptx -emit-cuda-via-nvvm -capability cuda_sm_7_0 -o -
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -43,3 +45,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[outIndex++] = 5;
 #endif
 }
+
+// CHECK_NVVM: .visible .entry computeMain()
+// CHECK_NVVM: mul.lo.s32
+// CHECK_NVVM: st.global.u32

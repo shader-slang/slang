@@ -1343,8 +1343,8 @@ SlangResult _validateScalarValue(
     return _diagnoseUnsupportedIR(codeGenContext, toSlice("scalar value"));
 }
 
-// Checks a selected scalar or one of the fixed numeric-vector roles admitted by preflight.
-SlangResult _validateNumericValue(
+// Checks a selected scalar or fixed value vector admitted by preflight.
+SlangResult _validateSelectedValue(
     CodeGenContext* codeGenContext,
     IRInst* value,
     IRInst* consumer,
@@ -1377,7 +1377,7 @@ SlangResult _validateByteAddressValue(
             consumer,
             availableValues,
             dominatorTree);
-    return _validateNumericValue(codeGenContext, value, consumer, availableValues, dominatorTree);
+    return _validateSelectedValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
 // Checks an available scalar pointer and enforces the source access qualifier for stores.
@@ -1498,8 +1498,12 @@ SlangResult _validateBranchArguments(
         SLANG_ASSERT(targetParam);
         if (!argument || !isTypeEqual(argument->getDataType(), targetParam->getDataType()))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("branch argument type"));
-        SLANG_RETURN_ON_FAIL(
-            _validateScalarValue(codeGenContext, argument, branch, availableValues, dominatorTree));
+        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+            codeGenContext,
+            argument,
+            branch,
+            availableValues,
+            dominatorTree));
     }
     return SLANG_OK;
 }
@@ -1523,21 +1527,10 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
     return getMangledName(function);
 }
 
-// Returns whether a type is an accepted canonical scalar in a helper parameter.
-bool _isSupportedNVVMHelperParameterType(IRInst* type)
-{
-    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           isNVVMBoolType(type);
-}
-
 // Returns whether a type is an accepted canonical value in a helper result.
 bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
-    bool isSigned = false;
-    uint32_t elementCount = 0;
-    const bool isExecutionVector = asNVVMSupportedI32VectorType(type, &isSigned, &elementCount) &&
-                                   !isSigned && elementCount == 3;
-    return as<IRVoidType>(type) || isExecutionVector || _isSupportedNVVMHelperParameterType(type);
+    return as<IRVoidType>(type) || isNVVMSupportedValueType(type);
 }
 
 // Returns whether a canonical helper signature needs the generic construction path.
@@ -1550,7 +1543,7 @@ bool _usesGenericNVVMFunctions(IRFunc* helper)
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
         IRType* parameterType = helper->getParamType(parameterIndex);
-        SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperParameterType(parameterType));
+        SLANG_RELEASE_ASSERT(isNVVMSupportedValueType(parameterType));
         if (!isNVVMSignedI32Type(parameterType))
             return true;
     }
@@ -1577,7 +1570,7 @@ SlangResult _validateNVVMHelperTarget(
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function result type"));
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
-        if (!_isSupportedNVVMHelperParameterType(helper->getParamType(parameterIndex)))
+        if (!isNVVMSupportedValueType(helper->getParamType(parameterIndex)))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function parameter"));
     }
     return SLANG_OK;
@@ -1735,9 +1728,9 @@ SlangResult _validateNVVMFunction(
     UInt actualParamCount = 0;
     for (auto param : function->getParams())
     {
-        const bool isSupportedType =
-            isEntryPoint ? isNVVMSupportedParameterType(param->getDataType())
-                         : _isSupportedNVVMHelperParameterType(param->getDataType());
+        const bool isSupportedType = isEntryPoint
+                                         ? isNVVMSupportedParameterType(param->getDataType())
+                                         : isNVVMSupportedValueType(param->getDataType());
         if (actualParamCount >= function->getParamCount() || !isSupportedType ||
             !isTypeEqual(param->getDataType(), function->getParamType(actualParamCount)))
         {
@@ -1775,8 +1768,7 @@ SlangResult _validateNVVMFunction(
         {
             for (auto param : block->getParams())
             {
-                if (!isNVVMSupportedIntegerScalarType(param->getDataType()) &&
-                    !isNVVMFloat32Type(param->getDataType()))
+                if (!isNVVMSupportedValueType(param->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
                 }
@@ -2099,7 +2091,7 @@ SlangResult _validateNVVMFunction(
                         dominatorTree,
                         true,
                         store->getVal()->getDataType()));
-                    SLANG_RETURN_ON_FAIL(_validateNumericValue(
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                         codeGenContext,
                         store->getVal(),
                         store,
@@ -2120,7 +2112,7 @@ SlangResult _validateNVVMFunction(
                         dominatorTree,
                         true,
                         store.destinationType));
-                    SLANG_RETURN_ON_FAIL(_validateNumericValue(
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                         codeGenContext,
                         store.source,
                         inst,
@@ -2157,7 +2149,7 @@ SlangResult _validateNVVMFunction(
                     for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
                          ++operandIndex)
                     {
-                        SLANG_RETURN_ON_FAIL(_validateNumericValue(
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                             codeGenContext,
                             inst->getOperand(operandIndex),
                             inst,
@@ -2212,7 +2204,7 @@ SlangResult _validateNVVMFunction(
                                 codeGenContext,
                                 toSlice("call argument type"));
                         }
-                        SLANG_RETURN_ON_FAIL(_validateScalarValue(
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                             codeGenContext,
                             argument,
                             call,
@@ -2566,18 +2558,9 @@ SlangResult _validateNVVMFunction(
                                     toSlice("void helper return"));
                             }
                         }
-                        else if (isNVVMBoolType(returnInst->getVal()->getDataType()))
-                        {
-                            SLANG_RETURN_ON_FAIL(_validateBooleanValue(
-                                codeGenContext,
-                                returnInst->getVal(),
-                                returnInst,
-                                availableValues,
-                                dominatorTree));
-                        }
                         else
                         {
-                            SLANG_RETURN_ON_FAIL(_validateScalarValue(
+                            SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                                 codeGenContext,
                                 returnInst->getVal(),
                                 returnInst,
@@ -3271,17 +3254,18 @@ SlangResult emitNVVMIRFromLinkedIR(
                 SlangNVVMValueHandle loweredPhi = nullptr;
                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                     codeGenContext,
-                    isNVVMFloat32Type(param->getDataType()) ? "float32 phi" : "signed i32 phi",
-                    isNVVMFloat32Type(param->getDataType()) ? builder.emitPhi(
-                                                                  moduleScope.module,
-                                                                  blockMap.getValue(block),
-                                                                  parameterType,
-                                                                  loweredPhi)
-                                                            : builder.emitIntegerPhi(
-                                                                  moduleScope.module,
-                                                                  blockMap.getValue(block),
-                                                                  parameterType,
-                                                                  loweredPhi)));
+                    isNVVMSignedI32Type(param->getDataType()) ? "signed i32 phi"
+                                                              : "generic value phi",
+                    isNVVMSignedI32Type(param->getDataType()) ? builder.emitIntegerPhi(
+                                                                    moduleScope.module,
+                                                                    blockMap.getValue(block),
+                                                                    parameterType,
+                                                                    loweredPhi)
+                                                              : builder.emitPhi(
+                                                                    moduleScope.module,
+                                                                    blockMap.getValue(block),
+                                                                    parameterType,
+                                                                    loweredPhi)));
                 valueMap[param] = loweredPhi;
             }
         }
@@ -4178,15 +4162,16 @@ SlangResult emitNVVMIRFromLinkedIR(
                         loweredArgument));
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
-                        isNVVMFloat32Type(param->getDataType()) ? "float32 phi incoming value"
-                                                                : "signed i32 phi incoming value",
-                        isNVVMFloat32Type(param->getDataType())
-                            ? builder.addPhiIncoming(
+                        isNVVMSignedI32Type(param->getDataType())
+                            ? "signed i32 phi incoming value"
+                            : "generic value phi incoming value",
+                        isNVVMSignedI32Type(param->getDataType())
+                            ? builder.addIntegerPhiIncoming(
                                   moduleScope.module,
                                   valueMap.getValue(param),
                                   loweredArgument,
                                   blockMap.getValue(predecessor))
-                            : builder.addIntegerPhiIncoming(
+                            : builder.addPhiIncoming(
                                   moduleScope.module,
                                   valueMap.getValue(param),
                                   loweredArgument,

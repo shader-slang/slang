@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=CUDA_NO_LOOP):-target cuda -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=CPP_NO_LOOP):-target cpp -entry computeMain -stage compute -line-directive-mode none
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 // The generic `dot` fallback in `hlsl.meta.slang` accumulates over a loop, and the C-like
 // targets have no native `dot` arm to replace it. Without `[ForceUnroll]` the emitted code
@@ -62,3 +63,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // CPP_NO_LOOP-NOT: for(;;)
 // CPP_NO_LOOP-NOT: _slang_vector_get_element
+
+// NVVM: .visible .entry computeMain()
+// NVVM-DAG: ld.global.f32
+// NVVM-DAG: mul.f32
+// NVVM-DAG: mul.lo.s32
+// NVVM-DAG: st.global.f32

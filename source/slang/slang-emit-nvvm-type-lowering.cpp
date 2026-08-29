@@ -99,6 +99,12 @@ IRVectorType* asNVVMSupportedValueVectorType(IRInst* type, uint32_t* outElementC
     return _asNVVMSupportedVectorType(type, true, outElementCount);
 }
 
+bool isNVVMSupportedValueType(IRInst* type)
+{
+    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+           isNVVMBoolType(type) || asNVVMSupportedValueVectorType(type);
+}
+
 IRVectorType* asNVVMSupportedNumericVectorType(IRInst* type, uint32_t* outElementCount)
 {
     return _asNVVMSupportedVectorType(type, false, outElementCount);
@@ -753,11 +759,6 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isBool = isNVVMBoolType(type);
     uint32_t valueVectorElementCount = 0;
     IRVectorType* valueVectorType = asNVVMSupportedValueVectorType(type, &valueVectorElementCount);
-    bool vectorIsSigned = false;
-    uint32_t vectorElementCount = 0;
-    IRVectorType* integerVectorType =
-        asNVVMSupportedI32VectorType(type, &vectorIsSigned, &vectorElementCount);
-    const bool isExecutionVector = integerVectorType && !vectorIsSigned && vectorElementCount == 3;
     IRStructType* structType = as<IRStructType>(type);
     IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
@@ -785,12 +786,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // helper signature.
     const bool isLegal =
         (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-        (use == NVVMTypeUse::HelperResult &&
-         (isVoid || isInteger || isFloat32 || isBool || isExecutionVector)) ||
+        (use == NVVMTypeUse::HelperResult && (isVoid || isNVVMSupportedValueType(type))) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer)) ||
-        (use == NVVMTypeUse::HelperParameter && (isInteger || isFloat32 || isBool)) ||
+        (use == NVVMTypeUse::HelperParameter && isNVVMSupportedValueType(type)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloat32 || isBool || valueVectorType || scalarStructType ||
           fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||

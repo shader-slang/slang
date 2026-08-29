@@ -1148,6 +1148,16 @@ static SlangResult SLANG_NVVM_CALL _getFloatingPointConstant(
     return SLANG_OK;
 }
 
+// Returns whether a first-class value can cross the generic function and control-flow boundary.
+static bool _isSupportedFunctionValueType(llvm::Type* type)
+{
+    if (type && (type->isIntegerTy() || type->isFloatTy()))
+        return true;
+    auto vectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(type);
+    return vectorType && vectorType->getNumElements() >= 2 && vectorType->getNumElements() <= 4 &&
+           _isSupportedFunctionValueType(vectorType->getElementType());
+}
+
 static SlangResult SLANG_NVVM_CALL _emitPhi(
     SlangNVVMModuleHandle module,
     SlangNVVMBlockHandle targetBlock,
@@ -1160,7 +1170,7 @@ static SlangResult SLANG_NVVM_CALL _emitPhi(
     ModuleState* state = _getModule(module);
     llvm::BasicBlock* llvmTargetBlock = _getBlock(targetBlock);
     llvm::Type* llvmType = _getType(type);
-    const bool isSupportedType = llvmType && (llvmType->isIntegerTy() || llvmType->isFloatTy());
+    const bool isSupportedType = _isSupportedFunctionValueType(llvmType);
     if (!state || !llvmTargetBlock || !llvmTargetBlock->getParent() ||
         llvmTargetBlock->getParent()->getParent() != state->module.get() || !isSupportedType ||
         &llvmType->getContext() != &state->context || !outValue)
@@ -1188,8 +1198,7 @@ static SlangResult SLANG_NVVM_CALL _addPhiIncoming(
     llvm::BasicBlock* llvmPhiBlock = llvmPhi ? llvmPhi->getParent() : nullptr;
     llvm::Function* llvmFunction = llvmPhiBlock ? llvmPhiBlock->getParent() : nullptr;
     llvm::Instruction* firstNonPhi = llvmPhiBlock ? llvmPhiBlock->getFirstNonPHI() : nullptr;
-    const bool isSupportedType =
-        llvmPhi && (llvmPhi->getType()->isIntegerTy() || llvmPhi->getType()->isFloatTy());
+    const bool isSupportedType = llvmPhi && _isSupportedFunctionValueType(llvmPhi->getType());
     if (!state || !llvmPhi || !llvmValue || !llvmPredecessorBlock || !llvmPhiBlock ||
         !llvmFunction || llvmFunction->getParent() != state->module.get() || !isSupportedType ||
         &llvmValue->getContext() != &state->context || llvmValue->getType() != llvmPhi->getType() ||
@@ -1214,15 +1223,6 @@ static SlangResult SLANG_NVVM_CALL _addPhiIncoming(
 
     llvmPhi->addIncoming(llvmValue, llvmPredecessorBlock);
     return SLANG_OK;
-}
-
-static bool _isSupportedFunctionValueType(llvm::Type* type)
-{
-    if (type && (type->isIntegerTy() || type->isFloatTy()))
-        return true;
-    auto vectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(type);
-    return vectorType && vectorType->getNumElements() >= 2 && vectorType->getNumElements() <= 4 &&
-           _isSupportedFunctionValueType(vectorType->getElementType());
 }
 
 static SlangResult SLANG_NVVM_CALL _emitCall(

@@ -4827,6 +4827,37 @@ permutations produce `4`, with scalar component stores and `ld.global.v4.f32` re
 Release host build passes, three focused/adjacent units pass 3/3, and the complete NVVM prefix
 passes 362/362.
 
+### Slice 90: Selected vector helper and control-flow values
+
+Helper functions now accept and return the complete selected value family: signed/unsigned
+8/16/32/64-bit integer, Boolean, and Float32 scalars or exact two- through four-lane vectors of
+those elements. `isNVVMSupportedValueType` is the single role classifier used by helper-signature
+preflight and type lowering. This subsumes the former one-off UInt3 execution-helper result rule;
+no signature-combination enum, feature constant, builder callback, or ABI revision is added.
+
+Calls and returns preserve exact canonical Slang types. The emitter's signed-i32 convenience
+methods and generic methods all route through the same exact provider function callbacks. The same
+selected-value rule applies to positional block parameters and branch arguments, and every phi
+uses the provider's generic phi pair. The LLVM provider validates fixed vector phis with the same
+recursive two- through four-lane integer/float rule as generic calls and returns.
+
+The fake provider no longer names UInt3 as a result special case. Function results, parameters,
+calls, and phis retain exact type handles, while a single `ValueVector` category distinguishes
+vector transport from scalar and pointer/resource roles. Focused source passes Int4 through a
+conditional block parameter, Float3 through an identity helper, and comparison-produced Bool2
+through another identity helper. Double2 reaches E52017 before builder discovery, while Slang's
+front end rejects five-lane vectors before backend selection.
+
+Two existing dot-product shaders now pass direct evidence. `vector-dot-unroll.slang` compiles all
+Float2/3/4 and Int3 fallback helpers and preserves scalarized float/integer dot arithmetic in PTX.
+`vector-dot-int.slang` runs through direct libNVVM with Int3, UInt3, UInt64x2, and Int16x4 helpers,
+producing `-14, 28, 20, 5`. CUDA 12.9.86 `ptxas -arch=sm_70` accepts their optimized modules and
+produces 3,432- and 3,048-byte cubins; it also accepts the focused vector-helper module. The three
+other reprobes now reach independent later boundaries: vector logical `and`, canonical
+`GenericAsm`, and local `var` storage. The Release host/provider builds pass, the complete NVVM
+prefix passes 363/363, and the CUDA-scoped shader regressions pass 12/12 with five unrelated lanes
+ignored.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -4842,8 +4873,9 @@ The following remain open until their named slice supplies evidence:
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;
-- external/indirect calls, richer helper ABI, calling conventions and function attributes beyond
-  no-inline, saturating or overflow-decorated arithmetic, float64/low-precision scalar families,
+- external/indirect calls, pointer/aggregate helper ABI, calling conventions and function
+  attributes beyond no-inline, saturating or overflow-decorated arithmetic, float64/low-precision
+  scalar families,
   and vector or matrix operations beyond bounded selected-integer/float32 construction,
   extraction, binary arithmetic, integer shifts/division/remainder/comparison, Boolean comparison
   results, float32 remainder, and same-lane integer conversion;
