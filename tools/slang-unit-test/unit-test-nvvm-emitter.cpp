@@ -3393,6 +3393,74 @@ SLANG_UNIT_TEST(nvvmSlangCopyableStructLocalStoresToStructuredBuffer)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangMutableStructuredBufferAggregateFieldsUseGenericPointers)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMMutableStructuredBufferAggregateFieldSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.scalarStructFieldTypes.getCount() == 2);
+        for (SlangNVVMTypeHandle fieldType : gFakeNVVMBuilder.scalarStructFieldTypes)
+        {
+            SLANG_CHECK(
+                fieldType ==
+                _getFakeNVVMBuilderVectorType(4, FakeNVVMBuilderScalarTypeKind::Integer));
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount == 2);
+        const uint32_t expectedFieldIndices[] = {1, 0};
+        for (Index i = 0; i < SLANG_COUNT_OF(expectedFieldIndices); ++i)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.structFieldPointerBaseValueRefs[i].kind ==
+                FakeNVVMBuilderValueKind::PointerOffset);
+            SLANG_CHECK(gFakeNVVMBuilder.structFieldPointerIndices[i] == expectedFieldIndices[i]);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.emitSequentialElementPointerCallCount == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.sequentialElementPointerBaseValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::StructFieldPointer);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.sequentialElementPointerIndexValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::IntegerConstant);
+        SLANG_CHECK(gFakeNVVMBuilder.emitSequentialElementExtractCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.loadAlignment == 16);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storePointerValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::SequentialElementPointer);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::VectorElement);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangEmptyComputeUsesDirectPipeline)
 {
     _resetDirectNVVMFakes();
@@ -6049,12 +6117,9 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
         {kDirectNVVMUnsupportedNestedStructHelperSource, "'helper function parameter'"},
         {kDirectNVVMNonCanonicalCUDAOffsetSource, "'CUDA layout query'"},
-        {kDirectNVVMUnsupportedFixedSamplerArrayStorageSource,
-         "'conventional global parameter field address'"},
-        {kDirectNVVMUnsupportedNestedParameterBlockSource,
-         "'conventional global parameter field address'"},
-        {kDirectNVVMUnsupportedNestedConstantBufferSource,
-         "'conventional global parameter field address'"},
+        {kDirectNVVMUnsupportedFixedSamplerArrayStorageSource, "'struct field address'"},
+        {kDirectNVVMUnsupportedNestedParameterBlockSource, "'struct field address'"},
+        {kDirectNVVMUnsupportedNestedConstantBufferSource, "'struct field address'"},
         {kDirectNVVMFloatingSineSource, "'GenericAsm'"},
         {kDirectNVVMUnsupportedScalarTruthinessSignatureSource, "'GenericAsm'"},
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm'"},

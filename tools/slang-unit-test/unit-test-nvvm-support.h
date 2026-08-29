@@ -8420,6 +8420,20 @@ void computeMain(RWStructuredBuffer<Thing> destination, uniform uint index)
 }
 )";
 
+static const char kDirectNVVMMutableStructuredBufferAggregateFieldSource[] = R"(
+struct Payload
+{
+    int4 first;
+    int4 second;
+};
+
+[CUDAKernel]
+void computeMain(RWStructuredBuffer<Payload> values, uniform uint index)
+{
+    values[index].second.y = values[0].first.x;
+}
+)";
+
 static const char kDirectNVVMIncompatibleStructuredBufferAggregateLayoutSource[] = R"(
 struct MisalignedThing
 {

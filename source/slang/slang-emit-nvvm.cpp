@@ -114,7 +114,7 @@ struct NVVMStructField
     IRStructField* field = nullptr;
     uint32_t fieldIndex = 0;
     bool isConventionalGlobal = false;
-    bool isMutableLocal = false;
+    bool isMutable = false;
 };
 
 // Resolves the aggregate-address shapes with executable representations: a field in the collected
@@ -141,13 +141,18 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     {
         structType = asNVVMSupportedPhysicalArrayStructType(resourceElementPointer->getValueType());
         if (!structType)
-            return false;
+        {
+            structType = asNVVMSupportedCopyableStructType(resourceElementPointer->getValueType());
+            if (!structType)
+                return false;
+            outAddress.isMutable = true;
+        }
     }
     else if (asNVVMSupportedLocalCopyableStructPointerType(
                  fieldAddress->getBase()->getDataType(),
                  &structType))
     {
-        outAddress.isMutableLocal = true;
+        outAddress.isMutable = true;
     }
     else if (asNVVMSupportedLocalScalarStructPointerType(
                  fieldAddress->getBase()->getDataType(),
@@ -155,7 +160,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     {
         // A canonical BorrowInOutParam is not itself a local Ptr, but it shares the exact selected
         // scalar-struct pointee and mutable field contract established for helper parameters.
-        outAddress.isMutableLocal = true;
+        outAddress.isMutable = true;
     }
     else
     {
@@ -198,7 +203,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
                getNVVMSupportedRawBufferType(fieldType, rawBufferType);
     }
 
-    if (outAddress.isMutableLocal)
+    if (outAddress.isMutable)
         return isNVVMSupportedNumericValueType(fieldType);
 
     return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
@@ -410,7 +415,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         {
             NVVMStructField fieldAddress;
             if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress) &&
-                !fieldAddress.isConventionalGlobal && !fieldAddress.isMutableLocal)
+                !fieldAddress.isConventionalGlobal && !fieldAddress.isMutable)
             {
                 arrayType = asNVVMSupportedNumericArrayType(fieldAddress.field->getFieldType());
                 baseType = as<IRPtrTypeBase>(base->getDataType());
@@ -429,6 +434,16 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         IRType* valueType = nullptr;
         IRPtrTypeBase* numericPointer =
             asNVVMSupportedLocalNumericPointerType(base->getDataType(), &valueType);
+        if (!numericPointer && base->getOp() == kIROp_FieldAddress)
+        {
+            NVVMStructField fieldAddress;
+            if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress) &&
+                fieldAddress.isMutable)
+            {
+                numericPointer = as<IRPtrTypeBase>(base->getDataType());
+                valueType = numericPointer ? numericPointer->getValueType() : nullptr;
+            }
+        }
         NVVMSequentialElementPointer parentElement;
         if (!numericPointer && _getNVVMSequentialElementPointer(base, parentElement))
         {
@@ -545,6 +560,25 @@ bool _hasNVVMCompatibleStructLayout(CodeGenContext* codeGenContext, IRStructType
         }
     }
     return true;
+}
+
+// Returns the retained aggregate declaration required by an accepted structured-buffer view.
+// The view itself is the canonical producer of this dependency; requiring an unrelated local of
+// the same type would make otherwise identical raw and conventional entry signatures diverge.
+IRStructType* _getNVVMRawBufferAggregateElementType(IRType* type)
+{
+    NVVMRawBufferType rawBufferType;
+    if (!getNVVMSupportedRawBufferType(type, rawBufferType) ||
+        rawBufferType.kind != NVVMRawBufferKind::Structured)
+    {
+        return nullptr;
+    }
+    if (auto copyableStruct =
+            asNVVMSupportedCopyableStructType(rawBufferType.structuredElementType))
+    {
+        return copyableStruct;
+    }
+    return asNVVMSupportedPhysicalArrayStructType(rawBufferType.structuredElementType);
 }
 
 // Maps a canonical global produced by CUDA varying legalization to its semantic provider operation.
@@ -2514,12 +2548,10 @@ SlangResult _validatePointerValue(
             codeGenContext,
             toSlice("raw RWStructuredBuffer numeric load or store consumer"));
     }
-    if (fieldPtrType && !fieldAddress.isMutableLocal &&
+    if (fieldPtrType && !fieldAddress.isMutable &&
         (consumer->getOp() != kIROp_Load || requireWriteAccess))
     {
-        return _diagnoseUnsupportedIR(
-            codeGenContext,
-            toSlice("read-only conventional parameter field load"));
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("immutable struct field access"));
     }
     if (sequentialElementPtrType && sequentialElement.isImmutable &&
         (consumer->getOp() != kIROp_Load || requireWriteAccess))
@@ -3393,7 +3425,7 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("conventional global parameter field address"));
+                            toSlice("struct field address"));
                     }
                 }
                 break;
@@ -4561,19 +4593,8 @@ SlangResult validateNVVMSupportedIR(
     {
         for (auto field : conventionalGlobalParams.elementType->getFields())
         {
-            NVVMRawBufferType rawBufferType;
-            if (!getNVVMSupportedRawBufferType(field->getFieldType(), rawBufferType) ||
-                rawBufferType.kind != NVVMRawBufferKind::Structured)
-            {
-                continue;
-            }
             IRStructType* elementStruct =
-                asNVVMSupportedCopyableStructType(rawBufferType.structuredElementType);
-            if (!elementStruct)
-            {
-                elementStruct =
-                    asNVVMSupportedPhysicalArrayStructType(rawBufferType.structuredElementType);
-            }
+                _getNVVMRawBufferAggregateElementType(field->getFieldType());
             if (elementStruct)
             {
                 if (!_hasNVVMCompatibleStructLayout(codeGenContext, elementStruct))
@@ -4595,6 +4616,17 @@ SlangResult validateNVVMSupportedIR(
         {
             if (auto parameterType = asNVVMSupportedCopyableStructType(parameter->getDataType()))
                 selectedReachableStructTypes.add(parameterType);
+            if (auto elementStruct =
+                    _getNVVMRawBufferAggregateElementType(parameter->getDataType()))
+            {
+                if (!_hasNVVMCompatibleStructLayout(codeGenContext, elementStruct))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("structured-buffer aggregate layout"));
+                }
+                selectedReachableStructTypes.add(elementStruct);
+            }
             IRStructType* pointerValueType = nullptr;
             if (asNVVMSupportedLocalScalarStructPointerType(
                     parameter->getDataType(),
@@ -6046,8 +6078,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            resolvedAddress.isMutableLocal ? "local copyable-struct field address"
-                                                           : "global parameter field address",
+                            resolvedAddress.isMutable ? "mutable struct field address"
+                                                      : "immutable struct field address",
                             builder.emitStructFieldPointer(
                                 moduleScope.module,
                                 loweredBasePointer,

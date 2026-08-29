@@ -5594,6 +5594,41 @@ descriptor evidence as family-resolved operations in the test double; this chang
 ABI. A two-parameter malformed helper is rejected before provider mutation. Release host builds
 pass, and the complete NVVM unit-test prefix passes 384/384.
 
+### Slice 117: Mutable structured-buffer aggregate fields
+
+Writable elements of the existing layout-compatible copyable-struct resource family now compose
+with generic keyed field and sequential vector-lane addressing. The final producer for
+`buffer[index].second.y` is already canonical: raw-buffer legalization creates a writable
+scalar-layout pointer to the aggregate, `get_field_addr` selects the field by semantic key, and
+`getElementPtr` selects the vector lane. The direct emitter resolves that producer chain and calls
+the existing typed struct-field and sequential-pointer operations; no source member names, whole
+aggregate reconstruction, new builder callback, or LLVM-provider branch is involved.
+
+Field mutability is now a property of the resolved producer rather than an alias for local storage.
+Mutable locals and writable copyable resource elements admit selected numeric fields. Conventional
+parameter fields and sole-array physical matrix wrappers retain their immutable contracts. The
+sequential resolver accepts the raw resource field's explicit scalar-layout pointer only by
+revalidating that exact mutable field producer, so it does not broaden ordinary local pointers or
+admit arbitrary explicit pointer spellings.
+
+Accepted structured-buffer views also retain their own aggregate element declaration. Previously,
+a raw aggregate resource parameter passed only if an unrelated local of the same type happened to
+keep the struct alive. Conventional global fields and raw entry parameters now share one aggregate
+element selector and the same CUDA-versus-LLVM layout proof.
+
+`write-structured-buffer-field.slang` passes direct runtime with its unchanged 32-element result:
+each destination `b.y` lane becomes the first element's `a.x` value `1`. Its direct PTX lane checks
+the selected kernel, vector global load, and scalar global store. The 681-byte module assembles with
+CUDA 12.9.86 `ptxas -arch=sm_70` to a 2,792-byte cubin. Focused fake coverage proves the two raw
+element pointers, semantic field indices, lane pointer, typed load/extract/store chain, and zero new
+provider operations. Adjacent incompatible-layout, whole-aggregate, and immutable physical-matrix
+regressions pass, and the complete NVVM unit-test prefix passes 385/385.
+
+The next bounded corpus probes are independent: `assoctype-nested-lookup.slang` stops at a helper
+result type, `constant-buffer-memory-packing.slang` stops at a different struct-field shape, and
+`bitcast-64bit.slang` stops at a wide helper parameter. They remain prioritization choices rather
+than reasons to widen this resource-field contract.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5630,13 +5665,14 @@ The following remain open until their named slice supplies evidence:
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical
-  structured/byte-address data pointers and constant-lane structured-buffer vector swizzled stores,
-  plus selected-element indexing of fixed numeric local arrays and vectors, including other
+  structured/byte-address data pointers, constant-lane structured-buffer vector swizzled stores,
+  and direct keyed numeric-field/vector-lane access to layout-compatible copyable read-write
+  structured-buffer elements, plus selected-element indexing of fixed numeric local arrays and
+  vectors, including other
   `IRGetElementPtr`
   shapes, pointer escape through helpers beyond the exact selected-scalar-struct, numeric-value,
   and fixed-numeric-array helper subsets or through SSA, nested or dynamically indexed aggregate
-  values, mutable aggregate families beyond layout-compatible first-level
-  numeric-field structs,
+  values, mutable aggregate families beyond layout-compatible first-level numeric-field structs,
   first-class aggregate field reads beyond flat copyable helper values, aggregate layouts requiring
   padding, true mutable device globals beyond the established actual-global atomic subset,
   thread-local contexts beyond flat scalar fields, additional shared-memory shapes, and
