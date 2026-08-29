@@ -68,8 +68,16 @@ bool isNVVMSupportedByteAddressValueType(IRInst* type);
 /// Returns an exact nonempty struct whose fields are all selected scalar values.
 IRStructType* asNVVMSupportedScalarStructType(IRInst* type);
 
+/// Returns an exact generic local or borrowed mutable pointer to a selected scalar struct.
+IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
+    IRInst* type,
+    IRStructType** outValueType = nullptr);
+
 /// Returns the natural byte alignment of one selected numeric value, or zero when unsupported.
 uint32_t getNVVMNumericValueAlignment(IRInst* type);
+
+/// Returns the natural alignment of a selected first-class value, including a scalar struct.
+uint32_t getNVVMCopyableValueAlignment(IRInst* type);
 
 /// Returns an accepted nonempty fixed i32 array and optionally its exact element count.
 IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount = nullptr);

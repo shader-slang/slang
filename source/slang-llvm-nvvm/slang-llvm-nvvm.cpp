@@ -651,6 +651,40 @@ static SlangResult SLANG_NVVM_CALL _emitStore(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _emitLocalStorage(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle valueType,
+    uint32_t alignment,
+    const char* name,
+    size_t nameSize,
+    SlangNVVMValueHandle* outStorage)
+{
+    if (outStorage)
+        *outStorage = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Type* llvmValueType = _getType(valueType);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::Function* function = insertionBlock ? insertionBlock->getParent() : nullptr;
+    if (!state || !llvmValueType || &llvmValueType->getContext() != &state->context ||
+        !llvm::PointerType::isLoadableOrStorableType(llvmValueType) || !llvmValueType->isSized() ||
+        !function || function->getParent() != state->module.get() ||
+        !_isValidAlignment(alignment) || (!name && nameSize) || !outStorage)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    // A source local denotes one allocation per function activation even when its canonical IR
+    // instruction is physically inside a loop block. Keep every fixed-size allocation in the
+    // entry block and let ordinary dominance make the resulting pointer usable everywhere.
+    llvm::IRBuilder<> entryBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
+    llvm::AllocaInst* storage =
+        entryBuilder.CreateAlloca(llvmValueType, nullptr, _getStringRef(name, nameSize));
+    storage->setAlignment(llvm::Align(alignment));
+    *outStorage = reinterpret_cast<SlangNVVMValueHandle>(storage);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitIntegerBinary(
     SlangNVVMModuleHandle module,
     SlangNVVMValueOperation operation,
@@ -1182,6 +1216,17 @@ static bool _isSupportedFunctionValueType(llvm::Type* type)
     return false;
 }
 
+// Returns whether a direct helper parameter has one accepted physical representation.
+static bool _isSupportedFunctionParameterType(llvm::Type* type)
+{
+    if (_isSupportedFunctionValueType(type))
+        return true;
+    auto pointerType = llvm::dyn_cast_or_null<llvm::PointerType>(type);
+    return pointerType && !pointerType->isOpaque() &&
+           pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_GENERIC &&
+           _isSupportedFunctionValueType(pointerType->getNonOpaquePointerElementType());
+}
+
 static SlangResult SLANG_NVVM_CALL _emitPhi(
     SlangNVVMModuleHandle module,
     SlangNVVMBlockHandle targetBlock,
@@ -1278,7 +1323,7 @@ static SlangResult SLANG_NVVM_CALL _emitCall(
     {
         llvm::Type* parameterType = functionType->getParamType(static_cast<unsigned>(i));
         llvm::Value* argument = _getValue(arguments[i]);
-        if (!_isSupportedFunctionValueType(parameterType) || !argument ||
+        if (!_isSupportedFunctionParameterType(parameterType) || !argument ||
             argument->getType() != parameterType ||
             !_isValueUsableAtInsertionPoint(state, insertionBlock, argument))
         {
@@ -2939,6 +2984,7 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.setInsertBlock = _setInsertBlock;
     api.emitLoad = _emitLoad;
     api.emitStore = _emitStore;
+    api.emitLocalStorage = _emitLocalStorage;
     api.emitBranch = _emitBranch;
     api.emitConditionalBranch = _emitConditionalBranch;
     api.getIntegerConstant = _getIntegerConstant;

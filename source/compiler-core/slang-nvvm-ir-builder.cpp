@@ -35,14 +35,15 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
            api.getPointerType && api.getFunctionType && api.getArrayType && api.getVectorType &&
            api.getStructType && api.declareFunction && api.getFunctionParameter &&
            api.setFunctionParameterAttributes && api.createBlock && api.setInsertBlock &&
-           api.emitLoad && api.emitStore && api.emitBranch && api.emitConditionalBranch &&
-           api.getIntegerConstant && api.getFloatingPointConstant && api.emitPhi &&
-           api.addPhiIncoming && api.emitCall && api.emitValueReturn && api.emitReturnVoid &&
-           api.emitPointerOffset && api.emitByteOffsetPointer && api.emitArrayElementPointer &&
-           api.emitStructFieldPointer && api.emitAggregateConstruct &&
-           api.emitAggregateElementExtract && api.emitVectorConstruct &&
-           api.emitVectorElementExtract && api.emitRelaxedGlobalI32AtomicAdd &&
-           api.declareGlobalStorage && api.markFunctionAsKernel;
+           api.emitLoad && api.emitStore && api.emitLocalStorage && api.emitBranch &&
+           api.emitConditionalBranch && api.getIntegerConstant && api.getFloatingPointConstant &&
+           api.emitPhi && api.addPhiIncoming && api.emitCall && api.emitValueReturn &&
+           api.emitReturnVoid && api.emitPointerOffset && api.emitByteOffsetPointer &&
+           api.emitArrayElementPointer && api.emitStructFieldPointer &&
+           api.emitAggregateConstruct && api.emitAggregateElementExtract &&
+           api.emitVectorConstruct && api.emitVectorElementExtract &&
+           api.emitRelaxedGlobalI32AtomicAdd && api.declareGlobalStorage &&
+           api.markFunctionAsKernel;
 }
 
 static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI& api)
@@ -362,6 +363,26 @@ SlangResult NVVMIRBuilder::emitStore(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
     return m_construction.emitStore(module, value, pointer, alignment);
+}
+
+SlangResult NVVMIRBuilder::emitLocalStorage(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle valueType,
+    uint32_t alignment,
+    const UnownedStringSlice& name,
+    SlangNVVMValueHandle& outStorage) const
+{
+    outStorage = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    const SlangNVVMResult result = m_construction.emitLocalStorage(
+        module,
+        valueType,
+        alignment,
+        name.begin(),
+        name.getLength(),
+        &outStorage);
+    return _validateHandleResult(result, outStorage);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerBinary(

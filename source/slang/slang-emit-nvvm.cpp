@@ -115,6 +115,7 @@ struct NVVMStructField
 {
     IRStructField* field = nullptr;
     uint32_t fieldIndex = 0;
+    bool isMutableLocal = false;
 };
 
 // Resolves the two aggregate-address shapes with executable representations: a field in the
@@ -132,6 +133,12 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     if (isConventionalGlobal)
     {
         structType = globalParams.elementType;
+    }
+    else if (asNVVMSupportedLocalScalarStructPointerType(
+                 fieldAddress->getBase()->getDataType(),
+                 &structType))
+    {
+        outAddress.isMutableLocal = true;
     }
     else if (!asNVVMSupportedScalarParameterGroupType(
                  fieldAddress->getBase()->getDataType(),
@@ -1556,6 +1563,8 @@ SlangResult _validatePointerValue(
         value ? asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType()) : nullptr;
     auto sharedElementPtrType =
         value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
+    auto localStructPtrType =
+        value ? asNVVMSupportedLocalScalarStructPointerType(value->getDataType()) : nullptr;
     auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
     NVVMStructField fieldAddress;
     if (!fieldPtrType || value->getOp() != kIROp_FieldAddress ||
@@ -1567,6 +1576,7 @@ SlangResult _validatePointerValue(
     IRPtrTypeBase* acceptedPtrType = devicePtrType            ? devicePtrType
                                      : sharedElementPtrType   ? sharedElementPtrType
                                      : resourceElementPtrType ? resourceElementPtrType
+                                     : localStructPtrType     ? localStructPtrType
                                                               : fieldPtrType;
     if (!acceptedPtrType)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
@@ -1580,7 +1590,8 @@ SlangResult _validatePointerValue(
             codeGenContext,
             toSlice("raw RWStructuredBuffer numeric load or store consumer"));
     }
-    if (fieldPtrType && (consumer->getOp() != kIROp_Load || requireWriteAccess))
+    if (fieldPtrType && !fieldAddress.isMutableLocal &&
+        (consumer->getOp() != kIROp_Load || requireWriteAccess))
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
@@ -1690,7 +1701,32 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 // Returns whether a type is an accepted canonical value in a helper result.
 bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
-    return as<IRVoidType>(type) || isNVVMSupportedValueType(type);
+    return as<IRVoidType>(type) || isNVVMSupportedValueType(type) ||
+           asNVVMSupportedScalarStructType(type);
+}
+
+// Returns whether one exact canonical type can cross a selected helper parameter boundary.
+bool _isSupportedNVVMHelperParameterType(IRInst* type)
+{
+    return isNVVMSupportedValueType(type) || asNVVMSupportedLocalScalarStructPointerType(type);
+}
+
+// Returns whether one canonical call argument satisfies an exact helper parameter. A mutable
+// borrow deliberately has a distinct source type from the local pointer passed to it, while both
+// preserve the same selected aggregate and lower to one typed generic pointer.
+bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterType)
+{
+    if (isTypeEqual(argumentType, parameterType))
+        return true;
+    IRStructType* argumentValueType = nullptr;
+    IRStructType* parameterValueType = nullptr;
+    auto argumentPointer =
+        asNVVMSupportedLocalScalarStructPointerType(argumentType, &argumentValueType);
+    auto parameterPointer =
+        asNVVMSupportedLocalScalarStructPointerType(parameterType, &parameterValueType);
+    return argumentPointer && argumentPointer->getOp() == kIROp_PtrType && parameterPointer &&
+           parameterPointer->getOp() == kIROp_BorrowInOutParamType &&
+           isTypeEqual(argumentValueType, parameterValueType);
 }
 
 // Returns whether a canonical helper signature needs the generic construction path.
@@ -1703,7 +1739,7 @@ bool _usesGenericNVVMFunctions(IRFunc* helper)
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
         IRType* parameterType = helper->getParamType(parameterIndex);
-        SLANG_RELEASE_ASSERT(isNVVMSupportedValueType(parameterType));
+        SLANG_RELEASE_ASSERT(_isSupportedNVVMHelperParameterType(parameterType));
         if (!isNVVMSignedI32Type(parameterType))
             return true;
     }
@@ -1730,7 +1766,7 @@ SlangResult _validateNVVMHelperTarget(
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function result type"));
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
-        if (!isNVVMSupportedValueType(helper->getParamType(parameterIndex)))
+        if (!_isSupportedNVVMHelperParameterType(helper->getParamType(parameterIndex)))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function parameter"));
     }
     return SLANG_OK;
@@ -1888,9 +1924,9 @@ SlangResult _validateNVVMFunction(
     UInt actualParamCount = 0;
     for (auto param : function->getParams())
     {
-        const bool isSupportedType = isEntryPoint
-                                         ? isNVVMSupportedParameterType(param->getDataType())
-                                         : isNVVMSupportedValueType(param->getDataType());
+        const bool isSupportedType =
+            isEntryPoint ? isNVVMSupportedParameterType(param->getDataType())
+                         : _isSupportedNVVMHelperParameterType(param->getDataType());
         if (actualParamCount >= function->getParamCount() || !isSupportedType ||
             !isTypeEqual(param->getDataType(), function->getParamType(actualParamCount)))
         {
@@ -1945,12 +1981,25 @@ SlangResult _validateNVVMFunction(
         {
             switch (inst->getOp())
             {
+            case kIROp_Var:
+                {
+                    IRStructType* valueType = nullptr;
+                    if (!asNVVMSupportedLocalScalarStructPointerType(
+                            inst->getDataType(),
+                            &valueType))
+                    {
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("var"));
+                    }
+                }
+                break;
+
             case kIROp_Load:
                 {
                     NVVMRawBufferType rawBufferType;
                     if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
                         !getNVVMSupportedRawBufferType(inst->getDataType(), rawBufferType) &&
-                        !asNVVMSupportedScalarParameterGroupType(inst->getDataType()))
+                        !asNVVMSupportedScalarParameterGroupType(inst->getDataType()) &&
+                        !asNVVMSupportedScalarStructType(inst->getDataType()))
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 }
                 break;
@@ -2238,6 +2287,10 @@ SlangResult _validateNVVMFunction(
         {
             switch (inst->getOp())
             {
+            case kIROp_Var:
+                availableValues.add(inst);
+                break;
+
             case kIROp_Load:
                 {
                     auto load = cast<IRLoad>(inst);
@@ -2264,12 +2317,24 @@ SlangResult _validateNVVMFunction(
                         dominatorTree,
                         true,
                         store->getVal()->getDataType()));
-                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
-                        codeGenContext,
-                        store->getVal(),
-                        store,
-                        availableValues,
-                        dominatorTree));
+                    if (asNVVMSupportedScalarStructType(store->getVal()->getDataType()))
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                            codeGenContext,
+                            store->getVal(),
+                            store,
+                            availableValues,
+                            dominatorTree));
+                    }
+                    else
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                            codeGenContext,
+                            store->getVal(),
+                            store,
+                            availableValues,
+                            dominatorTree));
+                    }
                 }
                 break;
 
@@ -2373,7 +2438,7 @@ SlangResult _validateNVVMFunction(
                          ++argumentIndex)
                     {
                         IRInst* argument = call->getArg(argumentIndex);
-                        if (!argument || !isTypeEqual(
+                        if (!argument || !_isSupportedNVVMHelperArgumentType(
                                              argument->getDataType(),
                                              callee->getParamType(argumentIndex)))
                         {
@@ -2381,12 +2446,26 @@ SlangResult _validateNVVMFunction(
                                 codeGenContext,
                                 toSlice("call argument type"));
                         }
-                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
-                            codeGenContext,
-                            argument,
-                            call,
-                            availableValues,
-                            dominatorTree));
+                        if (asNVVMSupportedLocalScalarStructPointerType(argument->getDataType()))
+                        {
+                            SLANG_RETURN_ON_FAIL(_validatePointerValue(
+                                codeGenContext,
+                                argument,
+                                call,
+                                availableValues,
+                                dominatorTree,
+                                false,
+                                cast<IRPtrTypeBase>(argument->getDataType())->getValueType()));
+                        }
+                        else
+                        {
+                            SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                                codeGenContext,
+                                argument,
+                                call,
+                                availableValues,
+                                dominatorTree));
+                        }
                     }
                     if (!as<IRVoidType>(call->getDataType()))
                         availableValues.add(call);
@@ -2763,12 +2842,24 @@ SlangResult _validateNVVMFunction(
                         }
                         else
                         {
-                            SLANG_RETURN_ON_FAIL(_validateSelectedValue(
-                                codeGenContext,
-                                returnInst->getVal(),
-                                returnInst,
-                                availableValues,
-                                dominatorTree));
+                            if (asNVVMSupportedScalarStructType(function->getResultType()))
+                            {
+                                SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                                    codeGenContext,
+                                    returnInst->getVal(),
+                                    returnInst,
+                                    availableValues,
+                                    dominatorTree));
+                            }
+                            else
+                            {
+                                SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                                    codeGenContext,
+                                    returnInst->getVal(),
+                                    returnInst,
+                                    availableValues,
+                                    dominatorTree));
+                            }
                         }
                         hasHelperReturn = true;
                     }
@@ -3159,18 +3250,43 @@ SlangResult validateNVVMSupportedIR(
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("CUDA kernel decoration"));
     }
 
-    HashSet<IRInst*> entryParameterStructTypes;
-    for (auto parameter : entryPoint->getParams())
+    HashSet<IRInst*> selectedScalarStructTypes;
+    for (auto function : functions)
     {
-        if (asNVVMSupportedScalarStructType(parameter->getDataType()))
-            entryParameterStructTypes.add(parameter->getDataType());
+        if (auto resultType = asNVVMSupportedScalarStructType(function->getResultType()))
+            selectedScalarStructTypes.add(resultType);
+        for (auto parameter : function->getParams())
+        {
+            if (auto parameterType = asNVVMSupportedScalarStructType(parameter->getDataType()))
+                selectedScalarStructTypes.add(parameterType);
+            IRStructType* pointerValueType = nullptr;
+            if (asNVVMSupportedLocalScalarStructPointerType(
+                    parameter->getDataType(),
+                    &pointerValueType))
+            {
+                selectedScalarStructTypes.add(pointerValueType);
+            }
+        }
+        for (auto block : function->getBlocks())
+        {
+            for (auto inst : block->getOrdinaryInsts())
+            {
+                IRStructType* localValueType = nullptr;
+                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalScalarStructPointerType(
+                                                      inst->getDataType(),
+                                                      &localValueType))
+                {
+                    selectedScalarStructTypes.add(localValueType);
+                }
+            }
+        }
     }
 
     // Linking can retain module-scope types, layouts, capabilities, and constants needed to spell
     // the reachable functions. IRStructKey is also layout-only identity retained for raw CUDA
-    // parameter layouts. A selected-scalar struct used by the entry point is its canonical by-value
-    // parameter type, not an unrelated dropped global. Reject every other semantic global so this
-    // emitter cannot silently drop a function, parameter, initializer, or storage object.
+    // parameter layouts. A selected-scalar struct used by a reachable signature or local is its
+    // canonical value type, not an unrelated dropped global. Reject every other semantic global
+    // so this emitter cannot silently drop a function, parameter, initializer, or storage object.
     for (auto globalInst : linkedIR.module->getGlobalInsts())
     {
         if (auto globalFunction = as<IRFunc>(globalInst))
@@ -3207,7 +3323,7 @@ SlangResult validateNVVMSupportedIR(
         {
             continue;
         }
-        if (entryParameterStructTypes.contains(globalInst))
+        if (selectedScalarStructTypes.contains(globalInst))
             continue;
         if (_isNVVMConventionalGlobalStorageType(conventionalGlobalParams, globalInst))
             continue;
@@ -3492,6 +3608,31 @@ SlangResult emitNVVMIRFromLinkedIR(
             {
                 switch (inst->getOp())
                 {
+                case kIROp_Var:
+                    {
+                        IRStructType* valueType = nullptr;
+                        SLANG_RELEASE_ASSERT(asNVVMSupportedLocalScalarStructPointerType(
+                            inst->getDataType(),
+                            &valueType));
+                        SlangNVVMTypeHandle loweredValueType = nullptr;
+                        SLANG_RETURN_ON_FAIL(
+                            typeContext.lowerType(valueType, NVVMTypeUse::Value, loweredValueType));
+                        const uint32_t alignment = getNVVMCopyableValueAlignment(valueType);
+                        SLANG_RELEASE_ASSERT(alignment);
+                        SlangNVVMValueHandle loweredStorage = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "local scalar-struct storage",
+                            builder.emitLocalStorage(
+                                moduleScope.module,
+                                loweredValueType,
+                                alignment,
+                                toSlice("slangLocal"),
+                                loweredStorage)));
+                        valueMap[inst] = loweredStorage;
+                    }
+                    break;
+
                 case kIROp_Load:
                     {
                         auto load = cast<IRLoad>(inst);
@@ -3505,7 +3646,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        uint32_t alignment = getNVVMNumericValueAlignment(load->getDataType());
+                        uint32_t alignment = getNVVMCopyableValueAlignment(load->getDataType());
                         NVVMRawBufferType rawBufferType;
                         if (getNVVMSupportedRawBufferType(load->getDataType(), rawBufferType) ||
                             asNVVMSupportedScalarParameterGroupType(load->getDataType()))
@@ -3553,12 +3694,12 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredPointer));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "numeric store",
+                            "value store",
                             builder.emitStore(
                                 moduleScope.module,
                                 loweredValue,
                                 loweredPointer,
-                                getNVVMNumericValueAlignment(store->getVal()->getDataType()))));
+                                getNVVMCopyableValueAlignment(store->getVal()->getDataType()))));
                     }
                     break;
 
@@ -4149,7 +4290,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "conventional global parameter field address",
+                            resolvedAddress.isMutableLocal ? "local scalar-struct field address"
+                                                           : "global parameter field address",
                             builder.emitStructFieldPointer(
                                 moduleScope.module,
                                 loweredBasePointer,

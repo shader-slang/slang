@@ -234,6 +234,27 @@ IRStructType* asNVVMSupportedScalarStructType(IRInst* type)
     return hasField ? structType : nullptr;
 }
 
+IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
+    IRInst* type,
+    IRStructType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    auto pointerType = as<IRPtrTypeBase>(type);
+    auto valueType =
+        pointerType ? asNVVMSupportedScalarStructType(pointerType->getValueType()) : nullptr;
+    if (!pointerType || !valueType ||
+        (pointerType->getOp() != kIROp_PtrType &&
+         pointerType->getOp() != kIROp_BorrowInOutParamType) ||
+        pointerType->getOperandCount() != 1)
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
 uint32_t getNVVMNumericValueAlignment(IRInst* type)
 {
     uint32_t bitWidth = 0;
@@ -245,6 +266,23 @@ uint32_t getNVVMNumericValueAlignment(IRInst* type)
     if (asNVVMSupported32BitNumericVectorType(type, &elementCount))
         return elementCount == 2 ? 8 : 16;
     return 0;
+}
+
+uint32_t getNVVMCopyableValueAlignment(IRInst* type)
+{
+    if (const uint32_t numericAlignment = getNVVMNumericValueAlignment(type))
+        return numericAlignment;
+    auto structType = asNVVMSupportedScalarStructType(type);
+    if (!structType)
+        return 0;
+    uint32_t alignment = 0;
+    for (auto field : structType->getFields())
+    {
+        const uint32_t fieldAlignment = getNVVMNumericValueAlignment(field->getFieldType());
+        SLANG_RELEASE_ASSERT(fieldAlignment);
+        alignment = Math::Max(alignment, fieldAlignment);
+    }
+    return alignment;
 }
 
 IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount)
@@ -790,6 +828,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRVectorType* valueVectorType = asNVVMSupportedValueVectorType(type, &valueVectorElementCount);
     IRStructType* structType = as<IRStructType>(type);
     IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
+    IRStructType* localScalarStructValueType = nullptr;
+    IRPtrTypeBase* localScalarStructPointer =
+        asNVVMSupportedLocalScalarStructPointerType(type, &localScalarStructValueType);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
     IRArrayType* deviceArrayType = nullptr;
@@ -813,21 +854,22 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
     // helper signature.
-    const bool isLegal =
-        (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-        (use == NVVMTypeUse::HelperResult && (isVoid || isNVVMSupportedValueType(type))) ||
-        (use == NVVMTypeUse::EntryPointParameter &&
-         (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
-          deviceArrayPointer || isRawBuffer)) ||
-        (use == NVVMTypeUse::HelperParameter && isNVVMSupportedValueType(type)) ||
-        (use == NVVMTypeUse::Value &&
-         (isInteger || isFloatingPoint || isBool || valueVectorType || scalarStructType ||
-          fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
-          isBufferDataPointer || parameterGroup || resourceElementPointer ||
-          sharedElementPointer)) ||
-        (use == NVVMTypeUse::Storage &&
-         (isInteger || isFloat32 || structType || isRawBuffer || parameterGroup || samplerStorage ||
-          unsizedSamplerArrayStorage));
+    const bool isLegal = (use == NVVMTypeUse::EntryPointResult && isVoid) ||
+                         (use == NVVMTypeUse::HelperResult &&
+                          (isVoid || isNVVMSupportedValueType(type) || scalarStructType)) ||
+                         (use == NVVMTypeUse::EntryPointParameter &&
+                          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
+                           deviceArrayPointer || isRawBuffer)) ||
+                         (use == NVVMTypeUse::HelperParameter &&
+                          (isNVVMSupportedValueType(type) || localScalarStructPointer)) ||
+                         (use == NVVMTypeUse::Value &&
+                          (isInteger || isFloatingPoint || isBool || valueVectorType ||
+                           scalarStructType || fixedNumericArrayType || deviceNumericPointer ||
+                           deviceArrayPointer || isRawBuffer || isBufferDataPointer ||
+                           parameterGroup || resourceElementPointer || sharedElementPointer)) ||
+                         (use == NVVMTypeUse::Storage &&
+                          (isInteger || isFloat32 || structType || isRawBuffer || parameterGroup ||
+                           samplerStorage || unsizedSamplerArrayStorage));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -853,6 +895,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                 outType)));
         m_entryParameterRepresentationMap[type] = outType;
         return SLANG_OK;
+    }
+
+    if (use == NVVMTypeUse::HelperParameter && localScalarStructPointer)
+    {
+        return _lowerPointerType(
+            type,
+            localScalarStructValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            outType);
     }
 
     if (auto mappedType = m_typeMap.tryGetValue(type))

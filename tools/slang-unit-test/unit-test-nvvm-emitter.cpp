@@ -2517,8 +2517,7 @@ SLANG_UNIT_TEST(nvvmSlangLocalVectorSwizzlePromotesToGenericValues)
         SLANG_CHECK_ABORT(code != nullptr);
         SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
 
-        // The fake interface deliberately has no local-allocation callback. Successful emission
-        // proves the source variable was promoted, while these calls prove the pure lane update
+        // This source has no surviving local allocation. These calls prove its pure lane update
         // was flattened through the generic vector value path.
         SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount >= 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitVectorElementExtractCallCount >= 7);
@@ -2528,6 +2527,82 @@ SLANG_UNIT_TEST(nvvmSlangLocalVectorSwizzlePromotesToGenericValues)
         {
             SLANG_CHECK(elementKind == FakeNVVMBuilderScalarTypeKind::Half);
         }
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangStatefulAggregateHelpersUseGenericLocalPointers)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMStatefulAggregateHelperSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLocalStorageCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.localStorageValueTypes.getCount() == 2);
+        for (Index storageIndex = 0;
+             storageIndex < gFakeNVVMBuilder.localStorageValueTypes.getCount();
+             ++storageIndex)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.localStorageValueTypes[storageIndex] ==
+                _getFakeNVVMBuilderScalarStructType());
+            SLANG_CHECK(gFakeNVVMBuilder.localStorageAlignments[storageIndex] == 4);
+        }
+
+        bool sawStructResult = false;
+        bool sawMutableStructParameter = false;
+        for (Index functionTypeIndex = 0;
+             functionTypeIndex < gFakeNVVMBuilder.functionTypeResultKinds.getCount();
+             ++functionTypeIndex)
+        {
+            sawStructResult |= gFakeNVVMBuilder.functionTypeResultKinds[functionTypeIndex] ==
+                               FakeNVVMBuilderResultTypeKind::ScalarStruct;
+            const Index parameterOffset =
+                gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionTypeIndex];
+            const size_t parameterCount =
+                gFakeNVVMBuilder.functionTypeParameterCounts[functionTypeIndex];
+            for (size_t parameterIndex = 0; parameterIndex < parameterCount; ++parameterIndex)
+            {
+                sawMutableStructParameter |=
+                    gFakeNVVMBuilder
+                        .functionParameterTypeKinds[parameterOffset + Index(parameterIndex)] ==
+                    FakeNVVMBuilderParameterTypeKind::ScalarStructPointer;
+            }
+        }
+        SLANG_CHECK(sawStructResult);
+        SLANG_CHECK(sawMutableStructParameter);
+
+        bool sawLocalPointerCall = false;
+        for (const FakeNVVMBuilderValueRef argument : gFakeNVVMBuilder.callArgumentValueRefs)
+            sawLocalPointerCall |= argument.kind == FakeNVVMBuilderValueKind::LocalStorage;
+        SLANG_CHECK(sawLocalPointerCall);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount >= 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount >= 4);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);

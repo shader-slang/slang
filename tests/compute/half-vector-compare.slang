@@ -1,6 +1,8 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -compute -output-using-type -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-vk -compute -output-using-type -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cuda -compute -output-using-type -render-features half -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -render-features half -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
 
 // Test for doing a calculation using half
 
@@ -96,3 +98,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     outputBuffer[tid] = r;
 }
+
+// NVVM: .visible .entry computeMain()

@@ -5008,6 +5008,32 @@ host/provider builds and the complete 367/367 NVVM prefix pass. The next direct-
 the scalar-struct result and `BorrowInOutParam<Values>` helper ABI in
 `half-vector-compare.slang`.
 
+### Slice 96: Stateful scalar-struct helpers through typed local pointers
+
+Exact forward-only builder ABI revision 11 adds one structural operation,
+`emitLocalStorage(module, valueType, alignment, name)`. The provider validates the complete owning
+module, insertion function, sized value type, power-of-two alignment, and name before it creates a
+fixed alloca in the function's entry block. The operation is type-driven and is not specific to a
+Slang struct or method; compiler-side policy remains responsible for deciding which source shapes
+may request storage.
+
+Direct NVVM now admits first-class selected scalar structs as helper results and exact
+`BorrowInOutParam<selected-scalar-struct>` helper parameters. A matching function-local
+`Ptr<selected-scalar-struct>` remains a typed generic LLVM pointer through calls, field GEPs,
+loads, and stores. The source IR deliberately spells the caller and callee types differently:
+method lowering passes a local `Ptr<Values>` to a parameter declared
+`BorrowInOutParam<Values>`. The direct call validator recognizes only that exact language-defined
+relation with an identical pointee type; it does not introduce a general type-equivalence rule.
+Pointer results, pointer phis, address-space casts, pointer arithmetic, and unrelated local
+aggregate families remain closed.
+
+`half-vector-compare.slang` now runs its existing stateful `Values.next` helper through direct
+libNVVM. Its direct runtime lane produces four `32` results. The 3,061-byte optimized PTX passes
+CUDA 12.9.86 `ptxas -arch=sm_70` and produces a 3,688-byte cubin. Release host/provider builds,
+the complete 369/369 NVVM prefix, and all four enabled comparison-shader lanes pass. The next
+existing-suite probe reaches the local `Thing` aggregate in `half-structured-buffer.slang`; its
+mixed `uint`, `float`, and `half4` local/storage representation is a separate capability boundary.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5023,7 +5049,8 @@ The following remain open until their named slice supplies evidence:
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
   signed-i32x2 device pointers, and selected scalar/vector raw read-only/read-write structured and
   byte-address buffers;
-- external/indirect calls, pointer/aggregate helper ABI, calling conventions and function
+- external/indirect calls, helper pointer/aggregate ABI beyond exact selected-scalar-struct local
+  pointers and `BorrowInOutParam` parameters, calling conventions and function
   attributes beyond no-inline, saturating or overflow-decorated arithmetic, Float64/BFloat16/FP8
   scalar families, Float16 storage and unoptimized vector execution,
   and vector or matrix operations beyond bounded selected-numeric construction, constant-indexed
@@ -5036,9 +5063,10 @@ The following remain open until their named slice supplies evidence:
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical
   structured/byte-address data pointers and constant-lane structured-buffer vector swizzled stores,
-  including other `IRGetElementPtr` shapes, pointer escape through helpers or SSA, nested or
-  dynamically indexed aggregate values, mutable structs, general globals, additional shared-memory
-  shapes, and address spaces;
+  including other `IRGetElementPtr` shapes, pointer escape through helpers beyond the exact
+  selected-scalar-struct mutable-local subset or through SSA, nested or dynamically indexed
+  aggregate values, mutable aggregate families beyond that subset, general globals, additional
+  shared-memory shapes, and address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;

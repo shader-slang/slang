@@ -136,6 +136,14 @@ public:
         SlangNVVMValueHandle pointer,
         uint32_t alignment) const;
 
+    /// Emits entry-block generic local storage for one complete provider value type.
+    SlangResult emitLocalStorage(
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle valueType,
+        uint32_t alignment,
+        const UnownedStringSlice& name,
+        SlangNVVMValueHandle& outStorage) const;
+
     /// Emits ADD or SUB for same-typed scalar integer values.
     SlangResult emitIntegerBinary(
         SlangNVVMModuleHandle module,
