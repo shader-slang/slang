@@ -2838,7 +2838,7 @@ static SlangResult _emitValueOperationFamily(
     if (!state || !insertionBlock || !resultType || !outValue)
         return SLANG_E_INVALID_ARG;
 
-    llvm::Value* llvmOperands[2] = {};
+    llvm::Value* llvmOperands[3] = {};
     for (size_t i = 0; i < operation.operandCount; ++i)
     {
         llvmOperands[i] = _getValue(operands[i]);
@@ -3044,6 +3044,9 @@ static SlangResult _emitValueOperationFamily(
         result = llvmOperands[0]->getType() == resultType
                      ? llvmOperands[0]
                      : state->builder.CreateBitCast(llvmOperands[0], resultType);
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::Select:
+        result = state->builder.CreateSelect(llvmOperands[0], llvmOperands[1], llvmOperands[2]);
         break;
     default:
         return SLANG_E_INVALID_ARG;

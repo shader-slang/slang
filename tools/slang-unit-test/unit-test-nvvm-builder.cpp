@@ -128,7 +128,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=19") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=20") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -3168,6 +3168,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("or <2 x i1>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("icmp eq <2 x i1>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("icmp ne <2 x i1>")) >= 0);
+        SLANG_CHECK(_countOccurrences(text, toSlice("select <2 x i1>")) >= 2);
+        SLANG_CHECK(text.indexOf(toSlice("select i1")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("insertelement <2 x i1>")) >= 0);
         SLANG_CHECK(_countOccurrences(text, toSlice("extractelement <2 x i1>")) >= 2);
         SLANG_CHECK(_countOccurrences(text, toSlice("insertelement <2 x half>")) == 2);
@@ -3377,6 +3379,37 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
             SLANG_COUNT_OF(invalidOperands),
             invalidResult) == SLANG_E_NOT_AVAILABLE);
     SLANG_CHECK(invalidResult == nullptr);
+
+    const SlangNVVMValueTypeDesc scalarConditionVectorSelectOperands[] = {
+        NVVMSemantics::kBool,
+        signedI32x2,
+        signedI32x2,
+    };
+    const SlangNVVMValueOperationDesc scalarConditionVectorSelect = {
+        SLANG_NVVM_VALUE_OP_SELECT,
+        signedI32x2,
+        scalarConditionVectorSelectOperands,
+        SLANG_COUNT_OF(scalarConditionVectorSelectOperands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(scalarConditionVectorSelect));
+
+    const SlangNVVMValueTypeDesc unsignedI32x2 = {
+        SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+        32,
+        2,
+    };
+    const SlangNVVMValueTypeDesc mismatchedSelectAlternatives[] = {
+        bool2,
+        signedI32x2,
+        unsignedI32x2,
+    };
+    const SlangNVVMValueOperationDesc mismatchedSelect = {
+        SLANG_NVVM_VALUE_OP_SELECT,
+        signedI32x2,
+        mismatchedSelectAlternatives,
+        SLANG_COUNT_OF(mismatchedSelectAlternatives),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(mismatchedSelect));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderRealProviderPreservesShortBuffers)

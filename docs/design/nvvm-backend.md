@@ -5517,6 +5517,29 @@ reproduced the file's documented CUDA bounds-semantics defect. Its tentative lan
 instead of treating successful PTX generation as semantic coverage. Release compiler/provider
 builds pass, and the complete NVVM unit-test prefix remains 381/381.
 
+### Slice 114: Generic typed value selection
+
+Canonical Slang `select` now uses the same generic typed value-operation interface as arithmetic,
+comparisons, conversions, and bit reinterpretation. Forward-only builder ABI revision 20 adds one
+semantic operation ID but no callback or interface field. The shared resolver requires exactly
+three operands: a selected Boolean condition with the result's lane count, followed by two
+alternatives exactly equal to the result descriptor. Scalar and two- through four-lane Boolean,
+selected integer, Float16, and Float32 values therefore share one bounded rule without enumerated
+overload combinations or scalar-broadcast spellings.
+
+The direct emitter maps only the canonical three-operand IR instruction and preserves its operand
+order. Preflight validates the same descriptors and value availability used by the provider. The
+LLVM provider emits `CreateSelect`; its ordinary scalar and fixed-vector assembly is already valid
+in the LLVM 7-era NVVM IR 2.0 dialect, so the compatibility serializer needs no text rewrite.
+
+`tests/cuda/nvvm-typed-select.slang` passes direct runtime with `0, 0, 1, 0` and direct PTX
+checking. Its 1,193-byte module assembles with CUDA 12.9.86 `ptxas -arch=sm_70` to a 3,048-byte
+cubin. The existing `logic-no-short-circuit-evaluation.slang` corpus probe now advances past its
+same-lane Boolean-vector select and stops at its separate mutable module-scope `static int` device
+pointer. That global needs an initializer-preserving storage contract and remains the measured next
+boundary rather than being silently emitted through the existing `undef` global declaration.
+Release host/provider builds pass, and the complete NVVM unit-test prefix passes 382/382.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5548,7 +5571,7 @@ The following remain open until their named slice supplies evidence:
   integer-indexed selected-value extraction, selected integer/Float16/Float32 scalar-broadcast
   binary arithmetic, integer and Float16/Float32 comparisons, Boolean logic and
   equality/inequality, integer shifts/division/remainder, Float16/Float32 remainder, and same-lane
-  integer/floating conversion;
+  integer/floating conversion, plus exact same-lane typed selection;
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical

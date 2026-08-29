@@ -1211,6 +1211,77 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangTypedSelectUsesGenericValueOperation)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMTypedSelectSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+            StringBuilder state;
+            state << "typed-select fake trace: result " << int(result) << "; operations "
+                  << gFakeNVVMBuilder.scalarOperations.getCount() << "; selects "
+                  << gFakeNVVMBuilder
+                         .scalarFamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::Select)]
+                  << "; calls " << gFakeNVVMBuilder.emitCallCallCount << "; stores "
+                  << gFakeNVVMBuilder.emitStoreCallCount << "; modules "
+                  << gFakeNVVMBuilder.createModuleCallCount << "; programs "
+                  << gFakeNVVM.createProgramCallCount;
+            for (const FakeNVVMBuilderScalarOperation& operation :
+                 gFakeNVVMBuilder.scalarOperations)
+            {
+                state << "; op " << operation.key.operation << " family "
+                      << uint32_t(operation.key.family) << " type " << operation.resultType.kind
+                      << "/" << operation.resultType.bitWidth << "/"
+                      << operation.resultType.laneCount;
+            }
+            getTestReporter()->message(TestMessageType::TestFailure, state.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool sawBooleanVectorSelect = false;
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            sawBooleanVectorSelect =
+                sawBooleanVectorSelect ||
+                (operation.key.family == FakeNVVMBuilderScalarFamily::Select &&
+                 operation.key.operation == SLANG_NVVM_VALUE_OP_SELECT &&
+                 operation.operandCount == 3 &&
+                 operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
+                 operation.resultType.bitWidth == 1 && operation.resultType.laneCount == 2 &&
+                 operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
+                 operation.operandTypes[0].laneCount == 2 &&
+                 NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[1]) &&
+                 NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[2]));
+        }
+        SLANG_CHECK(sawBooleanVectorSelect);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.scalarFamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::Select)] ==
+            1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangScalarShiftDivideRemainderUseTypedOperations)
 {
     struct OperationCase

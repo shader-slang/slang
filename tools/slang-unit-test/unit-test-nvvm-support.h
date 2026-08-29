@@ -314,6 +314,7 @@ enum class FakeNVVMBuilderScalarFamily : uint32_t
     FloatingUnary,
     FloatingBinary,
     FloatingCompare,
+    Select,
     Count,
 };
 
@@ -334,9 +335,9 @@ struct FakeNVVMBuilderScalarOperation
 {
     FakeNVVMBuilderScalarOperationKey key;
     SlangNVVMValueTypeDesc resultType = {};
-    SlangNVVMValueTypeDesc operandTypes[2] = {};
+    SlangNVVMValueTypeDesc operandTypes[3] = {};
     Index callerBlockIndex = -1;
-    FakeNVVMBuilderValueRef operands[2];
+    FakeNVVMBuilderValueRef operands[3];
     uint32_t operandCount = 0;
 };
 
@@ -2032,10 +2033,16 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
         return valueRef.index >= 0 && valueRef.index < gFakeNVVMBuilder.scalarPhiTypes.getCount() &&
                gFakeNVVMBuilder.scalarPhiTypes[valueRef.index] == _getFakeNVVMBuilderIntegerType();
     case FakeNVVMBuilderValueKind::ScalarOperation:
-        return gFakeNVVMBuilder.scalarOperations[valueRef.index].key.family ==
-                   FakeNVVMBuilderScalarFamily::Unary ||
-               gFakeNVVMBuilder.scalarOperations[valueRef.index].key.family ==
-                   FakeNVVMBuilderScalarFamily::Binary;
+        {
+            const FakeNVVMBuilderScalarOperation& operation =
+                gFakeNVVMBuilder.scalarOperations[valueRef.index];
+            return operation.key.family == FakeNVVMBuilderScalarFamily::Unary ||
+                   operation.key.family == FakeNVVMBuilderScalarFamily::Binary ||
+                   (operation.key.family == FakeNVVMBuilderScalarFamily::Select &&
+                    (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                     operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+                    operation.resultType.laneCount == 1);
+        }
     case FakeNVVMBuilderValueKind::Intrinsic:
         return valueRef.index >= 0 &&
                valueRef.index < gFakeNVVMBuilder.intrinsicResultTypes.getCount() &&
@@ -2515,11 +2522,15 @@ static bool _isFakeNVVMBuilderBooleanValue(SlangNVVMValueHandle value)
                    FakeNVVMBuilderScalarTypeKind::Boolean;
     }
     Index operationIndex = -1;
-    return _getFakeNVVMBuilderScalarOperationIndex(value, operationIndex) &&
-           (gFakeNVVMBuilder.scalarOperations[operationIndex].key.family ==
-                FakeNVVMBuilderScalarFamily::Compare ||
-            gFakeNVVMBuilder.scalarOperations[operationIndex].key.family ==
-                FakeNVVMBuilderScalarFamily::FloatingCompare);
+    if (!_getFakeNVVMBuilderScalarOperationIndex(value, operationIndex))
+        return false;
+    const FakeNVVMBuilderScalarOperation& operation =
+        gFakeNVVMBuilder.scalarOperations[operationIndex];
+    return operation.key.family == FakeNVVMBuilderScalarFamily::Compare ||
+           operation.key.family == FakeNVVMBuilderScalarFamily::FloatingCompare ||
+           (operation.key.family == FakeNVVMBuilderScalarFamily::Select &&
+            operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
+            operation.resultType.laneCount == 1);
 }
 
 static bool _getFakeNVVMBuilderResourceViewElementTypeKind(
@@ -5313,6 +5324,19 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
         return _recordFakeNVVMBuilderScalarOperation(
             module,
             {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(operation->operation)},
+            operands,
+            uint32_t(operandCount),
+            outValue,
+            &operation->resultType,
+            operation->operandTypes);
+    }
+    if (resolution.family == NVVMSemantics::ValueOperationFamily::Select)
+    {
+        gFakeNVVMBuilder.emittedValueOperations.add(
+            {FakeNVVMBuilderScalarFamily::Select, uint32_t(operation->operation)});
+        return _recordFakeNVVMBuilderScalarOperation(
+            module,
+            {FakeNVVMBuilderScalarFamily::Select, uint32_t(operation->operation)},
             operands,
             uint32_t(operandCount),
             outValue,
@@ -8942,6 +8966,51 @@ static SlangResult _populateNumericFamilyFunction(
         emitOperation(SLANG_NVVM_VALUE_OP_EQUAL, bool2, operandTypes, operands, 2, ignored));
     SLANG_RETURN_ON_FAIL(
         emitOperation(SLANG_NVVM_VALUE_OP_NOT_EQUAL, bool2, operandTypes, operands, 2, ignored));
+    const SlangNVVMValueTypeDesc boolSelectOperandTypes[] = {bool2, bool2, bool2};
+    const SlangNVVMValueHandle boolSelectOperands[] = {
+        vectorComparison,
+        constructedBooleanVector,
+        combinedComparison,
+    };
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_SELECT,
+        bool2,
+        boolSelectOperandTypes,
+        boolSelectOperands,
+        SLANG_COUNT_OF(boolSelectOperands),
+        ignored));
+
+    const SlangNVVMValueTypeDesc integerSelectOperandTypes[] = {
+        bool2,
+        signedI32x2,
+        signedI32x2,
+    };
+    const SlangNVVMValueHandle integerSelectOperands[] = {
+        vectorComparison,
+        parameters[3],
+        parameters[4],
+    };
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_SELECT,
+        signedI32x2,
+        integerSelectOperandTypes,
+        integerSelectOperands,
+        SLANG_COUNT_OF(integerSelectOperands),
+        ignored));
+
+    const SlangNVVMValueTypeDesc halfSelectOperandTypes[] = {boolType, float16, float16};
+    const SlangNVVMValueHandle halfSelectOperands[] = {
+        parameters[10],
+        halfValues[0],
+        halfValues[1],
+    };
+    SLANG_RETURN_ON_FAIL(emitOperation(
+        SLANG_NVVM_VALUE_OP_SELECT,
+        float16,
+        halfSelectOperandTypes,
+        halfSelectOperands,
+        SLANG_COUNT_OF(halfSelectOperands),
+        ignored));
     operandTypes[1] = boolType;
     operands[1] = parameters[10];
     SLANG_RETURN_ON_FAIL(
@@ -8984,6 +9053,21 @@ void computeMain(
     destination[7] = logic.y ? 1 : 0;
     destination[8] = floatLess.x ? 1 : 0;
     destination[9] = equalBoolean.y ? 1 : 0;
+}
+)";
+
+static const char kDirectNVVMTypedSelectSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int value)
+{
+    int2 values = int2(value, value + 1);
+    bool2 condition = values > 0;
+    bool2 whenTrue = values < 4;
+    bool2 whenFalse = values == 0;
+    bool2 selected = condition ? whenTrue : whenFalse;
+    *destination = all(selected) ? 1 : 0;
 }
 )";
 

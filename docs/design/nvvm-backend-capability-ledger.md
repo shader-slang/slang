@@ -1667,3 +1667,21 @@ The PTX modules are 478, 688, 685, 688, 645, 680, 645, 688, 688, 712, 685, 1,233
 2,792-byte cubins, and one 3,048-byte cubin. The adjacent zero-index bounds fixture compiles but
 reproduces its documented CUDA runtime mismatch, so no direct lane is registered. Release
 compiler/provider builds pass, and the complete NVVM unit-test prefix remains 381/381.
+
+Slice 114 adds canonical typed value selection through forward-only builder ABI revision 20. One
+generic operation descriptor covers scalar and two- through four-lane Boolean, selected integer,
+Float16, and Float32 results. The condition must be Boolean with the result's exact lane count, and
+both alternatives must exactly match the result. Scalar-condition vector selection, broadcast,
+aggregate selection, and wider floating kinds remain unsupported.
+
+The real provider emits ordinary LLVM `select` for both LLVM 14 assembly and the LLVM 7-era NVVM
+IR 2.0 dialect. Focused builder coverage observes Boolean-vector, integer-vector, and scalar-Half
+selection and rejects mismatched condition lanes or alternative signedness. The fake-emitter path
+records the exact three typed operands, while the direct emitter maps only canonical
+`kIROp_Select`.
+
+`tests/cuda/nvvm-typed-select.slang` passes direct runtime and PTX lanes with `0, 0, 1, 0`; its
+1,193-byte PTX assembles with CUDA 12.9.86 to a 3,048-byte cubin. The existing
+`logic-no-short-circuit-evaluation.slang` probe advances through select and stops at its independent
+mutable module-scope `static int` pointer, which requires an initializer-preserving global-storage
+contract. Release host/provider builds pass, and the complete NVVM unit-test prefix passes 382/382.

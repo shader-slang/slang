@@ -2067,6 +2067,9 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation& outOperation)
     case kIROp_FloatCast:
         outOperation = SLANG_NVVM_VALUE_OP_FLOAT_CONVERT;
         return true;
+    case kIROp_Select:
+        outOperation = SLANG_NVVM_VALUE_OP_SELECT;
+        return true;
     case kIROp_WaveMaskBallot:
         outOperation = SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT;
         return true;
@@ -3046,6 +3049,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_CastIntToFloat:
             case kIROp_CastFloatToInt:
             case kIROp_FloatCast:
+            case kIROp_Select:
                 {
                     NVVMResolvedValueOperation operation;
                     if (!_resolveNVVMValueOperation(inst, operation))
@@ -3495,6 +3499,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_CastIntToFloat:
             case kIROp_CastFloatToInt:
             case kIROp_FloatCast:
+            case kIROp_Select:
                 {
                     NVVMResolvedValueOperation operation;
                     SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
@@ -5186,6 +5191,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_CastIntToFloat:
                 case kIROp_CastFloatToInt:
                 case kIROp_FloatCast:
+                case kIROp_Select:
                 case kIROp_WaveMaskBallot:
                     {
                         NVVMResolvedValueOperation operation;

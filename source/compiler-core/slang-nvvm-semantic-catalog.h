@@ -25,6 +25,7 @@ enum class ValueOperationFamily : uint32_t
     FloatToInteger,
     FloatConvert,
     BitReinterpret,
+    Select,
 };
 
 struct ValueOperationFamilyResolution
@@ -830,6 +831,19 @@ inline bool resolveValueOperationFamily(
         desc.resultType.laneCount == desc.operandTypes[0].laneCount)
     {
         outResolution = {ValueOperationFamily::BitReinterpret, "bitwise value reinterpretation"};
+        return true;
+    }
+
+    const bool hasSelectedResult = isSelectedBoolValue(desc.resultType) ||
+                                   isSelectedIntegerValue(desc.resultType) ||
+                                   isSelectedFloatValue(desc.resultType);
+    if (desc.operation == SLANG_NVVM_VALUE_OP_SELECT && desc.operandCount == 3 &&
+        hasSelectedResult && isSelectedBoolValue(desc.operandTypes[0]) &&
+        desc.operandTypes[0].laneCount == desc.resultType.laneCount &&
+        areSameType(desc.resultType, desc.operandTypes[1]) &&
+        areSameType(desc.resultType, desc.operandTypes[2]))
+    {
+        outResolution = {ValueOperationFamily::Select, "typed value selection"};
         return true;
     }
 
