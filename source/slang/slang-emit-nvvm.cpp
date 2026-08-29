@@ -1092,6 +1092,13 @@ bool _resolveNVVMSurfaceGenericAsm(
         dimensionCount = 2;
     }
     else if (
+        assembly == toSlice("surf3Dread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, "
+                            "SLANG_CUDA_BOUNDARY_MODE)"))
+    {
+        operation = SLANG_NVVM_SURFACE_OP_LOAD;
+        dimensionCount = 3;
+    }
+    else if (
         assembly == toSlice("surf1Dwrite$C<$T0>($2, $0, ($1) * $E, "
                             "SLANG_CUDA_BOUNDARY_MODE)"))
     {
@@ -1104,6 +1111,13 @@ bool _resolveNVVMSurfaceGenericAsm(
     {
         operation = SLANG_NVVM_SURFACE_OP_STORE;
         dimensionCount = 2;
+    }
+    else if (
+        assembly == toSlice("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, "
+                            "SLANG_CUDA_BOUNDARY_MODE)"))
+    {
+        operation = SLANG_NVVM_SURFACE_OP_STORE;
+        dimensionCount = 3;
     }
     else
         return false;
@@ -1132,8 +1146,8 @@ bool _resolveNVVMSurfaceGenericAsm(
         bool isSigned = false;
         uint32_t laneCount = 0;
         hasCanonicalCoordinate =
-            asNVVMSupportedI32VectorType(coordinateType, &isSigned, &laneCount) && laneCount == 2 &&
-            isSigned == (operation == SLANG_NVVM_SURFACE_OP_LOAD);
+            asNVVMSupportedI32VectorType(coordinateType, &isSigned, &laneCount) &&
+            laneCount == dimensionCount && isSigned == (operation == SLANG_NVVM_SURFACE_OP_LOAD);
     }
     if (!hasCanonicalCoordinate)
         return false;

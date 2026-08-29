@@ -705,7 +705,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderLoadStorage loadStorage[16];
     FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[64];
     FakeNVVMBuilderIntrinsicStorage intrinsicStorage[8];
-    FakeNVVMBuilderSurfaceOperationStorage surfaceOperationStorage[16];
+    FakeNVVMBuilderSurfaceOperationStorage surfaceOperationStorage[32];
     FakeNVVMBuilderTextureOperationStorage textureOperationStorage[16];
     FakeNVVMBuilderIntegerConstantStorage integerConstantStorage[64];
     FakeNVVMBuilderFloatingPointConstantStorage floatingPointConstantStorage[64];
@@ -5214,7 +5214,7 @@ static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperation
 {
     if ((operation.operation != SLANG_NVVM_SURFACE_OP_LOAD &&
          operation.operation != SLANG_NVVM_SURFACE_OP_STORE) ||
-        (operation.dimensionCount != 1 && operation.dimensionCount != 2) ||
+        operation.dimensionCount < 1 || operation.dimensionCount > 3 ||
         operation.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
         (operation.elementType.laneCount != 1 && operation.elementType.laneCount != 2 &&
          operation.elementType.laneCount != 4) ||
@@ -5222,10 +5222,13 @@ static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperation
     {
         return false;
     }
-    return (operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_NATIVE &&
-            operation.elementType.bitWidth == 16) ||
-           (operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16 &&
-            operation.elementType.bitWidth == 32);
+    if (operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_NATIVE)
+    {
+        return operation.elementType.bitWidth == 32 ||
+               (operation.elementType.bitWidth == 16 && operation.dimensionCount <= 2);
+    }
+    return operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16 &&
+           operation.elementType.bitWidth == 32 && operation.dimensionCount <= 2;
 }
 
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsSurfaceOperationSupported(
@@ -5269,8 +5272,9 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitSurfaceOperation(
     }
 
     if (!_isFakeNVVMBuilderIntegerValue(operands[0]) ||
-        (operation->dimensionCount == 1 ? !_isFakeNVVMBuilderIntegerValue(operands[1])
-                                        : !_isFakeNVVMBuilderIntegerVectorValue(operands[1], 2)))
+        (operation->dimensionCount == 1
+             ? !_isFakeNVVMBuilderIntegerValue(operands[1])
+             : !_isFakeNVVMBuilderIntegerVectorValue(operands[1], operation->dimensionCount)))
     {
         return SLANG_E_INVALID_ARG;
     }

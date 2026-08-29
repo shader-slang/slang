@@ -5145,10 +5145,12 @@ queries describe conversion explicitly instead of inferring it from a Float reso
 The field key on the collected conventional global remains the source of truth for `[format]`.
 Preflight accepts only the canonical `load(fieldAddress(globalParams, key))` resource argument at
 every call to a retained CUDA-prelude surface helper. It resolves the complete descriptor once and
-stores it with the helper identity for emission. A Float surface without a format, a resource
-passed through an arbitrary user helper, or call sites that do not agree remain unsupported. This
-is deliberately the same bounded producer shape used by CUDA intrinsic expansion; direct NVVM
-does not walk arbitrary operand graphs or guess physical storage from semantic type.
+stores it with the helper identity for emission. At this slice, a Float surface without a format,
+a resource passed through an arbitrary user helper, or call sites that do not agree remain
+unsupported. This is deliberately the same bounded producer shape used by CUDA intrinsic
+expansion; direct NVVM does not walk arbitrary operand graphs or guess physical storage from
+semantic type. Slice 105 later assigns undecorated Float surfaces their native Float32 storage
+meaning while retaining this exact provenance rule for explicit converting formats.
 
 Formatted reads reuse LLVM's native i16 `suld` intrinsics, reconstruct Half lanes, and widen each
 lane to Float. LLVM 7 and LLVM 14 expose only trap-boundary IDs for formatted stores, so the
@@ -5158,9 +5160,11 @@ coordinates. No source GenericAsm text crosses the builder ABI.
 
 The re-enabled `half-rw-texture-convert.slang` fixture and all four enabled lanes of
 `half-rw-texture-convert2.slang` pass, including direct CUDA runtime comparison and PTX checks for
-all scalar/v2/v4 2D load/store rows. A focused 1D fixture covers the corresponding six 1D rows;
-negative fixtures prove that missing format and smuggled provenance are rejected. The 1,956-byte
-optimized 2D PTX passes CUDA 12.9.86 `ptxas -arch=sm_70` and produces a 3,304-byte cubin.
+all scalar/v2/v4 2D load/store rows. A focused 1D fixture covers the corresponding six 1D rows.
+At this slice, focused negatives prove that missing format and smuggled provenance are rejected;
+Slice 105 later promotes the missing-format case to native Float32 while retaining the provenance
+negative. The 1,956-byte optimized 2D PTX passes CUDA 12.9.86 `ptxas -arch=sm_70` and produces a
+3,304-byte cubin.
 
 ### Slice 102: Sampled texture level operations
 
@@ -5248,6 +5252,42 @@ and direct PTX checks. Their direct results are respectively
 and `FE000000, FE000000, FE000000`. The optimized modules contain 21 and 9 fetch rows across the
 selected shape/data families. Their 8,138-byte and 2,997-byte PTX modules pass CUDA 12.9.86
 `ptxas -arch=sm_70`, producing 5,800-byte and 3,432-byte cubins.
+
+### Slice 105: Native Float32 read-write surfaces
+
+The existing typed surface descriptor now covers native Float32 scalar, v2, and v4 loads and
+stores for 1D, 2D, and 3D read-write textures. An undecorated selected Float32 field means native
+Float32 storage; an exact R16F, RG16F, or RGBA16F field decoration still selects the established
+Float-to-Half conversion path. The collected field key remains the source of truth for that
+choice, so an explicitly formatted resource passed through an arbitrary helper still stops before
+provider discovery. Native Half and formatted Float-to-Half 3D surfaces remain closed because no
+retained fixture has measured those neighboring shapes.
+
+The compiler recognizes only the six exact finalized CUDA-prelude `surf1D`/`surf2D`/`surf3D`
+read/write GenericAsm strings. It checks signed scalar/vector coordinates on loads, unsigned
+coordinates on stores, and exact coordinate width against dimension count. No source assembly
+crosses the ABI. Builder ABI revision 15 remains unchanged: operation, dimension count, semantic
+element descriptor, boundary mode, and storage format already form the complete capability key.
+
+The LLVM provider selects the exact `llvm.nvvm.suld.*.i32.zero` and
+`llvm.nvvm.sust.b.*.i32.zero` intrinsic from one direction/dimension/physical-width/lane table.
+It scales x by lane count times four bytes, appends the retained y and z coordinates, and bitcasts
+between semantic Float32 lanes and the intrinsic's physical i32 payload. The same generalized
+emitter continues to scale native Half and converting loads by two bytes; formatted stores retain
+their pixel-coordinate inline-PTX path.
+
+`rw-texture-simple.slang` now passes ordinary CUDA and direct-libNVVM runtime comparison with
+outputs `3, 24, 45, 66`. Its permanent PTX checks cover all eighteen unique load/store,
+dimension, and scalar/v2/v4 rows. The optimized module is 3,642 bytes and contains 21 surface
+instructions because the scalar loads occur before and after their stores. CUDA 12.9.86
+`ptxas -arch=sm_70` accepts it and emits a 4,328-byte cubin. The affected surface fixture family
+passes 26/26 executed tests, and the complete NVVM unit-test prefix passes 376/376.
+
+The next existing-suite boundary is `texture-subscript.slang`. Its first direct stop is E52017
+`helper function parameter`: the retained helpers use native Int4 read-write surfaces, including
+1D, 2D, 3D, and 2D-array shapes. That resource family, its exact helper bodies, and the fixture's
+barrier and partial-vector-update dependencies should be measured together before Slice 106 chooses
+a capability boundary.
 
 The following remain open until their named slice supplies evidence:
 

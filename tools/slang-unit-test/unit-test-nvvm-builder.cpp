@@ -550,6 +550,32 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     unsupported = load2D;
     unsupported.storageFormat = SLANG_NVVM_SURFACE_STORAGE_FLOAT16;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+
+    for (uint32_t dimensionCount = 1; dimensionCount <= 3; ++dimensionCount)
+    {
+        for (uint32_t laneCount : {1u, 2u, 4u})
+        {
+            for (SlangNVVMSurfaceOperation operation :
+                 {SLANG_NVVM_SURFACE_OP_LOAD, SLANG_NVVM_SURFACE_OP_STORE})
+            {
+                const SlangNVVMSurfaceOperationDesc nativeFloat = {
+                    operation,
+                    dimensionCount,
+                    {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, laneCount},
+                    SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
+                    SLANG_NVVM_SURFACE_STORAGE_NATIVE,
+                };
+                SLANG_CHECK(builder.supportsSurfaceOperation(nativeFloat));
+            }
+        }
+    }
+
+    unsupported = load2D;
+    unsupported.elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 3};
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+    unsupported = formattedStore2D;
+    unsupported.dimensionCount = 3;
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderRejectsCurrentABIMismatches)

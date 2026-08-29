@@ -595,6 +595,9 @@ bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType)
     case SLANG_TEXTURE_2D:
         dimensionCount = 2;
         break;
+    case SLANG_TEXTURE_3D:
+        dimensionCount = 3;
+        break;
     default:
         return false;
     }
@@ -612,6 +615,8 @@ bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType)
     uint32_t bitWidth = 0;
     if (!isNVVMSupportedFloatingPointScalarType(scalarType, &bitWidth) ||
         (bitWidth != 16 && bitWidth != 32))
+        return false;
+    if (dimensionCount == 3 && bitWidth != 32)
         return false;
 
     outType.textureType = textureType;
@@ -652,6 +657,8 @@ bool getNVVMSupportedSurfaceField(
     if (outType.elementType.bitWidth == 16)
         return true;
     if (!formatDecoration)
+        return true;
+    if (outType.dimensionCount == 3)
         return false;
 
     outStorageFormat = SLANG_NVVM_SURFACE_STORAGE_FLOAT16;
