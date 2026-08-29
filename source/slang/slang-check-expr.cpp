@@ -5503,71 +5503,6 @@ Expr* SemanticsVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
     return visitor.dispatch(exprIn);
 }
 
-Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
-{
-    // This function is invoked on parameter types that could
-    // still be wrapped to represent a parameter-passing mode
-    // like `ref`, `out`, etc.
-    //
-    // We need to intercept these cases here, and ensure that
-    // the wrapper is not exposed to other parts of the front-end
-    // code, because they only exist to encode the parameter-passing
-    // mode, and are not a proper part of the Slang type system
-    // (at least not at this time).
-    //
-    if (auto primalParamWrapperType = as<ParamPassingModeType>(primalParamType))
-    {
-        // Some parameter-passing modes do not naturally lend themselves
-        // to being differentiated - most notably, `ref` parameters.
-        // We will detect those cases here, and handle them as a parameter
-        // of a non-differentiable type would be handled.
-        //
-        // TODO(tfoley): With the introduction of `IDifferentiablePtrType`,
-        // it is possible that something like a `ref` parameter could also
-        // support autodiff, but it is not clear what a correct
-        // one-size-fits-all behavior should be in that case.
-        //
-        if (as<RefParamType>(primalParamType))
-            return primalParamWrapperType;
-
-        // Given a primal type that is a wrapper like `Out<T>`, we can
-        // extract the underlying primal value type `T`, and determine
-        // what the differential type value type corresponding to `T`
-        // should be.
-        //
-        auto primalValueType = primalParamWrapperType->getValueType();
-        auto diffValueType = _toDifferentialParamType(primalValueType);
-
-        // Once we have created the appropriate differential value type,
-        // we will form the differential parameter type by wrapping
-        // the differential value type in the same wrapper that had
-        // been used for the primal type.
-        //
-        if (as<OutType>(primalParamWrapperType))
-        {
-            return m_astBuilder->getOutParamType(diffValueType);
-        }
-        else if (as<BorrowInOutParamType>(primalParamWrapperType))
-        {
-            return m_astBuilder->getBorrowInOutParamType(diffValueType);
-        }
-        else if (as<BorrowInParamType>(primalParamWrapperType))
-        {
-            return m_astBuilder->getConstRefParamType(diffValueType);
-        }
-        else
-        {
-            SLANG_UNEXPECTED("unhandled parameter-passing mode");
-            UNREACHABLE_RETURN(diffValueType);
-        }
-    }
-
-    if (auto diffPairType = tryGetDifferentialPairType(primalParamType))
-        return diffPairType;
-    else
-        return primalParamType;
-}
-
 Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
 {
     if (auto modifiedType = as<ModifiedType>(primalType))
@@ -5641,17 +5576,6 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     // the auto-generation logic in slang-ir-diff-diff.cpp
     List<Type*> paramTypes;
 
-    Type* thisType = nullptr;
-
-    if (thisQualType.type)
-    {
-        if (thisQualType.isLeftValue)
-            thisType = getCurrentASTBuilder()->getBorrowInOutParamType(thisQualType.type);
-        else
-            thisType = thisQualType.type;
-    }
-
-
     auto resultType = originalType->getResultType();
     if (auto resultPairType = tryGetDifferentialPairType(resultType))
         resultType = resultPairType;
@@ -5660,20 +5584,33 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
 
-    if (thisType)
+    auto addForwardDiffParameterElements = [&](Type* primalType, ParamPassingMode mode)
     {
-        // The first parameter is the primal function itself.
-        if (auto diffThisType = _toDifferentialParamType(thisType))
-        {
-            paramTypes.add(diffThisType);
-        }
+        Type* pairType = nullptr;
+        if (mode != ParamPassingMode::Ref)
+            pairType = tryGetDifferentialPairType(primalType);
+
+        appendDifferentiatedParameterTypes(
+            m_astBuilder,
+            paramTypes,
+            pairType ? pairType : primalType,
+            mode,
+            DifferentiatedParameterDirectionPolicy::Preserve,
+            mode != ParamPassingMode::Ref && !pairType);
+    };
+
+    if (thisQualType.type)
+    {
+        addForwardDiffParameterElements(
+            thisQualType.type,
+            thisQualType.isLeftValue ? ParamPassingMode::BorrowInOut : ParamPassingMode::In);
     }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
-        if (auto jvpParamType =
-                _toDifferentialParamType(originalType->getParamTypeWithModeWrapper(i)))
-            paramTypes.add(jvpParamType);
+        addForwardDiffParameterElements(
+            originalType->getParamValueType(i),
+            originalType->getParamPassingMode(i));
     }
 
     FuncType* diffType =
@@ -5697,24 +5634,33 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
 
+    auto addBackwardDiffParameterElements = [&](Type* primalType, ParamPassingMode mode)
+    {
+        auto pairType = tryGetDifferentialPairType(primalType);
+
+        appendDifferentiatedParameterTypes(
+            m_astBuilder,
+            paramTypes,
+            pairType ? pairType : primalType,
+            mode,
+            DifferentiatedParameterDirectionPolicy::Backward,
+            !pairType);
+    };
+
     // Handle implicit `this` parameter for non-static member methods.
     if (thisQualType.type)
     {
-        if (auto diffPairType = tryGetDifferentialPairType(thisQualType.type))
-        {
-            paramTypes.add(
-                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(diffPairType)
-                                         : diffPairType);
-        }
-        else
-        {
-            auto noDiffThisType = m_astBuilder->getModifiedType(
-                thisQualType.type,
-                {m_astBuilder->getNoDiffModifierVal()});
-            paramTypes.add(
-                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(noDiffThisType)
-                                         : noDiffThisType);
-        }
+        auto pairType = tryGetDifferentialPairType(thisQualType.type);
+
+        // The explicit object argument keeps the base expression's value category. Unlike an
+        // ordinary backward `in` parameter, an r-value object argument is not made mutable.
+        appendDifferentiatedParameterTypes(
+            m_astBuilder,
+            paramTypes,
+            pairType ? pairType : thisQualType.type,
+            thisQualType.isLeftValue ? ParamPassingMode::BorrowInOut : ParamPassingMode::In,
+            DifferentiatedParameterDirectionPolicy::Preserve,
+            !pairType);
     }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
@@ -5728,56 +5674,25 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             {
                 auto diffElementType = tryGetDifferentialValueType(m_astBuilder, paramValType);
                 if (diffElementType)
-                    paramTypes.add(diffElementType);
+                {
+                    // The backward mapping changes each `out` element into a separate ordinary
+                    // input parameter. Split a resolved pack now because `FuncType` cannot
+                    // represent those per-element directions while retaining the pack as one
+                    // parameter.
+                    appendMappedElementTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffElementType,
+                        [](Type* elementType) { return elementType; });
+                }
 
                 break;
             }
         case ParamPassingMode::In:
-            {
-                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
-                {
-                    if (as<DifferentialPairType>(diffPairValType))
-                        paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
-                    else if (as<DifferentialPtrPairType>(diffPairValType))
-                        paramTypes.add(diffPairValType);
-                }
-                else
-                {
-                    paramTypes.add(m_astBuilder->getModifiedType(
-                        paramValType,
-                        {m_astBuilder->getNoDiffModifierVal()}));
-                }
-
-                break;
-            }
         case ParamPassingMode::BorrowInOut:
-            {
-                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
-                {
-                    paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
-                }
-                else
-                {
-                    paramTypes.add(m_astBuilder->getModifiedType(
-                        paramValType,
-                        {m_astBuilder->getNoDiffModifierVal()}));
-                }
-
-                break;
-            }
         case ParamPassingMode::BorrowIn:
             {
-                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
-                {
-                    paramTypes.add(m_astBuilder->getConstRefParamType(diffPairValType));
-                }
-                else
-                {
-                    paramTypes.add(m_astBuilder->getConstRefParamType(m_astBuilder->getModifiedType(
-                        paramValType,
-                        {m_astBuilder->getNoDiffModifierVal()})));
-                }
-
+                addBackwardDiffParameterElements(paramValType, paramPassingMode);
                 break;
             }
         case ParamPassingMode::Ref:
@@ -5832,20 +5747,28 @@ struct HigherOrderInvokeExprCheckingActions
         return nullptr;
     }
 
-    // Extract the implicit `this` type for a statically-referenced non-static
-    // member method (e.g. `Type::method`).  Returns a null QualType for free
-    // functions, static methods, constructors, and member methods referenced
-    // by name within their own type (e.g. `[BackwardDerivativeOf(f)]`).
+    // Extract the explicit `this` parameter type for a non-static member method
+    // used as the operand of a higher-order operator.
+    //
+    // Both `Type::method` and `value.method` use the specialized `this` type from
+    // the checked method declaration reference. The derivative callable is static,
+    // so that value must be provided as its first argument.
+    //
+    // Returns a null QualType for free functions, static methods, constructors, and
+    // member methods referenced by name within their own type (e.g.
+    // `[BackwardDerivativeOf(f)]`).
     QualType getThisTypeForBaseFunc(SemanticsVisitor* semantics, Expr* funcExpr)
     {
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
-        // Only produce a this-type when the method is accessed via Type::method
-        // (StaticMemberExpr). When referenced by name within the same struct
-        // (plain DeclRefExpr), the derivative is itself a member method and
-        // the this parameter is handled implicitly.
-        if (!as<StaticMemberExpr>(innerExpr))
+        auto declRefExpr = as<DeclRefExpr>(innerExpr);
+
+        // Only member references can contribute an explicit `this` parameter. A plain
+        // DeclRefExpr inside the same type still means "use the current implicit
+        // this", so the differentiated function remains an instance member.
+        if (!as<MemberExpr>(innerExpr) && !as<StaticMemberExpr>(innerExpr))
             return QualType();
-        if (auto declRefExpr = as<DeclRefExpr>(innerExpr))
+
+        if (declRefExpr)
         {
             auto declRef = declRefExpr->declRef;
             // Unwrap GenericDecl to get to the inner callable.
@@ -5861,6 +5784,10 @@ struct HigherOrderInvokeExprCheckingActions
                 if (!callableDecl->hasModifier<HLSLStaticModifier>() &&
                     !as<ConstructorDecl>(callableDecl))
                 {
+                    // Ask the checked method declaration reference for its specialized
+                    // `this` type and passing mode. For `function.operator()` where
+                    // `F : IUnary`, the declaration starts with `IUnary.This`, and the
+                    // lookup substitution on the declaration reference resolves it to `F`.
                     return getTypeForThisExpr(semantics, callableDeclRef);
                 }
             }
@@ -5889,6 +5816,7 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             return;
         }
         auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->hasExplicitThisParameter = thisType.type != nullptr;
         resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisType);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
@@ -5930,6 +5858,7 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             return;
         }
         auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->hasExplicitThisParameter = thisType.type != nullptr;
         resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType, thisType);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
@@ -6025,10 +5954,10 @@ static Expr* _checkHigherOrderInvokeExpr(
         {
             auto lookupResultExpr = semantics->ConstructLookupResultExpr(
                 item,
-                nullptr,
+                overloadedExpr->base,
                 overloadedExpr->name,
                 overloadedExpr->loc,
-                nullptr);
+                overloadedExpr);
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, lookupResultExpr);
             candidateExpr->loc = expr->loc;
@@ -6091,6 +6020,7 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
         // __apply(fn) takes the same params as fn (not wrapped in DifferentialPair).
         // Give it the base function type so overload resolution works with original args.
         auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultExpr->hasExplicitThisParameter = thisType.type != nullptr;
         if (thisType.type)
         {
             List<Type*> paramTypes;

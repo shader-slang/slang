@@ -797,6 +797,76 @@ static Type* _getNoDiffType(ASTBuilder* astBuilder, Type* type)
     return astBuilder->getModifiedType(type, {astBuilder->getNoDiffModifierVal()});
 }
 
+void appendDifferentiatedParameterTypes(
+    ASTBuilder* astBuilder,
+    List<Type*>& outTypes,
+    Type* pairOrPrimalType,
+    ParamPassingMode primalMode,
+    DifferentiatedParameterDirectionPolicy directionPolicy,
+    bool markNoDiff)
+{
+    appendMappedElementTypes(
+        astBuilder,
+        outTypes,
+        pairOrPrimalType,
+        [&](Type* elementType) -> Type*
+        {
+            auto parameterValueType =
+                markNoDiff ? _getNoDiffType(astBuilder, elementType) : elementType;
+
+            switch (directionPolicy)
+            {
+            case DifferentiatedParameterDirectionPolicy::Preserve:
+                switch (primalMode)
+                {
+                case ParamPassingMode::In:
+                    return parameterValueType;
+                case ParamPassingMode::Out:
+                    return astBuilder->getOutParamType(parameterValueType);
+                case ParamPassingMode::BorrowInOut:
+                    return astBuilder->getBorrowInOutParamType(parameterValueType);
+                case ParamPassingMode::BorrowIn:
+                    return astBuilder->getConstRefParamType(parameterValueType);
+                case ParamPassingMode::Ref:
+                    return astBuilder->getRefParamType(parameterValueType);
+                default:
+                    SLANG_UNEXPECTED("Unhandled parameter passing mode");
+                }
+
+            case DifferentiatedParameterDirectionPolicy::Backward:
+                {
+                    auto valuePairType = as<DifferentialPairType>(elementType);
+                    auto pointerPairType = as<DifferentialPtrPairType>(elementType);
+
+                    switch (primalMode)
+                    {
+                    case ParamPassingMode::In:
+                        // A value pair is mutable because the backward function accumulates its
+                        // differential. A pointer pair already identifies mutable storage.
+                        if (valuePairType)
+                            return astBuilder->getBorrowInOutParamType(elementType);
+                        if (pointerPairType)
+                            return elementType;
+                        return parameterValueType;
+                    case ParamPassingMode::BorrowInOut:
+                        // A differentiable inout value remains inout. A non-differentiable value
+                        // only carries its primal value into the derivative function.
+                        if (valuePairType || pointerPairType)
+                            return astBuilder->getBorrowInOutParamType(elementType);
+                        return parameterValueType;
+                    case ParamPassingMode::BorrowIn:
+                        return astBuilder->getConstRefParamType(parameterValueType);
+                    default:
+                        SLANG_UNEXPECTED(
+                            "unsupported parameter mode for backward differential pair");
+                    }
+                }
+            default:
+                SLANG_UNEXPECTED("Unhandled differentiated parameter direction policy");
+            }
+        });
+}
+
 Val* BwdDiffFuncType::_resolveImplOverride()
 {
     // Resolve all operands.
@@ -825,39 +895,25 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         if (thisTypeDiffWitness)
         {
             auto thisPairType = getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
-            switch (thisParamDirection)
-            {
-            case ParamPassingMode::In:
-                // In parameters become inout differential pairs in backward diff.
-                if (as<DifferentialPairType>(thisPairType))
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
-                else if (as<DifferentialPtrPairType>(thisPairType))
-                    newParamTypes.add(thisPairType);
-                break;
-            case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
-                break;
-            default:
-                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
-                break;
-            }
+            // The resolved backward signature must provide mutable pair storage for the reverse
+            // translator to accumulate the receiver differential.
+            appendDifferentiatedParameterTypes(
+                astBuilder,
+                newParamTypes,
+                thisPairType,
+                thisParamDirection,
+                DifferentiatedParameterDirectionPolicy::Backward,
+                false);
         }
         else if (thisParamType)
         {
-            // Non-differentiable this type gets no_diff modifier.
-            auto noDiffThisType = _getNoDiffType(astBuilder, thisParamValueType);
-            switch (thisParamDirection)
-            {
-            case ParamPassingMode::In:
-                newParamTypes.add(noDiffThisType);
-                break;
-            case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(astBuilder->getBorrowInOutParamType(noDiffThisType));
-                break;
-            default:
-                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
-                break;
-            }
+            appendDifferentiatedParameterTypes(
+                astBuilder,
+                newParamTypes,
+                thisParamValueType,
+                thisParamDirection,
+                DifferentiatedParameterDirectionPolicy::Preserve,
+                true);
         }
 
         // Process each parameter according to backward diff rules.
@@ -877,52 +933,33 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                         paramInfo.type,
                         diffWitness);
                     if (diffValueType)
-                        newParamTypes.add(diffValueType);
+                    {
+                        // The backward mapping changes each `out` element into a separate ordinary
+                        // input parameter. Split a resolved pack now because `FuncType` cannot
+                        // represent those per-element directions while retaining the pack as one
+                        // parameter.
+                        appendMappedElementTypes(
+                            astBuilder,
+                            newParamTypes,
+                            diffValueType,
+                            [](Type* elementType) { return elementType; });
+                    }
                     break;
                 }
             case ParamPassingMode::In:
-                {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        // In parameters become inout differential pairs.
-                        if (as<DifferentialPairType>(pairType))
-                            newParamTypes.add(astBuilder->getBorrowInOutParamType(pairType));
-                        else if (as<DifferentialPtrPairType>(pairType))
-                            newParamTypes.add(pairType);
-                    }
-                    else
-                    {
-                        // Non-differentiable param gets no_diff modifier.
-                        newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
-                    }
-                    break;
-                }
             case ParamPassingMode::BorrowInOut:
-                {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        newParamTypes.add(astBuilder->getBorrowInOutParamType(pairType));
-                    }
-                    else
-                    {
-                        newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
-                    }
-                    break;
-                }
             case ParamPassingMode::BorrowIn:
                 {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        newParamTypes.add(astBuilder->getConstRefParamType(pairType));
-                    }
-                    else
-                    {
-                        newParamTypes.add(astBuilder->getConstRefParamType(
-                            _getNoDiffType(astBuilder, paramInfo.type)));
-                    }
+                    auto pairOrPrimalType =
+                        diffWitness ? getEffectiveDiffPairType(paramInfo.type, diffWitness)
+                                    : paramInfo.type;
+                    appendDifferentiatedParameterTypes(
+                        astBuilder,
+                        newParamTypes,
+                        pairOrPrimalType,
+                        paramInfo.mode,
+                        DifferentiatedParameterDirectionPolicy::Backward,
+                        !diffWitness);
                     break;
                 }
             case ParamPassingMode::Ref:
@@ -979,35 +1016,23 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         if (thisTypeDiffWitness)
         {
             auto thisPairType = getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
-            switch (thisParamDirection)
-            {
-            case ParamPassingMode::In:
-                newParamTypes.add(thisPairType);
-                break;
-            case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
-                break;
-            default:
-                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
-                break;
-            }
+            appendDifferentiatedParameterTypes(
+                astBuilder,
+                newParamTypes,
+                thisPairType,
+                thisParamDirection,
+                DifferentiatedParameterDirectionPolicy::Preserve,
+                false);
         }
         else if (thisParamType)
         {
-            // Non-differentiable this type
-            auto noDiffThisType = _getNoDiffType(astBuilder, thisParamValueType);
-            switch (thisParamDirection)
-            {
-            case ParamPassingMode::In:
-                newParamTypes.add(noDiffThisType);
-                break;
-            case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(astBuilder->getBorrowInOutParamType(noDiffThisType));
-                break;
-            default:
-                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
-                break;
-            }
+            appendDifferentiatedParameterTypes(
+                astBuilder,
+                newParamTypes,
+                thisParamValueType,
+                thisParamDirection,
+                DifferentiatedParameterDirectionPolicy::Preserve,
+                true);
         }
 
         for (Index i = 0; i < funcType->getParamCount(); ++i)
@@ -1015,74 +1040,28 @@ Val* FwdDiffFuncType::_resolveImplOverride()
             auto paramInfo = funcType->getParamInfo(i);
             auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
 
-            switch (paramInfo.mode)
+            if (paramInfo.mode == ParamPassingMode::Ref)
             {
-            case ParamPassingMode::In:
-                {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        newParamTypes.add(pairType);
-                    }
-                    else
-                    {
-                        newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
-                    }
-                    break;
-                }
-            case ParamPassingMode::Out:
-                {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        newParamTypes.add(getCurrentASTBuilder()->getOutParamType(pairType));
-                    }
-                    else
-                    {
-                        newParamTypes.add(getCurrentASTBuilder()->getOutParamType(
-                            _getNoDiffType(astBuilder, paramInfo.type)));
-                    }
-                    break;
-                }
-            case ParamPassingMode::BorrowInOut:
-                {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        newParamTypes.add(
-                            getCurrentASTBuilder()->getBorrowInOutParamType(pairType));
-                    }
-                    else
-                    {
-                        newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(
-                            _getNoDiffType(astBuilder, paramInfo.type)));
-                    }
-                    break;
-                }
-            case ParamPassingMode::Ref:
-                {
-                    // do not differentiate ref params
-                    newParamTypes.add(getCurrentASTBuilder()->getRefParamType(paramInfo.type));
-                    break;
-                }
-            case ParamPassingMode::BorrowIn:
-                {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(pairType));
-                    }
-                    else
-                    {
-                        newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(
-                            _getNoDiffType(astBuilder, paramInfo.type)));
-                    }
-                    break;
-                }
-            default:
-                SLANG_UNEXPECTED("Unhandled param passing mode");
-                break;
+                appendDifferentiatedParameterTypes(
+                    astBuilder,
+                    newParamTypes,
+                    paramInfo.type,
+                    paramInfo.mode,
+                    DifferentiatedParameterDirectionPolicy::Preserve,
+                    false);
+                continue;
             }
+
+            auto pairOrPrimalType = diffWitness
+                                        ? getEffectiveDiffPairType(paramInfo.type, diffWitness)
+                                        : paramInfo.type;
+            appendDifferentiatedParameterTypes(
+                astBuilder,
+                newParamTypes,
+                pairOrPrimalType,
+                paramInfo.mode,
+                DifferentiatedParameterDirectionPolicy::Preserve,
+                !diffWitness);
         }
 
         Type* newReturnType = funcType->getResultType();
