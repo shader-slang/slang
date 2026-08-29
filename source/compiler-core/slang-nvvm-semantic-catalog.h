@@ -286,6 +286,22 @@ inline constexpr CatalogEntry kCatalog[] = {
         nullptr,
     },
     {
+        SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+        kFloat16,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "floating-point width conversion",
+        "__float2half",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+        kFloat32,
+        {kFloat16, kNoType, kNoType},
+        1,
+        "floating-point width conversion",
+        "__half2float($0)",
+    },
+    {
         SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
         kUnsignedI32,
         {kNoType, kNoType, kNoType},

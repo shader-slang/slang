@@ -936,7 +936,11 @@ bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc& semanticTyp
                    (semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER) == isSigned;
         }
     case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT:
-        return semanticType.bitWidth == 32 && isNVVMFloat32Type(type);
+        {
+            uint32_t bitWidth = 0;
+            return isNVVMSupportedFloatingPointScalarType(type, &bitWidth) &&
+                   semanticType.bitWidth == bitWidth;
+        }
     default:
         return false;
     }

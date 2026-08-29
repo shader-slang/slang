@@ -5064,6 +5064,37 @@ direct PTX FileCheck. Four threads write the established `Thing` values with pos
 370/370 NVVM prefix pass. The next existing Half fixture, `half-opaque-convert.slang`, reaches two
 canonical `GenericAsm` conversion helpers: `__float2half` and `__half2float($0)`.
 
+### Slice 98: Exact opaque-Half conversion helpers
+
+The CUDA prelude's scalar opaque-Half conversion helpers now map to the existing typed
+`FLOAT_CONVERT` operation. Recognition is deliberately semantic and closed: the final linked helper
+must have the exact `Half(Float)` body `GenericAsm("__float2half")` or the exact `Float(Half)` body
+`GenericAsm("__half2float($0)")`. Function parameters supply the typed operands after the complete
+signature is checked; the compiler does not parse placeholders or pass GenericAsm text through the
+LLVM boundary.
+
+Scalar floating semantic matching now uses the exact selected bit width carried by the existing
+type descriptor. The surrounding lane-count check keeps these catalog rows scalar, while the
+established selected floating classifier keeps Float64, BFloat16, and FP8 excluded. An exact-text
+helper with an extra integer parameter remains an unsupported `GenericAsm` before provider
+discovery, as does unrelated floating inline assembly.
+
+Both helpers reuse Slice 94's width-generic conversion implementation, which emits LLVM `fptrunc`
+and `fpext`. Builder ABI revision 11 is unchanged, and the provider gains no Half-specific callback
+or text-rewrite path. Ordinary scalar FloatCast descriptors and these helper descriptors share the
+established `floating-point width conversion` capability and diagnostic.
+
+All four enabled lanes of `half-opaque-convert.slang` pass, including direct CUDA runtime comparison
+and direct PTX FileCheck. The 780-byte optimized direct PTX passes CUDA 12.9.86
+`ptxas -arch=sm_70`, producing a 2,792-byte cubin. Release host/provider builds and the complete
+371/371 NVVM prefix pass.
+
+The remaining Half texture fixtures share the next measured boundary. Their final IR carries
+`TextureType` values through helper parameters before exact surface load/store GenericAsm bodies.
+For example, `half-rw-texture-simple.slang` retains Half/Half4 1D/2D texture helpers followed by
+`surf1Dread`, `surf2Dread`, and `surf2Dwrite`. Texture-handle ABI and typed resource operations are
+therefore the next coherent capability; they are not part of the scalar conversion mapping.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production

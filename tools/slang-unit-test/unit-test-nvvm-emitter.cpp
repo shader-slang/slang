@@ -2490,6 +2490,66 @@ SLANG_UNIT_TEST(nvvmSlangFloat16ValuesUseGenericTypedPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangOpaqueHalfHelpersUseTypedFloatConversions)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMOpaqueHalfConversionSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        Index floatConvertCount = 0;
+        bool sawFloatToHalf = false;
+        bool sawHalfToFloat = false;
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_FLOAT_CONVERT)
+                continue;
+
+            ++floatConvertCount;
+            SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::FloatingUnary);
+            SLANG_CHECK(operation.operandCount == 1);
+            const SlangNVVMValueTypeDesc& resultType = operation.resultType;
+            const SlangNVVMValueTypeDesc& operandType = operation.operandTypes[0];
+            sawFloatToHalf |= resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                              resultType.bitWidth == 16 && resultType.laneCount == 1 &&
+                              operandType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                              operandType.bitWidth == 32 && operandType.laneCount == 1;
+            sawHalfToFloat |= resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                              resultType.bitWidth == 32 && resultType.laneCount == 1 &&
+                              operandType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                              operandType.bitWidth == 16 && operandType.laneCount == 1;
+        }
+        SLANG_CHECK(floatConvertCount == 2);
+        SLANG_CHECK(sawFloatToHalf);
+        SLANG_CHECK(sawHalfToFloat);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangLocalVectorSwizzlePromotesToGenericValues)
 {
     _resetDirectNVVMFakes();
@@ -5347,6 +5407,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedNestedConstantBufferSource,
          "'conventional global parameter field address'"},
         {kDirectNVVMFloatingSineSource, "'GenericAsm'"},
+        {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm'"},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
         {kDirectNVVMUnsignedAtomicAddSource, "'relaxed global signed i32 atomic add'"},
         {kDirectNVVMWideAtomicAddSource, "'relaxed global signed i32 atomic add'"},
@@ -5363,7 +5424,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     };
 
     // Noncanonical layout, escaping or dynamically addressed local memory, logical NOT, libdevice
-    // calls, atomic-add ABI
+    // calls, malformed-signature opaque-Half helpers, atomic-add ABI
     // variants, non-relaxed atomic-add order, adjacent atomic operations, group-shared atomic add,
     // non-i32 shared arrays, pointer comparisons, and helper-array-pointer
     // shapes remain deterministic before builder discovery.

@@ -4722,6 +4722,19 @@ static SlangResult _fakeNVVMBuilderEmitCatalogOperation(
     SlangNVVMValueHandle* outValue)
 {
     const SlangNVVMValueOperationDesc operation = NVVMSemantics::getOperationDesc(entry);
+    if (entry.operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT)
+    {
+        gFakeNVVMBuilder.emittedValueOperations.add(
+            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(entry.operation)});
+        return _recordFakeNVVMBuilderScalarOperation(
+            module,
+            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(entry.operation)},
+            operands,
+            entry.operandCount,
+            outValue,
+            &operation.resultType,
+            operation.operandTypes);
+    }
     if (entry.operandCount && entry.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
     {
         if (entry.operandCount == 1)
@@ -7523,6 +7536,37 @@ void computeMain(
     half selectedLane = result[integerValue & 1];
     *destination =
         widened.x + float(integers.y) + float(selectedLane) + (compared.x ? 1.0 : 0.0);
+}
+)";
+
+static const char kDirectNVVMOpaqueHalfConversionSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float input)
+{
+    half narrowed = f32tof16_(input);
+    *destination = f16tof32(narrowed);
+}
+)";
+
+static const char kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource[] = R"(
+half malformedFloatToHalf(float input, int extra)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "__float2half";
+    default: return half(input + float(extra));
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float input)
+{
+    half narrowed = malformedFloatToHalf(input, 0);
+    *destination = f16tof32(narrowed);
 }
 )";
 
