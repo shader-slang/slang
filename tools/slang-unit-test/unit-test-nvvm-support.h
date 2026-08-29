@@ -252,6 +252,9 @@ struct FakeNVVMBuilderScalarOperationStorage
 struct FakeNVVMBuilderIntrinsicStorage
 {
 };
+struct FakeNVVMBuilderSurfaceOperationStorage
+{
+};
 struct FakeNVVMBuilderRelaxedGlobalI32AtomicAddStorage
 {
 };
@@ -280,6 +283,7 @@ enum class FakeNVVMBuilderValueKind
     Load,
     ScalarOperation,
     Intrinsic,
+    SurfaceOperation,
     IntegerConstant,
     FloatingPointConstant,
     ScalarPhi,
@@ -486,6 +490,7 @@ struct FakeNVVMBuilderState
         storeAlignments.clear();
         scalarOperations.clear();
         emittedValueOperations.clear();
+        surfaceOperations.clear();
         intrinsicOperations.clear();
         intrinsicResultTypes.clear();
         intrinsicCallerBlockIndices.clear();
@@ -579,6 +584,7 @@ struct FakeNVVMBuilderState
         foundation = {};
         construction = {};
         valueOperations = {};
+        surfaceOperationsAPI = {};
         acceptedABIRevision = SLANG_NVVM_BUILDER_ABI_REVISION;
         omittedInterface = SlangNVVMBuilderInterfaceID(~uint32_t(0));
         omitAPISymbol = false;
@@ -635,6 +641,7 @@ struct FakeNVVMBuilderState
     SlangNVVMBuilderFoundationAPI foundation = {};
     SlangNVVMBuilderConstructionAPI construction = {};
     SlangNVVMBuilderValueOperationsAPI valueOperations = {};
+    SlangNVVMBuilderSurfaceOperationsAPI surfaceOperationsAPI = {};
     uint32_t acceptedABIRevision = SLANG_NVVM_BUILDER_ABI_REVISION;
     SlangNVVMBuilderInterfaceID omittedInterface = SlangNVVMBuilderInterfaceID(~uint32_t(0));
     bool omitAPISymbol = false;
@@ -689,6 +696,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderLoadStorage loadStorage[16];
     FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[64];
     FakeNVVMBuilderIntrinsicStorage intrinsicStorage[8];
+    FakeNVVMBuilderSurfaceOperationStorage surfaceOperationStorage[16];
     FakeNVVMBuilderIntegerConstantStorage integerConstantStorage[64];
     FakeNVVMBuilderFloatingPointConstantStorage floatingPointConstantStorage[64];
     FakeNVVMBuilderScalarPhiStorage scalarPhiStorage[8];
@@ -800,6 +808,7 @@ struct FakeNVVMBuilderState
     List<uint32_t> storeAlignments;
     List<FakeNVVMBuilderScalarOperation> scalarOperations;
     List<FakeNVVMBuilderScalarOperationKey> emittedValueOperations;
+    List<SlangNVVMSurfaceOperationDesc> surfaceOperations;
     List<SlangNVVMValueOperation> intrinsicOperations;
     List<SlangNVVMValueTypeDesc> intrinsicResultTypes;
     bool rejectValueOperation = false;
@@ -1329,6 +1338,25 @@ static bool _getFakeNVVMBuilderIntrinsicIndex(SlangNVVMValueHandle value, Index&
     return false;
 }
 
+static SlangNVVMValueHandle _getFakeNVVMBuilderSurfaceOperation(Index index)
+{
+    SLANG_ASSERT(index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.surfaceOperationStorage));
+    return reinterpret_cast<SlangNVVMValueHandle>(&gFakeNVVMBuilder.surfaceOperationStorage[index]);
+}
+
+static bool _getFakeNVVMBuilderSurfaceOperationIndex(SlangNVVMValueHandle value, Index& outIndex)
+{
+    for (Index i = 0; i < gFakeNVVMBuilder.surfaceOperations.getCount(); ++i)
+    {
+        if (value == _getFakeNVVMBuilderSurfaceOperation(i))
+        {
+            outIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 static Index _findFakeNVVMBuilderScalarOperation(
     FakeNVVMBuilderScalarFamily family,
     uint32_t operation,
@@ -1711,6 +1739,11 @@ static bool _getFakeNVVMBuilderValueRef(SlangNVVMValueHandle value, FakeNVVMBuil
         outRef = {FakeNVVMBuilderValueKind::Intrinsic, valueIndex};
         return true;
     }
+    if (_getFakeNVVMBuilderSurfaceOperationIndex(value, valueIndex))
+    {
+        outRef = {FakeNVVMBuilderValueKind::SurfaceOperation, valueIndex};
+        return true;
+    }
     if (_getFakeNVVMBuilderIntegerConstantIndex(value, valueIndex))
     {
         outRef = {FakeNVVMBuilderValueKind::IntegerConstant, valueIndex};
@@ -2023,6 +2056,17 @@ static bool _isFakeNVVMBuilderVectorValue(
     {
         return gFakeNVVMBuilder.aggregateElementTypeKinds[valueRef.index] == expectedVectorTypeKind;
     }
+    if (valueRef.kind == FakeNVVMBuilderValueKind::SurfaceOperation && valueRef.index >= 0 &&
+        valueRef.index < gFakeNVVMBuilder.surfaceOperations.getCount())
+    {
+        const SlangNVVMSurfaceOperationDesc& operation =
+            gFakeNVVMBuilder.surfaceOperations[valueRef.index];
+        return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD &&
+               expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Half &&
+               operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+               operation.elementType.bitWidth == 16 &&
+               operation.elementType.laneCount == expectedElementCount;
+    }
     if (valueRef.kind == FakeNVVMBuilderValueKind::ScalarOperation && valueRef.index >= 0 &&
         valueRef.index < gFakeNVVMBuilder.scalarOperations.getCount())
     {
@@ -2224,6 +2268,17 @@ static bool _isFakeNVVMBuilderFloatingPointValue(
                    SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
                gFakeNVVMBuilder.intrinsicResultTypes[valueRef.index].bitWidth == expectedBitWidth &&
                gFakeNVVMBuilder.intrinsicResultTypes[valueRef.index].laneCount == 1;
+    }
+    if (valueRef.kind == FakeNVVMBuilderValueKind::SurfaceOperation)
+    {
+        if (valueRef.index < 0 || valueRef.index >= gFakeNVVMBuilder.surfaceOperations.getCount())
+            return false;
+        const SlangNVVMSurfaceOperationDesc& operation =
+            gFakeNVVMBuilder.surfaceOperations[valueRef.index];
+        return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD &&
+               operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+               operation.elementType.bitWidth == expectedBitWidth &&
+               operation.elementType.laneCount == 1;
     }
     if (valueRef.kind == FakeNVVMBuilderValueKind::VectorElement)
     {
@@ -5034,6 +5089,92 @@ static SlangNVVMBuilderValueOperationsAPI _makeFakeNVVMBuilderValueOperationsAPI
     return api;
 }
 
+static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& operation)
+{
+    return (operation.operation == SLANG_NVVM_SURFACE_OP_LOAD ||
+            operation.operation == SLANG_NVVM_SURFACE_OP_STORE) &&
+           (operation.dimensionCount == 1 || operation.dimensionCount == 2) &&
+           operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+           operation.elementType.bitWidth == 16 &&
+           (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
+            operation.elementType.laneCount == 4) &&
+           operation.boundaryMode == SLANG_NVVM_SURFACE_BOUNDARY_ZERO;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsSurfaceOperationSupported(
+    const SlangNVVMSurfaceOperationDesc* operation,
+    uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!operation || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported = _isFakeNVVMSurfaceOperationSupported(*operation) ? 1u : 0u;
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitSurfaceOperation(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMSurfaceOperationDesc* operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    const size_t expectedOperandCount =
+        operation && operation->operation == SLANG_NVVM_SURFACE_OP_LOAD    ? 2
+        : operation && operation->operation == SLANG_NVVM_SURFACE_OP_STORE ? 3
+                                                                           : 0;
+    if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
+        !operation || !outValue || !operands || operandCount != expectedOperandCount ||
+        !_isFakeNVVMSurfaceOperationSupported(*operation) ||
+        gFakeNVVMBuilder.surfaceOperations.getCount() >=
+            SLANG_COUNT_OF(gFakeNVVMBuilder.surfaceOperationStorage))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+    for (size_t i = 0; i < operandCount; ++i)
+    {
+        FakeNVVMBuilderValueRef ref;
+        if (!_getFakeNVVMBuilderValueRef(operands[i], ref))
+            return SLANG_E_INVALID_ARG;
+    }
+
+    if (!_isFakeNVVMBuilderIntegerValue(operands[0]) ||
+        (operation->dimensionCount == 1 ? !_isFakeNVVMBuilderIntegerValue(operands[1])
+                                        : !_isFakeNVVMBuilderIntegerVectorValue(operands[1], 2)))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+    if (operation->operation == SLANG_NVVM_SURFACE_OP_STORE)
+    {
+        const bool hasExpectedValue = operation->elementType.laneCount == 1
+                                          ? _isFakeNVVMBuilderFloatingPointValue(operands[2], 16)
+                                          : _isFakeNVVMBuilderVectorValue(
+                                                operands[2],
+                                                FakeNVVMBuilderScalarTypeKind::Half,
+                                                operation->elementType.laneCount);
+        if (!hasExpectedValue)
+            return SLANG_E_INVALID_ARG;
+    }
+
+    const Index resultIndex = gFakeNVVMBuilder.surfaceOperations.getCount();
+    gFakeNVVMBuilder.surfaceOperations.add(*operation);
+    if (operation->operation == SLANG_NVVM_SURFACE_OP_STORE)
+        return SLANG_OK;
+    *outValue = _getFakeNVVMBuilderSurfaceOperation(resultIndex);
+    return SLANG_OK;
+}
+
+static SlangNVVMBuilderSurfaceOperationsAPI _makeFakeNVVMBuilderSurfaceOperationsAPI()
+{
+    SlangNVVMBuilderSurfaceOperationsAPI api = {};
+    api.isOperationSupported = _fakeNVVMBuilderIsSurfaceOperationSupported;
+    api.emitOperation = _fakeNVVMBuilderEmitSurfaceOperation;
+    return api;
+}
+
 static SlangResult SLANG_NVVM_CALL
 _fakeNVVMBuilderQueryInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** outInterface)
 {
@@ -5053,6 +5194,9 @@ _fakeNVVMBuilderQueryInterface(SlangNVVMBuilderInterfaceID interfaceID, const vo
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS:
         *outInterface = &gFakeNVVMBuilder.valueOperations;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS:
+        *outInterface = &gFakeNVVMBuilder.surfaceOperationsAPI;
         return SLANG_OK;
     default:
         return SLANG_E_NO_INTERFACE;
@@ -7569,6 +7713,31 @@ void computeMain(
     *destination = f16tof32(narrowed);
 }
 )";
+
+static const char kDirectNVVMUnsupportedSurfaceSignatureSource[] = R"SLANG(
+RWTexture2D<half> surface;
+
+half malformedSurfaceLoad(RWTexture2D<half> resource, int2 coordinate, int extra)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm
+            "surf2Dread$C<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+    default:
+        return half(extra);
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int x,
+    uniform int y)
+{
+    *destination = float(malformedSurfaceLoad(surface, int2(x, y), 0));
+}
+)SLANG";
 
 static const char kDirectNVVMLocalVectorSwizzleSource[] = R"(
 [CUDAKernel]
@@ -10616,6 +10785,7 @@ static void _resetDirectNVVMFakes()
     gFakeNVVMBuilder.foundation = _makeFakeNVVMBuilderFoundationAPI();
     gFakeNVVMBuilder.construction = _makeFakeNVVMBuilderConstructionAPI();
     gFakeNVVMBuilder.valueOperations = _makeFakeNVVMBuilderValueOperationsAPI();
+    gFakeNVVMBuilder.surfaceOperationsAPI = _makeFakeNVVMBuilderSurfaceOperationsAPI();
     gFakeNVVM.reset();
     gFakeNVVM.compiledPTX = kFakeDirectPTX;
 }

@@ -3628,7 +3628,7 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
     SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(this, linkingAndOptimizationOptions, linkedIR));
     SLANG_RETURN_ON_FAIL(foldNVVMCompileTimeLayoutQueries(this, linkedIR));
-    NVVMValueOperationRequirements requirements;
+    NVVMOperationRequirements requirements;
     SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requirements));
 
     NVVMIRBuilder* builder = nullptr;

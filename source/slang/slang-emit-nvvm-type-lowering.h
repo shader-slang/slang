@@ -157,6 +157,17 @@ struct NVVMBufferDataPointerType
 /// Resolves an exact selected raw-buffer data pointer.
 bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerType& outType);
 
+/// Describes one exact native-Half read-write CUDA surface object.
+struct NVVMNativeHalfSurfaceType
+{
+    IRTextureTypeBase* textureType = nullptr;
+    uint32_t dimensionCount = 0;
+    SlangNVVMValueTypeDesc elementType = {};
+};
+
+/// Resolves a non-arrayed 1D/2D read-write surface with scalar, two-, or four-lane Half elements.
+bool getNVVMSupportedNativeHalfSurfaceType(IRInst* type, NVVMNativeHalfSurfaceType& outType);
+
 /// Returns an accepted storage-only CUDA sampler placeholder.
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type);
 

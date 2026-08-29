@@ -2957,6 +2957,191 @@ static SlangResult SLANG_NVVM_CALL _emitOperation(
     const Slang::NVVMSemantics::CatalogEntry* entry = Slang::NVVMSemantics::find(*operation);
     return entry ? _emitCatalogOperation(module, *entry, operands, outValue) : SLANG_E_INVALID_ARG;
 }
+
+static bool _isSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& operation)
+{
+    return (operation.operation == SLANG_NVVM_SURFACE_OP_LOAD ||
+            operation.operation == SLANG_NVVM_SURFACE_OP_STORE) &&
+           (operation.dimensionCount == 1 || operation.dimensionCount == 2) &&
+           operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+           operation.elementType.bitWidth == 16 &&
+           (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
+            operation.elementType.laneCount == 4) &&
+           operation.boundaryMode == SLANG_NVVM_SURFACE_BOUNDARY_ZERO;
+}
+
+static SlangResult SLANG_NVVM_CALL
+_isSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc* operation, uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!operation || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported = _isSurfaceOperationSupported(*operation) ? 1u : 0u;
+    return SLANG_OK;
+}
+
+static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperationDesc& operation)
+{
+    if (!_isSurfaceOperationSupported(operation))
+        return llvm::Intrinsic::not_intrinsic;
+
+    if (operation.operation == SLANG_NVVM_SURFACE_OP_LOAD)
+    {
+        if (operation.dimensionCount == 1)
+        {
+            switch (operation.elementType.laneCount)
+            {
+            case 1:
+                return llvm::Intrinsic::nvvm_suld_1d_i16_zero;
+            case 2:
+                return llvm::Intrinsic::nvvm_suld_1d_v2i16_zero;
+            case 4:
+                return llvm::Intrinsic::nvvm_suld_1d_v4i16_zero;
+            }
+        }
+        else
+        {
+            switch (operation.elementType.laneCount)
+            {
+            case 1:
+                return llvm::Intrinsic::nvvm_suld_2d_i16_zero;
+            case 2:
+                return llvm::Intrinsic::nvvm_suld_2d_v2i16_zero;
+            case 4:
+                return llvm::Intrinsic::nvvm_suld_2d_v4i16_zero;
+            }
+        }
+    }
+    else if (operation.dimensionCount == 1)
+    {
+        switch (operation.elementType.laneCount)
+        {
+        case 1:
+            return llvm::Intrinsic::nvvm_sust_b_1d_i16_zero;
+        case 2:
+            return llvm::Intrinsic::nvvm_sust_b_1d_v2i16_zero;
+        case 4:
+            return llvm::Intrinsic::nvvm_sust_b_1d_v4i16_zero;
+        }
+    }
+    else
+    {
+        switch (operation.elementType.laneCount)
+        {
+        case 1:
+            return llvm::Intrinsic::nvvm_sust_b_2d_i16_zero;
+        case 2:
+            return llvm::Intrinsic::nvvm_sust_b_2d_v2i16_zero;
+        case 4:
+            return llvm::Intrinsic::nvvm_sust_b_2d_v4i16_zero;
+        }
+    }
+    return llvm::Intrinsic::not_intrinsic;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMSurfaceOperationDesc* operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    const size_t expectedOperandCount =
+        operation && operation->operation == SLANG_NVVM_SURFACE_OP_LOAD    ? 2
+        : operation && operation->operation == SLANG_NVVM_SURFACE_OP_STORE ? 3
+                                                                           : 0;
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !insertionBlock || !operation || !outValue || !operands ||
+        !expectedOperandCount || operandCount != expectedOperandCount ||
+        !_isSurfaceOperationSupported(*operation))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Value* surface = _getValue(operands[0]);
+    llvm::Value* coordinate = _getValue(operands[1]);
+    llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
+    llvm::Type* expectedCoordinateType =
+        operation->dimensionCount == 1
+            ? int32Type
+            : llvm::FixedVectorType::get(int32Type, operation->dimensionCount);
+    if (!surface || !surface->getType()->isIntegerTy(64) || !coordinate ||
+        coordinate->getType() != expectedCoordinateType ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, surface) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, coordinate))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Type* halfType = llvm::Type::getHalfTy(state->context);
+    llvm::Type* semanticElementType =
+        operation->elementType.laneCount == 1
+            ? halfType
+            : llvm::FixedVectorType::get(halfType, operation->elementType.laneCount);
+    llvm::Value* storedValue = nullptr;
+    if (operation->operation == SLANG_NVVM_SURFACE_OP_STORE)
+    {
+        storedValue = _getValue(operands[2]);
+        if (!storedValue || storedValue->getType() != semanticElementType ||
+            !_isValueUsableAtInsertionPoint(state, insertionBlock, storedValue))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+    }
+
+    llvm::SmallVector<llvm::Value*, 7> arguments;
+    arguments.push_back(surface);
+    llvm::Value* x = operation->dimensionCount == 1
+                         ? coordinate
+                         : state->builder.CreateExtractElement(coordinate, uint64_t(0));
+    x = state->builder.CreateMul(
+        x,
+        llvm::ConstantInt::get(int32Type, operation->elementType.laneCount * 2u));
+    arguments.push_back(x);
+    if (operation->dimensionCount == 2)
+        arguments.push_back(state->builder.CreateExtractElement(coordinate, uint64_t(1)));
+
+    if (operation->operation == SLANG_NVVM_SURFACE_OP_STORE)
+    {
+        for (uint32_t lane = 0; lane < operation->elementType.laneCount; ++lane)
+        {
+            llvm::Value* halfValue = operation->elementType.laneCount == 1
+                                         ? storedValue
+                                         : state->builder.CreateExtractElement(storedValue, lane);
+            arguments.push_back(
+                state->builder.CreateBitCast(halfValue, llvm::Type::getInt16Ty(state->context)));
+        }
+    }
+
+    llvm::Intrinsic::ID intrinsicID = _getSurfaceIntrinsicID(*operation);
+    llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
+    llvm::CallInst* call = state->builder.CreateCall(intrinsic, arguments);
+    if (operation->operation == SLANG_NVVM_SURFACE_OP_STORE)
+        return SLANG_OK;
+
+    llvm::Value* result = nullptr;
+    if (operation->elementType.laneCount == 1)
+    {
+        result = state->builder.CreateBitCast(call, halfType);
+    }
+    else
+    {
+        result = llvm::UndefValue::get(semanticElementType);
+        for (uint32_t lane = 0; lane < operation->elementType.laneCount; ++lane)
+        {
+            llvm::Value* bits = state->builder.CreateExtractValue(call, {lane});
+            llvm::Value* halfValue = state->builder.CreateBitCast(bits, halfType);
+            result = state->builder.CreateInsertElement(result, halfValue, lane);
+        }
+    }
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
 static void _fillBuilderFoundationAPI(SlangNVVMBuilderFoundationAPI& api)
 {
     api = {};
@@ -3014,6 +3199,13 @@ static void _fillBuilderValueOperationsAPI(SlangNVVMBuilderValueOperationsAPI& a
     api.emitOperation = _emitOperation;
 }
 
+static void _fillBuilderSurfaceOperationsAPI(SlangNVVMBuilderSurfaceOperationsAPI& api)
+{
+    api = {};
+    api.isOperationSupported = _isSurfaceOperationSupported;
+    api.emitOperation = _emitSurfaceOperation;
+}
+
 static SlangResult SLANG_NVVM_CALL
 _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** outInterface)
 {
@@ -3040,6 +3232,12 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         _fillBuilderValueOperationsAPI(api);
         return api;
     }();
+    static const SlangNVVMBuilderSurfaceOperationsAPI surfaceOperations = []
+    {
+        SlangNVVMBuilderSurfaceOperationsAPI api;
+        _fillBuilderSurfaceOperationsAPI(api);
+        return api;
+    }();
 
     switch (interfaceID)
     {
@@ -3051,6 +3249,9 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS:
         *outInterface = &valueOperations;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS:
+        *outInterface = &surfaceOperations;
         return SLANG_OK;
     default:
         return SLANG_E_NO_INTERFACE;

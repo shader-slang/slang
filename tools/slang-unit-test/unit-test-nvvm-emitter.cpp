@@ -5408,6 +5408,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
          "'conventional global parameter field address'"},
         {kDirectNVVMFloatingSineSource, "'GenericAsm'"},
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm'"},
+        {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm'"},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
         {kDirectNVVMUnsignedAtomicAddSource, "'relaxed global signed i32 atomic add'"},
         {kDirectNVVMWideAtomicAddSource, "'relaxed global signed i32 atomic add'"},
@@ -5424,10 +5425,10 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     };
 
     // Noncanonical layout, escaping or dynamically addressed local memory, logical NOT, libdevice
-    // calls, malformed-signature opaque-Half helpers, atomic-add ABI
-    // variants, non-relaxed atomic-add order, adjacent atomic operations, group-shared atomic add,
-    // non-i32 shared arrays, pointer comparisons, and helper-array-pointer
-    // shapes remain deterministic before builder discovery.
+    // calls, malformed-signature opaque-Half and surface helpers, atomic-add ABI variants,
+    // non-relaxed atomic-add order, adjacent atomic operations, group-shared atomic add, non-i32
+    // shared arrays, pointer comparisons, and helper-array-pointer shapes remain deterministic
+    // before builder discovery.
     for (const auto& unsupported : kCases)
     {
         _resetDirectNVVMFakes();

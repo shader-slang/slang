@@ -26,6 +26,20 @@ struct NVVMValueOperationRequirement
 
 using NVVMValueOperationRequirements = List<NVVMValueOperationRequirement>;
 
+/// Owns one exact typed surface-operation overload required by accepted linked IR.
+struct NVVMSurfaceOperationRequirement
+{
+    SlangNVVMSurfaceOperationDesc desc = {};
+    const char* diagnosticName = nullptr;
+};
+
+/// Owns every provider capability required before module creation.
+struct NVVMOperationRequirements
+{
+    NVVMValueOperationRequirements valueOperations;
+    List<NVVMSurfaceOperationRequirement> surfaceOperations;
+};
+
 /// Replaces exact CUDA layout-query calls with constants and removes their compile-time-only IR.
 SlangResult foldNVVMCompileTimeLayoutQueries(CodeGenContext* codeGenContext, LinkedIR& linkedIR);
 
@@ -33,14 +47,14 @@ SlangResult foldNVVMCompileTimeLayoutQueries(CodeGenContext* codeGenContext, Lin
 SlangResult validateNVVMSupportedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
-    NVVMValueOperationRequirements& outRequirements);
+    NVVMOperationRequirements& outRequirements);
 
 /// Emits verified LLVM 7-compatible NVVM IR 2.0 assembly from already-validated linked IR.
 SlangResult emitNVVMIRFromLinkedIR(
     CodeGenContext* codeGenContext,
     const LinkedIR& linkedIR,
     const NVVMIRBuilder& builder,
-    const NVVMValueOperationRequirements& requirements,
+    const NVVMOperationRequirements& requirements,
     ComPtr<IArtifact>& outArtifact);
 
 } // namespace Slang

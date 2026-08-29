@@ -125,10 +125,37 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitByteOffsetPointer != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=11") >= 0);
+        SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=12") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
+{
+    _resetDirectNVVMFakes();
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+    NVVMIRBuilder builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, builder)));
+
+    const SlangNVVMSurfaceOperationDesc load2D = {
+        SLANG_NVVM_SURFACE_OP_LOAD,
+        2,
+        {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, 4},
+        SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
+    };
+    SLANG_CHECK(builder.supportsSurfaceOperation(load2D));
+
+    SlangNVVMSurfaceOperationDesc unsupported = load2D;
+    unsupported.elementType.laneCount = 3;
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+    unsupported = load2D;
+    unsupported.dimensionCount = 3;
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+    unsupported = load2D;
+    unsupported.boundaryMode = SlangNVVMSurfaceBoundaryMode(1);
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderRejectsCurrentABIMismatches)
@@ -163,6 +190,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsCurrentABIMismatches)
 
 SLANG_UNIT_TEST(nvvmIRBuilderRequiresCompleteCurrentInterfaces)
 {
+    _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.omittedInterface = SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+    }
+
     _resetDirectNVVMFakes();
     gFakeNVVMBuilder.omittedInterface = SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION;
     {

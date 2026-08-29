@@ -556,6 +556,50 @@ bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerTy
     return true;
 }
 
+bool getNVVMSupportedNativeHalfSurfaceType(IRInst* type, NVVMNativeHalfSurfaceType& outType)
+{
+    outType = {};
+    auto textureType = as<IRTextureTypeBase>(type);
+    if (!textureType || textureType->getOp() != kIROp_TextureType ||
+        textureType->getOperandCount() < 9 || textureType->isArray() ||
+        textureType->isMultisample() || textureType->isShadow() || textureType->isCombined() ||
+        textureType->getAccess() != SLANG_RESOURCE_ACCESS_READ_WRITE)
+    {
+        return false;
+    }
+
+    uint32_t dimensionCount = 0;
+    switch (textureType->getShape())
+    {
+    case SLANG_TEXTURE_1D:
+        dimensionCount = 1;
+        break;
+    case SLANG_TEXTURE_2D:
+        dimensionCount = 2;
+        break;
+    default:
+        return false;
+    }
+
+    IRType* scalarType = textureType->getElementType();
+    uint32_t laneCount = 1;
+    if (auto vectorType = as<IRVectorType>(scalarType))
+    {
+        auto count = as<IRIntLit>(vectorType->getElementCount());
+        if (!count || (count->getValue() != 2 && count->getValue() != 4))
+            return false;
+        scalarType = vectorType->getElementType();
+        laneCount = uint32_t(count->getValue());
+    }
+    if (!isNVVMFloat16Type(scalarType))
+        return false;
+
+    outType.textureType = textureType;
+    outType.dimensionCount = dimensionCount;
+    outType.elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, laneCount};
+    return true;
+}
+
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type)
 {
     return as<IRSamplerStateTypeBase>(type);
@@ -594,9 +638,11 @@ IRParameterGroupType* asNVVMSupportedScalarParameterGroupType(
 bool isNVVMSupportedConventionalGlobalFieldType(IRInst* type)
 {
     NVVMRawBufferType rawBufferType;
+    NVVMNativeHalfSurfaceType surfaceType;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedScalarParameterGroupType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
+           getNVVMSupportedNativeHalfSurfaceType(type, surfaceType) ||
            asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type);
 }
@@ -882,6 +928,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
     NVVMRawBufferType rawBufferType;
     const bool isRawBuffer = getNVVMSupportedRawBufferType(type, rawBufferType);
+    NVVMNativeHalfSurfaceType surfaceType;
+    const bool isNativeHalfSurface = getNVVMSupportedNativeHalfSurfaceType(type, surfaceType);
     NVVMBufferDataPointerType bufferDataPointerType;
     const bool isBufferDataPointer =
         getNVVMSupportedBufferDataPointerType(type, bufferDataPointerType);
@@ -898,22 +946,23 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
     // helper signature.
-    const bool isLegal = (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-                         (use == NVVMTypeUse::HelperResult &&
-                          (isVoid || isNVVMSupportedValueType(type) || scalarStructType)) ||
-                         (use == NVVMTypeUse::EntryPointParameter &&
-                          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
-                           deviceArrayPointer || isRawBuffer)) ||
-                         (use == NVVMTypeUse::HelperParameter &&
-                          (isNVVMSupportedValueType(type) || localScalarStructPointer)) ||
-                         (use == NVVMTypeUse::Value &&
-                          (isInteger || isFloatingPoint || isBool || valueVectorType ||
-                           copyableStructType || fixedNumericArrayType || deviceNumericPointer ||
-                           deviceArrayPointer || isRawBuffer || isBufferDataPointer ||
-                           parameterGroup || resourceElementPointer || sharedElementPointer)) ||
-                         (use == NVVMTypeUse::Storage &&
-                          (isInteger || isFloat32 || structType || isRawBuffer || parameterGroup ||
-                           samplerStorage || unsizedSamplerArrayStorage));
+    const bool isLegal =
+        (use == NVVMTypeUse::EntryPointResult && isVoid) ||
+        (use == NVVMTypeUse::HelperResult &&
+         (isVoid || isNVVMSupportedValueType(type) || scalarStructType)) ||
+        (use == NVVMTypeUse::EntryPointParameter &&
+         (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
+          deviceArrayPointer || isRawBuffer)) ||
+        (use == NVVMTypeUse::HelperParameter &&
+         (isNVVMSupportedValueType(type) || localScalarStructPointer || isNativeHalfSurface)) ||
+        (use == NVVMTypeUse::Value &&
+         (isInteger || isFloatingPoint || isBool || valueVectorType || copyableStructType ||
+          fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
+          isBufferDataPointer || parameterGroup || isNativeHalfSurface || resourceElementPointer ||
+          sharedElementPointer)) ||
+        (use == NVVMTypeUse::Storage &&
+         (isInteger || isFloat32 || structType || isRawBuffer || parameterGroup ||
+          isNativeHalfSurface || samplerStorage || unsizedSamplerArrayStorage));
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -1017,6 +1066,12 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (parameterGroup)
     {
         return _lowerScalarParameterGroupType(parameterGroup, parameterGroupElementType, outType);
+    }
+    else if (isNativeHalfSurface)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "native Half CUDA surface handle type",
+            m_builder.getIntegerType(m_module, 64, outType)));
     }
     else if (samplerStorage)
     {

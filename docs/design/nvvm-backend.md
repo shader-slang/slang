@@ -5095,6 +5095,30 @@ For example, `half-rw-texture-simple.slang` retains Half/Half4 1D/2D texture hel
 `surf1Dread`, `surf2Dread`, and `surf2Dwrite`. Texture-handle ABI and typed resource operations are
 therefore the next coherent capability; they are not part of the scalar conversion mapping.
 
+### Slice 99: Typed native-Half surface resources
+
+Forward-only builder ABI revision 12 adds a required surface-operation interface. One descriptor
+selects load or store, one or two dimensions, the complete semantic element type, and the boundary
+mode. This keeps resource semantics out of the scalar value-operation table and avoids callbacks
+per CUDA intrinsic. The first provider family accepts scalar Half, Half2, and Half4 with zero
+boundary behavior, computes the byte-based x coordinate from the element width, and emits LLVM's
+typed `llvm.nvvm.suld.*.i16.zero` or `llvm.nvvm.sust.b.*.i16.zero` intrinsics. Half values are
+bitcast to and from their native i16 surface payload lanes inside the LLVM shield.
+
+Direct compiler preflight recognizes exact non-arrayed, non-multisampled, non-shadow,
+non-combined read-write 1D/2D textures with those native Half element shapes. Their semantic
+resource identity remains distinct while storage, ordinary loads, helper parameters, and calls use
+the CUDA `i64` surface-object representation. Canonical surface helpers are admitted only when the
+complete result/resource/coordinate/value signature and exact selected GenericAsm text match.
+The finalized 1D helper uses a scalar signed-i32 coordinate; 2D load and store helpers use exact
+signed-i32x2 and unsigned-i32x2 coordinates, respectively. Arbitrary GenericAsm, Half3, other
+texture attributes, other formats, and other boundary modes remain closed.
+
+`half-rw-texture-simple.slang` now compiles through direct libNVVM. Its 1,681-byte optimized PTX
+contains scalar 1D and 2D Half loads, one four-lane 2D Half load, one scalar 2D Half store, and the
+following scalar 2D load. CUDA 12.9.86 `ptxas -arch=sm_70` accepts it and emits a 3,176-byte cubin.
+Final runtime and full-prefix counts are recorded by the Slice 99 plan.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production

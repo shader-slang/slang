@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 11u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 12u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -86,6 +86,7 @@ extern "C"
 #define SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION ((SlangNVVMBuilderInterfaceID)0u)
 #define SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION ((SlangNVVMBuilderInterfaceID)1u)
 #define SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS ((SlangNVVMBuilderInterfaceID)2u)
+#define SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS ((SlangNVVMBuilderInterfaceID)3u)
 
     /** Semantic scalar and fixed-vector categories used by operation signatures. */
     typedef uint32_t SlangNVVMValueTypeKind;
@@ -149,6 +150,22 @@ extern "C"
         const SlangNVVMValueTypeDesc* operandTypes;
         size_t operandCount;
     } SlangNVVMValueOperationDesc;
+
+    typedef uint32_t SlangNVVMSurfaceOperation;
+#define SLANG_NVVM_SURFACE_OP_LOAD ((SlangNVVMSurfaceOperation)0u)
+#define SLANG_NVVM_SURFACE_OP_STORE ((SlangNVVMSurfaceOperation)1u)
+
+    typedef uint32_t SlangNVVMSurfaceBoundaryMode;
+#define SLANG_NVVM_SURFACE_BOUNDARY_ZERO ((SlangNVVMSurfaceBoundaryMode)0u)
+
+    /** Describes one complete typed surface-resource operation. */
+    typedef struct SlangNVVMSurfaceOperationDesc
+    {
+        SlangNVVMSurfaceOperation operation;
+        uint32_t dimensionCount;
+        SlangNVVMValueTypeDesc elementType;
+        SlangNVVMSurfaceBoundaryMode boundaryMode;
+    } SlangNVVMSurfaceOperationDesc;
 
     /** Owns module lifetime and verified serialization. */
     typedef struct SlangNVVMBuilderFoundationAPI
@@ -380,6 +397,19 @@ extern "C"
             size_t operandCount,
             SlangNVVMValueHandle* outValue);
     } SlangNVVMBuilderValueOperationsAPI;
+
+    typedef struct SlangNVVMBuilderSurfaceOperationsAPI
+    {
+        SlangNVVMResult(SLANG_NVVM_CALL* isOperationSupported)(
+            const SlangNVVMSurfaceOperationDesc* operation,
+            uint32_t* outSupported);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitOperation)(
+            SlangNVVMModuleHandle module,
+            const SlangNVVMSurfaceOperationDesc* operation,
+            const SlangNVVMValueHandle* operands,
+            size_t operandCount,
+            SlangNVVMValueHandle* outValue);
+    } SlangNVVMBuilderSurfaceOperationsAPI;
 
     typedef SlangNVVMResult(SLANG_NVVM_CALL* SlangNVVMQueryBuilderInterface)(
         SlangNVVMBuilderInterfaceID interfaceID,

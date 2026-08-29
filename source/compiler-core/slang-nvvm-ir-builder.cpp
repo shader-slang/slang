@@ -51,6 +51,11 @@ static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI
     return api.isOperationSupported && api.emitOperation;
 }
 
+static bool _hasRequiredSurfaceOperations(const SlangNVVMBuilderSurfaceOperationsAPI& api)
+{
+    return api.isOperationSupported && api.emitOperation;
+}
+
 /* static */ SlangResult NVVMIRBuilder::load(
     const String& path,
     ISlangSharedLibraryLoader* loader,
@@ -98,13 +103,16 @@ static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI
     const void* foundationRaw = nullptr;
     const void* constructionRaw = nullptr;
     const void* valueOperationsRaw = nullptr;
+    const void* surfaceOperationsRaw = nullptr;
     SLANG_RETURN_ON_FAIL(
         api.queryInterface(SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION, &foundationRaw));
     SLANG_RETURN_ON_FAIL(
         api.queryInterface(SLANG_NVVM_BUILDER_INTERFACE_CONSTRUCTION, &constructionRaw));
     SLANG_RETURN_ON_FAIL(
         api.queryInterface(SLANG_NVVM_BUILDER_INTERFACE_VALUE_OPERATIONS, &valueOperationsRaw));
-    if (!foundationRaw || !constructionRaw || !valueOperationsRaw)
+    SLANG_RETURN_ON_FAIL(
+        api.queryInterface(SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS, &surfaceOperationsRaw));
+    if (!foundationRaw || !constructionRaw || !valueOperationsRaw || !surfaceOperationsRaw)
         return SLANG_E_NO_INTERFACE;
 
     const auto& foundation = *static_cast<const SlangNVVMBuilderFoundationAPI*>(foundationRaw);
@@ -112,8 +120,11 @@ static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI
         *static_cast<const SlangNVVMBuilderConstructionAPI*>(constructionRaw);
     const auto& valueOperations =
         *static_cast<const SlangNVVMBuilderValueOperationsAPI*>(valueOperationsRaw);
+    const auto& surfaceOperations =
+        *static_cast<const SlangNVVMBuilderSurfaceOperationsAPI*>(surfaceOperationsRaw);
     if (!_hasRequiredFoundation(foundation) || !_hasRequiredConstruction(construction) ||
-        !_hasRequiredValueOperations(valueOperations))
+        !_hasRequiredValueOperations(valueOperations) ||
+        !_hasRequiredSurfaceOperations(surfaceOperations))
     {
         return SLANG_E_NO_INTERFACE;
     }
@@ -122,8 +133,47 @@ static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI
     outBuilder.m_foundation = foundation;
     outBuilder.m_construction = construction;
     outBuilder.m_valueOperations = valueOperations;
+    outBuilder.m_surfaceOperations = surfaceOperations;
     outBuilder.m_library = library;
     return SLANG_OK;
+}
+
+bool NVVMIRBuilder::supportsSurfaceOperation(const SlangNVVMSurfaceOperationDesc& operation) const
+{
+    if (!isInitialized())
+        return false;
+    uint32_t supported = 0;
+    return SLANG_SUCCEEDED(m_surfaceOperations.isOperationSupported(&operation, &supported)) &&
+           supported != 0;
+}
+
+SlangResult NVVMIRBuilder::emitSurfaceOperation(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMSurfaceOperationDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    const size_t expectedOperandCount = operation.operation == SLANG_NVVM_SURFACE_OP_LOAD    ? 2
+                                        : operation.operation == SLANG_NVVM_SURFACE_OP_STORE ? 3
+                                                                                             : 0;
+    if (!expectedOperandCount || operandCount != expectedOperandCount || !operands)
+        return SLANG_E_INVALID_ARG;
+    if (!supportsSurfaceOperation(operation))
+        return SLANG_E_NOT_AVAILABLE;
+
+    const SlangNVVMResult result =
+        m_surfaceOperations.emitOperation(module, &operation, operands, operandCount, &outValue);
+    if (operation.operation == SLANG_NVVM_SURFACE_OP_STORE)
+    {
+        if (SLANG_FAILED(result))
+            return result;
+        return !outValue ? SLANG_OK : SLANG_FAIL;
+    }
+    return _validateHandleResult(result, outValue);
 }
 
 bool NVVMIRBuilder::supportsValueOperation(const SlangNVVMValueOperationDesc& operation) const

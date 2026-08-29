@@ -37,6 +37,10 @@ public:
     {
         return &m_valueOperations;
     }
+    const SlangNVVMBuilderSurfaceOperationsAPI* getSurfaceOperationsAPI() const
+    {
+        return &m_surfaceOperations;
+    }
 
     /// Queries one complete typed operation.
     bool supportsValueOperation(const SlangNVVMValueOperationDesc& operation) const;
@@ -45,6 +49,17 @@ public:
     SlangResult emitValueOperation(
         SlangNVVMModuleHandle module,
         const SlangNVVMValueOperationDesc& operation,
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle& outValue) const;
+
+    /// Queries one complete typed surface-resource operation.
+    bool supportsSurfaceOperation(const SlangNVVMSurfaceOperationDesc& operation) const;
+
+    /// Emits one complete typed surface-resource operation.
+    SlangResult emitSurfaceOperation(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMSurfaceOperationDesc& operation,
         const SlangNVVMValueHandle* operands,
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
@@ -477,6 +492,7 @@ private:
     SlangNVVMBuilderFoundationAPI m_foundation = {};
     SlangNVVMBuilderConstructionAPI m_construction = {};
     SlangNVVMBuilderValueOperationsAPI m_valueOperations = {};
+    SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
     ComPtr<ISlangSharedLibrary> m_library;
 };
 
