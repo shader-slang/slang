@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry computeMain -profile cs_6_2 -emit-spirv-directly
 //TEST:CROSS_COMPILE: -target dxil-assembly -entry computeMain -profile cs_6_2 -O3
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -target cuda -entry computeMain -profile cs_6_2
+//TEST:SIMPLE(filecheck=CHECK_NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -profile cs_6_2 -capability cuda_sm_7_0 -O3 -o -
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out
 RWStructuredBuffer<int> outputBuffer;
@@ -53,3 +54,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK_CUDA: surf2Dwrite<__half>
 // CHECK_CUDA: surf2Dwrite<__half2{{.*}}>
 // CHECK_CUDA: surf2Dwrite<__half4{{.*}}>
+
+// CHECK_NVVM: suld.b.2d.b16.zero
+// CHECK_NVVM: suld.b.2d.v2.b16.zero
+// CHECK_NVVM: suld.b.2d.v4.b16.zero
+// CHECK_NVVM: sust.b.2d.b16.zero
+// CHECK_NVVM: sust.b.2d.v2.b16.zero
+// CHECK_NVVM: sust.b.2d.v4.b16.zero

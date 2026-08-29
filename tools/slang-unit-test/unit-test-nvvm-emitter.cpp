@@ -654,6 +654,81 @@ SLANG_UNIT_TEST(nvvmSlangIntegerVectorSwizzleUsesGenericConstruction)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangVectorConstructionFlattensMixedOperands)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMFlattenedVectorConstructionSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        Index flattenedConstructIndex = -1;
+        for (Index i = 0; i < gFakeNVVMBuilder.vectorConstructResultTypes.getCount(); ++i)
+        {
+            if (gFakeNVVMBuilder.vectorConstructResultTypes[i] ==
+                _getFakeNVVMBuilderVectorType(4, FakeNVVMBuilderScalarTypeKind::Half))
+            {
+                flattenedConstructIndex = i;
+                break;
+            }
+        }
+        SLANG_CHECK_ABORT(flattenedConstructIndex >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.vectorConstructElementCounts[flattenedConstructIndex] == 4);
+        const Index elementOffset =
+            gFakeNVVMBuilder.vectorConstructElementOffsets[flattenedConstructIndex];
+        const FakeNVVMBuilderValueRef first =
+            gFakeNVVMBuilder.vectorConstructElementValueRefs[elementOffset];
+        const FakeNVVMBuilderValueRef second =
+            gFakeNVVMBuilder.vectorConstructElementValueRefs[elementOffset + 1];
+        SLANG_CHECK_ABORT(
+            first.kind == FakeNVVMBuilderValueKind::VectorElement && first.index >= 0 &&
+            first.index < gFakeNVVMBuilder.vectorElementIndices.getCount());
+        SLANG_CHECK_ABORT(
+            second.kind == FakeNVVMBuilderValueKind::VectorElement && second.index >= 0 &&
+            second.index < gFakeNVVMBuilder.vectorElementIndices.getCount());
+        SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[first.index] == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[second.index] == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.vectorElementBaseValueRefs[first.index].kind ==
+            FakeNVVMBuilderValueKind::Call);
+        const FakeNVVMBuilderValueRef firstBase =
+            gFakeNVVMBuilder.vectorElementBaseValueRefs[first.index];
+        const FakeNVVMBuilderValueRef secondBase =
+            gFakeNVVMBuilder.vectorElementBaseValueRefs[second.index];
+        SLANG_CHECK(secondBase.kind == firstBase.kind);
+        SLANG_CHECK(secondBase.index == firstBase.index);
+        SLANG_CHECK(secondBase.functionIndex == firstBase.functionIndex);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.vectorConstructElementValueRefs[elementOffset + 2].kind ==
+            FakeNVVMBuilderValueKind::ScalarOperation);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.vectorConstructElementValueRefs[elementOffset + 3].kind ==
+            FakeNVVMBuilderValueKind::ScalarOperation);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangFloatMatrixValuesUseLegalizedAggregates)
 {
     _resetDirectNVVMFakes();

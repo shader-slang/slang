@@ -5119,6 +5119,22 @@ contains scalar 1D and 2D Half loads, one four-lane 2D Half load, one scalar 2D 
 following scalar 2D load. CUDA 12.9.86 `ptxas -arch=sm_70` accepts it and emits a 3,176-byte cubin.
 Final runtime and full-prefix counts are recorded by the Slice 99 plan.
 
+### Slice 100: Flattened vector construction and complete Half surface widths
+
+Canonical vector construction can combine scalar and vector operands. Direct NVVM now flattens
+each accepted same-element operand from left to right into the existing bounded lane sequence. A
+scalar contributes one lane; a vector contributes constant-index extracts in increasing order. The
+lane total must exactly equal the result width, and every operand must have the result's canonical
+scalar element type. Emission consumes that resolved sequence through the existing typed vector
+extract and construct operations, without rediscovering source structure or adding LLVM callbacks.
+
+This admits the finalized `half4(half2Value, halfValue, halfValue)` shape in
+`half-texture.slang`. The full fixture now compiles through direct libNVVM and permanently checks
+scalar, v2, and v4 native-Half 2D surface loads and stores. Its 1,659-byte optimized PTX contains
+all six `suld.b.2d.*.zero`/`sust.b.2d.*.zero` rows, and CUDA 12.9.86
+`ptxas -arch=sm_70` accepts it as a 3,176-byte cubin. Formatted Float resources backed by Half
+surface formats and sampled Texture/Sampler operations remain separate resource families.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production

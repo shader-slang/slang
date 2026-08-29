@@ -8401,6 +8401,34 @@ void computeMain(
 }
 )";
 
+static const char kDirectNVVMFlattenedVectorConstructionSource[] = R"(
+[noinline]
+half2 makePair(float left, float right)
+{
+    return half2(half(left), half(right));
+}
+
+[noinline]
+half selectLane(half4 value, int index)
+{
+    return value[index & 3];
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float first,
+    uniform float second,
+    uniform float third,
+    uniform float fourth,
+    uniform int index)
+{
+    half2 pair = makePair(first, second);
+    half4 combined = half4(pair, half(third), half(fourth));
+    *destination = float(selectLane(combined, index));
+}
+)";
+
 static const char kDirectNVVMWaveLaneIndexSource[] = R"(
 [CUDAKernel]
 void computeMain(

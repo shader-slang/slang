@@ -529,6 +529,43 @@ struct NVVMVectorConstruction
     uint32_t elementCount = 0;
 };
 
+// Appends one canonical constructor operand to a flattened lane sequence. For example,
+// `half4(half2Value, halfValue, halfValue)` contributes lanes 0-1 from `half2Value`, followed by
+// the two scalar operands. The final provider operation can then consume one uniform lane list.
+bool _appendNVVMVectorConstructOperand(
+    IRInst* operand,
+    IRType* resultElementType,
+    uint32_t resultElementCount,
+    NVVMVectorConstructElement* outElements,
+    uint32_t& ioElementCount)
+{
+    if (!operand || !resultElementType || !outElements || ioElementCount > resultElementCount)
+        return false;
+
+    if (isTypeEqual(operand->getDataType(), resultElementType))
+    {
+        if (ioElementCount >= resultElementCount)
+            return false;
+        outElements[ioElementCount++].value = operand;
+        return true;
+    }
+
+    uint32_t operandElementCount = 0;
+    auto operandType = asNVVMSupportedValueVectorType(operand->getDataType(), &operandElementCount);
+    if (!operandType || !isTypeEqual(operandType->getElementType(), resultElementType) ||
+        operandElementCount > resultElementCount - ioElementCount)
+    {
+        return false;
+    }
+    for (uint32_t i = 0; i < operandElementCount; ++i)
+    {
+        NVVMVectorConstructElement& element = outElements[ioElementCount++];
+        element.extractedBase = operand;
+        element.extractedIndex = i;
+    }
+    return true;
+}
+
 // Resolves the canonical flat constructor, scalar splat, or multi-lane swizzle of one accepted
 // ordinary value vector. Every output lane retains its exact scalar value or base/index source.
 bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstruction)
@@ -542,15 +579,21 @@ bool _getNVVMVectorConstruction(IRInst* inst, NVVMVectorConstruction& outConstru
 
     if (inst->getOp() == kIROp_MakeVector)
     {
-        if (inst->getOperandCount() != elementCount)
-            return false;
-        for (uint32_t i = 0; i < elementCount; ++i)
+        uint32_t flattenedElementCount = 0;
+        for (UInt i = 0; i < inst->getOperandCount(); ++i)
         {
-            IRInst* element = inst->getOperand(i);
-            if (!element || !isTypeEqual(element->getDataType(), resultType->getElementType()))
+            if (!_appendNVVMVectorConstructOperand(
+                    inst->getOperand(i),
+                    resultType->getElementType(),
+                    elementCount,
+                    outConstruction.elements,
+                    flattenedElementCount))
+            {
                 return false;
-            outConstruction.elements[i].value = element;
+            }
         }
+        if (flattenedElementCount != elementCount)
+            return false;
     }
     else if (inst->getOp() == kIROp_MakeVectorFromScalar)
     {
