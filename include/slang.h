@@ -2951,6 +2951,23 @@ struct TypeLayoutReflection
             (SlangReflectionTypeLayout*)this);
     }
 
+    /** Get the variable layout for the "content" of a container-like type layout.
+     *
+     * The "content" is what a container holds, as opposed to the container ("wrapper") itself: the
+     * single element for a constant buffer / parameter block / texture buffer, and the sequence of
+     * elements for a structured buffer. For a constant buffer / parameter block / texture buffer
+     * this returns the element variable layout, whose offsets are relative to the container (they
+     * account for the container's own resource usage). For a structured buffer it returns a
+     * variable layout at offset zero whose `getTypeLayout()` is an array type layout, so
+     * `getElementTypeLayout` / `getElementStride` on it behave as for any array. Returns null for
+     * type layouts that are not container-like.
+     */
+    VariableLayoutReflection* getContentVarLayout()
+    {
+        return (VariableLayoutReflection*)spReflectionTypeLayout_GetContentVarLayout(
+            (SlangReflectionTypeLayout*)this);
+    }
+
     // How is this type supposed to be bound?
     ParameterCategory getParameterCategory()
     {

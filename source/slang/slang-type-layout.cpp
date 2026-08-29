@@ -4398,6 +4398,59 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferWithCounterTypeLayout(
     return typeLayout;
 }
 
+// Build the "content" variable layout for a structured buffer: a var layout over an unbounded
+// array of the element type, carrying no offsets (navigating to the content resets the byte-offset
+// root). The element layout is reused as-is; a structured buffer element carries no resource kind
+// other than uniform data and existential params, so the general array-layout path's AoS-to-SoA
+// element adjustment does not apply and the content array's usage is just strided uniform storage
+// plus those existentials.
+static RefPtr<VarLayout> createStructuredBufferContentVarLayout(
+    TypeLayoutContext const& context,
+    TypeLayout* elementTypeLayout)
+{
+    auto elementRules = elementTypeLayout->rules;
+
+    RefPtr<ArrayTypeLayout> contentTypeLayout = new ArrayTypeLayout();
+    contentTypeLayout->type =
+        context.astBuilder->getArrayType(elementTypeLayout->type, /* unbounded */ nullptr);
+    contentTypeLayout->rules = elementRules;
+    contentTypeLayout->elementTypeLayout = elementTypeLayout;
+    contentTypeLayout->originalElementTypeLayout = elementTypeLayout;
+    contentTypeLayout->uniformAlignment = elementTypeLayout->uniformAlignment;
+
+    // The stride/size come from the same rules a real array uses (`GetArrayLayout`), which asserts
+    // a finite element uniform size (`SLANG_RELEASE_ASSERT(elementInfo.size.isFinite())`). Only
+    // synthesize the content array's uniform stride/size when the element reports a finite uniform
+    // size; when it has no uniform resource at all (e.g. a pure interface value) or a non-finite
+    // one (unbounded or as-yet-unknown), there is no finite footprint to feed `GetArrayLayout`, so
+    // the content array carries no uniform size/stride.
+    if (auto elementUniformInfo = elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+        elementUniformInfo && elementUniformInfo->count.isFinite())
+    {
+        SimpleLayoutInfo elementInfo(
+            LayoutResourceKind::Uniform,
+            elementUniformInfo->count,
+            elementTypeLayout->uniformAlignment);
+        auto arrayInfo = elementRules->GetArrayLayout(elementInfo, LayoutSize::infinite());
+        contentTypeLayout->uniformStride = arrayInfo.elementStride;
+        contentTypeLayout->uniformAlignment = arrayInfo.alignment;
+        contentTypeLayout->addResourceUsage(LayoutResourceKind::Uniform, arrayInfo.size);
+    }
+
+    // Mirror the specialization footprint the buffer propagates from its element type, so a
+    // structured buffer of an interface type reports the same existential usage on its content.
+    for (auto kind :
+         {LayoutResourceKind::ExistentialTypeParam, LayoutResourceKind::ExistentialObjectParam})
+    {
+        if (auto info = elementTypeLayout->FindResourceInfo(kind))
+            contentTypeLayout->addResourceUsage(kind, info->count);
+    }
+
+    RefPtr<VarLayout> contentVarLayout = new VarLayout();
+    contentVarLayout->typeLayout = contentTypeLayout;
+    return contentVarLayout;
+}
+
 // Create a type layout for a structured buffer type.
 RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     TypeLayoutContext const& context,
@@ -4414,6 +4467,8 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     typeLayout->rules = rules;
 
     typeLayout->elementTypeLayout = elementTypeLayout;
+    typeLayout->contentVarLayout =
+        createStructuredBufferContentVarLayout(context, elementTypeLayout);
 
     typeLayout->uniformAlignment = info.alignment;
 
