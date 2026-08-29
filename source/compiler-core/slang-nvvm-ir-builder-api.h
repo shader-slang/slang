@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 15u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 16u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -142,7 +142,8 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_SHIFT_RIGHT ((SlangNVVMValueOperation)34u)
 #define SLANG_NVVM_VALUE_OP_FLOAT_CONVERT ((SlangNVVMValueOperation)35u)
 #define SLANG_NVVM_VALUE_OP_SQRT ((SlangNVVMValueOperation)36u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT 37u
+#define SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER ((SlangNVVMValueOperation)37u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT 38u
 
     /** Describes one complete semantic value-operation overload. */
     typedef struct SlangNVVMValueOperationDesc
@@ -164,11 +165,18 @@ extern "C"
 #define SLANG_NVVM_SURFACE_STORAGE_NATIVE ((SlangNVVMSurfaceStorageFormat)0u)
 #define SLANG_NVVM_SURFACE_STORAGE_FLOAT16 ((SlangNVVMSurfaceStorageFormat)1u)
 
+    typedef uint32_t SlangNVVMTextureShape;
+#define SLANG_NVVM_TEXTURE_SHAPE_1D ((SlangNVVMTextureShape)1u)
+#define SLANG_NVVM_TEXTURE_SHAPE_2D ((SlangNVVMTextureShape)2u)
+#define SLANG_NVVM_TEXTURE_SHAPE_3D ((SlangNVVMTextureShape)3u)
+#define SLANG_NVVM_TEXTURE_SHAPE_CUBE ((SlangNVVMTextureShape)4u)
+
     /** Describes one complete typed surface-resource operation. */
     typedef struct SlangNVVMSurfaceOperationDesc
     {
         SlangNVVMSurfaceOperation operation;
-        uint32_t dimensionCount;
+        SlangNVVMTextureShape shape;
+        uint32_t isArray;
         SlangNVVMValueTypeDesc elementType;
         SlangNVVMSurfaceBoundaryMode boundaryMode;
         SlangNVVMSurfaceStorageFormat storageFormat;
@@ -180,12 +188,6 @@ extern "C"
 #define SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT ((SlangNVVMTextureOperation)2u)
 #define SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH ((SlangNVVMTextureOperation)3u)
 #define SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL ((SlangNVVMTextureOperation)4u)
-
-    typedef uint32_t SlangNVVMTextureShape;
-#define SLANG_NVVM_TEXTURE_SHAPE_1D ((SlangNVVMTextureShape)1u)
-#define SLANG_NVVM_TEXTURE_SHAPE_2D ((SlangNVVMTextureShape)2u)
-#define SLANG_NVVM_TEXTURE_SHAPE_3D ((SlangNVVMTextureShape)3u)
-#define SLANG_NVVM_TEXTURE_SHAPE_CUBE ((SlangNVVMTextureShape)4u)
 
     /** Describes one complete typed sampled-texture operation. */
     typedef struct SlangNVVMTextureOperationDesc

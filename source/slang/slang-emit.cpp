@@ -2323,6 +2323,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::Metal:
     case CodeGenTarget::GLSL:
+    case CodeGenTarget::PTX:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         {

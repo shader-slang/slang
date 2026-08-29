@@ -5289,6 +5289,40 @@ The next existing-suite boundary is `texture-subscript.slang`. Its first direct 
 barrier and partial-vector-update dependencies should be measured together before Slice 106 chooses
 a capability boundary.
 
+### Slice 106: Native integer surface l-values and 2D arrays
+
+PTX now runs the existing image-subscript legalization used by the other image-oriented targets.
+For example, `outputTexture2D[coordinate].xz = value` becomes one typed `imageLoad`, a
+`swizzleSet`, and one typed `imageStore`. The direct emitter consumes those canonical operations;
+it does not recover an image root from a pointer chain or duplicate partial-store semantics. The
+collected global field key remains the source of truth for resource format. Its existing
+`ImageFormatInfo` supplies channel count and scalar kind, admitting native 32-bit signed,
+unsigned, and floating-point fields while preserving the established Float32-to-Float16
+conversion boundary.
+
+Forward-only builder ABI revision 16 replaces the surface descriptor's dimension count with base
+shape plus independent arrayness. This distinguishes 3D from a 2D array even though each has a
+three-lane semantic coordinate. The selected native matrix is signed i32, unsigned i32, and
+Float32 scalar/v2/v4 loads and stores for 1D, 2D, 3D, and arrayed 2D surfaces. The provider selects
+the exact `llvm.nvvm.suld.2d.array.*.zero` and `llvm.nvvm.sust.b.2d.array.*.zero` rows for arrays;
+signedness remains semantic because all selected 32-bit surface payloads use physical i32 lanes.
+Int3/UInt3/Float3, 1D arrays, cube resources, and formatted or Half arrays remain explicit
+capability negatives.
+
+The same ABI revision appends the catalog's zero-operand, void device-memory barrier. The exact
+retained CUDA helper body `__threadfence()` maps to the convergent `llvm.nvvm.membar.gl`
+intrinsic. Boolean-to-integer `intCast` also uses the existing descriptor-driven integer-convert
+family: the provider zero-extends Boolean lanes rather than adding a fixture-specific cast or
+callback.
+
+`texture-subscript.slang` now passes direct libNVVM runtime comparison with output `1` and checks
+native Int4 1D, 2D, 3D, and arrayed-2D load/store PTX plus `membar.gl`. Its optimized PTX is 4,787
+bytes. CUDA 12.9.86 `ptxas -arch=sm_70` accepts the module and emits a 4,968-byte cubin. The
+affected native, formatted-Half, and texture-subscript fixture prefixes pass 28/28; focused
+Float3, Int3, and 1D-array diagnostics pass 3/3; and the complete NVVM unit-test prefix passes
+376/376. The neighboring ordinary PTX/NVRTC route still emits invalid CUDA surface l-value syntax;
+that separate source-emitter boundary is unchanged.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production

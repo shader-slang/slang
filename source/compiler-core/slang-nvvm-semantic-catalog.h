@@ -469,6 +469,14 @@ inline constexpr CatalogEntry kCatalog[] = {
         "CUDA workgroup barrier",
         "__syncthreads()",
     },
+    {
+        SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER,
+        kVoid,
+        {kNoType, kNoType, kNoType},
+        0,
+        "CUDA device memory barrier",
+        "__threadfence()",
+    },
 };
 
 inline constexpr size_t getCatalogCount()
@@ -726,7 +734,9 @@ inline bool resolveValueOperationFamily(
     }
 
     if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT && desc.operandCount == 1 &&
-        isSelectedIntegerValue(desc.resultType) && isSelectedIntegerValue(desc.operandTypes[0]) &&
+        isSelectedIntegerValue(desc.resultType) &&
+        (isSelectedIntegerValue(desc.operandTypes[0]) ||
+         isSelectedBoolValue(desc.operandTypes[0])) &&
         desc.resultType.laneCount == desc.operandTypes[0].laneCount &&
         !areSameType(desc.resultType, desc.operandTypes[0]))
     {

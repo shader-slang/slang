@@ -5,6 +5,8 @@
 // Due to this, Metal compute test is disabled
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF): -cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
 
 //METAL-NOT: error[E41404]
 //METALLIB: @computeMain
@@ -19,6 +21,16 @@
 //CUDA: surf2Dread<{{.*}}>
 //CUDA: surf3Dread<{{.*}}>
 //CUDA: surf2DLayeredread<{{.*}}>
+
+//NVVM: suld.b.1d.v4.b32.zero
+//NVVM: sust.b.1d.v4.b32.zero
+//NVVM: membar.gl
+//NVVM: suld.b.2d.v4.b32.zero
+//NVVM: sust.b.2d.v4.b32.zero
+//NVVM: suld.b.3d.v4.b32.zero
+//NVVM: sust.b.3d.v4.b32.zero
+//NVVM: suld.b.a2d.v4.b32.zero
+//NVVM: sust.b.a2d.v4.b32.zero
 
 //TEST_INPUT: RWTexture1D(format=RGBA8Sint, size=8, content = zero, mipMaps = 1):name outputTexture1D
 RWTexture1D<int4> outputTexture1D;

@@ -166,11 +166,13 @@ bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerTy
 struct NVVMSurfaceType
 {
     IRTextureTypeBase* textureType = nullptr;
-    uint32_t dimensionCount = 0;
+    SlangNVVMTextureShape shape = 0;
+    bool isArray = false;
+    uint32_t coordinateLaneCount = 0;
     SlangNVVMValueTypeDesc elementType = {};
 };
 
-/// Resolves a non-arrayed 1D/2D read-write surface with selected floating-point elements.
+/// Resolves one selected read-write CUDA surface and its complete semantic element type.
 bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType);
 
 /// Resolves the physical storage selected by a conventional-global surface field.

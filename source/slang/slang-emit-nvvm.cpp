@@ -1038,10 +1038,25 @@ const NVVMSemantics::CatalogEntry* _findNVVMGenericAsmSemantic(
 struct NVVMResolvedSurfaceOperation
 {
     SlangNVVMSurfaceOperationDesc desc = {};
-    IRParam* surface = nullptr;
-    IRParam* coordinate = nullptr;
-    IRParam* value = nullptr;
+    IRInst* surface = nullptr;
+    IRInst* coordinate = nullptr;
+    IRInst* value = nullptr;
 };
+
+uint32_t _getNVVMSurfaceBaseCoordinateLaneCount(SlangNVVMTextureShape shape)
+{
+    switch (shape)
+    {
+    case SLANG_NVVM_TEXTURE_SHAPE_1D:
+        return 1;
+    case SLANG_NVVM_TEXTURE_SHAPE_2D:
+        return 2;
+    case SLANG_NVVM_TEXTURE_SHAPE_3D:
+        return 3;
+    default:
+        return 0;
+    }
+}
 
 // Resolves the storage selected at one exact direct call site. The CUDA intrinsic expander uses
 // this same canonical load-from-collected-global shape: the field key remains the source of truth
@@ -1078,46 +1093,55 @@ bool _resolveNVVMSurfaceGenericAsm(
 
     const UnownedStringSlice assembly = genericAsm->getAsm();
     SlangNVVMSurfaceOperation operation = 0;
-    uint32_t dimensionCount = 0;
+    SlangNVVMTextureShape shape = 0;
+    bool isArray = false;
     if (assembly == toSlice("surf1Dread$C<$T0>($0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)"))
     {
         operation = SLANG_NVVM_SURFACE_OP_LOAD;
-        dimensionCount = 1;
+        shape = SLANG_NVVM_TEXTURE_SHAPE_1D;
     }
     else if (
         assembly == toSlice("surf2Dread$C<$T0>($0, ($1).x * $E, ($1).y, "
                             "SLANG_CUDA_BOUNDARY_MODE)"))
     {
         operation = SLANG_NVVM_SURFACE_OP_LOAD;
-        dimensionCount = 2;
+        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
     }
     else if (
         assembly == toSlice("surf3Dread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, "
                             "SLANG_CUDA_BOUNDARY_MODE)"))
     {
         operation = SLANG_NVVM_SURFACE_OP_LOAD;
-        dimensionCount = 3;
+        shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
+    }
+    else if (
+        assembly == toSlice("surf2DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, "
+                            "SLANG_CUDA_BOUNDARY_MODE)"))
+    {
+        operation = SLANG_NVVM_SURFACE_OP_LOAD;
+        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
+        isArray = true;
     }
     else if (
         assembly == toSlice("surf1Dwrite$C<$T0>($2, $0, ($1) * $E, "
                             "SLANG_CUDA_BOUNDARY_MODE)"))
     {
         operation = SLANG_NVVM_SURFACE_OP_STORE;
-        dimensionCount = 1;
+        shape = SLANG_NVVM_TEXTURE_SHAPE_1D;
     }
     else if (
         assembly == toSlice("surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, "
                             "SLANG_CUDA_BOUNDARY_MODE)"))
     {
         operation = SLANG_NVVM_SURFACE_OP_STORE;
-        dimensionCount = 2;
+        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
     }
     else if (
         assembly == toSlice("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, "
                             "SLANG_CUDA_BOUNDARY_MODE)"))
     {
         operation = SLANG_NVVM_SURFACE_OP_STORE;
-        dimensionCount = 3;
+        shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
     }
     else
         return false;
@@ -1128,14 +1152,16 @@ bool _resolveNVVMSurfaceGenericAsm(
 
     NVVMSurfaceType surfaceType;
     if (!getNVVMSupportedSurfaceType(function->getParamType(0), surfaceType) ||
-        surfaceType.dimensionCount != dimensionCount)
+        surfaceType.shape != shape || surfaceType.isArray != isArray)
     {
         return false;
     }
 
     IRType* coordinateType = function->getParamType(1);
     bool hasCanonicalCoordinate = false;
-    if (dimensionCount == 1)
+    const uint32_t coordinateLaneCount =
+        _getNVVMSurfaceBaseCoordinateLaneCount(shape) + (isArray ? 1u : 0u);
+    if (coordinateLaneCount == 1)
     {
         hasCanonicalCoordinate = operation == SLANG_NVVM_SURFACE_OP_LOAD
                                      ? isNVVMSignedI32Type(coordinateType)
@@ -1147,7 +1173,8 @@ bool _resolveNVVMSurfaceGenericAsm(
         uint32_t laneCount = 0;
         hasCanonicalCoordinate =
             asNVVMSupportedI32VectorType(coordinateType, &isSigned, &laneCount) &&
-            laneCount == dimensionCount && isSigned == (operation == SLANG_NVVM_SURFACE_OP_LOAD);
+            laneCount == coordinateLaneCount &&
+            isSigned == (operation == SLANG_NVVM_SURFACE_OP_LOAD);
     }
     if (!hasCanonicalCoordinate)
         return false;
@@ -1184,48 +1211,107 @@ bool _resolveNVVMSurfaceGenericAsm(
 
     outOperation.desc = {
         operation,
-        dimensionCount,
+        shape,
+        isArray,
         surfaceType.elementType,
         SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
         storageFormat,
     };
-    outOperation.surface = function->getFirstParam();
-    outOperation.coordinate = outOperation.surface->getNextParam();
-    outOperation.value = operation == SLANG_NVVM_SURFACE_OP_STORE
-                             ? outOperation.coordinate->getNextParam()
-                             : nullptr;
+    IRParam* surface = function->getFirstParam();
+    IRParam* coordinate = surface->getNextParam();
+    outOperation.surface = surface;
+    outOperation.coordinate = coordinate;
+    outOperation.value =
+        operation == SLANG_NVVM_SURFACE_OP_STORE ? coordinate->getNextParam() : nullptr;
+    return true;
+}
+
+// Resolves the explicit image load/store form produced by PTX image-subscript legalization.
+bool _resolveNVVMSurfaceImageOperation(IRInst* inst, NVVMResolvedSurfaceOperation& outOperation)
+{
+    outOperation = {};
+    const bool isLoad = as<IRImageLoad>(inst) != nullptr;
+    const bool isStore = as<IRImageStore>(inst) != nullptr;
+    const uint32_t expectedOperandCount = isLoad ? 2 : isStore ? 3 : 0;
+    if (!expectedOperandCount || inst->getOperandCount() != expectedOperandCount)
+        return false;
+
+    IRInst* surface = inst->getOperand(0);
+    IRInst* coordinate = inst->getOperand(1);
+    IRInst* value = isStore ? inst->getOperand(2) : nullptr;
+    NVVMSurfaceType surfaceType;
+    SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
+    if (!surface || !coordinate ||
+        !getNVVMSupportedSurfaceType(surface->getDataType(), surfaceType) ||
+        !_getNVVMSurfaceCallStorageFormat(surface, surfaceType, storageFormat))
+    {
+        return false;
+    }
+
+    bool hasCanonicalCoordinate = false;
+    if (surfaceType.coordinateLaneCount == 1)
+    {
+        hasCanonicalCoordinate = isNVVMSignedI32Type(coordinate->getDataType());
+    }
+    else
+    {
+        bool isSigned = false;
+        uint32_t laneCount = 0;
+        hasCanonicalCoordinate =
+            asNVVMSupportedI32VectorType(coordinate->getDataType(), &isSigned, &laneCount) &&
+            isSigned && laneCount == surfaceType.coordinateLaneCount;
+    }
+    if (!hasCanonicalCoordinate ||
+        (isLoad && !isTypeEqual(inst->getDataType(), surfaceType.textureType->getElementType())) ||
+        (isStore &&
+         (!as<IRVoidType>(inst->getDataType()) ||
+          !isTypeEqual(value->getDataType(), surfaceType.textureType->getElementType()))))
+    {
+        return false;
+    }
+
+    outOperation.desc = {
+        isLoad ? SLANG_NVVM_SURFACE_OP_LOAD : SLANG_NVVM_SURFACE_OP_STORE,
+        surfaceType.shape,
+        surfaceType.isArray,
+        surfaceType.elementType,
+        SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
+        storageFormat,
+    };
+    outOperation.surface = surface;
+    outOperation.coordinate = coordinate;
+    outOperation.value = value;
     return true;
 }
 
 void _requireSurfaceOperation(
     List<NVVMSurfaceOperationRequirement>& requirements,
-    IRFunc* function,
+    IRInst* source,
     const SlangNVVMSurfaceOperationDesc& desc,
     const char* diagnosticName)
 {
     for (const auto& requirement : requirements)
     {
-        if (requirement.function != function)
+        if (requirement.source != source)
             continue;
         const auto& existing = requirement.desc;
         SLANG_RELEASE_ASSERT(
-            existing.operation == desc.operation &&
-            existing.dimensionCount == desc.dimensionCount &&
-            existing.boundaryMode == desc.boundaryMode &&
+            existing.operation == desc.operation && existing.shape == desc.shape &&
+            existing.isArray == desc.isArray && existing.boundaryMode == desc.boundaryMode &&
             existing.storageFormat == desc.storageFormat &&
             NVVMSemantics::areSameType(existing.elementType, desc.elementType));
         return;
     }
-    requirements.add({function, desc, diagnosticName});
+    requirements.add({source, desc, diagnosticName});
 }
 
 const NVVMSurfaceOperationRequirement* _findSurfaceOperationRequirement(
     const List<NVVMSurfaceOperationRequirement>& requirements,
-    IRFunc* function)
+    IRInst* source)
 {
     for (const auto& requirement : requirements)
     {
-        if (requirement.function == function)
+        if (requirement.source == source)
             return &requirement;
     }
     return nullptr;
@@ -2722,6 +2808,26 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_ImageLoad:
+            case kIROp_ImageStore:
+                {
+                    NVVMResolvedSurfaceOperation surfaceOperation;
+                    if (!_resolveNVVMSurfaceImageOperation(inst, surfaceOperation))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("legalized image surface operation"));
+                    }
+                    _requireSurfaceOperation(
+                        requirements.surfaceOperations,
+                        inst,
+                        surfaceOperation.desc,
+                        surfaceOperation.desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
+                            ? "native image surface load"
+                            : "native image surface store");
+                }
+                break;
+
             case kIROp_Add:
             case kIROp_Sub:
             case kIROp_Mul:
@@ -2859,10 +2965,10 @@ SlangResult _validateNVVMFunction(
                             requirements.surfaceOperations,
                             function,
                             surfaceOperation.desc,
-                            isFormatted ? (isLoad ? "formatted Half surface load"
-                                                  : "formatted Half surface store")
-                                        : (isLoad ? "native Half surface load"
-                                                  : "native Half surface store"));
+                            isFormatted
+                                ? (isLoad ? "formatted Half surface load"
+                                          : "formatted Half surface store")
+                                : (isLoad ? "native surface load" : "native surface store"));
                         break;
                     }
                     const char* textureDiagnosticName = nullptr;
@@ -3127,6 +3233,39 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree));
+                }
+                break;
+
+            case kIROp_ImageLoad:
+            case kIROp_ImageStore:
+                {
+                    NVVMResolvedSurfaceOperation surfaceOperation;
+                    SLANG_RELEASE_ASSERT(_resolveNVVMSurfaceImageOperation(inst, surfaceOperation));
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        surfaceOperation.surface,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        surfaceOperation.coordinate,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    if (surfaceOperation.value)
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                            codeGenContext,
+                            surfaceOperation.value,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                    }
+                    else
+                    {
+                        availableValues.add(inst);
+                    }
                 }
                 break;
 
@@ -4712,6 +4851,48 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     loweredElementPointer,
                                     kNVVMScalar32Alignment)));
                         }
+                    }
+                    break;
+
+                case kIROp_ImageLoad:
+                case kIROp_ImageStore:
+                    {
+                        NVVMResolvedSurfaceOperation operation;
+                        SLANG_RELEASE_ASSERT(_resolveNVVMSurfaceImageOperation(inst, operation));
+                        const auto requirement =
+                            _findSurfaceOperationRequirement(requirements.surfaceOperations, inst);
+                        SLANG_RELEASE_ASSERT(requirement);
+
+                        IRInst* semanticOperands[] = {
+                            operation.surface,
+                            operation.coordinate,
+                            operation.value,
+                        };
+                        const size_t operandCount = operation.value ? 3 : 2;
+                        SlangNVVMValueHandle loweredOperands[3] = {};
+                        for (size_t operandIndex = 0; operandIndex < operandCount; ++operandIndex)
+                        {
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                semanticOperands[operandIndex],
+                                valueMap,
+                                typeContext,
+                                loweredOperands[operandIndex]));
+                        }
+                        SlangNVVMValueHandle loweredResult = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            requirement->diagnosticName,
+                            builder.emitSurfaceOperation(
+                                moduleScope.module,
+                                requirement->desc,
+                                loweredOperands,
+                                operandCount,
+                                loweredResult)));
+                        if (!operation.value)
+                            valueMap[inst] = loweredResult;
                     }
                     break;
 

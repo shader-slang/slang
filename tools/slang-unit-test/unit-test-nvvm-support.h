@@ -443,6 +443,7 @@ struct FakeNVVMBuilderState
         emitVectorConstructCallCount = 0;
         emitVectorElementExtractCallCount = 0;
         workgroupBarrierCallCount = 0;
+        deviceMemoryBarrierCallCount = 0;
         for (Index family = 0; family < Index(FakeNVVMBuilderScalarFamily::Count); ++family)
         {
             scalarFamilyCallCounts[family] = 0;
@@ -773,6 +774,7 @@ struct FakeNVVMBuilderState
     int emitVectorConstructCallCount = 0;
     int emitVectorElementExtractCallCount = 0;
     int workgroupBarrierCallCount = 0;
+    int deviceMemoryBarrierCallCount = 0;
     int scalarFamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::Count)] = {};
     int valueOperationFamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::Count)] = {};
     int scalarOperationCallCounts[Index(FakeNVVMBuilderScalarFamily::Count)]
@@ -2037,6 +2039,19 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
                 return false;
             }
         }
+    case FakeNVVMBuilderValueKind::SurfaceOperation:
+        {
+            if (valueRef.index < 0 ||
+                valueRef.index >= gFakeNVVMBuilder.surfaceOperations.getCount())
+                return false;
+            const SlangNVVMSurfaceOperationDesc& surfaceOperation =
+                gFakeNVVMBuilder.surfaceOperations[valueRef.index];
+            return surfaceOperation.operation == SLANG_NVVM_SURFACE_OP_LOAD &&
+                   (surfaceOperation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                    surfaceOperation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+                   surfaceOperation.elementType.bitWidth == 32 &&
+                   surfaceOperation.elementType.laneCount == 1;
+        }
     case FakeNVVMBuilderValueKind::PointerOffset:
     case FakeNVVMBuilderValueKind::ByteOffsetPointer:
     case FakeNVVMBuilderValueKind::ArrayElementPointer:
@@ -2122,11 +2137,13 @@ static bool _isFakeNVVMBuilderVectorValue(
         const SlangNVVMSurfaceOperationDesc& operation =
             gFakeNVVMBuilder.surfaceOperations[valueRef.index];
         const uint32_t expectedBitWidth =
-            expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Half    ? 16
-            : expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Float ? 32
-                                                                              : 0;
-        return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD && expectedBitWidth != 0 &&
-               operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+            expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Half ? 16 : 32;
+        const bool isExpectedKind =
+            expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Integer
+                ? operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                      operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER
+                : operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+        return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD && isExpectedKind &&
                operation.elementType.bitWidth == expectedBitWidth &&
                operation.elementType.laneCount == expectedElementCount;
     }
@@ -4876,8 +4893,9 @@ static SlangResult _fakeNVVMBuilderEmitExecutionOperation(
     return SLANG_OK;
 }
 
-static SlangResult _fakeNVVMBuilderEmitWorkgroupBarrier(
+static SlangResult _fakeNVVMBuilderEmitBarrier(
     SlangNVVMModuleHandle module,
+    SlangNVVMValueOperation operation,
     SlangNVVMValueHandle* outValue)
 {
     if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
@@ -4885,7 +4903,12 @@ static SlangResult _fakeNVVMBuilderEmitWorkgroupBarrier(
     {
         return SLANG_E_INVALID_ARG;
     }
-    ++gFakeNVVMBuilder.workgroupBarrierCallCount;
+    if (operation == SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER)
+        ++gFakeNVVMBuilder.workgroupBarrierCallCount;
+    else if (operation == SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER)
+        ++gFakeNVVMBuilder.deviceMemoryBarrierCallCount;
+    else
+        return SLANG_E_INVALID_ARG;
     *outValue = nullptr;
     return SLANG_OK;
 }
@@ -4968,7 +4991,8 @@ static SlangResult _fakeNVVMBuilderEmitCatalogOperation(
     case SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS:
         return _fakeNVVMBuilderEmitExecutionOperation(module, entry.operation, outValue);
     case SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER:
-        return _fakeNVVMBuilderEmitWorkgroupBarrier(module, outValue);
+    case SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER:
+        return _fakeNVVMBuilderEmitBarrier(module, entry.operation, outValue);
     default:
         return _fakeNVVMBuilderEmitIntrinsic(
             module,
@@ -5212,10 +5236,18 @@ static SlangNVVMBuilderValueOperationsAPI _makeFakeNVVMBuilderValueOperationsAPI
 
 static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& operation)
 {
+    const bool isSupportedShape = operation.shape == SLANG_NVVM_TEXTURE_SHAPE_1D ||
+                                  operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
+                                  operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
+    const bool is32BitNumeric =
+        operation.elementType.bitWidth == 32 &&
+        (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
+         operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+         operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
     if ((operation.operation != SLANG_NVVM_SURFACE_OP_LOAD &&
          operation.operation != SLANG_NVVM_SURFACE_OP_STORE) ||
-        operation.dimensionCount < 1 || operation.dimensionCount > 3 ||
-        operation.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
+        !isSupportedShape || operation.isArray > 1 ||
+        (operation.isArray && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_2D) ||
         (operation.elementType.laneCount != 1 && operation.elementType.laneCount != 2 &&
          operation.elementType.laneCount != 4) ||
         operation.boundaryMode != SLANG_NVVM_SURFACE_BOUNDARY_ZERO)
@@ -5224,11 +5256,15 @@ static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperation
     }
     if (operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_NATIVE)
     {
-        return operation.elementType.bitWidth == 32 ||
-               (operation.elementType.bitWidth == 16 && operation.dimensionCount <= 2);
+        return is32BitNumeric ||
+               (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                operation.elementType.bitWidth == 16 && !operation.isArray &&
+                operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D);
     }
     return operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16 &&
-           operation.elementType.bitWidth == 32 && operation.dimensionCount <= 2;
+           operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+           operation.elementType.bitWidth == 32 && !operation.isArray &&
+           operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D;
 }
 
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsSurfaceOperationSupported(
@@ -5271,10 +5307,11 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitSurfaceOperation(
             return SLANG_E_INVALID_ARG;
     }
 
+    const uint32_t coordinateLaneCount = uint32_t(operation->shape) + operation->isArray;
     if (!_isFakeNVVMBuilderIntegerValue(operands[0]) ||
-        (operation->dimensionCount == 1
+        (coordinateLaneCount == 1
              ? !_isFakeNVVMBuilderIntegerValue(operands[1])
-             : !_isFakeNVVMBuilderIntegerVectorValue(operands[1], operation->dimensionCount)))
+             : !_isFakeNVVMBuilderIntegerVectorValue(operands[1], coordinateLaneCount)))
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -5282,11 +5319,15 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitSurfaceOperation(
     {
         const uint32_t semanticBitWidth = operation->elementType.bitWidth;
         const FakeNVVMBuilderScalarTypeKind semanticScalarKind =
-            semanticBitWidth == 16 ? FakeNVVMBuilderScalarTypeKind::Half
-                                   : FakeNVVMBuilderScalarTypeKind::Float;
+            operation->elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
+                ? (semanticBitWidth == 16 ? FakeNVVMBuilderScalarTypeKind::Half
+                                          : FakeNVVMBuilderScalarTypeKind::Float)
+                : FakeNVVMBuilderScalarTypeKind::Integer;
         const bool hasExpectedValue =
             operation->elementType.laneCount == 1
-                ? _isFakeNVVMBuilderFloatingPointValue(operands[2], semanticBitWidth)
+                ? (semanticScalarKind == FakeNVVMBuilderScalarTypeKind::Integer
+                       ? _isFakeNVVMBuilderIntegerValue(operands[2])
+                       : _isFakeNVVMBuilderFloatingPointValue(operands[2], semanticBitWidth))
                 : _isFakeNVVMBuilderVectorValue(
                       operands[2],
                       semanticScalarKind,

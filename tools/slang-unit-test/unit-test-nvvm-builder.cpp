@@ -127,7 +127,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=15") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=16") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -520,7 +520,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
 
     const SlangNVVMSurfaceOperationDesc load2D = {
         SLANG_NVVM_SURFACE_OP_LOAD,
-        2,
+        SLANG_NVVM_TEXTURE_SHAPE_2D,
+        0,
         {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, 4},
         SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
         SLANG_NVVM_SURFACE_STORAGE_NATIVE,
@@ -531,14 +532,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     unsupported.elementType.laneCount = 3;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported = load2D;
-    unsupported.dimensionCount = 3;
+    unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported = load2D;
     unsupported.boundaryMode = SlangNVVMSurfaceBoundaryMode(1);
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     const SlangNVVMSurfaceOperationDesc formattedStore2D = {
         SLANG_NVVM_SURFACE_OP_STORE,
-        2,
+        SLANG_NVVM_TEXTURE_SHAPE_2D,
+        0,
         {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 4},
         SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
         SLANG_NVVM_SURFACE_STORAGE_FLOAT16,
@@ -551,21 +553,36 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     unsupported.storageFormat = SLANG_NVVM_SURFACE_STORAGE_FLOAT16;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
 
-    for (uint32_t dimensionCount = 1; dimensionCount <= 3; ++dimensionCount)
+    for (SlangNVVMValueTypeKind kind :
+         {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+          SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+          SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER})
     {
-        for (uint32_t laneCount : {1u, 2u, 4u})
+        for (SlangNVVMTextureShape shape :
+             {SLANG_NVVM_TEXTURE_SHAPE_1D,
+              SLANG_NVVM_TEXTURE_SHAPE_2D,
+              SLANG_NVVM_TEXTURE_SHAPE_3D})
         {
-            for (SlangNVVMSurfaceOperation operation :
-                 {SLANG_NVVM_SURFACE_OP_LOAD, SLANG_NVVM_SURFACE_OP_STORE})
+            for (uint32_t laneCount : {1u, 2u, 4u})
             {
-                const SlangNVVMSurfaceOperationDesc nativeFloat = {
-                    operation,
-                    dimensionCount,
-                    {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, laneCount},
-                    SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
-                    SLANG_NVVM_SURFACE_STORAGE_NATIVE,
-                };
-                SLANG_CHECK(builder.supportsSurfaceOperation(nativeFloat));
+                for (SlangNVVMSurfaceOperation operation :
+                     {SLANG_NVVM_SURFACE_OP_LOAD, SLANG_NVVM_SURFACE_OP_STORE})
+                {
+                    SlangNVVMSurfaceOperationDesc native32 = {
+                        operation,
+                        shape,
+                        0,
+                        {kind, 32, laneCount},
+                        SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
+                        SLANG_NVVM_SURFACE_STORAGE_NATIVE,
+                    };
+                    SLANG_CHECK(builder.supportsSurfaceOperation(native32));
+                    if (shape == SLANG_NVVM_TEXTURE_SHAPE_2D)
+                    {
+                        native32.isArray = 1;
+                        SLANG_CHECK(builder.supportsSurfaceOperation(native32));
+                    }
+                }
             }
         }
     }
@@ -574,7 +591,16 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     unsupported.elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 3};
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported = formattedStore2D;
-    unsupported.dimensionCount = 3;
+    unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+    unsupported = formattedStore2D;
+    unsupported.isArray = 1;
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+    unsupported = load2D;
+    unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_CUBE;
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+    unsupported = load2D;
+    unsupported.isArray = 1;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
 }
 
@@ -1305,6 +1331,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     };
     const SlangNVVMValueOperationDesc barrierOperation =
         getOperation(SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER);
+    const SlangNVVMValueOperationDesc deviceBarrierOperation =
+        getOperation(SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER);
 
     SlangNVVMValueHandle rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
@@ -1389,6 +1417,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitValueOperation(scope.module, barrierOperation, nullptr, 0, barrierValue)));
     SLANG_CHECK(barrierValue == nullptr);
+    barrierValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder
+            .emitValueOperation(scope.module, deviceBarrierOperation, nullptr, 0, barrierValue)));
+    SLANG_CHECK(barrierValue == nullptr);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
 
@@ -1434,6 +1467,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         SLANG_CHECK(
             _countOccurrences(text.getUnownedSlice(), toSlice("call void @llvm.nvvm.barrier0()")) ==
             1);
+        SLANG_CHECK(
+            _countOccurrences(
+                text.getUnownedSlice(),
+                toSlice("call void @llvm.nvvm.membar.gl()")) == 1);
         SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("extractelement")) == 12);
         SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("ret void")) == 1);
         if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)
