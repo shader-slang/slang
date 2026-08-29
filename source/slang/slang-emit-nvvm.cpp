@@ -118,8 +118,9 @@ struct NVVMStructField
     bool isMutableLocal = false;
 };
 
-// Resolves the two aggregate-address shapes with executable representations: a field in the
-// collected CUDA parameter block, or a selected scalar in a loaded parameter group.
+// Resolves the aggregate-address shapes with executable representations: a field in the collected
+// CUDA parameter block, a selected scalar in a loaded parameter group, or a selected numeric field
+// in a local copyable struct.
 bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& outAddress)
 {
     outAddress = {};
@@ -134,10 +135,18 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     {
         structType = globalParams.elementType;
     }
+    else if (asNVVMSupportedLocalCopyableStructPointerType(
+                 fieldAddress->getBase()->getDataType(),
+                 &structType))
+    {
+        outAddress.isMutableLocal = true;
+    }
     else if (asNVVMSupportedLocalScalarStructPointerType(
                  fieldAddress->getBase()->getDataType(),
                  &structType))
     {
+        // A canonical BorrowInOutParam is not itself a local Ptr, but it shares the exact selected
+        // scalar-struct pointee and mutable field contract established for helper parameters.
         outAddress.isMutableLocal = true;
     }
     else if (!asNVVMSupportedScalarParameterGroupType(
@@ -170,6 +179,9 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
                asNVVMSupportedScalarParameterGroupType(fieldType) ||
                getNVVMSupportedRawBufferType(fieldType, rawBufferType);
     }
+
+    if (outAddress.isMutableLocal)
+        return isNVVMSupportedNumericValueType(fieldType);
 
     return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType);
 }
@@ -362,6 +374,55 @@ bool _getNVVMByValueParameterAlignment(
         return false;
     }
     outAlignment = uint32_t(layout.alignment);
+    return true;
+}
+
+// Verifies that a copyable struct can use one unpadded LLVM struct for local and raw-buffer
+// storage. Consider `Thing { uint pos; float radius; half4 color; }`: CUDA and LLVM give its fields
+// offsets 0, 4, and 8 and the same 16-byte stride, even though their preferred aggregate alignment
+// differs. Matching offsets and size are the actual memory contract; a mismatch must be handled by
+// a future layout-lowering slice rather than by silently indexing a different LLVM representation.
+bool _hasNVVMCompatibleCopyableStructLayout(CodeGenContext* codeGenContext, IRStructType* type)
+{
+    if (!codeGenContext || !asNVVMSupportedCopyableStructType(type))
+        return false;
+
+    IRSizeAndAlignment cudaLayout;
+    IRSizeAndAlignment llvmLayout;
+    if (SLANG_FAILED(getSizeAndAlignment(
+            codeGenContext->getTargetReq(),
+            IRTypeLayoutRules::getCUDA(),
+            type,
+            &cudaLayout)) ||
+        SLANG_FAILED(getSizeAndAlignment(
+            codeGenContext->getTargetReq(),
+            IRTypeLayoutRules::getLLVM(),
+            type,
+            &llvmLayout)) ||
+        cudaLayout.size <= 0 || cudaLayout.size != llvmLayout.size)
+    {
+        return false;
+    }
+
+    for (auto field : type->getFields())
+    {
+        IRIntegerValue cudaOffset = 0;
+        IRIntegerValue llvmOffset = 0;
+        if (SLANG_FAILED(getOffset(
+                codeGenContext->getTargetReq(),
+                IRTypeLayoutRules::getCUDA(),
+                field,
+                &cudaOffset)) ||
+            SLANG_FAILED(getOffset(
+                codeGenContext->getTargetReq(),
+                IRTypeLayoutRules::getLLVM(),
+                field,
+                &llvmOffset)) ||
+            cudaOffset < 0 || cudaOffset != llvmOffset)
+        {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -1564,6 +1625,8 @@ SlangResult _validatePointerValue(
     auto sharedElementPtrType =
         value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
     auto localStructPtrType =
+        value ? asNVVMSupportedLocalCopyableStructPointerType(value->getDataType()) : nullptr;
+    auto borrowedStructPtrType =
         value ? asNVVMSupportedLocalScalarStructPointerType(value->getDataType()) : nullptr;
     auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
     NVVMStructField fieldAddress;
@@ -1577,6 +1640,7 @@ SlangResult _validatePointerValue(
                                      : sharedElementPtrType   ? sharedElementPtrType
                                      : resourceElementPtrType ? resourceElementPtrType
                                      : localStructPtrType     ? localStructPtrType
+                                     : borrowedStructPtrType  ? borrowedStructPtrType
                                                               : fieldPtrType;
     if (!acceptedPtrType)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
@@ -1935,6 +1999,21 @@ SlangResult _validateNVVMFunction(
                 isEntryPoint ? toSlice("entry-point parameter")
                              : toSlice("helper function parameter"));
         }
+        NVVMRawBufferType rawBufferType;
+        if (isEntryPoint && getNVVMSupportedRawBufferType(param->getDataType(), rawBufferType) &&
+            rawBufferType.kind == NVVMRawBufferKind::Structured)
+        {
+            if (auto elementStruct =
+                    asNVVMSupportedCopyableStructType(rawBufferType.structuredElementType))
+            {
+                if (!_hasNVVMCompatibleCopyableStructLayout(codeGenContext, elementStruct))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("structured-buffer aggregate layout"));
+                }
+            }
+        }
         if (isEntryPoint && asNVVMSupportedScalarStructType(param->getDataType()))
         {
             uint32_t alignment = 0;
@@ -1984,11 +2063,17 @@ SlangResult _validateNVVMFunction(
             case kIROp_Var:
                 {
                     IRStructType* valueType = nullptr;
-                    if (!asNVVMSupportedLocalScalarStructPointerType(
+                    if (!asNVVMSupportedLocalCopyableStructPointerType(
                             inst->getDataType(),
                             &valueType))
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("var"));
+                    }
+                    if (!_hasNVVMCompatibleCopyableStructLayout(codeGenContext, valueType))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("local copyable-struct layout"));
                     }
                 }
                 break;
@@ -1999,7 +2084,7 @@ SlangResult _validateNVVMFunction(
                     if (!isNVVMSupportedNumericValueType(inst->getDataType()) &&
                         !getNVVMSupportedRawBufferType(inst->getDataType(), rawBufferType) &&
                         !asNVVMSupportedScalarParameterGroupType(inst->getDataType()) &&
-                        !asNVVMSupportedScalarStructType(inst->getDataType()))
+                        !asNVVMSupportedCopyableStructType(inst->getDataType()))
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 }
                 break;
@@ -2317,7 +2402,7 @@ SlangResult _validateNVVMFunction(
                         dominatorTree,
                         true,
                         store->getVal()->getDataType()));
-                    if (asNVVMSupportedScalarStructType(store->getVal()->getDataType()))
+                    if (asNVVMSupportedCopyableStructType(store->getVal()->getDataType()))
                     {
                         SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                             codeGenContext,
@@ -3250,21 +3335,45 @@ SlangResult validateNVVMSupportedIR(
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("CUDA kernel decoration"));
     }
 
-    HashSet<IRInst*> selectedScalarStructTypes;
+    HashSet<IRInst*> selectedReachableStructTypes;
+    if (conventionalGlobalParams.elementType)
+    {
+        for (auto field : conventionalGlobalParams.elementType->getFields())
+        {
+            NVVMRawBufferType rawBufferType;
+            if (!getNVVMSupportedRawBufferType(field->getFieldType(), rawBufferType) ||
+                rawBufferType.kind != NVVMRawBufferKind::Structured)
+            {
+                continue;
+            }
+            if (auto elementStruct =
+                    asNVVMSupportedCopyableStructType(rawBufferType.structuredElementType))
+            {
+                if (!_hasNVVMCompatibleCopyableStructLayout(codeGenContext, elementStruct))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("structured-buffer aggregate layout"));
+                }
+                selectedReachableStructTypes.add(elementStruct);
+            }
+        }
+    }
+
     for (auto function : functions)
     {
         if (auto resultType = asNVVMSupportedScalarStructType(function->getResultType()))
-            selectedScalarStructTypes.add(resultType);
+            selectedReachableStructTypes.add(resultType);
         for (auto parameter : function->getParams())
         {
             if (auto parameterType = asNVVMSupportedScalarStructType(parameter->getDataType()))
-                selectedScalarStructTypes.add(parameterType);
+                selectedReachableStructTypes.add(parameterType);
             IRStructType* pointerValueType = nullptr;
             if (asNVVMSupportedLocalScalarStructPointerType(
                     parameter->getDataType(),
                     &pointerValueType))
             {
-                selectedScalarStructTypes.add(pointerValueType);
+                selectedReachableStructTypes.add(pointerValueType);
             }
         }
         for (auto block : function->getBlocks())
@@ -3272,21 +3381,21 @@ SlangResult validateNVVMSupportedIR(
             for (auto inst : block->getOrdinaryInsts())
             {
                 IRStructType* localValueType = nullptr;
-                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalScalarStructPointerType(
+                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalCopyableStructPointerType(
                                                       inst->getDataType(),
                                                       &localValueType))
                 {
-                    selectedScalarStructTypes.add(localValueType);
+                    selectedReachableStructTypes.add(localValueType);
                 }
             }
         }
     }
-
     // Linking can retain module-scope types, layouts, capabilities, and constants needed to spell
     // the reachable functions. IRStructKey is also layout-only identity retained for raw CUDA
-    // parameter layouts. A selected-scalar struct used by a reachable signature or local is its
-    // canonical value type, not an unrelated dropped global. Reject every other semantic global
-    // so this emitter cannot silently drop a function, parameter, initializer, or storage object.
+    // parameter layouts. A selected struct used by a reachable signature, local, or raw structured
+    // buffer is its canonical value type, not an unrelated dropped global. Reject every other
+    // semantic global so this emitter cannot silently drop a function, parameter, initializer, or
+    // storage object.
     for (auto globalInst : linkedIR.module->getGlobalInsts())
     {
         if (auto globalFunction = as<IRFunc>(globalInst))
@@ -3323,7 +3432,7 @@ SlangResult validateNVVMSupportedIR(
         {
             continue;
         }
-        if (selectedScalarStructTypes.contains(globalInst))
+        if (selectedReachableStructTypes.contains(globalInst))
             continue;
         if (_isNVVMConventionalGlobalStorageType(conventionalGlobalParams, globalInst))
             continue;
@@ -3611,7 +3720,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Var:
                     {
                         IRStructType* valueType = nullptr;
-                        SLANG_RELEASE_ASSERT(asNVVMSupportedLocalScalarStructPointerType(
+                        SLANG_RELEASE_ASSERT(asNVVMSupportedLocalCopyableStructPointerType(
                             inst->getDataType(),
                             &valueType));
                         SlangNVVMTypeHandle loweredValueType = nullptr;
@@ -3622,7 +3731,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredStorage = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "local scalar-struct storage",
+                            "local copyable-struct storage",
                             builder.emitLocalStorage(
                                 moduleScope.module,
                                 loweredValueType,
@@ -4290,7 +4399,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            resolvedAddress.isMutableLocal ? "local scalar-struct field address"
+                            resolvedAddress.isMutableLocal ? "local copyable-struct field address"
                                                            : "global parameter field address",
                             builder.emitStructFieldPointer(
                                 moduleScope.module,

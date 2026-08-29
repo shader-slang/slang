@@ -234,6 +234,22 @@ IRStructType* asNVVMSupportedScalarStructType(IRInst* type)
     return hasField ? structType : nullptr;
 }
 
+IRStructType* asNVVMSupportedCopyableStructType(IRInst* type)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return nullptr;
+
+    bool hasField = false;
+    for (auto field : structType->getFields())
+    {
+        if (!isNVVMSupportedNumericValueType(field->getFieldType()))
+            return nullptr;
+        hasField = true;
+    }
+    return hasField ? structType : nullptr;
+}
+
 IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
     IRInst* type,
     IRStructType** outValueType)
@@ -255,16 +271,41 @@ IRPtrTypeBase* asNVVMSupportedLocalScalarStructPointerType(
     return pointerType;
 }
 
+IRPtrTypeBase* asNVVMSupportedLocalCopyableStructPointerType(
+    IRInst* type,
+    IRStructType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    auto pointerType = as<IRPtrTypeBase>(type);
+    auto valueType =
+        pointerType ? asNVVMSupportedCopyableStructType(pointerType->getValueType()) : nullptr;
+    if (!pointerType || !valueType || pointerType->getOp() != kIROp_PtrType ||
+        pointerType->getOperandCount() != 1)
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
 uint32_t getNVVMNumericValueAlignment(IRInst* type)
 {
     uint32_t bitWidth = 0;
     if (isNVVMSupportedIntegerScalarType(type, &bitWidth))
         return bitWidth / 8;
-    if (isNVVMFloat32Type(type))
-        return 4;
+    if (isNVVMSupportedFloatingPointScalarType(type, &bitWidth))
+        return bitWidth / 8;
     uint32_t elementCount = 0;
-    if (asNVVMSupported32BitNumericVectorType(type, &elementCount))
-        return elementCount == 2 ? 8 : 16;
+    auto vectorType = asNVVMSupportedNumericVectorType(type, &elementCount);
+    if (vectorType)
+    {
+        const uint32_t elementAlignment =
+            getNVVMNumericValueAlignment(vectorType->getElementType());
+        SLANG_RELEASE_ASSERT(elementAlignment);
+        return elementAlignment * (elementCount == 3 ? 4 : elementCount);
+    }
     return 0;
 }
 
@@ -272,7 +313,7 @@ uint32_t getNVVMCopyableValueAlignment(IRInst* type)
 {
     if (const uint32_t numericAlignment = getNVVMNumericValueAlignment(type))
         return numericAlignment;
-    auto structType = asNVVMSupportedScalarStructType(type);
+    auto structType = asNVVMSupportedCopyableStructType(type);
     if (!structType)
         return 0;
     uint32_t alignment = 0;
@@ -442,7 +483,7 @@ IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type)
 static bool _isNVVMSupportedResourceElementType(IRInst* type)
 {
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupported32BitNumericVectorType(type);
+           asNVVMSupported32BitNumericVectorType(type) || asNVVMSupportedCopyableStructType(type);
 }
 
 bool getNVVMSupportedRawBufferType(IRInst* type, NVVMRawBufferType& outType)
@@ -653,11 +694,13 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
     SlangNVVMTypeHandle& outType)
 {
     outType = nullptr;
+    const NVVMTypeUse fieldUse =
+        asNVVMSupportedCopyableStructType(type) ? NVVMTypeUse::Value : NVVMTypeUse::Storage;
     List<SlangNVVMTypeHandle> fieldTypes;
     for (auto field : type->getFields())
     {
         SlangNVVMTypeHandle fieldType = nullptr;
-        SLANG_RETURN_ON_FAIL(lowerType(field->getFieldType(), NVVMTypeUse::Storage, fieldType));
+        SLANG_RETURN_ON_FAIL(lowerType(field->getFieldType(), fieldUse, fieldType));
         fieldTypes.add(fieldType);
     }
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -828,6 +871,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRVectorType* valueVectorType = asNVVMSupportedValueVectorType(type, &valueVectorElementCount);
     IRStructType* structType = as<IRStructType>(type);
     IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
+    IRStructType* copyableStructType = asNVVMSupportedCopyableStructType(type);
     IRStructType* localScalarStructValueType = nullptr;
     IRPtrTypeBase* localScalarStructPointer =
         asNVVMSupportedLocalScalarStructPointerType(type, &localScalarStructValueType);
@@ -864,7 +908,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                           (isNVVMSupportedValueType(type) || localScalarStructPointer)) ||
                          (use == NVVMTypeUse::Value &&
                           (isInteger || isFloatingPoint || isBool || valueVectorType ||
-                           scalarStructType || fixedNumericArrayType || deviceNumericPointer ||
+                           copyableStructType || fixedNumericArrayType || deviceNumericPointer ||
                            deviceArrayPointer || isRawBuffer || isBufferDataPointer ||
                            parameterGroup || resourceElementPointer || sharedElementPointer)) ||
                          (use == NVVMTypeUse::Storage &&

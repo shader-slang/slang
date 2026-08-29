@@ -5034,6 +5034,36 @@ the complete 369/369 NVVM prefix, and all four enabled comparison-shader lanes p
 existing-suite probe reaches the local `Thing` aggregate in `half-structured-buffer.slang`; its
 mixed `uint`, `float`, and `half4` local/storage representation is a separate capability boundary.
 
+### Slice 97: Layout-compatible copyable structured-buffer aggregates
+
+Direct NVVM now has a distinct copyable-struct role for nonempty first-level structs whose fields
+are established numeric scalar or vector values. This role is deliberately separate from the
+older scalar-only entry-by-value and parameter-group roles: obtaining an LLVM type for a local or
+resource element cannot make an unproven launch or constant-buffer ABI legal through the type
+cache. Nested structs, arrays, matrices, Boolean storage, resources, and opaque fields remain
+outside this family.
+
+Every accepted copyable struct must have identical field offsets and total size under Slang's CUDA
+and LLVM layout rules. Preferred aggregate alignment may differ when offsets and stride remain the
+same. For example, `Thing { uint pos; float radius; half4 color; }` has offsets `0, 4, 8` and a
+16-byte stride in both representations, so one ordinary LLVM struct is faithful. A counterexample
+with a leading `half` followed by `half4` fails layout preflight before provider discovery. The
+backend does not synthesize padding or silently index an incompatible representation.
+
+The canonical `Thing` local uses Slice 96's existing entry-block storage operation. Its three
+field stores, whole-aggregate load, raw `RWStructuredBuffer<Thing>` view, typed element offset, and
+whole-aggregate store compose existing generic provider operations; builder ABI revision 11 is
+unchanged. Reachability retains only the exact struct definitions referenced by selected functions
+or structured resources. The fake boundary now represents copyable numeric-field structs as raw
+resource elements and verifies the complete local-to-buffer transport.
+
+All four lanes of `half-structured-buffer.slang` pass, including direct runtime comparison and
+direct PTX FileCheck. Four threads write the established `Thing` values with positions/radii
+`0..3` and Half4 colors `0..15`. The 1,159-byte direct PTX passes CUDA 12.9.86
+`ptxas -arch=sm_70`, producing a 2,920-byte cubin. Release host/provider builds and the complete
+370/370 NVVM prefix pass. The next existing Half fixture, `half-opaque-convert.slang`, reaches two
+canonical `GenericAsm` conversion helpers: `__float2half` and `__half2float($0)`.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5043,7 +5073,8 @@ The following remain open until their named slice supplies evidence:
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
   global parameter fields beyond selected integer/float32 scalars and selected 32-bit numeric
   vector resource elements, flat selected-scalar parameter blocks and constant buffers,
-  selected integer/float32 scalar and 32-bit numeric-vector structured buffers,
+  selected integer/float32 scalar, 32-bit numeric-vector, and layout-compatible first-level
+  numeric-field aggregate structured buffers,
   read-only/read-write byte-address buffers, and storage-only sampler/unsized-sampler-array
   placeholders, and raw CUDA parameters beyond selected integer and float32 scalars, flat
   selected-scalar by-value structs, selected numeric device pointers, fixed i32 array pointers,
@@ -5064,9 +5095,10 @@ The following remain open until their named slice supplies evidence:
   flat by-value entry struct, plus direct selected-element indexing of canonical
   structured/byte-address data pointers and constant-lane structured-buffer vector swizzled stores,
   including other `IRGetElementPtr` shapes, pointer escape through helpers beyond the exact
-  selected-scalar-struct mutable-local subset or through SSA, nested or dynamically indexed
-  aggregate values, mutable aggregate families beyond that subset, general globals, additional
-  shared-memory shapes, and address spaces;
+  selected-scalar-struct helper subset or through SSA, nested or dynamically indexed aggregate
+  values, mutable aggregate families beyond layout-compatible first-level numeric-field structs,
+  aggregate layouts requiring padding, general globals, additional shared-memory shapes, and
+  address spaces;
 - every other atomic operation, memory order, value type, pointer shape, and address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;

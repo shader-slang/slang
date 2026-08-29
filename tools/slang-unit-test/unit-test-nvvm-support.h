@@ -1085,6 +1085,8 @@ static SlangNVVMTypeHandle _getFakeNVVMBuilderVectorPointerType(
         &gFakeNVVMBuilder.vectorPointerTypeStorage[elementTypeIndex][elementCount - 2]);
 }
 
+static SlangNVVMTypeHandle _getFakeNVVMBuilderScalarStructPointerType();
+
 static bool _getFakeNVVMBuilderPointerElementTypeKind(
     SlangNVVMTypeHandle type,
     FakeNVVMBuilderScalarTypeKind& outElementTypeKind)
@@ -1097,6 +1099,11 @@ static bool _getFakeNVVMBuilderPointerElementTypeKind(
     if (type == _getFakeNVVMBuilderFloatPointerType())
     {
         outElementTypeKind = FakeNVVMBuilderScalarTypeKind::Float;
+        return true;
+    }
+    if (type == _getFakeNVVMBuilderScalarStructPointerType())
+    {
+        outElementTypeKind = FakeNVVMBuilderScalarTypeKind::ScalarStruct;
         return true;
     }
     const FakeNVVMBuilderScalarTypeKind elementTypeKinds[] = {
@@ -1143,6 +1150,7 @@ static SlangNVVMTypeHandle _getFakeNVVMBuilderResourceViewType(
     SLANG_ASSERT(
         elementTypeKind == FakeNVVMBuilderScalarTypeKind::Integer ||
         elementTypeKind == FakeNVVMBuilderScalarTypeKind::Float ||
+        elementTypeKind == FakeNVVMBuilderScalarTypeKind::ScalarStruct ||
         (elementTypeKind >= FakeNVVMBuilderScalarTypeKind::UInt2 &&
          elementTypeKind <= FakeNVVMBuilderScalarTypeKind::Float4));
     return reinterpret_cast<SlangNVVMTypeHandle>(
@@ -1162,6 +1170,7 @@ static bool _getFakeNVVMBuilderResourceViewElementTypeKind(
         FakeNVVMBuilderScalarTypeKind::Float2,
         FakeNVVMBuilderScalarTypeKind::Float3,
         FakeNVVMBuilderScalarTypeKind::Float4,
+        FakeNVVMBuilderScalarTypeKind::ScalarStruct,
     };
     for (auto elementTypeKind : elementTypeKinds)
     {
@@ -2538,13 +2547,22 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetStructType(
         fieldCount == 2 &&
         _getFakeNVVMBuilderPointerElementTypeKind(fieldTypes[0], resourceElementTypeKind) &&
         fieldTypes[1] == _getFakeNVVMBuilderIntegerType();
-    bool isScalarStruct = fieldCount != 0 && !isResourceView;
-    for (size_t i = 0; isScalarStruct && i < fieldCount; ++i)
+    bool isCopyableStruct = fieldCount != 0 && !isResourceView;
+    for (size_t i = 0; isCopyableStruct && i < fieldCount; ++i)
     {
-        isScalarStruct = fieldTypes[i] == _getFakeNVVMBuilderIntegerType() ||
-                         fieldTypes[i] == _getFakeNVVMBuilderFloatType();
+        uint32_t vectorElementCount = 0;
+        FakeNVVMBuilderScalarTypeKind vectorElementTypeKind;
+        const bool isNumericVector =
+            _getFakeNVVMBuilderVectorTypeInfo(
+                fieldTypes[i],
+                vectorElementCount,
+                vectorElementTypeKind) &&
+            vectorElementTypeKind != FakeNVVMBuilderScalarTypeKind::Boolean;
+        isCopyableStruct = fieldTypes[i] == _getFakeNVVMBuilderIntegerType() ||
+                           fieldTypes[i] == _getFakeNVVMBuilderHalfType() ||
+                           fieldTypes[i] == _getFakeNVVMBuilderFloatType() || isNumericVector;
     }
-    bool isGlobalParams = fieldCount != 0 && !isResourceView && !isScalarStruct;
+    bool isGlobalParams = fieldCount != 0 && !isResourceView && !isCopyableStruct;
     bool hasGlobalResource = false;
     for (size_t i = 0; isGlobalParams && i < fieldCount; ++i)
     {
@@ -2564,7 +2582,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetStructType(
         }
     }
     isGlobalParams = isGlobalParams && hasGlobalResource;
-    if (!isResourceView && !isScalarStruct && !isGlobalParams)
+    if (!isResourceView && !isCopyableStruct && !isGlobalParams)
         return SLANG_E_INVALID_ARG;
     if (isGlobalParams)
     {
@@ -2572,7 +2590,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetStructType(
         gFakeNVVMBuilder.structFieldTypes.addRange(fieldTypes, Index(fieldCount));
         *outType = _getFakeNVVMBuilderStructType();
     }
-    else if (isScalarStruct)
+    else if (isCopyableStruct)
     {
         gFakeNVVMBuilder.scalarStructFieldTypes.clear();
         gFakeNVVMBuilder.scalarStructFieldTypes.addRange(fieldTypes, Index(fieldCount));
@@ -7549,6 +7567,42 @@ void computeMain(
 {
     Counter counter = Counter(initialValue);
     *destination = counter.next() + counter.next();
+}
+)";
+
+static const char kDirectNVVMCopyableStructuredBufferAggregateSource[] = R"(
+struct Thing
+{
+    uint pos;
+    float radius;
+    half4 color;
+};
+
+[CUDAKernel]
+void computeMain(RWStructuredBuffer<Thing> destination, uniform uint index)
+{
+    Thing value;
+    value.pos = index;
+    value.radius = float(index);
+    value.color = half4(1.0h, 2.0h, 3.0h, 4.0h);
+    destination[index] = value;
+}
+)";
+
+static const char kDirectNVVMIncompatibleStructuredBufferAggregateLayoutSource[] = R"(
+struct MisalignedThing
+{
+    half leading;
+    half4 payload;
+};
+
+[CUDAKernel]
+void computeMain(RWStructuredBuffer<MisalignedThing> destination)
+{
+    MisalignedThing value;
+    value.leading = 1.0h;
+    value.payload = half4(2.0h, 3.0h, 4.0h, 5.0h);
+    destination[0] = value;
 }
 )";
 
