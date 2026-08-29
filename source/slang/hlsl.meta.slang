@@ -11205,7 +11205,10 @@ vector<uint, N> firstbithigh<T : __BuiltinIntegerType, let N : int>(vector<T, N>
                 OpExtInst $$vector<uint, N> result glsl450 FindUMsb $value
             };
         }
-        else VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
+        else
+        {
+            VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
+        }
     case wgsl: return vector<uint, N>(__wgsl_firstLeadingBit(value));
     default:
         VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
@@ -11283,7 +11286,10 @@ vector<uint,N> firstbitlow<T : __BuiltinIntegerType, let N : int>(vector<T,N> va
                 OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
             };
         }
-        else VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
+        else
+        {
+            VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
+        }
     case wgsl: return vector<uint, N>(__wgsl_firstTrailingBit(value));
     default:
         VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
@@ -14656,7 +14662,10 @@ vector<T, N> reversebits<T : __BuiltinIntegerType, let N : int>(vector<T, N> val
     case spirv:
         if (T is int || T is uint)
             return spirv_asm {OpBitReverse $$vector<T, N> result $value};
-        else VECTOR_MAP_UNARY(T, N, reversebits, value);
+        else
+        {
+            VECTOR_MAP_UNARY(T, N, reversebits, value);
+        }
     case wgsl: __intrinsic_asm "reverseBits";
     case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     }
