@@ -1,5 +1,10 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type -cuda
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type -cuda -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+//NVVM: mov.u32
+//NVVM: st.global.u32
 
 // Test IEEE 754 NaN comparison behavior with mixed int/float types
 // Tests the type promotion logic across integer and floating-point categories

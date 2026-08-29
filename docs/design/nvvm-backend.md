@@ -5323,6 +5323,26 @@ Float3, Int3, and 1D-array diagnostics pass 3/3; and the complete NVVM unit-test
 376/376. The neighboring ordinary PTX/NVRTC route still emits invalid CUDA surface l-value syntax;
 that separate source-emitter boundary is unchanged.
 
+### Slice 107: Existing core compute fixture promotion
+
+Six existing compute-suite shaders now permanently run through direct libNVVM without widening the
+production backend: `simple.slang`, `switch-stmt.slang`, `dot1.slang`,
+`entry-point-uniform-params.slang`, `ieee754-mixed-type-nan-comparisons.slang`, and
+`logic-short-circuit-evaluation.slang`. Together they compose launch indices, Float32 and integer
+structured-buffer traffic, one-lane vector folding, helper calls, integer switch/merge control
+flow, short-circuit side effects, mixed integer/Float32 NaN comparison behavior, and conventional
+entry-point uniform structs/resources.
+
+Each fixture adds one optimized direct CUDA runtime lane and one direct PTX check using stable
+semantic instructions. The twelve exact new tests pass. The six PTX modules are respectively 674,
+1,151, 477, 1,090, 1,253, and 953 bytes; CUDA 12.9.86 `ptxas -arch=sm_70` accepts every module and
+emits cubins of 2,792, 3,240, 2,664, 2,920, 3,048, and 2,920 bytes. Builder ABI revision 16 and all
+production source files are unchanged; the complete NVVM unit prefix remains 376/376.
+
+Broad filename-prefix runs also select automatically synthesized WebGPU lanes on this machine.
+Those unrelated lanes fail before dispatch because Dawn rejects an empty bind-group-layout entry;
+the exact new CUDA/PTX lanes isolate and pass the direct backend contract.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production

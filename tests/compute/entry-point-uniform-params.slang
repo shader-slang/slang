@@ -8,8 +8,15 @@
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -metal -shaderobj
+//TEST:SIMPLE(filecheck=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
+
+//NVVM: .visible .entry computeMain(
+//NVVM: ld.global.nc.u32
+//NVVM: ld.param.u32
+//NVVM: st.global.u32
 
 struct Signs
 {
