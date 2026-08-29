@@ -136,14 +136,19 @@ IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     IRArrayType** outArrayType = nullptr,
     uint32_t* outElementCount = nullptr);
 
-/// Returns the exact canonical uninitialized `groupshared` fixed-i32-array global.
-IRGlobalVar* asNVVMSupportedSharedI32ArrayGlobal(
+/// Returns an exact canonical uninitialized `groupshared` Int32/UInt32 scalar global.
+IRGlobalVar* asNVVMSupportedSharedIntegerScalarGlobal(
+    IRInst* inst,
+    IRType** outValueType = nullptr);
+
+/// Returns an exact canonical uninitialized `groupshared` Int32/UInt32 fixed-array global.
+IRGlobalVar* asNVVMSupportedSharedIntegerArrayGlobal(
     IRInst* inst,
     IRArrayType** outArrayType = nullptr,
     uint32_t* outElementCount = nullptr);
 
-/// Returns the canonical shared-address-space pointer produced for one i32 array element.
-IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type);
+/// Returns the canonical shared-address-space pointer to one selected integer scalar.
+IRPtrTypeBase* asNVVMSupportedSharedIntegerElementPointerType(IRInst* type);
 
 /// Describes which operations a canonical raw buffer view permits.
 enum class NVVMBufferAccess

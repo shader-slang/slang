@@ -4,7 +4,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
 // Not supported in WGSL: Use of traditional atomics intrinsics (InterlockedXXX functions)
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 // Not supported in LLVM: atomics are not currently available
@@ -15,6 +17,12 @@
 RWStructuredBuffer<uint> outputBuffer;
 
 groupshared uint shared[4];
+
+// NVVM: .visible .entry computeMain
+// NVVM: .shared .align 4 .b8
+// NVVM: bar.sync
+// NVVM-COUNT-3: atom.shared.add.u32
+// NVVM: bar.sync
 
 uint test(uint val)
 {

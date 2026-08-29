@@ -5749,6 +5749,31 @@ both signed device pointers and unsigned structured-buffer elements, invalid des
 dimensions, pointer/value mismatches, unavailable values, and missing provider interfaces.
 Release host/provider builds pass, and the complete NVVM unit-test prefix passes 388/388.
 
+### Slice 122: Selected-integer groupshared storage and atomics
+
+Direct NVVM now treats canonical uninitialized groupshared scalar and fixed-array storage as one
+selected Int32/UInt32 family. The former signed-i32-specific global and element-pointer classifiers
+were replaced rather than duplicated. Module ownership, GroupShared rate, absent initializer,
+nonempty fixed-array shape, exact read-write GroupShared scalar element pointer, and 4-byte
+alignment remain mandatory. Scalar globals and array-element GEPs lower through the existing
+generic global-storage and sequential-element-pointer callbacks, so builder ABI stays at revision
+21.
+
+The Slice 121 atomic descriptor catalog now admits relaxed scalar Int32/UInt32 add in either global
+or shared physical address space. The compiler derives shared address space only from an admitted
+scalar groupshared global or a direct GEP rooted in an admitted groupshared array. The real provider
+checks that descriptor against the LLVM pointer and emits naturally aligned monotonic system-scope
+`atomicrmw add i32 addrspace(3)*`. The semantic legacy serializer validates global and shared
+atomics before removing LLVM 14's explicit natural-alignment suffix.
+
+`tests/compute/atomics-groupshared.slang` passes its unchanged result `223, 322, 21, 120` through
+direct CUDA execution and a direct PTX lane. Its 1,333-byte PTX declares one 16-byte shared object,
+contains exactly three `atom.shared.add.u32` instructions and two ordered `bar.sync` instructions,
+and assembles with CUDA 12.9.86 `ptxas -arch=sm_70` to a 3,168-byte cubin. Focused tests prove a
+signed scalar shared atomic, UInt32 array indexing/load/store, both signedness catalog rows, and
+the preserved floating/shared and invalid atomic boundaries. Release host/provider builds pass,
+and the complete NVVM prefix passes 389/389.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production
@@ -5798,11 +5823,12 @@ The following remain open until their named slice supplies evidence:
   mutable aggregate families beyond layout-compatible recursively numeric-field structs,
   first-class aggregate field reads beyond copyable helper values, aggregate layouts requiring
   padding, true mutable device globals beyond the established actual-global atomic subset,
-  thread-local contexts beyond flat scalar fields, additional shared-memory shapes, and
-  address spaces;
-- atomics beyond relaxed global scalar Int32/UInt32 add through established writable device
-  pointers and direct structured-buffer elements, including every other operation, memory order,
-  value type, pointer shape, and address space, plus a
+  thread-local contexts beyond flat scalar fields, shared-memory shapes beyond canonical
+  uninitialized scalar/fixed-array Int32/UInt32 storage, and address spaces;
+- atomics beyond relaxed global/shared scalar Int32/UInt32 add through established writable device
+  pointers, direct structured-buffer elements, groupshared scalar globals, and direct groupshared
+  array elements, including every other operation, memory order, value type, pointer shape, and
+  address space, plus a
   production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
   bridge, and a future purpose-built bitcode writer;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float

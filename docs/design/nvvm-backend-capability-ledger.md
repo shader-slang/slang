@@ -244,7 +244,7 @@ remain in the current implementation.
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangCUDAExecutionPtxasAccepts` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 `ptxas` | Pass | Pass | Not applicable | Both execution-family PTX outputs assemble | Static PTX acceptance | Resource and timing measurements not collected |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangCUDAExecutionRuntimeMatchesNVRTC` | 2-3 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA driver, RTX 5090 | Pass | Pass | Not applicable | A 288-invocation multi-block launch records all twelve execution components after group synchronization | Every thread/block coordinate occurs exactly once and all block/grid dimensions agree | Kernel timing not measured |
 | `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangSharedMemoryUsesDirectPipeline` | 3-4 | V4 construction-version-3 fake provider and fake libNVVM | Not compared | Pass | Not applicable | One canonical module-owned `groupshared int[64]` lowers through generic fixed-array, global-storage, GEP, load/store, atomic, and barrier operations | Exact address-space-3 storage and two element-pointer relations; no runtime | Fake-only; not measured |
-| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline` | 3-4 | Current fake provider and fake libNVVM | Not compared | Pass | Not applicable | Two available UInt32 parameters index one canonical module-owned `groupshared int[4]` through the generic array-element operation | Exact write/read parameter identities feed shared store/load around one barrier | Fake-only; not measured |
+| `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline` | 3-4 | Current fake provider and fake libNVVM | Not compared | Pass | Not applicable | Two available UInt32 parameters index one canonical module-owned `groupshared uint[4]` through the generic array-element operation | Exact write/read parameter identities feed shared store/load around one barrier | Fake-only; not measured |
 | `tools/slang-unit-test/unit-test-nvvm-emitter.cpp::nvvmSlangUnsignedConstantPointerIndicesUseDirectPipeline` | 3 | Current fake provider and fake libNVVM | Not compared | Pass | Not applicable | Exact UInt32 literal indices address ordinary selected-scalar pointers and fixed i32 device arrays | Both source/destination pointer families consume the same exact 32-bit constant; no cast or byte reconstruction | Fake-only; not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangSharedMemoryDifferentialPTX` | 3-4 | LLVM 14.0.6 provider, audited NVVM-2.0 text writer, NVRTC, CUDA 12.9 libNVVM | Pass | Pass | Not applicable | Both routes compile the 64-element shared-memory reverse-read workload | Matching `[64, 64]` ABI, 256-byte shared object, shared load/store, global atomic, and group barrier inventory | PTX size/timing not measured |
 | `tools/slang-unit-test/unit-test-nvvm-integration.cpp::nvvmSlangSharedMemoryPtxasAccepts` | 3-4 | Matching-root CUDA 12.9 `ptxas`, `sm_75` | Pass | Pass | Not applicable | Both shared-memory outputs assemble | Static acceptance; direct `sm_70 -v` probe reports 14 registers, one barrier, 256 bytes shared memory, and no stack or spills | Compile time reported as 0.000 ms |
@@ -1704,3 +1704,22 @@ contains exactly three `atom.global.add.u32` instructions and CUDA 12.9.86
 `ptxas -arch=sm_70` emits a 2,920-byte cubin. Release host/provider builds pass, focused tests cover
 both admitted signedness rows and adjacent invalid dimensions, and the complete NVVM prefix passes
 388/388.
+
+Slice 122 replaces the signed-i32-specific groupshared classifiers with one exact selected-integer
+family. Canonical uninitialized scalar and nonempty fixed-array Int32/UInt32 globals share the
+existing internal address-space-3 storage declaration; direct array GEPs require the exact
+read-write GroupShared element type. The construction interface and builder ABI revision 21 remain
+unchanged.
+
+The shared semantic atomic catalog now admits relaxed add for scalar Int32/UInt32 in global or
+shared address space. Compiler resolution derives shared address space only from the canonical
+scalar global or a direct GEP rooted in the canonical array global. The real provider emits
+`atomicrmw add i32 addrspace(3)*` and the semantic LLVM 7 compatibility serializer validates both
+admitted address spaces before removing explicit LLVM 14 atomic alignment.
+
+The unchanged `tests/compute/atomics-groupshared.slang` result `223, 322, 21, 120` passes direct
+CUDA execution. Its 1,333-byte PTX contains one 16-byte shared object, exactly three
+`atom.shared.add.u32` instructions, and two ordered barriers; CUDA 12.9.86
+`ptxas -arch=sm_70` emits a 3,168-byte cubin. Focused fake coverage proves scalar shared atomic
+production and UInt32 shared-array access, real-provider coverage proves both descriptor address
+spaces, Release host/provider builds pass, and the complete NVVM prefix passes 389/389.

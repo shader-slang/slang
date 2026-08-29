@@ -2569,7 +2569,8 @@ static bool _isFakeNVVMBuilderPointerValue(SlangNVVMValueHandle value)
         valueRef.kind == FakeNVVMBuilderValueKind::SequentialElementPointer ||
         valueRef.kind == FakeNVVMBuilderValueKind::StructFieldPointer)
         return true;
-    if (valueRef.kind == FakeNVVMBuilderValueKind::LocalStorage)
+    if (valueRef.kind == FakeNVVMBuilderValueKind::LocalStorage ||
+        valueRef.kind == FakeNVVMBuilderValueKind::GlobalStorage)
         return true;
     if (valueRef.kind == FakeNVVMBuilderValueKind::AggregateElement)
     {
@@ -4894,13 +4895,14 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderDeclareGlobalStorage(
     const Index storageIndex = gFakeNVVMBuilder.declareGlobalStorageCallCount++;
     if (outStorage)
         *outStorage = nullptr;
-    const bool isSharedArray = valueType == _getFakeNVVMBuilderArrayType() &&
-                               linkage == SLANG_NVVM_LINKAGE_INTERNAL &&
-                               addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
+    const bool isSharedInteger = (valueType == _getFakeNVVMBuilderIntegerType() ||
+                                  valueType == _getFakeNVVMBuilderArrayType()) &&
+                                 linkage == SLANG_NVVM_LINKAGE_INTERNAL &&
+                                 addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
     const bool isConstantStruct = valueType == _getFakeNVVMBuilderStructType() &&
                                   linkage == SLANG_NVVM_LINKAGE_EXTERNAL &&
                                   addressSpace == SLANG_NVVM_ADDRESS_SPACE_CONSTANT;
-    if (module != _getFakeNVVMBuilderModule() || (!isSharedArray && !isConstantStruct) ||
+    if (module != _getFakeNVVMBuilderModule() || (!isSharedInteger && !isConstantStruct) ||
         !alignment || (alignment & (alignment - 1)) || !name || !nameSize || !outStorage ||
         storageIndex < 0 || storageIndex >= SLANG_COUNT_OF(gFakeNVVMBuilder.globalStorage))
     {
@@ -9562,15 +9564,15 @@ void computeMain(
 }
 )";
 static const char kDirectNVVMUnsignedSharedArrayIndexSource[] = R"(
-groupshared int sharedValues[4];
+groupshared uint sharedValues[4];
 
 [CUDAKernel]
 void computeMain(
-    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> destination,
     uniform uint writeIndex,
     uniform uint readIndex)
 {
-    sharedValues[writeIndex] = int(writeIndex) + 1;
+    sharedValues[writeIndex] = writeIndex + 1;
     GroupMemoryBarrierWithGroupSync();
     destination[writeIndex] = sharedValues[readIndex];
 }

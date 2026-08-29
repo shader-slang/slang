@@ -2358,16 +2358,54 @@ struct NVVMResolvedAtomicOperation
     const char* diagnosticName = nullptr;
 };
 
-// Returns an exact writable producer whose provider representation is a typed global pointer.
-IRPtrTypeBase* _asNVVMSupportedAtomicGlobalPointer(IRInst* value)
+struct NVVMResolvedAtomicPointer
 {
+    IRPtrTypeBase* type = nullptr;
+    SlangNVVMAddressSpace addressSpace = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
+};
+
+// Resolves an exact writable producer and its physical provider address space.
+bool _resolveNVVMAtomicPointer(IRInst* value, NVVMResolvedAtomicPointer& outPointer)
+{
+    outPointer = {};
     if (!value)
-        return nullptr;
+        return false;
+
+    IRType* sharedScalarType = nullptr;
+    if (asNVVMSupportedSharedIntegerScalarGlobal(value, &sharedScalarType))
+    {
+        outPointer.type = as<IRPtrTypeBase>(value->getDataType());
+        outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
+        return outPointer.type && isTypeEqual(outPointer.type->getValueType(), sharedScalarType);
+    }
+
+    if (value->getOp() == kIROp_GetElementPtr && value->getOperandCount() == 2)
+    {
+        IRArrayType* sharedArrayType = nullptr;
+        auto resultType = asNVVMSupportedSharedIntegerElementPointerType(value->getDataType());
+        if (asNVVMSupportedSharedIntegerArrayGlobal(value->getOperand(0), &sharedArrayType) &&
+            resultType &&
+            isTypeEqual(sharedArrayType->getElementType(), resultType->getValueType()))
+        {
+            outPointer.type = resultType;
+            outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
+            return true;
+        }
+    }
+
     if (as<IRGlobalVar>(value) || as<IRParam>(value))
-        return asNVVMSupportedDeviceNumericPointerType(value->getDataType());
+    {
+        outPointer.type = asNVVMSupportedDeviceNumericPointerType(value->getDataType());
+        outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
+        return outPointer.type != nullptr;
+    }
     if (value->getOp() == kIROp_RWStructuredBufferGetElementPtr)
-        return asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType());
-    return nullptr;
+    {
+        outPointer.type = asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType());
+        outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
+        return outPointer.type != nullptr;
+    }
+    return false;
 }
 
 // Resolves one canonical integer atomic to the complete descriptor consumed by both preflight and
@@ -2381,10 +2419,11 @@ bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMResolvedAtomicOperation& outO
     IRInst* pointer = inst->getOperand(0);
     IRInst* value = inst->getOperand(1);
     auto memoryOrder = _asExecutableI32Constant(inst->getOperand(2));
-    auto pointerType = _asNVVMSupportedAtomicGlobalPointer(pointer);
+    NVVMResolvedAtomicPointer resolvedPointer;
     SlangNVVMValueTypeDesc valueType = {};
-    if (!pointerType || pointerType->getAccessQualifier() != AccessQualifier::ReadWrite || !value ||
-        !isTypeEqual(pointerType->getValueType(), inst->getDataType()) ||
+    if (!_resolveNVVMAtomicPointer(pointer, resolvedPointer) ||
+        resolvedPointer.type->getAccessQualifier() != AccessQualifier::ReadWrite || !value ||
+        !isTypeEqual(resolvedPointer.type->getValueType(), inst->getDataType()) ||
         !isTypeEqual(value->getDataType(), inst->getDataType()) ||
         !_getNVVMSemanticType(inst->getDataType(), valueType) || !memoryOrder ||
         memoryOrder->getValue() != kIRMemoryOrder_Relaxed)
@@ -2395,14 +2434,16 @@ bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMResolvedAtomicOperation& outO
     outOperation.desc = {
         SLANG_NVVM_ATOMIC_OP_ADD,
         valueType,
-        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        resolvedPointer.addressSpace,
         SLANG_NVVM_MEMORY_ORDER_RELAXED,
     };
     if (!NVVMSemantics::isSupported(outOperation.desc))
         return false;
     outOperation.pointer = pointer;
     outOperation.value = value;
-    outOperation.diagnosticName = "relaxed global i32 atomic add";
+    outOperation.diagnosticName = resolvedPointer.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED
+                                      ? "relaxed shared i32 atomic add"
+                                      : "relaxed global i32 atomic add";
     return true;
 }
 
@@ -2514,7 +2555,8 @@ SlangResult _validateAvailableValue(
     NVVMConventionalGlobalParams globalParams;
     SlangNVVMValueOperation executionOperation = 0;
     if (value && consumer && value->getModule() == consumer->getModule() &&
-        (asNVVMSupportedSharedI32ArrayGlobal(value) ||
+        (asNVVMSupportedSharedIntegerScalarGlobal(value) ||
+         asNVVMSupportedSharedIntegerArrayGlobal(value) ||
          _getNVVMConventionalGlobalParams(value, globalParams) ||
          _getNVVMCUDAExecutionGlobalOperation(value, executionOperation)))
     {
@@ -2754,7 +2796,10 @@ SlangResult _validatePointerValue(
             ? asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType())
             : nullptr;
     auto sharedElementPtrType =
-        value ? asNVVMSupportedSharedI32ElementPointerType(value->getDataType()) : nullptr;
+        value ? asNVVMSupportedSharedIntegerElementPointerType(value->getDataType()) : nullptr;
+    auto sharedScalarPtrType = value && asNVVMSupportedSharedIntegerScalarGlobal(value)
+                                   ? as<IRPtrTypeBase>(value->getDataType())
+                                   : nullptr;
     auto localStructPtrType =
         value ? asNVVMSupportedLocalCopyableStructPointerType(value->getDataType()) : nullptr;
     // A local `var T` and a module-scope groupshared value can both expose the canonical
@@ -2784,6 +2829,7 @@ SlangResult _validatePointerValue(
     IRPtrTypeBase* devicePtrType = numericPtrType;
     IRPtrTypeBase* acceptedPtrType = devicePtrType              ? devicePtrType
                                      : sharedElementPtrType     ? sharedElementPtrType
+                                     : sharedScalarPtrType      ? sharedScalarPtrType
                                      : resourceElementPtrType   ? resourceElementPtrType
                                      : localNumericPtrType      ? localNumericPtrType
                                      : localNumericArrayPtrType ? localNumericArrayPtrType
@@ -3149,7 +3195,9 @@ SlangResult _collectNVVMFunctionNames(
                 return _diagnoseUnsupportedIR(codeGenContext, toSlice("global storage name"));
             continue;
         }
-        auto globalVar = asNVVMSupportedSharedI32ArrayGlobal(globalInst);
+        auto globalVar = asNVVMSupportedSharedIntegerScalarGlobal(globalInst);
+        if (!globalVar)
+            globalVar = asNVVMSupportedSharedIntegerArrayGlobal(globalInst);
         if (!globalVar)
             continue;
         const UnownedStringSlice name = getMangledName(globalVar);
@@ -3593,7 +3641,7 @@ SlangResult _validateNVVMFunction(
                     NVVMSequentialElementPointer sequentialElementPointer;
                     if (inst->getOperandCount() != 2 ||
                         (!asNVVMSupportedDevicePointerType(inst->getDataType()) &&
-                         !asNVVMSupportedSharedI32ElementPointerType(inst->getDataType()) &&
+                         !asNVVMSupportedSharedIntegerElementPointerType(inst->getDataType()) &&
                          !_getNVVMSequentialElementPointer(inst, sequentialElementPointer) &&
                          !_getNVVMRawBufferElementPointer(inst, bufferElementPointer)))
                     {
@@ -4143,10 +4191,10 @@ SlangResult _validateNVVMFunction(
                                                        : nullptr;
                     IRArrayType* sharedArrayType = nullptr;
                     auto sharedGlobal =
-                        asNVVMSupportedSharedI32ArrayGlobal(basePointer, &sharedArrayType);
+                        asNVVMSupportedSharedIntegerArrayGlobal(basePointer, &sharedArrayType);
                     auto resultPointerType = asNVVMSupportedDevicePointerType(inst->getDataType());
                     auto sharedResultPointerType =
-                        asNVVMSupportedSharedI32ElementPointerType(inst->getDataType());
+                        asNVVMSupportedSharedIntegerElementPointerType(inst->getDataType());
                     const bool isDeviceArrayElement =
                         basePointerType && resultPointerType && arrayType &&
                         basePointerType->getAddressSpace() ==
@@ -4954,7 +5002,8 @@ SlangResult validateNVVMSupportedIR(
         }
         if (as<IRGlobalVar>(globalInst))
         {
-            if (asNVVMSupportedSharedI32ArrayGlobal(globalInst))
+            if (asNVVMSupportedSharedIntegerScalarGlobal(globalInst) ||
+                asNVVMSupportedSharedIntegerArrayGlobal(globalInst))
                 continue;
             return _diagnoseUnsupportedIR(
                 codeGenContext,
@@ -5103,21 +5152,27 @@ SlangResult emitNVVMIRFromLinkedIR(
             continue;
         }
 
+        IRType* sharedStorageType = nullptr;
+        auto globalVar = asNVVMSupportedSharedIntegerScalarGlobal(globalInst, &sharedStorageType);
         IRArrayType* arrayType = nullptr;
-        auto globalVar = asNVVMSupportedSharedI32ArrayGlobal(globalInst, &arrayType);
+        if (!globalVar)
+        {
+            globalVar = asNVVMSupportedSharedIntegerArrayGlobal(globalInst, &arrayType);
+            sharedStorageType = arrayType;
+        }
         if (!globalVar)
             continue;
 
-        SlangNVVMTypeHandle loweredArrayType = nullptr;
+        SlangNVVMTypeHandle loweredStorageType = nullptr;
         SLANG_RETURN_ON_FAIL(
-            typeContext.lowerType(arrayType, NVVMTypeUse::Value, loweredArrayType));
+            typeContext.lowerType(sharedStorageType, NVVMTypeUse::Value, loweredStorageType));
         SlangNVVMValueHandle loweredStorage = nullptr;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
             "shared global storage declaration",
             builder.declareGlobalStorage(
                 moduleScope.module,
-                loweredArrayType,
+                loweredStorageType,
                 SLANG_NVVM_LINKAGE_INTERNAL,
                 SLANG_NVVM_ADDRESS_SPACE_SHARED,
                 kNVVMScalar32Alignment,
@@ -6365,8 +6420,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                                                   loweredPointer);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            asNVVMSupportedSharedI32ArrayGlobal(inst->getOperand(0))
-                                ? "shared i32 array element pointer"
+                            asNVVMSupportedSharedIntegerArrayGlobal(inst->getOperand(0))
+                                ? "shared integer array element pointer"
                             : isBufferElement     ? "raw buffer scalar element pointer"
                             : isSequentialElement ? "numeric sequential element pointer"
                                                   : "device i32 array element pointer",

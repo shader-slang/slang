@@ -2266,9 +2266,11 @@ static SlangResult _writeLegacyNVVMAssembly(
                     continue;
 
                 ++semanticAtomicCount;
+                const unsigned addressSpace = atomic->getPointerAddressSpace();
                 if (atomic->getOperation() != llvm::AtomicRMWInst::Add ||
                     !atomic->getType()->isIntegerTy(32) ||
-                    atomic->getPointerAddressSpace() != SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+                    (addressSpace != SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
+                     addressSpace != SLANG_NVVM_ADDRESS_SPACE_SHARED) ||
                     atomic->getAlign() != llvm::Align(4) ||
                     atomic->getOrdering() != llvm::AtomicOrdering::Monotonic ||
                     atomic->getSyncScopeID() != llvm::SyncScope::System || atomic->isVolatile())

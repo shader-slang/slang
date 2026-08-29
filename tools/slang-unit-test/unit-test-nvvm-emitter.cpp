@@ -6010,6 +6010,69 @@ SLANG_UNIT_TEST(nvvmSlangRelaxedGlobalI32AtomicAddUsesDirectPipeline)
     }
 }
 
+SLANG_UNIT_TEST(nvvmSlangRelaxedSharedI32AtomicAddUsesDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMGroupSharedI32AtomicAddSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+            StringBuilder trace;
+            trace << "shared atomic fake trace: result " << result << "; modules "
+                  << gFakeNVVMBuilder.createModuleCallCount << "; globals "
+                  << gFakeNVVMBuilder.declareGlobalStorageCallCount << "; atomics "
+                  << gFakeNVVMBuilder.emitAtomicOperationCallCount << "; serializations "
+                  << gFakeNVVMBuilder.serializeWithDiagnosticsQueryCallCount;
+            getTestReporter()->message(TestMessageType::TestFailure, trace.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.declareGlobalStorageCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageValueType == _getFakeNVVMBuilderIntegerType());
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageLinkage == SLANG_NVVM_LINKAGE_INTERNAL);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageAddressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageAlignment == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageNames.getCount() == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.globalStorageNames[0].indexOf("atomicCounter") >= 0);
+
+        SLANG_CHECK(gFakeNVVMBuilder.atomicOperations.getCount() == 1);
+        const SlangNVVMAtomicOperationDesc& operation = gFakeNVVMBuilder.atomicOperations[0];
+        SLANG_CHECK(operation.operation == SLANG_NVVM_ATOMIC_OP_ADD);
+        SLANG_CHECK(NVVMSemantics::areSameType(operation.valueType, NVVMSemantics::kSignedI32));
+        SLANG_CHECK(operation.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED);
+        SLANG_CHECK(operation.memoryOrder == SLANG_NVVM_MEMORY_ORDER_RELAXED);
+        SLANG_CHECK(gFakeNVVMBuilder.atomicOperationPointerValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.atomicOperationPointerValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::GlobalStorage);
+        SLANG_CHECK(gFakeNVVMBuilder.atomicOperationValueRefs.getCount() == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.atomicOperationValueRefs[0].kind ==
+            FakeNVVMBuilderValueKind::IntegerConstant);
+        SLANG_CHECK(gFakeNVVMBuilder.emitSequentialElementPointerCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitReturnVoidCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerEqualUsesDirectPipeline, Equal)
 NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerNotEqualUsesDirectPipeline, NotEqual)
 NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerSignedGreaterThanUsesDirectPipeline, SignedGreaterThan)
@@ -6360,7 +6423,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMAtomicSubSource, "'atomicSub'"},
         {kDirectNVVMAtomicExchangeSource, "'atomicExchange'"},
         {kDirectNVVMAcquireGlobalI32AtomicAddSource, "'selected atomic operation'"},
-        {kDirectNVVMGroupSharedI32AtomicAddSource, "'selected atomic operation'"},
         {kDirectNVVMPointerEqualSource, "'cmpEQ'"},
         {kDirectNVVMPointerNotEqualSource, "'cmpNE'"},
         {kDirectNVVMPointerGreaterThanSource, "'cmpGT'"},
@@ -6370,8 +6432,8 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 
     // Noncanonical layout, escaping or dynamically addressed local memory, logical NOT, libdevice
     // calls, malformed-signature opaque-Half and surface helpers, atomic-add ABI variants,
-    // non-relaxed atomic-add order, adjacent atomic operations, group-shared atomic add, non-i32
-    // shared arrays, pointer comparisons, and helper-array-pointer shapes remain deterministic
+    // non-relaxed atomic-add order, adjacent atomic operations, non-integer shared arrays, pointer
+    // comparisons, and helper-array-pointer shapes remain deterministic
     // before builder discovery.
     for (const auto& unsupported : kCases)
     {

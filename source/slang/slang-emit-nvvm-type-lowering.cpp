@@ -606,7 +606,27 @@ IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     return ptrType;
 }
 
-IRGlobalVar* asNVVMSupportedSharedI32ArrayGlobal(
+IRGlobalVar* asNVVMSupportedSharedIntegerScalarGlobal(IRInst* inst, IRType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+
+    auto globalVar = as<IRGlobalVar>(inst);
+    auto ptrType = globalVar ? globalVar->getDataType() : nullptr;
+    IRType* valueType = ptrType ? ptrType->getValueType() : nullptr;
+    if (!globalVar || !as<IRGroupSharedRate>(globalVar->getRate()) || globalVar->getFirstBlock() ||
+        !ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 1 ||
+        !isNVVMInteger32Type(valueType))
+    {
+        return nullptr;
+    }
+
+    if (outValueType)
+        *outValueType = valueType;
+    return globalVar;
+}
+
+IRGlobalVar* asNVVMSupportedSharedIntegerArrayGlobal(
     IRInst* inst,
     IRArrayType** outArrayType,
     uint32_t* outElementCount)
@@ -622,7 +642,8 @@ IRGlobalVar* asNVVMSupportedSharedI32ArrayGlobal(
     uint32_t elementCount = 0;
     if (!globalVar || !as<IRGroupSharedRate>(globalVar->getRate()) || globalVar->getFirstBlock() ||
         !ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 1 ||
-        !(arrayType = asNVVMSupportedI32ArrayType(ptrType->getValueType(), &elementCount)))
+        !(arrayType = asNVVMSupportedNumericArrayType(ptrType->getValueType(), &elementCount)) ||
+        !isNVVMInteger32Type(arrayType->getElementType()))
     {
         return nullptr;
     }
@@ -634,12 +655,12 @@ IRGlobalVar* asNVVMSupportedSharedI32ArrayGlobal(
     return globalVar;
 }
 
-IRPtrTypeBase* asNVVMSupportedSharedI32ElementPointerType(IRInst* type)
+IRPtrTypeBase* asNVVMSupportedSharedIntegerElementPointerType(IRInst* type)
 {
     auto ptrType = as<IRPtrTypeBase>(type);
     IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
     if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
-        !isNVVMSignedI32Type(ptrType->getValueType()) ||
+        !isNVVMInteger32Type(ptrType->getValueType()) ||
         ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
         ptrType->getAddressSpace() != AddressSpace::GroupShared || !dataLayout ||
         dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
@@ -1312,7 +1333,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         asNVVMSupportedUnsizedSamplerArrayStorageType(type);
     IRPtrTypeBase* resourceElementPointer =
         asNVVMSupportedRWStructuredBufferElementPointerType(type);
-    IRPtrTypeBase* sharedElementPointer = asNVVMSupportedSharedI32ElementPointerType(type);
+    IRPtrTypeBase* sharedElementPointer = asNVVMSupportedSharedIntegerElementPointerType(type);
 
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
