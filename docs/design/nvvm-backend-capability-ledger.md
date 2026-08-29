@@ -31,6 +31,7 @@ unsupported shape remain planning evidence rather than expected failures.
 | `tests/compute/byte-address-buffer-aligned.slang` | CUDA/NVRTC + direct NVVM runtime | Pass | Float/Float4 aligned and scalarized byte-address copies pass; direct PTX exposes four Float loads/stores and passes `ptxas` |
 | `tests/compute/byte-address-buffer-singlearg-float3-11592.slang` | CPU + direct NVVM runtime | Pass | A Float3 constant round-trips through a byte buffer into typed Float output; direct PTX passes `ptxas` |
 | `tests/compute/byte-address-buffer-64bit.slang` | CPU + direct NVVM runtime | Pass | UInt widens and adds as UInt64 before byte storage; direct PTX lowers the four-byte-aligned wide store to two ordered UInt stores and passes `ptxas` |
+| `tests/compute/byte-address-buffer-array.slang` | CUDA/NVRTC + direct NVVM runtime | Pass | One-level `Array<Float4, 2>` byte pass-through and the scalarized Float copy compile and run; direct PTX passes `ptxas` |
 
 Slices 69 and 70 consolidated the implementation onto one exact forward-only builder ABI and one
 typed-descriptor capability system. Older rows below retain the interface names that described the
@@ -355,7 +356,8 @@ same canonical graph through LLVM `icmp eq`.
 | `slang-unit-test-tool/nvvmSlangCoreByteAddressAccessUsesGenericByteOffsets` | Read-only UInt4 and mutable UInt loads plus one UInt store use three generic byte-offset pointers; immutable flags and canonical alignment reach the fake provider exactly | Pass |
 | `slang-unit-test-tool/nvvmSlangFloatVectorByteAddressAccessUsesGenericOperations` | Float4 construction/extraction and exact Int/Float/Float4 byte pointers compose through generic vector and memory callbacks with scalar/vector identity preserved | Pass |
 | `slang-unit-test-tool/nvvmSlangWideIntegerByteAddressAccessUsesGenericOperations` | Read-only Int64 and mutable UInt64 loads plus matching wide stores use four generic byte-offset pointers, exact explicit-eight/default-four-byte alignment, and the correct invariant policy | Pass |
-| `slang-unit-test-tool/nvvmSlangRejectsAggregateByteAddressAccessBeforeProviderMutation` | An array-bearing aggregate byte access remains outside the selected scalar/vector family and reaches E52017 before builder discovery or mutation | Pass |
+| `slang-unit-test-tool/nvvmSlangNumericArrayByteAddressAccessUsesGenericOperations` | `Array<Float4, 2>` preserves exact element/count identity through generic array construction, two byte-offset pointers, one invariant load, and one store | Pass |
+| `slang-unit-test-tool/nvvmSlangRejectsNestedArrayByteAddressAccessBeforeProviderMutation` | A nested numeric array remains outside the nonrecursive byte payload family and reaches E52017 before builder discovery or mutation | Pass |
 
 Slice 9 extends Bucket 2 through a finite DAG of canonical direct `IRFunc`
 callees with signed-i32 parameters/results and valued returns. Complex and aggregate types, pointer

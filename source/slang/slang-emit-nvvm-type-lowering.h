@@ -44,7 +44,10 @@ IRVectorType* asNVVMSupportedI32VectorType(
 /// Returns whether `type` is a selected scalar or established fixed numeric vector.
 bool isNVVMSupportedNumericValueType(IRInst* type);
 
-/// Returns whether `type` is an exact selected byte-address scalar or vector value.
+/// Returns an exact nonempty fixed array whose direct element is a byte-address numeric value.
+IRArrayType* asNVVMSupportedNumericArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
+
+/// Returns whether `type` is an exact selected byte-address payload value.
 bool isNVVMSupportedByteAddressValueType(IRInst* type);
 
 /// Returns an exact nonempty struct whose fields are all selected scalar values.

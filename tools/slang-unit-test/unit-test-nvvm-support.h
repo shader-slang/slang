@@ -357,6 +357,7 @@ enum class FakeNVVMBuilderScalarTypeKind
     Float2,
     Float3,
     Float4,
+    NumericArray,
     ResourceView,
     ScalarStructPointer,
 };
@@ -1065,6 +1066,8 @@ static bool _getFakeNVVMBuilderTypeKind(
         outTypeKind = FakeNVVMBuilderScalarTypeKind::Float3;
     else if (type == _getFakeNVVMBuilderVectorType(4, FakeNVVMBuilderScalarTypeKind::Float))
         outTypeKind = FakeNVVMBuilderScalarTypeKind::Float4;
+    else if (type == _getFakeNVVMBuilderArrayType())
+        outTypeKind = FakeNVVMBuilderScalarTypeKind::NumericArray;
     else if (type == _getFakeNVVMBuilderScalarStructPointerType())
         outTypeKind = FakeNVVMBuilderScalarTypeKind::ScalarStructPointer;
     else
@@ -1859,6 +1862,15 @@ static bool _isFakeNVVMBuilderValueOfTypeKind(
         return _isFakeNVVMBuilderVectorValue(value, FakeNVVMBuilderScalarTypeKind::Float, 3);
     case FakeNVVMBuilderScalarTypeKind::Float4:
         return _isFakeNVVMBuilderVectorValue(value, FakeNVVMBuilderScalarTypeKind::Float, 4);
+    case FakeNVVMBuilderScalarTypeKind::NumericArray:
+        {
+            FakeNVVMBuilderValueRef valueRef;
+            return _getFakeNVVMBuilderValueRef(value, valueRef) &&
+                   valueRef.kind == FakeNVVMBuilderValueKind::Load && valueRef.index >= 0 &&
+                   valueRef.index < gFakeNVVMBuilder.loadResultTypeKinds.getCount() &&
+                   gFakeNVVMBuilder.loadResultTypeKinds[valueRef.index] ==
+                       FakeNVVMBuilderScalarTypeKind::NumericArray;
+        }
     default:
         return false;
     }
@@ -2592,7 +2604,12 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetArrayType(
     gFakeNVVMBuilder.arrayElementCount = elementCount;
     if (outType)
         *outType = nullptr;
-    if (module != _getFakeNVVMBuilderModule() || elementType != _getFakeNVVMBuilderIntegerType() ||
+    FakeNVVMBuilderScalarTypeKind elementTypeKind;
+    if (module != _getFakeNVVMBuilderModule() ||
+        !_getFakeNVVMBuilderTypeKind(elementType, elementTypeKind) ||
+        elementTypeKind == FakeNVVMBuilderScalarTypeKind::NumericArray ||
+        elementTypeKind == FakeNVVMBuilderScalarTypeKind::ResourceView ||
+        elementTypeKind == FakeNVVMBuilderScalarTypeKind::ScalarStructPointer ||
         elementCount == 0 || !outType)
     {
         return SLANG_E_INVALID_ARG;
@@ -8644,16 +8661,28 @@ void computeMain(
     destination[0] = unsignedValue;
 }
 )";
-static const char kDirectNVVMUnsupportedAggregateByteAddressAccessSource[] = R"(
+static const char kDirectNVVMNumericArrayByteAddressAccessSource[] = R"(
 struct Block
 {
     float4 values[2];
 };
 
 [CUDAKernel]
+void computeMain(ByteAddressBuffer source, RWByteAddressBuffer destination)
+{
+    destination.Store(0, source.LoadAligned<Block>(0));
+}
+)";
+static const char kDirectNVVMUnsupportedNestedArrayByteAddressAccessSource[] = R"(
+struct NestedBlock
+{
+    float4 values[2][2];
+};
+
+[CUDAKernel]
 void computeMain(RWByteAddressBuffer source)
 {
-    source.Store(0, source.LoadAligned<Block>(0));
+    source.Store(0, source.LoadAligned<NestedBlock>(0));
 }
 )";
 static const char kDirectNVVMAggregateAndReadOnlyResourceSource[] = R"(

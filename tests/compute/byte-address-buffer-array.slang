@@ -2,14 +2,17 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -d3d12 -profile cs_6_0 -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -cuda -profile cs_6_0 -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -cuda -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
 
 //TEST:SIMPLE(filecheck=CHECK2):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry computeMain -stage compute -O1
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -emit-spirv-directly -entry computeMain -stage compute -O1
+//TEST:SIMPLE(filecheck=CHECK_NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o -
 
 // Confirm compilation of `(RW)ByteAddressBuffer` with aligned load / stores to wider data types.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=buffer
+// The shader reaches byte 47, so allocate the full 48-byte range used by both copies.
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buffer
 RWByteAddressBuffer buffer;
 struct Block {
     float4 val[2];
@@ -45,4 +48,25 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // / `StoreAligned(16, ...)` self-contradictory calls are expressed with valid alignments.)
     buffer.Store<Block>(16, buffer.LoadAligned<Block>(4, 4), 16);
 }
+
+// The same-location wide array copy is optimized away. The alignment-four path remains eight exact
+// Float loads and eight Float stores through the selected numeric-array/scalar byte contracts.
+// CHECK_NVVM: .visible .const .align 8 .b8 SLANG_globalParams[16]
+// CHECK_NVVM: .visible .entry computeMain()
+// CHECK_NVVM: ld.global.f32
+// CHECK_NVVM: ld.global.f32
+// CHECK_NVVM: ld.global.f32
+// CHECK_NVVM: ld.global.f32
+// CHECK_NVVM: ld.global.f32
+// CHECK_NVVM: ld.global.f32
+// CHECK_NVVM: ld.global.f32
+// CHECK_NVVM: ld.global.f32
+// CHECK_NVVM: st.global.f32
+// CHECK_NVVM: st.global.f32
+// CHECK_NVVM: st.global.f32
+// CHECK_NVVM: st.global.f32
+// CHECK_NVVM: st.global.f32
+// CHECK_NVVM: st.global.f32
+// CHECK_NVVM: st.global.f32
+// CHECK_NVVM: st.global.f32
 

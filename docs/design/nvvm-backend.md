@@ -4696,6 +4696,33 @@ lowers it to two ordered `st.global.u32` instructions separated by `shr.u64`. CU
 `ptxas -arch=sm_70` accepts the module. The Release host and isolated-provider builds pass, four
 focused byte-address units pass 4/4, and the complete NVVM prefix passes 355/355.
 
+### Slice 86: Fixed numeric-array byte-address values
+
+The byte-address payload boundary now accepts one nonrecursive aggregate family: a canonical
+nonempty fixed array whose direct element is an established byte leaf (32-bit Int/UInt/Float,
+64-bit Int/UInt, or a two- through four-lane 32-bit numeric vector). One leaf classifier is shared
+by scalar/vector byte access and array-element policy. The historical fixed-i32 device-array
+classifier narrows the broader array shape/count classifier, so pointer roles remain unchanged.
+
+Ordinary value lowering creates the exact provider element and reuses ABI revision 8's generic
+array type operation. The array is admitted only as a byte-load result passed directly to a byte
+store. No array constructor, extractor, index, phi, helper/entry ABI, structured-buffer role, or
+new provider operation is implied. Byte-store SSA validation consumes the already-available exact
+array value instead of decomposing it. Nested arrays remain E52017 before provider discovery.
+
+The focused fake fixture lowers `Array<Float4, 2>` with exact element/count identity, then observes
+two array-typed generic byte pointers, one invariant load, and one store at the canonical four-byte
+contract. Its separate array value kind prevents the loaded aggregate from satisfying a scalar or
+vector store accidentally. The real provider needed no change because its existing array
+constructor already accepts every sized loadable LLVM element type.
+
+The existing `tests/compute/byte-address-buffer-array.slang` passes direct-libNVVM runtime and PTX
+lanes 2/2 after its backing buffer was expanded from 16 to the 48 bytes its pre-existing accesses
+touch. Final optimization removes the same-location wide array copy; the alignment-four path
+retains eight `ld.global.f32` and eight `st.global.f32` instructions. CUDA 12.9.86
+`ptxas -arch=sm_70` accepts the module. The Release host and isolated-provider builds pass, four
+focused array/adjacent units pass 4/4, and the complete NVVM prefix passes 356/356.
+
 The following remain open until their named slice supplies evidence:
 
 - packaging and update policy for the optional NVVM builder module, including whether production

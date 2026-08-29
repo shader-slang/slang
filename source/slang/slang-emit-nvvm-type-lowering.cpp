@@ -118,13 +118,40 @@ bool isNVVMSupportedNumericValueType(IRInst* type)
            asNVVMSupported32BitNumericVectorType(type);
 }
 
-bool isNVVMSupportedByteAddressValueType(IRInst* type)
+// Returns the non-aggregate byte payload family shared by direct values and array elements.
+static bool _isNVVMSupportedByteAddressLeafValueType(IRInst* type)
 {
     uint32_t integerBitWidth = 0;
-    const bool isWideInteger =
-        isNVVMSupportedIntegerScalarType(type, &integerBitWidth) && integerBitWidth == 64;
-    return isWideInteger || isNVVMInteger32Type(type) || isNVVMFloat32Type(type) ||
+    const bool isSupportedInteger = isNVVMSupportedIntegerScalarType(type, &integerBitWidth) &&
+                                    (integerBitWidth == 32 || integerBitWidth == 64);
+    return isSupportedInteger || isNVVMFloat32Type(type) ||
            asNVVMSupported32BitNumericVectorType(type);
+}
+
+IRArrayType* asNVVMSupportedNumericArrayType(IRInst* type, uint32_t* outElementCount)
+{
+    if (outElementCount)
+        *outElementCount = 0;
+
+    auto arrayType = as<IRArrayType>(type);
+    if (!arrayType || arrayType->getOp() != kIROp_ArrayType || arrayType->getOperandCount() != 2 ||
+        !_isNVVMSupportedByteAddressLeafValueType(arrayType->getElementType()))
+    {
+        return nullptr;
+    }
+
+    auto elementCount = as<IRIntLit>(arrayType->getElementCount());
+    if (!elementCount || elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX)
+        return nullptr;
+
+    if (outElementCount)
+        *outElementCount = uint32_t(elementCount->getValue());
+    return arrayType;
+}
+
+bool isNVVMSupportedByteAddressValueType(IRInst* type)
+{
+    return _isNVVMSupportedByteAddressLeafValueType(type) || asNVVMSupportedNumericArrayType(type);
 }
 
 IRStructType* asNVVMSupportedScalarStructType(IRInst* type)
@@ -164,19 +191,13 @@ IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount
     if (outElementCount)
         *outElementCount = 0;
 
-    auto arrayType = as<IRArrayType>(type);
-    if (!arrayType || arrayType->getOp() != kIROp_ArrayType || arrayType->getOperandCount() != 2 ||
-        !isNVVMSignedI32Type(arrayType->getElementType()))
-    {
-        return nullptr;
-    }
-
-    auto elementCount = as<IRIntLit>(arrayType->getElementCount());
-    if (!elementCount || elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX)
+    uint32_t elementCount = 0;
+    auto arrayType = asNVVMSupportedNumericArrayType(type, &elementCount);
+    if (!arrayType || !isNVVMSignedI32Type(arrayType->getElementType()))
         return nullptr;
 
     if (outElementCount)
-        *outElementCount = uint32_t(elementCount->getValue());
+        *outElementCount = elementCount;
     return arrayType;
 }
 
@@ -517,11 +538,11 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     }
 
     uint32_t elementCount = 0;
-    SLANG_RELEASE_ASSERT(asNVVMSupportedI32ArrayType(type, &elementCount));
+    SLANG_RELEASE_ASSERT(asNVVMSupportedNumericArrayType(type, &elementCount));
     SlangNVVMTypeHandle elementType = nullptr;
     SLANG_RETURN_ON_FAIL(lowerType(type->getElementType(), NVVMTypeUse::Value, elementType));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        "fixed i32 array type",
+        "fixed numeric array type",
         m_builder.getArrayType(m_module, elementType, elementCount, outType)));
     m_typeMap[type] = outType;
     return SLANG_OK;
@@ -711,7 +732,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRStructType* structType = as<IRStructType>(type);
     IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
-    IRArrayType* fixedArrayType = asNVVMSupportedI32ArrayType(type);
+    IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
     IRArrayType* deviceArrayType = nullptr;
     IRPtrTypeBase* deviceArrayPointer =
         asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
@@ -743,7 +764,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         (use == NVVMTypeUse::HelperParameter && (isInteger || isFloat32 || isBool)) ||
         (use == NVVMTypeUse::Value &&
          (isInteger || isFloat32 || isBool || numericVectorType || scalarStructType ||
-          fixedArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
+          fixedNumericArrayType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
           isBufferDataPointer || parameterGroup || resourceElementPointer ||
           sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
@@ -808,9 +829,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             "fixed 32-bit numeric vector type",
             m_builder.getVectorType(m_module, elementType, numericVectorElementCount, outType)));
     }
-    else if (fixedArrayType)
+    else if (fixedNumericArrayType)
     {
-        return _lowerArrayType(fixedArrayType, outType);
+        return _lowerArrayType(fixedNumericArrayType, outType);
     }
     else if (structType)
     {

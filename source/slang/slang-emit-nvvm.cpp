@@ -1258,6 +1258,25 @@ SlangResult _validateNumericValue(
     return _validateScalarValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
+// Checks a selected byte payload. A fixed array is already an exact first-class SSA value, so it
+// needs availability validation rather than the scalar/vector semantic validator.
+SlangResult _validateByteAddressValue(
+    CodeGenContext* codeGenContext,
+    IRInst* value,
+    IRInst* consumer,
+    const HashSet<IRInst*>& availableValues,
+    IRDominatorTree* dominatorTree)
+{
+    if (value && asNVVMSupportedNumericArrayType(value->getDataType()))
+        return _validateAvailableValue(
+            codeGenContext,
+            value,
+            consumer,
+            availableValues,
+            dominatorTree);
+    return _validateNumericValue(codeGenContext, value, consumer, availableValues, dominatorTree);
+}
+
 // Checks an available scalar pointer and enforces the source access qualifier for stores.
 SlangResult _validatePointerValue(
     CodeGenContext* codeGenContext,
@@ -2323,7 +2342,7 @@ SlangResult _validateNVVMFunction(
                         toSlice("byte-address offset")));
                     if (access.isStore)
                     {
-                        SLANG_RETURN_ON_FAIL(_validateNumericValue(
+                        SLANG_RETURN_ON_FAIL(_validateByteAddressValue(
                             codeGenContext,
                             access.value,
                             inst,
