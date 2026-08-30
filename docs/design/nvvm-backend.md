@@ -6439,6 +6439,36 @@ correct identity regresses. The fixed 452-row census reaches 338 O0 and 343 O3 s
 accepted with CUDA 12.9 for SM70, SM80, and SM90. Provider ABI revision 29 already expresses the
 complete recipe and remains unchanged.
 
+### Slice 142: Helper references and common atomic reductions
+
+Final linked helper signatures may intentionally preserve generic read-write `RefParam<T>` or
+read-only `BorrowInParam<T>` roles even when a call argument is produced by resource, global, local,
+or shared storage. The direct emitter now recognizes the complete pointer role, access, address
+space, and layout contract and compares canonical pointees at calls. Producer-proven global
+pointers convert from provider address space one to generic only at the helper boundary. Exact
+explicit groupshared numeric pointers remain address space three through helpers and generic
+pointer offsets.
+
+CUDA atomic reductions are canonical final one-block `IRGenericAsm` helpers. Nine exact assembly
+spellings plus the complete linked signature select a compiler-owned descriptor for relaxed global
+scalar integer add/and/or/xor/min/max, Float32/Float64 add, subtraction-through-negation, and
+increment/decrement constants. Every call must supply a canonical global producer and the exact
+relaxed memory-order literal. The existing generic atomic callback returns the old value, which the
+Void reduction deliberately discards. Local reductions, Half/vector reductions, wrong orders, and
+adjacent signatures remain deterministic preflight failures.
+
+The LLVM 14 provider builds typed `AtomicRMWInst` operations for the admitted family. CUDA's
+LLVM-7-era NVVM reader cannot parse LLVM 14 `atomicrmw fadd`, so the established provider
+serialization boundary validates and translates only exact global scalar Float32/Float64 forms to
+the legacy `llvm.nvvm.atomic.load.add` intrinsics. The compiler never manipulates LLVM text, and
+provider ABI revision 29 remains unchanged.
+
+Three workloads become correct at O0 and O3 with no old-correct regression:
+`atomic-reduce-float`, `atomic-reduce-intrinsics`, and `ptr-to-groupshared-1`. The fixed 452-row
+census reaches 341 O0 and 346 O3 successes. Against 427 healthy MVP references, O0/O3/both
+correctness is 339/343/339 (79.4%/80.3%/79.4%). The selected prefix passes 421/421, and the three
+representative direct O3 modules remain accepted with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

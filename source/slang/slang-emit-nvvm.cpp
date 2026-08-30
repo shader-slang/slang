@@ -4064,6 +4064,191 @@ struct NVVMResolvedAtomicOperation
     const char* diagnosticName = nullptr;
 };
 
+struct NVVMResolvedAtomicReduction
+{
+    SlangNVVMAtomicOperationDesc desc = {};
+    IRParam* pointerParameter = nullptr;
+    IRParam* valueParameter = nullptr;
+    IRParam* orderParameter = nullptr;
+    IRType* valueIRType = nullptr;
+    NVVMValueRecipeStep valueNegation;
+    int64_t implicitValue = 0;
+    const char* diagnosticName = nullptr;
+    bool hasImplicitValue = false;
+    bool negatesValue = false;
+};
+
+// Resolves one final CUDA atomic-reduction helper from its complete assembly/signature contract.
+// The helper reference is semantic; `Atomic<T>` and `T` references both point at physical `T`.
+bool _resolveNVVMAtomicReduction(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMResolvedAtomicReduction& outReduction)
+{
+    outReduction = {};
+    IRBlock* block = function ? function->getFirstBlock() : nullptr;
+    if (!genericAsm || !block || block->getNextBlock() || genericAsm->getParent() != block ||
+        genericAsm->getOperandCount() != 1 || !as<IRVoidType>(function->getResultType()))
+    {
+        return false;
+    }
+    for (auto inst : block->getOrdinaryInsts())
+    {
+        if (inst != genericAsm)
+            return false;
+    }
+
+    struct ReductionSignature
+    {
+        const char* assembly;
+        SlangNVVMAtomicOperation operation;
+        bool negatesValue;
+        bool hasImplicitValue;
+        int64_t implicitValue;
+        const char* diagnosticName;
+    };
+    static const ReductionSignature kSignatures[] = {
+        {"__slang_atomic_reduce_add($0, $1, (int)$2)",
+         SLANG_NVVM_ATOMIC_OP_ADD,
+         false,
+         false,
+         0,
+         "relaxed atomic reduction add"},
+        {"__slang_atomic_reduce_add($0, -($1), (int)$2)",
+         SLANG_NVVM_ATOMIC_OP_ADD,
+         true,
+         false,
+         0,
+         "relaxed atomic reduction subtract"},
+        {"__slang_atomic_reduce_min($0, $1, (int)$2)",
+         SLANG_NVVM_ATOMIC_OP_MIN,
+         false,
+         false,
+         0,
+         "relaxed atomic reduction minimum"},
+        {"__slang_atomic_reduce_max($0, $1, (int)$2)",
+         SLANG_NVVM_ATOMIC_OP_MAX,
+         false,
+         false,
+         0,
+         "relaxed atomic reduction maximum"},
+        {"__slang_atomic_reduce_and($0, $1, (int)$2)",
+         SLANG_NVVM_ATOMIC_OP_BIT_AND,
+         false,
+         false,
+         0,
+         "relaxed atomic reduction bitwise-and"},
+        {"__slang_atomic_reduce_or($0, $1, (int)$2)",
+         SLANG_NVVM_ATOMIC_OP_BIT_OR,
+         false,
+         false,
+         0,
+         "relaxed atomic reduction bitwise-or"},
+        {"__slang_atomic_reduce_xor($0, $1, (int)$2)",
+         SLANG_NVVM_ATOMIC_OP_BIT_XOR,
+         false,
+         false,
+         0,
+         "relaxed atomic reduction bitwise-xor"},
+        {"__slang_atomic_reduce_inc($0, (int)$1)",
+         SLANG_NVVM_ATOMIC_OP_ADD,
+         false,
+         true,
+         1,
+         "relaxed atomic reduction increment"},
+        {"__slang_atomic_reduce_dec($0, (int)$1)",
+         SLANG_NVVM_ATOMIC_OP_ADD,
+         false,
+         true,
+         -1,
+         "relaxed atomic reduction decrement"},
+    };
+    const ReductionSignature* signature = nullptr;
+    for (const auto& candidate : kSignatures)
+    {
+        if (genericAsm->getAsm() == UnownedStringSlice(candidate.assembly))
+        {
+            signature = &candidate;
+            break;
+        }
+    }
+    if (!signature)
+        return false;
+
+    const UInt expectedParameterCount = signature->hasImplicitValue ? 2 : 3;
+    if (function->getParamCount() != expectedParameterCount)
+        return false;
+    IRParam* pointerParameter = function->getFirstParam();
+    IRType* referenceValueType = nullptr;
+    auto referenceType = pointerParameter ? asNVVMSupportedHelperReferencePointerType(
+                                                pointerParameter->getDataType(),
+                                                &referenceValueType)
+                                          : nullptr;
+    if (!referenceType || referenceType->getOp() != kIROp_RefParamType)
+        return false;
+
+    IRType* physicalValueType = nullptr;
+    if (!asNVVMSupportedAtomicType(referenceValueType, &physicalValueType))
+        physicalValueType = referenceValueType;
+    SlangNVVMValueTypeDesc valueType = {};
+    if (!_getNVVMSemanticType(physicalValueType, valueType))
+        return false;
+
+    IRParam* valueParameter =
+        signature->hasImplicitValue ? nullptr : pointerParameter->getNextParam();
+    IRParam* orderParameter = signature->hasImplicitValue ? pointerParameter->getNextParam()
+                                                          : valueParameter->getNextParam();
+    if ((!signature->hasImplicitValue &&
+         (!valueParameter || !isTypeEqual(valueParameter->getDataType(), physicalValueType))) ||
+        !orderParameter || !isNVVMSignedI32Type(orderParameter->getDataType()) ||
+        orderParameter->getNextParam())
+    {
+        return false;
+    }
+
+    if (signature->hasImplicitValue &&
+        (!(valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+           valueType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) ||
+         valueType.bitWidth != 32 || valueType.laneCount != 1))
+    {
+        return false;
+    }
+
+    outReduction.desc = {
+        signature->operation,
+        valueType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        SLANG_NVVM_MEMORY_ORDER_RELAXED,
+    };
+    if (!NVVMSemantics::isSupported(outReduction.desc))
+        return false;
+
+    if (signature->negatesValue)
+    {
+        const SlangNVVMValueTypeDesc operandTypes[] = {valueType};
+        if (!_setNVVMSupportedValueRecipeStep(
+                outReduction.valueNegation,
+                SLANG_NVVM_VALUE_OP_NEGATE,
+                valueType,
+                operandTypes,
+                SLANG_COUNT_OF(operandTypes),
+                "atomic reduction value negation"))
+        {
+            return false;
+        }
+    }
+
+    outReduction.pointerParameter = pointerParameter;
+    outReduction.valueParameter = valueParameter;
+    outReduction.orderParameter = orderParameter;
+    outReduction.valueIRType = physicalValueType;
+    outReduction.implicitValue = signature->implicitValue;
+    outReduction.diagnosticName = signature->diagnosticName;
+    outReduction.hasImplicitValue = signature->hasImplicitValue;
+    outReduction.negatesValue = signature->negatesValue;
+    return true;
+}
+
 struct NVVMResolvedAtomicPointer
 {
     IRPtrTypeBase* type = nullptr;
@@ -4088,8 +4273,8 @@ bool _resolveNVVMAtomicPointer(IRInst* value, NVVMResolvedAtomicPointer& outPoin
     if (value->getOp() == kIROp_GetElementPtr && value->getOperandCount() == 2)
     {
         IRArrayType* sharedArrayType = nullptr;
-        auto resultType = asNVVMSupportedSharedIntegerElementPointerType(value->getDataType());
-        if (asNVVMSupportedSharedIntegerArrayGlobal(value->getOperand(0), &sharedArrayType) &&
+        auto resultType = asNVVMSupportedSharedElementPointerType(value->getDataType());
+        if (asNVVMSupportedSharedArrayGlobal(value->getOperand(0), &sharedArrayType) &&
             resultType &&
             isTypeEqual(sharedArrayType->getElementType(), resultType->getValueType()))
         {
@@ -4211,6 +4396,23 @@ void _requireValueOperation(
     for (uint32_t i = 0; i < requirement.operandCount; ++i)
         requirement.operandTypes[i] = desc.operandTypes[i];
     requirements.add(requirement);
+}
+
+void _requireNVVMAtomicReductionOperations(
+    NVVMOperationRequirements& requirements,
+    const NVVMResolvedAtomicReduction& reduction)
+{
+    _requireAtomicOperation(
+        requirements.atomicOperations,
+        reduction.desc,
+        reduction.diagnosticName);
+    if (reduction.negatesValue)
+    {
+        _requireValueOperation(
+            requirements.valueOperations,
+            reduction.valueNegation.getDesc(),
+            reduction.valueNegation.diagnosticName);
+    }
 }
 
 // Records both directions of the bit-preserving Half helper ABI boundary. A Half parameter uses
@@ -4653,7 +4855,7 @@ SlangResult _validateAvailableValue(
     SlangNVVMValueOperation executionOperation = 0;
     if (value && consumer && value->getModule() == consumer->getModule() &&
         (asNVVMSupportedSharedIntegerScalarGlobal(value) ||
-         asNVVMSupportedSharedIntegerArrayGlobal(value) ||
+         asNVVMSupportedSharedArrayGlobal(value) ||
          _getNVVMConventionalGlobalParams(value, globalParams) ||
          _getNVVMCUDAExecutionGlobalOperation(value, executionOperation)))
     {
@@ -4907,7 +5109,7 @@ SlangResult _validatePointerValue(
             ? asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType())
             : nullptr;
     auto sharedElementPtrType =
-        value ? asNVVMSupportedSharedIntegerElementPointerType(value->getDataType()) : nullptr;
+        value ? asNVVMSupportedSharedElementPointerType(value->getDataType()) : nullptr;
     auto sharedScalarPtrType = value && asNVVMSupportedSharedIntegerScalarGlobal(value)
                                    ? as<IRPtrTypeBase>(value->getDataType())
                                    : nullptr;
@@ -4915,6 +5117,12 @@ SlangResult _validatePointerValue(
         value ? asNVVMSupportedLocalResourceStructPointerType(value->getDataType()) : nullptr;
     auto localHelperPtrType =
         value ? asNVVMSupportedLocalHelperValuePointerType(value->getDataType()) : nullptr;
+    auto helperReferencePtrType =
+        value && as<IRParam>(value)
+            ? asNVVMSupportedHelperReferencePointerType(value->getDataType())
+            : nullptr;
+    auto sharedHelperPtrType =
+        value ? asNVVMSupportedSharedHelperPointerType(value->getDataType()) : nullptr;
     // A local `var T` and a module-scope groupshared value can both expose the canonical
     // `Ptr<T>` spelling here. The value producer, rather than that shared type, owns the local
     // storage role. Helper parameters are the only other producer admitted by this slice.
@@ -4949,6 +5157,8 @@ SlangResult _validatePointerValue(
                                      : sequentialElementPtrType ? sequentialElementPtrType
                                      : localStructPtrType       ? localStructPtrType
                                      : localHelperPtrType       ? localHelperPtrType
+                                     : helperReferencePtrType   ? helperReferencePtrType
+                                     : sharedHelperPtrType      ? sharedHelperPtrType
                                                                 : fieldPtrType;
     if (!acceptedPtrType)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
@@ -4957,7 +5167,8 @@ SlangResult _validatePointerValue(
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device pointer pointee type"));
     if (resourceElementPtrType && consumer->getOp() != kIROp_Load &&
         consumer->getOp() != kIROp_Store && consumer->getOp() != kIROp_SwizzledStore &&
-        consumer->getOp() != kIROp_AtomicAdd && consumer->getOp() != kIROp_AtomicMax)
+        consumer->getOp() != kIROp_AtomicAdd && consumer->getOp() != kIROp_AtomicMax &&
+        consumer->getOp() != kIROp_Call)
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
@@ -5098,6 +5309,8 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
            asNVVMSupportedLocalResourceStructPointerType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
+           asNVVMSupportedHelperReferencePointerType(type) ||
+           asNVVMSupportedSharedHelperPointerType(type) ||
            asNVVMSupportedDeviceCopyableValuePointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceType(type, surfaceType) ||
@@ -5113,6 +5326,47 @@ bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterT
 {
     if (isTypeEqual(argumentType, parameterType))
         return true;
+
+    IRType* parameterSharedValueType = nullptr;
+    auto parameterSharedPointer =
+        asNVVMSupportedSharedHelperPointerType(parameterType, &parameterSharedValueType);
+    auto argumentSharedPointer = asNVVMSupportedSharedElementPointerType(argumentType);
+    if (parameterSharedPointer && argumentSharedPointer &&
+        isTypeEqual(argumentSharedPointer->getValueType(), parameterSharedValueType))
+    {
+        return true;
+    }
+
+    IRType* parameterReferenceValueType = nullptr;
+    auto parameterReference =
+        asNVVMSupportedHelperReferencePointerType(parameterType, &parameterReferenceValueType);
+    if (parameterReference)
+    {
+        IRType* argumentValueType = nullptr;
+        IRPtrTypeBase* argumentPointer =
+            asNVVMSupportedLocalCopyableValuePointerType(argumentType, &argumentValueType);
+        if (!argumentPointer)
+            argumentPointer =
+                asNVVMSupportedLocalHelperValuePointerType(argumentType, &argumentValueType);
+        if (!argumentPointer)
+            argumentPointer =
+                asNVVMSupportedDerivedCopyableValuePointerType(argumentType, &argumentValueType);
+        if (!argumentPointer)
+        {
+            argumentPointer = asNVVMSupportedRWStructuredBufferElementPointerType(argumentType);
+            argumentValueType = argumentPointer ? argumentPointer->getValueType() : nullptr;
+        }
+        const bool hasRequiredAccess =
+            parameterReference->getAccessQualifier() == AccessQualifier::Read ||
+            (argumentPointer &&
+             argumentPointer->getAccessQualifier() == AccessQualifier::ReadWrite);
+        if (argumentPointer && hasRequiredAccess &&
+            isTypeEqual(argumentValueType, parameterReferenceValueType))
+        {
+            return true;
+        }
+    }
+
     IRStructType* argumentValueType = nullptr;
     IRStructType* parameterValueType = nullptr;
     auto argumentPointer =
@@ -5172,6 +5426,20 @@ bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterT
     return argumentCopyablePointer && argumentCopyablePointer->getOp() == kIROp_PtrType &&
            argumentCopyablePointer->getOperandCount() == 1 && parameterDevicePointer &&
            isTypeEqual(argumentCopyableType, parameterDeviceValueType);
+}
+
+// Returns whether a canonical helper-reference argument is physically produced in CUDA global
+// memory. Its source type remains generic because resource layout is semantic metadata; the
+// producer is the source of truth for the provider address space.
+bool _isNVVMGlobalHelperReferenceArgument(IRInst* argument)
+{
+    if (!argument)
+        return false;
+    if (asNVVMSupportedDeviceCopyableValuePointerType(argument->getDataType()))
+        return true;
+    NVVMRawBufferElementPointer rawElement;
+    return argument->getOp() == kIROp_RWStructuredBufferGetElementPtr ||
+           _getNVVMRawBufferElementPointer(argument, rawElement);
 }
 
 // Returns whether a canonical helper signature needs the generic construction path.
@@ -5375,7 +5643,7 @@ SlangResult _collectNVVMFunctionNames(
         }
         auto globalVar = asNVVMSupportedSharedIntegerScalarGlobal(globalInst);
         if (!globalVar)
-            globalVar = asNVVMSupportedSharedIntegerArrayGlobal(globalInst);
+            globalVar = asNVVMSupportedSharedArrayGlobal(globalInst);
         if (!globalVar)
             continue;
         const UnownedStringSlice name = getMangledName(globalVar);
@@ -5766,6 +6034,7 @@ SlangResult _validateNVVMFunction(
                     NVVMScalarIntrinsicRecipe scalarRecipe;
                     NVVMGenericAsmCompoundOperation compoundOperation;
                     NVVMMaskedWaveScalarOperation maskedWaveOperation;
+                    NVVMResolvedAtomicReduction atomicReduction;
                     NVVMResolvedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
                     if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
@@ -5774,6 +6043,11 @@ SlangResult _validateNVVMFunction(
                             requirements.valueOperations,
                             truthiness.getOperationDesc(),
                             truthiness.diagnosticName);
+                        break;
+                    }
+                    if (_resolveNVVMAtomicReduction(genericAsm, function, atomicReduction))
+                    {
+                        _requireNVVMAtomicReductionOperations(requirements, atomicReduction);
                         break;
                     }
                     if (_resolveNVVMGenericAsmValueOperation(genericAsm, function, valueOperation))
@@ -5910,11 +6184,13 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_GetOffsetPtr:
                 if (inst->getOperandCount() != 2 ||
-                    !asNVVMSupportedDeviceNumericPointerType(inst->getDataType()))
+                    (!asNVVMSupportedDeviceNumericPointerType(inst->getDataType()) &&
+                     !asNVVMSupportedSharedHelperPointerType(inst->getDataType()) &&
+                     !asNVVMSupportedSharedElementPointerType(inst->getDataType())))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
-                        toSlice("device scalar pointer offset"));
+                        toSlice("selected pointer offset"));
                 }
                 break;
 
@@ -5924,7 +6200,7 @@ SlangResult _validateNVVMFunction(
                     NVVMSequentialElementPointer sequentialElementPointer;
                     if (inst->getOperandCount() != 2 ||
                         (!asNVVMSupportedDevicePointerType(inst->getDataType()) &&
-                         !asNVVMSupportedSharedIntegerElementPointerType(inst->getDataType()) &&
+                         !asNVVMSupportedSharedElementPointerType(inst->getDataType()) &&
                          !_getNVVMSequentialElementPointer(inst, sequentialElementPointer) &&
                          !_getNVVMRawBufferElementPointer(inst, bufferElementPointer)))
                     {
@@ -6288,6 +6564,27 @@ SlangResult _validateNVVMFunction(
                             codeGenContext,
                             toSlice("direct scalar call"));
                     }
+                    auto calleeBlock = callee->getFirstBlock();
+                    auto calleeAsm =
+                        calleeBlock ? as<IRGenericAsm>(calleeBlock->getTerminator()) : nullptr;
+                    NVVMResolvedAtomicReduction atomicReduction;
+                    if (_resolveNVVMAtomicReduction(calleeAsm, callee, atomicReduction))
+                    {
+                        if (!_isNVVMGlobalHelperReferenceArgument(call->getArg(0)))
+                        {
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("atomic reduction global reference"));
+                        }
+                        const UInt orderArgumentIndex = call->getArgCount() - 1;
+                        auto order = _asExecutableI32Constant(call->getArg(orderArgumentIndex));
+                        if (!order || order->getValue() != kIRMemoryOrder_Relaxed)
+                        {
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("atomic reduction memory order"));
+                        }
+                    }
                     for (UInt argumentIndex = 0; argumentIndex < call->getArgCount();
                          ++argumentIndex)
                     {
@@ -6311,6 +6608,11 @@ SlangResult _validateNVVMFunction(
                             asNVVMSupportedLocalHelperValuePointerType(argument->getDataType()) ||
                             asNVVMSupportedDeviceCopyableValuePointerType(
                                 argument->getDataType()) ||
+                            asNVVMSupportedRWStructuredBufferElementPointerType(
+                                argument->getDataType()) ||
+                            asNVVMSupportedHelperReferencePointerType(argument->getDataType()) ||
+                            asNVVMSupportedSharedHelperPointerType(argument->getDataType()) ||
+                            asNVVMSupportedSharedElementPointerType(argument->getDataType()) ||
                             asNVVMSupportedDerivedCopyableValuePointerType(argument->getDataType()))
                         {
                             SLANG_RETURN_ON_FAIL(_validatePointerValue(
@@ -6441,6 +6743,12 @@ SlangResult _validateNVVMFunction(
                         basePointer
                             ? asNVVMSupportedDeviceNumericPointerType(basePointer->getDataType())
                             : nullptr;
+                    if (!basePointerType && basePointer)
+                        basePointerType =
+                            asNVVMSupportedSharedHelperPointerType(basePointer->getDataType());
+                    if (!basePointerType && basePointer)
+                        basePointerType =
+                            asNVVMSupportedSharedElementPointerType(basePointer->getDataType());
                     if (!basePointerType ||
                         !isTypeEqual(inst->getDataType(), basePointer->getDataType()))
                     {
@@ -6527,10 +6835,10 @@ SlangResult _validateNVVMFunction(
                                                        : nullptr;
                     IRArrayType* sharedArrayType = nullptr;
                     auto sharedGlobal =
-                        asNVVMSupportedSharedIntegerArrayGlobal(basePointer, &sharedArrayType);
+                        asNVVMSupportedSharedArrayGlobal(basePointer, &sharedArrayType);
                     auto resultPointerType = asNVVMSupportedDevicePointerType(inst->getDataType());
                     auto sharedResultPointerType =
-                        asNVVMSupportedSharedIntegerElementPointerType(inst->getDataType());
+                        asNVVMSupportedSharedElementPointerType(inst->getDataType());
                     const bool isDeviceArrayElement =
                         basePointerType && resultPointerType && arrayType &&
                         basePointerType->getAddressSpace() ==
@@ -7178,6 +7486,91 @@ SlangResult _getNVVMRecipeIntegerConstant(
         codeGenContext,
         "scalar intrinsic recipe integer constant",
         builder.getIntegerConstant(module, integerType, value, outValue));
+}
+
+SlangResult _emitNVVMAtomicReduction(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMResolvedAtomicReduction& reduction,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext)
+{
+    SlangNVVMValueHandle pointer = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        reduction.pointerParameter,
+        valueMap,
+        typeContext,
+        pointer));
+
+    // The CUDA prelude reduction spelling is a global-memory operation. Every call was proven to
+    // supply a canonical global producer, so recover that physical address space after the generic
+    // helper ABI boundary before emitting the atomic operation.
+    SlangNVVMTypeHandle valueType = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        typeContext.lowerType(reduction.valueIRType, NVVMTypeUse::Value, valueType));
+    SlangNVVMTypeHandle globalPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "atomic reduction global pointer type",
+        builder.getPointerType(
+            module,
+            valueType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            globalPointerType)));
+    SlangNVVMValueHandle globalPointer = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "atomic reduction generic-to-global reference conversion",
+        builder.emitPointerAddressSpaceCast(module, globalPointerType, pointer, globalPointer)));
+    pointer = globalPointer;
+
+    SlangNVVMValueHandle value = nullptr;
+    if (reduction.hasImplicitValue)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "atomic reduction implicit value",
+            builder.getIntegerConstant(module, valueType, reduction.implicitValue, value)));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+            codeGenContext,
+            builder,
+            module,
+            reduction.valueParameter,
+            valueMap,
+            typeContext,
+            value));
+    }
+
+    if (reduction.negatesValue)
+    {
+        SlangNVVMValueHandle negatedValue = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            reduction.valueNegation,
+            &value,
+            1,
+            negatedValue));
+        value = negatedValue;
+    }
+
+    SlangNVVMValueHandle originalValue = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        reduction.diagnosticName,
+        builder.emitAtomicOperation(module, reduction.desc, pointer, value, originalValue)));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "atomic reduction void return",
+        builder.emitReturnVoid(module));
 }
 
 // Materializes one already-typed scalar value across the exact integer scalar/vector shape owned
@@ -8827,7 +9220,7 @@ SlangResult validateNVVMSupportedIR(
         if (as<IRGlobalVar>(globalInst))
         {
             if (asNVVMSupportedSharedIntegerScalarGlobal(globalInst) ||
-                asNVVMSupportedSharedIntegerArrayGlobal(globalInst))
+                asNVVMSupportedSharedArrayGlobal(globalInst))
                 continue;
             return _diagnoseUnsupportedIR(
                 codeGenContext,
@@ -8986,7 +9379,7 @@ SlangResult emitNVVMIRFromLinkedIR(
         IRArrayType* arrayType = nullptr;
         if (!globalVar)
         {
-            globalVar = asNVVMSupportedSharedIntegerArrayGlobal(globalInst, &arrayType);
+            globalVar = asNVVMSupportedSharedArrayGlobal(globalInst, &arrayType);
             sharedStorageType = arrayType;
         }
         if (!globalVar)
@@ -9744,6 +10137,27 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 helperValueMap,
                                 typeContext,
                                 loweredArgument));
+                            if (asNVVMSupportedHelperReferencePointerType(
+                                    callee->getParamType(argumentIndex),
+                                    nullptr) &&
+                                _isNVVMGlobalHelperReferenceArgument(call->getArg(argumentIndex)))
+                            {
+                                SlangNVVMTypeHandle loweredReferenceType = nullptr;
+                                SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                                    callee->getParamType(argumentIndex),
+                                    NVVMTypeUse::HelperParameter,
+                                    loweredReferenceType));
+                                SlangNVVMValueHandle genericArgument = nullptr;
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "global-to-generic helper reference conversion",
+                                    builder.emitPointerAddressSpaceCast(
+                                        moduleScope.module,
+                                        loweredReferenceType,
+                                        loweredArgument,
+                                        genericArgument)));
+                                loweredArgument = genericArgument;
+                            }
                             if (isNVVMFloat16Type(callee->getParamType(argumentIndex)))
                             {
                                 SlangNVVMValueHandle physicalArgument = nullptr;
@@ -9976,6 +10390,18 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_GenericAsm:
                     {
                         auto genericAsm = as<IRGenericAsm>(inst);
+                        NVVMResolvedAtomicReduction atomicReduction;
+                        if (_resolveNVVMAtomicReduction(genericAsm, function, atomicReduction))
+                        {
+                            SLANG_RETURN_ON_FAIL(_emitNVVMAtomicReduction(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                atomicReduction,
+                                valueMap,
+                                typeContext));
+                            break;
+                        }
                         NVVMScalarTruthiness truthiness;
                         if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
                         {
@@ -10493,7 +10919,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "device scalar pointer offset",
+                            "selected pointer offset",
                             builder.emitPointerOffset(
                                 moduleScope.module,
                                 loweredBasePointer,
@@ -10548,8 +10974,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                                                   loweredPointer);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            asNVVMSupportedSharedIntegerArrayGlobal(inst->getOperand(0))
-                                ? "shared integer array element pointer"
+                            asNVVMSupportedSharedArrayGlobal(inst->getOperand(0))
+                                ? "shared array element pointer"
                             : isBufferElement     ? "raw buffer scalar element pointer"
                             : isSequentialElement ? "numeric sequential element pointer"
                                                   : "device i32 array element pointer",

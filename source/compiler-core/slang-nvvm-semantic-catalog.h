@@ -1078,10 +1078,24 @@ inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
                                          desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
     const bool isRelaxedI32Add =
         desc.operation == SLANG_NVVM_ATOMIC_OP_ADD && isI32 && isI32AtomicAddressSpace;
-    const bool isRelaxedGlobalU64Max = desc.operation == SLANG_NVVM_ATOMIC_OP_MAX &&
-                                       areSameType(desc.valueType, kUnsignedI64) &&
-                                       desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
-    return (isRelaxedI32Add || isRelaxedGlobalU64Max) &&
+    const bool isSelectedIntegerReduction =
+        desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
+        (desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+         desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+        (desc.valueType.bitWidth == 32 || desc.valueType.bitWidth == 64) &&
+        desc.valueType.laneCount == 1 &&
+        (desc.operation == SLANG_NVVM_ATOMIC_OP_ADD ||
+         desc.operation == SLANG_NVVM_ATOMIC_OP_BIT_AND ||
+         desc.operation == SLANG_NVVM_ATOMIC_OP_BIT_OR ||
+         desc.operation == SLANG_NVVM_ATOMIC_OP_BIT_XOR ||
+         desc.operation == SLANG_NVVM_ATOMIC_OP_MIN || desc.operation == SLANG_NVVM_ATOMIC_OP_MAX);
+    const bool isSelectedFloatingReduction =
+        desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
+        desc.operation == SLANG_NVVM_ATOMIC_OP_ADD &&
+        desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+        (desc.valueType.bitWidth == 32 || desc.valueType.bitWidth == 64) &&
+        desc.valueType.laneCount == 1;
+    return (isRelaxedI32Add || isSelectedIntegerReduction || isSelectedFloatingReduction) &&
            desc.memoryOrder == SLANG_NVVM_MEMORY_ORDER_RELAXED;
 }
 

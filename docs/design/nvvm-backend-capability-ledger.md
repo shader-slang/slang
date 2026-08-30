@@ -2014,3 +2014,29 @@ cluster rows advance to later independent failures and are reclassified. The fix
 reaches 338 O0 and 343 O3 successes. Against 427 healthy MVP references, O0/O3/both correctness is
 336/340/336 (78.7%/79.6%/78.7%). The selected prefix passes 413/413, while representative direct
 O3 PTX remains accepted with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 142 admits exact generic read-write and borrowed helper references over finite selected
+pointees. Canonical global/resource producers convert to provider generic pointers only when they
+cross that helper boundary; exact atomic-reduction helpers recover address space one after every
+call proves a global producer. Explicit groupshared numeric helper pointers and array-element
+pointers remain address space three. Pointee equality, access, pointer role, and layout metadata are
+checked independently rather than erased.
+
+Nine exact CUDA reduction assembly/full-signature contracts map to the existing typed atomic
+callback. The established semantic catalog now admits relaxed global scalar 32/64-bit integer
+add/and/or/xor/min/max and Float32/Float64 add. Subtraction uses typed negation; inc/dec use typed
+constants; the Void helper discards the returned old value. Half/vector reductions, non-relaxed
+orders, local producers, ordinary atomic load/store/compare-exchange, and adjacent signatures
+remain unsupported.
+
+The isolated LLVM 14 provider constructs typed atomic RMW instructions. Its strict legacy NVVM
+serializer translates only provider-validated global scalar Float32/Float64 `atomicrmw fadd` forms
+to the LLVM-7-era `llvm.nvvm.atomic.load.add` intrinsics. Provider ABI revision 29 is unchanged.
+
+Three workloads become correct in both modes with zero old-correct regression. The fixed 452-row
+census reaches 341 O0 and 346 O3 successes. Against 427 healthy MVP references, O0/O3/both
+correctness is 339/343/339 (79.4%/80.3%/79.4%). The leading healthy-MVP blockers are now
+aggregate/pointer/layout transport (12), preflight other (11), atomic/wave operations (10),
+residual target markers (10), helper ABI/type contracts (9), and wave/reconvergence GenericAsm
+(8). The selected prefix passes 421/421, while representative direct O3 PTX remains accepted for
+SM70, SM80, and SM90 with CUDA 12.9.

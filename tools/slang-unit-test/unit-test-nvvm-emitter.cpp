@@ -6643,6 +6643,149 @@ SLANG_UNIT_TEST(nvvmSlangRelaxedSharedI32AtomicAddUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangAtomicReductionsUseGlobalHelperReferences)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMAtomicReductionSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        bool sawUnsignedXor = false;
+        bool sawFloat32Add = false;
+        bool sawFloat64Add = false;
+        for (const SlangNVVMAtomicOperationDesc& operation : gFakeNVVMBuilder.atomicOperations)
+        {
+            SLANG_CHECK(operation.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL);
+            SLANG_CHECK(operation.memoryOrder == SLANG_NVVM_MEMORY_ORDER_RELAXED);
+            sawUnsignedXor |=
+                operation.operation == SLANG_NVVM_ATOMIC_OP_BIT_XOR &&
+                NVVMSemantics::areSameType(operation.valueType, NVVMSemantics::kUnsignedI32);
+            sawFloat32Add |=
+                operation.operation == SLANG_NVVM_ATOMIC_OP_ADD &&
+                NVVMSemantics::areSameType(operation.valueType, NVVMSemantics::kFloat32);
+            sawFloat64Add |=
+                operation.operation == SLANG_NVVM_ATOMIC_OP_ADD &&
+                NVVMSemantics::areSameType(operation.valueType, NVVMSemantics::kFloat64);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.atomicOperations.getCount() == 3);
+        SLANG_CHECK(sawUnsignedXor);
+        SLANG_CHECK(sawFloat32Add);
+        SLANG_CHECK(sawFloat64Add);
+        SLANG_CHECK(gFakeNVVMBuilder.emitPointerAddressSpaceCastCallCount == 6);
+        for (const FakeNVVMBuilderValueRef& pointer :
+             gFakeNVVMBuilder.atomicOperationPointerValueRefs)
+        {
+            SLANG_CHECK(pointer.kind == FakeNVVMBuilderValueKind::PointerAddressSpaceCast);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 3);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangFiniteGroupsharedValuesCrossHelperPointers)
+{
+    static const char* kSources[] = {
+        kDirectNVVMSharedHelperPointerSource,
+        kDirectNVVMSharedFloatArraySource,
+    };
+    for (const char* source : kSources)
+    {
+        _resetDirectNVVMFakes();
+        {
+            ComPtr<slang::IGlobalSession> globalSession;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            globalSession->setSharedLibraryLoader(loader);
+
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            const SlangResult result =
+                _compileSlangWithDirectNVVM(globalSession, source, code, diagnostics);
+            if (SLANG_FAILED(result))
+            {
+                const String diagnosticText = _getBlobText(diagnostics);
+                if (diagnosticText.getLength())
+                    getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+            }
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            SLANG_CHECK_ABORT(code != nullptr);
+            SLANG_CHECK(gFakeNVVMBuilder.declareGlobalStorageCallCount == 1);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.globalStorageAddressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED);
+            SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangSelectedWideAndFloatingAtomicAddsUseTypedOperations)
+{
+    struct DirectCase
+    {
+        const char* source;
+        SlangNVVMValueTypeDesc valueType;
+    };
+    static const DirectCase kCases[] = {
+        {kDirectNVVMWideAtomicAddSource, {SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER, 64, 1}},
+        {kDirectNVVMFloatingAtomicAddSource, NVVMSemantics::kFloat32},
+    };
+    for (const DirectCase& directCase : kCases)
+    {
+        _resetDirectNVVMFakes();
+        {
+            ComPtr<slang::IGlobalSession> globalSession;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            globalSession->setSharedLibraryLoader(loader);
+
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            const SlangResult result =
+                _compileSlangWithDirectNVVM(globalSession, directCase.source, code, diagnostics);
+            if (SLANG_FAILED(result))
+            {
+                const String diagnosticText = _getBlobText(diagnostics);
+                if (diagnosticText.getLength())
+                    getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+            }
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            SLANG_CHECK_ABORT(code != nullptr);
+            SLANG_CHECK(gFakeNVVMBuilder.atomicOperations.getCount() == 1);
+            const SlangNVVMAtomicOperationDesc& operation = gFakeNVVMBuilder.atomicOperations[0];
+            SLANG_CHECK(operation.operation == SLANG_NVVM_ATOMIC_OP_ADD);
+            SLANG_CHECK(NVVMSemantics::areSameType(operation.valueType, directCase.valueType));
+            SLANG_CHECK(operation.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL);
+            SLANG_CHECK(operation.memoryOrder == SLANG_NVVM_MEMORY_ORDER_RELAXED);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+    }
+}
+
 NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerEqualUsesDirectPipeline, Equal)
 NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerNotEqualUsesDirectPipeline, NotEqual)
 NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerSignedGreaterThanUsesDirectPipeline, SignedGreaterThan)
@@ -7602,7 +7745,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedHalfAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedDoubleAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedNestedArraySource, "'entry-point parameter'"},
-        {kDirectNVVMUnsupportedSharedFloatArraySource, "'sequential element pointer:"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter:"},
         {kDirectNVVMNonCanonicalCUDAOffsetSource, "'CUDA layout query'"},
@@ -7623,11 +7765,10 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
-        {kDirectNVVMWideAtomicAddSource, "'selected atomic operation'"},
-        {kDirectNVVMFloatingAtomicAddSource, "'selected atomic operation'"},
         {kDirectNVVMAtomicSubSource, "'atomicSub'"},
         {kDirectNVVMAtomicExchangeSource, "'atomicExchange'"},
         {kDirectNVVMAcquireGlobalI32AtomicAddSource, "'selected atomic operation'"},
+        {kDirectNVVMUnsupportedLocalAtomicReductionSource, "'atomic reduction global reference'"},
         {kDirectNVVMPointerEqualSource, "'cmpEQ'"},
         {kDirectNVVMPointerNotEqualSource, "'cmpNE'"},
         {kDirectNVVMPointerGreaterThanSource, "'cmpGT'"},

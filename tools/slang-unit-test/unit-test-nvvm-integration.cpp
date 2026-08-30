@@ -1729,6 +1729,72 @@ SLANG_UNIT_TEST(nvvmSlangRealRelaxedGlobalI32AtomicAddDifferentialPTX)
 }
 
 
+SLANG_UNIT_TEST(nvvmSlangRealAtomicReductionDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
+        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring atomic-reduction PTX differential because libNVVM or NVRTC was not found.");
+        SLANG_IGNORE_TEST;
+    }
+
+    static const SlangEmitCUDAMethod kMethods[] = {
+        SLANG_EMIT_CUDA_VIA_NVVM,
+        SLANG_EMIT_CUDA_VIA_NVRTC,
+    };
+    for (SlangEmitCUDAMethod method : kMethods)
+    {
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult compileResult = _compileSlangWithPTXMethod(
+            globalSession,
+            kDirectNVVMAtomicReductionSource,
+            method,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(compileResult))
+        {
+            const String text = _getBlobText(diagnostics);
+            if (text.getLength())
+                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+        SLANG_CHECK_ABORT(code != nullptr);
+        const String ptx = _getBlobText(code);
+        SLANG_CHECK(ptx.indexOf("xor") >= 0);
+        SLANG_CHECK(ptx.indexOf(".f32") >= 0);
+        SLANG_CHECK(ptx.indexOf(".f64") >= 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealSharedHelperPointerDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+
+    static const uint32_t kParameterWidths[] = {64};
+    _runNVVMSlangDifferentialPTX(
+        kDirectNVVMSharedHelperPointerSource,
+        "Ignoring groupshared-helper PTX differential because libNVVM or NVRTC was not found.",
+        kParameterWidths,
+        SLANG_COUNT_OF(kParameterWidths),
+        false,
+        [](SlangEmitCUDAMethod, const String& ptx)
+        {
+            SLANG_CHECK(ptx.indexOf(".shared") >= 0);
+            SLANG_CHECK(ptx.indexOf("st.shared") >= 0);
+            SLANG_CHECK(ptx.indexOf("ld.shared") >= 0);
+        });
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealScalarPtxasAccepts)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1849,6 +1915,22 @@ SLANG_UNIT_TEST(nvvmSlangSharedMemoryPtxasAccepts)
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
     _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMSharedMemorySource);
+}
+
+SLANG_UNIT_TEST(nvvmSlangAtomicReductionPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMAtomicReductionSource);
+}
+
+SLANG_UNIT_TEST(nvvmSlangSelectedWideAndFloatingAtomicAddsPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMWideAtomicAddSource);
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMFloatingAtomicAddSource);
+}
+
+SLANG_UNIT_TEST(nvvmSlangSharedHelperPointerPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(unitTestContext, kDirectNVVMSharedHelperPointerSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangMixedNumericPtxasAccepts)

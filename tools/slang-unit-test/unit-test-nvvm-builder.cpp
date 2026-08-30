@@ -6725,13 +6725,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
         SLANG_NVVM_MEMORY_ORDER_RELAXED,
     };
     SLANG_CHECK(builder.supportsAtomicOperation(unsignedWideMaxOperation));
+    SlangNVVMAtomicOperationDesc signedWideMaxOperation = unsignedWideMaxOperation;
+    signedWideMaxOperation.valueType.kind = SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+    SLANG_CHECK(builder.supportsAtomicOperation(signedWideMaxOperation));
+    SlangNVVMAtomicOperationDesc unsignedI32MaxOperation = unsignedWideMaxOperation;
+    unsignedI32MaxOperation.valueType.bitWidth = 32;
+    SLANG_CHECK(builder.supportsAtomicOperation(unsignedI32MaxOperation));
     SlangNVVMAtomicOperationDesc unsupportedWideMaxOperation = unsignedWideMaxOperation;
-    unsupportedWideMaxOperation.valueType.kind = SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
-    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedWideMaxOperation));
-    unsupportedWideMaxOperation = unsignedWideMaxOperation;
-    unsupportedWideMaxOperation.valueType.bitWidth = 32;
-    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedWideMaxOperation));
-    unsupportedWideMaxOperation = unsignedWideMaxOperation;
     unsupportedWideMaxOperation.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedWideMaxOperation));
     unsupportedWideMaxOperation = unsignedWideMaxOperation;
@@ -6745,14 +6745,22 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     unsupportedAtomicOperation.operation =
         SlangNVVMAtomicOperation(SLANG_NVVM_ATOMIC_OPERATION_COUNT);
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
-    unsupportedAtomicOperation = atomicOperation;
-    unsupportedAtomicOperation.valueType.bitWidth = 64;
-    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    SlangNVVMAtomicOperationDesc selectedWideAddOperation = atomicOperation;
+    selectedWideAddOperation.valueType.bitWidth = 64;
+    SLANG_CHECK(builder.supportsAtomicOperation(selectedWideAddOperation));
     unsupportedAtomicOperation = atomicOperation;
     unsupportedAtomicOperation.valueType.laneCount = 2;
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
-    unsupportedAtomicOperation = atomicOperation;
-    unsupportedAtomicOperation.valueType.kind = SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+    SlangNVVMAtomicOperationDesc selectedFloatingAddOperation = atomicOperation;
+    selectedFloatingAddOperation.valueType.kind = SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+    SLANG_CHECK(builder.supportsAtomicOperation(selectedFloatingAddOperation));
+    selectedFloatingAddOperation.valueType.bitWidth = 64;
+    SLANG_CHECK(builder.supportsAtomicOperation(selectedFloatingAddOperation));
+    unsupportedAtomicOperation = selectedFloatingAddOperation;
+    unsupportedAtomicOperation.operation = SLANG_NVVM_ATOMIC_OP_MAX;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    unsupportedAtomicOperation = selectedFloatingAddOperation;
+    unsupportedAtomicOperation.valueType.bitWidth = 16;
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
     unsupportedAtomicOperation = atomicOperation;
     unsupportedAtomicOperation.addressSpace = SlangNVVMAddressSpace(99);

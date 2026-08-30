@@ -612,6 +612,71 @@ IRStructType* asNVVMSupportedHelperStructType(IRInst* type)
     return structType && isNVVMSupportedHelperValueType(type) ? structType : nullptr;
 }
 
+IRAtomicType* asNVVMSupportedAtomicType(IRInst* type, IRType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    auto atomicType = as<IRAtomicType>(type);
+    IRType* valueType = atomicType ? atomicType->getElementType() : nullptr;
+    uint32_t integerBitWidth = 0;
+    const bool isSelectedInteger = isNVVMSupportedIntegerScalarType(valueType, &integerBitWidth) &&
+                                   (integerBitWidth == 32 || integerBitWidth == 64);
+    if (!atomicType ||
+        (!isSelectedInteger && !isNVVMFloat32Type(valueType) && !isNVVMFloat64Type(valueType)))
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return atomicType;
+}
+
+IRPtrTypeBase* asNVVMSupportedHelperReferencePointerType(IRInst* type, IRType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    auto pointerType = as<IRPtrTypeBase>(type);
+    IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
+    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    const bool isMutableReference = pointerType && pointerType->getOp() == kIROp_RefParamType &&
+                                    pointerType->getAccessQualifier() == AccessQualifier::ReadWrite;
+    const bool isImmutableReference = pointerType &&
+                                      pointerType->getOp() == kIROp_BorrowInParamType &&
+                                      pointerType->getAccessQualifier() == AccessQualifier::Read;
+    if (!pointerType || pointerType->getOperandCount() != 4 ||
+        (!isMutableReference && !isImmutableReference) ||
+        pointerType->getAddressSpace() != AddressSpace::Generic || !dataLayout ||
+        dataLayout->getOp() != kIROp_DefaultBufferLayoutType ||
+        (!isNVVMSupportedHelperValueType(valueType) && !asNVVMSupportedAtomicType(valueType)))
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
+IRPtrTypeBase* asNVVMSupportedSharedHelperPointerType(IRInst* type, IRType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    auto pointerType = as<IRPtrTypeBase>(type);
+    IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
+    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    if (!pointerType || pointerType->getOp() != kIROp_PtrType ||
+        pointerType->getOperandCount() != 4 ||
+        pointerType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        pointerType->getAddressSpace() != AddressSpace::GroupShared || !dataLayout ||
+        dataLayout->getOp() != kIROp_DefaultBufferLayoutType ||
+        !isNVVMSupportedNumericValueType(valueType))
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
 IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(IRInst* type, IRType** outValueType)
 {
     if (outValueType)
@@ -951,7 +1016,7 @@ IRGlobalVar* asNVVMSupportedSharedIntegerScalarGlobal(IRInst* inst, IRType** out
     return globalVar;
 }
 
-IRGlobalVar* asNVVMSupportedSharedIntegerArrayGlobal(
+IRGlobalVar* asNVVMSupportedSharedArrayGlobal(
     IRInst* inst,
     IRArrayType** outArrayType,
     uint32_t* outElementCount)
@@ -968,7 +1033,7 @@ IRGlobalVar* asNVVMSupportedSharedIntegerArrayGlobal(
     if (!globalVar || !as<IRGroupSharedRate>(globalVar->getRate()) || globalVar->getFirstBlock() ||
         !ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 1 ||
         !(arrayType = asNVVMSupportedNumericArrayType(ptrType->getValueType(), &elementCount)) ||
-        !isNVVMInteger32Type(arrayType->getElementType()))
+        !isNVVMSupportedHelperValueType(arrayType->getElementType()))
     {
         return nullptr;
     }
@@ -980,12 +1045,12 @@ IRGlobalVar* asNVVMSupportedSharedIntegerArrayGlobal(
     return globalVar;
 }
 
-IRPtrTypeBase* asNVVMSupportedSharedIntegerElementPointerType(IRInst* type)
+IRPtrTypeBase* asNVVMSupportedSharedElementPointerType(IRInst* type)
 {
     auto ptrType = as<IRPtrTypeBase>(type);
     IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
     if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
-        !isNVVMInteger32Type(ptrType->getValueType()) ||
+        !isNVVMSupportedNumericValueType(ptrType->getValueType()) ||
         ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
         ptrType->getAddressSpace() != AddressSpace::GroupShared || !dataLayout ||
         dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
@@ -1013,6 +1078,9 @@ static uint32_t _getNVVMResourceValueAlignment(IRInst* type, HashSet<IRInst*>& a
 {
     if (const uint32_t copyableAlignment = getNVVMCopyableValueAlignment(type))
         return copyableAlignment;
+    IRType* atomicValueType = nullptr;
+    if (asNVVMSupportedAtomicType(type, &atomicValueType))
+        return getNVVMCopyableValueAlignment(atomicValueType);
     if (isNVVMBoolType(type))
         return 1;
 
@@ -1070,7 +1138,8 @@ static bool _isNVVMSupportedResourceElementType(IRInst* type, HashSet<IRInst*>& 
     // Resource lowering preserves the exact specialized element type in the raw view and every
     // typed element pointer. Reuse the value algebra that generic type/memory emission already
     // supports instead of maintaining the older integer/Float32 subset here.
-    return isNVVMSupportedNumericValueType(type) || asNVVMSupportedPhysicalArrayStructType(type) ||
+    return isNVVMSupportedNumericValueType(type) || asNVVMSupportedAtomicType(type) ||
+           asNVVMSupportedPhysicalArrayStructType(type) ||
            (as<IRStructType>(type) && _getNVVMResourceValueAlignment(type, activeTypes));
 }
 
@@ -1738,6 +1807,12 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRType* localHelperPointerValueType = nullptr;
     IRPtrTypeBase* localHelperPointer =
         asNVVMSupportedLocalHelperValuePointerType(type, &localHelperPointerValueType);
+    IRType* helperReferenceValueType = nullptr;
+    IRPtrTypeBase* helperReferencePointer =
+        asNVVMSupportedHelperReferencePointerType(type, &helperReferenceValueType);
+    IRType* sharedHelperPointerValueType = nullptr;
+    IRPtrTypeBase* sharedHelperPointer =
+        asNVVMSupportedSharedHelperPointerType(type, &sharedHelperPointerValueType);
     IRType* deviceCopyablePointerValueType = nullptr;
     IRPtrTypeBase* deviceCopyablePointer =
         asNVVMSupportedDeviceCopyableValuePointerType(type, &deviceCopyablePointerValueType);
@@ -1772,7 +1847,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         asNVVMSupportedUnsizedSamplerArrayStorageType(type);
     IRPtrTypeBase* resourceElementPointer =
         asNVVMSupportedRWStructuredBufferElementPointerType(type);
-    IRPtrTypeBase* sharedElementPointer = asNVVMSupportedSharedIntegerElementPointerType(type);
+    IRPtrTypeBase* sharedElementPointer = asNVVMSupportedSharedElementPointerType(type);
+    IRType* atomicValueType = nullptr;
+    IRAtomicType* atomicType = asNVVMSupportedAtomicType(type, &atomicValueType);
 
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
@@ -1786,20 +1863,36 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           deviceCopyablePointer || deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
          (isHelperValue || resourceStructType || localResourceStructPointer ||
-          localCopyablePointer || localHelperPointer || isRawBuffer || isSurface ||
-          isSampledTexture || samplerValue)) ||
+          localCopyablePointer || localHelperPointer || helperReferencePointer ||
+          sharedHelperPointer || isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::HelperValue && isHelperValue) ||
         (use == NVVMTypeUse::Value &&
          (isHelperValue || resourceStructType || physicalArrayStructType || deviceNumericPointer ||
           deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup || isSurface ||
-          isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer)) ||
+          isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer ||
+          sharedHelperPointer || atomicType)) ||
         (use == NVVMTypeUse::Storage &&
          (isInteger || isFloat32 || asNVVMSupported32BitNumericVectorType(type) || structType ||
           aggregateStorageArrayType || deviceCopyablePointer || isRawBuffer || parameterGroup ||
-          isSurface || isSampledTexture || samplerStorage || unsizedSamplerArrayStorage)) ||
+          isSurface || isSampledTexture || samplerStorage || unsizedSamplerArrayStorage ||
+          atomicType)) ||
         (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type));
     if (!isLegal)
         return _reportUnsupportedType(use);
+
+    // `Atomic<T>` is a storage semantic wrapper. CUDA and LLVM both represent its physical
+    // payload as `T`; only atomic operations may access pointers to that storage.
+    if (atomicType)
+    {
+        if (auto mappedType = m_typeMap.tryGetValue(type))
+        {
+            outType = *mappedType;
+            return SLANG_OK;
+        }
+        SLANG_RETURN_ON_FAIL(lowerType(atomicValueType, NVVMTypeUse::Value, outType));
+        m_typeMap[type] = outType;
+        return SLANG_OK;
+    }
 
     // A finite pointer-bearing helper aggregate has one executable representation whose
     // UserPointer leaves are LLVM generic pointers. A helper can receive either a kernel device
@@ -1932,6 +2025,28 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             false));
         m_helperABIRepresentationMap[type] = outType;
         return SLANG_OK;
+    }
+
+    if (use == NVVMTypeUse::HelperParameter && helperReferencePointer)
+    {
+        return _lowerPointerType(
+            type,
+            helperReferenceValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            outType,
+            NVVMTypeUse::Value,
+            false);
+    }
+
+    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::Value) && sharedHelperPointer)
+    {
+        return _lowerPointerType(
+            type,
+            sharedHelperPointerValueType,
+            SLANG_NVVM_ADDRESS_SPACE_SHARED,
+            outType,
+            NVVMTypeUse::Value,
+            false);
     }
 
     if (use == NVVMTypeUse::HelperParameter && localResourceStructPointer)

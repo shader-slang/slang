@@ -123,6 +123,19 @@ IRArrayType* asNVVMSupportedHelperArrayType(IRInst* type, uint32_t* outElementCo
 /// Returns a finite helper struct composed from copyable values and device pointers.
 IRStructType* asNVVMSupportedHelperStructType(IRInst* type);
 
+/// Returns an atomic storage wrapper whose physical value is one selected scalar type.
+IRAtomicType* asNVVMSupportedAtomicType(IRInst* type, IRType** outValueType = nullptr);
+
+/// Returns an exact generic read-only or read-write helper reference to a selected pointee.
+IRPtrTypeBase* asNVVMSupportedHelperReferencePointerType(
+    IRInst* type,
+    IRType** outValueType = nullptr);
+
+// Recognizes an explicit numeric groupshared pointer carried through a helper signature.
+IRPtrTypeBase* asNVVMSupportedSharedHelperPointerType(
+    IRInst* type,
+    IRType** outValueType = nullptr);
+
 /// Returns an exact local or mutable-parameter pointer to a finite helper value.
 IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(
     IRInst* type,
@@ -191,14 +204,14 @@ IRGlobalVar* asNVVMSupportedSharedIntegerScalarGlobal(
     IRInst* inst,
     IRType** outValueType = nullptr);
 
-/// Returns an exact canonical uninitialized `groupshared` Int32/UInt32 fixed-array global.
-IRGlobalVar* asNVVMSupportedSharedIntegerArrayGlobal(
+/// Returns an exact canonical uninitialized groupshared fixed array of numeric helper values.
+IRGlobalVar* asNVVMSupportedSharedArrayGlobal(
     IRInst* inst,
     IRArrayType** outArrayType = nullptr,
     uint32_t* outElementCount = nullptr);
 
-/// Returns the canonical shared-address-space pointer to one selected integer scalar.
-IRPtrTypeBase* asNVVMSupportedSharedIntegerElementPointerType(IRInst* type);
+/// Returns a canonical scalar-layout groupshared pointer to one numeric helper value.
+IRPtrTypeBase* asNVVMSupportedSharedElementPointerType(IRInst* type);
 
 /// Describes which operations a canonical raw buffer view permits.
 enum class NVVMBufferAccess
