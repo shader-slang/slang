@@ -1448,6 +1448,11 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.lValueCast)
         SLANG_PASS(lowerLValueCast, targetProgram);
 
+    // Fill in default matrix layout into matrix types that left layout unspecified. Must run
+    // before specialization, so `row_major float4x4` and `float4x4` match as one type, and
+    // before `lowerEnumType`, which erases the `MatrixLayoutMode` type this pass looks for.
+    SLANG_PASS(specializeMatrixLayout, targetProgram);
+
     // Lower enum types early since enums and enum casts may appear in
     // specialization & not resolving them here would block specialization.
     //
@@ -1473,9 +1478,6 @@ Result linkAndOptimizeIR(
         if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
     }
-
-    // Fill in default matrix layout into matrix types that left layout unspecified.
-    SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // It's important that this takes place before defunctionalization as we
     // want to be able to easily discover the cooperate and fallback funcitons
