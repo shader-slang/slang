@@ -496,6 +496,11 @@ static RequirementWitness _tryLookUpExistingRequirementWitnessRec(
 /// witness shape accepted by the selection pass must visit the same conformance declarations here,
 /// in the same inner-to-outer order. The forceful frontier traversal below must recognize that same
 /// structural vocabulary, although it stops at the first missing step instead of reaching a leaf.
+/// The shared shapes are a known `PackBranchSubtypeWitness`, a `DeclaredSubtypeWitness` backed by a
+/// nested lookup, inheritance declaration, or generic constraint, and a `TransitiveSubtypeWitness`
+/// whose mid-to-super witness is declared. Selection distinguishes the three declared-witness
+/// sources to find their table; specialization intentionally treats them uniformly because only
+/// the substitutions on their conformance decl-ref matter at that stage.
 static RequirementWitness _specializeExistingRequirementWitnessRec(
     ASTBuilder* astBuilder,
     SubtypeWitness* subtypeWitness,
