@@ -2429,10 +2429,18 @@ int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, Overloa
 bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCount(
     OverloadResolveContext& context)
 {
-    if (isSlang202cOrLater(this) || context.bestCandidates.getCount() < 2 ||
-        context.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+    if (isSlang202cOrLater(this) || context.bestCandidates.getCount() < 2)
     {
         return false;
+    }
+
+    // `bestCandidates` normally contains candidates with the same status because candidate status
+    // is itself an ordinary ranking criterion. Check every candidate here instead of making that
+    // representation invariant part of the compatibility rule's contract.
+    for (auto& candidate : context.bestCandidates)
+    {
+        if (candidate.status != OverloadCandidate::Status::Applicable)
+            return false;
     }
 
     // Before Slang 202c, generic parameter count was used as a proxy for specificity. Consider

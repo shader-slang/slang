@@ -1,3 +1,4 @@
+//TEST:SIMPLE: -no-codegen
 //TEST:SIMPLE: -std 202c -no-codegen
 //TEST:SIMPLE(filecheck=CHECK): -std 202c -target spirv-asm -entry computeMain -stage compute
 
