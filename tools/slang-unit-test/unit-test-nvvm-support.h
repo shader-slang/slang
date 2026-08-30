@@ -2581,6 +2581,9 @@ static bool _isFakeNVVMBuilderBooleanValue(SlangNVVMValueHandle value)
         gFakeNVVMBuilder.scalarOperations[operationIndex];
     return operation.key.family == FakeNVVMBuilderScalarFamily::Compare ||
            operation.key.family == FakeNVVMBuilderScalarFamily::FloatingCompare ||
+           (operation.key.family == FakeNVVMBuilderScalarFamily::Binary &&
+            operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
+            operation.resultType.laneCount == 1) ||
            (operation.key.family == FakeNVVMBuilderScalarFamily::Select &&
             operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
             operation.resultType.laneCount == 1);
@@ -10132,6 +10135,40 @@ void computeMain(
     destination[laneIndex] = WaveReadLaneAt(source[laneIndex], sourceLane);
 }
 )";
+static const char kDirectNVVMCompoundWaveOperationsSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform uint mask,
+    uniform int sourceLane)
+{
+    uint lane = WaveGetLaneIndex();
+    float2 shuffled = WaveMaskReadLaneAt(mask, float2(lane, lane + 1), sourceLane);
+    bool allEqual = WaveMaskAllEqual(mask, int2(sourceLane, sourceLane + 1));
+    uint count = WaveMaskCountBits(mask, lane < 2);
+    destination[lane] = int(shuffled.x + shuffled.y) + (allEqual ? 16 : 0) + int(count);
+}
+)";
+static const char kDirectNVVMUnsupportedCompoundWaveSignatureSource[] = R"SLANG(
+float2 malformedWaveShuffle(int mask, float2 value, int lane)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
+    default:
+        return value;
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int mask)
+{
+    *destination = int(malformedWaveShuffle(mask, float2(1.0, 2.0), 0).x);
+}
+)SLANG";
 static const char kDirectNVVMFloat32SubtractSource[] = R"(
 [CUDAKernel]
 void computeMain(

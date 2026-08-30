@@ -2575,16 +2575,11 @@ struct NVVMGenericAsmValueOperation
     }
 };
 
-// Recognizes canonical one-block value helpers emitted by the CUDA prelude. The final assembly
-// spelling selects a semantic operation, while the specialized function signature supplies its
-// exact typed contract. This keeps all accepted overloads on the generic queried value-operation
-// path and leaves source intrinsic names and fixture paths out of lowering.
-bool _resolveNVVMGenericAsmValueOperation(
-    IRGenericAsm* genericAsm,
-    IRFunc* function,
-    NVVMGenericAsmValueOperation& outOperation)
+// Returns whether `genericAsm` is the complete executable body of one linked value helper. CUDA
+// target specialization produces this exact shape after selecting an intrinsic-asm case; compound
+// legalization below must not infer semantics from a fragment embedded in an arbitrary function.
+bool _isCanonicalNVVMGenericAsmValueHelper(IRGenericAsm* genericAsm, IRFunc* function)
 {
-    outOperation = {};
     IRBlock* block = function ? function->getFirstBlock() : nullptr;
     if (!genericAsm || !block || block->getNextBlock() || genericAsm->getParent() != block ||
         genericAsm->getOperandCount() != 1)
@@ -2596,6 +2591,21 @@ bool _resolveNVVMGenericAsmValueOperation(
         if (inst != genericAsm)
             return false;
     }
+    return true;
+}
+
+// Recognizes canonical one-block value helpers emitted by the CUDA prelude. The final assembly
+// spelling selects a semantic operation, while the specialized function signature supplies its
+// exact typed contract. This keeps all accepted overloads on the generic queried value-operation
+// path and leaves source intrinsic names and fixture paths out of lowering.
+bool _resolveNVVMGenericAsmValueOperation(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMGenericAsmValueOperation& outOperation)
+{
+    outOperation = {};
+    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function))
+        return false;
 
     struct GenericAsmOperationSpelling
     {
@@ -2632,6 +2642,7 @@ bool _resolveNVVMGenericAsmValueOperation(
         {"$P_sqrt($0)", SLANG_NVVM_VALUE_OP_SQRT, 1},
         {"$P_tan($0)", SLANG_NVVM_VALUE_OP_TAN, 1},
         {"$P_trunc($0)", SLANG_NVVM_VALUE_OP_TRUNC, 1},
+        {"__ballot_sync($0, $1)", SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT, 2},
     };
     const GenericAsmOperationSpelling* spelling = nullptr;
     for (const auto& candidate : kOperationSpellings)
@@ -2666,13 +2677,230 @@ bool _resolveNVVMGenericAsmValueOperation(
     }
     SLANG_ASSERT(!parameter);
 
+    const SlangNVVMValueOperationDesc operation = outOperation.getOperationDesc();
+    if (const auto semantic = NVVMSemantics::find(operation))
+    {
+        outOperation.diagnosticName = semantic->diagnosticName;
+        outOperation.requiresCUDADeviceLibrary = semantic->requiresCUDADeviceLibrary;
+        return true;
+    }
+
     NVVMSemantics::ValueOperationFamilyResolution family;
-    if (!NVVMSemantics::resolveValueOperationFamily(outOperation.getOperationDesc(), family))
+    if (!NVVMSemantics::resolveValueOperationFamily(operation, family))
     {
         return false;
     }
     outOperation.diagnosticName = family.diagnosticName;
     outOperation.requiresCUDADeviceLibrary = family.requiresCUDADeviceLibrary;
+    return true;
+}
+
+enum class NVVMGenericAsmCompoundKind
+{
+    None,
+    VectorWaveReadLaneAt,
+    VectorWaveAllEqual,
+    BallotPopulationCount,
+};
+
+struct NVVMGenericAsmCompoundStep
+{
+    SlangNVVMValueOperation operation = 0;
+    SlangNVVMValueTypeDesc resultType = {};
+    SlangNVVMValueTypeDesc operandTypes[3] = {};
+    uint32_t operandCount = 0;
+    const char* diagnosticName = nullptr;
+
+    SlangNVVMValueOperationDesc getDesc() const
+    {
+        return {operation, resultType, operandCount ? operandTypes : nullptr, operandCount};
+    }
+};
+
+struct NVVMGenericAsmCompoundOperation
+{
+    NVVMGenericAsmCompoundKind kind = NVVMGenericAsmCompoundKind::None;
+    IRParam* parameters[3] = {};
+    SlangNVVMValueTypeDesc operandTypes[3] = {};
+    SlangNVVMValueTypeDesc resultType = {};
+    uint32_t operandCount = 0;
+    const char* diagnosticName = nullptr;
+    NVVMGenericAsmCompoundStep steps[2] = {};
+    uint32_t stepCount = 0;
+};
+
+void _setNVVMGenericAsmCompoundStep(
+    NVVMGenericAsmCompoundStep& step,
+    SlangNVVMValueOperation operation,
+    const SlangNVVMValueTypeDesc& resultType,
+    const SlangNVVMValueTypeDesc* operandTypes,
+    uint32_t operandCount,
+    const char* diagnosticName)
+{
+    SLANG_ASSERT(operandCount <= SLANG_COUNT_OF(step.operandTypes));
+    step = {};
+    step.operation = operation;
+    step.resultType = resultType;
+    step.operandCount = operandCount;
+    step.diagnosticName = diagnosticName;
+    for (uint32_t i = 0; i < operandCount; ++i)
+        step.operandTypes[i] = operandTypes[i];
+}
+
+bool _isSelectedNVVMWaveVector(const SlangNVVMValueTypeDesc& type)
+{
+    const bool isSelectedElement = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                                   type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
+                                   type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+    return isSelectedElement && type.bitWidth == 32 && type.laneCount >= 2 && type.laneCount <= 4;
+}
+
+// Recognizes compound CUDA-prelude wave helpers whose semantics are exactly representable as a
+// sequence of existing scalar value operations. The final assembly and complete specialized
+// signature are both required; source intrinsic names and fixture paths are deliberately absent.
+bool _resolveNVVMGenericAsmCompoundOperation(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMGenericAsmCompoundOperation& outOperation)
+{
+    outOperation = {};
+    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function) ||
+        !_getNVVMSemanticType(function->getResultType(), outOperation.resultType))
+    {
+        return false;
+    }
+
+    const UnownedStringSlice assembly = genericAsm->getAsm();
+    if (assembly == toSlice("_waveShuffleMultiple($0, $1, $2)"))
+    {
+        outOperation.kind = NVVMGenericAsmCompoundKind::VectorWaveReadLaneAt;
+        outOperation.operandCount = 3;
+        outOperation.diagnosticName = "selected-vector wave read-lane-at";
+    }
+    else if (assembly == toSlice("_waveAllEqualMultiple($0, $1)"))
+    {
+        outOperation.kind = NVVMGenericAsmCompoundKind::VectorWaveAllEqual;
+        outOperation.operandCount = 2;
+        outOperation.diagnosticName = "selected-vector wave all-equal";
+    }
+    else if (assembly == toSlice("__popc(__ballot_sync($0, $1))"))
+    {
+        outOperation.kind = NVVMGenericAsmCompoundKind::BallotPopulationCount;
+        outOperation.operandCount = 2;
+        outOperation.diagnosticName = "wave ballot population count";
+    }
+    else
+    {
+        return false;
+    }
+
+    if (function->getParamCount() != outOperation.operandCount)
+        return false;
+    IRParam* parameter = function->getFirstParam();
+    for (uint32_t i = 0; i < outOperation.operandCount; ++i)
+    {
+        if (!parameter ||
+            !_getNVVMSemanticType(parameter->getDataType(), outOperation.operandTypes[i]))
+        {
+            return false;
+        }
+        outOperation.parameters[i] = parameter;
+        parameter = parameter->getNextParam();
+    }
+    SLANG_ASSERT(!parameter);
+
+    if (outOperation.kind == NVVMGenericAsmCompoundKind::VectorWaveReadLaneAt)
+    {
+        if (!_isSelectedNVVMWaveVector(outOperation.resultType) ||
+            !NVVMSemantics::areSameType(outOperation.resultType, outOperation.operandTypes[1]) ||
+            !NVVMSemantics::areSameType(
+                outOperation.operandTypes[0],
+                NVVMSemantics::kUnsignedI32) ||
+            !NVVMSemantics::areSameType(outOperation.operandTypes[2], NVVMSemantics::kSignedI32))
+        {
+            return false;
+        }
+        SlangNVVMValueTypeDesc elementType = outOperation.resultType;
+        elementType.laneCount = 1;
+        const SlangNVVMValueTypeDesc operands[] = {
+            NVVMSemantics::kUnsignedI32,
+            elementType,
+            NVVMSemantics::kSignedI32,
+        };
+        _setNVVMGenericAsmCompoundStep(
+            outOperation.steps[0],
+            SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+            elementType,
+            operands,
+            3,
+            outOperation.diagnosticName);
+        outOperation.stepCount = 1;
+        return true;
+    }
+    if (outOperation.kind == NVVMGenericAsmCompoundKind::VectorWaveAllEqual)
+    {
+        if (!NVVMSemantics::areSameType(outOperation.resultType, NVVMSemantics::kBool) ||
+            !NVVMSemantics::areSameType(
+                outOperation.operandTypes[0],
+                NVVMSemantics::kUnsignedI32) ||
+            !_isSelectedNVVMWaveVector(outOperation.operandTypes[1]))
+        {
+            return false;
+        }
+        SlangNVVMValueTypeDesc elementType = outOperation.operandTypes[1];
+        elementType.laneCount = 1;
+        const SlangNVVMValueTypeDesc waveOperands[] = {
+            NVVMSemantics::kUnsignedI32,
+            elementType,
+        };
+        _setNVVMGenericAsmCompoundStep(
+            outOperation.steps[0],
+            SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
+            NVVMSemantics::kBool,
+            waveOperands,
+            2,
+            outOperation.diagnosticName);
+        const SlangNVVMValueTypeDesc booleanOperands[] = {
+            NVVMSemantics::kBool,
+            NVVMSemantics::kBool,
+        };
+        _setNVVMGenericAsmCompoundStep(
+            outOperation.steps[1],
+            SLANG_NVVM_VALUE_OP_BIT_AND,
+            NVVMSemantics::kBool,
+            booleanOperands,
+            2,
+            "Boolean conjunction for selected-vector wave all-equal");
+        outOperation.stepCount = 2;
+        return true;
+    }
+    SLANG_ASSERT(outOperation.kind == NVVMGenericAsmCompoundKind::BallotPopulationCount);
+    if (!NVVMSemantics::areSameType(outOperation.resultType, NVVMSemantics::kUnsignedI32) ||
+        !NVVMSemantics::areSameType(outOperation.operandTypes[0], NVVMSemantics::kUnsignedI32) ||
+        !NVVMSemantics::areSameType(outOperation.operandTypes[1], NVVMSemantics::kBool))
+    {
+        return false;
+    }
+    const SlangNVVMValueTypeDesc ballotOperands[] = {
+        NVVMSemantics::kUnsignedI32,
+        NVVMSemantics::kBool,
+    };
+    _setNVVMGenericAsmCompoundStep(
+        outOperation.steps[0],
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
+        NVVMSemantics::kUnsignedI32,
+        ballotOperands,
+        2,
+        outOperation.diagnosticName);
+    const SlangNVVMValueTypeDesc countOperands[] = {NVVMSemantics::kUnsignedI32};
+    _setNVVMGenericAsmCompoundStep(
+        outOperation.steps[1],
+        SLANG_NVVM_VALUE_OP_COUNT_BITS,
+        NVVMSemantics::kUnsignedI32,
+        countOperands,
+        1,
+        outOperation.diagnosticName);
+    outOperation.stepCount = 2;
     return true;
 }
 
@@ -2934,6 +3162,21 @@ void _requireValueOperation(
     for (uint32_t i = 0; i < requirement.operandCount; ++i)
         requirement.operandTypes[i] = desc.operandTypes[i];
     requirements.add(requirement);
+}
+
+// Records every scalar operation used to legalize one compound wave helper. These descriptors are
+// the exact operations emitted later, so unsupported provider capability is reported before module
+// creation rather than after partial compound construction.
+void _requireNVVMGenericAsmCompoundOperations(
+    NVVMValueOperationRequirements& requirements,
+    const NVVMGenericAsmCompoundOperation& compound)
+{
+    SLANG_ASSERT(compound.stepCount >= 1 && compound.stepCount <= SLANG_COUNT_OF(compound.steps));
+    for (uint32_t i = 0; i < compound.stepCount; ++i)
+    {
+        const NVVMGenericAsmCompoundStep& step = compound.steps[i];
+        _requireValueOperation(requirements, step.getDesc(), step.diagnosticName);
+    }
 }
 
 // Resolves canonical Slang value operations to either a fixed exact row or one bounded family.
@@ -3963,6 +4206,7 @@ SlangResult _validateNVVMFunction(
                         _findNVVMGenericAsmSemantic(genericAsm, function);
                     NVVMScalarTruthiness truthiness;
                     NVVMGenericAsmValueOperation valueOperation;
+                    NVVMGenericAsmCompoundOperation compoundOperation;
                     NVVMResolvedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
                     if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
@@ -3981,6 +4225,16 @@ SlangResult _validateNVVMFunction(
                             valueOperation.diagnosticName);
                         requirements.requiresCUDADeviceLibrary |=
                             valueOperation.requiresCUDADeviceLibrary;
+                        break;
+                    }
+                    if (_resolveNVVMGenericAsmCompoundOperation(
+                            genericAsm,
+                            function,
+                            compoundOperation))
+                    {
+                        _requireNVVMGenericAsmCompoundOperations(
+                            requirements.valueOperations,
+                            compoundOperation);
                         break;
                     }
                     if (_resolveNVVMSurfaceGenericAsm(genericAsm, function, surfaceOperation))
@@ -5148,6 +5402,160 @@ SlangResult _getLoweredNVVMValue(
             .getFloatingPointConstant(module, floatingPointType, bitWidth, bitPattern, outValue)));
     valueMap[irValue] = outValue;
     return SLANG_OK;
+}
+
+// Emits one compiler-owned compound wave recipe through revision 27's existing scalar and
+// structural operations. The matching preflight helper records these same descriptors before a
+// provider module exists.
+SlangResult _emitNVVMGenericAsmCompoundOperation(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRFunc* function,
+    const NVVMGenericAsmCompoundOperation& compound,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext)
+{
+    SlangNVVMValueHandle loweredOperands[3] = {};
+    for (uint32_t i = 0; i < compound.operandCount; ++i)
+    {
+        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+            codeGenContext,
+            builder,
+            module,
+            compound.parameters[i],
+            valueMap,
+            typeContext,
+            loweredOperands[i]));
+    }
+
+    if (compound.kind == NVVMGenericAsmCompoundKind::BallotPopulationCount)
+    {
+        SLANG_ASSERT(compound.stepCount == 2);
+        SlangNVVMValueHandle ballot = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            compound.steps[0].diagnosticName,
+            builder.emitValueOperation(
+                module,
+                compound.steps[0].getDesc(),
+                loweredOperands,
+                2,
+                ballot)));
+
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            compound.steps[1].diagnosticName,
+            builder.emitValueOperation(module, compound.steps[1].getDesc(), &ballot, 1, result)));
+        return _requireBuilderOperation(
+            codeGenContext,
+            "wave ballot population-count return",
+            builder.emitValueReturn(module, result));
+    }
+
+    const uint32_t laneCount = compound.kind == NVVMGenericAsmCompoundKind::VectorWaveReadLaneAt
+                                   ? compound.resultType.laneCount
+                                   : compound.operandTypes[1].laneCount;
+    SlangNVVMTypeHandle indexType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "compound wave vector index type",
+        builder.getIntegerType(module, 32, indexType)));
+
+    if (compound.kind == NVVMGenericAsmCompoundKind::VectorWaveReadLaneAt)
+    {
+        SLANG_ASSERT(compound.stepCount == 1);
+        SlangNVVMValueHandle shuffledElements[4] = {};
+        for (uint32_t lane = 0; lane < laneCount; ++lane)
+        {
+            SlangNVVMValueHandle index = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "compound wave vector lane index",
+                builder.getIntegerConstant(module, indexType, lane, index)));
+            SlangNVVMValueHandle element = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "compound wave vector lane extraction",
+                builder.emitSequentialElementExtract(module, loweredOperands[1], index, element)));
+            const SlangNVVMValueHandle waveOperands[] = {
+                loweredOperands[0],
+                element,
+                loweredOperands[2],
+            };
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                compound.steps[0].diagnosticName,
+                builder.emitValueOperation(
+                    module,
+                    compound.steps[0].getDesc(),
+                    waveOperands,
+                    3,
+                    shuffledElements[lane])));
+        }
+
+        SlangNVVMTypeHandle resultType = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            typeContext.lowerType(function->getResultType(), NVVMTypeUse::Value, resultType));
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "compound wave vector construction",
+            builder.emitVectorConstruct(module, resultType, shuffledElements, laneCount, result)));
+        return _requireBuilderOperation(
+            codeGenContext,
+            "selected-vector wave read-lane-at return",
+            builder.emitValueReturn(module, result));
+    }
+
+    SLANG_ASSERT(compound.kind == NVVMGenericAsmCompoundKind::VectorWaveAllEqual);
+    SLANG_ASSERT(compound.stepCount == 2);
+    SlangNVVMValueHandle result = nullptr;
+    for (uint32_t lane = 0; lane < laneCount; ++lane)
+    {
+        SlangNVVMValueHandle index = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "compound wave vector lane index",
+            builder.getIntegerConstant(module, indexType, lane, index)));
+        SlangNVVMValueHandle element = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "compound wave vector lane extraction",
+            builder.emitSequentialElementExtract(module, loweredOperands[1], index, element)));
+        const SlangNVVMValueHandle waveOperands[] = {loweredOperands[0], element};
+        SlangNVVMValueHandle componentEqual = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            compound.steps[0].diagnosticName,
+            builder.emitValueOperation(
+                module,
+                compound.steps[0].getDesc(),
+                waveOperands,
+                2,
+                componentEqual)));
+        if (!result)
+        {
+            result = componentEqual;
+            continue;
+        }
+        const SlangNVVMValueHandle conjunctionOperands[] = {result, componentEqual};
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            compound.steps[1].diagnosticName,
+            builder.emitValueOperation(
+                module,
+                compound.steps[1].getDesc(),
+                conjunctionOperands,
+                2,
+                result)));
+    }
+    SLANG_ASSERT(result);
+    return _requireBuilderOperation(
+        codeGenContext,
+        "selected-vector wave all-equal return",
+        builder.emitValueReturn(module, result));
 }
 
 } // namespace
@@ -6527,6 +6935,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 codeGenContext,
                                 "generic value operation return",
                                 builder.emitValueReturn(moduleScope.module, loweredValue)));
+                            break;
+                        }
+
+                        NVVMGenericAsmCompoundOperation compoundOperation;
+                        if (_resolveNVVMGenericAsmCompoundOperation(
+                                genericAsm,
+                                function,
+                                compoundOperation))
+                        {
+                            SLANG_RETURN_ON_FAIL(_emitNVVMGenericAsmCompoundOperation(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                function,
+                                compoundOperation,
+                                valueMap,
+                                typeContext));
                             break;
                         }
 

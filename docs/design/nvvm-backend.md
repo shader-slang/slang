@@ -6254,6 +6254,33 @@ prefix passes 404/404. The representative workload gates remain correct, and the
 assembles with CUDA 12.9 for SM70, SM80, and SM90. CUDA 13 and physical SM70/SM80/SM90 runtime
 remain infrastructure gaps.
 
+### Slice 136: Compiler-owned common wave recipes
+
+The leading 31-workload healthy-MVP wave/reconvergence cluster contains an 18-row coherent family:
+scalar ballot, selected 32-bit vector shuffle, selected 32-bit vector all-equal, and ballot
+population count. CUDA specialization produces canonical one-block `IRGenericAsm` helpers. Exact
+final assembly selects the semantic and the specialized helper signature supplies mask, value,
+lane, result, and arity; fixture paths and source names do not participate.
+
+Scalar ballot uses the existing exact descriptor. Compound helpers resolve to one ordered step
+table consumed unchanged by capability preflight and emission. The compiler extracts vector lanes,
+invokes established scalar read-lane-at or all-equal descriptors, reconstructs the exact vector or
+combines Boolean predicates, and composes ballot with UInt32 population count. These operations use
+revision 27's generic scalar and structural callbacks, so the LLVM provider and ABI remain
+unchanged.
+
+Twelve workloads become correct at O0 and O3 and receive 24 direct lanes. Four others advance to
+aggregate Void/out-parameter shuffle ABI and two advance to masked wave reductions; they remain
+measured failures rather than triggering a fallback. The full 452-row census reaches 276 O0 and
+272 O3 successes, an exact +12/+12 delta with no old-correct regression. Among 427 healthy MVP
+references, O0/O3/both correctness is 275/270/267. The wave/reconvergence cluster falls from 31 to
+19; helper ABI (28) and aggregate/pointer/layout transport (23) become the leading clusters.
+
+All 36 promoted native/direct CUDA lanes pass, and the selected NVVM regression prefix passes
+405/405. The three representative workloads remain correct; their direct O3 PTX assembles with
+CUDA 12.9 for SM70, SM80, and SM90. CUDA 13 and physical SM70/SM80/SM90 runtime remain
+infrastructure gaps.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

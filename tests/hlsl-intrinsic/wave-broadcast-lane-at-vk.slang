@@ -1,6 +1,8 @@
 //TEST_CATEGORY(wave, compute)
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -cuda -profile cs_6_0 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile cs_6_0 -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile cs_6_0 -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj

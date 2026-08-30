@@ -3,6 +3,8 @@
 //TEST_CATEGORY(wave, compute)
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj -render-feature hardware-device
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -profile cs_6_0 -shaderobj -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -profile cs_6_0 -shaderobj -render-feature hardware-device -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -profile cs_6_0 -shaderobj -render-feature hardware-device -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj

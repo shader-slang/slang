@@ -1904,3 +1904,19 @@ mismatch. The full census reaches 264 O0 and 260 O3 successes with no old-correc
 Against 427 healthy MVP references, O0/O3/both correctness is 263/258/255. All 81 promoted
 native/direct CUDA lanes pass, and the three representative direct O3 PTX modules continue to
 assemble for SM70, SM80, and SM90 with CUDA 12.9.
+
+Slice 136 represents scalar ballot and compound selected-vector shuffle/all-equal plus
+ballot-popcount through compiler-owned recipes. The canonical producer is a final one-block CUDA
+`IRGenericAsm` helper; exact assembly and specialized signature select the recipe. One ordered
+step table is shared by capability preflight and emission.
+
+Vector recipes use generic extraction/construction around existing scalar wave operations;
+ballot-popcount composes existing ballot and UInt32 population count. Builder ABI revision 27 and
+the LLVM provider remain unchanged. Twelve workloads become correct at both modes and receive 24
+direct lanes; four advance to aggregate out-parameter shuffle ABI and two to wave reductions.
+
+The fixed census reaches 276 O0 and 272 O3 successes with zero old-correct regressions. Against 427
+healthy MVP references, O0/O3/both correctness is 275/270/267. Wave/reconvergence failures fall
+from 31 to 19; helper ABI (28) and aggregate/pointer/layout transport (23) are the leading measured
+priorities. All 36 promoted lanes and the 405/405 selected prefix pass, while representative direct
+O3 PTX remains accepted for SM70, SM80, and SM90 with CUDA 12.9.
