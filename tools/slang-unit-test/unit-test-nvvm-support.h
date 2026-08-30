@@ -12059,13 +12059,6 @@ void computeMain(
     doubleVectors[0] = double2(5.0, 6.0);
 }
 )";
-static const char kDirectNVVMUnsupportedBooleanStructuredBufferSource[] = R"(
-[CUDAKernel]
-void computeMain(RWStructuredBuffer<bool> destination)
-{
-    destination[0] = true;
-}
-)";
 static const char kDirectNVVMRawBufferDataPointerSource[] = R"(
 [CUDAKernel]
 void computeMain(

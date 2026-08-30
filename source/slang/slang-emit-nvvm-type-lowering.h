@@ -308,6 +308,9 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
 /// Returns whether `type` has an accepted direct CUDA launch-parameter representation.
 bool isNVVMSupportedParameterType(IRInst* type);
 
+/// Returns whether `type` has a finite external structured-buffer storage representation.
+bool isNVVMSupportedStructuredBufferStorageType(IRInst* type);
+
 /// Identifies the producer/consumer contract under which a canonical linked-IR type is lowered.
 enum class NVVMTypeUse
 {
@@ -319,6 +322,7 @@ enum class NVVMTypeUse
     Value,
     Storage,
     ParameterGroupStorage,
+    StructuredBufferStorage,
 };
 
 /// Maps canonical linked-IR types to module-owned provider handles and caches each representation.
@@ -340,16 +344,20 @@ private:
     {
         IRType* pointeeType = nullptr;
         SlangNVVMAddressSpace addressSpace = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
+        NVVMTypeUse pointeeUse = NVVMTypeUse::Value;
 
         HashCode getHashCode() const
         {
             return combineHash(
-                Slang::getHashCode(pointeeType),
-                Slang::getHashCode(uint32_t(addressSpace)));
+                combineHash(
+                    Slang::getHashCode(pointeeType),
+                    Slang::getHashCode(uint32_t(addressSpace))),
+                Slang::getHashCode(uint32_t(pointeeUse)));
         }
         bool operator==(const PointerTypeKey& other) const
         {
-            return pointeeType == other.pointeeType && addressSpace == other.addressSpace;
+            return pointeeType == other.pointeeType && addressSpace == other.addressSpace &&
+                   pointeeUse == other.pointeeUse;
         }
     };
 
@@ -378,6 +386,7 @@ private:
     SlangNVVMModuleHandle m_module = nullptr;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_typeMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_aggregateStorageTypeMap;
+    Dictionary<IRType*, SlangNVVMTypeHandle> m_structuredBufferStorageTypeMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_entryParameterRepresentationMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_helperABIRepresentationMap;
     Dictionary<PointerTypeKey, SlangNVVMTypeHandle> m_pointerRepresentationMap;

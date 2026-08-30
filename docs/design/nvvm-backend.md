@@ -6469,6 +6469,34 @@ census reaches 341 O0 and 346 O3 successes. Against 427 healthy MVP references, 
 correctness is 339/343/339 (79.4%/80.3%/79.4%). The selected prefix passes 421/421, and the three
 representative direct O3 modules remain accepted with CUDA 12.9 for SM70, SM80, and SM90.
 
+### Slice 143: Structured-buffer physical storage representation
+
+Canonical structured-buffer values now remain distinct from the provider pointee representation
+used for CUDA external storage. A finite recursive storage algebra covers selected numeric and
+Boolean scalar/vector leaves, fixed arrays, nonempty structs, and the established physical matrix
+wrapper. Boolean storage uses i8, numeric vector3 and bool3 use compact scalar arrays, and bool2/
+bool4 use naturally aligned i8 vectors.
+
+Raw buffer data and writable element pointers select this storage use. One recursive conversion is
+shared by direct structured loads and ordinary pointer-chain loads/stores: aggregate and vector
+elements are extracted, Boolean bytes cross through integer conversion/nonzero comparison, and the
+exact semantic value or physical aggregate is reconstructed. Ordinary SSA, helpers, control flow,
+and upstream linked IR retain their canonical semantic types.
+
+Preflight derives the provider layout and proves final pointer stride, every explicit array stride,
+and every direct struct field offset against CUDA. Loads/stores carry CUDA's conservative alignment
+explicitly, so a stronger provider-preferred root alignment is allowed only when it changes no
+addressable byte. Resource-containing elements such as `MyImpl { Texture2D tex; }` remain a
+separate established ordinary-value family with their existing exact layout proof. No retry or
+byte-copy fallback is used.
+
+The implementation composes generic typed, vector, aggregate, pointer, load, and store operations;
+provider ABI revision 29 and the LLVM provider are unchanged. Five workloads become correct at O0
+and O3 with zero old-correct regression. The fixed 452-row census reaches 346 O0 and 351 O3
+successes. Against 427 healthy MVP references, O0/O3/both correctness is 344/348/344
+(80.6%/81.5%/80.6%). The selected prefix passes 421/421, and the representative direct O3 modules
+assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

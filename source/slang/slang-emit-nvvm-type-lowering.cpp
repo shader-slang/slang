@@ -266,7 +266,8 @@ IRStructType* asNVVMSupportedPhysicalArrayStructType(IRInst* type)
     IRStructField* onlyField = nullptr;
     for (auto field : structType->getFields())
     {
-        if (onlyField || !asNVVMSupportedNumericArrayType(field->getFieldType()))
+        if (onlyField || (!asNVVMSupportedNumericArrayType(field->getFieldType()) &&
+                          !asNVVMSupportedAggregateStorageArrayType(field->getFieldType())))
             return nullptr;
         onlyField = field;
     }
@@ -1138,7 +1139,8 @@ static bool _isNVVMSupportedResourceElementType(IRInst* type, HashSet<IRInst*>& 
     // Resource lowering preserves the exact specialized element type in the raw view and every
     // typed element pointer. Reuse the value algebra that generic type/memory emission already
     // supports instead of maintaining the older integer/Float32 subset here.
-    return isNVVMSupportedNumericValueType(type) || asNVVMSupportedAtomicType(type) ||
+    return isNVVMSupportedStructuredBufferStorageType(type) ||
+           isNVVMSupportedNumericValueType(type) || asNVVMSupportedAtomicType(type) ||
            asNVVMSupportedPhysicalArrayStructType(type) ||
            (as<IRStructType>(type) && _getNVVMResourceValueAlignment(type, activeTypes));
 }
@@ -1505,6 +1507,68 @@ bool isNVVMSupportedParameterType(IRInst* type)
            getNVVMSupportedRawBufferType(type, rawBufferType);
 }
 
+static bool _isNVVMSupportedStructuredBufferStorageType(IRInst* type, HashSet<IRInst*>& activeTypes)
+{
+    if (isNVVMSupportedNumericValueType(type) || isNVVMBoolType(type))
+        return true;
+
+    if (auto vectorType = asNVVMSupportedValueVectorType(type))
+        return isNVVMBoolType(vectorType->getElementType());
+
+    if (!type || activeTypes.contains(type))
+        return false;
+
+    activeTypes.add(type);
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        auto count = as<IRIntLit>(arrayType->getElementCount());
+        const bool isSupported =
+            arrayType->getOp() == kIROp_ArrayType &&
+            (arrayType->getOperandCount() == 2 || arrayType->getOperandCount() == 3) && count &&
+            count->getValue() > 0 && count->getValue() <= UINT32_MAX &&
+            _isNVVMSupportedStructuredBufferStorageType(arrayType->getElementType(), activeTypes);
+        activeTypes.remove(type);
+        return isSupported;
+    }
+
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+    {
+        activeTypes.remove(type);
+        return false;
+    }
+
+    bool hasField = false;
+    for (auto field : structType->getFields())
+    {
+        if (!_isNVVMSupportedStructuredBufferStorageType(field->getFieldType(), activeTypes))
+        {
+            activeTypes.remove(type);
+            return false;
+        }
+        hasField = true;
+    }
+    activeTypes.remove(type);
+    return hasField;
+}
+
+bool isNVVMSupportedStructuredBufferStorageType(IRInst* type)
+{
+    HashSet<IRInst*> activeTypes;
+    return _isNVVMSupportedStructuredBufferStorageType(type, activeTypes);
+}
+
+// Selects the provider pointee representation for one canonical structured-buffer element.
+// Numeric/Boolean aggregates need the external CUDA storage algebra, while an established
+// resource-containing element such as `MyImpl { Texture2D tex; }` already has an exact ordinary
+// value representation. The resource-element classifier proves that the latter family is legal;
+// its layout is checked separately before this role is consumed.
+static NVVMTypeUse _getNVVMStructuredBufferElementTypeUse(IRType* type)
+{
+    return isNVVMSupportedStructuredBufferStorageType(type) ? NVVMTypeUse::StructuredBufferStorage
+                                                            : NVVMTypeUse::Value;
+}
+
 SlangResult NVVMTypeLoweringContext::_requireBuilderOperation(
     const char* operation,
     SlangResult result) const
@@ -1545,6 +1609,9 @@ SlangResult NVVMTypeLoweringContext::_reportUnsupportedType(NVVMTypeUse use) con
     case NVVMTypeUse::ParameterGroupStorage:
         construct = "aggregate storage type";
         break;
+    case NVVMTypeUse::StructuredBufferStorage:
+        construct = "structured-buffer storage type";
+        break;
     }
     m_codeGenContext->getSink()->diagnose(
         Diagnostics::NvvmUnsupportedIr{.construct = String(construct)});
@@ -1559,9 +1626,10 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     outType = nullptr;
     const bool isAggregateStorage =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
-    auto& typeMap = use == NVVMTypeUse::HelperValue ? m_helperABIRepresentationMap
-                    : isAggregateStorage            ? m_aggregateStorageTypeMap
-                                                    : m_typeMap;
+    auto& typeMap = use == NVVMTypeUse::HelperValue               ? m_helperABIRepresentationMap
+                    : use == NVVMTypeUse::StructuredBufferStorage ? m_structuredBufferStorageTypeMap
+                    : isAggregateStorage                          ? m_aggregateStorageTypeMap
+                                                                  : m_typeMap;
     if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
@@ -1569,15 +1637,28 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     }
 
     uint32_t elementCount = 0;
-    IRArrayType* supportedType =
-        use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage
-            ? asNVVMSupportedAggregateStorageArrayType(type, &elementCount)
-            : asNVVMSupportedHelperArrayType(type, &elementCount);
+    IRArrayType* supportedType = nullptr;
+    if (use == NVVMTypeUse::StructuredBufferStorage)
+    {
+        auto count = as<IRIntLit>(type->getElementCount());
+        if (isNVVMSupportedStructuredBufferStorageType(type) && count)
+        {
+            supportedType = type;
+            elementCount = uint32_t(count->getValue());
+        }
+    }
+    else
+    {
+        supportedType = use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage
+                            ? asNVVMSupportedAggregateStorageArrayType(type, &elementCount)
+                            : asNVVMSupportedHelperArrayType(type, &elementCount);
+    }
     SLANG_RELEASE_ASSERT(supportedType);
     SlangNVVMTypeHandle elementType = nullptr;
     const NVVMTypeUse elementUse =
-        use == NVVMTypeUse::HelperValue             ? NVVMTypeUse::HelperValue
-        : use == NVVMTypeUse::ParameterGroupStorage ? NVVMTypeUse::ParameterGroupStorage
+        use == NVVMTypeUse::HelperValue               ? NVVMTypeUse::HelperValue
+        : use == NVVMTypeUse::StructuredBufferStorage ? NVVMTypeUse::StructuredBufferStorage
+        : use == NVVMTypeUse::ParameterGroupStorage   ? NVVMTypeUse::ParameterGroupStorage
         : use == NVVMTypeUse::Storage && isNVVMSupportedHelperValueType(type) &&
                 !isNVVMSupportedCopyableValueType(type)
             ? NVVMTypeUse::HelperValue
@@ -1585,7 +1666,9 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
                                       : NVVMTypeUse::Value;
     SLANG_RETURN_ON_FAIL(lowerType(type->getElementType(), elementUse, elementType));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        isAggregateStorage ? "fixed aggregate storage array type" : "fixed copyable array type",
+        use == NVVMTypeUse::StructuredBufferStorage ? "structured-buffer storage array type"
+        : isAggregateStorage                        ? "fixed aggregate storage array type"
+                                                    : "fixed copyable array type",
         m_builder.getArrayType(m_module, elementType, elementCount, outType)));
     typeMap[type] = outType;
     return SLANG_OK;
@@ -1599,9 +1682,10 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
     outType = nullptr;
     const bool isAggregateStorage =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
-    auto& typeMap = use == NVVMTypeUse::HelperValue ? m_helperABIRepresentationMap
-                    : isAggregateStorage            ? m_aggregateStorageTypeMap
-                                                    : m_typeMap;
+    auto& typeMap = use == NVVMTypeUse::HelperValue               ? m_helperABIRepresentationMap
+                    : use == NVVMTypeUse::StructuredBufferStorage ? m_structuredBufferStorageTypeMap
+                    : isAggregateStorage                          ? m_aggregateStorageTypeMap
+                                                                  : m_typeMap;
     if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
@@ -1609,8 +1693,9 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
     }
 
     const NVVMTypeUse fieldUse =
-        use == NVVMTypeUse::HelperValue             ? NVVMTypeUse::HelperValue
-        : use == NVVMTypeUse::ParameterGroupStorage ? NVVMTypeUse::ParameterGroupStorage
+        use == NVVMTypeUse::HelperValue               ? NVVMTypeUse::HelperValue
+        : use == NVVMTypeUse::StructuredBufferStorage ? NVVMTypeUse::StructuredBufferStorage
+        : use == NVVMTypeUse::ParameterGroupStorage   ? NVVMTypeUse::ParameterGroupStorage
         : (asNVVMSupportedHelperStructType(type) && !isNVVMSupportedCopyableValueType(type))
             ? NVVMTypeUse::HelperValue
         : asNVVMSupportedHelperStructType(type) ||
@@ -1680,8 +1765,10 @@ SlangResult NVVMTypeLoweringContext::_lowerRawBufferType(
     }
     else
     {
-        SLANG_RETURN_ON_FAIL(
-            lowerType(type.structuredElementType, NVVMTypeUse::Value, loweredElementType));
+        SLANG_RETURN_ON_FAIL(lowerType(
+            type.structuredElementType,
+            _getNVVMStructuredBufferElementTypeUse(type.structuredElementType),
+            loweredElementType));
     }
     SlangNVVMTypeHandle dataPointerType = nullptr;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -1715,7 +1802,10 @@ SlangResult NVVMTypeLoweringContext::_lowerParameterGroupType(
     SLANG_RETURN_ON_FAIL(
         lowerType(elementType, NVVMTypeUse::ParameterGroupStorage, loweredElementType));
 
-    const PointerTypeKey key = {elementType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL};
+    const PointerTypeKey key = {
+        elementType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        NVVMTypeUse::ParameterGroupStorage};
     if (auto mappedRepresentation = m_pointerRepresentationMap.tryGetValue(key))
     {
         outType = *mappedRepresentation;
@@ -1759,7 +1849,7 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
     // legal through only one of them, but LLVM represents both as the same `i32 addrspace(1)*`.
     // Cache that provider representation by exact pointee identity and address space, then record
     // the resulting handle separately for each canonical source type.
-    const PointerTypeKey key = {pointeeType, addressSpace};
+    const PointerTypeKey key = {pointeeType, addressSpace, pointeeUse};
     if (auto mappedRepresentation = m_pointerRepresentationMap.tryGetValue(key))
     {
         outType = *mappedRepresentation;
@@ -1850,6 +1940,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRPtrTypeBase* sharedElementPointer = asNVVMSupportedSharedElementPointerType(type);
     IRType* atomicValueType = nullptr;
     IRAtomicType* atomicType = asNVVMSupportedAtomicType(type, &atomicValueType);
+    const bool isStructuredBufferStorage = isNVVMSupportedStructuredBufferStorageType(type);
 
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
@@ -1876,7 +1967,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           aggregateStorageArrayType || deviceCopyablePointer || isRawBuffer || parameterGroup ||
           isSurface || isSampledTexture || samplerStorage || unsizedSamplerArrayStorage ||
           atomicType)) ||
-        (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type));
+        (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type)) ||
+        (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage);
     if (!isLegal)
         return _reportUnsupportedType(use);
 
@@ -1908,6 +2000,12 @@ SlangResult NVVMTypeLoweringContext::lowerType(
 
     if (use == NVVMTypeUse::HelperValue && isNVVMSupportedCopyableValueType(type))
         return lowerType(type, NVVMTypeUse::Value, outType);
+
+    // Matrix legalization marks its one-field wrapper as PhysicalType. Its canonical value is
+    // already the external storage spelling, so use the same provider handle as every typed
+    // structured-buffer pointer instead of creating a parallel ordinary-value struct.
+    if (use == NVVMTypeUse::Value && physicalArrayStructType)
+        return lowerType(type, NVVMTypeUse::StructuredBufferStorage, outType);
 
     if (use == NVVMTypeUse::EntryPointParameter && deviceCopyablePointer)
     {
@@ -2069,9 +2167,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
 
     const bool isAggregateStorage =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
-    auto& typeMap = use == NVVMTypeUse::HelperValue ? m_helperABIRepresentationMap
-                    : isAggregateStorage            ? m_aggregateStorageTypeMap
-                                                    : m_typeMap;
+    auto& typeMap = use == NVVMTypeUse::HelperValue               ? m_helperABIRepresentationMap
+                    : use == NVVMTypeUse::StructuredBufferStorage ? m_structuredBufferStorageTypeMap
+                    : isAggregateStorage                          ? m_aggregateStorageTypeMap
+                                                                  : m_typeMap;
     if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
@@ -2086,8 +2185,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (isInteger || isBool)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            isInteger ? "selected integer type" : "Boolean type",
-            m_builder.getIntegerType(m_module, isInteger ? integerBitWidth : 1u, outType)));
+            isInteger                                     ? "selected integer type"
+            : use == NVVMTypeUse::StructuredBufferStorage ? "structured-buffer Boolean storage type"
+                                                          : "Boolean type",
+            m_builder.getIntegerType(
+                m_module,
+                isInteger                                     ? integerBitWidth
+                : use == NVVMTypeUse::StructuredBufferStorage ? 8u
+                                                              : 1u,
+                outType)));
     }
     else if (isFloatingPoint)
     {
@@ -2100,14 +2206,22 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (valueVectorType)
     {
         SlangNVVMTypeHandle elementType = nullptr;
-        SLANG_RETURN_ON_FAIL(
-            lowerType(valueVectorType->getElementType(), NVVMTypeUse::Value, elementType));
+        SLANG_RETURN_ON_FAIL(lowerType(
+            valueVectorType->getElementType(),
+            use == NVVMTypeUse::StructuredBufferStorage ? NVVMTypeUse::StructuredBufferStorage
+                                                        : NVVMTypeUse::Value,
+            elementType));
+        const bool useStructuredBufferArray =
+            use == NVVMTypeUse::StructuredBufferStorage && valueVectorElementCount == 3;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            compactParameterGroupVectorType &&
+            useStructuredBufferArray ? "structured-buffer vector storage type"
+            : compactParameterGroupVectorType &&
                     (use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage)
                 ? "compact aggregate vector storage type"
                 : "selected value vector type",
-            compactParameterGroupVectorType &&
+            useStructuredBufferArray
+                ? m_builder.getArrayType(m_module, elementType, valueVectorElementCount, outType)
+            : compactParameterGroupVectorType &&
                     (use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage)
                 ? m_builder.getArrayType(m_module, elementType, valueVectorElementCount, outType)
                 : m_builder
@@ -2115,6 +2229,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
     else if (
         fixedCopyableArrayType || fixedHelperArrayType ||
+        (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage &&
+         as<IRArrayType>(type)) ||
         ((use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage) &&
          aggregateStorageArrayType))
     {
@@ -2154,7 +2270,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             type,
             bufferDataPointerType.elementType,
             SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-            outType);
+            outType,
+            _getNVVMStructuredBufferElementTypeUse(bufferDataPointerType.elementType));
     }
     else if (parameterGroup)
     {
@@ -2191,7 +2308,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             type,
             resourceElementPointer->getValueType(),
             SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-            outType);
+            outType,
+            _getNVVMStructuredBufferElementTypeUse(resourceElementPointer->getValueType()));
     }
 
     typeMap[type] = outType;

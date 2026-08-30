@@ -25,6 +25,30 @@ static const IRIntegerValue kNVVMI32Min = -2147483647 - 1;
 static const IRIntegerValue kNVVMI32Max = 2147483647;
 static const IRIntegerValue kNVVMUInt32Max = 4294967295;
 static const uint32_t kNVVMPointerAlignment = 8;
+static const SlangNVVMValueTypeDesc kNVVMUnsignedI8 = {
+    SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+    8,
+    1,
+};
+static const SlangNVVMValueTypeDesc kNVVMStructuredBoolLoadOperands[] = {
+    kNVVMUnsignedI8,
+    kNVVMUnsignedI8,
+};
+static const SlangNVVMValueOperationDesc kNVVMStructuredBoolLoadOperation = {
+    SLANG_NVVM_VALUE_OP_NOT_EQUAL,
+    NVVMSemantics::kBool,
+    kNVVMStructuredBoolLoadOperands,
+    SLANG_COUNT_OF(kNVVMStructuredBoolLoadOperands),
+};
+static const SlangNVVMValueTypeDesc kNVVMStructuredBoolStoreOperands[] = {
+    NVVMSemantics::kBool,
+};
+static const SlangNVVMValueOperationDesc kNVVMStructuredBoolStoreOperation = {
+    SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+    kNVVMUnsignedI8,
+    kNVVMStructuredBoolStoreOperands,
+    SLANG_COUNT_OF(kNVVMStructuredBoolStoreOperands),
+};
 
 // Returns the natural alignment of every first-class value admitted by the direct backend.
 uint32_t _getNVVMExecutableValueAlignment(IRInst* type)
@@ -342,7 +366,6 @@ struct NVVMStructuredBufferLoad
     IRInst* elementIndex = nullptr;
     NVVMRawBufferType bufferType;
     IRType* resultType = nullptr;
-    uint32_t alignment = 0;
     SlangNVVMLoadFlags flags = SLANG_NVVM_LOAD_FLAG_NONE;
 };
 
@@ -369,7 +392,8 @@ bool _getNVVMStructuredBufferLoad(IRInst* inst, NVVMStructuredBufferLoad& outLoa
     if (!buffer || !elementIndex || !isNVVMInteger32Type(elementIndex->getDataType()) ||
         !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
         bufferType.kind != NVVMRawBufferKind::Structured || bufferType.access != expectedAccess ||
-        !isNVVMRawBufferElementType(bufferType, resultType) || !alignment)
+        !isNVVMRawBufferElementType(bufferType, resultType) ||
+        (!alignment && !isNVVMSupportedStructuredBufferStorageType(resultType)))
     {
         return false;
     }
@@ -378,7 +402,6 @@ bool _getNVVMStructuredBufferLoad(IRInst* inst, NVVMStructuredBufferLoad& outLoa
     outLoad.elementIndex = elementIndex;
     outLoad.bufferType = bufferType;
     outLoad.resultType = resultType;
-    outLoad.alignment = alignment;
     outLoad.flags = expectedAccess == NVVMBufferAccess::ReadOnly ? SLANG_NVVM_LOAD_FLAG_INVARIANT
                                                                  : SLANG_NVVM_LOAD_FLAG_NONE;
     return true;
@@ -846,6 +869,120 @@ bool _hasNVVMCompatibleCopyableValueLayout(CodeGenContext* codeGenContext, IRTyp
            cudaLayout.alignment == llvmLayout.alignment;
 }
 
+IRIntegerValue _alignNVVMStorageSize(IRIntegerValue size, IRIntegerValue alignment)
+{
+    SLANG_RELEASE_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0);
+    return (size + alignment - 1) & ~(alignment - 1);
+}
+
+// Computes the physical provider representation selected at a structured-buffer boundary. The
+// final IR type remains the semantic source of truth: this routine merely proves that the derived
+// UInt8 Boolean, scalar-array vector3, fixed-array, and direct-field struct representation has the
+// exact pointer stride and field offsets required by external storage. Loads and stores carry the
+// canonical CUDA alignment explicitly, so a stronger provider-preferred root alignment is valid.
+bool _getNVVMStructuredBufferStorageLayout(
+    CodeGenContext* codeGenContext,
+    IRType* type,
+    IRSizeAndAlignment& outLayout)
+{
+    outLayout = {};
+    if (!codeGenContext || !isNVVMSupportedStructuredBufferStorageType(type))
+        return false;
+
+    if (isNVVMBoolType(type))
+    {
+        outLayout.size = 1;
+        outLayout.alignment = 1;
+        return true;
+    }
+
+    uint32_t laneCount = 0;
+    if (auto vectorType = asNVVMSupportedValueVectorType(type, &laneCount))
+    {
+        if (isNVVMBoolType(vectorType->getElementType()) || laneCount == 3)
+        {
+            IRSizeAndAlignment elementLayout;
+            if (!_getNVVMStructuredBufferStorageLayout(
+                    codeGenContext,
+                    vectorType->getElementType(),
+                    elementLayout))
+            {
+                return false;
+            }
+            const IRIntegerValue stride =
+                _alignNVVMStorageSize(elementLayout.size, elementLayout.alignment);
+            outLayout.size = laneCount * stride;
+            outLayout.alignment = isNVVMBoolType(vectorType->getElementType())
+                                      ? (laneCount == 2   ? 2
+                                         : laneCount == 3 ? 1
+                                                          : 4)
+                                      : elementLayout.alignment;
+            return true;
+        }
+    }
+
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        auto count = as<IRIntLit>(arrayType->getElementCount());
+        IRSizeAndAlignment elementLayout;
+        if (!count || !_getNVVMStructuredBufferStorageLayout(
+                          codeGenContext,
+                          arrayType->getElementType(),
+                          elementLayout))
+        {
+            return false;
+        }
+        const IRIntegerValue stride =
+            _alignNVVMStorageSize(elementLayout.size, elementLayout.alignment);
+        if (IRInst* explicitStride = arrayType->getArrayStride())
+        {
+            auto strideValue = as<IRIntLit>(explicitStride);
+            if (!strideValue || strideValue->getValue() != stride)
+                return false;
+        }
+        outLayout.size = count->getValue() * stride;
+        outLayout.alignment = elementLayout.alignment;
+        return true;
+    }
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        IRIntegerValue size = 0;
+        int alignment = 1;
+        for (auto field : structType->getFields())
+        {
+            IRSizeAndAlignment fieldLayout;
+            IRIntegerValue cudaOffset = 0;
+            if (!_getNVVMStructuredBufferStorageLayout(
+                    codeGenContext,
+                    field->getFieldType(),
+                    fieldLayout) ||
+                SLANG_FAILED(getOffset(
+                    codeGenContext->getTargetReq(),
+                    IRTypeLayoutRules::getCUDA(),
+                    field,
+                    &cudaOffset)))
+            {
+                return false;
+            }
+            size = _alignNVVMStorageSize(size, fieldLayout.alignment);
+            if (cudaOffset != size)
+                return false;
+            size += fieldLayout.size;
+            alignment = Math::Max(alignment, fieldLayout.alignment);
+        }
+        outLayout.size = _alignNVVMStorageSize(size, alignment);
+        outLayout.alignment = alignment;
+        return true;
+    }
+
+    return SLANG_SUCCEEDED(getSizeAndAlignment(
+        codeGenContext->getTargetReq(),
+        IRTypeLayoutRules::getLLVM(),
+        type,
+        &outLayout));
+}
+
 // Verifies the external element representation selected by one canonical structured-buffer view.
 // Byte-address views keep their fixed UInt32 storage contract and need no element comparison.
 bool _hasNVVMCompatibleRawBufferElementLayout(CodeGenContext* codeGenContext, IRType* type)
@@ -853,16 +990,52 @@ bool _hasNVVMCompatibleRawBufferElementLayout(CodeGenContext* codeGenContext, IR
     NVVMRawBufferType rawBufferType;
     if (!getNVVMSupportedRawBufferType(type, rawBufferType))
         return false;
-    return rawBufferType.kind == NVVMRawBufferKind::ByteAddress ||
-           _hasNVVMCompatibleCopyableValueLayout(
-               codeGenContext,
-               rawBufferType.structuredElementType);
+    if (rawBufferType.kind == NVVMRawBufferKind::ByteAddress)
+        return true;
+
+    // Resource-containing structured-buffer elements were already supported through their exact
+    // ordinary value representation. They are a distinct canonical family from the recursively
+    // converted numeric/Boolean storage algebra introduced here, so keep proving them with the
+    // established CUDA/LLVM value-layout contract.
+    if (!isNVVMSupportedStructuredBufferStorageType(rawBufferType.structuredElementType))
+    {
+        return _hasNVVMCompatibleCopyableValueLayout(
+            codeGenContext,
+            rawBufferType.structuredElementType);
+    }
+
+    IRSizeAndAlignment providerLayout;
+    IRSizeAndAlignment cudaLayout;
+    const bool providerOK = _getNVVMStructuredBufferStorageLayout(
+        codeGenContext,
+        rawBufferType.structuredElementType,
+        providerLayout);
+    const bool cudaOK = SLANG_SUCCEEDED(getSizeAndAlignment(
+        codeGenContext->getTargetReq(),
+        IRTypeLayoutRules::getCUDA(),
+        rawBufferType.structuredElementType,
+        &cudaLayout));
+    // Pointer stride and every nested field offset are fixed by the provider type, while each
+    // load/store carries CUDA's explicit conservative alignment. LLVM may prefer a stronger
+    // aggregate alignment without changing either memory fact; `Thing { uint, float, half4 }` is
+    // the established example (16-byte size, offsets 0/4/8, CUDA alignment 4, LLVM alignment 8).
+    return providerOK && cudaOK && providerLayout.size == cudaLayout.size;
 }
 
-IRIntegerValue _alignNVVMStorageSize(IRIntegerValue size, IRIntegerValue alignment)
+uint32_t _getNVVMStructuredBufferMemoryAlignment(CodeGenContext* codeGenContext, IRType* type)
 {
-    SLANG_RELEASE_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0);
-    return (size + alignment - 1) & ~(alignment - 1);
+    IRSizeAndAlignment cudaLayout;
+    if (!codeGenContext ||
+        SLANG_FAILED(getSizeAndAlignment(
+            codeGenContext->getTargetReq(),
+            IRTypeLayoutRules::getCUDA(),
+            type,
+            &cudaLayout)) ||
+        cudaLayout.alignment <= 0 || cudaLayout.alignment > UINT32_MAX)
+    {
+        return 0;
+    }
+    return uint32_t(cudaLayout.alignment);
 }
 
 // Computes the provider layout selected for one aggregate-storage type. Three-lane 32-bit vectors
@@ -989,7 +1162,8 @@ void _addNVVMReachableStructTypes(IRType* type, HashSet<IRInst*>& reachableTypes
     while (auto arrayType = as<IRArrayType>(type))
     {
         if (!asNVVMSupportedHelperArrayType(arrayType) &&
-            !asNVVMSupportedAggregateStorageArrayType(arrayType))
+            !asNVVMSupportedAggregateStorageArrayType(arrayType) &&
+            !isNVVMSupportedStructuredBufferStorageType(arrayType))
             return;
         type = arrayType->getElementType();
     }
@@ -997,7 +1171,8 @@ void _addNVVMReachableStructTypes(IRType* type, HashSet<IRInst*>& reachableTypes
     if (!structType ||
         (!asNVVMSupportedHelperStructType(structType) &&
          !asNVVMSupportedResourceStructType(structType) &&
-         !asNVVMSupportedAggregateStorageStructType(structType)) ||
+         !asNVVMSupportedAggregateStorageStructType(structType) &&
+         !isNVVMSupportedStructuredBufferStorageType(structType)) ||
         reachableTypes.contains(structType))
         return;
     reachableTypes.add(structType);
@@ -1007,7 +1182,7 @@ void _addNVVMReachableStructTypes(IRType* type, HashSet<IRInst*>& reachableTypes
     }
 }
 
-// Returns the retained aggregate declaration required by an accepted structured-buffer view.
+// Returns the retained aggregate declaration required by the selected external-storage family.
 // The view itself is the canonical producer of this dependency; requiring an unrelated local of
 // the same type would make otherwise identical raw and conventional entry signatures diverge.
 IRStructType* _getNVVMRawBufferAggregateElementType(IRType* type)
@@ -1018,12 +1193,11 @@ IRStructType* _getNVVMRawBufferAggregateElementType(IRType* type)
     {
         return nullptr;
     }
-    if (auto resourceStruct =
-            asNVVMSupportedResourceStructType(rawBufferType.structuredElementType))
-    {
-        return resourceStruct;
-    }
-    return asNVVMSupportedPhysicalArrayStructType(rawBufferType.structuredElementType);
+    auto structType = as<IRStructType>(rawBufferType.structuredElementType);
+    return structType &&
+                   isNVVMSupportedStructuredBufferStorageType(rawBufferType.structuredElementType)
+               ? structType
+               : nullptr;
 }
 
 // Maps a canonical global produced by CUDA varying legalization to its semantic provider operation.
@@ -1319,6 +1493,7 @@ struct NVVMAggregateConstruction
     IRType* resultType = nullptr;
     uint32_t elementCount = 0;
     bool repeatsSingleElement = false;
+    NVVMTypeUse resultUse = NVVMTypeUse::Value;
 };
 
 // Resolves a canonical aggregate value whose complete ordered element sequence is explicit in
@@ -1334,6 +1509,12 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     {
         uint32_t elementCount = 0;
         auto resultType = asNVVMSupportedHelperArrayType(inst->getDataType(), &elementCount);
+        if (!resultType)
+        {
+            resultType =
+                asNVVMSupportedAggregateStorageArrayType(inst->getDataType(), &elementCount);
+            outConstruction.resultUse = NVVMTypeUse::Storage;
+        }
         if (!resultType || inst->getOperandCount() != elementCount)
             return false;
         for (uint32_t i = 0; i < elementCount; ++i)
@@ -1351,6 +1532,12 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     {
         uint32_t elementCount = 0;
         auto resultType = asNVVMSupportedHelperArrayType(inst->getDataType(), &elementCount);
+        if (!resultType)
+        {
+            resultType =
+                asNVVMSupportedAggregateStorageArrayType(inst->getDataType(), &elementCount);
+            outConstruction.resultUse = NVVMTypeUse::Storage;
+        }
         IRInst* element = inst->getOperandCount() == 1 ? inst->getOperand(0) : nullptr;
         if (!resultType || !element ||
             !isTypeEqual(element->getDataType(), resultType->getElementType()))
@@ -1364,6 +1551,8 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     auto resultType = inst->getOp() == kIROp_MakeStruct
                           ? asNVVMSupportedHelperStructType(inst->getDataType())
                           : nullptr;
+    if (!resultType && inst->getOp() == kIROp_MakeStruct)
+        resultType = asNVVMSupportedPhysicalArrayStructType(inst->getDataType());
     if (!resultType)
         return false;
 
@@ -4398,6 +4587,112 @@ void _requireValueOperation(
     requirements.add(requirement);
 }
 
+void _requireNVVMStructuredBufferStorageConversion(
+    NVVMValueOperationRequirements& requirements,
+    IRType* type,
+    bool requiresLoad,
+    bool requiresStore,
+    HashSet<IRInst*>& activeTypes)
+{
+    if (!type || activeTypes.contains(type))
+        return;
+    if (isNVVMBoolType(type))
+    {
+        if (requiresLoad)
+        {
+            _requireValueOperation(
+                requirements,
+                kNVVMStructuredBoolLoadOperation,
+                "structured-buffer Boolean load conversion");
+        }
+        if (requiresStore)
+        {
+            _requireValueOperation(
+                requirements,
+                kNVVMStructuredBoolStoreOperation,
+                "structured-buffer Boolean store conversion");
+        }
+        return;
+    }
+
+    if (auto vectorType = asNVVMSupportedValueVectorType(type))
+    {
+        _requireNVVMStructuredBufferStorageConversion(
+            requirements,
+            vectorType->getElementType(),
+            requiresLoad,
+            requiresStore,
+            activeTypes);
+        return;
+    }
+
+    activeTypes.add(type);
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        _requireNVVMStructuredBufferStorageConversion(
+            requirements,
+            arrayType->getElementType(),
+            requiresLoad,
+            requiresStore,
+            activeTypes);
+    }
+    else if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            _requireNVVMStructuredBufferStorageConversion(
+                requirements,
+                field->getFieldType(),
+                requiresLoad,
+                requiresStore,
+                activeTypes);
+        }
+    }
+    activeTypes.remove(type);
+}
+
+void _requireNVVMStructuredBufferStorageConversion(
+    NVVMValueOperationRequirements& requirements,
+    IRType* type,
+    bool requiresLoad,
+    bool requiresStore)
+{
+    HashSet<IRInst*> activeTypes;
+    _requireNVVMStructuredBufferStorageConversion(
+        requirements,
+        type,
+        requiresLoad,
+        requiresStore,
+        activeTypes);
+}
+
+// Returns the semantic pointee of an exact pointer chain rooted at a structured-buffer data or
+// writable-element producer. `getRootAddr` is the canonical address utility used by memory
+// validation; recognizing only these two roots prevents unrelated struct and array pointers from
+// silently acquiring an external-storage representation.
+IRType* _getNVVMStructuredBufferStoragePointerValueType(IRInst* pointer)
+{
+    auto pointerType = pointer ? as<IRPtrTypeBase>(pointer->getDataType()) : nullptr;
+    IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
+    if (!valueType || !isNVVMSupportedStructuredBufferStorageType(valueType))
+        return nullptr;
+
+    IRInst* root = getRootAddr(pointer);
+    if (!root)
+        return nullptr;
+    if (root->getOp() == kIROp_RWStructuredBufferGetElementPtr &&
+        asNVVMSupportedRWStructuredBufferElementPointerType(root->getDataType()))
+    {
+        return valueType;
+    }
+
+    NVVMRawBufferDataPointer dataPointer;
+    return _getNVVMRawBufferDataPointer(root, dataPointer) &&
+                   dataPointer.bufferType.kind == NVVMRawBufferKind::Structured
+               ? valueType
+               : nullptr;
+}
+
 void _requireNVVMAtomicReductionOperations(
     NVVMOperationRequirements& requirements,
     const NVVMResolvedAtomicReduction& reduction)
@@ -5052,6 +5347,8 @@ SlangResult _validateSelectedValue(
     const bool requiresAvailability =
         valueType &&
         (asNVVMSupportedValueVectorType(valueType) ||
+         ((as<IRArrayType>(valueType) || as<IRStructType>(valueType)) &&
+          isNVVMSupportedStructuredBufferStorageType(valueType)) ||
          (_getNVVMExecutableValueAlignment(valueType) &&
           !isNVVMSupportedIntegerScalarType(valueType) &&
           !isNVVMSupportedFloatingPointScalarType(valueType) && !isNVVMBoolType(valueType)));
@@ -5821,15 +6118,46 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_Load:
                 {
-                    if (!_getNVVMExecutableValueAlignment(inst->getDataType()) &&
+                    IRType* storageType =
+                        _getNVVMStructuredBufferStoragePointerValueType(inst->getOperand(0));
+                    if (storageType && !isTypeEqual(storageType, inst->getDataType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("structured-buffer load type"));
+                    }
+                    if (!storageType && !_getNVVMExecutableValueAlignment(inst->getDataType()) &&
                         !asNVVMSupportedParameterGroupType(inst->getDataType()))
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
+                    if (storageType)
+                    {
+                        _requireNVVMStructuredBufferStorageConversion(
+                            requirements.valueOperations,
+                            storageType,
+                            true,
+                            false);
+                    }
                 }
                 break;
 
             case kIROp_Store:
                 if (inst->getOperandCount() != 2 || !inst->getOperand(0))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("store"));
+                if (IRType* storageType =
+                        _getNVVMStructuredBufferStoragePointerValueType(inst->getOperand(0)))
+                {
+                    if (!isTypeEqual(storageType, inst->getOperand(1)->getDataType()))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("structured-buffer store type"));
+                    }
+                    _requireNVVMStructuredBufferStorageConversion(
+                        requirements.valueOperations,
+                        storageType,
+                        false,
+                        true);
+                }
                 if (isPointerToImmutableLocation(getRootAddr(inst->getOperand(0))))
                 {
                     return _diagnoseUnsupportedIR(
@@ -6244,6 +6572,14 @@ SlangResult _validateNVVMFunction(
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
                             toSlice("raw structured-buffer value load"));
+                    }
+                    if (isNVVMSupportedStructuredBufferStorageType(load.resultType))
+                    {
+                        _requireNVVMStructuredBufferStorageConversion(
+                            requirements.valueOperations,
+                            load.resultType,
+                            true,
+                            false);
                     }
                 }
                 break;
@@ -7451,6 +7787,218 @@ SlangResult _getLoweredNVVMHelperValue(
         outValue));
     helperValueMap[irValue] = outValue;
     return SLANG_OK;
+}
+
+SlangResult _emitNVVMSequentialElementExtract(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle aggregate,
+    uint32_t index,
+    SlangNVVMValueHandle& outElement)
+{
+    SlangNVVMTypeHandle indexType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "structured-buffer conversion index type",
+        builder.getIntegerType(module, 32, indexType)));
+    SlangNVVMValueHandle indexValue = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "structured-buffer conversion index",
+        builder.getIntegerConstant(module, indexType, index, indexValue)));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "structured-buffer vector lane extraction",
+        builder.emitSequentialElementExtract(module, aggregate, indexValue, outElement));
+}
+
+// Crosses one selected external structured-buffer boundary without changing the canonical IR
+// value. Structs and arrays follow their direct declarations, vector3 uses its compact scalar
+// array, and Boolean leaves use the CUDA byte representation. The same recursion is used in both
+// directions so a writable field chain cannot select a different physical spelling from a direct
+// buffer load.
+SlangResult _emitNVVMStructuredBufferStorageConversion(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    NVVMTypeLoweringContext& typeContext,
+    IRType* type,
+    bool storageToValue,
+    SlangNVVMValueHandle input,
+    SlangNVVMValueHandle& outValue)
+{
+    SLANG_RELEASE_ASSERT(isNVVMSupportedStructuredBufferStorageType(type));
+    outValue = nullptr;
+
+    // Matrix legalization deliberately produces a PhysicalType wrapper whose ordinary provider
+    // value is already its external storage representation. Its explicit-stride array producer
+    // performs the only required vector3 conversion before constructing the wrapper.
+    if (asNVVMSupportedPhysicalArrayStructType(type))
+    {
+        outValue = input;
+        return SLANG_OK;
+    }
+
+    if (isNVVMBoolType(type))
+    {
+        if (storageToValue)
+        {
+            SlangNVVMTypeHandle storageType = nullptr;
+            SLANG_RETURN_ON_FAIL(
+                typeContext.lowerType(type, NVVMTypeUse::StructuredBufferStorage, storageType));
+            SlangNVVMValueHandle zero = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "structured-buffer Boolean zero",
+                builder.getIntegerConstant(module, storageType, 0, zero)));
+            const SlangNVVMValueHandle operands[] = {input, zero};
+            return _requireBuilderOperation(
+                codeGenContext,
+                "structured-buffer Boolean load conversion",
+                builder.emitValueOperation(
+                    module,
+                    kNVVMStructuredBoolLoadOperation,
+                    operands,
+                    SLANG_COUNT_OF(operands),
+                    outValue));
+        }
+
+        return _requireBuilderOperation(
+            codeGenContext,
+            "structured-buffer Boolean store conversion",
+            builder.emitValueOperation(
+                module,
+                kNVVMStructuredBoolStoreOperation,
+                &input,
+                1,
+                outValue));
+    }
+
+    uint32_t laneCount = 0;
+    if (auto vectorType = asNVVMSupportedValueVectorType(type, &laneCount))
+    {
+        const bool isBoolVector = isNVVMBoolType(vectorType->getElementType());
+        if (!isBoolVector && laneCount != 3)
+        {
+            outValue = input;
+            return SLANG_OK;
+        }
+
+        List<SlangNVVMValueHandle> elements;
+        for (uint32_t index = 0; index < laneCount; ++index)
+        {
+            SlangNVVMValueHandle element = nullptr;
+            if (storageToValue && laneCount == 3)
+            {
+                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                    codeGenContext,
+                    "structured-buffer compact vector element extraction",
+                    builder.emitAggregateElementExtract(module, input, index, element)));
+            }
+            else
+            {
+                SLANG_RETURN_ON_FAIL(_emitNVVMSequentialElementExtract(
+                    codeGenContext,
+                    builder,
+                    module,
+                    input,
+                    index,
+                    element));
+            }
+
+            SlangNVVMValueHandle convertedElement = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMStructuredBufferStorageConversion(
+                codeGenContext,
+                builder,
+                module,
+                typeContext,
+                vectorType->getElementType(),
+                storageToValue,
+                element,
+                convertedElement));
+            elements.add(convertedElement);
+        }
+
+        SlangNVVMTypeHandle targetType = nullptr;
+        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+            type,
+            storageToValue ? NVVMTypeUse::Value : NVVMTypeUse::StructuredBufferStorage,
+            targetType));
+        const bool targetIsArray = !storageToValue && laneCount == 3;
+        return _requireBuilderOperation(
+            codeGenContext,
+            targetIsArray ? "structured-buffer compact vector storage construction"
+                          : "structured-buffer semantic vector construction",
+            targetIsArray ? builder.emitAggregateConstruct(
+                                module,
+                                targetType,
+                                elements.getBuffer(),
+                                size_t(elements.getCount()),
+                                outValue)
+                          : builder.emitVectorConstruct(
+                                module,
+                                targetType,
+                                elements.getBuffer(),
+                                size_t(elements.getCount()),
+                                outValue));
+    }
+
+    List<IRType*> elementTypes;
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        const uint32_t elementCount =
+            uint32_t(cast<IRIntLit>(arrayType->getElementCount())->getValue());
+        for (uint32_t index = 0; index < elementCount; ++index)
+            elementTypes.add(arrayType->getElementType());
+    }
+    else if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+            elementTypes.add(field->getFieldType());
+    }
+    else
+    {
+        outValue = input;
+        return SLANG_OK;
+    }
+
+    List<SlangNVVMValueHandle> elements;
+    for (Index index = 0; index < elementTypes.getCount(); ++index)
+    {
+        SlangNVVMValueHandle element = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "structured-buffer aggregate element extraction",
+            builder.emitAggregateElementExtract(module, input, uint32_t(index), element)));
+        SlangNVVMValueHandle convertedElement = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMStructuredBufferStorageConversion(
+            codeGenContext,
+            builder,
+            module,
+            typeContext,
+            elementTypes[index],
+            storageToValue,
+            element,
+            convertedElement));
+        elements.add(convertedElement);
+    }
+
+    SlangNVVMTypeHandle targetType = nullptr;
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+        type,
+        storageToValue ? NVVMTypeUse::Value : NVVMTypeUse::StructuredBufferStorage,
+        targetType));
+    return _requireBuilderOperation(
+        codeGenContext,
+        storageToValue ? "structured-buffer semantic aggregate reconstruction"
+                       : "structured-buffer physical aggregate construction",
+        builder.emitAggregateConstruct(
+            module,
+            targetType,
+            elements.getBuffer(),
+            size_t(elements.getCount()),
+            outValue));
 }
 
 SlangResult _emitNVVMValueRecipeStep(
@@ -9106,12 +9654,6 @@ SlangResult validateNVVMSupportedIR(
             }
             if (elementStruct)
             {
-                if (!_hasNVVMCompatibleStructLayout(codeGenContext, elementStruct))
-                {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        toSlice("structured-buffer aggregate layout"));
-                }
                 _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
             }
         }
@@ -9128,12 +9670,6 @@ SlangResult validateNVVMSupportedIR(
             if (auto elementStruct =
                     _getNVVMRawBufferAggregateElementType(parameter->getDataType()))
             {
-                if (!_hasNVVMCompatibleStructLayout(codeGenContext, elementStruct))
-                {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        toSlice("structured-buffer aggregate layout"));
-                }
                 _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
             }
             NVVMRawBufferType rawBufferType;
@@ -9656,6 +10192,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Load:
                     {
                         auto load = cast<IRLoad>(inst);
+                        IRType* structuredStorageType =
+                            _getNVVMStructuredBufferStoragePointerValueType(load->getPtr());
                         IRVectorType* compactStorageVector =
                             _getNVVMCompactParameterGroupVectorPointer(load->getPtr());
                         SlangNVVMValueHandle loweredPointer = nullptr;
@@ -9673,6 +10211,13 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 ? getNVVMNumericValueAlignment(
                                       compactStorageVector->getElementType())
                                 : _getNVVMExecutableValueAlignment(load->getDataType());
+                        if (structuredStorageType)
+                        {
+                            alignment = _getNVVMStructuredBufferMemoryAlignment(
+                                codeGenContext,
+                                structuredStorageType);
+                            SLANG_RELEASE_ASSERT(alignment);
+                        }
                         NVVMRawBufferType rawBufferType;
                         NVVMSurfaceType surfaceType;
                         NVVMReadOnlyTextureType sampledTextureType;
@@ -9700,6 +10245,20 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 alignment,
                                 loadFlags,
                                 loweredValue)));
+                        if (structuredStorageType)
+                        {
+                            SlangNVVMValueHandle semanticValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMStructuredBufferStorageConversion(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                typeContext,
+                                structuredStorageType,
+                                true,
+                                loweredValue,
+                                semanticValue));
+                            loweredValue = semanticValue;
+                        }
                         NVVMStructField pointerStorageField;
                         if (asNVVMSupportedDeviceCopyableValuePointerType(load->getDataType()) &&
                             _getNVVMStructFieldAddress(
@@ -9751,6 +10310,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Store:
                     {
                         auto store = cast<IRStore>(inst);
+                        IRType* structuredStorageType =
+                            _getNVVMStructuredBufferStoragePointerValueType(store->getPtr());
                         SlangNVVMValueHandle loweredValue = nullptr;
                         IRInst* rootAddress = getRootAddr(store->getPtr());
                         if (asNVVMSupportedDeviceCopyableValuePointerType(
@@ -9780,6 +10341,20 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 typeContext,
                                 loweredValue));
                         }
+                        if (structuredStorageType)
+                        {
+                            SlangNVVMValueHandle storageValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMStructuredBufferStorageConversion(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                typeContext,
+                                structuredStorageType,
+                                false,
+                                loweredValue,
+                                storageValue));
+                            loweredValue = storageValue;
+                        }
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -9789,6 +10364,15 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredPointer));
+                        uint32_t alignment =
+                            _getNVVMExecutableValueAlignment(store->getVal()->getDataType());
+                        if (structuredStorageType)
+                        {
+                            alignment = _getNVVMStructuredBufferMemoryAlignment(
+                                codeGenContext,
+                                structuredStorageType);
+                            SLANG_RELEASE_ASSERT(alignment);
+                        }
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "value store",
@@ -9796,7 +10380,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 loweredValue,
                                 loweredPointer,
-                                _getNVVMExecutableValueAlignment(store->getVal()->getDataType()))));
+                                alignment)));
                     }
                     break;
 
@@ -10260,12 +10844,28 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     helperValueMap,
                                     typeContext,
                                     loweredElement));
+                                if (aggregateConstruction.resultUse == NVVMTypeUse::Storage)
+                                {
+                                    auto resultArray =
+                                        cast<IRArrayType>(aggregateConstruction.resultType);
+                                    SlangNVVMValueHandle storageElement = nullptr;
+                                    SLANG_RETURN_ON_FAIL(_emitNVVMStructuredBufferStorageConversion(
+                                        codeGenContext,
+                                        builder,
+                                        moduleScope.module,
+                                        typeContext,
+                                        resultArray->getElementType(),
+                                        false,
+                                        loweredElement,
+                                        storageElement));
+                                    loweredElement = storageElement;
+                                }
                                 loweredElements.add(loweredElement);
                             }
                             SlangNVVMTypeHandle loweredResultType = nullptr;
                             SLANG_RETURN_ON_FAIL(typeContext.lowerType(
                                 aggregateConstruction.resultType,
-                                NVVMTypeUse::Value,
+                                aggregateConstruction.resultUse,
                                 loweredResultType));
                             SlangNVVMValueHandle loweredValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -11146,6 +11746,10 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 loweredDataPointer,
                                 loweredElementIndex,
                                 loweredElementPointer)));
+                        const uint32_t storageAlignment = _getNVVMStructuredBufferMemoryAlignment(
+                            codeGenContext,
+                            load.resultType);
+                        SLANG_RELEASE_ASSERT(storageAlignment);
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
@@ -11153,9 +11757,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                             builder.emitLoad(
                                 moduleScope.module,
                                 loweredElementPointer,
-                                load.alignment,
+                                storageAlignment,
                                 load.flags,
                                 loweredValue)));
+                        if (isNVVMSupportedStructuredBufferStorageType(load.resultType))
+                        {
+                            SlangNVVMValueHandle semanticValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMStructuredBufferStorageConversion(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                typeContext,
+                                load.resultType,
+                                true,
+                                loweredValue,
+                                semanticValue));
+                            loweredValue = semanticValue;
+                        }
                         valueMap[inst] = loweredValue;
                     }
                     break;

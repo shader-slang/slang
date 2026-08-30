@@ -2040,3 +2040,27 @@ aggregate/pointer/layout transport (12), preflight other (11), atomic/wave opera
 residual target markers (10), helper ABI/type contracts (9), and wave/reconvergence GenericAsm
 (8). The selected prefix passes 421/421, while representative direct O3 PTX remains accepted for
 SM70, SM80, and SM90 with CUDA 12.9.
+
+Slice 143 separates canonical structured-buffer semantic values from their physical external
+storage representation. One finite recursive storage algebra covers selected numeric and Boolean
+scalars/vectors, fixed arrays, nonempty structs, and the established one-field physical matrix
+wrapper. Boolean leaves use i8, numeric vector3 and bool3 use compact scalar arrays, and bool2/
+bool4 use naturally aligned i8 vectors. Raw data and writable element pointers select that storage
+use; direct and pointer-chain loads/stores cross the boundary through one recursive conversion.
+
+Every explicit array stride and direct struct field offset is proven against CUDA before provider
+mutation, and final provider/CUDA size proves pointer stride. Memory operations carry CUDA's
+explicit conservative alignment, allowing a stronger provider-preferred root alignment only when
+it changes no addressable byte. Resource-containing elements such as a struct holding `Texture2D`
+remain on their already-proven ordinary-value representation. Provider ABI revision 29 and the
+isolated LLVM provider are unchanged.
+
+Five workloads become correct at both O0 and O3 with no old-correct regression:
+`bugs/gh-7441`, `bugs/gh-8121`, `compute/dynamic-dispatch-{16,17}`, and `cuda/make-matrix`. The fixed
+452-row census reaches 346 O0 and 351 O3 successes. Against 427 healthy MVP references,
+O0/O3/both correctness is 344/348/344 (80.6%/81.5%/80.6%). One additional matrix/array workload
+advances from helper ABI to a later struct-field blocker and remains a measured failure. The
+leading healthy-MVP populations are preflight other (11), residual markers (10), atomic/wave
+operations (10), and aggregate/layout, helper ABI, and wave/reconvergence at eight each. The
+selected prefix passes 421/421, and representative direct O3 PTX remains accepted for SM70, SM80,
+and SM90 with CUDA 12.9.
