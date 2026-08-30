@@ -7,6 +7,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DWGSL
 // Debug info for inlining errors can be given out, so disable them for this test.
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0 -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0 -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_6 -dx12 -shaderobj -render-feature hardware-device -xslang -DUSE_SLANG_SYNTAX
@@ -17,6 +19,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DWGSL -xslang -DUSE_SLANG_SYNTAX
 // Debug info for inlining errors can be given out, so disable them for this test.
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0 -xslang -DUSE_SLANG_SYNTAX
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0 -xslang -DUSE_SLANG_SYNTAX -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0 -xslang -DUSE_SLANG_SYNTAX -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX
 
 

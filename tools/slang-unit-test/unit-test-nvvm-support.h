@@ -8534,6 +8534,27 @@ void computeMain(
 }
 )SLANG";
 
+static const char kDirectNVVMUnsupportedMinMaxSignatureSource[] = R"SLANG(
+int malformedMinimum(int left, int right, int extra)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "$P_min($0, $1)";
+    default:
+        return min(left, right) + extra;
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int value)
+{
+    *destination = malformedMinimum(value, 0, 1);
+}
+)SLANG";
+
 static const char kDirectNVVMCopyableValueHelperSource[] = R"(
 struct Payload
 {
@@ -8836,6 +8857,7 @@ static SlangResult _populateNumericFamilyFunction(
     SlangNVVMTypeHandle boolTypeHandle = nullptr;
     SlangNVVMTypeHandle halfType = nullptr;
     SlangNVVMTypeHandle floatType = nullptr;
+    SlangNVVMTypeHandle doubleType = nullptr;
     SlangNVVMTypeHandle int2Type = nullptr;
     SlangNVVMTypeHandle int8x2Type = nullptr;
     SlangNVVMTypeHandle bool2Type = nullptr;
@@ -8848,6 +8870,7 @@ static SlangResult _populateNumericFamilyFunction(
     SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 1, boolTypeHandle));
     SLANG_RETURN_ON_FAIL(builder.getFloatingPointType(module, 16, halfType));
     SLANG_RETURN_ON_FAIL(builder.getFloatingPointType(module, 32, floatType));
+    SLANG_RETURN_ON_FAIL(builder.getFloatingPointType(module, 64, doubleType));
     SLANG_RETURN_ON_FAIL(builder.getVectorType(module, int32Type, 2, int2Type));
     SLANG_RETURN_ON_FAIL(builder.getVectorType(module, int8Type, 2, int8x2Type));
     SLANG_RETURN_ON_FAIL(builder.getVectorType(module, boolTypeHandle, 2, bool2Type));
@@ -8866,6 +8889,8 @@ static SlangResult _populateNumericFamilyFunction(
         float3Type,
         int32Type,
         boolTypeHandle,
+        doubleType,
+        doubleType,
     };
     SlangNVVMTypeHandle functionType = nullptr;
     SlangNVVMValueHandle function = nullptr;
@@ -8911,6 +8936,7 @@ static SlangResult _populateNumericFamilyFunction(
         1,
     };
     const SlangNVVMValueTypeDesc float32 = NVVMSemantics::kFloat32;
+    const SlangNVVMValueTypeDesc float64 = NVVMSemantics::kFloat64;
     const SlangNVVMValueTypeDesc float16 = NVVMSemantics::kFloat16;
     const SlangNVVMValueTypeDesc boolType = NVVMSemantics::kBool;
     const SlangNVVMValueTypeDesc signedI32x2 = NVVMSemantics::kSignedI32x2;
@@ -8965,6 +8991,8 @@ static SlangResult _populateNumericFamilyFunction(
         emitOperation(SLANG_NVVM_VALUE_OP_ADD, signedI8, operandTypes, operands, 2, ignored));
     SLANG_RETURN_ON_FAIL(
         emitOperation(SLANG_NVVM_VALUE_OP_LESS_THAN, boolType, operandTypes, operands, 2, ignored));
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_MIN, signedI8, operandTypes, operands, 2, ignored));
     operandTypes[0] = unsignedI8;
     operandTypes[1] = unsignedI8;
     SLANG_RETURN_ON_FAIL(emitOperation(
@@ -8974,8 +9002,25 @@ static SlangResult _populateNumericFamilyFunction(
         operands,
         2,
         ignored));
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_MAX, unsignedI8, operandTypes, operands, 2, ignored));
+
+    operandTypes[0] = float32;
+    operandTypes[1] = float32;
+    operands[0] = parameters[2];
+    operands[1] = parameters[2];
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_MIN, float32, operandTypes, operands, 2, ignored));
+    operandTypes[0] = float64;
+    operandTypes[1] = float64;
+    operands[0] = parameters[11];
+    operands[1] = parameters[12];
+    SLANG_RETURN_ON_FAIL(
+        emitOperation(SLANG_NVVM_VALUE_OP_MAX, float64, operandTypes, operands, 2, ignored));
 
     operandTypes[0] = signedI8;
+    operands[0] = parameters[0];
+    operands[1] = parameters[1];
     SLANG_RETURN_ON_FAIL(emitOperation(
         SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
         signedI64,
@@ -10791,6 +10836,24 @@ void computeMain(
 {
     double y = double(x);
     *destination = int(sin(x) + cos(x) + trunc(x) + sin(y) + cos(y));
+}
+)";
+static const char kDirectNVVMMinMaxSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float x)
+{
+    double y = double(x);
+    int integerMinimum = min(int(x), 2);
+    uint integerMaximum = max(uint(x), 3);
+    float floatMinimum = min(x, 1.0);
+    float floatMaximum = max(x, 2.0);
+    double doubleMinimum = min(y, 3.0);
+    double doubleMaximum = max(y, 4.0);
+    *destination =
+        integerMinimum + int(integerMaximum) +
+        int(floatMinimum + floatMaximum + doubleMinimum + doubleMaximum);
 }
 )";
 static const char kDirectNVVMIntegerBitAndSource[] = R"(

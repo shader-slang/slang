@@ -2776,11 +2776,35 @@ static SlangResult _emitBarrier(
     return SLANG_OK;
 }
 
-// Emits one exact scalar libdevice operation selected by the typed semantic catalog.
-static SlangResult _emitLibdeviceUnary(
+static const char* _getLibdeviceFunctionName(
+    SlangNVVMValueOperation operation,
+    uint32_t bitWidth,
+    size_t operandCount)
+{
+    if (operandCount == 1)
+    {
+        if (operation == SLANG_NVVM_VALUE_OP_SIN)
+            return bitWidth == 32 ? "__nv_sinf" : bitWidth == 64 ? "__nv_sin" : nullptr;
+        if (operation == SLANG_NVVM_VALUE_OP_COS)
+            return bitWidth == 32 ? "__nv_cosf" : bitWidth == 64 ? "__nv_cos" : nullptr;
+        if (operation == SLANG_NVVM_VALUE_OP_TRUNC && bitWidth == 32)
+            return "__nv_truncf";
+    }
+    if (operandCount == 2)
+    {
+        if (operation == SLANG_NVVM_VALUE_OP_MIN)
+            return bitWidth == 32 ? "__nv_fminf" : bitWidth == 64 ? "__nv_fmin" : nullptr;
+        if (operation == SLANG_NVVM_VALUE_OP_MAX)
+            return bitWidth == 32 ? "__nv_fmaxf" : bitWidth == 64 ? "__nv_fmax" : nullptr;
+    }
+    return nullptr;
+}
+
+// Emits a selected scalar libdevice operation without reconstructing its type from LLVM text.
+static SlangResult _emitLibdeviceOperation(
     SlangNVVMModuleHandle module,
-    const Slang::NVVMSemantics::CatalogEntry& entry,
-    SlangNVVMValueHandle operand,
+    const SlangNVVMValueOperationDesc& operation,
+    const SlangNVVMValueHandle* operands,
     SlangNVVMValueHandle* outValue)
 {
     if (outValue)
@@ -2788,33 +2812,40 @@ static SlangResult _emitLibdeviceUnary(
 
     ModuleState* state = _getModule(module);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    llvm::Value* llvmOperand = _getValue(operand);
-    const bool isFloat32 = entry.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                           entry.resultType.bitWidth == 32 && entry.resultType.laneCount == 1;
-    const bool isFloat64 = entry.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                           entry.resultType.bitWidth == 64 && entry.resultType.laneCount == 1;
-    if (!state || !insertionBlock || !llvmOperand || !outValue || entry.operandCount != 1 ||
-        !entry.requiresCUDADeviceLibrary || (!isFloat32 && !isFloat64) ||
-        !Slang::NVVMSemantics::areSameType(entry.resultType, entry.operandTypes[0]) ||
-        llvmOperand->getType() != (isFloat32 ? llvm::Type::getFloatTy(state->context)
-                                             : llvm::Type::getDoubleTy(state->context)) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmOperand))
+    const bool isFloat32 = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                           operation.resultType.bitWidth == 32 &&
+                           operation.resultType.laneCount == 1;
+    const bool isFloat64 = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                           operation.resultType.bitWidth == 64 &&
+                           operation.resultType.laneCount == 1;
+    const char* functionName = _getLibdeviceFunctionName(
+        operation.operation,
+        operation.resultType.bitWidth,
+        operation.operandCount);
+    if (!state || !insertionBlock || !operands || !outValue || !functionName ||
+        (!isFloat32 && !isFloat64) || operation.operandCount < 1 || operation.operandCount > 2)
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    const char* functionName = nullptr;
-    if (entry.operation == SLANG_NVVM_VALUE_OP_SIN)
-        functionName = isFloat32 ? "__nv_sinf" : "__nv_sin";
-    else if (entry.operation == SLANG_NVVM_VALUE_OP_COS)
-        functionName = isFloat32 ? "__nv_cosf" : "__nv_cos";
-    else if (entry.operation == SLANG_NVVM_VALUE_OP_TRUNC && isFloat32)
-        functionName = "__nv_truncf";
-    else
-        return SLANG_E_INVALID_ARG;
+    llvm::Type* resultType = isFloat32 ? llvm::Type::getFloatTy(state->context)
+                                       : llvm::Type::getDoubleTy(state->context);
+    llvm::SmallVector<llvm::Value*, 2> llvmOperands;
+    llvm::SmallVector<llvm::Type*, 2> parameterTypes;
+    for (size_t i = 0; i < operation.operandCount; ++i)
+    {
+        llvm::Value* operand = _getValue(operands[i]);
+        if (!Slang::NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[i]) ||
+            !operand || operand->getType() != resultType ||
+            !_isValueUsableAtInsertionPoint(state, insertionBlock, operand))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+        llvmOperands.push_back(operand);
+        parameterTypes.push_back(resultType);
+    }
 
-    llvm::FunctionType* functionType =
-        llvm::FunctionType::get(llvmOperand->getType(), {llvmOperand->getType()}, false);
+    llvm::FunctionType* functionType = llvm::FunctionType::get(resultType, parameterTypes, false);
     llvm::Function* function = state->module->getFunction(functionName);
     if (function && (function->getFunctionType() != functionType || !function->isDeclaration()))
         return SLANG_E_INVALID_ARG;
@@ -2827,7 +2858,7 @@ static SlangResult _emitLibdeviceUnary(
             state->module.get());
     }
 
-    llvm::Value* result = state->builder.CreateCall(function, {llvmOperand});
+    llvm::Value* result = state->builder.CreateCall(function, llvmOperands);
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
@@ -2840,7 +2871,7 @@ static SlangResult _emitCatalogOperation(
 {
     const SlangNVVMValueOperationDesc operation = Slang::NVVMSemantics::getOperationDesc(entry);
     if (entry.requiresCUDADeviceLibrary)
-        return _emitLibdeviceUnary(module, entry, operands[0], outValue);
+        return _emitLibdeviceOperation(module, operation, operands, outValue);
     if (entry.operandCount && entry.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
     {
         if (entry.operandCount == 1)
@@ -3044,6 +3075,20 @@ static SlangResult _emitValueOperationFamily(
                          ? state->builder.CreateAShr(llvmOperands[0], llvmOperands[1])
                          : state->builder.CreateLShr(llvmOperands[0], llvmOperands[1]);
             break;
+        case SLANG_NVVM_VALUE_OP_MIN:
+        case SLANG_NVVM_VALUE_OP_MAX:
+            {
+                const bool isSigned =
+                    operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+                const bool isMinimum = operation.operation == SLANG_NVVM_VALUE_OP_MIN;
+                const llvm::CmpInst::Predicate predicate =
+                    isMinimum ? (isSigned ? llvm::CmpInst::ICMP_SLT : llvm::CmpInst::ICMP_ULT)
+                              : (isSigned ? llvm::CmpInst::ICMP_SGT : llvm::CmpInst::ICMP_UGT);
+                llvm::Value* condition =
+                    state->builder.CreateICmp(predicate, llvmOperands[0], llvmOperands[1]);
+                result = state->builder.CreateSelect(condition, llvmOperands[0], llvmOperands[1]);
+            }
+            break;
         default:
             return SLANG_E_INVALID_ARG;
         }
@@ -3074,6 +3119,9 @@ static SlangResult _emitValueOperationFamily(
         case SLANG_NVVM_VALUE_OP_REMAINDER:
             result = state->builder.CreateFRem(llvmOperands[0], llvmOperands[1]);
             break;
+        case SLANG_NVVM_VALUE_OP_MIN:
+        case SLANG_NVVM_VALUE_OP_MAX:
+            return _emitLibdeviceOperation(module, operation, operands, outValue);
         default:
             return SLANG_E_INVALID_ARG;
         }

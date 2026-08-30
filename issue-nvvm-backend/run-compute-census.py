@@ -276,6 +276,8 @@ def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str
         if shape.startswith(f"{typed_role}:"):
             shape = typed_role
             break
+    if shape.startswith("GenericAsm assembly="):
+        shape = "GenericAsm"
 
     if "no tests run" in output.lower():
         return "infrastructure", "generated census test was not discovered", shape

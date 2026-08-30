@@ -1846,3 +1846,23 @@ SM70, SM80, and SM90; runtime remains measured on the SM120 RTX 5090. CUDA 13 an
 SM70/80/SM90 runtime workers remain open infrastructure requirements. The committed Slice 132
 census matrix and Pareto JSON are authoritative for the next ordinary-intrinsic,
 wave/reconvergence, remaining-helper, aggregate/pointer, and numeric-operation priorities.
+
+Slice 133 inventories all 66 ordinary-intrinsic first failures by exact final `IRGenericAsm` text
+and linked helper signature. The inventory contains 48 exact pairs. Scalar minimum/maximum is the
+largest coherent first-blocker family at 17 workloads: signed Int32 maximum (6), Float32 maximum
+(4), Float64 maximum (4), UInt32 maximum (1), signed Int32 minimum (1), and Float64 minimum (1).
+
+The compiler admits only canonical one-block `$P_min($0, $1)`/`$P_max($0, $1)` helpers whose two
+parameters and result are the same selected scalar. The shared semantic-family resolver owns
+overload legality and libdevice demand. Integer operations use typed compare/select; Float32 and
+Float64 use exact `__nv_fminf`, `__nv_fmaxf`, `__nv_fmin`, and `__nv_fmax` calls. Builder ABI
+revision 25 adds the two operation IDs to the existing generic query/emit interface and adds no
+operation-specific callback.
+
+Eight existing workloads become correct at both optimization levels: `min-max-iarithmetic`, both
+CUDA variants of `packed/pack-unpack`, and the five scalar-Double clamp/max/min/saturate/smoothstep
+fixtures. Nine other workloads advance to exact `abs`, `countbits`, Half-conversion, `round`, or
+`fmod` blockers and remain failures. The 452-row census reaches 226 O0 and 222 O3 successes, with
+zero old-correct regressions. On 427 healthy MVP references, O0/O3/both correctness is
+225/220/217. The selected regression prefix and representative SM70/80/90 assembly gates remain
+separate validation scores.

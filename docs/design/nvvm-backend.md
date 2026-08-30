@@ -6048,7 +6048,7 @@ The installed CUDA 13 directory has no tool binaries, so CUDA 13 validation rema
 infrastructure gap.
 
 Production packaging treats `slang-llvm-nvvm` as an optional compiler-matched LLVM 14 provider at
-builder ABI revision 24. It should ship next to Slang binaries, with
+builder ABI revision 25. It should ship next to Slang binaries, with
 `SLANG_NVVM_BUILDER_PATH` reserved as the explicit deployment/development override. Sessions cache
 one load result, and direct selection retains deterministic E52016 failure for missing or mismatched
 providers rather than falling back to NVRTC. Provider updates move with the Slang commit and build
@@ -6093,7 +6093,8 @@ The following remain open until their named slice supplies evidence:
   scalar Float64 comparisons and conversions, Boolean logic and
   equality/inequality, integer shifts/division/remainder, Float16/Float32 remainder, same-lane
   integer/floating conversion, exact same-lane typed selection, and canonical scalar truthiness
-  plus vector `all`/`any` reduction over selected Bool/integer/Float16/Float32 values;
+  plus vector `all`/`any` reduction over selected Bool/integer/Float16/Float32 values, and canonical
+  scalar signed/unsigned integer and Float32/Float64 minimum/maximum;
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical
@@ -6154,6 +6155,33 @@ ordinary intrinsic `GenericAsm` (66), wave/reconvergence `GenericAsm` (31), help
 aggregate/pointer/layout transport (23), and ordinary numeric/bit operations (16). The complete
 selected NVVM prefix passes 400/400; all three representative workloads remain correct and their
 direct O3 PTX assembles with CUDA 12.9 for SM70, SM80, and SM90.
+
+### Slice 133: Canonical scalar minimum and maximum
+
+The ordinary-intrinsic census now reports the exact `IRGenericAsm` assembly spelling together with
+the final linked helper signature. Across the 66-row pre-slice cluster, this distinguishes 48 exact
+semantic pairs. Scalar `min`/`max` is the largest coherent family: 17 workloads first encounter
+`$P_min($0, $1)` or `$P_max($0, $1)` over exact signed/unsigned integer, Float32, or Float64
+signatures.
+
+The compiler recognizes only the CUDA prelude's canonical one-block, two-parameter, same-type
+helper shape and resolves it through the shared typed value-operation family. Integer overloads
+emit signed/unsigned comparison plus selection. Float32 and Float64 overloads call the exact
+libdevice `fmin`/`fmax` functions, preserving CUDA NaN and signed-zero behavior. Forward-only
+builder ABI revision 25 adds only generic `MIN` and `MAX` operation IDs; the provider callback
+shape remains unchanged.
+
+Eight existing workloads become differentially correct at both O0 and O3. Nine more move to their
+next exact ordinary-intrinsic blocker and are not promoted or counted as correct. The post-slice
+452-row census is correct for 226 workloads at O0 and 222 at O3, with 214 preflight failures in
+each mode and no previously correct regression. Among 427 MVP rows with a healthy native
+reference, 225 compare correctly at O0, 220 at O3, and 217 at both. The leading remaining MVP
+clusters are ordinary intrinsic semantics (58), wave/reconvergence semantics (31), helper ABI
+types (28), aggregate/pointer/layout transport (23), and ordinary numeric/bit operations (16).
+
+All three representative workload gates remain correct. Their direct O3 PTX assembles with CUDA
+12.9 for SM70, SM80, and SM90; physical runtime remains on the local SM120 GPU. CUDA 13 and
+physical SM70/80/90 runtime coverage remain productionization gaps.
 
 ## Authoritative References
 

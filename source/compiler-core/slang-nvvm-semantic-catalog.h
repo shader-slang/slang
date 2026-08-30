@@ -32,6 +32,7 @@ struct ValueOperationFamilyResolution
 {
     ValueOperationFamily family = ValueOperationFamily::None;
     const char* diagnosticName = nullptr;
+    bool requiresCUDADeviceLibrary = false;
 };
 
 /// Describes one established semantic overload from canonical Slang values to the provider ABI.
@@ -726,6 +727,10 @@ inline bool resolveValueOperationFamily(
                                 areSameType(desc.resultType, desc.operandTypes[0]) &&
                                 desc.resultType.bitWidth == desc.operandTypes[1].bitWidth &&
                                 hasComponentWiseLanes(desc.resultType, desc.operandTypes[1]);
+    const bool isScalarIntegerMinMax = desc.operandCount == 2 &&
+                                       isSelectedScalarInteger(desc.resultType) &&
+                                       areSameType(desc.resultType, desc.operandTypes[0]) &&
+                                       areSameType(desc.resultType, desc.operandTypes[1]);
     if ((isOrdinaryBinaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_ADD ||
                                      desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT ||
                                      desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY ||
@@ -734,6 +739,8 @@ inline bool resolveValueOperationFamily(
                                      desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR ||
                                      desc.operation == SLANG_NVVM_VALUE_OP_BIT_XOR ||
                                      desc.operation == SLANG_NVVM_VALUE_OP_REMAINDER)) ||
+        (isScalarIntegerMinMax && (desc.operation == SLANG_NVVM_VALUE_OP_MIN ||
+                                   desc.operation == SLANG_NVVM_VALUE_OP_MAX)) ||
         (isIntegerShift && (desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_LEFT ||
                             desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT)))
     {
@@ -808,6 +815,22 @@ inline bool resolveValueOperationFamily(
         outResolution = {
             ValueOperationFamily::FloatBinary,
             "parameterized floating-point binary operation"};
+        return true;
+    }
+
+    const bool isLibdeviceBinaryFloat =
+        desc.operandCount == 2 && desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+        (desc.resultType.bitWidth == 32 || desc.resultType.bitWidth == 64) &&
+        desc.resultType.laneCount == 1 && areSameType(desc.resultType, desc.operandTypes[0]) &&
+        areSameType(desc.resultType, desc.operandTypes[1]);
+    if (isLibdeviceBinaryFloat &&
+        (desc.operation == SLANG_NVVM_VALUE_OP_MIN || desc.operation == SLANG_NVVM_VALUE_OP_MAX))
+    {
+        outResolution = {
+            ValueOperationFamily::FloatBinary,
+            "scalar floating-point minimum or maximum",
+            true,
+        };
         return true;
     }
 

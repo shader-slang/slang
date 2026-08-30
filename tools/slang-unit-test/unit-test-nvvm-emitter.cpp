@@ -6852,7 +6852,7 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
     }
 }
 
-SLANG_UNIT_TEST(nvvmSlangExactUnaryOperationsRequestLibdevice)
+SLANG_UNIT_TEST(nvvmSlangLibdeviceAndMinMaxOperationsRequestTypedOperations)
 {
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
     static const uint8_t kLibdevice[] = {0x42, 0x43, 0xc0, 0xde, 0x7e, 0x12};
@@ -6944,6 +6944,84 @@ SLANG_UNIT_TEST(nvvmSlangExactUnaryOperationsRequestLibdevice)
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        globalSession->setDownstreamCompilerPath(SLANG_PASS_THROUGH_NVVM, toolkit.path.getBuffer());
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result =
+            _compileSlangWithDirectNVVM(globalSession, kDirectNVVMMinMaxSource, code, diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        uint32_t integerMinimumCount = 0;
+        uint32_t integerMaximumCount = 0;
+        uint32_t float32MinimumCount = 0;
+        uint32_t float32MaximumCount = 0;
+        uint32_t float64MinimumCount = 0;
+        uint32_t float64MaximumCount = 0;
+        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_MIN &&
+                operation.key.operation != SLANG_NVVM_VALUE_OP_MAX)
+            {
+                continue;
+            }
+            SLANG_CHECK(operation.operandCount == 2);
+            SLANG_CHECK(
+                NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[0]));
+            SLANG_CHECK(
+                NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[1]));
+            if (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
+            {
+                SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::FloatingBinary);
+                uint32_t* count = nullptr;
+                if (operation.resultType.bitWidth == 32)
+                    count = operation.key.operation == SLANG_NVVM_VALUE_OP_MIN
+                                ? &float32MinimumCount
+                                : &float32MaximumCount;
+                else if (operation.resultType.bitWidth == 64)
+                    count = operation.key.operation == SLANG_NVVM_VALUE_OP_MIN
+                                ? &float64MinimumCount
+                                : &float64MaximumCount;
+                SLANG_CHECK_ABORT(count != nullptr);
+                ++*count;
+            }
+            else
+            {
+                SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::Binary);
+                if (operation.key.operation == SLANG_NVVM_VALUE_OP_MIN)
+                    ++integerMinimumCount;
+                else
+                    ++integerMaximumCount;
+            }
+        }
+        SLANG_CHECK(integerMinimumCount == 1);
+        SLANG_CHECK(integerMaximumCount == 1);
+        SLANG_CHECK(float32MinimumCount == 1);
+        SLANG_CHECK(float32MaximumCount == 1);
+        SLANG_CHECK(float64MinimumCount == 1);
+        SLANG_CHECK(float64MaximumCount == 1);
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds[1] == FakeModuleAddKind::Lazy);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+
     // The same selected toolkit must not be read for a module whose accepted semantic set does not
     // contain a device-library operation.
     _resetDirectNVVMFakes();
@@ -6997,9 +7075,10 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedFixedSamplerArrayStorageSource, "'struct field address'"},
         {kDirectNVVMUnsupportedNestedParameterBlockSource, "'struct field address'"},
         {kDirectNVVMUnsupportedNestedConstantBufferSource, "'struct field address'"},
-        {kDirectNVVMUnsupportedScalarTruthinessSignatureSource, "'GenericAsm'"},
-        {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm'"},
-        {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm'"},
+        {kDirectNVVMUnsupportedScalarTruthinessSignatureSource, "'GenericAsm assembly="},
+        {kDirectNVVMUnsupportedMinMaxSignatureSource, "assembly=$P_min($0, $1)"},
+        {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm assembly="},
+        {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
         {kDirectNVVMWideAtomicAddSource, "'selected atomic operation'"},
         {kDirectNVVMFloatingAtomicAddSource, "'selected atomic operation'"},

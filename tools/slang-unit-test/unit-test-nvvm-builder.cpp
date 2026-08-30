@@ -128,7 +128,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=24") >= 0);
+        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=25") >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -3314,6 +3314,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("add i8")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("icmp slt i8")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("icmp ugt i8")) >= 0);
+        SLANG_CHECK(_countOccurrences(text, toSlice("select i1")) >= 4);
+        SLANG_CHECK(text.indexOf(toSlice("declare float @__nv_fminf(float, float)")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("declare double @__nv_fmax(double, double)")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("sext i8")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("zext i8")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("sitofp i8")) >= 0);
@@ -3437,6 +3440,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
 
     const SlangNVVMValueTypeDesc signedI32x2 = NVVMSemantics::kSignedI32x2;
     const SlangNVVMValueTypeDesc signedI32x2Operands[] = {signedI32x2, signedI32x2};
+    const SlangNVVMValueOperationDesc unsupportedVectorIntegerMinimum = {
+        SLANG_NVVM_VALUE_OP_MIN,
+        signedI32x2,
+        signedI32x2Operands,
+        SLANG_COUNT_OF(signedI32x2Operands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedVectorIntegerMinimum));
     const SlangNVVMValueTypeDesc bool3 = {SLANG_NVVM_VALUE_TYPE_BOOL, 1, 3};
     const SlangNVVMValueOperationDesc mismatchedComparisonLanes = {
         SLANG_NVVM_VALUE_OP_EQUAL,
@@ -3493,8 +3503,24 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
     };
     SLANG_CHECK(!builder.supportsValueOperation(unsupportedFloatRemainder));
 
+    const SlangNVVMValueOperationDesc unsupportedVectorFloatMinimum = {
+        SLANG_NVVM_VALUE_OP_MIN,
+        float64x2,
+        float64x2Operands,
+        SLANG_COUNT_OF(float64x2Operands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedVectorFloatMinimum));
+
     const SlangNVVMValueTypeDesc float16 = NVVMSemantics::kFloat16;
     const SlangNVVMValueTypeDesc float32 = NVVMSemantics::kFloat32;
+    const SlangNVVMValueTypeDesc float16BinaryOperands[] = {float16, float16};
+    const SlangNVVMValueOperationDesc unsupportedHalfMaximum = {
+        SLANG_NVVM_VALUE_OP_MAX,
+        float16,
+        float16BinaryOperands,
+        SLANG_COUNT_OF(float16BinaryOperands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedHalfMaximum));
     const SlangNVVMValueTypeDesc sameWidthFloatOperands[] = {float16};
     const SlangNVVMValueOperationDesc sameWidthFloatConvert = {
         SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
