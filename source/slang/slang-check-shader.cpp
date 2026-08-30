@@ -3528,8 +3528,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     RefPtr<SharedSemanticsContext> sharedSemanticsContext;
     if (entryPointModule)
     {
-        sharedSemanticsContext =
-            new SharedSemanticsContext(getLinkage(), entryPointModule, sink);
+        sharedSemanticsContext = new SharedSemanticsContext(getLinkage(), entryPointModule, sink);
         for (auto module : getModuleDependencies())
         {
             auto moduleDecl = module->getModuleDecl();
@@ -3844,10 +3843,7 @@ Type* Linkage::specializeType(
     // TODO: We should cache and re-use specialized types
     // when the exact same arguments are provided again later.
 
-    SharedSemanticsContext sharedSemanticsContext(
-        this,
-        m_optionSet.getLanguageVersion(),
-        sink);
+    SharedSemanticsContext sharedSemanticsContext(this, m_optionSet.getLanguageVersion(), sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     SpecializationParams specializationParams;
@@ -4006,10 +4002,8 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
     // applying the global generic arguments (if any) to the
     // unspecialized program.
     //
-    auto specializedProgram = _createSpecializedProgramImpl(
-        unspecializedProgram,
-        globalSpecializationArgs,
-        sink);
+    auto specializedProgram =
+        _createSpecializedProgramImpl(unspecializedProgram, globalSpecializationArgs, sink);
 
     // If anything went wrong with the global generic
     // arguments, then bail out now.

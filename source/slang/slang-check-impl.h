@@ -955,9 +955,7 @@ public:
         Linkage* linkage,
         SlangLanguageVersion languageVersion,
         DiagnosticSink* sink)
-        : m_linkage(linkage)
-        , m_languageVersion(languageVersion)
-        , m_sink(sink)
+        : m_linkage(linkage), m_languageVersion(languageVersion), m_sink(sink)
     {
         SLANG_RELEASE_ASSERT(languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN);
     }

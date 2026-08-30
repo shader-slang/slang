@@ -80,7 +80,6 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
         for (const auto& nameToMod : builtinLinkage->mapNameToLoadedModules)
             mapNameToLoadedModules.add(nameToMod);
     }
-
 }
 
 SharedSemanticsContext* Linkage::getSemanticsForReflection()
@@ -91,10 +90,8 @@ SharedSemanticsContext* Linkage::getSemanticsForReflection()
     std::lock_guard<std::recursive_mutex> lock(getComponentTypeOperationMutex());
     if (!m_semanticsForReflection)
     {
-        m_semanticsForReflection = new SharedSemanticsContext(
-            this,
-            m_optionSet.getLanguageVersion(),
-            nullptr);
+        m_semanticsForReflection =
+            new SharedSemanticsContext(this, m_optionSet.getLanguageVersion(), nullptr);
     }
     return m_semanticsForReflection.get();
 }
