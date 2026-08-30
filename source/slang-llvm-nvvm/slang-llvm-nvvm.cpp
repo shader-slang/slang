@@ -2268,9 +2268,10 @@ static SlangResult _writeLegacyNVVMAssembly(
         else if (intrinsicID == llvm::Intrinsic::sqrt)
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
-            llvm::Type* floatType = llvm::Type::getFloatTy(state->context);
-            if (!function.isDeclaration() || function.getReturnType() != floatType ||
-                function.arg_size() != 1 || function.arg_begin()->getType() != floatType ||
+            llvm::Type* floatingType = function.getReturnType();
+            if (!function.isDeclaration() ||
+                (!floatingType->isFloatTy() && !floatingType->isDoubleTy()) ||
+                function.arg_size() != 1 || function.arg_begin()->getType() != floatingType ||
                 functionAttributes.getNumAttributes() != 6 ||
                 !function.hasFnAttribute(llvm::Attribute::NoFree) ||
                 !function.hasFnAttribute(llvm::Attribute::NoSync) ||
@@ -2800,21 +2801,70 @@ static const char* _getLibdeviceFunctionName(
     uint32_t bitWidth,
     size_t operandCount)
 {
+    const bool isFloat32 = bitWidth == 32;
+    const bool isFloat64 = bitWidth == 64;
+    if (!isFloat32 && !isFloat64)
+        return nullptr;
     if (operandCount == 1)
     {
-        if (operation == SLANG_NVVM_VALUE_OP_SIN)
-            return bitWidth == 32 ? "__nv_sinf" : bitWidth == 64 ? "__nv_sin" : nullptr;
-        if (operation == SLANG_NVVM_VALUE_OP_COS)
-            return bitWidth == 32 ? "__nv_cosf" : bitWidth == 64 ? "__nv_cos" : nullptr;
-        if (operation == SLANG_NVVM_VALUE_OP_TRUNC && bitWidth == 32)
-            return "__nv_truncf";
+        switch (operation)
+        {
+        case SLANG_NVVM_VALUE_OP_ABS:
+            return isFloat32 ? "__nv_fabsf" : "__nv_fabs";
+        case SLANG_NVVM_VALUE_OP_ACOS:
+            return isFloat32 ? "__nv_acosf" : "__nv_acos";
+        case SLANG_NVVM_VALUE_OP_ASIN:
+            return isFloat32 ? "__nv_asinf" : "__nv_asin";
+        case SLANG_NVVM_VALUE_OP_ATAN:
+            return isFloat32 ? "__nv_atanf" : "__nv_atan";
+        case SLANG_NVVM_VALUE_OP_CEIL:
+            return isFloat32 ? "__nv_ceilf" : "__nv_ceil";
+        case SLANG_NVVM_VALUE_OP_COS:
+            return isFloat32 ? "__nv_cosf" : "__nv_cos";
+        case SLANG_NVVM_VALUE_OP_EXP:
+            return isFloat32 ? "__nv_expf" : "__nv_exp";
+        case SLANG_NVVM_VALUE_OP_EXP2:
+            return isFloat32 ? "__nv_exp2f" : "__nv_exp2";
+        case SLANG_NVVM_VALUE_OP_FLOOR:
+        case SLANG_NVVM_VALUE_OP_FRAC:
+            return isFloat32 ? "__nv_floorf" : "__nv_floor";
+        case SLANG_NVVM_VALUE_OP_LOG:
+            return isFloat32 ? "__nv_logf" : "__nv_log";
+        case SLANG_NVVM_VALUE_OP_LOG2:
+            return isFloat32 ? "__nv_log2f" : "__nv_log2";
+        case SLANG_NVVM_VALUE_OP_LOG10:
+            return isFloat32 ? "__nv_log10f" : "__nv_log10";
+        case SLANG_NVVM_VALUE_OP_ROUND:
+            return isFloat32 ? "__nv_roundf" : "__nv_round";
+        case SLANG_NVVM_VALUE_OP_RSQRT:
+            return isFloat32 ? "__nv_rsqrtf" : "__nv_rsqrt";
+        case SLANG_NVVM_VALUE_OP_SIN:
+            return isFloat32 ? "__nv_sinf" : "__nv_sin";
+        case SLANG_NVVM_VALUE_OP_TAN:
+            return isFloat32 ? "__nv_tanf" : "__nv_tan";
+        case SLANG_NVVM_VALUE_OP_TRUNC:
+            return isFloat32 ? "__nv_truncf" : "__nv_trunc";
+        default:
+            return nullptr;
+        }
     }
     if (operandCount == 2)
     {
-        if (operation == SLANG_NVVM_VALUE_OP_MIN)
-            return bitWidth == 32 ? "__nv_fminf" : bitWidth == 64 ? "__nv_fmin" : nullptr;
-        if (operation == SLANG_NVVM_VALUE_OP_MAX)
-            return bitWidth == 32 ? "__nv_fmaxf" : bitWidth == 64 ? "__nv_fmax" : nullptr;
+        switch (operation)
+        {
+        case SLANG_NVVM_VALUE_OP_ATAN2:
+            return isFloat32 ? "__nv_atan2f" : "__nv_atan2";
+        case SLANG_NVVM_VALUE_OP_FMOD:
+            return isFloat32 ? "__nv_fmodf" : "__nv_fmod";
+        case SLANG_NVVM_VALUE_OP_MAX:
+            return isFloat32 ? "__nv_fmaxf" : "__nv_fmax";
+        case SLANG_NVVM_VALUE_OP_MIN:
+            return isFloat32 ? "__nv_fminf" : "__nv_fmin";
+        case SLANG_NVVM_VALUE_OP_POW:
+            return isFloat32 ? "__nv_powf" : "__nv_pow";
+        default:
+            return nullptr;
+        }
     }
     return nullptr;
 }
@@ -2878,6 +2928,8 @@ static SlangResult _emitLibdeviceOperation(
     }
 
     llvm::Value* result = state->builder.CreateCall(function, llvmOperands);
+    if (operation.operation == SLANG_NVVM_VALUE_OP_FRAC)
+        result = state->builder.CreateFSub(llvmOperands[0], result);
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
@@ -3051,9 +3103,22 @@ static SlangResult _emitValueOperationFamily(
     switch (family)
     {
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerUnary:
-        result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_NOT
-                     ? state->builder.CreateNot(llvmOperands[0])
-                     : state->builder.CreateNeg(llvmOperands[0]);
+        if (operation.operation == SLANG_NVVM_VALUE_OP_ABS)
+        {
+            llvm::Value* isNegative = state->builder.CreateICmpSLT(
+                llvmOperands[0],
+                llvm::ConstantInt::get(resultType, 0));
+            result = state->builder.CreateSelect(
+                isNegative,
+                state->builder.CreateNeg(llvmOperands[0]),
+                llvmOperands[0]);
+        }
+        else
+        {
+            result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_NOT
+                         ? state->builder.CreateNot(llvmOperands[0])
+                         : state->builder.CreateNeg(llvmOperands[0]);
+        }
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerBit:
         {
@@ -3196,12 +3261,35 @@ static SlangResult _emitValueOperationFamily(
         }
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatUnary:
-        // LLVM 14 prints `fneg`, which libNVVM's LLVM 7 reader cannot parse. Use the equivalent
-        // typed subtraction directly so scalar/vector Half and Float negation need no fragile
-        // text-level type reconstruction in the NVVM IR 2.0 serializer.
-        result = state->builder.CreateFSub(
-            llvm::ConstantFP::getNegativeZero(resultType),
-            llvmOperands[0]);
+        if (operation.operation == SLANG_NVVM_VALUE_OP_NEGATE)
+        {
+            // LLVM 14 prints `fneg`, which libNVVM's LLVM 7 reader cannot parse. Use the equivalent
+            // typed subtraction directly so scalar/vector Half and Float negation need no fragile
+            // text-level type reconstruction in the NVVM IR 2.0 serializer.
+            result = state->builder.CreateFSub(
+                llvm::ConstantFP::getNegativeZero(resultType),
+                llvmOperands[0]);
+        }
+        else if (
+            operation.operation == SLANG_NVVM_VALUE_OP_ABS && operation.resultType.bitWidth == 16)
+        {
+            llvm::Type* int16Type = llvm::Type::getInt16Ty(state->context);
+            llvm::Value* bits = state->builder.CreateBitCast(llvmOperands[0], int16Type);
+            bits = state->builder.CreateAnd(bits, llvm::ConstantInt::get(int16Type, 0x7fff));
+            result = state->builder.CreateBitCast(bits, resultType);
+        }
+        else if (operation.operation == SLANG_NVVM_VALUE_OP_SQRT)
+        {
+            llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(
+                state->module.get(),
+                llvm::Intrinsic::sqrt,
+                {resultType});
+            result = state->builder.CreateCall(intrinsic, {llvmOperands[0]});
+        }
+        else
+        {
+            return _emitLibdeviceOperation(module, operation, operands, outValue);
+        }
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatBinary:
         switch (operation.operation)
@@ -3223,9 +3311,25 @@ static SlangResult _emitValueOperationFamily(
             break;
         case SLANG_NVVM_VALUE_OP_MIN:
         case SLANG_NVVM_VALUE_OP_MAX:
+        case SLANG_NVVM_VALUE_OP_ATAN2:
+        case SLANG_NVVM_VALUE_OP_FMOD:
+        case SLANG_NVVM_VALUE_OP_POW:
             return _emitLibdeviceOperation(module, operation, operands, outValue);
         default:
             return SLANG_E_INVALID_ARG;
+        }
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::FloatClassification:
+        result = state->builder.CreateFCmpUNO(llvmOperands[0], llvmOperands[0]);
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::FloatSign:
+        {
+            llvm::Value* zero = llvm::ConstantFP::get(llvmOperands[0]->getType(), 0.0);
+            llvm::Value* positive = state->builder.CreateFCmpOGT(llvmOperands[0], zero);
+            llvm::Value* negative = state->builder.CreateFCmpOLT(llvmOperands[0], zero);
+            result = state->builder.CreateSub(
+                state->builder.CreateZExt(positive, resultType),
+                state->builder.CreateZExt(negative, resultType));
         }
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerCompare:

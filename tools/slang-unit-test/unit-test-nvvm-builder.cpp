@@ -7001,6 +7001,232 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceUnaryOperations)
     }
 }
 
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+
+    const SlangNVVMValueTypeDesc signedOperands[] = {NVVMSemantics::kSignedI32};
+    const SlangNVVMValueTypeDesc halfOperands[] = {NVVMSemantics::kFloat16};
+    const SlangNVVMValueTypeDesc float32Operands[] = {NVVMSemantics::kFloat32};
+    const SlangNVVMValueTypeDesc float64Operands[] = {
+        NVVMSemantics::kFloat64,
+        NVVMSemantics::kFloat64,
+    };
+    const SlangNVVMValueOperation unaryMathOperations[] = {
+        SLANG_NVVM_VALUE_OP_ABS,
+        SLANG_NVVM_VALUE_OP_ACOS,
+        SLANG_NVVM_VALUE_OP_ASIN,
+        SLANG_NVVM_VALUE_OP_ATAN,
+        SLANG_NVVM_VALUE_OP_CEIL,
+        SLANG_NVVM_VALUE_OP_EXP,
+        SLANG_NVVM_VALUE_OP_EXP2,
+        SLANG_NVVM_VALUE_OP_FLOOR,
+        SLANG_NVVM_VALUE_OP_FRAC,
+        SLANG_NVVM_VALUE_OP_LOG,
+        SLANG_NVVM_VALUE_OP_LOG2,
+        SLANG_NVVM_VALUE_OP_LOG10,
+        SLANG_NVVM_VALUE_OP_ROUND,
+        SLANG_NVVM_VALUE_OP_RSQRT,
+        SLANG_NVVM_VALUE_OP_SQRT,
+        SLANG_NVVM_VALUE_OP_TAN,
+        SLANG_NVVM_VALUE_OP_TRUNC,
+    };
+    const SlangNVVMValueOperation binaryMathOperations[] = {
+        SLANG_NVVM_VALUE_OP_ATAN2,
+        SLANG_NVVM_VALUE_OP_FMOD,
+        SLANG_NVVM_VALUE_OP_POW,
+    };
+
+    SlangNVVMValueOperationDesc operation = {
+        SLANG_NVVM_VALUE_OP_ABS,
+        NVVMSemantics::kSignedI32,
+        signedOperands,
+        1,
+    };
+    SLANG_CHECK(builder.supportsValueOperation(operation));
+    operation = {
+        SLANG_NVVM_VALUE_OP_ABS,
+        NVVMSemantics::kFloat16,
+        halfOperands,
+        1,
+    };
+    SLANG_CHECK(builder.supportsValueOperation(operation));
+    for (auto mathOperation : unaryMathOperations)
+    {
+        operation = {mathOperation, NVVMSemantics::kFloat64, float64Operands, 1};
+        SLANG_CHECK(builder.supportsValueOperation(operation));
+    }
+    for (auto mathOperation : binaryMathOperations)
+    {
+        operation = {mathOperation, NVVMSemantics::kFloat64, float64Operands, 2};
+        SLANG_CHECK(builder.supportsValueOperation(operation));
+    }
+    operation = {
+        SLANG_NVVM_VALUE_OP_IS_NAN,
+        NVVMSemantics::kBool,
+        float64Operands,
+        1,
+    };
+    SLANG_CHECK(builder.supportsValueOperation(operation));
+    operation = {
+        SLANG_NVVM_VALUE_OP_SIGN,
+        NVVMSemantics::kSignedI32,
+        float64Operands,
+        1,
+    };
+    SLANG_CHECK(builder.supportsValueOperation(operation));
+
+    SlangNVVMValueTypeDesc vectorFloat64 = NVVMSemantics::kFloat64;
+    vectorFloat64.laneCount = 2;
+    const SlangNVVMValueTypeDesc vectorFloat64Operands[] = {vectorFloat64};
+    operation = {
+        SLANG_NVVM_VALUE_OP_TAN,
+        vectorFloat64,
+        vectorFloat64Operands,
+        1,
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(operation));
+    operation = {
+        SLANG_NVVM_VALUE_OP_TAN,
+        NVVMSemantics::kFloat16,
+        halfOperands,
+        1,
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(operation));
+    operation = {
+        SLANG_NVVM_VALUE_OP_ABS,
+        NVVMSemantics::kUnsignedI32,
+        &NVVMSemantics::kUnsignedI32,
+        1,
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(operation));
+
+    ScopedNVVMBuilderModule module;
+    module.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(toSlice("scalar-math"), module.module)));
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle int32Type = nullptr;
+    SlangNVVMTypeHandle halfType = nullptr;
+    SlangNVVMTypeHandle float32Type = nullptr;
+    SlangNVVMTypeHandle float64Type = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 32, int32Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, 16, halfType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, 32, float32Type)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, 64, float64Type)));
+    const SlangNVVMTypeHandle parameterTypes[] = {
+        int32Type,
+        halfType,
+        float32Type,
+        float64Type,
+    };
+    SlangNVVMTypeHandle functionType = nullptr;
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        module.module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("useScalarMath"),
+        function)));
+    SlangNVVMValueHandle values[SLANG_COUNT_OF(parameterTypes)] = {};
+    for (Index i = 0; i < SLANG_COUNT_OF(values); ++i)
+    {
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, i, values[i])));
+    }
+    SlangNVVMBlockHandle entryBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
+
+    SlangNVVMValueHandle result = nullptr;
+    operation = {
+        SLANG_NVVM_VALUE_OP_ABS,
+        NVVMSemantics::kSignedI32,
+        signedOperands,
+        1,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(module.module, operation, &values[0], 1, result)));
+    operation = {
+        SLANG_NVVM_VALUE_OP_ABS,
+        NVVMSemantics::kFloat16,
+        halfOperands,
+        1,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(module.module, operation, &values[1], 1, result)));
+    operation = {
+        SLANG_NVVM_VALUE_OP_ABS,
+        NVVMSemantics::kFloat32,
+        float32Operands,
+        1,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(module.module, operation, &values[2], 1, result)));
+    for (auto mathOperation : unaryMathOperations)
+    {
+        operation = {mathOperation, NVVMSemantics::kFloat64, float64Operands, 1};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
+    }
+    const SlangNVVMValueHandle binaryOperands[] = {values[3], values[3]};
+    for (auto mathOperation : binaryMathOperations)
+    {
+        operation = {mathOperation, NVVMSemantics::kFloat64, float64Operands, 2};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.emitValueOperation(module.module, operation, binaryOperands, 2, result)));
+    }
+    operation = {
+        SLANG_NVVM_VALUE_OP_IS_NAN,
+        NVVMSemantics::kBool,
+        float64Operands,
+        1,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
+    operation = {
+        SLANG_NVVM_VALUE_OP_SIGN,
+        NVVMSemantics::kSignedI32,
+        float64Operands,
+        1,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (auto format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assembly)));
+        const String text = _getBlobText(assembly);
+        SLANG_CHECK(text.indexOf("declare float @__nv_fabsf(float)") >= 0);
+        SLANG_CHECK(text.indexOf("declare double @__nv_acos(double)") >= 0);
+        SLANG_CHECK(text.indexOf("declare double @__nv_pow(double, double)") >= 0);
+        SLANG_CHECK(text.indexOf("declare double @llvm.sqrt.f64(double)") >= 0);
+        SLANG_CHECK(text.indexOf("call double @__nv_floor(double") >= 0);
+        SLANG_CHECK(text.indexOf("fcmp uno double") >= 0);
+        SLANG_CHECK(text.indexOf("fcmp ogt double") >= 0);
+        SLANG_CHECK(text.indexOf("fcmp olt double") >= 0);
+        SLANG_CHECK(text.indexOf("and i16") >= 0);
+    }
+}
+
 NVVM_SCALAR_INVALID_TEST(nvvmIRBuilderRejectsInvalidIntegerEqualOperations, Equal)
 NVVM_SCALAR_INVALID_TEST(nvvmIRBuilderRejectsInvalidIntegerNotEqualOperations, NotEqual)
 NVVM_SCALAR_INVALID_TEST(

@@ -17,6 +17,8 @@ enum class ValueOperationFamily : uint32_t
     IntegerCompare,
     FloatUnary,
     FloatBinary,
+    FloatClassification,
+    FloatSign,
     FloatCompare,
     BooleanUnary,
     BooleanBinary,
@@ -708,8 +710,11 @@ inline bool resolveValueOperationFamily(
     const bool isUnaryInteger = desc.operandCount == 1 &&
                                 isSelectedScalarInteger(desc.resultType) &&
                                 areSameType(desc.resultType, desc.operandTypes[0]);
-    if (isUnaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_BIT_NOT ||
-                           desc.operation == SLANG_NVVM_VALUE_OP_NEGATE))
+    const bool isSignedUnaryInteger =
+        isUnaryInteger && desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+    if ((isUnaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_BIT_NOT ||
+                            desc.operation == SLANG_NVVM_VALUE_OP_NEGATE)) ||
+        (isSignedUnaryInteger && desc.operation == SLANG_NVVM_VALUE_OP_ABS))
     {
         outResolution = {
             ValueOperationFamily::IntegerUnary,
@@ -818,6 +823,52 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
+    const bool isScalarFloat16Abs = isUnaryFloat && desc.resultType.bitWidth == 16 &&
+                                    desc.resultType.laneCount == 1 &&
+                                    desc.operation == SLANG_NVVM_VALUE_OP_ABS;
+    const bool isScalarFloat32Or64Unary =
+        isUnaryFloat && (desc.resultType.bitWidth == 32 || desc.resultType.bitWidth == 64) &&
+        desc.resultType.laneCount == 1;
+    const bool isScalarMathUnary =
+        desc.operation == SLANG_NVVM_VALUE_OP_ABS || desc.operation == SLANG_NVVM_VALUE_OP_ACOS ||
+        desc.operation == SLANG_NVVM_VALUE_OP_ASIN || desc.operation == SLANG_NVVM_VALUE_OP_ATAN ||
+        desc.operation == SLANG_NVVM_VALUE_OP_CEIL || desc.operation == SLANG_NVVM_VALUE_OP_EXP ||
+        desc.operation == SLANG_NVVM_VALUE_OP_EXP2 || desc.operation == SLANG_NVVM_VALUE_OP_FLOOR ||
+        desc.operation == SLANG_NVVM_VALUE_OP_FRAC || desc.operation == SLANG_NVVM_VALUE_OP_LOG ||
+        desc.operation == SLANG_NVVM_VALUE_OP_LOG2 || desc.operation == SLANG_NVVM_VALUE_OP_LOG10 ||
+        desc.operation == SLANG_NVVM_VALUE_OP_ROUND ||
+        desc.operation == SLANG_NVVM_VALUE_OP_RSQRT || desc.operation == SLANG_NVVM_VALUE_OP_SQRT ||
+        desc.operation == SLANG_NVVM_VALUE_OP_TAN || desc.operation == SLANG_NVVM_VALUE_OP_TRUNC;
+    if (isScalarFloat16Abs || (isScalarFloat32Or64Unary && isScalarMathUnary))
+    {
+        outResolution = {
+            ValueOperationFamily::FloatUnary,
+            "scalar floating-point math operation",
+            desc.resultType.bitWidth != 16 && desc.operation != SLANG_NVVM_VALUE_OP_SQRT,
+        };
+        return true;
+    }
+
+    const bool isScalarFloat32Or64Operand =
+        desc.operandCount == 1 &&
+        desc.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+        (desc.operandTypes[0].bitWidth == 32 || desc.operandTypes[0].bitWidth == 64) &&
+        desc.operandTypes[0].laneCount == 1;
+    if (isScalarFloat32Or64Operand && desc.operation == SLANG_NVVM_VALUE_OP_IS_NAN &&
+        areSameType(desc.resultType, kBool))
+    {
+        outResolution = {
+            ValueOperationFamily::FloatClassification,
+            "scalar floating-point classification"};
+        return true;
+    }
+    if (isScalarFloat32Or64Operand && desc.operation == SLANG_NVVM_VALUE_OP_SIGN &&
+        areSameType(desc.resultType, kSignedI32))
+    {
+        outResolution = {ValueOperationFamily::FloatSign, "scalar floating-point sign"};
+        return true;
+    }
+
     const bool isBinaryFloat =
         desc.operandCount == 2 && isSelectedFloatValue(desc.resultType) &&
         isSelectedFloatValue(desc.operandTypes[0]) && isSelectedFloatValue(desc.operandTypes[1]) &&
@@ -831,6 +882,23 @@ inline bool resolveValueOperationFamily(
         outResolution = {
             ValueOperationFamily::FloatBinary,
             "parameterized floating-point binary operation"};
+        return true;
+    }
+
+    const bool isScalarFloat32Or64Binary =
+        desc.operandCount == 2 && desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+        (desc.resultType.bitWidth == 32 || desc.resultType.bitWidth == 64) &&
+        desc.resultType.laneCount == 1 && areSameType(desc.resultType, desc.operandTypes[0]) &&
+        areSameType(desc.resultType, desc.operandTypes[1]);
+    if (isScalarFloat32Or64Binary &&
+        (desc.operation == SLANG_NVVM_VALUE_OP_ATAN2 ||
+         desc.operation == SLANG_NVVM_VALUE_OP_FMOD || desc.operation == SLANG_NVVM_VALUE_OP_POW))
+    {
+        outResolution = {
+            ValueOperationFamily::FloatBinary,
+            "scalar floating-point math operation",
+            true,
+        };
         return true;
     }
 

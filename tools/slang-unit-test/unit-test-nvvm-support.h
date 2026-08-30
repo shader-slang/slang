@@ -5383,8 +5383,10 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
             &operation->resultType,
             operation->operandTypes);
     }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerBit ||
-        resolution.family == NVVMSemantics::ValueOperationFamily::BooleanUnary)
+    if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerUnary ||
+        resolution.family == NVVMSemantics::ValueOperationFamily::IntegerBit ||
+        resolution.family == NVVMSemantics::ValueOperationFamily::BooleanUnary ||
+        resolution.family == NVVMSemantics::ValueOperationFamily::FloatSign)
     {
         gFakeNVVMBuilder.emittedValueOperations.add(
             {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)});
@@ -5404,6 +5406,19 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
         return _recordFakeNVVMBuilderScalarOperation(
             module,
             {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(operation->operation)},
+            operands,
+            uint32_t(operandCount),
+            outValue,
+            &operation->resultType,
+            operation->operandTypes);
+    }
+    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatClassification)
+    {
+        gFakeNVVMBuilder.emittedValueOperations.add(
+            {FakeNVVMBuilderScalarFamily::FloatingCompare, uint32_t(operation->operation)});
+        return _recordFakeNVVMBuilderScalarOperation(
+            module,
+            {FakeNVVMBuilderScalarFamily::FloatingCompare, uint32_t(operation->operation)},
             operands,
             uint32_t(operandCount),
             outValue,
@@ -8598,6 +8613,27 @@ void computeMain(
 }
 )SLANG";
 
+static const char kDirectNVVMUnsupportedVectorScalarMathSource[] = R"SLANG(
+float2 malformedTangent(float2 value)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "$P_tan($0)";
+    default:
+        return tan(value);
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float value)
+{
+    *destination = int(malformedTangent(float2(value, value + 1.0)).x);
+}
+)SLANG";
+
 static const char kDirectNVVMCopyableValueHelperSource[] = R"(
 struct Payload
 {
@@ -10879,6 +10915,22 @@ void computeMain(
 {
     double y = double(x);
     *destination = int(sin(x) + cos(x) + trunc(x) + sin(y) + cos(y));
+}
+)";
+static const char kDirectNVVMScalarMathOperationsSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float x,
+    uniform int integerValue)
+{
+    double y = double(x);
+    destination[0] = abs(integerValue);
+    destination[1] = int(abs(half(x)));
+    destination[2] = int(tan(y));
+    destination[3] = int(pow(y, 2.0));
+    destination[4] = isnan(y) ? 1 : 0;
+    destination[5] = sign(y);
 }
 )";
 static const char kDirectNVVMMinMaxSource[] = R"(

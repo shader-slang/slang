@@ -7128,6 +7128,68 @@ SLANG_UNIT_TEST(nvvmSlangIntegerBitHelpersRequestTypedOperations)
 #endif
 }
 
+SLANG_UNIT_TEST(nvvmSlangScalarMathHelpersRequestTypedOperations)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    static const uint8_t kLibdevice[] = {0x42, 0x43, 0xc0, 0xde, 0x7e, 0x12};
+    TempDirectory toolkit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createTempDirectory(toolkit)));
+    String candidatePath;
+    String libdevicePath;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createFakeNVVMToolkit(
+        toolkit.path,
+        kLibdevice,
+        sizeof(kLibdevice),
+        candidatePath,
+        libdevicePath)));
+
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        globalSession->setDownstreamCompilerPath(SLANG_PASS_THROUGH_NVVM, toolkit.path.getBuffer());
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMScalarMathOperationsSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        uint32_t operationCounts[SLANG_NVVM_VALUE_OPERATION_COUNT] = {};
+        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation < SLANG_NVVM_VALUE_OPERATION_COUNT)
+                ++operationCounts[operation.key.operation];
+        }
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_ABS] == 2);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_TAN] == 1);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_POW] == 1);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_IS_NAN] == 1);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_SIGN] == 1);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds[1] == FakeModuleAddKind::Lazy);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
 SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 {
     struct UnsupportedCase
@@ -7154,6 +7216,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedMinMaxSignatureSource, "assembly=$P_min($0, $1)"},
         {kDirectNVVMUnsupportedIntegerBitSignatureSource, "assembly=$P_countbits($0)"},
         {kDirectNVVMUnsupportedVectorIntegerBitSource, "assembly=$P_reversebits($0)"},
+        {kDirectNVVMUnsupportedVectorScalarMathSource, "assembly=$P_tan($0)"},
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
@@ -7170,7 +7233,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     };
 
     // Noncanonical layout, unsupported shared storage, logical NOT,
-    // malformed-signature opaque-Half and surface helpers, atomic-add ABI variants,
+    // malformed-signature opaque-Half, scalar-math, and surface helpers, atomic-add ABI variants,
     // non-relaxed atomic-add order, adjacent atomic operations, non-integer shared arrays, pointer
     // comparisons, and helper-array-pointer shapes remain deterministic
     // before builder discovery.

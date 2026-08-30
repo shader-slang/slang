@@ -2597,38 +2597,55 @@ bool _resolveNVVMGenericAsmValueOperation(
             return false;
     }
 
-    if (genericAsm->getAsm() == toSlice("$P_min($0, $1)"))
+    struct GenericAsmOperationSpelling
     {
-        outOperation.operation = SLANG_NVVM_VALUE_OP_MIN;
-        outOperation.operandCount = 2;
-    }
-    else if (genericAsm->getAsm() == toSlice("$P_max($0, $1)"))
+        const char* assembly;
+        SlangNVVMValueOperation operation;
+        uint32_t operandCount;
+    };
+    static const GenericAsmOperationSpelling kOperationSpellings[] = {
+        {"$P_min($0, $1)", SLANG_NVVM_VALUE_OP_MIN, 2},
+        {"$P_max($0, $1)", SLANG_NVVM_VALUE_OP_MAX, 2},
+        {"$P_countbits($0)", SLANG_NVVM_VALUE_OP_COUNT_BITS, 1},
+        {"$P_reversebits($0)", SLANG_NVVM_VALUE_OP_REVERSE_BITS, 1},
+        {"$P_firstbithigh($0)", SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH, 1},
+        {"$P_firstbitlow($0)", SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW, 1},
+        {"$P_abs($0)", SLANG_NVVM_VALUE_OP_ABS, 1},
+        {"$P_acos($0)", SLANG_NVVM_VALUE_OP_ACOS, 1},
+        {"$P_asin($0)", SLANG_NVVM_VALUE_OP_ASIN, 1},
+        {"$P_atan($0)", SLANG_NVVM_VALUE_OP_ATAN, 1},
+        {"$P_atan2($0, $1)", SLANG_NVVM_VALUE_OP_ATAN2, 2},
+        {"$P_ceil($0)", SLANG_NVVM_VALUE_OP_CEIL, 1},
+        {"$P_exp($0)", SLANG_NVVM_VALUE_OP_EXP, 1},
+        {"$P_exp2($0)", SLANG_NVVM_VALUE_OP_EXP2, 1},
+        {"$P_floor($0)", SLANG_NVVM_VALUE_OP_FLOOR, 1},
+        {"$P_fmod($0, $1)", SLANG_NVVM_VALUE_OP_FMOD, 2},
+        {"$P_frac($0)", SLANG_NVVM_VALUE_OP_FRAC, 1},
+        {"$P_isnan($0)", SLANG_NVVM_VALUE_OP_IS_NAN, 1},
+        {"$P_log($0)", SLANG_NVVM_VALUE_OP_LOG, 1},
+        {"$P_log2($0)", SLANG_NVVM_VALUE_OP_LOG2, 1},
+        {"$P_log10($0)", SLANG_NVVM_VALUE_OP_LOG10, 1},
+        {"$P_pow($0, $1)", SLANG_NVVM_VALUE_OP_POW, 2},
+        {"$P_round($0)", SLANG_NVVM_VALUE_OP_ROUND, 1},
+        {"$P_rsqrt($0)", SLANG_NVVM_VALUE_OP_RSQRT, 1},
+        {"$P_sign($0)", SLANG_NVVM_VALUE_OP_SIGN, 1},
+        {"$P_sqrt($0)", SLANG_NVVM_VALUE_OP_SQRT, 1},
+        {"$P_tan($0)", SLANG_NVVM_VALUE_OP_TAN, 1},
+        {"$P_trunc($0)", SLANG_NVVM_VALUE_OP_TRUNC, 1},
+    };
+    const GenericAsmOperationSpelling* spelling = nullptr;
+    for (const auto& candidate : kOperationSpellings)
     {
-        outOperation.operation = SLANG_NVVM_VALUE_OP_MAX;
-        outOperation.operandCount = 2;
+        if (genericAsm->getAsm() == UnownedStringSlice(candidate.assembly))
+        {
+            spelling = &candidate;
+            break;
+        }
     }
-    else if (genericAsm->getAsm() == toSlice("$P_countbits($0)"))
-    {
-        outOperation.operation = SLANG_NVVM_VALUE_OP_COUNT_BITS;
-        outOperation.operandCount = 1;
-    }
-    else if (genericAsm->getAsm() == toSlice("$P_reversebits($0)"))
-    {
-        outOperation.operation = SLANG_NVVM_VALUE_OP_REVERSE_BITS;
-        outOperation.operandCount = 1;
-    }
-    else if (genericAsm->getAsm() == toSlice("$P_firstbithigh($0)"))
-    {
-        outOperation.operation = SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH;
-        outOperation.operandCount = 1;
-    }
-    else if (genericAsm->getAsm() == toSlice("$P_firstbitlow($0)"))
-    {
-        outOperation.operation = SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW;
-        outOperation.operandCount = 1;
-    }
-    else
+    if (!spelling)
         return false;
+    outOperation.operation = spelling->operation;
+    outOperation.operandCount = spelling->operandCount;
 
     if (function->getParamCount() != outOperation.operandCount ||
         !_getNVVMSemanticType(function->getResultType(), outOperation.resultType))

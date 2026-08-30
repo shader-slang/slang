@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 26u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 27u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -155,7 +155,27 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_REVERSE_BITS ((SlangNVVMValueOperation)46u)
 #define SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH ((SlangNVVMValueOperation)47u)
 #define SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW ((SlangNVVMValueOperation)48u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT 49u
+#define SLANG_NVVM_VALUE_OP_ABS ((SlangNVVMValueOperation)49u)
+#define SLANG_NVVM_VALUE_OP_ACOS ((SlangNVVMValueOperation)50u)
+#define SLANG_NVVM_VALUE_OP_ASIN ((SlangNVVMValueOperation)51u)
+#define SLANG_NVVM_VALUE_OP_ATAN ((SlangNVVMValueOperation)52u)
+#define SLANG_NVVM_VALUE_OP_ATAN2 ((SlangNVVMValueOperation)53u)
+#define SLANG_NVVM_VALUE_OP_CEIL ((SlangNVVMValueOperation)54u)
+#define SLANG_NVVM_VALUE_OP_EXP ((SlangNVVMValueOperation)55u)
+#define SLANG_NVVM_VALUE_OP_EXP2 ((SlangNVVMValueOperation)56u)
+#define SLANG_NVVM_VALUE_OP_FLOOR ((SlangNVVMValueOperation)57u)
+#define SLANG_NVVM_VALUE_OP_FMOD ((SlangNVVMValueOperation)58u)
+#define SLANG_NVVM_VALUE_OP_FRAC ((SlangNVVMValueOperation)59u)
+#define SLANG_NVVM_VALUE_OP_LOG ((SlangNVVMValueOperation)60u)
+#define SLANG_NVVM_VALUE_OP_LOG2 ((SlangNVVMValueOperation)61u)
+#define SLANG_NVVM_VALUE_OP_LOG10 ((SlangNVVMValueOperation)62u)
+#define SLANG_NVVM_VALUE_OP_POW ((SlangNVVMValueOperation)63u)
+#define SLANG_NVVM_VALUE_OP_ROUND ((SlangNVVMValueOperation)64u)
+#define SLANG_NVVM_VALUE_OP_RSQRT ((SlangNVVMValueOperation)65u)
+#define SLANG_NVVM_VALUE_OP_TAN ((SlangNVVMValueOperation)66u)
+#define SLANG_NVVM_VALUE_OP_IS_NAN ((SlangNVVMValueOperation)67u)
+#define SLANG_NVVM_VALUE_OP_SIGN ((SlangNVVMValueOperation)68u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT 69u
 
     /** Describes one complete semantic value-operation overload. */
     typedef struct SlangNVVMValueOperationDesc

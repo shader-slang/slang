@@ -6048,7 +6048,7 @@ The installed CUDA 13 directory has no tool binaries, so CUDA 13 validation rema
 infrastructure gap.
 
 Production packaging treats `slang-llvm-nvvm` as an optional compiler-matched LLVM 14 provider at
-builder ABI revision 26. It should ship next to Slang binaries, with
+builder ABI revision 27. It should ship next to Slang binaries, with
 `SLANG_NVVM_BUILDER_PATH` reserved as the explicit deployment/development override. Sessions cache
 one load result, and direct selection retains deterministic E52016 failure for missing or mismatched
 providers rather than falling back to NVRTC. Provider updates move with the Slang commit and build
@@ -6094,8 +6094,9 @@ The following remain open until their named slice supplies evidence:
   equality/inequality, integer shifts/division/remainder, Float16/Float32 remainder, same-lane
   integer/floating conversion, exact same-lane typed selection, and canonical scalar truthiness
   plus vector `all`/`any` reduction over selected Bool/integer/Float16/Float32 values, and canonical
-  scalar signed/unsigned integer and Float32/Float64 minimum/maximum, plus scalar selected-integer
-  population count, bit reversal, and high/low bit scans;
+  scalar signed/unsigned integer and Float32/Float64 minimum/maximum, scalar selected-integer
+  population count, bit reversal, and high/low bit scans, plus selected scalar integer/Half
+  absolute value, Float32/Float64 common math, classification, and sign;
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical
@@ -6215,6 +6216,43 @@ transport (23), and ordinary numeric/bit operations (16).
 The selected NVVM prefix passes 402/402 and all 22 promoted lanes pass. The three representative
 workloads remain correct; their direct O3 PTX assembles with CUDA 12.9 for SM70, SM80, and SM90.
 CUDA 13 and physical SM70/80/90 runtime remain infrastructure gaps.
+
+### Slice 135: Common scalar math semantics
+
+The 47-row residual ordinary-intrinsic inventory contains one 34-workload scalar-math family. Its
+canonical producer is CUDA-prelude target specialization: each final linked helper is a one-block,
+asm-only `IRFunc` whose exact `$P_*` spelling selects the operation and whose specialized function
+signature supplies the complete typed contract. The compiler now resolves those shapes through a
+single spelling table and the shared semantic-family resolver; it does not inspect source names or
+fixture paths.
+
+Forward-only builder ABI revision 27 adds the missing semantic operation IDs but retains the
+existing generic typed query/emit callback. Selected Float32/Float64 operations use exact
+libdevice symbols, while Float32/Float64 square root uses the validated LLVM intrinsic. `frac` is
+typed `x - floor(x)`, `isnan` is an unordered self-comparison, and floating `sign` subtracts the
+ordered negative predicate from the ordered positive predicate. Signed-integer absolute value is
+typed compare/select; Half absolute value clears the sign bit. These compositions preserve their
+result types without reconstructing LLVM syntax.
+
+Twenty-seven workloads become correct at both O0 and O3 and receive 54 direct regression lanes.
+Six reach later canonical blockers (`shr`, `isfinite`, opaque-Half packing, Float/Half
+classification, or `sincos`) and remain unpromoted. `matrix-float.slang` compiles but exposes the
+same runtime mismatch at O0 and O3; the separately passing scalar/vector workloads show that this
+is a newly exposed combined matrix-runtime issue, not evidence for admitting another semantic
+shape in this slice.
+
+The fixed census remains 452 workloads. Direct O0 is correct for 264, with eight runtime
+mismatches, 175 preflight failures, and five provider failures; direct O3 is correct for 260, with
+16 mismatches, 175 preflight failures, and one provider failure. There are 27 new successes and no
+old-correct regressions in either mode. Among 427 healthy MVP references, O0/O3/both correctness is
+263/258/255. The leading remaining MVP clusters are wave/reconvergence semantics (31), helper ABI
+contracts (28), aggregate/pointer/layout transport (23), ordinary intrinsic semantics (18), and
+ordinary numeric/bit operations (17).
+
+All 81 native/direct CUDA lanes in the promoted fixtures pass, and the selected NVVM regression
+prefix passes 404/404. The representative workload gates remain correct, and their direct O3 PTX
+assembles with CUDA 12.9 for SM70, SM80, and SM90. CUDA 13 and physical SM70/SM80/SM90 runtime
+remain infrastructure gaps.
 
 ## Authoritative References
 

@@ -1885,3 +1885,22 @@ All 11 first blockers become correct at O0 and O3, and all 22 promoted direct la
 healthy MVP references, O0/O3/both correctness is 236/231/228. Ordinary intrinsic failures fall
 from 58 to 47. The selected prefix passes 402/402; representative direct O3 PTX remains accepted by
 CUDA 12.9 `ptxas` for SM70, SM80, and SM90.
+
+Slice 135 represents the 34-workload common scalar-math family through the existing generic typed
+operation interface. CUDA-prelude target specialization produces exact one-block `IRGenericAsm`
+helpers; one compiler spelling table selects the semantic operation, and the specialized result
+and parameter types are validated by the shared resolver. No fixture or source-name dispatch is
+used.
+
+Forward-only builder ABI revision 27 adds missing operation IDs for scalar absolute value,
+transcendentals, exp/log, rounding/root, `fmod`, `frac`, classification, and sign. The provider
+uses exact Float32/Float64 libdevice calls where required, validated LLVM square root, and typed
+composition for `frac`, `isnan`, `sign`, signed-integer absolute value, and Half absolute value.
+The provider callback remains unchanged.
+
+Twenty-seven workloads become correct at both optimization levels and receive 54 direct lanes;
+six advance to later measured blockers, and one matrix workload becomes a measured runtime
+mismatch. The full census reaches 264 O0 and 260 O3 successes with no old-correct regression.
+Against 427 healthy MVP references, O0/O3/both correctness is 263/258/255. All 81 promoted
+native/direct CUDA lanes pass, and the three representative direct O3 PTX modules continue to
+assemble for SM70, SM80, and SM90 with CUDA 12.9.
