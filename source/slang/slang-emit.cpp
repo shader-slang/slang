@@ -1474,9 +1474,7 @@ Result linkAndOptimizeIR(
             return SLANG_FAIL;
     }
 
-    // Fill in default matrix layout into matrix types that left layout unspecified. Must run
-    // before specialization: `row_major float4x4` and `float4x4` are only recognized as the
-    // same type once both layouts are resolved, otherwise a generic is specialized twice.
+    // Fill in default matrix layout into matrix types that left layout unspecified.
     SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // It's important that this takes place before defunctionalization as we
@@ -1537,11 +1535,6 @@ Result linkAndOptimizeIR(
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
-
-    // Run again: specialization creates new matrix types with unspecified layout, because the
-    // layout can arrive as a plain int generic argument that only becomes a layout here.
-    // Left unresolved they reach emit as duplicate types and fail spirv-val.
-    SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     if (requiredLoweringPassSet.higherOrderFunc)
     {
