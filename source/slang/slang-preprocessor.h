@@ -5,6 +5,7 @@
 #include "compiler-core/slang-include-system.h"
 #include "compiler-core/slang-lexer.h"
 #include "core/slang-basic.h"
+#include "slang-profile.h"
 
 namespace Slang
 {
@@ -12,8 +13,6 @@ namespace Slang
 class DiagnosticSink;
 class Linkage;
 struct PreprocessorContentAssistInfo;
-
-enum class SourceLanguage : SlangSourceLanguageIntegral;
 
 namespace preprocessor
 {
