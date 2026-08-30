@@ -121,6 +121,11 @@ def _failure_ownership(row: dict[str, str]) -> tuple[str, str]:
     if classification == "infrastructure":
         return "infrastructure-native-reference", "NVRTC/toolkit or generated reference contract"
     if classification == "provider":
+        if "by-value aggregate field pointer" in row["diagnostic"]:
+            return (
+                "provider-aggregate-field-pointer",
+                "canonical by-value aggregate field address -> provider field-pointer operation",
+            )
         return (
             "provider-unoptimized-half-operation",
             "NVVMTypeLoweringContext/emitNVVMIRFromLinkedIR -> libNVVM compilation",

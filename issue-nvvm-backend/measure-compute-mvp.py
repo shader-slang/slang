@@ -98,6 +98,12 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--output", type=Path, default=Path("build/nvvm-census/mvp-metrics"))
+    parser.add_argument(
+        "--census-results",
+        type=Path,
+        default=Path("build/nvvm-census/results.tsv"),
+        help="census result rows supplying end-to-end timings",
+    )
     parser.add_argument("--repetitions", type=int, default=3)
     return parser.parse_args()
 
@@ -113,7 +119,12 @@ def main() -> int:
     provider = repo_root / "build/nvvm-builder-deps/slang-llvm-nvvm-build/Release"
     environment = os.environ.copy()
     environment["SLANG_NVVM_BUILDER_PATH"] = str(provider)
-    census_timings = _load_census_timings(repo_root / "build/nvvm-census/results.tsv")
+    census_results = (
+        (repo_root / args.census_results).resolve()
+        if not args.census_results.is_absolute()
+        else args.census_results
+    )
+    census_timings = _load_census_timings(census_results)
     measurements: list[dict[str, object]] = []
 
     for workload in WORKLOADS:

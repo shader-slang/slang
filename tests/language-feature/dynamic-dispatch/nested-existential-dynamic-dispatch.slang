@@ -15,6 +15,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1" -conformance "BarX:IBar=0" -conformance "BarY:IBar=1" -conformance "ScaleProcessor:IProcessor=0" -conformance "OffsetProcessor:IProcessor=1" -conformance "ArraySumProcessor:IArrayProcessor=0" -conformance "ArrayMaxProcessor:IArrayProcessor=1" -conformance "DualScaleProcessor:IDualProcessor=0" -conformance "DualAddProcessor:IDualProcessor=1" -conformance "MixedScaleProcessor:IMixedProcessor=0" -conformance "MixedSumProcessor:IMixedProcessor=1" -conformance "WeightedProcessor:IWeightedProcessor=0" -conformance "BiasedProcessor:IWeightedProcessor=1"
 

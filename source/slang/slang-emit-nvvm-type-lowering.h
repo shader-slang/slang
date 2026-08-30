@@ -59,7 +59,7 @@ IRVectorType* asNVVMSupportedI32VectorType(
     bool* outIsSigned = nullptr,
     uint32_t* outElementCount = nullptr);
 
-/// Returns whether `type` is a selected scalar or established fixed numeric vector.
+/// Returns whether `type` is a selected integer/floating scalar or fixed numeric vector.
 bool isNVVMSupportedNumericValueType(IRInst* type);
 
 /// Returns an exact nonempty fixed array whose direct element is a byte-address numeric value.
@@ -88,14 +88,28 @@ IRStructType* asNVVMSupportedAggregateStorageStructType(IRInst* type);
 /// Returns whether a type is in the recursive aggregate-storage algebra.
 bool isNVVMSupportedAggregateStorageType(IRInst* type);
 
-/// Returns an exact nonempty struct whose leaves are selected numeric values.
+/// Returns whether `type` is a finite value composed from selected scalar/vector leaves, fixed
+/// arrays, and nonempty structs.
+bool isNVVMSupportedCopyableValueType(IRInst* type);
+
+/// Returns an exact nonempty struct in the recursive copyable-value algebra.
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type);
 
 /// Returns a nonempty struct recursively composed of selected values and CUDA resource values.
 IRStructType* asNVVMSupportedResourceStructType(IRInst* type);
 
-/// Returns an exact nonempty fixed array of selected numeric values or copyable structs.
+/// Returns an exact nonempty fixed array in the recursive copyable-value algebra.
 IRArrayType* asNVVMSupportedCopyableArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
+
+/// Returns an exact generic local, output, or mutable-borrow pointer to a copyable value.
+IRPtrTypeBase* asNVVMSupportedLocalCopyableValuePointerType(
+    IRInst* type,
+    IRType** outValueType = nullptr);
+
+/// Returns an exact generic derived pointer to a copyable value with explicit access/layout.
+IRPtrTypeBase* asNVVMSupportedDerivedCopyableValuePointerType(
+    IRInst* type,
+    IRType** outValueType = nullptr);
 
 /// Returns an exact generic local pointer or output parameter to a selected numeric value.
 IRPtrTypeBase* asNVVMSupportedLocalNumericPointerType(

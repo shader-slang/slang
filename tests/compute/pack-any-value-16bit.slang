@@ -4,6 +4,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -render-feature int16,half
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_2 -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile sm_6_2 -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile sm_6_2 -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile sm_6_2 -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 [anyValueSize(32)]
 interface IInterface

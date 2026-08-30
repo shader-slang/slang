@@ -1824,3 +1824,25 @@ PTX for each assembles for SM70, SM80, and SM90, while physical runtime is measu
 feature families, these gates, deterministic rejection, CUDA 12/13 validation, and at least 80%
 O0/O3 differential correctness over healthy MVP references. The selected 399/399 prefix remains a
 separate regression score.
+
+Slice 132 replaces the narrow helper scalar/struct/array admission paths with one recursive,
+cycle-safe copyable-value algebra. Selected scalar/vector leaves, fixed arrays, and nonempty
+structs compose through local storage, helper parameters/results, calls, returns, fixed-array
+splats, nested aggregate extraction, and keyed field access using generic builder ABI revision 24
+operations. Plain local/output/mutable-borrow pointer producers remain distinct from derived
+field/element pointers, so mutability continues to be proven from the producer chain.
+
+The complete census grows to 452 workloads (430 MVP and 22 extension). Native CUDA/NVRTC O3 is
+correct for 449. Direct O0 is correct for 218 and direct O3 for 214; 217/427 and 212/427 healthy MVP
+references compare correctly respectively, with 209 correct at both. Twenty-one previously failing
+corpus workloads plus the new recursive helper fixture pass at both optimization levels, and no
+previously correct row regresses. The original 51-row MVP helper cluster produces ten correct
+workloads, thirteen newly exposed exact downstream blockers, and 28 remaining helper-contract
+failures. The selected NVVM regression prefix passes 400/400.
+
+The representative resource/helper, parameter-block, and shared-control/barrier workloads remain
+correct through native CUDA and direct O0/O3. CUDA 12.9 direct O3 PTX for all three assembles for
+SM70, SM80, and SM90; runtime remains measured on the SM120 RTX 5090. CUDA 13 and physical
+SM70/80/SM90 runtime workers remain open infrastructure requirements. The committed Slice 132
+census matrix and Pareto JSON are authoritative for the next ordinary-intrinsic,
+wave/reconvergence, remaining-helper, aggregate/pointer, and numeric-operation priorities.

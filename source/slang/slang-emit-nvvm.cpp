@@ -513,6 +513,21 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
 
     if (!arrayType && base)
     {
+        NVVMSequentialElementPointer parentElement;
+        if (_getNVVMSequentialElementPointer(base, parentElement))
+        {
+            arrayType = asNVVMSupportedCopyableArrayType(parentElement.resultType->getValueType());
+            if (arrayType)
+            {
+                baseType = parentElement.resultType;
+                aggregateType = arrayType;
+                isImmutable = parentElement.isImmutable;
+            }
+        }
+    }
+
+    if (!arrayType && base)
+    {
         IRType* parameterGroupElementType = nullptr;
         const bool hasParameterGroupBase =
             asNVVMSupportedParameterGroupType(base->getDataType(), &parameterGroupElementType);
@@ -522,18 +537,20 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         if (!arrayType && base->getOp() == kIROp_FieldAddress)
         {
             NVVMStructField fieldAddress;
-            if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress) &&
-                !fieldAddress.isMutable)
+            if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress))
             {
                 arrayType =
-                    asNVVMSupportedAggregateStorageArrayType(fieldAddress.field->getFieldType());
+                    fieldAddress.isMutable
+                        ? asNVVMSupportedCopyableArrayType(fieldAddress.field->getFieldType())
+                        : asNVVMSupportedAggregateStorageArrayType(
+                              fieldAddress.field->getFieldType());
                 baseType = as<IRPtrTypeBase>(base->getDataType());
+                isImmutable = !fieldAddress.isMutable;
             }
         }
         if (arrayType)
         {
             aggregateType = arrayType;
-            isImmutable = true;
         }
     }
 
@@ -580,7 +597,8 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     const AddressSpace expectedAddressSpace =
         baseType ? baseType->getAddressSpace() : AddressSpace::Generic;
     const bool hasCanonicalLocalLayout =
-        (resultType && resultType->getOperandCount() == 3 && !resultLayout) ||
+        (resultType && (resultType->getOperandCount() == 1 || resultType->getOperandCount() == 3) &&
+         !resultLayout) ||
         (resultType && resultType->getOperandCount() == 4 && resultLayout &&
          resultLayout->getOp() == kIROp_ScalarBufferLayoutType);
     if (!aggregateType || !resultType || resultType->getOp() != kIROp_PtrType ||
@@ -656,6 +674,8 @@ bool _getNVVMByValueParameterAlignment(
     return true;
 }
 
+bool _hasNVVMCompatibleCopyableValueLayout(CodeGenContext* codeGenContext, IRType* type);
+
 // Verifies that a selected copyable struct can use unpadded LLVM structs for storage. Consider
 // `Thing { uint pos; float radius; half4 color; }`: CUDA and LLVM give its fields offsets 0, 4, and
 // 8 and the same 16-byte stride, even though their preferred aggregate alignment differs. Matching
@@ -701,13 +721,42 @@ bool _hasNVVMCompatibleStructLayout(CodeGenContext* codeGenContext, IRStructType
         {
             return false;
         }
-        if (auto nestedType = asNVVMSupportedResourceStructType(field->getFieldType()))
-        {
-            if (!_hasNVVMCompatibleStructLayout(codeGenContext, nestedType))
-                return false;
-        }
+        IRType* fieldType = field->getFieldType();
+        if ((asNVVMSupportedResourceStructType(fieldType) ||
+             asNVVMSupportedCopyableArrayType(fieldType)) &&
+            !_hasNVVMCompatibleCopyableValueLayout(codeGenContext, fieldType))
+            return false;
     }
     return true;
+}
+
+// Verifies every aggregate node in one recursive copyable value. Matching the complete array size
+// proves that an explicit canonical stride, when present, agrees with LLVM's element stride; the
+// struct check above additionally proves every CUDA field offset.
+bool _hasNVVMCompatibleCopyableValueLayout(CodeGenContext* codeGenContext, IRType* type)
+{
+    if (!codeGenContext || !type)
+        return false;
+    if (auto structType = asNVVMSupportedResourceStructType(type))
+        return _hasNVVMCompatibleStructLayout(codeGenContext, structType);
+    if (auto arrayType = asNVVMSupportedCopyableArrayType(type))
+    {
+        IRSizeAndAlignment cudaLayout;
+        IRSizeAndAlignment llvmLayout;
+        return SLANG_SUCCEEDED(getSizeAndAlignment(
+                   codeGenContext->getTargetReq(),
+                   IRTypeLayoutRules::getCUDA(),
+                   arrayType,
+                   &cudaLayout)) &&
+               SLANG_SUCCEEDED(getSizeAndAlignment(
+                   codeGenContext->getTargetReq(),
+                   IRTypeLayoutRules::getLLVM(),
+                   arrayType,
+                   &llvmLayout)) &&
+               cudaLayout.size > 0 && cudaLayout.size == llvmLayout.size &&
+               _hasNVVMCompatibleCopyableValueLayout(codeGenContext, arrayType->getElementType());
+    }
+    return isNVVMSupportedCopyableValueType(type);
 }
 
 IRIntegerValue _alignNVVMStorageSize(IRIntegerValue size, IRIntegerValue alignment)
@@ -832,25 +881,25 @@ bool _hasNVVMCompatibleAggregateStorageLayout(CodeGenContext* codeGenContext, IR
 // fixed-array elements are semantic type dependencies of their parent even when no independent
 // local or signature mentions them, so validation must accept the complete tree that type
 // lowering will visit.
-void _addNVVMReachableStructTypes(IRStructType* type, HashSet<IRInst*>& reachableTypes)
+void _addNVVMReachableStructTypes(IRType* type, HashSet<IRInst*>& reachableTypes)
 {
-    if (!type || reachableTypes.contains(type))
-        return;
-    reachableTypes.add(type);
-    for (auto field : type->getFields())
+    while (auto arrayType = as<IRArrayType>(type))
     {
-        IRType* fieldType = field->getFieldType();
-        auto nestedType = asNVVMSupportedResourceStructType(fieldType);
-        if (!nestedType)
-            nestedType = asNVVMSupportedAggregateStorageStructType(fieldType);
-        if (nestedType)
-            _addNVVMReachableStructTypes(nestedType, reachableTypes);
-        if (auto arrayType = asNVVMSupportedAggregateStorageArrayType(fieldType))
-        {
-            auto elementStruct = as<IRStructType>(arrayType->getElementType());
-            if (elementStruct)
-                _addNVVMReachableStructTypes(elementStruct, reachableTypes);
-        }
+        if (!asNVVMSupportedCopyableArrayType(arrayType) &&
+            !asNVVMSupportedAggregateStorageArrayType(arrayType))
+            return;
+        type = arrayType->getElementType();
+    }
+    auto structType = as<IRStructType>(type);
+    if (!structType ||
+        (!asNVVMSupportedResourceStructType(structType) &&
+         !asNVVMSupportedAggregateStorageStructType(structType)) ||
+        reachableTypes.contains(structType))
+        return;
+    reachableTypes.add(structType);
+    for (auto field : structType->getFields())
+    {
+        _addNVVMReachableStructTypes(field->getFieldType(), reachableTypes);
     }
 }
 
@@ -1165,6 +1214,7 @@ struct NVVMAggregateConstruction
 {
     IRType* resultType = nullptr;
     uint32_t elementCount = 0;
+    bool repeatsSingleElement = false;
 };
 
 // Resolves a canonical aggregate value whose complete ordered element sequence is explicit in
@@ -1190,6 +1240,20 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
         }
         outConstruction.resultType = resultType;
         outConstruction.elementCount = elementCount;
+        return true;
+    }
+
+    if (inst->getOp() == kIROp_MakeArrayFromElement)
+    {
+        uint32_t elementCount = 0;
+        auto resultType = asNVVMSupportedCopyableArrayType(inst->getDataType(), &elementCount);
+        IRInst* element = inst->getOperandCount() == 1 ? inst->getOperand(0) : nullptr;
+        if (!resultType || !element ||
+            !isTypeEqual(element->getDataType(), resultType->getElementType()))
+            return false;
+        outConstruction.resultType = resultType;
+        outConstruction.elementCount = elementCount;
+        outConstruction.repeatsSingleElement = true;
         return true;
     }
 
@@ -1233,7 +1297,7 @@ bool _getNVVMAggregateElement(IRInst* inst, NVVMAggregateElement& outElement)
     IRInst* base = getElement ? getElement->getBase() : nullptr;
     uint32_t elementCount = 0;
     auto baseType =
-        asNVVMSupportedNumericArrayType(base ? base->getDataType() : nullptr, &elementCount);
+        asNVVMSupportedCopyableArrayType(base ? base->getDataType() : nullptr, &elementCount);
     auto index = getElement ? _asExecutableInteger32Constant(getElement->getIndex()) : nullptr;
     if (!baseType || !isTypeEqual(inst->getDataType(), baseType->getElementType()) || !index ||
         index->getValue() < 0 || index->getValue() >= elementCount)
@@ -1348,6 +1412,62 @@ SlangResult _diagnoseUnsupportedIR(
     codeGenContext->getSink()->diagnose(
         Diagnostics::NvvmUnsupportedIr{.construct = String(construct)});
     return SLANG_E_NOT_IMPLEMENTED;
+}
+
+// Appends a stable description of a canonical helper-boundary type. `getTypeNameHint` deliberately
+// omits pointer wrappers, so spell their role, pointee, address space, and access contract here.
+void _appendNVVMCanonicalTypeName(StringBuilder& out, IRInst* type)
+{
+    SLANG_RELEASE_ASSERT(type);
+    if (auto pointerType = as<IRPtrTypeBase>(type))
+    {
+        out << getIROpInfo(type->getOp()).name << "<";
+        _appendNVVMCanonicalTypeName(out, pointerType->getValueType());
+        if (pointerType->getOperandCount() > 1)
+        {
+            out << ", addressSpace=" << uint32_t(pointerType->getAddressSpace())
+                << ", access=" << uint32_t(pointerType->getAccessQualifier())
+                << ", operands=" << pointerType->getOperandCount();
+        }
+        out << ">";
+        return;
+    }
+
+    const Index typeNameStart = out.getLength();
+    getTypeNameHint(out, type);
+    if (out.getLength() == typeNameStart)
+        out << getIROpInfo(type->getOp()).name;
+}
+
+// Reports the exact canonical type at a role-based preflight boundary. The final linked type is
+// the source of truth here; source syntax may no longer describe the specialized helper contract.
+SlangResult _diagnoseUnsupportedIRType(
+    CodeGenContext* codeGenContext,
+    const char* role,
+    IRInst* type)
+{
+    SLANG_RELEASE_ASSERT(type);
+    StringBuilder construct;
+    construct << role << ": ";
+    _appendNVVMCanonicalTypeName(construct, type);
+    return _diagnoseUnsupportedIR(codeGenContext, construct.getUnownedSlice());
+}
+
+// Reports an exact canonical source/destination type relation. Call legality is relational, so a
+// diagnostic naming only the argument or only the parameter would hide the invariant that failed.
+SlangResult _diagnoseUnsupportedIRTypeRelation(
+    CodeGenContext* codeGenContext,
+    const char* role,
+    IRInst* sourceType,
+    IRInst* destinationType)
+{
+    SLANG_RELEASE_ASSERT(sourceType && destinationType);
+    StringBuilder construct;
+    construct << role << ": ";
+    _appendNVVMCanonicalTypeName(construct, sourceType);
+    construct << " -> ";
+    _appendNVVMCanonicalTypeName(construct, destinationType);
+    return _diagnoseUnsupportedIR(codeGenContext, construct.getUnownedSlice());
 }
 
 SlangResult _requireBuilderOperation(
@@ -3010,7 +3130,10 @@ SlangResult _validatePointerValue(
     if (fieldPtrType && !fieldAddress.isMutable &&
         (consumer->getOp() != kIROp_Load || requireWriteAccess))
     {
-        return _diagnoseUnsupportedIR(codeGenContext, toSlice("immutable struct field access"));
+        StringBuilder construct;
+        construct << "immutable struct field access: consumer="
+                  << getIROpInfo(consumer->getOp()).name;
+        return _diagnoseUnsupportedIR(codeGenContext, construct.getUnownedSlice());
     }
     if (sequentialElementPtrType && sequentialElement.isImmutable &&
         (consumer->getOp() != kIROp_Load || requireWriteAccess))
@@ -3121,8 +3244,7 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 // Returns whether a type is an accepted canonical value in a helper result.
 bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
-    return as<IRVoidType>(type) || isNVVMSupportedValueType(type) ||
-           asNVVMSupportedCopyableStructType(type);
+    return as<IRVoidType>(type) || isNVVMSupportedCopyableValueType(type);
 }
 
 // Returns whether one exact canonical type can cross a selected helper parameter boundary.
@@ -3131,11 +3253,9 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return isNVVMSupportedValueType(type) || asNVVMSupportedNumericArrayType(type) ||
-           asNVVMSupportedResourceStructType(type) ||
+    return isNVVMSupportedCopyableValueType(type) || asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalResourceStructPointerType(type) ||
-           asNVVMSupportedLocalNumericPointerType(type) ||
-           asNVVMSupportedLocalNumericArrayPointerType(type) ||
+           asNVVMSupportedLocalCopyableValuePointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceType(type, surfaceType) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
@@ -3166,32 +3286,23 @@ bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterT
         return true;
     }
 
-    IRType* argumentNumericType = nullptr;
-    IRType* parameterNumericType = nullptr;
-    auto argumentNumericPointer =
-        asNVVMSupportedLocalNumericPointerType(argumentType, &argumentNumericType);
-    auto parameterNumericPointer =
-        asNVVMSupportedLocalNumericPointerType(parameterType, &parameterNumericType);
-    const bool isMutableNumericParameter =
-        parameterNumericPointer && (parameterNumericPointer->getOp() == kIROp_OutParamType ||
-                                    parameterNumericPointer->getOp() == kIROp_BorrowInOutParamType);
-    if (argumentNumericPointer && argumentNumericPointer->getOp() == kIROp_PtrType &&
-        isMutableNumericParameter && isTypeEqual(argumentNumericType, parameterNumericType))
+    IRType* argumentCopyableType = nullptr;
+    IRType* parameterCopyableType = nullptr;
+    auto argumentCopyablePointer =
+        asNVVMSupportedLocalCopyableValuePointerType(argumentType, &argumentCopyableType);
+    if (!argumentCopyablePointer)
     {
-        return true;
+        argumentCopyablePointer =
+            asNVVMSupportedDerivedCopyableValuePointerType(argumentType, &argumentCopyableType);
     }
-
-    IRArrayType* argumentArrayType = nullptr;
-    IRArrayType* parameterArrayType = nullptr;
-    auto argumentArrayPointer =
-        asNVVMSupportedLocalNumericArrayPointerType(argumentType, &argumentArrayType);
-    auto parameterArrayPointer =
-        asNVVMSupportedLocalNumericArrayPointerType(parameterType, &parameterArrayType);
-    const bool isMutableArrayParameter =
-        parameterArrayPointer && (parameterArrayPointer->getOp() == kIROp_OutParamType ||
-                                  parameterArrayPointer->getOp() == kIROp_BorrowInOutParamType);
-    return argumentArrayPointer && argumentArrayPointer->getOp() == kIROp_PtrType &&
-           isMutableArrayParameter && isTypeEqual(argumentArrayType, parameterArrayType);
+    auto parameterCopyablePointer =
+        asNVVMSupportedLocalCopyableValuePointerType(parameterType, &parameterCopyableType);
+    const bool isMutableCopyableParameter =
+        parameterCopyablePointer &&
+        (parameterCopyablePointer->getOp() == kIROp_OutParamType ||
+         parameterCopyablePointer->getOp() == kIROp_BorrowInOutParamType);
+    return argumentCopyablePointer && argumentCopyablePointer->getOp() == kIROp_PtrType &&
+           isMutableCopyableParameter && isTypeEqual(argumentCopyableType, parameterCopyableType);
 }
 
 // Returns whether a canonical helper signature needs the generic construction path.
@@ -3228,11 +3339,19 @@ SlangResult _validateNVVMHelperTarget(
     if (helper->getParent() != linkedIR.module->getModuleInst() || !helper->isDefinition())
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("call"));
     if (!_isSupportedNVVMHelperResultType(helper->getResultType()))
-        return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function result type"));
+        return _diagnoseUnsupportedIRType(
+            codeGenContext,
+            "helper function result type",
+            helper->getResultType());
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
         if (!_isSupportedNVVMHelperParameterType(helper->getParamType(parameterIndex)))
-            return _diagnoseUnsupportedIR(codeGenContext, toSlice("helper function parameter"));
+        {
+            return _diagnoseUnsupportedIRType(
+                codeGenContext,
+                "helper function parameter",
+                helper->getParamType(parameterIndex));
+        }
     }
     return SLANG_OK;
 }
@@ -3471,8 +3590,7 @@ SlangResult _validateNVVMFunction(
         {
             for (auto param : block->getParams())
             {
-                if (!isNVVMSupportedValueType(param->getDataType()) &&
-                    !asNVVMSupportedNumericArrayType(param->getDataType()))
+                if (!isNVVMSupportedCopyableValueType(param->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
                 }
@@ -3490,30 +3608,14 @@ SlangResult _validateNVVMFunction(
             {
             case kIROp_Var:
                 {
-                    IRType* numericValueType = nullptr;
+                    IRType* copyableValueType = nullptr;
+                    if (asNVVMSupportedLocalCopyableValuePointerType(
+                            inst->getDataType(),
+                            &copyableValueType))
+                    {
+                        break;
+                    }
                     IRStructType* valueType = nullptr;
-                    if (asNVVMSupportedLocalNumericPointerType(
-                            inst->getDataType(),
-                            &numericValueType))
-                    {
-                        break;
-                    }
-                    IRArrayType* arrayValueType = nullptr;
-                    if (asNVVMSupportedLocalCopyableArrayPointerType(
-                            inst->getDataType(),
-                            &arrayValueType))
-                    {
-                        auto elementStruct =
-                            asNVVMSupportedCopyableStructType(arrayValueType->getElementType());
-                        if (elementStruct &&
-                            !_hasNVVMCompatibleStructLayout(codeGenContext, elementStruct))
-                        {
-                            return _diagnoseUnsupportedIR(
-                                codeGenContext,
-                                toSlice("local copyable-array element layout"));
-                        }
-                        break;
-                    }
                     if (!asNVVMSupportedLocalResourceStructPointerType(
                             inst->getDataType(),
                             &valueType))
@@ -3662,6 +3764,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_MakeVector:
             case kIROp_MakeVectorFromScalar:
             case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
             case kIROp_MakeStruct:
             case kIROp_Swizzle:
             case kIROp_SwizzleSet:
@@ -3810,9 +3913,10 @@ SlangResult _validateNVVMFunction(
                          !_getNVVMSequentialElementPointer(inst, sequentialElementPointer) &&
                          !_getNVVMRawBufferElementPointer(inst, bufferElementPointer)))
                     {
-                        return _diagnoseUnsupportedIR(
+                        return _diagnoseUnsupportedIRType(
                             codeGenContext,
-                            toSlice("sequential element pointer"));
+                            "sequential element pointer",
+                            inst->getDataType());
                     }
                 }
                 break;
@@ -4114,14 +4218,19 @@ SlangResult _validateNVVMFunction(
                                              argument->getDataType(),
                                              callee->getParamType(argumentIndex)))
                         {
-                            return _diagnoseUnsupportedIR(
-                                codeGenContext,
-                                toSlice("call argument type"));
+                            return argument ? _diagnoseUnsupportedIRTypeRelation(
+                                                  codeGenContext,
+                                                  "call argument type",
+                                                  argument->getDataType(),
+                                                  callee->getParamType(argumentIndex))
+                                            : _diagnoseUnsupportedIR(
+                                                  codeGenContext,
+                                                  toSlice("call argument type"));
                         }
                         if (asNVVMSupportedLocalResourceStructPointerType(
                                 argument->getDataType()) ||
-                            asNVVMSupportedLocalNumericPointerType(argument->getDataType()) ||
-                            asNVVMSupportedLocalNumericArrayPointerType(argument->getDataType()))
+                            asNVVMSupportedLocalCopyableValuePointerType(argument->getDataType()) ||
+                            asNVVMSupportedDerivedCopyableValuePointerType(argument->getDataType()))
                         {
                             SLANG_RETURN_ON_FAIL(_validatePointerValue(
                                 codeGenContext,
@@ -4150,6 +4259,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_MakeVector:
             case kIROp_MakeVectorFromScalar:
             case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
             case kIROp_MakeStruct:
             case kIROp_Swizzle:
             case kIROp_SwizzleSet:
@@ -4210,7 +4320,8 @@ SlangResult _validateNVVMFunction(
                         {
                             SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                                 codeGenContext,
-                                inst->getOperand(i),
+                                inst->getOperand(
+                                    aggregateConstruction.repeatsSingleElement ? 0 : i),
                                 inst,
                                 availableValues,
                                 dominatorTree));
@@ -4549,7 +4660,8 @@ SlangResult _validateNVVMFunction(
                         }
                         else
                         {
-                            if (asNVVMSupportedCopyableStructType(function->getResultType()))
+                            if (as<IRStructType>(function->getResultType()) ||
+                                as<IRArrayType>(function->getResultType()))
                             {
                                 SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                                     codeGenContext,
@@ -5091,26 +5203,18 @@ SlangResult validateNVVMSupportedIR(
 
     for (auto function : functions)
     {
-        if (auto resultType = asNVVMSupportedCopyableStructType(function->getResultType()))
+        IRType* resultType = function->getResultType();
+        if ((as<IRStructType>(resultType) || as<IRArrayType>(resultType)) &&
+            isNVVMSupportedCopyableValueType(resultType))
         {
-            if (!_hasNVVMCompatibleStructLayout(codeGenContext, resultType))
-            {
-                return _diagnoseUnsupportedIR(
-                    codeGenContext,
-                    toSlice("helper copyable-struct result layout"));
-            }
             _addNVVMReachableStructTypes(resultType, selectedReachableStructTypes);
         }
         for (auto parameter : function->getParams())
         {
-            if (auto parameterType = asNVVMSupportedResourceStructType(parameter->getDataType()))
+            IRType* parameterType = parameter->getDataType();
+            if (asNVVMSupportedResourceStructType(parameterType) ||
+                asNVVMSupportedCopyableArrayType(parameterType))
             {
-                if (!_hasNVVMCompatibleStructLayout(codeGenContext, parameterType))
-                {
-                    return _diagnoseUnsupportedIR(
-                        codeGenContext,
-                        toSlice("helper resource-struct parameter layout"));
-                }
                 _addNVVMReachableStructTypes(parameterType, selectedReachableStructTypes);
             }
             if (auto elementStruct =
@@ -5131,28 +5235,35 @@ SlangResult validateNVVMSupportedIR(
             {
                 _addNVVMReachableStructTypes(pointerValueType, selectedReachableStructTypes);
             }
+            IRType* copyablePointerValueType = nullptr;
+            if (asNVVMSupportedLocalCopyableValuePointerType(
+                    parameter->getDataType(),
+                    &copyablePointerValueType))
+            {
+                _addNVVMReachableStructTypes(
+                    copyablePointerValueType,
+                    selectedReachableStructTypes);
+            }
         }
         for (auto block : function->getBlocks())
         {
             for (auto inst : block->getOrdinaryInsts())
             {
-                IRStructType* localValueType = nullptr;
-                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalResourceStructPointerType(
+                IRType* localValueType = nullptr;
+                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalCopyableValuePointerType(
                                                       inst->getDataType(),
                                                       &localValueType))
                 {
                     _addNVVMReachableStructTypes(localValueType, selectedReachableStructTypes);
                 }
-                IRArrayType* localArrayType = nullptr;
-                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalCopyableArrayPointerType(
+                IRStructType* localResourceValueType = nullptr;
+                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalResourceStructPointerType(
                                                       inst->getDataType(),
-                                                      &localArrayType))
+                                                      &localResourceValueType))
                 {
-                    if (auto elementType =
-                            asNVVMSupportedCopyableStructType(localArrayType->getElementType()))
-                    {
-                        _addNVVMReachableStructTypes(elementType, selectedReachableStructTypes);
-                    }
+                    _addNVVMReachableStructTypes(
+                        localResourceValueType,
+                        selectedReachableStructTypes);
                 }
             }
         }
@@ -5538,25 +5649,15 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Var:
                     {
                         IRType* valueType = nullptr;
-                        if (!asNVVMSupportedLocalNumericPointerType(
+                        if (!asNVVMSupportedLocalCopyableValuePointerType(
                                 inst->getDataType(),
                                 &valueType))
                         {
-                            IRArrayType* arrayValueType = nullptr;
-                            if (asNVVMSupportedLocalCopyableArrayPointerType(
-                                    inst->getDataType(),
-                                    &arrayValueType))
-                            {
-                                valueType = arrayValueType;
-                            }
-                            else
-                            {
-                                IRStructType* structValueType = nullptr;
-                                SLANG_RELEASE_ASSERT(asNVVMSupportedLocalResourceStructPointerType(
-                                    inst->getDataType(),
-                                    &structValueType));
-                                valueType = structValueType;
-                            }
+                            IRStructType* structValueType = nullptr;
+                            SLANG_RELEASE_ASSERT(asNVVMSupportedLocalResourceStructPointerType(
+                                inst->getDataType(),
+                                &structValueType));
+                            valueType = structValueType;
                         }
                         SlangNVVMTypeHandle loweredValueType = nullptr;
                         SLANG_RETURN_ON_FAIL(
@@ -5971,6 +6072,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_MakeVector:
                 case kIROp_MakeVectorFromScalar:
                 case kIROp_MakeArray:
+                case kIROp_MakeArrayFromElement:
                 case kIROp_MakeStruct:
                 case kIROp_Swizzle:
                 case kIROp_SwizzleSet:
@@ -6012,7 +6114,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     codeGenContext,
                                     builder,
                                     moduleScope.module,
-                                    inst->getOperand(i),
+                                    inst->getOperand(
+                                        aggregateConstruction.repeatsSingleElement ? 0 : i),
                                     valueMap,
                                     typeContext,
                                     loweredElement));

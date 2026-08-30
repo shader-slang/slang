@@ -4475,6 +4475,18 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitAggregateElementExtract(
     {
         aggregateType = _getFakeNVVMBuilderScalarStructType();
     }
+    else if (
+        baseRef.kind == FakeNVVMBuilderValueKind::AggregateElement && baseRef.index >= 0 &&
+        baseRef.index < gFakeNVVMBuilder.aggregateElementTypeKinds.getCount())
+    {
+        const FakeNVVMBuilderScalarTypeKind elementTypeKind =
+            gFakeNVVMBuilder.aggregateElementTypeKinds[baseRef.index];
+        aggregateType = elementTypeKind == FakeNVVMBuilderScalarTypeKind::NumericArray
+                            ? _getFakeNVVMBuilderArrayType()
+                        : elementTypeKind == FakeNVVMBuilderScalarTypeKind::ScalarStruct
+                            ? _getFakeNVVMBuilderScalarStructType()
+                            : nullptr;
+    }
 
     SlangNVVMTypeHandle elementType = nullptr;
     bool isAggregateElement = false;
@@ -8555,6 +8567,31 @@ void computeMain(
 }
 )";
 
+static const char kDirectNVVMRecursiveCopyableValueHelperSource[] = R"(
+struct PayloadWithArray
+{
+    int values[2];
+    float scale;
+};
+
+float sumPayload(PayloadWithArray value)
+{
+    return float(value.values[0] + value.values[1]) * value.scale;
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int input)
+{
+    PayloadWithArray value;
+    value.values[0] = input;
+    value.values[1] = 3;
+    value.scale = 0.5;
+    *destination = sumPayload(value);
+}
+)";
+
 static const char kDirectNVVMResourceStructHelperSource[] = R"(
 struct ResourceParam
 {
@@ -11463,13 +11500,6 @@ void computeMain()
 }
 )";
 static const char kDirectNVVMUnsupportedVectorFunctionSources[][512] = {
-    R"(
-RWStructuredBuffer<int> outputBuffer;
-double2 identity(double2 value) { return value; }
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void computeMain() { outputBuffer[0] = int(identity(double2(1.0, 2.0)).x); }
-)",
     R"(
 RWStructuredBuffer<int> outputBuffer;
 vector<int, 5> identity(vector<int, 5> value) { return value; }

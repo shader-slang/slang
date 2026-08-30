@@ -6124,6 +6124,37 @@ The following remain open until their named slice supplies evidence:
 - the scope of source-level debugging; and
 - production thresholds for compile time, resource use, and runtime performance.
 
+### Slice 132: Recursive copyable values and producer-owned pointers
+
+Direct NVVM now uses one cycle-safe copyable-value algebra for selected scalar/vector leaves,
+positive-size fixed arrays, and nonempty structs. The same classifier owns local storage, block
+parameters, helper parameters/results, exact calls/returns, aggregate construction/extraction, and
+role-based LLVM type lowering. Internal helper values retain one LLVM representation; CUDA layout
+comparison remains at external resource and parameter-storage boundaries.
+
+Plain local `Ptr`, exact `OutParam`, and mutable `BorrowInOutParam` producers are distinct from
+derived `Ptr` types. A derived field/element pointer may satisfy an exact call relation, but its
+mutability and storage provenance still come from its canonical producer chain. This prevents an
+immutable parameter-group or resource field from becoming writable based only on its final pointer
+type. Fixed-array splats and nested array/struct extraction use the existing generic aggregate
+operations. Builder ABI revision 24 is unchanged.
+
+The post-slice census contains 452 workloads: 430 MVP and 22 extension lanes. Native CUDA/NVRTC O3
+is correct for 449, with three infrastructure failures. Direct O0 is correct for 218, has seven
+runtime mismatches, 222 preflight failures, and five provider failures. Direct O3 is correct for
+214, with 15 mismatches, 222 preflight failures, and one provider failure. Against 427 healthy MVP
+references, 217 compare correctly at O0, 212 at O3, and 209 at both. This is 21 newly correct
+existing workloads plus one new representation fixture at both optimization levels, with no
+previously correct regression.
+
+Within the original 51-row MVP helper cluster, ten become correct, thirteen reach their next exact
+root cause, and 28 retain a helper type-contract failure. Eleven neighboring aggregate/pointer
+workloads also become correct under the shared invariant. The leading remaining MVP clusters are
+ordinary intrinsic `GenericAsm` (66), wave/reconvergence `GenericAsm` (31), helper ABI types (28),
+aggregate/pointer/layout transport (23), and ordinary numeric/bit operations (16). The complete
+selected NVVM prefix passes 400/400; all three representative workloads remain correct and their
+direct O3 PTX assembles with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

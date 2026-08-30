@@ -266,6 +266,16 @@ def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str
     diagnostic = diagnostic_match.group(2).strip() if diagnostic_match else ""
     shape_match = PREFLIGHT_SHAPE_RE.search(output)
     shape = shape_match.group(1) if shape_match else ""
+    for typed_role in (
+        "helper function parameter",
+        "helper function result type",
+        "call argument type",
+        "immutable struct field access",
+        "sequential element pointer",
+    ):
+        if shape.startswith(f"{typed_role}:"):
+            shape = typed_role
+            break
 
     if "no tests run" in output.lower():
         return "infrastructure", "generated census test was not discovered", shape
@@ -438,6 +448,10 @@ def parse_arguments() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--match-regex",
+        help="Run only workload IDs matching this case-insensitive regular expression.",
+    )
+    parser.add_argument(
         "--modes",
         nargs="+",
         choices=sorted(MODES),
@@ -529,6 +543,8 @@ def main() -> int:
         return 0 if all("unclassified" not in item for item in counts.values()) else 2
 
     run_workloads = workloads
+    if args.match and args.match_regex:
+        raise SystemExit("--match and --match-regex are mutually exclusive")
     if args.match:
         needle = args.match.lower()
         run_workloads = [
@@ -537,6 +553,20 @@ def main() -> int:
         if not run_workloads:
             raise SystemExit(f"no eligible workload ID contains: {args.match}")
         print(f"selected {len(run_workloads)} workloads matching {args.match!r}", flush=True)
+    elif args.match_regex:
+        try:
+            selection = re.compile(args.match_regex, re.IGNORECASE)
+        except re.error as error:
+            raise SystemExit(f"invalid --match-regex: {error}") from error
+        run_workloads = [
+            workload for workload in workloads if selection.search(str(workload["id"]))
+        ]
+        if not run_workloads:
+            raise SystemExit(f"no eligible workload ID matches: {args.match_regex}")
+        print(
+            f"selected {len(run_workloads)} workloads matching the regular expression",
+            flush=True,
+        )
 
     all_results: list[dict[str, object]] = []
     for mode in args.modes:

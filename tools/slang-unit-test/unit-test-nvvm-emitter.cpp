@@ -3425,6 +3425,61 @@ SLANG_UNIT_TEST(nvvmSlangCopyableValuesAndNumericBorrowsCrossHelperBoundaries)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangRecursiveCopyableValuesCrossHelperBoundaries)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMRecursiveCopyableValueHelperSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+            StringBuilder trace;
+            trace << "recursive-copyable fake trace: arrays "
+                  << gFakeNVVMBuilder.getArrayTypeCallCount << "; structs "
+                  << gFakeNVVMBuilder.getStructTypeCallCount << "; local storage "
+                  << gFakeNVVMBuilder.emitLocalStorageCallCount << "; field pointers "
+                  << gFakeNVVMBuilder.emitStructFieldPointerCallCount << "; sequential pointers "
+                  << gFakeNVVMBuilder.emitSequentialElementPointerCallCount << "; loads "
+                  << gFakeNVVMBuilder.emitLoadCallCount << "; stores "
+                  << gFakeNVVMBuilder.emitStoreCallCount << "; calls "
+                  << gFakeNVVMBuilder.emitCallCallCount << "; value returns "
+                  << gFakeNVVMBuilder.emitValueReturnCallCount << "; kernel marks "
+                  << gFakeNVVMBuilder.markFunctionAsKernelCallCount;
+            getTestReporter()->message(TestMessageType::TestFailure, trace.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool sawArrayField = false;
+        for (const auto fieldType : gFakeNVVMBuilder.scalarStructFieldTypes)
+            sawArrayField |= fieldType == _getFakeNVVMBuilderArrayType();
+        SLANG_CHECK(sawArrayField);
+        SLANG_CHECK(gFakeNVVMBuilder.getArrayTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitLocalStorageCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitSequentialElementPointerCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount >= 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangResourceStructsCrossLocalAndHelperBoundaries)
 {
     _resetDirectNVVMFakes();
@@ -4878,10 +4933,7 @@ SLANG_UNIT_TEST(nvvmSlangVectorFunctionsUseExactGenericTypes)
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 
-    const char* expectedDiagnostics[] = {
-        "helper function result type",
-        "invalid vector element count",
-    };
+    const char* expectedDiagnostics[] = {"invalid vector element count"};
     Index unsupportedIndex = 0;
     for (const char* source : kDirectNVVMUnsupportedVectorFunctionSources)
     {
@@ -6932,16 +6984,15 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     };
     static const UnsupportedCase kCases[] = {
         {kDirectNVVMUnsupportedCallSource, "'CUDA kernel decoration'"},
-        {kDirectNVVMUnsupportedPointerHelperParameterSource, "'helper function parameter'"},
-        {kDirectNVVMUnsupportedPointerHelperResultSource, "'helper function result type'"},
+        {kDirectNVVMUnsupportedPointerHelperParameterSource, "'helper function parameter:"},
+        {kDirectNVVMUnsupportedPointerHelperResultSource, "'helper function result type:"},
         {kDirectNVVMUnsupportedFloatArraySource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedHalfAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedDoubleAddSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedNestedArraySource, "'entry-point parameter'"},
-        {kDirectNVVMUnsupportedNestedLocalArraySource, "'var'"},
-        {kDirectNVVMUnsupportedSharedFloatArraySource, "'sequential element pointer'"},
+        {kDirectNVVMUnsupportedSharedFloatArraySource, "'sequential element pointer:"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
-        {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter'"},
+        {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter:"},
         {kDirectNVVMNonCanonicalCUDAOffsetSource, "'CUDA layout query'"},
         {kDirectNVVMUnsupportedFixedSamplerArrayStorageSource, "'struct field address'"},
         {kDirectNVVMUnsupportedNestedParameterBlockSource, "'struct field address'"},
@@ -6962,7 +7013,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMPointerGreaterEqualSource, "'cmpGE'"},
     };
 
-    // Noncanonical layout, escaping or dynamically addressed local memory, logical NOT,
+    // Noncanonical layout, unsupported shared storage, logical NOT,
     // malformed-signature opaque-Half and surface helpers, atomic-add ABI variants,
     // non-relaxed atomic-add order, adjacent atomic operations, non-integer shared arrays, pointer
     // comparisons, and helper-array-pointer shapes remain deterministic
