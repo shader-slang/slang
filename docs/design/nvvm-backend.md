@@ -6416,6 +6416,29 @@ falls from 36 to 24, and its healthy-MVP population falls from 19 to eight. The 
 passes 410/410, while representative direct O3 PTX remains accepted with CUDA 12.9 for SM70,
 SM80, and SM90.
 
+### Slice 141: Integer truthiness and bitfields through typed recipes
+
+Canonical scalar selected-integer-to-Boolean `IRIntCast` now lowers as a typed nonzero comparison.
+Canonical `IRBitfieldExtract` and `IRBitfieldInsert` lower for equal selected integer
+scalar/vector result and data types with scalar UInt32 offset/count operands. One compiler-owned
+descriptor derives the complete typed operation closure used by preflight and emission.
+
+Bitfield transport uses an unsigned mirror of the data type. Insert constructs a shifted mask,
+clears the base bits, masks and shifts the payload, combines the result, and reinterprets signed
+data only at the final boundary. Extract shifts logically first, moves the requested field to the
+physical high bit, and finishes with a logical or arithmetic shift according to result signedness.
+Scalar counts and constants are converted and structurally splatted for vector data. The shared
+generic bitwise-not legality row now admits selected integer vectors because canonical vector
+insertion needs a vector mask complement and the provider already implements that generic form.
+
+The bounded eleven-row probe gains eight both-mode successes and exposes three later independent
+stops (`LoadFromUninitializedMemory`, floating `castFloatToInt`, and `makeUInt64`). No previously
+correct identity regresses. The fixed 452-row census reaches 338 O0 and 343 O3 successes. Among
+427 healthy MVP references, O0/O3/both correctness is 336/340/336
+(78.7%/79.6%/78.7%). The selected prefix passes 413/413, and representative direct O3 PTX remains
+accepted with CUDA 12.9 for SM70, SM80, and SM90. Provider ABI revision 29 already expresses the
+complete recipe and remains unchanged.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

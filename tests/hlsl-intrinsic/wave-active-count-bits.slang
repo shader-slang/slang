@@ -3,8 +3,12 @@
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj -render-feature hardware-device
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -cuda -profile cs_6_0 -shaderobj -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile cs_6_0 -shaderobj -render-feature hardware-device -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile cs_6_0 -shaderobj -render-feature hardware-device -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -render-feature hardware-device
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer

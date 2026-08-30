@@ -7236,6 +7236,73 @@ SLANG_UNIT_TEST(nvvmSlangIntegerBitHelpersRequestTypedOperations)
 #endif
 }
 
+SLANG_UNIT_TEST(nvvmSlangIntegerTruthinessAndBitfieldsUseTypedRecipes)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMIntegerTruthinessBitfieldSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        bool sawIntegerTruthiness = false;
+        bool sawVectorBitNot = false;
+        bool sawSignedReinterpretation = false;
+        bool sawUnsignedReinterpretation = false;
+        bool sawVectorShift = false;
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            sawIntegerTruthiness |=
+                operation.key.operation == SLANG_NVVM_VALUE_OP_NOT_EQUAL &&
+                operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
+                operation.operandCount == 2 &&
+                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
+            sawVectorBitNot |= operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_NOT &&
+                               operation.resultType.laneCount == 2;
+            sawSignedReinterpretation |=
+                operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET &&
+                operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+            sawUnsignedReinterpretation |=
+                operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET &&
+                operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER &&
+                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+            sawVectorShift |= (operation.key.operation == SLANG_NVVM_VALUE_OP_SHIFT_LEFT ||
+                               operation.key.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT) &&
+                              operation.resultType.laneCount == 2;
+        }
+        SLANG_CHECK(sawIntegerTruthiness);
+        SLANG_CHECK(sawVectorBitNot);
+        SLANG_CHECK(sawSignedReinterpretation);
+        SLANG_CHECK(sawUnsignedReinterpretation);
+        SLANG_CHECK(sawVectorShift);
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount >= 6);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
 SLANG_UNIT_TEST(nvvmSlangScalarMathHelpersRequestTypedOperations)
 {
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
@@ -7546,6 +7613,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedMinMaxSignatureSource, "assembly=$P_min($0, $1)"},
         {kDirectNVVMUnsupportedIntegerBitSignatureSource, "assembly=$P_countbits($0)"},
         {kDirectNVVMUnsupportedVectorIntegerBitSource, "assembly=$P_reversebits($0)"},
+        {kDirectNVVMUnsupportedFloatingTruthinessSource, "castFloatToInt"},
         {kDirectNVVMUnsupportedVectorScalarMathSource, "assembly=$P_tan($0)"},
         {kDirectNVVMUnsupportedScalarIntrinsicRecipeSignatureSource,
          "assembly=$P_asuint($0, $1, $2)"},

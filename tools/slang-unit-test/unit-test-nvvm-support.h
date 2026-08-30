@@ -11655,6 +11655,43 @@ void computeMain(
     destination[3] = int(firstbitlow(unsignedValue));
 }
 )";
+static const char kDirectNVVMIntegerTruthinessBitfieldSource[] = R"(
+[noinline]
+uint firstLane(uint2 value)
+{
+    return value.x;
+}
+
+[noinline]
+int secondLane(int2 value)
+{
+    return value.y;
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform uint value)
+{
+    uint inserted = bitfieldInsert(value, 15u, 4u, 4u);
+    int extracted = bitfieldExtract(int(value), 3u, 4u);
+    uint2 vectorBase = uint2(value, value + 1u);
+    uint2 vectorInserted = bitfieldInsert(vectorBase, uint2(3u, 5u), 2u, 3u);
+    int2 vectorExtracted = bitfieldExtract(int2(value, value + 1u), 1u, 5u);
+    bool hasValue = bool(value);
+    destination[0] = int(inserted + firstLane(vectorInserted)) + extracted +
+                     secondLane(vectorExtracted) + (hasValue ? 1 : 0);
+}
+)";
+static const char kDirectNVVMUnsupportedFloatingTruthinessSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float value)
+{
+    *destination = bool(value) ? 1 : 0;
+}
+)";
 static const char kDirectNVVMIntegerBitAndSource[] = R"(
 [CUDAKernel]
 void computeMain(

@@ -3,6 +3,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgpu
 
 // CHECK: 1

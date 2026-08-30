@@ -753,13 +753,14 @@ inline bool resolveValueOperationFamily(
     if (!desc.operandTypes && desc.operandCount)
         return false;
 
-    const bool isUnaryInteger = desc.operandCount == 1 &&
-                                isSelectedScalarInteger(desc.resultType) &&
-                                areSameType(desc.resultType, desc.operandTypes[0]);
+    const bool isUnaryIntegerValue = desc.operandCount == 1 &&
+                                     isSelectedIntegerValue(desc.resultType) &&
+                                     areSameType(desc.resultType, desc.operandTypes[0]);
+    const bool isUnaryInteger = isUnaryIntegerValue && isSelectedScalarInteger(desc.resultType);
     const bool isSignedUnaryInteger =
         isUnaryInteger && desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
-    if ((isUnaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_BIT_NOT ||
-                            desc.operation == SLANG_NVVM_VALUE_OP_NEGATE)) ||
+    if ((isUnaryIntegerValue && desc.operation == SLANG_NVVM_VALUE_OP_BIT_NOT) ||
+        (isUnaryInteger && desc.operation == SLANG_NVVM_VALUE_OP_NEGATE) ||
         (isSignedUnaryInteger && desc.operation == SLANG_NVVM_VALUE_OP_ABS))
     {
         outResolution = {

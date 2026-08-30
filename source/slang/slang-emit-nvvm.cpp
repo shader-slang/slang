@@ -4330,6 +4330,314 @@ bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOpe
     return true;
 }
 
+struct NVVMResolvedIntegerTruthiness
+{
+    IRInst* value = nullptr;
+    SlangNVVMValueTypeDesc valueType = {};
+    NVVMValueRecipeStep comparison;
+};
+
+// Resolves the canonical checked integer-to-Boolean cast as truthiness rather than an integer
+// width conversion. This bounded recipe accepts one selected integer scalar and scalar Bool.
+bool _resolveNVVMIntegerTruthiness(IRInst* inst, NVVMResolvedIntegerTruthiness& outOperation)
+{
+    outOperation = {};
+    if (!inst || inst->getOp() != kIROp_IntCast || inst->getOperandCount() != 1)
+        return false;
+
+    IRInst* value = inst->getOperand(0);
+    SlangNVVMValueTypeDesc resultType = {};
+    if (!value || !_getNVVMSemanticType(inst->getDataType(), resultType) ||
+        !_getNVVMSemanticType(value->getDataType(), outOperation.valueType) ||
+        !NVVMSemantics::isSelectedBoolValue(resultType) || resultType.laneCount != 1 ||
+        !NVVMSemantics::isSelectedIntegerValue(outOperation.valueType) ||
+        resultType.laneCount != outOperation.valueType.laneCount)
+    {
+        return false;
+    }
+
+    const SlangNVVMValueTypeDesc operands[] = {
+        outOperation.valueType,
+        outOperation.valueType,
+    };
+    if (!_setNVVMSupportedValueRecipeStep(
+            outOperation.comparison,
+            SLANG_NVVM_VALUE_OP_NOT_EQUAL,
+            resultType,
+            operands,
+            SLANG_COUNT_OF(operands),
+            "integer truthiness comparison"))
+    {
+        return false;
+    }
+    outOperation.value = value;
+    return true;
+}
+
+enum class NVVMBitfieldOperationKind
+{
+    None,
+    Extract,
+    Insert,
+};
+
+struct NVVMResolvedBitfieldOperation
+{
+    NVVMBitfieldOperationKind kind = NVVMBitfieldOperationKind::None;
+    IRInst* value = nullptr;
+    IRInst* insertedValue = nullptr;
+    IRInst* offset = nullptr;
+    IRInst* count = nullptr;
+    IRType* dataIRType = nullptr;
+    SlangNVVMValueTypeDesc dataType = {};
+    SlangNVVMValueTypeDesc unsignedDataType = {};
+    SlangNVVMValueTypeDesc unsignedScalarType = {};
+    bool needsCountConversion = false;
+    bool isSigned = false;
+    NVVMValueRecipeStep countConversion;
+    NVVMValueRecipeStep toUnsigned;
+    NVVMValueRecipeStep toSigned;
+    NVVMValueRecipeStep subtract;
+    NVVMValueRecipeStep shiftLeft;
+    NVVMValueRecipeStep logicalShiftRight;
+    NVVMValueRecipeStep signedShiftRight;
+    NVVMValueRecipeStep bitAnd;
+    NVVMValueRecipeStep bitOr;
+    NVVMValueRecipeStep bitNot;
+};
+
+// Resolves ordinary checked bitfield IR to a finite typed recipe. Offset and count remain scalar
+// UInt32 at the Slang boundary; emission converts and splats them to the selected data shape.
+bool _resolveNVVMBitfieldOperation(IRInst* inst, NVVMResolvedBitfieldOperation& outOperation)
+{
+    outOperation = {};
+    if (!inst || (inst->getOp() != kIROp_BitfieldExtract && inst->getOp() != kIROp_BitfieldInsert))
+    {
+        return false;
+    }
+
+    const bool isInsert = inst->getOp() == kIROp_BitfieldInsert;
+    const UInt expectedOperandCount = isInsert ? 4 : 3;
+    if (inst->getOperandCount() != expectedOperandCount)
+        return false;
+
+    IRInst* value = inst->getOperand(0);
+    IRInst* insertedValue = isInsert ? inst->getOperand(1) : nullptr;
+    IRInst* offset = inst->getOperand(isInsert ? 2 : 1);
+    IRInst* count = inst->getOperand(isInsert ? 3 : 2);
+    if (!value || !offset || !count || !isTypeEqual(inst->getDataType(), value->getDataType()) ||
+        (isInsert &&
+         (!insertedValue || !isTypeEqual(inst->getDataType(), insertedValue->getDataType()))) ||
+        !isNVVMUnsignedI32Type(offset->getDataType()) ||
+        !isNVVMUnsignedI32Type(count->getDataType()) ||
+        !_getNVVMSemanticType(inst->getDataType(), outOperation.dataType) ||
+        !NVVMSemantics::isSelectedIntegerValue(outOperation.dataType))
+    {
+        return false;
+    }
+
+    outOperation.kind =
+        isInsert ? NVVMBitfieldOperationKind::Insert : NVVMBitfieldOperationKind::Extract;
+    outOperation.value = value;
+    outOperation.insertedValue = insertedValue;
+    outOperation.offset = offset;
+    outOperation.count = count;
+    outOperation.dataIRType = as<IRType>(inst->getDataType());
+    outOperation.isSigned = outOperation.dataType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+    outOperation.unsignedDataType = outOperation.dataType;
+    outOperation.unsignedDataType.kind = SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
+    outOperation.unsignedScalarType = outOperation.unsignedDataType;
+    outOperation.unsignedScalarType.laneCount = 1;
+    outOperation.needsCountConversion = outOperation.dataType.bitWidth != 32;
+
+    if (outOperation.needsCountConversion)
+    {
+        const SlangNVVMValueTypeDesc operands[] = {NVVMSemantics::kUnsignedI32};
+        if (!_setNVVMSupportedValueRecipeStep(
+                outOperation.countConversion,
+                SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+                outOperation.unsignedScalarType,
+                operands,
+                SLANG_COUNT_OF(operands),
+                "bitfield offset/count conversion"))
+        {
+            return false;
+        }
+    }
+
+    const SlangNVVMValueTypeDesc unsignedBinary[] = {
+        outOperation.unsignedDataType,
+        outOperation.unsignedDataType,
+    };
+    const SlangNVVMValueTypeDesc unsignedUnary[] = {outOperation.unsignedDataType};
+    if (!_setNVVMSupportedValueRecipeStep(
+            outOperation.subtract,
+            SLANG_NVVM_VALUE_OP_SUBTRACT,
+            outOperation.unsignedDataType,
+            unsignedBinary,
+            SLANG_COUNT_OF(unsignedBinary),
+            "bitfield unsigned subtraction") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.shiftLeft,
+            SLANG_NVVM_VALUE_OP_SHIFT_LEFT,
+            outOperation.unsignedDataType,
+            unsignedBinary,
+            SLANG_COUNT_OF(unsignedBinary),
+            "bitfield unsigned left shift"))
+    {
+        return false;
+    }
+
+    if (!isInsert && !_setNVVMSupportedValueRecipeStep(
+                         outOperation.logicalShiftRight,
+                         SLANG_NVVM_VALUE_OP_SHIFT_RIGHT,
+                         outOperation.unsignedDataType,
+                         unsignedBinary,
+                         SLANG_COUNT_OF(unsignedBinary),
+                         "bitfield logical right shift"))
+    {
+        return false;
+    }
+
+    if (outOperation.isSigned)
+    {
+        const SlangNVVMValueTypeDesc toUnsignedOperands[] = {outOperation.dataType};
+        const SlangNVVMValueTypeDesc toSignedOperands[] = {outOperation.unsignedDataType};
+        if (!_setNVVMSupportedValueRecipeStep(
+                outOperation.toUnsigned,
+                SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+                outOperation.unsignedDataType,
+                toUnsignedOperands,
+                SLANG_COUNT_OF(toUnsignedOperands),
+                "bitfield signed-to-unsigned reinterpretation") ||
+            !_setNVVMSupportedValueRecipeStep(
+                outOperation.toSigned,
+                SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+                outOperation.dataType,
+                toSignedOperands,
+                SLANG_COUNT_OF(toSignedOperands),
+                "bitfield unsigned-to-signed reinterpretation"))
+        {
+            return false;
+        }
+
+        if (!isInsert)
+        {
+            const SlangNVVMValueTypeDesc signedShiftOperands[] = {
+                outOperation.dataType,
+                outOperation.unsignedDataType,
+            };
+            if (!_setNVVMSupportedValueRecipeStep(
+                    outOperation.signedShiftRight,
+                    SLANG_NVVM_VALUE_OP_SHIFT_RIGHT,
+                    outOperation.dataType,
+                    signedShiftOperands,
+                    SLANG_COUNT_OF(signedShiftOperands),
+                    "bitfield signed-extension right shift"))
+            {
+                return false;
+            }
+        }
+    }
+
+    if (isInsert && (!_setNVVMSupportedValueRecipeStep(
+                         outOperation.bitAnd,
+                         SLANG_NVVM_VALUE_OP_BIT_AND,
+                         outOperation.unsignedDataType,
+                         unsignedBinary,
+                         SLANG_COUNT_OF(unsignedBinary),
+                         "bitfield unsigned mask") ||
+                     !_setNVVMSupportedValueRecipeStep(
+                         outOperation.bitOr,
+                         SLANG_NVVM_VALUE_OP_BIT_OR,
+                         outOperation.unsignedDataType,
+                         unsignedBinary,
+                         SLANG_COUNT_OF(unsignedBinary),
+                         "bitfield unsigned combine") ||
+                     !_setNVVMSupportedValueRecipeStep(
+                         outOperation.bitNot,
+                         SLANG_NVVM_VALUE_OP_BIT_NOT,
+                         outOperation.unsignedDataType,
+                         unsignedUnary,
+                         SLANG_COUNT_OF(unsignedUnary),
+                         "bitfield unsigned mask complement")))
+    {
+        return false;
+    }
+    return true;
+}
+
+void _requireNVVMIntegerTruthinessOperations(
+    NVVMValueOperationRequirements& requirements,
+    const NVVMResolvedIntegerTruthiness& operation)
+{
+    _requireValueOperation(
+        requirements,
+        operation.comparison.getDesc(),
+        operation.comparison.diagnosticName);
+}
+
+void _requireNVVMBitfieldOperations(
+    NVVMValueOperationRequirements& requirements,
+    const NVVMResolvedBitfieldOperation& operation)
+{
+    if (operation.needsCountConversion)
+    {
+        _requireValueOperation(
+            requirements,
+            operation.countConversion.getDesc(),
+            operation.countConversion.diagnosticName);
+    }
+    if (operation.isSigned)
+    {
+        _requireValueOperation(
+            requirements,
+            operation.toUnsigned.getDesc(),
+            operation.toUnsigned.diagnosticName);
+        _requireValueOperation(
+            requirements,
+            operation.toSigned.getDesc(),
+            operation.toSigned.diagnosticName);
+    }
+    _requireValueOperation(
+        requirements,
+        operation.subtract.getDesc(),
+        operation.subtract.diagnosticName);
+    _requireValueOperation(
+        requirements,
+        operation.shiftLeft.getDesc(),
+        operation.shiftLeft.diagnosticName);
+    if (operation.kind == NVVMBitfieldOperationKind::Extract)
+    {
+        _requireValueOperation(
+            requirements,
+            operation.logicalShiftRight.getDesc(),
+            operation.logicalShiftRight.diagnosticName);
+        if (operation.isSigned)
+        {
+            _requireValueOperation(
+                requirements,
+                operation.signedShiftRight.getDesc(),
+                operation.signedShiftRight.diagnosticName);
+        }
+    }
+    if (operation.kind == NVVMBitfieldOperationKind::Insert)
+    {
+        _requireValueOperation(
+            requirements,
+            operation.bitAnd.getDesc(),
+            operation.bitAnd.diagnosticName);
+        _requireValueOperation(
+            requirements,
+            operation.bitOr.getDesc(),
+            operation.bitOr.diagnosticName);
+        _requireValueOperation(
+            requirements,
+            operation.bitNot.getDesc(),
+            operation.bitNot.diagnosticName);
+    }
+}
+
 // Checks that an executable operand has an accepted definition that dominates its use.
 SlangResult _validateAvailableValue(
     CodeGenContext* codeGenContext,
@@ -5316,6 +5624,14 @@ SlangResult _validateNVVMFunction(
             case kIROp_FloatCast:
             case kIROp_Select:
                 {
+                    NVVMResolvedIntegerTruthiness truthiness;
+                    if (_resolveNVVMIntegerTruthiness(inst, truthiness))
+                    {
+                        _requireNVVMIntegerTruthinessOperations(
+                            requirements.valueOperations,
+                            truthiness);
+                        break;
+                    }
                     NVVMResolvedValueOperation operation;
                     if (!_resolveNVVMValueOperation(inst, operation))
                         return inst->getOperandCount() == 2
@@ -5331,6 +5647,20 @@ SlangResult _validateNVVMFunction(
                         requirements.valueOperations,
                         operation.desc,
                         operation.diagnosticName);
+                }
+                break;
+
+            case kIROp_BitfieldExtract:
+            case kIROp_BitfieldInsert:
+                {
+                    NVVMResolvedBitfieldOperation operation;
+                    if (!_resolveNVVMBitfieldOperation(inst, operation))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                    }
+                    _requireNVVMBitfieldOperations(requirements.valueOperations, operation);
                 }
                 break;
 
@@ -5843,8 +6173,31 @@ SlangResult _validateNVVMFunction(
             case kIROp_FloatCast:
             case kIROp_Select:
                 {
-                    NVVMResolvedValueOperation operation;
-                    SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                    NVVMResolvedIntegerTruthiness truthiness;
+                    if (!_resolveNVVMIntegerTruthiness(inst, truthiness))
+                    {
+                        NVVMResolvedValueOperation operation;
+                        SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                    }
+                    for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
+                         ++operandIndex)
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                            codeGenContext,
+                            inst->getOperand(operandIndex),
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                    }
+                    availableValues.add(inst);
+                }
+                break;
+
+            case kIROp_BitfieldExtract:
+            case kIROp_BitfieldInsert:
+                {
+                    NVVMResolvedBitfieldOperation operation;
+                    SLANG_RELEASE_ASSERT(_resolveNVVMBitfieldOperation(inst, operation));
                     for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
                          ++operandIndex)
                     {
@@ -6825,6 +7178,419 @@ SlangResult _getNVVMRecipeIntegerConstant(
         codeGenContext,
         "scalar intrinsic recipe integer constant",
         builder.getIntegerConstant(module, integerType, value, outValue));
+}
+
+// Materializes one already-typed scalar value across the exact integer scalar/vector shape owned
+// by the canonical instruction. Signedness does not change the physical provider type.
+SlangResult _emitNVVMIntegerSplat(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRType* dataIRType,
+    const SlangNVVMValueTypeDesc& dataType,
+    SlangNVVMValueHandle scalarValue,
+    const char* diagnosticName,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    SLANG_RELEASE_ASSERT(
+        dataIRType && NVVMSemantics::isSelectedIntegerValue(dataType) && scalarValue);
+    if (dataType.laneCount == 1)
+    {
+        outValue = scalarValue;
+        return SLANG_OK;
+    }
+
+    SlangNVVMTypeHandle vectorType = nullptr;
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(dataIRType, NVVMTypeUse::Value, vectorType));
+    SlangNVVMValueHandle elements[4] = {};
+    SLANG_RELEASE_ASSERT(dataType.laneCount <= SLANG_COUNT_OF(elements));
+    for (uint32_t lane = 0; lane < dataType.laneCount; ++lane)
+        elements[lane] = scalarValue;
+    return _requireBuilderOperation(
+        codeGenContext,
+        diagnosticName,
+        builder.emitVectorConstruct(module, vectorType, elements, dataType.laneCount, outValue));
+}
+
+SlangResult _emitNVVMIntegerSplatConstant(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRType* dataIRType,
+    const SlangNVVMValueTypeDesc& dataType,
+    int64_t value,
+    const char* diagnosticName,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMValueHandle scalarValue = nullptr;
+    SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
+        codeGenContext,
+        builder,
+        module,
+        dataType.bitWidth,
+        value,
+        scalarValue));
+    return _emitNVVMIntegerSplat(
+        codeGenContext,
+        builder,
+        module,
+        dataIRType,
+        dataType,
+        scalarValue,
+        diagnosticName,
+        typeContext,
+        outValue);
+}
+
+SlangResult _emitNVVMIntegerTruthiness(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMResolvedIntegerTruthiness& operation,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMValueHandle value = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.value,
+        valueMap,
+        typeContext,
+        value));
+    SlangNVVMValueHandle zero = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMIntegerSplatConstant(
+        codeGenContext,
+        builder,
+        module,
+        as<IRType>(operation.value->getDataType()),
+        operation.valueType,
+        0,
+        "integer truthiness zero",
+        typeContext,
+        zero));
+    const SlangNVVMValueHandle operands[] = {value, zero};
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.comparison,
+        operands,
+        SLANG_COUNT_OF(operands),
+        outValue));
+    SLANG_RELEASE_ASSERT(outValue);
+    return SLANG_OK;
+}
+
+SlangResult _emitNVVMBitfieldCount(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRInst* irValue,
+    const char* diagnosticName,
+    const NVVMResolvedBitfieldOperation& operation,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMValueHandle scalarValue = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        irValue,
+        valueMap,
+        typeContext,
+        scalarValue));
+    if (operation.needsCountConversion)
+    {
+        SlangNVVMValueHandle convertedValue = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.countConversion,
+            &scalarValue,
+            1,
+            convertedValue));
+        scalarValue = convertedValue;
+    }
+    return _emitNVVMIntegerSplat(
+        codeGenContext,
+        builder,
+        module,
+        operation.dataIRType,
+        operation.unsignedDataType,
+        scalarValue,
+        diagnosticName,
+        typeContext,
+        outValue);
+}
+
+SlangResult _emitNVVMBitfieldOperation(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMResolvedBitfieldOperation& operation,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMValueHandle value = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.value,
+        valueMap,
+        typeContext,
+        value));
+    if (operation.isSigned)
+    {
+        SlangNVVMValueHandle unsignedValue = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.toUnsigned,
+            &value,
+            1,
+            unsignedValue));
+        value = unsignedValue;
+    }
+
+    SlangNVVMValueHandle offset = nullptr;
+    SlangNVVMValueHandle count = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMBitfieldCount(
+        codeGenContext,
+        builder,
+        module,
+        operation.offset,
+        "bitfield offset splat",
+        operation,
+        valueMap,
+        typeContext,
+        offset));
+    SLANG_RETURN_ON_FAIL(_emitNVVMBitfieldCount(
+        codeGenContext,
+        builder,
+        module,
+        operation.count,
+        "bitfield count splat",
+        operation,
+        valueMap,
+        typeContext,
+        count));
+
+    if (operation.kind == NVVMBitfieldOperationKind::Extract)
+    {
+        const SlangNVVMValueHandle initialShiftOperands[] = {value, offset};
+        SlangNVVMValueHandle shifted = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.logicalShiftRight,
+            initialShiftOperands,
+            SLANG_COUNT_OF(initialShiftOperands),
+            shifted));
+
+        SlangNVVMValueHandle width = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMIntegerSplatConstant(
+            codeGenContext,
+            builder,
+            module,
+            operation.dataIRType,
+            operation.unsignedDataType,
+            operation.dataType.bitWidth,
+            "bitfield width splat",
+            typeContext,
+            width));
+        const SlangNVVMValueHandle highBitCountOperands[] = {width, count};
+        SlangNVVMValueHandle highBitCount = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.subtract,
+            highBitCountOperands,
+            SLANG_COUNT_OF(highBitCountOperands),
+            highBitCount));
+
+        const SlangNVVMValueHandle leftShiftOperands[] = {shifted, highBitCount};
+        SlangNVVMValueHandle highBits = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.shiftLeft,
+            leftShiftOperands,
+            SLANG_COUNT_OF(leftShiftOperands),
+            highBits));
+        if (!operation.isSigned)
+        {
+            const SlangNVVMValueHandle finalShiftOperands[] = {highBits, highBitCount};
+            return _emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.logicalShiftRight,
+                finalShiftOperands,
+                SLANG_COUNT_OF(finalShiftOperands),
+                outValue);
+        }
+
+        SlangNVVMValueHandle signedHighBits = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.toSigned,
+            &highBits,
+            1,
+            signedHighBits));
+        const SlangNVVMValueHandle finalShiftOperands[] = {signedHighBits, highBitCount};
+        return _emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.signedShiftRight,
+            finalShiftOperands,
+            SLANG_COUNT_OF(finalShiftOperands),
+            outValue);
+    }
+
+    SLANG_RELEASE_ASSERT(operation.kind == NVVMBitfieldOperationKind::Insert);
+    SlangNVVMValueHandle insertedValue = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.insertedValue,
+        valueMap,
+        typeContext,
+        insertedValue));
+    if (operation.isSigned)
+    {
+        SlangNVVMValueHandle unsignedInsertedValue = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.toUnsigned,
+            &insertedValue,
+            1,
+            unsignedInsertedValue));
+        insertedValue = unsignedInsertedValue;
+    }
+
+    SlangNVVMValueHandle one = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMIntegerSplatConstant(
+        codeGenContext,
+        builder,
+        module,
+        operation.dataIRType,
+        operation.unsignedDataType,
+        1,
+        "bitfield one splat",
+        typeContext,
+        one));
+    const SlangNVVMValueHandle initialMaskOperands[] = {one, count};
+    SlangNVVMValueHandle mask = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.shiftLeft,
+        initialMaskOperands,
+        SLANG_COUNT_OF(initialMaskOperands),
+        mask));
+    const SlangNVVMValueHandle lowMaskOperands[] = {mask, one};
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.subtract,
+        lowMaskOperands,
+        SLANG_COUNT_OF(lowMaskOperands),
+        mask));
+    const SlangNVVMValueHandle shiftedMaskOperands[] = {mask, offset};
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.shiftLeft,
+        shiftedMaskOperands,
+        SLANG_COUNT_OF(shiftedMaskOperands),
+        mask));
+
+    const SlangNVVMValueHandle shiftedInsertOperands[] = {insertedValue, offset};
+    SlangNVVMValueHandle shiftedInsert = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.shiftLeft,
+        shiftedInsertOperands,
+        SLANG_COUNT_OF(shiftedInsertOperands),
+        shiftedInsert));
+    const SlangNVVMValueHandle maskedInsertOperands[] = {shiftedInsert, mask};
+    SlangNVVMValueHandle maskedInsert = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.bitAnd,
+        maskedInsertOperands,
+        SLANG_COUNT_OF(maskedInsertOperands),
+        maskedInsert));
+
+    SlangNVVMValueHandle invertedMask = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.bitNot,
+        &mask,
+        1,
+        invertedMask));
+    const SlangNVVMValueHandle clearedBaseOperands[] = {value, invertedMask};
+    SlangNVVMValueHandle clearedBase = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.bitAnd,
+        clearedBaseOperands,
+        SLANG_COUNT_OF(clearedBaseOperands),
+        clearedBase));
+    const SlangNVVMValueHandle combinedOperands[] = {clearedBase, maskedInsert};
+    SlangNVVMValueHandle combined = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.bitOr,
+        combinedOperands,
+        SLANG_COUNT_OF(combinedOperands),
+        combined));
+    if (!operation.isSigned)
+    {
+        outValue = combined;
+        return SLANG_OK;
+    }
+    return _emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.toSigned,
+        &combined,
+        1,
+        outValue);
 }
 
 SlangResult _emitNVVMScalarIntrinsicOutStore(
@@ -8801,6 +9567,21 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Select:
                 case kIROp_WaveMaskBallot:
                     {
+                        NVVMResolvedIntegerTruthiness truthiness;
+                        if (_resolveNVVMIntegerTruthiness(inst, truthiness))
+                        {
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMIntegerTruthiness(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                truthiness,
+                                valueMap,
+                                typeContext,
+                                loweredValue));
+                            valueMap[inst] = loweredValue;
+                            break;
+                        }
                         NVVMResolvedValueOperation operation;
                         SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
                         SlangNVVMValueHandle loweredOperands[3] = {};
@@ -8827,6 +9608,24 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 inst->getOperandCount() ? loweredOperands : nullptr,
                                 inst->getOperandCount(),
                                 loweredValue)));
+                        valueMap[inst] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_BitfieldExtract:
+                case kIROp_BitfieldInsert:
+                    {
+                        NVVMResolvedBitfieldOperation operation;
+                        SLANG_RELEASE_ASSERT(_resolveNVVMBitfieldOperation(inst, operation));
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_emitNVVMBitfieldOperation(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            operation,
+                            valueMap,
+                            typeContext,
+                            loweredValue));
                         valueMap[inst] = loweredValue;
                     }
                     break;

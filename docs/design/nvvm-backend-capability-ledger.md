@@ -2001,3 +2001,16 @@ O0/O3/both correctness is 328/332/328 (76.8%/77.8%/76.8%). Wave/reconvergence fa
 36 to 24 total rows and from 19 to eight healthy-MVP rows. The selected prefix passes 410/410, and
 the three representative direct O3 modules still assemble for SM70, SM80, and SM90 with CUDA
 12.9. CUDA 13 and physical SM70/SM80/SM90 runtime workers remain productionization gaps.
+
+Slice 141 admits scalar selected-integer truthiness and canonical selected integer scalar/vector
+bitfield extract/insert through compiler-owned typed recipes. Truthiness is compare-to-zero.
+Bitfield operations use an unsigned mirror for logical shifts and mask algebra, structurally splat
+scalar UInt32 offset/count values for vector data, and cross the signed reinterpretation boundary
+only where required. Generic vector bitwise-not is admitted in the shared semantic catalog for the
+canonical insertion mask complement; provider ABI revision 29 remains unchanged.
+
+Eight workloads become correct at both modes and no old-correct identity regresses. Three original
+cluster rows advance to later independent failures and are reclassified. The fixed 452-row census
+reaches 338 O0 and 343 O3 successes. Against 427 healthy MVP references, O0/O3/both correctness is
+336/340/336 (78.7%/79.6%/78.7%). The selected prefix passes 413/413, while representative direct
+O3 PTX remains accepted with CUDA 12.9 for SM70, SM80, and SM90.

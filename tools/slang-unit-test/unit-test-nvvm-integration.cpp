@@ -779,6 +779,23 @@ SLANG_UNIT_TEST(nvvmSlangRealMaskedWaveScalarDifferentialPTX)
         { SLANG_CHECK(ptx.indexOf("shfl.sync.idx.b32") >= 0); });
 }
 
+SLANG_UNIT_TEST(nvvmSlangRealIntegerTruthinessBitfieldDifferentialPTX)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+
+    static const uint32_t kParameterWidths[] = {64, 32};
+    _runNVVMSlangDifferentialPTX(
+        kDirectNVVMIntegerTruthinessBitfieldSource,
+        "Ignoring integer-truthiness/bitfield PTX differential because libNVVM or NVRTC was not "
+        "found.",
+        kParameterWidths,
+        SLANG_COUNT_OF(kParameterWidths),
+        false,
+        [](SlangEmitCUDAMethod, const String& ptx)
+        { SLANG_CHECK(ptx.indexOf("st.global.u32") >= 0); });
+}
+
 SLANG_UNIT_TEST(nvvmSlangRealWaveLaneCountDifferentialPTX)
 {
     NVVMIRBuilder preflightBuilder;
@@ -1908,6 +1925,13 @@ SLANG_UNIT_TEST(nvvmSlangRealMaskedWaveScalarPtxasAccepts)
     _runNVVMSlangRealSourcePtxasAccepts(
         unitTestContext,
         kDirectNVVMMaskedWaveScalarOperationsSource);
+}
+
+SLANG_UNIT_TEST(nvvmSlangRealIntegerTruthinessBitfieldPtxasAccepts)
+{
+    _runNVVMSlangRealSourcePtxasAccepts(
+        unitTestContext,
+        kDirectNVVMIntegerTruthinessBitfieldSource);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveLaneCountPtxasAccepts)
