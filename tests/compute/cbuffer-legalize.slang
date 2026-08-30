@@ -1,5 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-shaderobj
+//TEST(compute, nvvm):COMPARE_COMPUTE:-cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE:-cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 // Not supported in LLVM: textures are not currently available
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-llvm -shaderobj
 

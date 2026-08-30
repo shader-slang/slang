@@ -6618,6 +6618,36 @@ direct O3 PTX is 647--1171 bytes versus 8586--9168 bytes. CUDA 12.9 `ptxas` acce
 outputs for SM70, SM80, and SM90. These remain uncontrolled exploratory measurements; runtime is on
 the local SM120 GPU, while CUDA 13 and physical SM70/SM80/SM90 workers remain open requirements.
 
+### Slice 148: Canonical recursive parameter-group aggregate paths
+
+Nested field addressing now preserves the storage role established by its canonical root. A child
+`IRFieldAddress` is admitted only after recursively resolving its parent, finding the field by key,
+and proving that the parent's declared field type equals the child's base aggregate. The child
+inherits conventional-global provenance and mutability; selection cannot turn immutable parameter
+storage into mutable storage.
+
+CUDA target layout represents nested parameter blocks and constant buffers as pointer-sized fields,
+matching native CUDA declarations. The direct aggregate storage algebra recursively validates the
+specialized element behind each parameter-group pointer and reuses existing exact classifiers for
+raw buffers, surfaces, sampled textures, samplers, and device-copyable pointers. Reachable-type
+collection retains the nested specialized element structs so provider declarations and field
+pointers use one concrete type closure. Preflight diagnostics preserve the exact rejected field
+result type for adjacent root/layout shapes.
+
+All lowering composes revision-30 generic struct, pointer, resource, load, and store operations; the
+provider ABI and isolated LLVM implementation are unchanged. Two discovery workloads become correct
+at O0 and O3: the nested parameter-block/resource gate and the constant-buffer/resource/helper gate.
+They receive four permanent direct lanes. Discovery reaches 47/72 O0, O3, and both-mode correctness
+with zero old-correct regression; two additional rows advance to a separate device-pointer-load
+blocker.
+
+Corpus v1 remains exactly 452 workloads and 427 healthy MVP references. The census runner can now
+join dynamic repository discovery to the frozen ID/source TSV, rejecting missing, duplicate, or
+source-drifted rows. Its metrics remain 371 O0, 375 O3, and 371 both-mode successes with zero
+old-correct regression, even though permanent discovery promotions raise current dynamic discovery
+to 456 workloads. The selected prefix passes 424/424. CUDA 12.9 `ptxas` accepts the two new and
+three established discovery representatives at SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

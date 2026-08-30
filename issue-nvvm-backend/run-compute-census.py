@@ -208,6 +208,37 @@ def discover_workloads(tests_dir: Path) -> tuple[list[dict[str, object]], list[d
     return workloads, excluded
 
 
+def select_frozen_workloads(
+    workloads: list[dict[str, object]],
+    manifest_path: Path,
+) -> list[dict[str, object]]:
+    with manifest_path.open(encoding="utf-8", newline="") as stream:
+        rows = list(csv.DictReader(stream, delimiter="\t"))
+    if not rows or "id" not in rows[0] or "source" not in rows[0]:
+        raise SystemExit(f"frozen workload manifest has no id/source records: {manifest_path}")
+
+    discovered_by_id = {str(workload["id"]): workload for workload in workloads}
+    selected: list[dict[str, object]] = []
+    selected_ids: set[str] = set()
+    for row in rows:
+        workload_id = row["id"]
+        if workload_id in selected_ids:
+            raise SystemExit(f"duplicate frozen workload ID in {manifest_path}: {workload_id}")
+        workload = discovered_by_id.get(workload_id)
+        if not workload:
+            raise SystemExit(
+                f"frozen workload is no longer discoverable: {workload_id} ({manifest_path})"
+            )
+        if str(workload["source"]) != row["source"]:
+            raise SystemExit(
+                f"frozen workload source changed for {workload_id}: "
+                f"{workload['source']} != {row['source']}"
+            )
+        selected.append(workload)
+        selected_ids.add(workload_id)
+    return selected
+
+
 def _directive_for_mode(workload: dict[str, object], mode: str) -> str:
     use_nvvm, optimization = MODES[mode]
     arguments = OPTIMIZATION_RE.sub("", str(workload["arguments"])).strip()
@@ -434,6 +465,11 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--output", type=Path, default=Path("build/nvvm-census"))
+    parser.add_argument(
+        "--workload-ids-from",
+        type=Path,
+        help="optional TSV whose exact id/source rows freeze the executed workload identity set",
+    )
     parser.add_argument("--jobs", type=int, default=8)
     parser.add_argument("--discover-only", action="store_true")
     parser.add_argument(
@@ -477,6 +513,23 @@ def main() -> int:
         raise SystemExit(f"missing NVVM provider directory: {provider_path}")
 
     workloads, excluded = discover_workloads(tests_dir)
+    discovered_workload_count = len(workloads)
+    discovered_eligible_source_count = len({str(workload["source"]) for workload in workloads})
+    discovered_candidate_sources = {str(workload["source"]) for workload in workloads}
+    discovered_candidate_sources.update(item["source"] for item in excluded)
+    frozen_workload_manifest: str | None = None
+    if args.workload_ids_from:
+        manifest_path = (
+            (repo_root / args.workload_ids_from).resolve()
+            if not args.workload_ids_from.is_absolute()
+            else args.workload_ids_from.resolve()
+        )
+        workloads = select_frozen_workloads(workloads, manifest_path)
+        frozen_workload_manifest = str(manifest_path)
+        print(
+            f"selected {len(workloads)} frozen workloads from {manifest_path}",
+            flush=True,
+        )
     candidate_sources = {str(workload["source"]) for workload in workloads}
     candidate_sources.update(item["source"] for item in excluded)
     manifest = {
@@ -484,6 +537,10 @@ def main() -> int:
         "candidate_source_count": len(candidate_sources),
         "eligible_source_count": len({str(workload["source"]) for workload in workloads}),
         "eligible_workload_count": len(workloads),
+        "discovered_candidate_source_count": len(discovered_candidate_sources),
+        "discovered_eligible_source_count": discovered_eligible_source_count,
+        "discovered_workload_count": discovered_workload_count,
+        "frozen_workload_manifest": frozen_workload_manifest,
         "mvp_workload_count": sum(
             1 for workload in workloads if workload["coverage_tier"] == "mvp"
         ),
@@ -517,7 +574,7 @@ def main() -> int:
     )
     _write_tsv(output_root / "excluded-sources.tsv", excluded, ["source", "reason"])
     print(
-        "discovered "
+        "selected "
         f"{manifest['candidate_source_count']} candidate sources, "
         f"{manifest['eligible_source_count']} eligible sources, and "
         f"{manifest['eligible_workload_count']} eligible CUDA workloads",

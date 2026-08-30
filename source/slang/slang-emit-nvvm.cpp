@@ -189,9 +189,9 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     else if (auto parentFieldAddress = as<IRFieldAddress>(fieldAddress->getBase()))
     {
         // A nested field address carries the complete pointer spelling produced for its parent
-        // field, which is intentionally more explicit than a local `Ptr<T>`. Resolve the producer
-        // recursively so only a field proven to belong to mutable aggregate storage can introduce
-        // another mutable aggregate address.
+        // field, which is intentionally more explicit than a local `Ptr<T>`. Resolve that producer
+        // recursively and preserve its root role: selecting a child cannot make immutable storage
+        // mutable or detach conventional-global pointer provenance.
         NVVMStructField parentAddress;
         auto basePointerType = as<IRPtrTypeBase>(parentFieldAddress->getDataType());
         structType = basePointerType
@@ -200,12 +200,12 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         if (!structType && basePointerType)
             structType = asNVVMSupportedResourceStructType(basePointerType->getValueType());
         if (!structType || !_getNVVMStructFieldAddress(parentFieldAddress, parentAddress) ||
-            !parentAddress.isMutable ||
             !isTypeEqual(parentAddress.field->getFieldType(), structType))
         {
             return false;
         }
-        outAddress.isMutable = true;
+        outAddress.isConventionalGlobal = parentAddress.isConventionalGlobal;
+        outAddress.isMutable = parentAddress.isMutable;
     }
     else if (
         auto resourceElementPointer = asNVVMSupportedRWStructuredBufferElementPointerType(
@@ -1058,6 +1058,15 @@ bool _getNVVMAggregateStorageLayout(
         return true;
     }
 
+    IRType* parameterGroupElementType = nullptr;
+    if (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType))
+    {
+        SLANG_UNUSED(parameterGroupElementType);
+        outLayout.size = kNVVMPointerAlignment;
+        outLayout.alignment = kNVVMPointerAlignment;
+        return true;
+    }
+
     if (auto arrayType = asNVVMSupportedAggregateStorageArrayType(type))
     {
         if (asNVVMSupportedCompactParameterGroupVectorType(arrayType->getElementType()))
@@ -1124,6 +1133,18 @@ bool _getNVVMAggregateStorageLayout(
         return true;
     }
 
+    NVVMSurfaceType surfaceType;
+    NVVMReadOnlyTextureType sampledTextureType;
+    if (getNVVMSupportedSurfaceType(type, surfaceType) ||
+        getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
+        asNVVMSupportedSamplerStorageType(type) ||
+        asNVVMSupportedDeviceCopyableValuePointerType(type))
+    {
+        outLayout.size = kNVVMPointerAlignment;
+        outLayout.alignment = kNVVMPointerAlignment;
+        return true;
+    }
+
     if (!isNVVMSupportedIntegerScalarType(type) && !isNVVMFloat32Type(type) &&
         !asNVVMSupported32BitNumericVectorType(type))
     {
@@ -1159,6 +1180,9 @@ void _addNVVMReachableStructTypes(IRType* type, HashSet<IRInst*>& reachableTypes
     IRType* pointerValueType = nullptr;
     if (asNVVMSupportedDeviceCopyableValuePointerType(type, &pointerValueType))
         type = pointerValueType;
+    IRType* parameterGroupElementType = nullptr;
+    if (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType))
+        type = parameterGroupElementType;
     while (auto arrayType = as<IRArrayType>(type))
     {
         if (!asNVVMSupportedHelperArrayType(arrayType) &&
@@ -7230,9 +7254,10 @@ SlangResult _validateNVVMFunction(
                     NVVMStructField fieldAddress;
                     if (!_getNVVMStructFieldAddress(as<IRFieldAddress>(inst), fieldAddress))
                     {
-                        return _diagnoseUnsupportedIR(
+                        return _diagnoseUnsupportedIRType(
                             codeGenContext,
-                            toSlice("struct field address"));
+                            "struct field address result",
+                            inst->getDataType());
                     }
                 }
                 break;

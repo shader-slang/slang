@@ -422,6 +422,20 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             return SLANG_OK;
         }
         break;
+    case kIROp_ParameterBlockType:
+    case kIROp_ConstantBufferType:
+        // CUDA emits a parameter group as a pointer to its specialized element struct. Keeping
+        // that target representation in the canonical layout query lets an enclosing aggregate
+        // derive the same field offsets as the generated CUDA declaration. Other targets retain
+        // their existing parameter-group layout paths.
+        if (targetReq && isCUDATarget(targetReq))
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(
+                builtinTypeInfo.genericPointerSize,
+                builtinTypeInfo.genericPointerSize);
+            return SLANG_OK;
+        }
+        break;
     case kIROp_StringType:
         if (targetReq && builtinTypeInfo.stringSize != 0)
         {

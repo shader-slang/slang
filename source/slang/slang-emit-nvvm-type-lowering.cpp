@@ -342,11 +342,43 @@ static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>&
     }
 
     NVVMRawBufferType rawBufferType;
-    if (getNVVMSupportedRawBufferType(type, rawBufferType))
+    NVVMSurfaceType surfaceType;
+    NVVMReadOnlyTextureType sampledTextureType;
+    if (getNVVMSupportedRawBufferType(type, rawBufferType) ||
+        getNVVMSupportedSurfaceType(type, surfaceType) ||
+        getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
+        asNVVMSupportedSamplerStorageType(type) ||
+        asNVVMSupportedDeviceCopyableValuePointerType(type))
+    {
         return true;
+    }
 
     if (activeTypes.contains(type))
         return false;
+
+    // A nested parameter group is one pointer-sized storage leaf, but its pointee still needs an
+    // executable parameter-group representation. Consider this example:
+    //
+    //     struct Scene { ParameterBlock<Material> material; }
+    //     ParameterBlock<Scene> scene;
+    //
+    // Entry-point-uniform lowering stores the `Material` parameter block pointer in `Scene` and
+    // preserves the specialized `Material` element type on that pointer. Prove the complete
+    // pointee here while the active set prevents recursive parameter-group declarations from
+    // creating an infinite storage type.
+    if (auto parameterGroupType = as<IRParameterGroupType>(type))
+    {
+        if (parameterGroupType->getOp() != kIROp_ParameterBlockType &&
+            parameterGroupType->getOp() != kIROp_ConstantBufferType)
+        {
+            return false;
+        }
+        activeTypes.add(type);
+        const bool isSupported =
+            _isNVVMSupportedAggregateStorageType(parameterGroupType->getElementType(), activeTypes);
+        activeTypes.remove(type);
+        return isSupported;
+    }
 
     if (auto arrayType = as<IRArrayType>(type))
     {

@@ -10217,59 +10217,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[1] = bit_cast<uint64_t>(bit_cast<int64_t>(3.0));
 }
 )";
-static const char kDirectNVVMUnsupportedNestedParameterBlockSource[] = R"(
-struct Inner
-{
-    uint value;
-};
-
-struct Block
-{
-    Inner inner;
-};
-
-ParameterBlock<Block> block;
-RWStructuredBuffer<uint> outputBuffer;
-
-[numthreads(1, 1, 1)]
-void computeMain()
-{
-    outputBuffer[0] = block.inner.value;
-}
-)";
-static const char kDirectNVVMUnsupportedNestedConstantBufferSource[] = R"(
-struct Inner
-{
-    uint value;
-};
-
-struct Params
-{
-    Inner inner;
-};
-
-ConstantBuffer<Params> params;
-RWStructuredBuffer<uint> outputBuffer;
-
-[numthreads(1, 1, 1)]
-void computeMain()
-{
-    outputBuffer[0] = params.inner.value;
-}
-)";
 static const char kDirectNVVMConventionalSamplerStorageSource[] = R"(
 SamplerComparisonState comparisonSampler;
 SamplerComparisonState comparisonSamplers[];
-RWStructuredBuffer<float> outputBuffer;
-
-[numthreads(1, 1, 1)]
-void computeMain()
-{
-    outputBuffer[0] = 1.0f;
-}
-)";
-static const char kDirectNVVMUnsupportedFixedSamplerArrayStorageSource[] = R"(
-SamplerComparisonState comparisonSamplers[2];
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]

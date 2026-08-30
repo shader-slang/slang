@@ -110,7 +110,7 @@ def _runtime_cluster(tags: str) -> tuple[str, str]:
 
 
 def _preflight_cluster(exact_shape: str) -> tuple[str, str]:
-    if exact_shape == "struct field address":
+    if exact_shape.startswith("struct field address"):
         return (
             "aggregate-struct-field-pointer",
             "IRBuilder::emitFieldAddress -> IRFieldAddress; _validateNVVMFunction",

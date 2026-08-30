@@ -2126,3 +2126,20 @@ in corpus v1 without combining their denominators. The slice changes no producti
 provider, ABI, or checked-in test directive and unlocks zero workloads; the 45 successes establish
 the discovery baseline for later generalization measurements. Corpus v1 remains at 371/427
 both-mode correctness, so no corpus v2 is proposed.
+
+Slice 148 admits canonical recursive field-address chains rooted in selected aggregate storage.
+Each child proves its recursively resolved parent, field key, and exact declared aggregate type,
+then inherits root mutability and conventional-global provenance. CUDA parameter-block and
+constant-buffer fields use the native pointer-sized layout; their specialized element storage is
+validated recursively and retained in the provider's reachable struct closure. Selected resource
+handles remain exact pointer-sized storage leaves. Typed diagnostics distinguish adjacent
+field-address result types without weakening preflight.
+
+The generic revision-30 provider interface is unchanged. Two discovery workloads become correct in
+both modes and receive four direct regression lanes. Discovery reaches 47/72 O0, O3, and both-mode
+correctness with no old-correct loss; its remaining leading healthy clusters are device-pointer
+load chains at four rows and typed struct-field pointers at three. Frozen corpus v1 remains
+371/375/371 over its 427 healthy-MVP denominator with zero old-correct regression. Exact checked-in
+ID/source selection keeps its 452 identities fixed while current dynamic repository discovery has
+grown to 456. The selected prefix passes 424/424, and five measured discovery representatives
+assemble with CUDA 12.9 for SM70, SM80, and SM90.

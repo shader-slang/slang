@@ -140,7 +140,7 @@ def _failure_ownership(row: dict[str, str]) -> tuple[str, str]:
             "helper-abi-type-contract",
             "post-specialization linked IRFunc signature -> _validateNVVMHelperTarget",
         )
-    if shape in AGGREGATE_SHAPES:
+    if shape in AGGREGATE_SHAPES or shape.startswith("struct field address"):
         return (
             "aggregate-pointer-layout-transport",
             "canonical linked aggregate/pointer IR -> _validateNVVMFunction",
