@@ -67,6 +67,11 @@ inline constexpr SlangNVVMValueTypeDesc kUnsignedI32 = {
     32,
     1,
 };
+inline constexpr SlangNVVMValueTypeDesc kSignedI16 = {
+    SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+    16,
+    1,
+};
 inline constexpr SlangNVVMValueTypeDesc kUnsignedI16 = {
     SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
     16,
@@ -422,6 +427,42 @@ inline constexpr CatalogEntry kCatalog[] = {
         1,
         "float64 cosine",
         "$P_cos($0)",
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
+        kFloat32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "float32 frexp fraction",
+        nullptr,
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
+        kSignedI32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "float32 frexp exponent",
+        nullptr,
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
+        kFloat64,
+        {kFloat64, kNoType, kNoType},
+        1,
+        "float64 frexp fraction",
+        nullptr,
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
+        kSignedI32,
+        {kFloat64, kNoType, kNoType},
+        1,
+        "float64 frexp exponent",
+        nullptr,
         true,
     },
     {

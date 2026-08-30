@@ -7298,6 +7298,95 @@ SLANG_UNIT_TEST(nvvmSlangScalarMathHelpersRequestTypedOperations)
 #endif
 }
 
+SLANG_UNIT_TEST(nvvmSlangScalarIntrinsicHelpersUseTypedRecipes)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    static const uint8_t kLibdevice[] = {0x42, 0x43, 0xc0, 0xde, 0x7e, 0x12};
+    TempDirectory toolkit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createTempDirectory(toolkit)));
+    String candidatePath;
+    String libdevicePath;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createFakeNVVMToolkit(
+        toolkit.path,
+        kLibdevice,
+        sizeof(kLibdevice),
+        candidatePath,
+        libdevicePath)));
+
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        globalSession->setDownstreamCompilerPath(SLANG_PASS_THROUGH_NVVM, toolkit.path.getBuffer());
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMScalarIntrinsicRecipeSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        uint32_t operationCounts[SLANG_NVVM_VALUE_OPERATION_COUNT] = {};
+        bool hasSignedI16ToHalf = false;
+        bool hasHalfToUnsignedI16 = false;
+        bool hasUnsignedI64ToDouble = false;
+        bool hasDoubleToUnsignedI64 = false;
+        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation < SLANG_NVVM_VALUE_OPERATION_COUNT)
+                ++operationCounts[operation.key.operation];
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_BIT_REINTERPRET ||
+                operation.operandCount != 1)
+            {
+                continue;
+            }
+            hasSignedI16ToHalf |=
+                NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat16) &&
+                NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kSignedI16);
+            hasHalfToUnsignedI16 |=
+                NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kUnsignedI16) &&
+                NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat16);
+            hasUnsignedI64ToDouble |=
+                NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat64) &&
+                NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kUnsignedI64);
+            hasDoubleToUnsignedI64 |=
+                NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kUnsignedI64) &&
+                NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat64);
+        }
+        SLANG_CHECK(hasSignedI16ToHalf);
+        SLANG_CHECK(hasHalfToUnsignedI16);
+        SLANG_CHECK(hasUnsignedI64ToDouble);
+        SLANG_CHECK(hasDoubleToUnsignedI64);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_SHIFT_LEFT] >= 1);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_SHIFT_RIGHT] >= 1);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_SIN] >= 2);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_COS] >= 2);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_FREXP_FRACTION] == 2);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_FREXP_EXPONENT] == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount >= 8);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
+        SLANG_CHECK(gFakeNVVM.moduleAddKinds[1] == FakeModuleAddKind::Lazy);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
 SLANG_UNIT_TEST(nvvmSlangCompoundWaveHelpersUseScalarRecipes)
 {
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
@@ -7394,6 +7483,8 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedIntegerBitSignatureSource, "assembly=$P_countbits($0)"},
         {kDirectNVVMUnsupportedVectorIntegerBitSource, "assembly=$P_reversebits($0)"},
         {kDirectNVVMUnsupportedVectorScalarMathSource, "assembly=$P_tan($0)"},
+        {kDirectNVVMUnsupportedScalarIntrinsicRecipeSignatureSource,
+         "assembly=$P_asuint($0, $1, $2)"},
         {kDirectNVVMUnsupportedCompoundWaveSignatureSource,
          "assembly=_waveShuffleMultiple($0, $1, $2)"},
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm assembly="},

@@ -2934,6 +2934,86 @@ static SlangResult _emitLibdeviceOperation(
     return SLANG_OK;
 }
 
+// Emits one pure projection of libdevice frexp through the existing typed value-operation ABI.
+// The compiler requests the fraction and exponent independently because the generic callback has
+// one result. Keeping libdevice's temporary exponent pointer inside the provider avoids exposing an
+// LLVM pointer type through the semantic descriptor while preserving every special-value case.
+static SlangResult _emitFrexpProjectionOperation(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMValueOperationDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::Value* operand =
+        operands && operation.operandCount == 1 ? _getValue(operands[0]) : nullptr;
+    const bool isFloat32 = Slang::NVVMSemantics::areSameType(
+        operation.operandTypes[0],
+        Slang::NVVMSemantics::kFloat32);
+    const bool isFloat64 = Slang::NVVMSemantics::areSameType(
+        operation.operandTypes[0],
+        Slang::NVVMSemantics::kFloat64);
+    const bool isFraction = operation.operation == SLANG_NVVM_VALUE_OP_FREXP_FRACTION;
+    const bool isExponent = operation.operation == SLANG_NVVM_VALUE_OP_FREXP_EXPONENT;
+    if (!state || !insertionBlock || !operand || (!isFloat32 && !isFloat64) ||
+        (!isFraction && !isExponent) || !outValue ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, operand))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Type* floatingType = isFloat32 ? llvm::Type::getFloatTy(state->context)
+                                         : llvm::Type::getDoubleTy(state->context);
+    llvm::Type* exponentType = llvm::Type::getInt32Ty(state->context);
+    const SlangNVVMValueTypeDesc& floatingSemanticType =
+        isFloat32 ? Slang::NVVMSemantics::kFloat32 : Slang::NVVMSemantics::kFloat64;
+    llvm::Function* function = insertionBlock->getParent();
+    if (!function || operand->getType() != floatingType ||
+        (isFraction &&
+         !Slang::NVVMSemantics::areSameType(operation.resultType, floatingSemanticType)) ||
+        (isExponent && !Slang::NVVMSemantics::areSameType(
+                           operation.resultType,
+                           Slang::NVVMSemantics::kSignedI32)))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Type* exponentPointerType = llvm::PointerType::getUnqual(exponentType);
+    llvm::FunctionType* functionType =
+        llvm::FunctionType::get(floatingType, {floatingType, exponentPointerType}, false);
+    const char* functionName = isFloat32 ? "__nv_frexpf" : "__nv_frexp";
+    llvm::Function* frexp = state->module->getFunction(functionName);
+    if (frexp && (frexp->getFunctionType() != functionType || !frexp->isDeclaration()))
+        return SLANG_E_INVALID_ARG;
+    if (!frexp)
+    {
+        frexp = llvm::Function::Create(
+            functionType,
+            llvm::GlobalValue::ExternalLinkage,
+            functionName,
+            state->module.get());
+    }
+
+    llvm::IRBuilder<> entryBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
+    llvm::AllocaInst* exponentStorage =
+        entryBuilder.CreateAlloca(exponentType, nullptr, "frexp.exponent");
+    exponentStorage->setAlignment(llvm::Align(4));
+
+    llvm::Value* fraction = state->builder.CreateCall(frexp, {operand, exponentStorage});
+    llvm::Value* result =
+        isFraction
+            ? fraction
+            : state->builder.CreateAlignedLoad(exponentType, exponentStorage, llvm::Align(4));
+    if (!result || result->getType() != (isFraction ? floatingType : exponentType))
+        return SLANG_E_INVALID_ARG;
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
 static SlangResult _emitCatalogOperation(
     SlangNVVMModuleHandle module,
     const Slang::NVVMSemantics::CatalogEntry& entry,
@@ -2941,6 +3021,11 @@ static SlangResult _emitCatalogOperation(
     SlangNVVMValueHandle* outValue)
 {
     const SlangNVVMValueOperationDesc operation = Slang::NVVMSemantics::getOperationDesc(entry);
+    if (entry.operation == SLANG_NVVM_VALUE_OP_FREXP_FRACTION ||
+        entry.operation == SLANG_NVVM_VALUE_OP_FREXP_EXPONENT)
+    {
+        return _emitFrexpProjectionOperation(module, operation, operands, outValue);
+    }
     if (entry.requiresCUDADeviceLibrary)
         return _emitLibdeviceOperation(module, operation, operands, outValue);
     if (entry.operandCount && entry.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)

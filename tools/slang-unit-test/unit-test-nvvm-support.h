@@ -371,6 +371,8 @@ enum class FakeNVVMBuilderParameterTypeKind
     Float,
     Double,
     FloatPointer,
+    HalfPointer,
+    DoublePointer,
     ArrayPointer,
     ScalarStructPointer,
     ScalarStruct,
@@ -709,9 +711,9 @@ struct FakeNVVMBuilderState
 
     FakeNVVMBuilderModuleStorage moduleStorage;
     FakeNVVMBuilderVoidTypeStorage voidTypeStorage;
-    FakeNVVMBuilderFunctionTypeStorage functionTypeStorage[8];
-    FakeNVVMBuilderFunctionStorage functionStorage[8];
-    FakeNVVMBuilderBlockStorage blockStorage[32];
+    FakeNVVMBuilderFunctionTypeStorage functionTypeStorage[32];
+    FakeNVVMBuilderFunctionStorage functionStorage[32];
+    FakeNVVMBuilderBlockStorage blockStorage[64];
     FakeNVVMBuilderIntegerTypeStorage integerTypeStorage;
     FakeNVVMBuilderBooleanTypeStorage booleanTypeStorage;
     FakeNVVMBuilderHalfTypeStorage halfTypeStorage;
@@ -730,16 +732,16 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderResourceViewTypeStorage
         resourceViewTypeStorage[static_cast<uint32_t>(FakeNVVMBuilderScalarTypeKind::Count)];
     FakeNVVMBuilderPointerTypeStorage vectorPointerTypeStorage[4][3];
-    FakeNVVMBuilderParameterStorage parameterStorage[64];
-    FakeNVVMBuilderLoadStorage loadStorage[16];
-    FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[64];
+    FakeNVVMBuilderParameterStorage parameterStorage[32 * 8];
+    FakeNVVMBuilderLoadStorage loadStorage[64];
+    FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[128];
     FakeNVVMBuilderIntrinsicStorage intrinsicStorage[8];
     FakeNVVMBuilderSurfaceOperationStorage surfaceOperationStorage[32];
     FakeNVVMBuilderTextureOperationStorage textureOperationStorage[16];
     FakeNVVMBuilderIntegerConstantStorage integerConstantStorage[64];
     FakeNVVMBuilderFloatingPointConstantStorage floatingPointConstantStorage[64];
     FakeNVVMBuilderScalarPhiStorage scalarPhiStorage[8];
-    FakeNVVMBuilderCallStorage callStorage[16];
+    FakeNVVMBuilderCallStorage callStorage[32];
     FakeNVVMBuilderPointerOffsetStorage pointerOffsetStorage[16];
     FakeNVVMBuilderByteOffsetPointerStorage byteOffsetPointerStorage[16];
     FakeNVVMBuilderSequentialElementPointerStorage sequentialElementPointerStorage[16];
@@ -751,7 +753,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderVectorConstructStorage vectorConstructStorage[16];
     FakeNVVMBuilderVectorElementStorage vectorElementStorage[64];
     FakeNVVMBuilderGlobalStorage globalStorage[4];
-    FakeNVVMBuilderLocalStorage localStorage[8];
+    FakeNVVMBuilderLocalStorage localStorage[32];
 
     int createModuleCallCount = 0;
     int destroyModuleCallCount = 0;
@@ -1374,7 +1376,8 @@ static SlangNVVMValueHandle _getFakeNVVMBuilderFunctionParameter(
     Index parameterIndex)
 {
     const Index storageIndex = functionIndex * 8 + parameterIndex;
-    SLANG_ASSERT(functionIndex >= 0 && functionIndex < 8);
+    SLANG_ASSERT(
+        functionIndex >= 0 && functionIndex < SLANG_COUNT_OF(gFakeNVVMBuilder.functionStorage));
     SLANG_ASSERT(parameterIndex >= 0 && parameterIndex < 8);
     return reinterpret_cast<SlangNVVMValueHandle>(&gFakeNVVMBuilder.parameterStorage[storageIndex]);
 }
@@ -1390,7 +1393,8 @@ static bool _getFakeNVVMBuilderParameterRef(
     Index& outFunctionIndex,
     size_t& outParameterIndex)
 {
-    for (Index functionIndex = 0; functionIndex < 8; ++functionIndex)
+    for (Index functionIndex = 0; functionIndex < SLANG_COUNT_OF(gFakeNVVMBuilder.functionStorage);
+         ++functionIndex)
     {
         for (Index parameterIndex = 0; parameterIndex < 8; ++parameterIndex)
         {
@@ -2136,12 +2140,15 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
         {
             const FakeNVVMBuilderScalarOperation& operation =
                 gFakeNVVMBuilder.scalarOperations[valueRef.index];
+            if (operation.resultType.kind != SLANG_NVVM_VALUE_TYPE_VOID)
+            {
+                return (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                        operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+                       operation.resultType.laneCount == 1;
+            }
+            // Legacy scalar callbacks predate typed result recording and are integer-only.
             return operation.key.family == FakeNVVMBuilderScalarFamily::Unary ||
-                   operation.key.family == FakeNVVMBuilderScalarFamily::Binary ||
-                   (operation.key.family == FakeNVVMBuilderScalarFamily::Select &&
-                    (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
-                     operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
-                    operation.resultType.laneCount == 1);
+                   operation.key.family == FakeNVVMBuilderScalarFamily::Binary;
         }
     case FakeNVVMBuilderValueKind::Intrinsic:
         return valueRef.index >= 0 &&
@@ -2722,6 +2729,8 @@ static bool _isFakeNVVMBuilderPointerValue(SlangNVVMValueHandle value)
     return _getFakeNVVMBuilderParameterTypeKind(valueRef, parameterTypeKind) &&
            (parameterTypeKind == FakeNVVMBuilderParameterTypeKind::Pointer ||
             parameterTypeKind == FakeNVVMBuilderParameterTypeKind::FloatPointer ||
+            parameterTypeKind == FakeNVVMBuilderParameterTypeKind::HalfPointer ||
+            parameterTypeKind == FakeNVVMBuilderParameterTypeKind::DoublePointer ||
             parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ArrayPointer ||
             parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ScalarStructPointer);
 }
@@ -2796,6 +2805,16 @@ static bool _getFakeNVVMBuilderPointerScalarTypeKind(
             if (parameterTypeKind == FakeNVVMBuilderParameterTypeKind::FloatPointer)
             {
                 outTypeKind = FakeNVVMBuilderScalarTypeKind::Float;
+                return true;
+            }
+            if (parameterTypeKind == FakeNVVMBuilderParameterTypeKind::HalfPointer)
+            {
+                outTypeKind = FakeNVVMBuilderScalarTypeKind::Half;
+                return true;
+            }
+            if (parameterTypeKind == FakeNVVMBuilderParameterTypeKind::DoublePointer)
+            {
+                outTypeKind = FakeNVVMBuilderScalarTypeKind::Double;
                 return true;
             }
             if (parameterTypeKind == FakeNVVMBuilderParameterTypeKind::ScalarStructPointer)
@@ -3124,6 +3143,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
             parameterTypes[i] != _getFakeNVVMBuilderDoubleType() &&
             parameterTypes[i] != _getFakeNVVMBuilderPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderFloatPointerType() &&
+            parameterTypes[i] != _getFakeNVVMBuilderHalfPointerType() &&
+            parameterTypes[i] != _getFakeNVVMBuilderDoublePointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderArrayPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderScalarStructPointerType() &&
             parameterTypes[i] != _getFakeNVVMBuilderScalarStructType() &&
@@ -3166,6 +3187,10 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
                 ? FakeNVVMBuilderParameterTypeKind::Pointer
             : parameterTypes[i] == _getFakeNVVMBuilderFloatPointerType()
                 ? FakeNVVMBuilderParameterTypeKind::FloatPointer
+            : parameterTypes[i] == _getFakeNVVMBuilderHalfPointerType()
+                ? FakeNVVMBuilderParameterTypeKind::HalfPointer
+            : parameterTypes[i] == _getFakeNVVMBuilderDoublePointerType()
+                ? FakeNVVMBuilderParameterTypeKind::DoublePointer
             : parameterTypes[i] == _getFakeNVVMBuilderArrayPointerType()
                 ? FakeNVVMBuilderParameterTypeKind::ArrayPointer
             : parameterTypes[i] == _getFakeNVVMBuilderScalarStructPointerType()
@@ -11110,6 +11135,246 @@ void computeMain(
     destination[5] = sign(y);
 }
 )";
+static const char kDirectNVVMScalarIntrinsicRecipeSource[] = R"SLANG(
+half halfFromSignedBits(int16_t value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "__short_as_half";
+    default: return half(value);
+    }
+}
+
+half halfFromUnsignedBits(uint16_t value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "__ushort_as_half";
+    default: return half(value);
+    }
+}
+
+uint16_t halfToBits(half value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "__half_as_ushort";
+    default: return uint16_t(value);
+    }
+}
+
+float floatFromPackedHalf(uint value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "__half2float(__ushort_as_half($0))";
+    default: return float(value);
+    }
+}
+
+uint packedHalfFromFloat(float value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "__half_as_ushort(__float2half($0))";
+    default: return uint(value);
+    }
+}
+
+double doubleFromWords(uint low, uint high)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_asdouble($0, $1)";
+    default: return double(low) + double(high);
+    }
+}
+
+void doubleToWords(double value, out uint low, out uint high)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_asuint($0, $1, $2)";
+    default:
+        low = uint(value);
+        high = 0;
+        return;
+    }
+}
+
+bool finiteHalf(half value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_isfinite($0)";
+    default: return true;
+    }
+}
+
+bool finiteFloat(float value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_isfinite($0)";
+    default: return true;
+    }
+}
+
+bool finiteDouble(double value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_isfinite($0)";
+    default: return true;
+    }
+}
+
+bool infiniteHalf(half value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_isinf($0)";
+    default: return false;
+    }
+}
+
+bool infiniteFloat(float value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_isinf($0)";
+    default: return false;
+    }
+}
+
+bool infiniteDouble(double value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_isinf($0)";
+    default: return false;
+    }
+}
+
+bool nanHalf(half value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_isnan($0)";
+    default: return false;
+    }
+}
+
+void sineCosineFloat(float value, out float sineValue, out float cosineValue)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_sincos($0, $1, $2)";
+    default:
+        sineValue = value;
+        cosineValue = value;
+        return;
+    }
+}
+
+void sineCosineDouble(double value, out double sineValue, out double cosineValue)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_sincos($0, $1, $2)";
+    default:
+        sineValue = value;
+        cosineValue = value;
+        return;
+    }
+}
+
+float frexpFloat(float value, out int exponent)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_frexp($0, $1)";
+    default:
+        exponent = 0;
+        return value;
+    }
+}
+
+double frexpDouble(double value, out int exponent)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_frexp($0, $1)";
+    default:
+        exponent = 0;
+        return value;
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float value,
+    uniform int seed)
+{
+    half signedHalf = halfFromSignedBits(int16_t(seed));
+    half unsignedHalf = halfFromUnsignedBits(uint16_t(seed));
+    uint16_t halfBits = halfToBits(unsignedHalf);
+    float unpacked = floatFromPackedHalf(uint(halfBits));
+    uint packed = packedHalfFromFloat(value);
+    double assembled = doubleFromWords(packed, uint(seed));
+    uint low;
+    uint high;
+    doubleToWords(assembled, low, high);
+    float sineFloat;
+    float cosineFloat;
+    double sineDouble;
+    double cosineDouble;
+    sineCosineFloat(value, sineFloat, cosineFloat);
+    sineCosineDouble(assembled, sineDouble, cosineDouble);
+    int floatExponent;
+    int doubleExponent;
+    float floatFraction = frexpFloat(value, floatExponent);
+    double doubleFraction = frexpDouble(assembled, doubleExponent);
+    int classifications =
+        (finiteHalf(signedHalf) ? 1 : 0) +
+        (finiteFloat(value) ? 2 : 0) +
+        (finiteDouble(assembled) ? 4 : 0) +
+        (infiniteHalf(unsignedHalf) ? 8 : 0) +
+        (infiniteFloat(value) ? 16 : 0) +
+        (infiniteDouble(assembled) ? 32 : 0) +
+        (nanHalf(signedHalf) ? 64 : 0);
+    destination[0] =
+        int(halfBits) + int(unpacked) + int(packed + low + high) +
+        int(sineFloat + cosineFloat + sineDouble + cosineDouble) +
+        int(floatFraction + doubleFraction) + floatExponent + doubleExponent + classifications;
+}
+)SLANG";
+
+static const char kDirectNVVMUnsupportedScalarIntrinsicRecipeSignatureSource[] = R"SLANG(
+void malformedDoubleToWords(double value, out uint low, out int high)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_asuint($0, $1, $2)";
+    default:
+        low = 0;
+        high = 0;
+        return;
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float value)
+{
+    uint low;
+    int high;
+    malformedDoubleToWords(double(value), low, high);
+    *destination = int(low) + high;
+}
+)SLANG";
 static const char kDirectNVVMMinMaxSource[] = R"(
 [CUDAKernel]
 void computeMain(

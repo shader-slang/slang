@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 27u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 28u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -175,7 +175,9 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_TAN ((SlangNVVMValueOperation)66u)
 #define SLANG_NVVM_VALUE_OP_IS_NAN ((SlangNVVMValueOperation)67u)
 #define SLANG_NVVM_VALUE_OP_SIGN ((SlangNVVMValueOperation)68u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT 69u
+#define SLANG_NVVM_VALUE_OP_FREXP_FRACTION ((SlangNVVMValueOperation)69u)
+#define SLANG_NVVM_VALUE_OP_FREXP_EXPONENT ((SlangNVVMValueOperation)70u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT 71u
 
     /** Describes one complete semantic value-operation overload. */
     typedef struct SlangNVVMValueOperationDesc

@@ -6048,7 +6048,7 @@ The installed CUDA 13 directory has no tool binaries, so CUDA 13 validation rema
 infrastructure gap.
 
 Production packaging treats `slang-llvm-nvvm` as an optional compiler-matched LLVM 14 provider at
-builder ABI revision 27. It should ship next to Slang binaries, with
+builder ABI revision 28. It should ship next to Slang binaries, with
 `SLANG_NVVM_BUILDER_PATH` reserved as the explicit deployment/development override. Sessions cache
 one load result, and direct selection retains deterministic E52016 failure for missing or mismatched
 providers rather than falling back to NVRTC. Provider updates move with the Slang commit and build
@@ -6324,6 +6324,39 @@ direct O3 PTX for all three assembles with CUDA 12.9 for SM70, SM80, and SM90. R
 continues on the local SM120 GPU, while CUDA 13 tooling and physical SM70/80/90 workers remain open
 productionization requirements. The selected unit prefix passes 405/405 and remains a regression
 score rather than the coverage denominator.
+
+### Slice 138: Canonical scalar intrinsic recipes
+
+The 21-workload ordinary-intrinsic GenericAsm bucket is one coherent producer family. CUDA
+specialization leaves final one-block helpers for Half bit transport and packed conversion, Double
+word transport, floating classification, `sincos`, and `frexp`. The direct emitter now accepts only
+18 exact assembly/full-signature pairs. Result and parameter types, order, arity, and exact
+out-parameter pointee roles are part of the semantic key; fixture paths and source function names
+are not.
+
+One compiler-owned recipe-step representation is shared with the established compound-wave path.
+Half/Double transport and classification compose typed reinterpretation, integer conversion,
+shifts, masks, comparisons, stores, and returns. `sincos` composes existing sine and cosine
+operations. Requirement collection queries every step before provider discovery or module
+mutation.
+
+`frexp` is the one concrete revision-27 gap: libdevice's exponent is an out-pointer result that the
+one-result typed callback cannot expose. Forward-only ABI revision 28 adds fraction and exponent
+projection operation IDs to the generic callback. The provider uses entry-block temporary i32
+storage and exact `__nv_frexpf`/`__nv_frexp` calls, keeping LLVM pointer types behind the provider
+boundary. No intrinsic-specific callback family is introduced.
+
+Nineteen existing workloads become correct at both O0 and O3. `bit-cast-16-bit` is additionally
+correct at O3; its O0 module remains an explicit unoptimized-Half provider failure. The fixed
+452-row census reaches 298 O0 and 303 O3 successes with no previously correct regression. Among
+427 healthy MVP references, O0/O3/both correctness is 297/301/297
+(69.6%/70.5%/69.6%). Ordinary intrinsic GenericAsm failures fall from 21 to the later Half-minimum
+blocker in one workload.
+
+All 59 CUDA lanes in the promoted files pass, and the selected NVVM unit prefix passes 406/406.
+The three representative gates remain correct; direct O3 PTX assembles with CUDA 12.9 for SM70,
+SM80, and SM90. CUDA 13 tooling and physical SM70/SM80/SM90 runtime workers remain explicit
+productionization gaps.
 
 ## Authoritative References
 

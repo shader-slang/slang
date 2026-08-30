@@ -7076,6 +7076,20 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         1,
     };
     SLANG_CHECK(builder.supportsValueOperation(operation));
+    operation = {
+        SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
+        NVVMSemantics::kFloat32,
+        float32Operands,
+        1,
+    };
+    SLANG_CHECK(builder.supportsValueOperation(operation));
+    operation = {
+        SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
+        NVVMSemantics::kSignedI32,
+        float64Operands,
+        1,
+    };
+    SLANG_CHECK(builder.supportsValueOperation(operation));
 
     SlangNVVMValueTypeDesc vectorFloat64 = NVVMSemantics::kFloat64;
     vectorFloat64.laneCount = 2;
@@ -7203,6 +7217,38 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
     };
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
+    operation = {
+        SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
+        NVVMSemantics::kFloat32,
+        float32Operands,
+        1,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(module.module, operation, &values[2], 1, result)));
+    operation = {
+        SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
+        NVVMSemantics::kSignedI32,
+        float32Operands,
+        1,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(module.module, operation, &values[2], 1, result)));
+    operation = {
+        SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
+        NVVMSemantics::kFloat64,
+        float64Operands,
+        1,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
+    operation = {
+        SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
+        NVVMSemantics::kSignedI32,
+        float64Operands,
+        1,
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
 
     const SlangNVVMSerializationFormat formats[] = {
@@ -7218,12 +7264,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_CHECK(text.indexOf("declare float @__nv_fabsf(float)") >= 0);
         SLANG_CHECK(text.indexOf("declare double @__nv_acos(double)") >= 0);
         SLANG_CHECK(text.indexOf("declare double @__nv_pow(double, double)") >= 0);
+        SLANG_CHECK(text.indexOf("declare float @__nv_frexpf(float, i32*)") >= 0);
+        SLANG_CHECK(text.indexOf("declare double @__nv_frexp(double, i32*)") >= 0);
         SLANG_CHECK(text.indexOf("declare double @llvm.sqrt.f64(double)") >= 0);
         SLANG_CHECK(text.indexOf("call double @__nv_floor(double") >= 0);
         SLANG_CHECK(text.indexOf("fcmp uno double") >= 0);
         SLANG_CHECK(text.indexOf("fcmp ogt double") >= 0);
         SLANG_CHECK(text.indexOf("fcmp olt double") >= 0);
         SLANG_CHECK(text.indexOf("and i16") >= 0);
+        SLANG_CHECK(text.indexOf("load i32, i32*") >= 0);
     }
 }
 

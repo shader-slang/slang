@@ -3,6 +3,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
 
 // inf, -inf, nan, finite

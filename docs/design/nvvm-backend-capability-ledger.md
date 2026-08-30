@@ -1945,3 +1945,23 @@ aggregate field addressing to their next exact blocker, reducing aggregate/point
 from 23 to 17; helper ABI types (28), ordinary GenericAsm semantics (21), and wave/reconvergence
 semantics (19) are now the largest healthy-MVP clusters. The selected prefix passes 405/405, and
 representative direct O3 PTX remains accepted for SM70, SM80, and SM90 with CUDA 12.9.
+
+Slice 138 replaces the remaining ordinary scalar-intrinsic GenericAsm bucket with one bounded,
+compiler-owned recipe representation. The canonical producer is CUDA specialization of a final
+one-block helper. Exact assembly plus the complete linked result/parameter signature, including
+out-parameter roles and pointee types, selects one of 18 measured recipes; fixture paths, source
+names, substring parsing, and syntax reconstruction do not participate.
+
+Half bit/packed conversion, Double word transport, floating classification, and `sincos` compose
+existing generic typed operations. `frexp` proves one concrete interface gap: libdevice returns a
+fraction and writes an exponent through a pointer, while the generic callback has one result.
+Forward-only builder ABI revision 28 adds fraction and exponent projection operation IDs to that
+callback. The provider keeps the temporary LLVM pointer local and calls exact `__nv_frexpf` or
+`__nv_frexp`; no intrinsic-specific callback family is added.
+
+Nineteen workloads become correct at O0 and O3, and `bit-cast-16-bit` additionally becomes correct
+at O3. The fixed 452-row census reaches 298 O0 and 303 O3 successes with zero old-correct
+regressions. Against 427 healthy MVP references, O0/O3/both correctness is 297/301/297
+(69.6%/70.5%/69.6%). Ordinary intrinsic GenericAsm failures fall from 21 to one. All 59 promoted
+CUDA lanes and the 406/406 selected prefix pass; representative direct O3 PTX remains accepted for
+SM70, SM80, and SM90 with CUDA 12.9.

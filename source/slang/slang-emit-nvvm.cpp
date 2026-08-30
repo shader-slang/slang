@@ -2764,15 +2764,10 @@ bool _resolveNVVMGenericAsmValueOperation(
     return true;
 }
 
-enum class NVVMGenericAsmCompoundKind
-{
-    None,
-    VectorWaveReadLaneAt,
-    VectorWaveAllEqual,
-    BallotPopulationCount,
-};
-
-struct NVVMGenericAsmCompoundStep
+// Describes one queried scalar operation in a compiler-owned compound recipe. The descriptor is
+// shared by the ordinary scalar recipes below and the established compound-wave recipes; only the
+// recipe emitter decides how intermediate values flow between steps.
+struct NVVMValueRecipeStep
 {
     SlangNVVMValueOperation operation = 0;
     SlangNVVMValueTypeDesc resultType = {};
@@ -2786,20 +2781,8 @@ struct NVVMGenericAsmCompoundStep
     }
 };
 
-struct NVVMGenericAsmCompoundOperation
-{
-    NVVMGenericAsmCompoundKind kind = NVVMGenericAsmCompoundKind::None;
-    IRParam* parameters[3] = {};
-    SlangNVVMValueTypeDesc operandTypes[3] = {};
-    SlangNVVMValueTypeDesc resultType = {};
-    uint32_t operandCount = 0;
-    const char* diagnosticName = nullptr;
-    NVVMGenericAsmCompoundStep steps[2] = {};
-    uint32_t stepCount = 0;
-};
-
-void _setNVVMGenericAsmCompoundStep(
-    NVVMGenericAsmCompoundStep& step,
+void _setNVVMValueRecipeStep(
+    NVVMValueRecipeStep& step,
     SlangNVVMValueOperation operation,
     const SlangNVVMValueTypeDesc& resultType,
     const SlangNVVMValueTypeDesc* operandTypes,
@@ -2815,6 +2798,528 @@ void _setNVVMGenericAsmCompoundStep(
     for (uint32_t i = 0; i < operandCount; ++i)
         step.operandTypes[i] = operandTypes[i];
 }
+
+enum class NVVMScalarIntrinsicRecipeKind
+{
+    None,
+    HalfFromBits,
+    HalfToBits,
+    FloatFromPackedHalf,
+    PackedHalfFromFloat,
+    DoubleFromWords,
+    DoubleToWords,
+    IsFiniteFloating,
+    IsInfiniteFloating,
+    IsNaNHalf,
+    SinCos,
+    Frexp,
+};
+
+struct NVVMScalarIntrinsicRecipe
+{
+    NVVMScalarIntrinsicRecipeKind kind = NVVMScalarIntrinsicRecipeKind::None;
+    IRParam* parameters[3] = {};
+    SlangNVVMValueTypeDesc parameterTypes[3] = {};
+    bool parameterIsOut[3] = {};
+    SlangNVVMValueTypeDesc resultType = {};
+    uint32_t parameterCount = 0;
+    const char* diagnosticName = nullptr;
+    NVVMValueRecipeStep steps[5] = {};
+    uint32_t stepCount = 0;
+    bool requiresCUDADeviceLibrary = false;
+};
+
+bool _appendNVVMScalarIntrinsicRecipeStep(
+    NVVMScalarIntrinsicRecipe& recipe,
+    SlangNVVMValueOperation operation,
+    const SlangNVVMValueTypeDesc& resultType,
+    const SlangNVVMValueTypeDesc* operandTypes,
+    uint32_t operandCount,
+    const char* diagnosticName)
+{
+    if (recipe.stepCount >= SLANG_COUNT_OF(recipe.steps))
+        return false;
+
+    NVVMValueRecipeStep& step = recipe.steps[recipe.stepCount];
+    _setNVVMValueRecipeStep(
+        step,
+        operation,
+        resultType,
+        operandTypes,
+        operandCount,
+        diagnosticName);
+
+    const SlangNVVMValueOperationDesc desc = step.getDesc();
+    if (const auto semantic = NVVMSemantics::find(desc))
+    {
+        recipe.requiresCUDADeviceLibrary |= semantic->requiresCUDADeviceLibrary;
+    }
+    else
+    {
+        NVVMSemantics::ValueOperationFamilyResolution family;
+        if (!NVVMSemantics::resolveValueOperationFamily(desc, family))
+            return false;
+        recipe.requiresCUDADeviceLibrary |= family.requiresCUDADeviceLibrary;
+    }
+    ++recipe.stepCount;
+    return true;
+}
+
+bool _appendNVVMScalarIntrinsicUnaryStep(
+    NVVMScalarIntrinsicRecipe& recipe,
+    SlangNVVMValueOperation operation,
+    const SlangNVVMValueTypeDesc& resultType,
+    const SlangNVVMValueTypeDesc& operandType,
+    const char* diagnosticName)
+{
+    return _appendNVVMScalarIntrinsicRecipeStep(
+        recipe,
+        operation,
+        resultType,
+        &operandType,
+        1,
+        diagnosticName);
+}
+
+bool _appendNVVMScalarIntrinsicBinaryStep(
+    NVVMScalarIntrinsicRecipe& recipe,
+    SlangNVVMValueOperation operation,
+    const SlangNVVMValueTypeDesc& resultType,
+    const SlangNVVMValueTypeDesc& leftType,
+    const SlangNVVMValueTypeDesc& rightType,
+    const char* diagnosticName)
+{
+    const SlangNVVMValueTypeDesc operandTypes[] = {leftType, rightType};
+    return _appendNVVMScalarIntrinsicRecipeStep(
+        recipe,
+        operation,
+        resultType,
+        operandTypes,
+        SLANG_COUNT_OF(operandTypes),
+        diagnosticName);
+}
+
+// Recognizes the remaining finalized scalar intrinsic helpers selected by the CUDA prelude. Each
+// row checks the complete linked signature, including exact out-parameter roles, before attaching
+// a typed recipe. Assembly is a bounded semantic key here, not text passed to or parsed by LLVM.
+bool _resolveNVVMScalarIntrinsicRecipe(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMScalarIntrinsicRecipe& outRecipe)
+{
+    outRecipe = {};
+    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function) ||
+        !_getNVVMSemanticType(function->getResultType(), outRecipe.resultType) ||
+        function->getParamCount() > SLANG_COUNT_OF(outRecipe.parameters))
+    {
+        return false;
+    }
+
+    IRParam* parameter = function->getFirstParam();
+    for (uint32_t i = 0; i < function->getParamCount(); ++i)
+    {
+        SLANG_ASSERT(parameter);
+        IRType* pointedToType = nullptr;
+        auto pointerType =
+            asNVVMSupportedLocalCopyableValuePointerType(parameter->getDataType(), &pointedToType);
+        const bool isOut = pointerType && pointerType->getOp() == kIROp_OutParamType;
+        IRType* semanticType = isOut ? pointedToType : parameter->getDataType();
+        if (!_getNVVMSemanticType(semanticType, outRecipe.parameterTypes[i]))
+            return false;
+        outRecipe.parameters[i] = parameter;
+        outRecipe.parameterIsOut[i] = isOut;
+        parameter = parameter->getNextParam();
+    }
+    SLANG_ASSERT(!parameter);
+    outRecipe.parameterCount = uint32_t(function->getParamCount());
+
+    struct RecipeSignature
+    {
+        const char* assembly;
+        NVVMScalarIntrinsicRecipeKind kind;
+        SlangNVVMValueTypeDesc resultType;
+        SlangNVVMValueTypeDesc parameterTypes[3];
+        uint32_t parameterCount;
+        uint32_t outParameterMask;
+        const char* diagnosticName;
+    };
+    static const RecipeSignature kSignatures[] = {
+        {"__short_as_half",
+         NVVMScalarIntrinsicRecipeKind::HalfFromBits,
+         NVVMSemantics::kFloat16,
+         {NVVMSemantics::kSignedI16},
+         1,
+         0,
+         "signed-i16 to Half bit transport"},
+        {"__ushort_as_half",
+         NVVMScalarIntrinsicRecipeKind::HalfFromBits,
+         NVVMSemantics::kFloat16,
+         {NVVMSemantics::kUnsignedI16},
+         1,
+         0,
+         "unsigned-i16 to Half bit transport"},
+        {"__half_as_ushort",
+         NVVMScalarIntrinsicRecipeKind::HalfToBits,
+         NVVMSemantics::kUnsignedI16,
+         {NVVMSemantics::kFloat16},
+         1,
+         0,
+         "Half to unsigned-i16 bit transport"},
+        {"__half2float(__ushort_as_half($0))",
+         NVVMScalarIntrinsicRecipeKind::FloatFromPackedHalf,
+         NVVMSemantics::kFloat32,
+         {NVVMSemantics::kUnsignedI32},
+         1,
+         0,
+         "packed Half to Float conversion"},
+        {"__half_as_ushort(__float2half($0))",
+         NVVMScalarIntrinsicRecipeKind::PackedHalfFromFloat,
+         NVVMSemantics::kUnsignedI32,
+         {NVVMSemantics::kFloat32},
+         1,
+         0,
+         "Float to packed Half conversion"},
+        {"$P_asdouble($0, $1)",
+         NVVMScalarIntrinsicRecipeKind::DoubleFromWords,
+         NVVMSemantics::kFloat64,
+         {NVVMSemantics::kUnsignedI32, NVVMSemantics::kUnsignedI32},
+         2,
+         0,
+         "Double construction from UInt32 words"},
+        {"$P_asuint($0, $1, $2)",
+         NVVMScalarIntrinsicRecipeKind::DoubleToWords,
+         NVVMSemantics::kVoid,
+         {NVVMSemantics::kFloat64, NVVMSemantics::kUnsignedI32, NVVMSemantics::kUnsignedI32},
+         3,
+         6,
+         "Double decomposition to UInt32 words"},
+        {"$P_isfinite($0)",
+         NVVMScalarIntrinsicRecipeKind::IsFiniteFloating,
+         NVVMSemantics::kBool,
+         {NVVMSemantics::kFloat16},
+         1,
+         0,
+         "Float16 finite classification"},
+        {"$P_isfinite($0)",
+         NVVMScalarIntrinsicRecipeKind::IsFiniteFloating,
+         NVVMSemantics::kBool,
+         {NVVMSemantics::kFloat32},
+         1,
+         0,
+         "Float32 finite classification"},
+        {"$P_isfinite($0)",
+         NVVMScalarIntrinsicRecipeKind::IsFiniteFloating,
+         NVVMSemantics::kBool,
+         {NVVMSemantics::kFloat64},
+         1,
+         0,
+         "Float64 finite classification"},
+        {"$P_isinf($0)",
+         NVVMScalarIntrinsicRecipeKind::IsInfiniteFloating,
+         NVVMSemantics::kBool,
+         {NVVMSemantics::kFloat16},
+         1,
+         0,
+         "Float16 infinity classification"},
+        {"$P_isinf($0)",
+         NVVMScalarIntrinsicRecipeKind::IsInfiniteFloating,
+         NVVMSemantics::kBool,
+         {NVVMSemantics::kFloat32},
+         1,
+         0,
+         "Float32 infinity classification"},
+        {"$P_isinf($0)",
+         NVVMScalarIntrinsicRecipeKind::IsInfiniteFloating,
+         NVVMSemantics::kBool,
+         {NVVMSemantics::kFloat64},
+         1,
+         0,
+         "Float64 infinity classification"},
+        {"$P_isnan($0)",
+         NVVMScalarIntrinsicRecipeKind::IsNaNHalf,
+         NVVMSemantics::kBool,
+         {NVVMSemantics::kFloat16},
+         1,
+         0,
+         "Float16 NaN classification"},
+        {"$P_sincos($0, $1, $2)",
+         NVVMScalarIntrinsicRecipeKind::SinCos,
+         NVVMSemantics::kVoid,
+         {NVVMSemantics::kFloat32, NVVMSemantics::kFloat32, NVVMSemantics::kFloat32},
+         3,
+         6,
+         "Float32 sine/cosine pair"},
+        {"$P_sincos($0, $1, $2)",
+         NVVMScalarIntrinsicRecipeKind::SinCos,
+         NVVMSemantics::kVoid,
+         {NVVMSemantics::kFloat64, NVVMSemantics::kFloat64, NVVMSemantics::kFloat64},
+         3,
+         6,
+         "Float64 sine/cosine pair"},
+        {"$P_frexp($0, $1)",
+         NVVMScalarIntrinsicRecipeKind::Frexp,
+         NVVMSemantics::kFloat32,
+         {NVVMSemantics::kFloat32, NVVMSemantics::kSignedI32},
+         2,
+         2,
+         "Float32 frexp pair"},
+        {"$P_frexp($0, $1)",
+         NVVMScalarIntrinsicRecipeKind::Frexp,
+         NVVMSemantics::kFloat64,
+         {NVVMSemantics::kFloat64, NVVMSemantics::kSignedI32},
+         2,
+         2,
+         "Float64 frexp pair"},
+    };
+
+    const RecipeSignature* signature = nullptr;
+    for (const auto& candidate : kSignatures)
+    {
+        if (genericAsm->getAsm() != UnownedStringSlice(candidate.assembly) ||
+            outRecipe.parameterCount != candidate.parameterCount ||
+            !NVVMSemantics::areSameType(outRecipe.resultType, candidate.resultType))
+        {
+            continue;
+        }
+        bool matches = true;
+        for (uint32_t i = 0; i < candidate.parameterCount; ++i)
+        {
+            matches = matches &&
+                      NVVMSemantics::areSameType(
+                          outRecipe.parameterTypes[i],
+                          candidate.parameterTypes[i]) &&
+                      outRecipe.parameterIsOut[i] == bool(candidate.outParameterMask & (1u << i));
+        }
+        if (matches)
+        {
+            signature = &candidate;
+            break;
+        }
+    }
+    if (!signature)
+        return false;
+
+    outRecipe.kind = signature->kind;
+    outRecipe.diagnosticName = signature->diagnosticName;
+    switch (outRecipe.kind)
+    {
+    case NVVMScalarIntrinsicRecipeKind::HalfFromBits:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+            outRecipe,
+            SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+            NVVMSemantics::kFloat16,
+            outRecipe.parameterTypes[0],
+            outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::HalfToBits:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+            outRecipe,
+            SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+            NVVMSemantics::kUnsignedI16,
+            NVVMSemantics::kFloat16,
+            outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::FloatFromPackedHalf:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+                   NVVMSemantics::kUnsignedI16,
+                   NVVMSemantics::kUnsignedI32,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+                   NVVMSemantics::kFloat16,
+                   NVVMSemantics::kUnsignedI16,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                   NVVMSemantics::kFloat32,
+                   NVVMSemantics::kFloat16,
+                   outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::PackedHalfFromFloat:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                   NVVMSemantics::kFloat16,
+                   NVVMSemantics::kFloat32,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+                   NVVMSemantics::kUnsignedI16,
+                   NVVMSemantics::kFloat16,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+                   NVVMSemantics::kUnsignedI32,
+                   NVVMSemantics::kUnsignedI16,
+                   outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::DoubleFromWords:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+                   NVVMSemantics::kUnsignedI64,
+                   NVVMSemantics::kUnsignedI32,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicBinaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_SHIFT_LEFT,
+                   NVVMSemantics::kUnsignedI64,
+                   NVVMSemantics::kUnsignedI64,
+                   NVVMSemantics::kUnsignedI64,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicBinaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_BIT_OR,
+                   NVVMSemantics::kUnsignedI64,
+                   NVVMSemantics::kUnsignedI64,
+                   NVVMSemantics::kUnsignedI64,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+                   NVVMSemantics::kFloat64,
+                   NVVMSemantics::kUnsignedI64,
+                   outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::DoubleToWords:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+                   NVVMSemantics::kUnsignedI64,
+                   NVVMSemantics::kFloat64,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+                   NVVMSemantics::kUnsignedI32,
+                   NVVMSemantics::kUnsignedI64,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicBinaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_SHIFT_RIGHT,
+                   NVVMSemantics::kUnsignedI64,
+                   NVVMSemantics::kUnsignedI64,
+                   NVVMSemantics::kUnsignedI64,
+                   outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::IsFiniteFloating:
+    case NVVMScalarIntrinsicRecipeKind::IsInfiniteFloating:
+        {
+            const SlangNVVMValueTypeDesc bitType = {
+                SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+                outRecipe.parameterTypes[0].bitWidth,
+                1,
+            };
+            const SlangNVVMValueOperation comparison =
+                outRecipe.kind == NVVMScalarIntrinsicRecipeKind::IsFiniteFloating
+                    ? SLANG_NVVM_VALUE_OP_NOT_EQUAL
+                    : SLANG_NVVM_VALUE_OP_EQUAL;
+            return _appendNVVMScalarIntrinsicUnaryStep(
+                       outRecipe,
+                       SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+                       bitType,
+                       outRecipe.parameterTypes[0],
+                       outRecipe.diagnosticName) &&
+                   _appendNVVMScalarIntrinsicBinaryStep(
+                       outRecipe,
+                       SLANG_NVVM_VALUE_OP_BIT_AND,
+                       bitType,
+                       bitType,
+                       bitType,
+                       outRecipe.diagnosticName) &&
+                   _appendNVVMScalarIntrinsicBinaryStep(
+                       outRecipe,
+                       comparison,
+                       NVVMSemantics::kBool,
+                       bitType,
+                       bitType,
+                       outRecipe.diagnosticName);
+        }
+    case NVVMScalarIntrinsicRecipeKind::IsNaNHalf:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+                   NVVMSemantics::kUnsignedI16,
+                   NVVMSemantics::kFloat16,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicBinaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_BIT_AND,
+                   NVVMSemantics::kUnsignedI16,
+                   NVVMSemantics::kUnsignedI16,
+                   NVVMSemantics::kUnsignedI16,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicBinaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_EQUAL,
+                   NVVMSemantics::kBool,
+                   NVVMSemantics::kUnsignedI16,
+                   NVVMSemantics::kUnsignedI16,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicBinaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_NOT_EQUAL,
+                   NVVMSemantics::kBool,
+                   NVVMSemantics::kUnsignedI16,
+                   NVVMSemantics::kUnsignedI16,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicBinaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_BIT_AND,
+                   NVVMSemantics::kBool,
+                   NVVMSemantics::kBool,
+                   NVVMSemantics::kBool,
+                   outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::SinCos:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_SIN,
+                   outRecipe.parameterTypes[0],
+                   outRecipe.parameterTypes[0],
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_COS,
+                   outRecipe.parameterTypes[0],
+                   outRecipe.parameterTypes[0],
+                   outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::Frexp:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
+                   outRecipe.resultType,
+                   outRecipe.parameterTypes[0],
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
+                   NVVMSemantics::kSignedI32,
+                   outRecipe.parameterTypes[0],
+                   outRecipe.diagnosticName);
+    default:
+        return false;
+    }
+}
+
+enum class NVVMGenericAsmCompoundKind
+{
+    None,
+    VectorWaveReadLaneAt,
+    VectorWaveAllEqual,
+    BallotPopulationCount,
+};
+
+struct NVVMGenericAsmCompoundOperation
+{
+    NVVMGenericAsmCompoundKind kind = NVVMGenericAsmCompoundKind::None;
+    IRParam* parameters[3] = {};
+    SlangNVVMValueTypeDesc operandTypes[3] = {};
+    SlangNVVMValueTypeDesc resultType = {};
+    uint32_t operandCount = 0;
+    const char* diagnosticName = nullptr;
+    NVVMValueRecipeStep steps[2] = {};
+    uint32_t stepCount = 0;
+};
 
 bool _isSelectedNVVMWaveVector(const SlangNVVMValueTypeDesc& type)
 {
@@ -2896,7 +3401,7 @@ bool _resolveNVVMGenericAsmCompoundOperation(
             elementType,
             NVVMSemantics::kSignedI32,
         };
-        _setNVVMGenericAsmCompoundStep(
+        _setNVVMValueRecipeStep(
             outOperation.steps[0],
             SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
             elementType,
@@ -2922,7 +3427,7 @@ bool _resolveNVVMGenericAsmCompoundOperation(
             NVVMSemantics::kUnsignedI32,
             elementType,
         };
-        _setNVVMGenericAsmCompoundStep(
+        _setNVVMValueRecipeStep(
             outOperation.steps[0],
             SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
             NVVMSemantics::kBool,
@@ -2933,7 +3438,7 @@ bool _resolveNVVMGenericAsmCompoundOperation(
             NVVMSemantics::kBool,
             NVVMSemantics::kBool,
         };
-        _setNVVMGenericAsmCompoundStep(
+        _setNVVMValueRecipeStep(
             outOperation.steps[1],
             SLANG_NVVM_VALUE_OP_BIT_AND,
             NVVMSemantics::kBool,
@@ -2954,7 +3459,7 @@ bool _resolveNVVMGenericAsmCompoundOperation(
         NVVMSemantics::kUnsignedI32,
         NVVMSemantics::kBool,
     };
-    _setNVVMGenericAsmCompoundStep(
+    _setNVVMValueRecipeStep(
         outOperation.steps[0],
         SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
         NVVMSemantics::kUnsignedI32,
@@ -2962,7 +3467,7 @@ bool _resolveNVVMGenericAsmCompoundOperation(
         2,
         outOperation.diagnosticName);
     const SlangNVVMValueTypeDesc countOperands[] = {NVVMSemantics::kUnsignedI32};
-    _setNVVMGenericAsmCompoundStep(
+    _setNVVMValueRecipeStep(
         outOperation.steps[1],
         SLANG_NVVM_VALUE_OP_COUNT_BITS,
         NVVMSemantics::kUnsignedI32,
@@ -3258,7 +3763,20 @@ void _requireNVVMGenericAsmCompoundOperations(
     SLANG_ASSERT(compound.stepCount >= 1 && compound.stepCount <= SLANG_COUNT_OF(compound.steps));
     for (uint32_t i = 0; i < compound.stepCount; ++i)
     {
-        const NVVMGenericAsmCompoundStep& step = compound.steps[i];
+        const NVVMValueRecipeStep& step = compound.steps[i];
+        _requireValueOperation(requirements, step.getDesc(), step.diagnosticName);
+    }
+}
+
+// Records the complete operation closure of one scalar intrinsic recipe before provider discovery.
+void _requireNVVMScalarIntrinsicRecipeOperations(
+    NVVMValueOperationRequirements& requirements,
+    const NVVMScalarIntrinsicRecipe& recipe)
+{
+    SLANG_ASSERT(recipe.stepCount >= 1 && recipe.stepCount <= SLANG_COUNT_OF(recipe.steps));
+    for (uint32_t i = 0; i < recipe.stepCount; ++i)
+    {
+        const NVVMValueRecipeStep& step = recipe.steps[i];
         _requireValueOperation(requirements, step.getDesc(), step.diagnosticName);
     }
 }
@@ -4326,6 +4844,7 @@ SlangResult _validateNVVMFunction(
                         _findNVVMGenericAsmSemantic(genericAsm, function);
                     NVVMScalarTruthiness truthiness;
                     NVVMGenericAsmValueOperation valueOperation;
+                    NVVMScalarIntrinsicRecipe scalarRecipe;
                     NVVMGenericAsmCompoundOperation compoundOperation;
                     NVVMResolvedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
@@ -4345,6 +4864,15 @@ SlangResult _validateNVVMFunction(
                             valueOperation.diagnosticName);
                         requirements.requiresCUDADeviceLibrary |=
                             valueOperation.requiresCUDADeviceLibrary;
+                        break;
+                    }
+                    if (_resolveNVVMScalarIntrinsicRecipe(genericAsm, function, scalarRecipe))
+                    {
+                        _requireNVVMScalarIntrinsicRecipeOperations(
+                            requirements.valueOperations,
+                            scalarRecipe);
+                        requirements.requiresCUDADeviceLibrary |=
+                            scalarRecipe.requiresCUDADeviceLibrary;
                         break;
                     }
                     if (_resolveNVVMGenericAsmCompoundOperation(
@@ -5524,7 +6052,479 @@ SlangResult _getLoweredNVVMValue(
     return SLANG_OK;
 }
 
-// Emits one compiler-owned compound wave recipe through revision 27's existing scalar and
+SlangResult _emitNVVMValueRecipeStep(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMValueRecipeStep& step,
+    const SlangNVVMValueHandle* operands,
+    uint32_t operandCount,
+    SlangNVVMValueHandle& outValue)
+{
+    SLANG_ASSERT(operandCount == step.operandCount);
+    return _requireBuilderOperation(
+        codeGenContext,
+        step.diagnosticName,
+        builder.emitValueOperation(module, step.getDesc(), operands, operandCount, outValue));
+}
+
+SlangResult _getNVVMRecipeIntegerConstant(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    uint32_t bitWidth,
+    int64_t value,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMTypeHandle integerType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "scalar intrinsic recipe integer type",
+        builder.getIntegerType(module, bitWidth, integerType)));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "scalar intrinsic recipe integer constant",
+        builder.getIntegerConstant(module, integerType, value, outValue));
+}
+
+SlangResult _emitNVVMScalarIntrinsicOutStore(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMScalarIntrinsicRecipe& recipe,
+    uint32_t parameterIndex,
+    SlangNVVMValueHandle pointer,
+    SlangNVVMValueHandle value)
+{
+    SLANG_RELEASE_ASSERT(
+        parameterIndex < recipe.parameterCount && recipe.parameterIsOut[parameterIndex]);
+    IRType* valueType = nullptr;
+    auto pointerType = asNVVMSupportedLocalCopyableValuePointerType(
+        recipe.parameters[parameterIndex]->getDataType(),
+        &valueType);
+    SLANG_RELEASE_ASSERT(pointerType && pointerType->getOp() == kIROp_OutParamType && valueType);
+    return _requireBuilderOperation(
+        codeGenContext,
+        "scalar intrinsic recipe out-parameter store",
+        builder.emitStore(module, value, pointer, getNVVMResourceValueAlignment(valueType)));
+}
+
+// Emits one finalized scalar intrinsic helper as a bounded graph of queried typed operations. The
+// resolver above proves the complete helper signature, so out-parameter handles are ordinary
+// canonical helper pointers and every stored value has the exact pointee representation.
+SlangResult _emitNVVMScalarIntrinsicRecipe(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRFunc* function,
+    const NVVMScalarIntrinsicRecipe& recipe,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext)
+{
+    SlangNVVMValueHandle parameters[3] = {};
+    for (uint32_t i = 0; i < recipe.parameterCount; ++i)
+    {
+        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+            codeGenContext,
+            builder,
+            module,
+            recipe.parameters[i],
+            valueMap,
+            typeContext,
+            parameters[i]));
+    }
+
+    SlangNVVMValueHandle result = nullptr;
+    switch (recipe.kind)
+    {
+    case NVVMScalarIntrinsicRecipeKind::HalfFromBits:
+    case NVVMScalarIntrinsicRecipeKind::HalfToBits:
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            recipe.steps[0],
+            parameters,
+            1,
+            result));
+        break;
+    case NVVMScalarIntrinsicRecipeKind::FloatFromPackedHalf:
+    case NVVMScalarIntrinsicRecipeKind::PackedHalfFromFloat:
+        {
+            SlangNVVMValueHandle intermediate = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[0],
+                parameters,
+                1,
+                intermediate));
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                &intermediate,
+                1,
+                result));
+            intermediate = result;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[2],
+                &intermediate,
+                1,
+                result));
+        }
+        break;
+    case NVVMScalarIntrinsicRecipeKind::DoubleFromWords:
+        {
+            SlangNVVMValueHandle words[2] = {};
+            for (uint32_t i = 0; i < 2; ++i)
+            {
+                SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                    codeGenContext,
+                    builder,
+                    module,
+                    recipe.steps[0],
+                    &parameters[i],
+                    1,
+                    words[i]));
+            }
+            SlangNVVMValueHandle shiftAmount = nullptr;
+            SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
+                codeGenContext,
+                builder,
+                module,
+                64,
+                32,
+                shiftAmount));
+            const SlangNVVMValueHandle shiftOperands[] = {words[1], shiftAmount};
+            SlangNVVMValueHandle highWord = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                shiftOperands,
+                SLANG_COUNT_OF(shiftOperands),
+                highWord));
+            const SlangNVVMValueHandle combineOperands[] = {words[0], highWord};
+            SlangNVVMValueHandle bits = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[2],
+                combineOperands,
+                SLANG_COUNT_OF(combineOperands),
+                bits));
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[3],
+                &bits,
+                1,
+                result));
+        }
+        break;
+    case NVVMScalarIntrinsicRecipeKind::DoubleToWords:
+        {
+            SlangNVVMValueHandle bits = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[0],
+                parameters,
+                1,
+                bits));
+            SlangNVVMValueHandle lowWord = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                &bits,
+                1,
+                lowWord));
+            SlangNVVMValueHandle shiftAmount = nullptr;
+            SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
+                codeGenContext,
+                builder,
+                module,
+                64,
+                32,
+                shiftAmount));
+            const SlangNVVMValueHandle shiftOperands[] = {bits, shiftAmount};
+            SlangNVVMValueHandle highBits = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[2],
+                shiftOperands,
+                SLANG_COUNT_OF(shiftOperands),
+                highBits));
+            SlangNVVMValueHandle highWord = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                &highBits,
+                1,
+                highWord));
+            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicOutStore(
+                codeGenContext,
+                builder,
+                module,
+                recipe,
+                1,
+                parameters[1],
+                lowWord));
+            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicOutStore(
+                codeGenContext,
+                builder,
+                module,
+                recipe,
+                2,
+                parameters[2],
+                highWord));
+            return _requireBuilderOperation(
+                codeGenContext,
+                "scalar intrinsic recipe void return",
+                builder.emitReturnVoid(module));
+        }
+    case NVVMScalarIntrinsicRecipeKind::IsFiniteFloating:
+    case NVVMScalarIntrinsicRecipeKind::IsInfiniteFloating:
+        {
+            SlangNVVMValueHandle bits = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[0],
+                parameters,
+                1,
+                bits));
+            SlangNVVMValueHandle exponentMask = nullptr;
+            const uint32_t bitWidth = recipe.parameterTypes[0].bitWidth;
+            const int64_t exponentMaskValue = bitWidth == 16   ? 0x7c00
+                                              : bitWidth == 32 ? 0x7f800000
+                                                               : 0x7ff0000000000000ll;
+            const int64_t magnitudeMaskValue = bitWidth == 16   ? 0x7fff
+                                               : bitWidth == 32 ? 0x7fffffff
+                                                                : 0x7fffffffffffffffll;
+            const bool isFinite = recipe.kind == NVVMScalarIntrinsicRecipeKind::IsFiniteFloating;
+            SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
+                codeGenContext,
+                builder,
+                module,
+                bitWidth,
+                exponentMaskValue,
+                exponentMask));
+            SlangNVVMValueHandle valueMask = exponentMask;
+            if (!isFinite)
+            {
+                SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
+                    codeGenContext,
+                    builder,
+                    module,
+                    bitWidth,
+                    magnitudeMaskValue,
+                    valueMask));
+            }
+            const SlangNVVMValueHandle maskOperands[] = {bits, valueMask};
+            SlangNVVMValueHandle exponent = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                maskOperands,
+                SLANG_COUNT_OF(maskOperands),
+                exponent));
+            const SlangNVVMValueHandle compareOperands[] = {exponent, exponentMask};
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[2],
+                compareOperands,
+                SLANG_COUNT_OF(compareOperands),
+                result));
+        }
+        break;
+    case NVVMScalarIntrinsicRecipeKind::IsNaNHalf:
+        {
+            SlangNVVMValueHandle bits = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[0],
+                parameters,
+                1,
+                bits));
+            SlangNVVMValueHandle exponentMask = nullptr;
+            SlangNVVMValueHandle mantissaMask = nullptr;
+            SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
+                codeGenContext,
+                builder,
+                module,
+                16,
+                0x7c00,
+                exponentMask));
+            SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
+                codeGenContext,
+                builder,
+                module,
+                16,
+                0x03ff,
+                mantissaMask));
+            const SlangNVVMValueHandle exponentOperands[] = {bits, exponentMask};
+            SlangNVVMValueHandle exponent = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                exponentOperands,
+                SLANG_COUNT_OF(exponentOperands),
+                exponent));
+            const SlangNVVMValueHandle exponentCompare[] = {exponent, exponentMask};
+            SlangNVVMValueHandle hasNaNExponent = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[2],
+                exponentCompare,
+                SLANG_COUNT_OF(exponentCompare),
+                hasNaNExponent));
+            const SlangNVVMValueHandle mantissaOperands[] = {bits, mantissaMask};
+            SlangNVVMValueHandle mantissa = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                mantissaOperands,
+                SLANG_COUNT_OF(mantissaOperands),
+                mantissa));
+            SlangNVVMValueHandle zero = nullptr;
+            SLANG_RETURN_ON_FAIL(
+                _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 16, 0, zero));
+            const SlangNVVMValueHandle mantissaCompare[] = {mantissa, zero};
+            SlangNVVMValueHandle hasNaNMantissa = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[3],
+                mantissaCompare,
+                SLANG_COUNT_OF(mantissaCompare),
+                hasNaNMantissa));
+            const SlangNVVMValueHandle resultOperands[] = {hasNaNExponent, hasNaNMantissa};
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[4],
+                resultOperands,
+                SLANG_COUNT_OF(resultOperands),
+                result));
+        }
+        break;
+    case NVVMScalarIntrinsicRecipeKind::SinCos:
+        {
+            SlangNVVMValueHandle sine = nullptr;
+            SlangNVVMValueHandle cosine = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[0],
+                parameters,
+                1,
+                sine));
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                parameters,
+                1,
+                cosine));
+            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicOutStore(
+                codeGenContext,
+                builder,
+                module,
+                recipe,
+                1,
+                parameters[1],
+                sine));
+            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicOutStore(
+                codeGenContext,
+                builder,
+                module,
+                recipe,
+                2,
+                parameters[2],
+                cosine));
+            return _requireBuilderOperation(
+                codeGenContext,
+                "scalar intrinsic recipe void return",
+                builder.emitReturnVoid(module));
+        }
+    case NVVMScalarIntrinsicRecipeKind::Frexp:
+        {
+            SlangNVVMValueHandle exponent = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[0],
+                parameters,
+                1,
+                result));
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                parameters,
+                1,
+                exponent));
+            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicOutStore(
+                codeGenContext,
+                builder,
+                module,
+                recipe,
+                1,
+                parameters[1],
+                exponent));
+        }
+        break;
+    default:
+        return SLANG_FAIL;
+    }
+
+    SLANG_ASSERT(result);
+    return _emitNVVMFunctionValueReturn(
+        codeGenContext,
+        builder,
+        module,
+        function,
+        recipe.diagnosticName,
+        result);
+}
+
+// Emits one compiler-owned compound wave recipe through revision 28's existing scalar and
 // structural operations. The matching preflight helper records these same descriptors before a
 // provider module exists.
 SlangResult _emitNVVMGenericAsmCompoundOperation(
@@ -7138,6 +8138,20 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 function,
                                 "generic value operation return",
                                 loweredValue));
+                            break;
+                        }
+
+                        NVVMScalarIntrinsicRecipe scalarRecipe;
+                        if (_resolveNVVMScalarIntrinsicRecipe(genericAsm, function, scalarRecipe))
+                        {
+                            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicRecipe(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                function,
+                                scalarRecipe,
+                                valueMap,
+                                typeContext));
                             break;
                         }
 
