@@ -16,6 +16,10 @@ struct FloatContainer : IHasElement
     typealias Element = float;
 }
 
+// Generic specialization currently reports any unsatisfied type constraint through the shared
+// `TypeArgumentDoesNotConformToInterface` diagnostic, including equality constraints whose right
+// side is not an interface. This test intentionally pins that existing wording; improving it is
+// independent of resolving the concrete associated-type projection.
 RequiresIntElement<FloatContainer> value;
 /*CHECK:
 ^^^^^^^^^^^^^^^^^^ type argument doesn't conform to interface

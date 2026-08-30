@@ -2475,6 +2475,19 @@ public:
     using ConformanceCheckingContext = Slang::ConformanceCheckingContext;
     using ConformanceInterfaceCheckingState = Slang::ConformanceInterfaceCheckingState;
 
+    // Requirement resolution reports state at several adjacent layers:
+    //
+    // * `RequirementCheckState` persists the state of one entry in a `WitnessTable`, while
+    //   `ConformanceInterfaceCheckStatus` persists whole-table traversal state.
+    // * `RequirementWitnessLookupFrontierStatus` describes how far passive structural lookup got.
+    // * `ConformanceRequirementCheckResult` reports one semantic attempt to populate an entry.
+    // * `RequirementLookupStatus` reports forceful traversal of a complete witness path.
+    // * `RequirementProjectionResolutionStatus` reports whether the resulting value is concrete,
+    //   remains a valid symbolic projection, or belongs to a failed concrete conformance.
+    //
+    // The first three types live with their persistent or structural data; the semantic result
+    // types are declared below beside the operations that convert between these layers.
+
     /// The result of requesting one interface-requirement witness.
     enum class ConformanceRequirementCheckResult
     {
@@ -2856,8 +2869,12 @@ public:
         SubtypeWitness* projectedConformanceWitness,
         DeclRef<Decl> requirementDeclRef);
 
-    /// Resolves one endpoint needed to reconstruct a concrete projected conformance. `Found`
-    /// guarantees that `outType` is populated; other statuses leave it null.
+    /// Resolves one endpoint needed to reconstruct a concrete projected conformance.
+    ///
+    /// `Found` guarantees that `outType` is populated. `Unavailable` means the endpoint remains a
+    /// valid symbolic projection, and `Failed` means its concrete conformance could not be
+    /// satisfied. This operation never returns `Recursive`: recursive projection resolution is
+    /// represented as an unchanged endpoint and therefore maps to `Unavailable` here.
     RequirementLookupStatus ensureConcreteConformanceEndpoint(Type* type, Type*& outType);
 
     /// Resolves ordinary aliases and then forcefully resolves one remaining concrete requirement

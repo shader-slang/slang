@@ -10189,8 +10189,13 @@ bool SemanticsVisitor::ensureInheritedInterfaceRequirement(
     RequirementWitness existingWitness;
     if (witnessTable->tryGetRequirementWitness(requirementKey, existingWitness))
     {
-        if (existingWitness.getFlavor() != RequirementWitness::Flavor::witnessTable)
-            return false;
+        // A canonical inherited-interface entry is created only by this branch, including its
+        // `PrepareForLookup` mode, and is always a nested table. A non-canonical path stores a
+        // `SubtypeWitness` value in the branch above and is finalized without re-entering this
+        // canonical branch. Seeing that value here would mean the path classification or the
+        // per-requirement checking state has changed underneath an already-published entry.
+        SLANG_RELEASE_ASSERT(
+            existingWitness.getFlavor() == RequirementWitness::Flavor::witnessTable);
         satisfyingWitnessTable = existingWitness.getWitnessTable();
     }
     else
@@ -10907,9 +10912,12 @@ SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequi
     // passive lookup from the original witness and requirement. Every path that reaches the bottom
     // of the loop must set `madeProgress` after publishing the table or entry named by its
     // frontier; the release assertion makes that restart contract structural rather than merely
-    // documentary. Encountering an entry already owned by an outer request returns `Recursive`
-    // instead of spinning, and every finite witness path therefore either advances to a later
-    // missing step or returns a terminal result.
+    // documentary. Both publication and the next lookup normalize an entry through
+    // `InterfaceRequirementKey`, so the next traversal must observe the newly inserted key and
+    // advance beyond that frontier. `gh-12822-multistep-inheritance.slang` exercises multiple such
+    // restarts. Encountering an entry already owned by an outer request returns `Recursive` instead
+    // of spinning, and every finite witness path therefore either advances to a later missing step
+    // or returns a terminal result.
     for (;;)
     {
         bool madeProgress = false;
@@ -10978,6 +10986,11 @@ SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequi
                 auto registeredState =
                     getShared()->m_mapWitnessTableToConformanceInterfaceCheckingState.tryGetValue(
                         witnessTable);
+                // Abstract generic constraints own path-resolution tables rather than declared
+                // conformances, and serialized or synthesized tables may likewise have no live
+                // declaration-context checker. Passive lookup may traverse such a table, but there
+                // is no concrete conformance state from which this operation could synthesize a
+                // missing entry, so leave the projection symbolic.
                 if (!registeredState)
                     return result;
                 auto interfaceState = registeredState->Ptr();
