@@ -8,8 +8,8 @@
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP): -Wno-120 -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120 -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -emit-spirv-directly
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer

@@ -5,11 +5,11 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -Wno-120 -stage compute -entry computeMain -target hlsl
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -Wno-120 -stage compute -entry computeMain -target cuda
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120 -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -Wno-120
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -source-language glsl -Xslang -Wno-118
 // Metal disabled: lane mask computation may differ on Apple GPUs
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -entry computeMain -Wno-120
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -entry computeMain -source-language glsl -Xslang -Wno-118
 
 #version 430
 

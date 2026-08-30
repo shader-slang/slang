@@ -7,12 +7,12 @@
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP): -Wno-120 -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120 -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -Wno-120 -xslang -DWGPU -render-feature half
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -xslang -DWGPU -render-feature half
 
 // Not testing because CI runners may not support Metal's intrinsics.
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -Wno-120 -xslang -DMETAL
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -xslang -DMETAL
 
 #version 430
 

@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -Wno-120 -stage compute -entry computeMain -target glsl -DTARGET_GLSL
 //TEST:SIMPLE(filecheck=CHECK_SPV): -Wno-120 -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120 -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -Xslang -Wno-118 -emit-spirv-directly
 #version 430
 
 // float2 is currently a very new extension; most hardware lacks 

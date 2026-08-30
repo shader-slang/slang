@@ -982,7 +982,7 @@ Perform uniformity validation analysis.
 
 <a id="allow-glsl"></a>
 ### -allow-glsl
-Deprecated. Treat every input translation unit as GLSL.
+Deprecated. Treat every input translation unit as GLSL. 
 
 
 <a id="enable-experimental-passes"></a>
