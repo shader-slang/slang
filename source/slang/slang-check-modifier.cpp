@@ -1737,7 +1737,8 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
                    as<VarDeclBase>(decl) && isGlobalDecl(decl) || as<ParamDecl>(decl) ||
                    (as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl)));
         return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) ||
-                                     as<GLSLInterfaceBlockDecl>(decl));
+                                     as<GLSLInterfaceBlockDecl>(decl)) ||
+               as<ParamDecl>(decl);
 
         // Allowed only on parameters, struct fields and global variables.
     case ASTNodeType::InterpolationModeModifier:

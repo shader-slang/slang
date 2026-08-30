@@ -75,6 +75,12 @@ protected:
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
         SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
+
+    /// Emit the `globallycoherent` keyword for `inst` if it carries a coherent
+    /// memory qualifier, followed by `separator` (a newline for a variable
+    /// declaration, a space when the qualifier prefixes a function parameter).
+    /// Returns true if a keyword was emitted.
+    bool emitMemoryQualifierKeyword(IRInst* inst, const char* separator);
     virtual void emitParamTypeModifier(IRType* type) SLANG_OVERRIDE
     {
         emitMatrixLayoutModifiersImpl(type);
