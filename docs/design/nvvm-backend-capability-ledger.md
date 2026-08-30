@@ -1985,3 +1985,19 @@ correctness is 317/321/317 (74.2%/75.2%/74.2%). Helper ABI/type failures fall fr
 aggregate/pointer/layout failures fall from 17 to 14. All 40 promoted lanes and the 407/407
 selected prefix pass; representative direct O3 PTX remains accepted for SM70, SM80, and SM90 with
 CUDA 12.9.
+
+Slice 140 admits 21 exact scalar masked-wave reduction and prefix assembly/signature pairs as one
+compiler-owned algebra. Every helper is a canonical final one-block `IRGenericAsm` with
+`T(T, vector<uint,4>)`; selected scalar type, reduction/prefix mode, combine operation, and exact
+identity form the descriptor. Emission visits the set bits of the partition mask in a compact
+two-phi loop using existing typed value, wave read-lane-at, constant, and CFG operations. A
+straight-line 32-lane prototype was rejected after its 134-register O3 PTX failed CUDA 12.9
+`ptxas`; the compact representation passes differential runtime and assembly without changing
+provider ABI revision 29.
+
+Twelve workloads become correct at both modes and no old-correct identity regresses. The fixed
+452-row census reaches 330 O0 and 335 O3 successes. Against 427 healthy MVP references,
+O0/O3/both correctness is 328/332/328 (76.8%/77.8%/76.8%). Wave/reconvergence failures fall from
+36 to 24 total rows and from 19 to eight healthy-MVP rows. The selected prefix passes 410/410, and
+the three representative direct O3 modules still assemble for SM70, SM80, and SM90 with CUDA
+12.9. CUDA 13 and physical SM70/SM80/SM90 runtime workers remain productionization gaps.

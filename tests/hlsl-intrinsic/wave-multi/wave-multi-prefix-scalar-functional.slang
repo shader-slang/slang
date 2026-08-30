@@ -5,6 +5,8 @@
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_5 -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

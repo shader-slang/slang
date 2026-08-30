@@ -4,6 +4,8 @@
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
 //TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj
 
 // WGSL doesn't support wave functions in a dynamic control flow; it works with uniform control flow.

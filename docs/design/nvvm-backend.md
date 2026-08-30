@@ -6387,6 +6387,35 @@ lanes and the 407/407 selected prefix pass. Representative direct O3 PTX remains
 CUDA 12.9 for SM70, SM80, and SM90; CUDA 13 and physical SM70/SM80/SM90 runtime workers remain
 productionization gaps.
 
+### Slice 140: Scalar masked-wave algebra through generic loops
+
+CUDA specialization produces scalar masked wave reductions and prefixes as final one-block
+`IRGenericAsm` helpers. The direct emitter recognizes a bounded semantic family from 21 exact
+assembly/full-signature pairs. Every admitted helper is `T(T, vector<uint,4>)`, its result equals
+its scalar value parameter, and its combine operation is legal for that selected 32-bit type.
+Fixture paths, source function names, substring parsing, and compatibility aliases do not
+participate.
+
+One compiler-owned descriptor records reduction versus exclusive/inclusive prefix, typed combine
+operation, identity bit pattern, and the complete provider-operation closure. Emission extracts
+the 32-bit partition mask and visits exactly its set bits in a compact loop. Each iteration uses
+`remaining & -remaining`, `firstbitlow`, masked read-lane-at, typed combine, and bit clearing.
+Prefix recipes condition the combine on source-lane order relative to the current lane. Preflight
+and emission consume the same descriptor.
+
+A 32-way unrolled prototype was differentially correct but generated O3 PTX with 134 b32 SSA
+registers for `wave-active-product`; CUDA 12.9 `ptxas` could not allocate it. The compact two-phi
+CFG preserves arbitrary-mask semantics with bounded live state and passes runtime and assembly.
+Provider ABI revision 29 already expresses every required type, constant, CFG, phi, structural,
+and typed value operation, so the isolated LLVM provider is unchanged.
+
+Twelve workloads become correct at O0 and O3 with no previously correct regression. The fixed
+452-row census reaches 330 O0 and 335 O3 successes. Among 427 healthy MVP references,
+O0/O3/both correctness is 328/332/328 (76.8%/77.8%/76.8%). The total wave/reconvergence cluster
+falls from 36 to 24, and its healthy-MVP population falls from 19 to eight. The selected prefix
+passes 410/410, while representative direct O3 PTX remains accepted with CUDA 12.9 for SM70,
+SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

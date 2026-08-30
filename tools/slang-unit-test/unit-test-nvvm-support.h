@@ -10529,6 +10529,40 @@ void computeMain(
     destination[lane] = int(shuffled.x + shuffled.y) + (allEqual ? 16 : 0) + int(count);
 }
 )";
+static const char kDirectNVVMMaskedWaveScalarOperationsSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform uint mask)
+{
+    uint lane = WaveGetLaneIndex();
+    uint4 partition = uint4(mask, 0, 0, 0);
+    int value = int(lane) + 1;
+    int reduction = WaveMultiSum(value, partition);
+    int prefix = WaveMultiPrefixSum(value, partition);
+    destination[lane] = reduction + prefix;
+}
+)";
+static const char kDirectNVVMUnsupportedMaskedWaveScalarSignatureSource[] = R"SLANG(
+int malformedMaskedWaveSum(int value, uint mask)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_waveSum($1.x, $0)";
+    default:
+        return value;
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform uint mask)
+{
+    *destination = malformedMaskedWaveSum(1, mask);
+}
+)SLANG";
 static const char kDirectNVVMUnsupportedCompoundWaveSignatureSource[] = R"SLANG(
 float2 malformedWaveShuffle(int mask, float2 value, int lane)
 {

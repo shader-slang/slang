@@ -3566,6 +3566,348 @@ bool _resolveNVVMGenericAsmCompoundOperation(
     return true;
 }
 
+enum class NVVMMaskedWaveScalarMode
+{
+    None,
+    Reduction,
+    ExclusivePrefix,
+    InclusivePrefix,
+};
+
+struct NVVMMaskedWaveScalarOperation
+{
+    NVVMMaskedWaveScalarMode mode = NVVMMaskedWaveScalarMode::None;
+    IRParam* valueParameter = nullptr;
+    IRParam* maskParameter = nullptr;
+    SlangNVVMValueTypeDesc valueType = {};
+    uint64_t identityBits = 0;
+    const char* diagnosticName = nullptr;
+    NVVMValueRecipeStep remainingIsNonZero;
+    NVVMValueRecipeStep remainingNegate;
+    NVVMValueRecipeStep isolateLaneBit;
+    NVVMValueRecipeStep firstLaneBitIndex;
+    NVVMValueRecipeStep laneBitNot;
+    NVVMValueRecipeStep laneIndex;
+    NVVMValueRecipeStep prefixLanePredicate;
+    NVVMValueRecipeStep waveReadLaneAt;
+    NVVMValueRecipeStep combine;
+    NVVMValueRecipeStep select;
+};
+
+bool _setNVVMSupportedValueRecipeStep(
+    NVVMValueRecipeStep& step,
+    SlangNVVMValueOperation operation,
+    const SlangNVVMValueTypeDesc& resultType,
+    const SlangNVVMValueTypeDesc* operandTypes,
+    uint32_t operandCount,
+    const char* diagnosticName)
+{
+    _setNVVMValueRecipeStep(
+        step,
+        operation,
+        resultType,
+        operandTypes,
+        operandCount,
+        diagnosticName);
+    return NVVMSemantics::isSupported(step.getDesc());
+}
+
+// Returns the exact identity used by one scalar masked reduction or prefix. The bit pattern is
+// interpreted through the already-validated scalar type, so integer signedness and Float32
+// infinities remain explicit properties of the recipe rather than host-language conversions.
+bool _getNVVMMaskedWaveScalarIdentity(
+    SlangNVVMValueOperation operation,
+    const SlangNVVMValueTypeDesc& type,
+    uint64_t& outIdentityBits)
+{
+    outIdentityBits = 0;
+    if (type.bitWidth != 32 || type.laneCount != 1)
+        return false;
+
+    const bool isInteger = type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                           type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
+    const bool isFloating = type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+    switch (operation)
+    {
+    case SLANG_NVVM_VALUE_OP_ADD:
+        if (!isInteger && !isFloating)
+            return false;
+        outIdentityBits = 0;
+        return true;
+    case SLANG_NVVM_VALUE_OP_BIT_OR:
+    case SLANG_NVVM_VALUE_OP_BIT_XOR:
+        if (!isInteger)
+            return false;
+        outIdentityBits = 0;
+        return true;
+    case SLANG_NVVM_VALUE_OP_MULTIPLY:
+        if (!isInteger && !isFloating)
+            return false;
+        outIdentityBits = isFloating ? 0x3f800000u : 1u;
+        return true;
+    case SLANG_NVVM_VALUE_OP_BIT_AND:
+        if (!isInteger)
+            return false;
+        outIdentityBits = 0xffffffffu;
+        return true;
+    case SLANG_NVVM_VALUE_OP_MIN:
+        if (!isInteger && !isFloating)
+            return false;
+        outIdentityBits = isFloating                                          ? 0x7f800000u
+                          : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ? 0x7fffffffu
+                                                                              : 0xffffffffu;
+        return true;
+    case SLANG_NVVM_VALUE_OP_MAX:
+        if (!isInteger && !isFloating)
+            return false;
+        outIdentityBits = isFloating                                          ? 0xff800000u
+                          : type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ? 0x80000000u
+                                                                              : 0u;
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Recognizes the finite scalar masked-wave algebra produced by CUDA specialization. Every row is
+// an exact final assembly spelling plus the complete `T(T, uint4)` signature; emission never parses
+// placeholders or derives a semantic from a source intrinsic or fixture name.
+bool _resolveNVVMMaskedWaveScalarOperation(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMMaskedWaveScalarOperation& outOperation)
+{
+    outOperation = {};
+    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function))
+        return false;
+
+    struct Spelling
+    {
+        const char* assembly;
+        SlangNVVMValueOperation combineOperation;
+        NVVMMaskedWaveScalarMode mode;
+        const char* diagnosticName;
+    };
+    static const Spelling kSpellings[] = {
+        {"_waveSum($1.x, $0)",
+         SLANG_NVVM_VALUE_OP_ADD,
+         NVVMMaskedWaveScalarMode::Reduction,
+         "masked scalar wave sum"},
+        {"_waveProduct($1.x, $0)",
+         SLANG_NVVM_VALUE_OP_MULTIPLY,
+         NVVMMaskedWaveScalarMode::Reduction,
+         "masked scalar wave product"},
+        {"_waveMin($1.x, $0)",
+         SLANG_NVVM_VALUE_OP_MIN,
+         NVVMMaskedWaveScalarMode::Reduction,
+         "masked scalar wave minimum"},
+        {"_waveMax($1.x, $0)",
+         SLANG_NVVM_VALUE_OP_MAX,
+         NVVMMaskedWaveScalarMode::Reduction,
+         "masked scalar wave maximum"},
+        {"_waveAnd($1.x, $0)",
+         SLANG_NVVM_VALUE_OP_BIT_AND,
+         NVVMMaskedWaveScalarMode::Reduction,
+         "masked scalar wave bitwise-and"},
+        {"_waveOr($1.x, $0)",
+         SLANG_NVVM_VALUE_OP_BIT_OR,
+         NVVMMaskedWaveScalarMode::Reduction,
+         "masked scalar wave bitwise-or"},
+        {"_waveXor($1.x, $0)",
+         SLANG_NVVM_VALUE_OP_BIT_XOR,
+         NVVMMaskedWaveScalarMode::Reduction,
+         "masked scalar wave bitwise-xor"},
+        {"_wavePrefixSum($1.x, $0) ",
+         SLANG_NVVM_VALUE_OP_ADD,
+         NVVMMaskedWaveScalarMode::ExclusivePrefix,
+         "masked scalar exclusive wave sum"},
+        {"_wavePrefixProduct($1.x, $0) ",
+         SLANG_NVVM_VALUE_OP_MULTIPLY,
+         NVVMMaskedWaveScalarMode::ExclusivePrefix,
+         "masked scalar exclusive wave product"},
+        {"_wavePrefixAnd($1.x, $0) ",
+         SLANG_NVVM_VALUE_OP_BIT_AND,
+         NVVMMaskedWaveScalarMode::ExclusivePrefix,
+         "masked scalar exclusive wave bitwise-and"},
+        {"_wavePrefixOr($1.x, $0) ",
+         SLANG_NVVM_VALUE_OP_BIT_OR,
+         NVVMMaskedWaveScalarMode::ExclusivePrefix,
+         "masked scalar exclusive wave bitwise-or"},
+        {"_wavePrefixXor($1.x, $0) ",
+         SLANG_NVVM_VALUE_OP_BIT_XOR,
+         NVVMMaskedWaveScalarMode::ExclusivePrefix,
+         "masked scalar exclusive wave bitwise-xor"},
+        {"_wavePrefixSum($1.x, $0) + $0",
+         SLANG_NVVM_VALUE_OP_ADD,
+         NVVMMaskedWaveScalarMode::InclusivePrefix,
+         "masked scalar inclusive wave sum"},
+        {"_wavePrefixProduct($1.x, $0) * $0",
+         SLANG_NVVM_VALUE_OP_MULTIPLY,
+         NVVMMaskedWaveScalarMode::InclusivePrefix,
+         "masked scalar inclusive wave product"},
+        {"_wavePrefixAnd($1.x, $0) & $0",
+         SLANG_NVVM_VALUE_OP_BIT_AND,
+         NVVMMaskedWaveScalarMode::InclusivePrefix,
+         "masked scalar inclusive wave bitwise-and"},
+        {"_wavePrefixOr($1.x, $0) | $0",
+         SLANG_NVVM_VALUE_OP_BIT_OR,
+         NVVMMaskedWaveScalarMode::InclusivePrefix,
+         "masked scalar inclusive wave bitwise-or"},
+        {"_wavePrefixXor($1.x, $0) ^ $0",
+         SLANG_NVVM_VALUE_OP_BIT_XOR,
+         NVVMMaskedWaveScalarMode::InclusivePrefix,
+         "masked scalar inclusive wave bitwise-xor"},
+        {"_wavePrefixExclusiveMin(($1).x, $0)",
+         SLANG_NVVM_VALUE_OP_MIN,
+         NVVMMaskedWaveScalarMode::ExclusivePrefix,
+         "masked scalar exclusive wave minimum"},
+        {"_wavePrefixExclusiveMax(($1).x, $0)",
+         SLANG_NVVM_VALUE_OP_MAX,
+         NVVMMaskedWaveScalarMode::ExclusivePrefix,
+         "masked scalar exclusive wave maximum"},
+        {"_wavePrefixInclusiveMin(($1).x, $0)",
+         SLANG_NVVM_VALUE_OP_MIN,
+         NVVMMaskedWaveScalarMode::InclusivePrefix,
+         "masked scalar inclusive wave minimum"},
+        {"_wavePrefixInclusiveMax(($1).x, $0)",
+         SLANG_NVVM_VALUE_OP_MAX,
+         NVVMMaskedWaveScalarMode::InclusivePrefix,
+         "masked scalar inclusive wave maximum"},
+    };
+
+    const Spelling* spelling = nullptr;
+    for (const auto& candidate : kSpellings)
+    {
+        if (genericAsm->getAsm() == UnownedStringSlice(candidate.assembly))
+        {
+            spelling = &candidate;
+            break;
+        }
+    }
+    if (!spelling || function->getParamCount() != 2)
+        return false;
+
+    IRParam* valueParameter = function->getFirstParam();
+    IRParam* maskParameter = valueParameter ? valueParameter->getNextParam() : nullptr;
+    SlangNVVMValueTypeDesc resultType = {};
+    SlangNVVMValueTypeDesc maskType = {};
+    if (!valueParameter || !maskParameter || maskParameter->getNextParam() ||
+        !_getNVVMSemanticType(function->getResultType(), resultType) ||
+        !_getNVVMSemanticType(valueParameter->getDataType(), outOperation.valueType) ||
+        !_getNVVMSemanticType(maskParameter->getDataType(), maskType) ||
+        !NVVMSemantics::areSameType(resultType, outOperation.valueType) ||
+        maskType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER || maskType.bitWidth != 32 ||
+        maskType.laneCount != 4 ||
+        !_getNVVMMaskedWaveScalarIdentity(
+            spelling->combineOperation,
+            outOperation.valueType,
+            outOperation.identityBits))
+    {
+        return false;
+    }
+
+    outOperation.mode = spelling->mode;
+    outOperation.valueParameter = valueParameter;
+    outOperation.maskParameter = maskParameter;
+    outOperation.diagnosticName = spelling->diagnosticName;
+
+    const SlangNVVMValueTypeDesc unsignedBinary[] = {
+        NVVMSemantics::kUnsignedI32,
+        NVVMSemantics::kUnsignedI32,
+    };
+    const SlangNVVMValueTypeDesc unsignedUnary[] = {NVVMSemantics::kUnsignedI32};
+    const SlangNVVMValueTypeDesc waveReadOperands[] = {
+        NVVMSemantics::kUnsignedI32,
+        outOperation.valueType,
+        NVVMSemantics::kSignedI32,
+    };
+    const SlangNVVMValueTypeDesc combineOperands[] = {
+        outOperation.valueType,
+        outOperation.valueType,
+    };
+    const SlangNVVMValueTypeDesc selectOperands[] = {
+        NVVMSemantics::kBool,
+        outOperation.valueType,
+        outOperation.valueType,
+    };
+    if (!_setNVVMSupportedValueRecipeStep(
+            outOperation.remainingIsNonZero,
+            SLANG_NVVM_VALUE_OP_NOT_EQUAL,
+            NVVMSemantics::kBool,
+            unsignedBinary,
+            2,
+            "masked-wave remaining-lane predicate") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.remainingNegate,
+            SLANG_NVVM_VALUE_OP_NEGATE,
+            NVVMSemantics::kUnsignedI32,
+            unsignedUnary,
+            1,
+            "masked-wave remaining-mask negation") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.isolateLaneBit,
+            SLANG_NVVM_VALUE_OP_BIT_AND,
+            NVVMSemantics::kUnsignedI32,
+            unsignedBinary,
+            2,
+            "masked-wave lowest-lane bit isolation") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.firstLaneBitIndex,
+            SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW,
+            NVVMSemantics::kUnsignedI32,
+            unsignedUnary,
+            1,
+            "masked-wave lowest-lane index") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.laneBitNot,
+            SLANG_NVVM_VALUE_OP_BIT_NOT,
+            NVVMSemantics::kUnsignedI32,
+            unsignedUnary,
+            1,
+            "masked-wave consumed-lane complement") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.laneIndex,
+            SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
+            NVVMSemantics::kUnsignedI32,
+            nullptr,
+            0,
+            "masked-wave current lane") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.prefixLanePredicate,
+            outOperation.mode == NVVMMaskedWaveScalarMode::InclusivePrefix
+                ? SLANG_NVVM_VALUE_OP_GREATER_EQUAL
+                : SLANG_NVVM_VALUE_OP_GREATER_THAN,
+            NVVMSemantics::kBool,
+            unsignedBinary,
+            2,
+            "masked-wave prefix lane predicate") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.waveReadLaneAt,
+            SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+            outOperation.valueType,
+            waveReadOperands,
+            3,
+            "masked-wave source value read") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.combine,
+            spelling->combineOperation,
+            outOperation.valueType,
+            combineOperands,
+            2,
+            spelling->diagnosticName) ||
+        !_setNVVMSupportedValueRecipeStep(
+            outOperation.select,
+            SLANG_NVVM_VALUE_OP_SELECT,
+            outOperation.valueType,
+            selectOperands,
+            3,
+            "masked-wave conditional accumulation"))
+    {
+        return false;
+    }
+    return true;
+}
+
 bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation& outOperation)
 {
     switch (op)
@@ -3898,6 +4240,41 @@ void _requireNVVMGenericAsmCompoundOperations(
     {
         const NVVMValueRecipeStep& step = compound.steps[i];
         _requireValueOperation(requirements, step.getDesc(), step.diagnosticName);
+    }
+}
+
+// Records the complete operation closure of one scalar masked-wave recipe before provider
+// discovery. Reduction recipes do not need a current-lane comparison; prefix recipes do.
+void _requireNVVMMaskedWaveScalarOperations(
+    NVVMValueOperationRequirements& requirements,
+    const NVVMMaskedWaveScalarOperation& operation)
+{
+    const NVVMValueRecipeStep* commonSteps[] = {
+        &operation.remainingIsNonZero,
+        &operation.remainingNegate,
+        &operation.isolateLaneBit,
+        &operation.firstLaneBitIndex,
+        &operation.laneBitNot,
+        &operation.waveReadLaneAt,
+        &operation.combine,
+    };
+    for (auto step : commonSteps)
+        _requireValueOperation(requirements, step->getDesc(), step->diagnosticName);
+
+    if (operation.mode != NVVMMaskedWaveScalarMode::Reduction)
+    {
+        _requireValueOperation(
+            requirements,
+            operation.laneIndex.getDesc(),
+            operation.laneIndex.diagnosticName);
+        _requireValueOperation(
+            requirements,
+            operation.prefixLanePredicate.getDesc(),
+            operation.prefixLanePredicate.diagnosticName);
+        _requireValueOperation(
+            requirements,
+            operation.select.getDesc(),
+            operation.select.diagnosticName);
     }
 }
 
@@ -5058,6 +5435,7 @@ SlangResult _validateNVVMFunction(
                     NVVMGenericAsmValueOperation valueOperation;
                     NVVMScalarIntrinsicRecipe scalarRecipe;
                     NVVMGenericAsmCompoundOperation compoundOperation;
+                    NVVMMaskedWaveScalarOperation maskedWaveOperation;
                     NVVMResolvedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
                     if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
@@ -5085,6 +5463,16 @@ SlangResult _validateNVVMFunction(
                             scalarRecipe);
                         requirements.requiresCUDADeviceLibrary |=
                             scalarRecipe.requiresCUDADeviceLibrary;
+                        break;
+                    }
+                    if (_resolveNVVMMaskedWaveScalarOperation(
+                            genericAsm,
+                            function,
+                            maskedWaveOperation))
+                    {
+                        _requireNVVMMaskedWaveScalarOperations(
+                            requirements.valueOperations,
+                            maskedWaveOperation);
                         break;
                     }
                     if (_resolveNVVMGenericAsmCompoundOperation(
@@ -7039,6 +7427,295 @@ SlangResult _emitNVVMGenericAsmCompoundOperation(
         result);
 }
 
+// Emits one correctness-first scalar masked-wave scan using only the established generic builder
+// algebra. The compact loop visits exactly the set bits in the partition mask. Prefix recipes
+// additionally restrict each accumulated source by its order relative to the current lane.
+SlangResult _emitNVVMMaskedWaveScalarOperation(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle loweredFunction,
+    SlangNVVMBlockHandle sourceBlock,
+    IRFunc* function,
+    const NVVMMaskedWaveScalarOperation& operation,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext)
+{
+    SlangNVVMValueHandle loweredValue = nullptr;
+    SlangNVVMValueHandle loweredMaskVector = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.valueParameter,
+        valueMap,
+        typeContext,
+        loweredValue));
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.maskParameter,
+        valueMap,
+        typeContext,
+        loweredMaskVector));
+
+    SlangNVVMTypeHandle int32Type = nullptr;
+    SlangNVVMTypeHandle valueType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave i32 type",
+        builder.getIntegerType(module, 32, int32Type)));
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+        operation.valueParameter->getDataType(),
+        NVVMTypeUse::Value,
+        valueType));
+
+    SlangNVVMValueHandle zero = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave zero constant",
+        builder.getIntegerConstant(module, int32Type, 0, zero)));
+
+    SlangNVVMValueHandle loweredMask = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave partition mask extraction",
+        builder.emitSequentialElementExtract(module, loweredMaskVector, zero, loweredMask)));
+
+    SlangNVVMValueHandle result = nullptr;
+    if (operation.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "masked-wave floating-point identity",
+            builder.getFloatingPointConstant(
+                module,
+                valueType,
+                operation.valueType.bitWidth,
+                operation.identityBits,
+                result)));
+    }
+    else
+    {
+        const int64_t signedIdentity = int64_t(int32_t(uint32_t(operation.identityBits)));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "masked-wave integer identity",
+            builder.getIntegerConstant(module, valueType, signedIdentity, result)));
+    }
+
+    SlangNVVMValueHandle currentLane = nullptr;
+    if (operation.mode != NVVMMaskedWaveScalarMode::Reduction)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            operation.laneIndex.diagnosticName,
+            builder.emitValueOperation(
+                module,
+                operation.laneIndex.getDesc(),
+                nullptr,
+                0,
+                currentLane)));
+    }
+
+    SlangNVVMBlockHandle loopBlock = nullptr;
+    SlangNVVMBlockHandle bodyBlock = nullptr;
+    SlangNVVMBlockHandle exitBlock = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave loop block",
+        builder.createBlock(module, loweredFunction, toSlice("masked.wave.loop"), loopBlock)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave body block",
+        builder.createBlock(module, loweredFunction, toSlice("masked.wave.body"), bodyBlock)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave exit block",
+        builder.createBlock(module, loweredFunction, toSlice("masked.wave.exit"), exitBlock)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave loop entry",
+        builder.emitBranch(module, loopBlock)));
+
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave loop selection",
+        builder.setInsertBlock(module, loopBlock)));
+    SlangNVVMValueHandle remaining = nullptr;
+    SlangNVVMValueHandle accumulated = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave remaining-mask phi",
+        builder.emitPhi(module, loopBlock, int32Type, remaining)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave accumulated-value phi",
+        builder.emitPhi(module, loopBlock, valueType, accumulated)));
+
+    const SlangNVVMValueHandle loopConditionOperands[] = {remaining, zero};
+    SlangNVVMValueHandle hasRemainingLane = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        operation.remainingIsNonZero.diagnosticName,
+        builder.emitValueOperation(
+            module,
+            operation.remainingIsNonZero.getDesc(),
+            loopConditionOperands,
+            SLANG_COUNT_OF(loopConditionOperands),
+            hasRemainingLane)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave loop condition",
+        builder.emitConditionalBranch(module, hasRemainingLane, bodyBlock, exitBlock)));
+
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave body selection",
+        builder.setInsertBlock(module, bodyBlock)));
+    SlangNVVMValueHandle negatedRemaining = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        operation.remainingNegate.diagnosticName,
+        builder.emitValueOperation(
+            module,
+            operation.remainingNegate.getDesc(),
+            &remaining,
+            1,
+            negatedRemaining)));
+    const SlangNVVMValueHandle isolateOperands[] = {remaining, negatedRemaining};
+    SlangNVVMValueHandle laneBit = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        operation.isolateLaneBit.diagnosticName,
+        builder.emitValueOperation(
+            module,
+            operation.isolateLaneBit.getDesc(),
+            isolateOperands,
+            SLANG_COUNT_OF(isolateOperands),
+            laneBit)));
+
+    SlangNVVMValueHandle sourceLane = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        operation.firstLaneBitIndex.diagnosticName,
+        builder.emitValueOperation(
+            module,
+            operation.firstLaneBitIndex.getDesc(),
+            &laneBit,
+            1,
+            sourceLane)));
+    const SlangNVVMValueHandle waveReadOperands[] = {loweredMask, loweredValue, sourceLane};
+    SlangNVVMValueHandle sourceValue = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        operation.waveReadLaneAt.diagnosticName,
+        builder.emitValueOperation(
+            module,
+            operation.waveReadLaneAt.getDesc(),
+            waveReadOperands,
+            SLANG_COUNT_OF(waveReadOperands),
+            sourceValue)));
+
+    const SlangNVVMValueHandle combineOperands[] = {accumulated, sourceValue};
+    SlangNVVMValueHandle nextAccumulated = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        operation.combine.diagnosticName,
+        builder.emitValueOperation(
+            module,
+            operation.combine.getDesc(),
+            combineOperands,
+            SLANG_COUNT_OF(combineOperands),
+            nextAccumulated)));
+    if (operation.mode != NVVMMaskedWaveScalarMode::Reduction)
+    {
+        const SlangNVVMValueHandle lanePredicateOperands[] = {currentLane, sourceLane};
+        SlangNVVMValueHandle laneParticipates = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            operation.prefixLanePredicate.diagnosticName,
+            builder.emitValueOperation(
+                module,
+                operation.prefixLanePredicate.getDesc(),
+                lanePredicateOperands,
+                SLANG_COUNT_OF(lanePredicateOperands),
+                laneParticipates)));
+        const SlangNVVMValueHandle selectOperands[] = {
+            laneParticipates,
+            nextAccumulated,
+            accumulated,
+        };
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            operation.select.diagnosticName,
+            builder.emitValueOperation(
+                module,
+                operation.select.getDesc(),
+                selectOperands,
+                SLANG_COUNT_OF(selectOperands),
+                nextAccumulated)));
+    }
+
+    SlangNVVMValueHandle laneBitComplement = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        operation.laneBitNot.diagnosticName,
+        builder.emitValueOperation(
+            module,
+            operation.laneBitNot.getDesc(),
+            &laneBit,
+            1,
+            laneBitComplement)));
+    const SlangNVVMValueHandle clearLaneOperands[] = {remaining, laneBitComplement};
+    SlangNVVMValueHandle nextRemaining = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave consumed-lane removal",
+        builder.emitValueOperation(
+            module,
+            operation.isolateLaneBit.getDesc(),
+            clearLaneOperands,
+            SLANG_COUNT_OF(clearLaneOperands),
+            nextRemaining)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave loop back edge",
+        builder.emitBranch(module, loopBlock)));
+
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave exit selection",
+        builder.setInsertBlock(module, exitBlock)));
+    SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
+        codeGenContext,
+        builder,
+        module,
+        function,
+        operation.diagnosticName,
+        accumulated));
+
+    // The provider validates incoming values against the complete function CFG. Add the edges only
+    // after the source, loop, body, and exit blocks all have terminators.
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave initial remaining mask",
+        builder.addPhiIncoming(module, remaining, loweredMask, sourceBlock)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave initial accumulated value",
+        builder.addPhiIncoming(module, accumulated, result, sourceBlock)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave next remaining mask",
+        builder.addPhiIncoming(module, remaining, nextRemaining, bodyBlock)));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "masked-wave next accumulated value",
+        builder.addPhiIncoming(module, accumulated, nextAccumulated, bodyBlock));
+}
+
 } // namespace
 
 SlangResult foldNVVMCompileTimeLayoutQueries(CodeGenContext* codeGenContext, LinkedIR& linkedIR)
@@ -8613,6 +9290,25 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 function,
                                 scalarRecipe,
+                                valueMap,
+                                typeContext));
+                            break;
+                        }
+
+                        NVVMMaskedWaveScalarOperation maskedWaveOperation;
+                        if (_resolveNVVMMaskedWaveScalarOperation(
+                                genericAsm,
+                                function,
+                                maskedWaveOperation))
+                        {
+                            SLANG_RETURN_ON_FAIL(_emitNVVMMaskedWaveScalarOperation(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                functionMap.getValue(function),
+                                blockMap.getValue(as<IRBlock>(genericAsm->getParent())),
+                                function,
+                                maskedWaveOperation,
                                 valueMap,
                                 typeContext));
                             break;
