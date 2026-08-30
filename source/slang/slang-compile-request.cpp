@@ -378,8 +378,11 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
     _resolveSourceLanguageFromPrimarySourceFiles(translationUnit, sourceFilesToParse, getSink());
 
-    translationUnit->sourceLanguageImpliedBySourceContents = SourceLanguage::Unknown;
-    translationUnit->sourceLanguageImpliedBySourceContentsLoc = SourceLoc();
+    // A translation unit is parsed once. Source-content provenance is populated only by the
+    // preprocessing loop below, so a pre-existing value would indicate an unsupported reparse.
+    SLANG_ASSERT(
+        translationUnit->sourceLanguageImpliedBySourceContents == SourceLanguage::Unknown);
+    SLANG_ASSERT(!translationUnit->sourceLanguageImpliedBySourceContentsLoc.isValid());
 
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
 
@@ -486,12 +489,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
     Scope* languageScope = translationUnit->getLanguageScope();
 
-    Index sourceIndex = 0;
-    for (auto sourceFile : sourceFilesToParse)
+    SLANG_ASSERT(preprocessedSources.getCount() == sourceFilesToParse.getCount());
+    SLANG_ASSERT(slangLanguageVersions.getCount() == sourceFilesToParse.getCount());
+    for (Index sourceIndex = 0; sourceIndex < sourceFilesToParse.getCount(); ++sourceIndex)
     {
+        SourceFile* sourceFile = sourceFilesToParse[sourceIndex];
         translationUnitSyntax->languageVersion = slangLanguageVersions[sourceIndex];
         parsePreprocessedSegments(
-            preprocessedSources[sourceIndex++],
+            preprocessedSources[sourceIndex],
             astBuilder,
             translationUnit,
             getSink(),

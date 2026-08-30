@@ -116,7 +116,8 @@ struct ReproUtil
     // spAddTranslationUnit
     struct TranslationUnitRequestState
     {
-        SourceLanguage language;
+        SourceLanguage language; ///< The resolved effective language.
+        SourceLanguage sourceLanguageExplicitlyRequested; ///< `Unknown` if it was inferred.
 
         Offset32Ptr<OffsetString> moduleName;
 

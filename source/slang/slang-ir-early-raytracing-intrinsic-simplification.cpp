@@ -168,7 +168,8 @@ void recurseAllOpsToReplace(CacheOfDataToReplaceOps* cache)
 void replaceLocationIntrinsicsWithRaytracingObject(IRModule* module, DiagnosticSink* sink)
 {
     // The GLSL-specific SPIR-V assembly operands and Vulkan decorations in the IR are the source
-    // of truth for whether this rewrite applies. If none are present, the traversal is a no-op.
+    // of truth for whether this rewrite applies. The caller's required-pass set avoids invoking
+    // this traversal when the module contains no location operands to replace.
     CacheOfDataToReplaceOps cache = CacheOfDataToReplaceOps(module, sink);
     cache.searchForGlobalsDataNeededInPass();
     recurseAllOpsToReplace(&cache);

@@ -548,6 +548,13 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetWorkGroupSize:
         result.globalVaryingVar = true;
         break;
+    case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
+    case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
+    case kIROp_SPIRVAsmOperandRayCallableFromLocation:
+        // AST-to-IR lowering emits these operands before the required-pass scan, so this flag can
+        // gate the later whole-module replacement traversal without a false negative.
+        result.rayTracingLocationOperand = true;
+        break;
     case kIROp_BindExistentialSlotsDecoration:
         result.bindExistential = true;
         result.generics = true;
@@ -2739,7 +2746,8 @@ Result linkAndOptimizeIR(
         }
     }
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly &&
+        requiredLoweringPassSet.rayTracingLocationOperand)
     {
         SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, sink);
     }

@@ -1225,8 +1225,10 @@ SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
 
     container[requestPtr]->translationUnits = translationUnits;
     container[translationUnits[0]].language = SourceLanguage::Slang;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[0]].sourceFiles = tu0SourceFiles;
     container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[1]].sourceFiles = tu1SourceFiles;
 
     container[tu0SourceFiles[0]] = tu0SourceFile;
@@ -1271,8 +1273,10 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
 
     container[requestPtr]->translationUnits = translationUnits;
     container[translationUnits[0]].language = SourceLanguage::Slang;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[0]].sourceFiles = tu0SourceFiles;
     container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[1]].sourceFiles = tu1SourceFiles;
 
     container[tu0SourceFiles[0]] = tu0SourceFile;
@@ -1310,6 +1314,11 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
 
     SLANG_CHECK_ABORT(loadedTu0.sourceFiles.getCount() == 1);
     SLANG_CHECK_ABORT(loadedTu1.sourceFiles.getCount() == 2);
+    // Loading and re-saving must not turn an inferred source language into an explicit selection.
+    SLANG_CHECK(
+        loadedTu0.sourceLanguageExplicitlyRequested == SourceLanguage::Unknown);
+    SLANG_CHECK(
+        loadedTu1.sourceLanguageExplicitlyRequested == SourceLanguage::Unknown);
     SLANG_CHECK(
         strcmp(
             getTranslationUnitSourceFilePath(loadedBase, loadedRequestState, 0, 0),

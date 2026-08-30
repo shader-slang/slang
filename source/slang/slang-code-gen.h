@@ -68,6 +68,7 @@ struct RequiredLoweringPassSet
     bool meshOutput;
     bool higherOrderFunc;
     bool globalVaryingVar;
+    bool rayTracingLocationOperand;
     bool glslSSBO;
     bool byteAddressBuffer;
     bool dynamicResource;

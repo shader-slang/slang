@@ -1921,8 +1921,11 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     }
 
     Stage impliedStage = Stage::Unknown;
-    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN ||
+        sourceLanguageExplicitlyRequested == sourceLanguageImpliedByFileExtension)
+    {
         impliedStage = stageImpliedByFileExtension;
+    }
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         m_requestImpl->getSink()->diagnose(Diagnostics::CannotDeduceSourceLanguage{.path = inPath});

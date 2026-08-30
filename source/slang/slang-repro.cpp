@@ -548,6 +548,8 @@ static String _scrubName(const String& in)
             TranslationUnitRequestState& dstTranslationUnit = base[dstTranslationUnits[i]];
 
             dstTranslationUnit.language = srcTranslationUnit->sourceLanguage;
+            dstTranslationUnit.sourceLanguageExplicitlyRequested =
+                srcTranslationUnit->sourceLanguageExplicitlyRequested;
             dstTranslationUnit.moduleName = moduleName;
             dstTranslationUnit.sourceFiles = dstSourceFiles;
             dstTranslationUnit.preprocessorDefinitions = defines;
@@ -1074,6 +1076,8 @@ struct LoadContext
             SLANG_ASSERT(index == i);
 
             TranslationUnitRequest* dstTranslationUnit = dstTranslationUnits[i];
+            dstTranslationUnit->sourceLanguageExplicitlyRequested =
+                srcTranslationUnit.sourceLanguageExplicitlyRequested;
 
             context.loadDefines(
                 srcTranslationUnit.preprocessorDefinitions,
