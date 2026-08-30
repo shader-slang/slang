@@ -41,8 +41,9 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
            api.emitValueReturn && api.emitReturnVoid && api.emitUnreachable &&
            api.emitPointerOffset && api.emitByteOffsetPointer && api.emitSequentialElementPointer &&
            api.emitStructFieldPointer && api.emitAggregateConstruct &&
-           api.emitAggregateElementExtract && api.emitVectorConstruct &&
-           api.emitSequentialElementExtract && api.declareGlobalStorage && api.markFunctionAsKernel;
+           api.emitAggregateElementExtract && api.emitBitCast && api.emitPointerAddressSpaceCast &&
+           api.emitVectorConstruct && api.emitSequentialElementExtract &&
+           api.declareGlobalStorage && api.markFunctionAsKernel;
 }
 
 static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI& api)
@@ -1057,6 +1058,33 @@ SlangResult NVVMIRBuilder::emitAggregateElementExtract(
     const SlangNVVMResult result =
         m_construction.emitAggregateElementExtract(module, aggregateValue, elementIndex, &outValue);
     return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitBitCast(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle resultType,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    const SlangNVVMResult result = m_construction.emitBitCast(module, resultType, value, &outValue);
+    return _validateHandleResult(result, outValue);
+}
+
+SlangResult NVVMIRBuilder::emitPointerAddressSpaceCast(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle resultType,
+    SlangNVVMValueHandle pointer,
+    SlangNVVMValueHandle& outPointer) const
+{
+    outPointer = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    const SlangNVVMResult result =
+        m_construction.emitPointerAddressSpaceCast(module, resultType, pointer, &outPointer);
+    return _validateHandleResult(result, outPointer);
 }
 
 SlangResult NVVMIRBuilder::emitIntegerMultiply(

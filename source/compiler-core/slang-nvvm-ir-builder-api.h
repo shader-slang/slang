@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 28u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 29u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -457,6 +457,16 @@ extern "C"
             SlangNVVMValueHandle aggregateValue,
             uint32_t elementIndex,
             SlangNVVMValueHandle* outValue);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitBitCast)(
+            SlangNVVMModuleHandle module,
+            SlangNVVMTypeHandle resultType,
+            SlangNVVMValueHandle value,
+            SlangNVVMValueHandle* outValue);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitPointerAddressSpaceCast)(
+            SlangNVVMModuleHandle module,
+            SlangNVVMTypeHandle resultType,
+            SlangNVVMValueHandle pointer,
+            SlangNVVMValueHandle* outPointer);
         SlangNVVMResult(SLANG_NVVM_CALL* emitVectorConstruct)(
             SlangNVVMModuleHandle module,
             SlangNVVMTypeHandle vectorType,

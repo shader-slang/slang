@@ -3,6 +3,8 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -metal -render-features argument-buffer-tier-2
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu
 
 // This reproduces the specific case that was failing where uniform pointers

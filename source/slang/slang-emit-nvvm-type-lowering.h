@@ -106,6 +106,28 @@ IRPtrTypeBase* asNVVMSupportedLocalCopyableValuePointerType(
     IRInst* type,
     IRType** outValueType = nullptr);
 
+/// Returns the complete CUDA device pointer spelling for a selected copyable value.
+IRPtrTypeBase* asNVVMSupportedDeviceCopyableValuePointerType(
+    IRInst* type,
+    IRType** outValueType = nullptr);
+
+/// Returns whether a finite helper value is composed from copyable values and device pointers.
+bool isNVVMSupportedHelperValueType(IRInst* type);
+
+/// Returns the natural alignment of a finite helper value, including device-pointer leaves.
+uint32_t getNVVMHelperValueAlignment(IRInst* type);
+
+/// Returns a finite helper array composed from copyable values and device pointers.
+IRArrayType* asNVVMSupportedHelperArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
+
+/// Returns a finite helper struct composed from copyable values and device pointers.
+IRStructType* asNVVMSupportedHelperStructType(IRInst* type);
+
+/// Returns an exact local or mutable-parameter pointer to a finite helper value.
+IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(
+    IRInst* type,
+    IRType** outValueType = nullptr);
+
 /// Returns an exact generic derived pointer to a copyable value with explicit access/layout.
 IRPtrTypeBase* asNVVMSupportedDerivedCopyableValuePointerType(
     IRInst* type,
@@ -280,6 +302,7 @@ enum class NVVMTypeUse
     HelperResult,
     EntryPointParameter,
     HelperParameter,
+    HelperValue,
     Value,
     Storage,
     ParameterGroupStorage,
@@ -331,7 +354,9 @@ private:
         IRType* canonicalType,
         IRType* pointeeType,
         SlangNVVMAddressSpace addressSpace,
-        SlangNVVMTypeHandle& outType);
+        SlangNVVMTypeHandle& outType,
+        NVVMTypeUse pointeeUse = NVVMTypeUse::Value,
+        bool cacheCanonicalType = true);
     SlangResult _reportUnsupportedType(NVVMTypeUse use) const;
     SlangResult _requireBuilderOperation(const char* operation, SlangResult result) const;
 

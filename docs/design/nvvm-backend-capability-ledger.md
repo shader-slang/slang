@@ -1965,3 +1965,23 @@ regressions. Against 427 healthy MVP references, O0/O3/both correctness is 297/3
 (69.6%/70.5%/69.6%). Ordinary intrinsic GenericAsm failures fall from 21 to one. All 59 promoted
 CUDA lanes and the 406/406 selected prefix pass; representative direct O3 PTX remains accepted for
 SM70, SM80, and SM90 with CUDA 12.9.
+
+Slice 139 admits exact default-layout read-write `UserPointer<T>` leaves into the finite helper
+value algebra, including fixed arrays and structs that contain them. Canonical entry and
+global-storage producers remain address-space one. A producer-proven global value is widened to a
+generic address-space-zero pointer only at helper-value boundaries; helper parameters, helper
+results, local loads, and pointer reconstruction are already generic. This distinction preserves
+ordinary global load/store and atomic semantics while allowing pointer-bearing values to cross
+helper calls, locals, phis, and aggregate construction.
+
+Forward-only builder ABI revision 29 adds generic pointer address-space conversion and pointer-bit
+reinterpretation callbacks for concrete LLVM `addrspacecast`, `ptrtoint`, and `inttoptr`
+operations. Mixed-width shifts continue through the generic typed operation callback, with the
+provider normalizing the shift count to the value width.
+
+Twenty workloads become correct at O0 and O3 with no old-correct regression. The fixed 452-row
+census reaches 318 O0 and 323 O3 successes. Against 427 healthy MVP references, O0/O3/both
+correctness is 317/321/317 (74.2%/75.2%/74.2%). Helper ABI/type failures fall from 28 to 16 and
+aggregate/pointer/layout failures fall from 17 to 14. All 40 promoted lanes and the 407/407
+selected prefix pass; representative direct O3 PTX remains accepted for SM70, SM80, and SM90 with
+CUDA 12.9.

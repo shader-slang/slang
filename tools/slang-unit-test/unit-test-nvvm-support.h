@@ -288,6 +288,12 @@ struct FakeNVVMBuilderGlobalStorage
 struct FakeNVVMBuilderLocalStorage
 {
 };
+struct FakeNVVMBuilderBitCastStorage
+{
+};
+struct FakeNVVMBuilderPointerAddressSpaceCastStorage
+{
+};
 
 enum class FakeNVVMBuilderValueKind
 {
@@ -313,6 +319,8 @@ enum class FakeNVVMBuilderValueKind
     VectorElement,
     GlobalStorage,
     LocalStorage,
+    BitCast,
+    PointerAddressSpaceCast,
 };
 
 enum class FakeNVVMBuilderScalarFamily : uint32_t
@@ -461,6 +469,8 @@ struct FakeNVVMBuilderState
         emitStructFieldPointerCallCount = 0;
         emitAggregateElementExtractCallCount = 0;
         emitAggregateConstructCallCount = 0;
+        emitBitCastCallCount = 0;
+        emitPointerAddressSpaceCastCallCount = 0;
         emitAtomicOperationCallCount = 0;
         emitVectorConstructCallCount = 0;
         emitSequentialElementExtractCallCount = 0;
@@ -583,6 +593,12 @@ struct FakeNVVMBuilderState
         aggregateConstructElementOffsets.clear();
         aggregateConstructElementCounts.clear();
         aggregateConstructElementValueRefs.clear();
+        bitCastResultTypes.clear();
+        bitCastValueRefs.clear();
+        bitCastCallerBlockIndices.clear();
+        pointerAddressSpaceCastResultTypes.clear();
+        pointerAddressSpaceCastValueRefs.clear();
+        pointerAddressSpaceCastCallerBlockIndices.clear();
         atomicOperations.clear();
         atomicOperationCallerBlockIndices.clear();
         atomicOperationPointerValueRefs.clear();
@@ -754,6 +770,8 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderVectorElementStorage vectorElementStorage[64];
     FakeNVVMBuilderGlobalStorage globalStorage[4];
     FakeNVVMBuilderLocalStorage localStorage[32];
+    FakeNVVMBuilderBitCastStorage bitCastStorage[32];
+    FakeNVVMBuilderPointerAddressSpaceCastStorage pointerAddressSpaceCastStorage[32];
 
     int createModuleCallCount = 0;
     int destroyModuleCallCount = 0;
@@ -801,6 +819,8 @@ struct FakeNVVMBuilderState
     int emitStructFieldPointerCallCount = 0;
     int emitAggregateElementExtractCallCount = 0;
     int emitAggregateConstructCallCount = 0;
+    int emitBitCastCallCount = 0;
+    int emitPointerAddressSpaceCastCallCount = 0;
     int emitAtomicOperationCallCount = 0;
     int emitVectorConstructCallCount = 0;
     int emitSequentialElementExtractCallCount = 0;
@@ -922,6 +942,12 @@ struct FakeNVVMBuilderState
     List<Index> aggregateConstructElementOffsets;
     List<size_t> aggregateConstructElementCounts;
     List<FakeNVVMBuilderValueRef> aggregateConstructElementValueRefs;
+    List<SlangNVVMTypeHandle> bitCastResultTypes;
+    List<FakeNVVMBuilderValueRef> bitCastValueRefs;
+    List<Index> bitCastCallerBlockIndices;
+    List<SlangNVVMTypeHandle> pointerAddressSpaceCastResultTypes;
+    List<FakeNVVMBuilderValueRef> pointerAddressSpaceCastValueRefs;
+    List<Index> pointerAddressSpaceCastCallerBlockIndices;
     List<SlangNVVMAtomicOperationDesc> atomicOperations;
     List<Index> atomicOperationCallerBlockIndices;
     List<FakeNVVMBuilderValueRef> atomicOperationPointerValueRefs;
@@ -1865,6 +1891,48 @@ static bool _getFakeNVVMBuilderLocalStorageIndex(SlangNVVMValueHandle value, Ind
     return false;
 }
 
+static SlangNVVMValueHandle _getFakeNVVMBuilderBitCast(Index index)
+{
+    SLANG_ASSERT(index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.bitCastStorage));
+    return reinterpret_cast<SlangNVVMValueHandle>(&gFakeNVVMBuilder.bitCastStorage[index]);
+}
+
+static bool _getFakeNVVMBuilderBitCastIndex(SlangNVVMValueHandle value, Index& outIndex)
+{
+    for (Index i = 0; i < gFakeNVVMBuilder.bitCastResultTypes.getCount(); ++i)
+    {
+        if (value == _getFakeNVVMBuilderBitCast(i))
+        {
+            outIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+static SlangNVVMValueHandle _getFakeNVVMBuilderPointerAddressSpaceCast(Index index)
+{
+    SLANG_ASSERT(
+        index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.pointerAddressSpaceCastStorage));
+    return reinterpret_cast<SlangNVVMValueHandle>(
+        &gFakeNVVMBuilder.pointerAddressSpaceCastStorage[index]);
+}
+
+static bool _getFakeNVVMBuilderPointerAddressSpaceCastIndex(
+    SlangNVVMValueHandle value,
+    Index& outIndex)
+{
+    for (Index i = 0; i < gFakeNVVMBuilder.pointerAddressSpaceCastResultTypes.getCount(); ++i)
+    {
+        if (value == _getFakeNVVMBuilderPointerAddressSpaceCast(i))
+        {
+            outIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool _getFakeNVVMBuilderValueRef(SlangNVVMValueHandle value, FakeNVVMBuilderValueRef& outRef)
 {
     Index parameterFunctionIndex = -1;
@@ -1983,7 +2051,41 @@ static bool _getFakeNVVMBuilderValueRef(SlangNVVMValueHandle value, FakeNVVMBuil
         outRef = {FakeNVVMBuilderValueKind::LocalStorage, valueIndex};
         return true;
     }
+    if (_getFakeNVVMBuilderBitCastIndex(value, valueIndex))
+    {
+        outRef = {FakeNVVMBuilderValueKind::BitCast, valueIndex};
+        return true;
+    }
+    if (_getFakeNVVMBuilderPointerAddressSpaceCastIndex(value, valueIndex))
+    {
+        outRef = {FakeNVVMBuilderValueKind::PointerAddressSpaceCast, valueIndex};
+        return true;
+    }
     return false;
+}
+
+static bool _getFakeNVVMBuilderRecordedCastResultType(
+    const FakeNVVMBuilderValueRef& valueRef,
+    SlangNVVMTypeHandle& outType)
+{
+    switch (valueRef.kind)
+    {
+    case FakeNVVMBuilderValueKind::BitCast:
+        if (valueRef.index < 0 || valueRef.index >= gFakeNVVMBuilder.bitCastResultTypes.getCount())
+            return false;
+        outType = gFakeNVVMBuilder.bitCastResultTypes[valueRef.index];
+        return true;
+    case FakeNVVMBuilderValueKind::PointerAddressSpaceCast:
+        if (valueRef.index < 0 ||
+            valueRef.index >= gFakeNVVMBuilder.pointerAddressSpaceCastResultTypes.getCount())
+        {
+            return false;
+        }
+        outType = gFakeNVVMBuilder.pointerAddressSpaceCastResultTypes[valueRef.index];
+        return true;
+    default:
+        return false;
+    }
 }
 
 static bool _hasFakeNVVMBuilderPhiIncoming(
@@ -2204,6 +2306,14 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
         return _isFakeNVVMBuilderAggregateElementValueOfTypeKind(
             valueRef,
             FakeNVVMBuilderScalarTypeKind::Integer);
+    case FakeNVVMBuilderValueKind::BitCast:
+        {
+            SlangNVVMTypeHandle resultType = nullptr;
+            return _getFakeNVVMBuilderRecordedCastResultType(valueRef, resultType) &&
+                   resultType == _getFakeNVVMBuilderIntegerType();
+        }
+    case FakeNVVMBuilderValueKind::PointerAddressSpaceCast:
+        return false;
     }
     return false;
 }
@@ -2254,6 +2364,13 @@ static bool _isFakeNVVMBuilderVectorValue(
     FakeNVVMBuilderValueRef valueRef;
     if (!_getFakeNVVMBuilderValueRef(value, valueRef))
         return false;
+    if (valueRef.kind == FakeNVVMBuilderValueKind::BitCast)
+    {
+        SlangNVVMTypeHandle resultType = nullptr;
+        return _getFakeNVVMBuilderRecordedCastResultType(valueRef, resultType) &&
+               resultType ==
+                   _getFakeNVVMBuilderVectorType(expectedElementCount, expectedElementTypeKind);
+    }
     if (valueRef.kind == FakeNVVMBuilderValueKind::Parameter)
     {
         SlangNVVMTypeHandle parameterType = nullptr;
@@ -2482,6 +2599,14 @@ static bool _isFakeNVVMBuilderValueOfTypeKind(
 // Checks a generic function/control-flow value against the exact type handle supplied by the API.
 static bool _isFakeNVVMBuilderValueOfType(SlangNVVMValueHandle value, SlangNVVMTypeHandle type)
 {
+    FakeNVVMBuilderValueRef recordedValueRef;
+    SlangNVVMTypeHandle recordedResultType = nullptr;
+    if (_getFakeNVVMBuilderValueRef(value, recordedValueRef) &&
+        _getFakeNVVMBuilderRecordedCastResultType(recordedValueRef, recordedResultType))
+    {
+        return recordedResultType == type;
+    }
+
     FakeNVVMBuilderScalarTypeKind resourceElementTypeKind;
     if (_getFakeNVVMBuilderResourceViewElementTypeKind(type, resourceElementTypeKind))
     {
@@ -2710,6 +2835,14 @@ static bool _isFakeNVVMBuilderPointerValue(SlangNVVMValueHandle value)
     if (valueRef.kind == FakeNVVMBuilderValueKind::LocalStorage ||
         valueRef.kind == FakeNVVMBuilderValueKind::GlobalStorage)
         return true;
+    if (valueRef.kind == FakeNVVMBuilderValueKind::BitCast ||
+        valueRef.kind == FakeNVVMBuilderValueKind::PointerAddressSpaceCast)
+    {
+        SlangNVVMTypeHandle resultType = nullptr;
+        FakeNVVMBuilderScalarTypeKind pointeeTypeKind;
+        return _getFakeNVVMBuilderRecordedCastResultType(valueRef, resultType) &&
+               _getFakeNVVMBuilderPointerElementTypeKind(resultType, pointeeTypeKind);
+    }
     if (valueRef.kind == FakeNVVMBuilderValueKind::AggregateElement)
     {
         return valueRef.index >= 0 &&
@@ -2898,6 +3031,13 @@ static bool _getFakeNVVMBuilderPointerScalarTypeKind(
         }
         outTypeKind = gFakeNVVMBuilder.structFieldPointerTypeKinds[pointerRef.index];
         return true;
+    case FakeNVVMBuilderValueKind::BitCast:
+    case FakeNVVMBuilderValueKind::PointerAddressSpaceCast:
+        {
+            SlangNVVMTypeHandle resultType = nullptr;
+            return _getFakeNVVMBuilderRecordedCastResultType(pointerRef, resultType) &&
+                   _getFakeNVVMBuilderPointerElementTypeKind(resultType, outTypeKind);
+        }
     default:
         return false;
     }
@@ -4678,6 +4818,79 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitAggregateElementExtract(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitBitCast(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle resultType,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle* outValue)
+{
+    ++gFakeNVVMBuilder.emitBitCastCallCount;
+    if (outValue)
+        *outValue = nullptr;
+
+    FakeNVVMBuilderValueRef valueRef;
+    FakeNVVMBuilderScalarTypeKind pointerElementTypeKind;
+    const bool resultIsPointer =
+        _getFakeNVVMBuilderPointerElementTypeKind(resultType, pointerElementTypeKind);
+    const bool valueIsPointer = _isFakeNVVMBuilderPointerValue(value);
+    const bool resultIsBitPattern =
+        resultType == _getFakeNVVMBuilderIntegerType() ||
+        resultType == _getFakeNVVMBuilderVectorType(2, FakeNVVMBuilderScalarTypeKind::Integer);
+    const bool valueIsBitPattern =
+        _isFakeNVVMBuilderIntegerValue(value) || _isFakeNVVMBuilderIntegerVectorValue(value, 2);
+    if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
+        !outValue || !_getFakeNVVMBuilderValueRef(value, valueRef) ||
+        !((valueIsPointer && resultIsBitPattern) || (valueIsBitPattern && resultIsPointer)) ||
+        gFakeNVVMBuilder.bitCastResultTypes.getCount() >=
+            SLANG_COUNT_OF(gFakeNVVMBuilder.bitCastStorage))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    const Index resultIndex = gFakeNVVMBuilder.bitCastResultTypes.getCount();
+    gFakeNVVMBuilder.bitCastResultTypes.add(resultType);
+    gFakeNVVMBuilder.bitCastValueRefs.add(valueRef);
+    gFakeNVVMBuilder.bitCastCallerBlockIndices.add(gFakeNVVMBuilder.currentInsertBlockIndex);
+    *outValue = _getFakeNVVMBuilderBitCast(resultIndex);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitPointerAddressSpaceCast(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle resultType,
+    SlangNVVMValueHandle pointer,
+    SlangNVVMValueHandle* outPointer)
+{
+    ++gFakeNVVMBuilder.emitPointerAddressSpaceCastCallCount;
+    if (outPointer)
+        *outPointer = nullptr;
+
+    FakeNVVMBuilderValueRef pointerRef;
+    FakeNVVMBuilderScalarTypeKind sourceElementTypeKind;
+    FakeNVVMBuilderScalarTypeKind resultElementTypeKind;
+    if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
+        !outPointer || !_getFakeNVVMBuilderValueRef(pointer, pointerRef) ||
+        !_getFakeNVVMBuilderPointerScalarTypeKind(pointerRef, sourceElementTypeKind) ||
+        !_getFakeNVVMBuilderPointerElementTypeKind(resultType, resultElementTypeKind) ||
+        sourceElementTypeKind != resultElementTypeKind ||
+        gFakeNVVMBuilder.pointerAddressSpaceCastResultTypes.getCount() >=
+            SLANG_COUNT_OF(gFakeNVVMBuilder.pointerAddressSpaceCastStorage))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    // The legacy fake interns a pointer type by pointee rather than address space. Record the
+    // requested result type so later fake calls still enforce the producer's pointee contract;
+    // the real-provider unit tests validate the address-space distinction itself.
+    const Index resultIndex = gFakeNVVMBuilder.pointerAddressSpaceCastResultTypes.getCount();
+    gFakeNVVMBuilder.pointerAddressSpaceCastResultTypes.add(resultType);
+    gFakeNVVMBuilder.pointerAddressSpaceCastValueRefs.add(pointerRef);
+    gFakeNVVMBuilder.pointerAddressSpaceCastCallerBlockIndices.add(
+        gFakeNVVMBuilder.currentInsertBlockIndex);
+    *outPointer = _getFakeNVVMBuilderPointerAddressSpaceCast(resultIndex);
+    return SLANG_OK;
+}
+
 static SlangResult _recordFakeNVVMBuilderUnaryOperation(
     SlangNVVMModuleHandle module,
     SlangNVVMValueOperation operation,
@@ -5760,6 +5973,8 @@ static SlangNVVMBuilderConstructionAPI _makeFakeNVVMBuilderConstructionAPI()
     api.emitStructFieldPointer = _fakeNVVMBuilderEmitStructFieldPointer;
     api.emitAggregateConstruct = _fakeNVVMBuilderEmitAggregateConstruct;
     api.emitAggregateElementExtract = _fakeNVVMBuilderEmitAggregateElementExtract;
+    api.emitBitCast = _fakeNVVMBuilderEmitBitCast;
+    api.emitPointerAddressSpaceCast = _fakeNVVMBuilderEmitPointerAddressSpaceCast;
     api.emitVectorConstruct = _fakeNVVMBuilderEmitVectorConstruct;
     api.emitSequentialElementExtract = _fakeNVVMBuilderEmitSequentialElementExtract;
     api.declareGlobalStorage = _fakeNVVMBuilderDeclareGlobalStorage;

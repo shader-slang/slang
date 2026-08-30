@@ -2,6 +2,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -profile cs_6_2 -compute
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -emit-spirv-directly -compute
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -Xslang -DSKIP_HALF_PRECISION
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -capability cuda_sm_7_0 -Xslang -DSKIP_HALF_PRECISION -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -capability cuda_sm_7_0 -Xslang -DSKIP_HALF_PRECISION -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu -compute
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer

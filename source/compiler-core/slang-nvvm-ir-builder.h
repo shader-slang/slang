@@ -424,6 +424,20 @@ public:
         uint32_t elementIndex,
         SlangNVVMValueHandle& outValue) const;
 
+    /// Reinterprets one same-width first-class value, including 64-bit pointer transport.
+    SlangResult emitBitCast(
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle resultType,
+        SlangNVVMValueHandle value,
+        SlangNVVMValueHandle& outValue) const;
+
+    /// Converts a typed pointer between NVVM address spaces without changing its pointee.
+    SlangResult emitPointerAddressSpaceCast(
+        SlangNVVMModuleHandle module,
+        SlangNVVMTypeHandle resultType,
+        SlangNVVMValueHandle pointer,
+        SlangNVVMValueHandle& outPointer) const;
+
     /// Emits multiplication for same-typed scalar integer values.
     SlangResult emitIntegerMultiply(
         SlangNVVMModuleHandle module,

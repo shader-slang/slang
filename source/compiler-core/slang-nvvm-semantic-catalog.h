@@ -792,7 +792,6 @@ inline bool resolveValueOperationFamily(
                                 isSelectedIntegerValue(desc.operandTypes[0]) &&
                                 isSelectedIntegerValue(desc.operandTypes[1]) &&
                                 areSameType(desc.resultType, desc.operandTypes[0]) &&
-                                desc.resultType.bitWidth == desc.operandTypes[1].bitWidth &&
                                 hasComponentWiseLanes(desc.resultType, desc.operandTypes[1]);
     const bool isScalarIntegerMinMax = desc.operandCount == 2 &&
                                        isSelectedScalarInteger(desc.resultType) &&

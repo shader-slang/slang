@@ -1271,6 +1271,13 @@ static bool _isSupportedFunctionValueType(llvm::Type* type)
         return vectorType->getNumElements() >= 2 && vectorType->getNumElements() <= 4 &&
                _isSupportedFunctionValueType(vectorType->getElementType());
     }
+    if (auto pointerType = llvm::dyn_cast_or_null<llvm::PointerType>(type))
+    {
+        return !pointerType->isOpaque() &&
+               _isNVVMAddressSpace(
+                   static_cast<SlangNVVMAddressSpace>(pointerType->getAddressSpace())) &&
+               _isSupportedFunctionValueType(pointerType->getNonOpaquePointerElementType());
+    }
     if (auto arrayType = llvm::dyn_cast_or_null<llvm::ArrayType>(type))
     {
         return arrayType->getNumElements() > 0 &&
@@ -1293,32 +1300,7 @@ static bool _isSupportedFunctionValueType(llvm::Type* type)
 // Returns whether a direct helper parameter has one accepted physical representation.
 static bool _isSupportedFunctionParameterType(llvm::Type* type)
 {
-    if (_isSupportedFunctionValueType(type))
-        return true;
-    if (auto pointerType = llvm::dyn_cast_or_null<llvm::PointerType>(type))
-    {
-        return !pointerType->isOpaque() &&
-               _isNVVMAddressSpace(
-                   static_cast<SlangNVVMAddressSpace>(pointerType->getAddressSpace())) &&
-               _isSupportedFunctionParameterType(pointerType->getNonOpaquePointerElementType());
-    }
-    if (auto arrayType = llvm::dyn_cast_or_null<llvm::ArrayType>(type))
-    {
-        return arrayType->getNumElements() > 0 &&
-               _isSupportedFunctionParameterType(arrayType->getElementType());
-    }
-    if (auto structType = llvm::dyn_cast_or_null<llvm::StructType>(type))
-    {
-        if (structType->getNumElements() == 0)
-            return false;
-        for (llvm::Type* elementType : structType->elements())
-        {
-            if (!_isSupportedFunctionParameterType(elementType))
-                return false;
-        }
-        return true;
-    }
-    return false;
+    return _isSupportedFunctionValueType(type);
 }
 
 static SlangResult SLANG_NVVM_CALL _emitPhi(
@@ -1977,6 +1959,104 @@ static SlangResult SLANG_NVVM_CALL _emitAggregateElementExtract(
 
     llvm::Value* result = state->builder.CreateExtractValue(llvmAggregateValue, {elementIndex});
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
+// Returns whether one first-class integer shape carries exactly one 64-bit pointer bit pattern.
+static bool _isPointerBitPatternType(llvm::Type* type)
+{
+    if (auto integerType = llvm::dyn_cast_or_null<llvm::IntegerType>(type))
+        return integerType->getBitWidth() == 64;
+    auto vectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(type);
+    auto elementType =
+        vectorType ? llvm::dyn_cast<llvm::IntegerType>(vectorType->getElementType()) : nullptr;
+    return vectorType && elementType && vectorType->getNumElements() == 2 &&
+           elementType->getBitWidth() == 32;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitBitCast(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle resultType,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::Type* llvmResultType = _getType(resultType);
+    llvm::Value* llvmValue = _getValue(value);
+    llvm::Type* llvmValueType = llvmValue ? llvmValue->getType() : nullptr;
+    auto resultPointerType = llvm::dyn_cast_or_null<llvm::PointerType>(llvmResultType);
+    auto valuePointerType = llvm::dyn_cast_or_null<llvm::PointerType>(llvmValueType);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    const bool isPointerToBits = valuePointerType && _isPointerBitPatternType(llvmResultType);
+    const bool isBitsToPointer = resultPointerType && _isPointerBitPatternType(llvmValueType);
+    if (!state || !outValue || !insertionBlock || !llvmResultType || !llvmValue ||
+        &llvmResultType->getContext() != &state->context ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue) ||
+        (!isPointerToBits && !isBitsToPointer) ||
+        (valuePointerType &&
+         (valuePointerType->isOpaque() || !_isNVVMAddressSpace(static_cast<SlangNVVMAddressSpace>(
+                                              valuePointerType->getAddressSpace())))) ||
+        (resultPointerType &&
+         (resultPointerType->isOpaque() || !_isNVVMAddressSpace(static_cast<SlangNVVMAddressSpace>(
+                                               resultPointerType->getAddressSpace())))))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Type* int64Type = llvm::Type::getInt64Ty(state->context);
+    llvm::Value* result = nullptr;
+    if (isPointerToBits)
+    {
+        result = state->builder.CreatePtrToInt(llvmValue, int64Type);
+        if (llvmResultType != int64Type)
+            result = state->builder.CreateBitCast(result, llvmResultType);
+    }
+    else
+    {
+        llvm::Value* integerBits = llvmValue;
+        if (llvmValueType != int64Type)
+            integerBits = state->builder.CreateBitCast(integerBits, int64Type);
+        result = state->builder.CreateIntToPtr(integerBits, llvmResultType);
+    }
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitPointerAddressSpaceCast(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle resultType,
+    SlangNVVMValueHandle pointer,
+    SlangNVVMValueHandle* outPointer)
+{
+    if (outPointer)
+        *outPointer = nullptr;
+
+    ModuleState* state = _getModule(module);
+    auto llvmResultType = llvm::dyn_cast_or_null<llvm::PointerType>(_getType(resultType));
+    llvm::Value* llvmPointer = _getValue(pointer);
+    auto llvmPointerType =
+        llvmPointer ? llvm::dyn_cast<llvm::PointerType>(llvmPointer->getType()) : nullptr;
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    if (!state || !outPointer || !insertionBlock || !llvmResultType || !llvmPointerType ||
+        llvmResultType->isOpaque() || llvmPointerType->isOpaque() ||
+        &llvmResultType->getContext() != &state->context ||
+        !_isNVVMAddressSpace(
+            static_cast<SlangNVVMAddressSpace>(llvmResultType->getAddressSpace())) ||
+        !_isNVVMAddressSpace(
+            static_cast<SlangNVVMAddressSpace>(llvmPointerType->getAddressSpace())) ||
+        llvmResultType->getAddressSpace() == llvmPointerType->getAddressSpace() ||
+        llvmResultType->getNonOpaquePointerElementType() !=
+            llvmPointerType->getNonOpaquePointerElementType() ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    *outPointer = reinterpret_cast<SlangNVVMValueHandle>(
+        state->builder.CreateAddrSpaceCast(llvmPointer, llvmResultType));
     return SLANG_OK;
 }
 
@@ -3184,6 +3264,17 @@ static SlangResult _emitValueOperationFamily(
         }
     }
 
+    if (family == Slang::NVVMSemantics::ValueOperationFamily::IntegerBinary &&
+        (operation.operation == SLANG_NVVM_VALUE_OP_SHIFT_LEFT ||
+         operation.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT) &&
+        llvmOperands[1]->getType() != resultType)
+    {
+        // Slang preserves the source shift-count width independently from the shifted value. LLVM
+        // requires both operands to have the same physical type, so normalize the already-checked
+        // scalar or component-wise count without changing the source operation's signedness.
+        llvmOperands[1] = state->builder.CreateZExtOrTrunc(llvmOperands[1], resultType);
+    }
+
     llvm::Value* result = nullptr;
     switch (family)
     {
@@ -4202,6 +4293,8 @@ static void _fillBuilderConstructionAPI(SlangNVVMBuilderConstructionAPI& api)
     api.emitStructFieldPointer = _emitStructFieldPointer;
     api.emitAggregateConstruct = _emitAggregateConstruct;
     api.emitAggregateElementExtract = _emitAggregateElementExtract;
+    api.emitBitCast = _emitBitCast;
+    api.emitPointerAddressSpaceCast = _emitPointerAddressSpaceCast;
     api.emitVectorConstruct = _emitVectorConstruct;
     api.emitSequentialElementExtract = _emitSequentialElementExtract;
     api.declareGlobalStorage = _declareGlobalStorage;

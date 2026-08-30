@@ -125,6 +125,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getConstructionAPI()->emitStructFieldPointer != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitByteOffsetPointer != nullptr);
         SLANG_CHECK(builder.getConstructionAPI()->emitSequentialElementPointer != nullptr);
+        SLANG_CHECK(builder.getConstructionAPI()->emitBitCast != nullptr);
+        SLANG_CHECK(builder.getConstructionAPI()->emitPointerAddressSpaceCast != nullptr);
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
@@ -792,6 +794,22 @@ SLANG_UNIT_TEST(nvvmIRBuilderRequiresCompleteCurrentInterfaces)
 
     _resetDirectNVVMFakes();
     gFakeNVVMBuilder.construction.emitByteOffsetPointer = nullptr;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+    }
+
+    _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.construction.emitBitCast = nullptr;
+    {
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
+    }
+
+    _resetDirectNVVMFakes();
+    gFakeNVVMBuilder.construction.emitPointerAddressSpaceCast = nullptr;
     {
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
         NVVMIRBuilder builder;
@@ -5219,6 +5237,196 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerAddressingOperations)
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("getelementptr i32")) == 2);
     SLANG_CHECK(assembly.indexOf("getelementptr inbounds") < 0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesPointerBitTransport)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.isInitialized());
+
+    ScopedNVVMBuilderModule module;
+    module.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("pointer-bit-transport"), module.module)));
+    ScopedNVVMBuilderModule foreignModule;
+    foreignModule.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("pointer-bit-transport-foreign"), foreignModule.module)));
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle int32Type = nullptr;
+    SlangNVVMTypeHandle int64Type = nullptr;
+    SlangNVVMTypeHandle uint2Type = nullptr;
+    SlangNVVMTypeHandle globalPointerType = nullptr;
+    SlangNVVMTypeHandle genericPointerType = nullptr;
+    SlangNVVMTypeHandle differentPointeePointerType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 32, int32Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 64, int64Type)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getVectorType(module.module, int32Type, 2, uint2Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        module.module,
+        int32Type,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        globalPointerType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        module.module,
+        int32Type,
+        SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+        genericPointerType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        module.module,
+        int64Type,
+        SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+        differentPointeePointerType)));
+
+    const SlangNVVMTypeHandle parameterTypes[] = {
+        globalPointerType,
+        globalPointerType,
+        int32Type,
+    };
+    SlangNVVMTypeHandle functionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        module.module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType)));
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("pointerBitTransport"),
+        function)));
+    SlangNVVMValueHandle destination = nullptr;
+    SlangNVVMValueHandle source = nullptr;
+    SlangNVVMValueHandle int32Value = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, destination)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 1, source)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 2, int32Value)));
+
+    SlangNVVMTypeHandle foreignVoidType = nullptr;
+    SlangNVVMTypeHandle foreignInt32Type = nullptr;
+    SlangNVVMTypeHandle foreignInt64Type = nullptr;
+    SlangNVVMTypeHandle foreignGlobalPointerType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(foreignModule.module, foreignVoidType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getIntegerType(foreignModule.module, 32, foreignInt32Type)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getIntegerType(foreignModule.module, 64, foreignInt64Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        foreignModule.module,
+        foreignInt32Type,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        foreignGlobalPointerType)));
+    SlangNVVMTypeHandle foreignFunctionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        foreignModule.module,
+        foreignVoidType,
+        &foreignGlobalPointerType,
+        1,
+        foreignFunctionType)));
+    SlangNVVMValueHandle foreignFunction = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        foreignModule.module,
+        foreignFunctionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("foreignPointerBitTransport"),
+        foreignFunction)));
+    SlangNVVMValueHandle foreignPointer = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionParameter(foreignModule.module, foreignFunction, 0, foreignPointer)));
+
+    auto expectRejectedBitCast = [&](SlangNVVMModuleHandle targetModule,
+                                     SlangNVVMTypeHandle resultType,
+                                     SlangNVVMValueHandle value)
+    {
+        SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitBitCast(targetModule, resultType, value, rejected) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejected == nullptr);
+    };
+    auto expectRejectedAddressSpaceCast = [&](SlangNVVMModuleHandle targetModule,
+                                              SlangNVVMTypeHandle resultType,
+                                              SlangNVVMValueHandle value)
+    {
+        SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+        SLANG_CHECK(
+            builder.emitPointerAddressSpaceCast(targetModule, resultType, value, rejected) ==
+            SLANG_E_INVALID_ARG);
+        SLANG_CHECK(rejected == nullptr);
+    };
+
+    // A value and type do not establish an insertion point. Foreign handles must also be rejected
+    // before the provider mutates either module.
+    expectRejectedBitCast(module.module, uint2Type, source);
+    expectRejectedAddressSpaceCast(module.module, genericPointerType, source);
+    expectRejectedBitCast(module.module, foreignInt64Type, source);
+    expectRejectedAddressSpaceCast(module.module, genericPointerType, foreignPointer);
+
+    SlangNVVMBlockHandle entryBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
+
+    expectRejectedAddressSpaceCast(module.module, globalPointerType, source);
+    expectRejectedAddressSpaceCast(module.module, differentPointeePointerType, source);
+    expectRejectedAddressSpaceCast(module.module, int64Type, source);
+    expectRejectedAddressSpaceCast(module.module, foreignGlobalPointerType, source);
+    expectRejectedBitCast(module.module, int32Type, source);
+    expectRejectedBitCast(module.module, genericPointerType, int32Value);
+    expectRejectedBitCast(module.module, genericPointerType, source);
+    expectRejectedBitCast(foreignModule.module, uint2Type, source);
+
+    SlangNVVMValueHandle genericSource = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitPointerAddressSpaceCast(
+        module.module,
+        genericPointerType,
+        source,
+        genericSource)));
+    SlangNVVMValueHandle pointerBits = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitBitCast(module.module, uint2Type, genericSource, pointerBits)));
+    SlangNVVMValueHandle roundTripPointer = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitBitCast(module.module, genericPointerType, pointerBits, roundTripPointer)));
+    SlangNVVMValueHandle loaded = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitLoad(module.module, roundTripPointer, 4, SLANG_NVVM_LOAD_FLAG_NONE, loaded)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(module.module, loaded, destination, 4)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(module.module, function)));
+
+    expectRejectedBitCast(module.module, int64Type, genericSource);
+    expectRejectedAddressSpaceCast(module.module, genericPointerType, source);
+
+    ComPtr<ISlangBlob> assemblyBlob;
+    String diagnostics;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        module.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        assemblyBlob,
+        diagnostics)));
+    SLANG_CHECK_ABORT(assemblyBlob != nullptr);
+    SLANG_CHECK(diagnostics.getLength() == 0);
+    const String assembly = _getBlobText(assemblyBlob);
+    const UnownedStringSlice assemblySlice = assembly.getUnownedSlice();
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("addrspacecast i32 addrspace(1)*")) == 1);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("ptrtoint i32*")) == 1);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("bitcast i64")) == 1);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("bitcast <2 x i32>")) == 1);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("inttoptr i64")) == 1);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("load i32, i32*")) == 1);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("store i32")) == 1);
+    SLANG_CHECK(assembly.indexOf("@pointerBitTransport, !\"kernel\", i32 1") >= 0);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidSequentialAddressingOperations)

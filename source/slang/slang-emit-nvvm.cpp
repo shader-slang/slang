@@ -25,6 +25,14 @@ static const IRIntegerValue kNVVMI32Min = -2147483647 - 1;
 static const IRIntegerValue kNVVMI32Max = 2147483647;
 static const IRIntegerValue kNVVMUInt32Max = 4294967295;
 static const uint32_t kNVVMPointerAlignment = 8;
+
+// Returns the natural alignment of every first-class value admitted by the direct backend.
+uint32_t _getNVVMExecutableValueAlignment(IRInst* type)
+{
+    if (const uint32_t helperAlignment = getNVVMHelperValueAlignment(type))
+        return helperAlignment;
+    return getNVVMResourceValueAlignment(type);
+}
 static const SlangNVVMValueTypeDesc kNVVMHalfToPhysicalOperands[] = {
     NVVMSemantics::kFloat16,
 };
@@ -162,8 +170,10 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         NVVMStructField parentAddress;
         auto basePointerType = as<IRPtrTypeBase>(parentFieldAddress->getDataType());
         structType = basePointerType
-                         ? asNVVMSupportedResourceStructType(basePointerType->getValueType())
+                         ? asNVVMSupportedHelperStructType(basePointerType->getValueType())
                          : nullptr;
+        if (!structType && basePointerType)
+            structType = asNVVMSupportedResourceStructType(basePointerType->getValueType());
         if (!structType || !_getNVVMStructFieldAddress(parentFieldAddress, parentAddress) ||
             !parentAddress.isMutable ||
             !isTypeEqual(parentAddress.field->getFieldType(), structType))
@@ -195,13 +205,37 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     }
     else
     {
-        IRType* parameterGroupElementType = nullptr;
-        if (!asNVVMSupportedParameterGroupType(
+        IRType* helperValueType = nullptr;
+        if (asNVVMSupportedLocalHelperValuePointerType(
                 fieldAddress->getBase()->getDataType(),
-                &parameterGroupElementType) ||
-            !(structType = as<IRStructType>(parameterGroupElementType)))
+                &helperValueType))
         {
-            return false;
+            structType = asNVVMSupportedHelperStructType(helperValueType);
+            if (!structType)
+                return false;
+            outAddress.isMutable = true;
+        }
+        else if (
+            auto devicePointer = asNVVMSupportedDeviceCopyableValuePointerType(
+                fieldAddress->getBase()->getDataType(),
+                &helperValueType))
+        {
+            SLANG_UNUSED(devicePointer);
+            structType = asNVVMSupportedHelperStructType(helperValueType);
+            if (!structType)
+                return false;
+            outAddress.isMutable = true;
+        }
+        else
+        {
+            IRType* parameterGroupElementType = nullptr;
+            if (!asNVVMSupportedParameterGroupType(
+                    fieldAddress->getBase()->getDataType(),
+                    &parameterGroupElementType) ||
+                !(structType = as<IRStructType>(parameterGroupElementType)))
+            {
+                return false;
+            }
         }
     }
     if (!_findNVVMStructField(
@@ -227,6 +261,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         NVVMReadOnlyTextureType sampledTextureType;
         SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
         return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
+               asNVVMSupportedDeviceCopyableValuePointerType(fieldType) ||
                asNVVMSupportedParameterGroupType(fieldType) ||
                getNVVMSupportedSurfaceField(outAddress.field, surfaceType, storageFormat) ||
                getNVVMSupportedReadOnlyTextureType(fieldType, sampledTextureType) ||
@@ -237,7 +272,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
 
     if (outAddress.isMutable)
     {
-        return getNVVMResourceValueAlignment(fieldType) != 0;
+        return _getNVVMExecutableValueAlignment(fieldType) != 0;
     }
 
     return isNVVMSupportedAggregateStorageType(fieldType);
@@ -247,9 +282,11 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
 bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructField& outField)
 {
     outField = {};
-    auto structType =
-        fieldExtract ? asNVVMSupportedResourceStructType(fieldExtract->getBase()->getDataType())
-                     : nullptr;
+    auto structType = fieldExtract
+                          ? asNVVMSupportedHelperStructType(fieldExtract->getBase()->getDataType())
+                          : nullptr;
+    if (!structType && fieldExtract)
+        structType = asNVVMSupportedResourceStructType(fieldExtract->getBase()->getDataType());
     if (!structType || !_findNVVMStructField(
                            structType,
                            fieldExtract->getField(),
@@ -328,7 +365,7 @@ bool _getNVVMStructuredBufferLoad(IRInst* inst, NVVMStructuredBufferLoad& outLoa
                                                 ? NVVMBufferAccess::ReadOnly
                                                 : NVVMBufferAccess::ReadWrite;
     IRType* resultType = inst->getDataType();
-    const uint32_t alignment = getNVVMResourceValueAlignment(resultType);
+    const uint32_t alignment = _getNVVMExecutableValueAlignment(resultType);
     if (!buffer || !elementIndex || !isNVVMInteger32Type(elementIndex->getDataType()) ||
         !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
         bufferType.kind != NVVMRawBufferKind::Structured || bufferType.access != expectedAccess ||
@@ -526,6 +563,15 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
              : nullptr;
     if (!baseType && base)
         baseType = asNVVMSupportedLocalCopyableArrayPointerType(base->getDataType(), &arrayType);
+    if (!baseType && base)
+    {
+        IRType* helperValueType = nullptr;
+        baseType =
+            asNVVMSupportedLocalHelperValuePointerType(base->getDataType(), &helperValueType);
+        arrayType = baseType ? asNVVMSupportedHelperArrayType(helperValueType) : nullptr;
+        if (!arrayType)
+            baseType = nullptr;
+    }
     IRType* aggregateType = arrayType;
     bool isImmutable = false;
 
@@ -534,7 +580,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         NVVMSequentialElementPointer parentElement;
         if (_getNVVMSequentialElementPointer(base, parentElement))
         {
-            arrayType = asNVVMSupportedCopyableArrayType(parentElement.resultType->getValueType());
+            arrayType = asNVVMSupportedHelperArrayType(parentElement.resultType->getValueType());
             if (arrayType)
             {
                 baseType = parentElement.resultType;
@@ -557,11 +603,10 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
             NVVMStructField fieldAddress;
             if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress))
             {
-                arrayType =
-                    fieldAddress.isMutable
-                        ? asNVVMSupportedCopyableArrayType(fieldAddress.field->getFieldType())
-                        : asNVVMSupportedAggregateStorageArrayType(
-                              fieldAddress.field->getFieldType());
+                arrayType = fieldAddress.isMutable
+                                ? asNVVMSupportedHelperArrayType(fieldAddress.field->getFieldType())
+                                : asNVVMSupportedAggregateStorageArrayType(
+                                      fieldAddress.field->getFieldType());
                 baseType = as<IRPtrTypeBase>(base->getDataType());
                 isImmutable = !fieldAddress.isMutable;
             }
@@ -622,7 +667,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     if (!aggregateType || !resultType || resultType->getOp() != kIROp_PtrType ||
         !hasCanonicalLocalLayout || resultType->getAddressSpace() != expectedAddressSpace ||
         resultType->getAccessQualifier() != expectedAccess ||
-        !getNVVMResourceValueAlignment(resultType->getValueType()) ||
+        !_getNVVMExecutableValueAlignment(resultType->getValueType()) ||
         !isTypeEqual(expectedElementType, resultType->getValueType()) ||
         !isNVVMInteger32Type(index->getDataType()))
     {
@@ -741,7 +786,8 @@ bool _hasNVVMCompatibleStructLayout(CodeGenContext* codeGenContext, IRStructType
         }
         IRType* fieldType = field->getFieldType();
         if ((asNVVMSupportedResourceStructType(fieldType) ||
-             asNVVMSupportedCopyableArrayType(fieldType)) &&
+             asNVVMSupportedHelperStructType(fieldType) ||
+             asNVVMSupportedHelperArrayType(fieldType)) &&
             !_hasNVVMCompatibleCopyableValueLayout(codeGenContext, fieldType))
             return false;
     }
@@ -755,9 +801,11 @@ bool _hasNVVMCompatibleCopyableValueLayout(CodeGenContext* codeGenContext, IRTyp
 {
     if (!codeGenContext || !type)
         return false;
+    if (auto structType = asNVVMSupportedHelperStructType(type))
+        return _hasNVVMCompatibleStructLayout(codeGenContext, structType);
     if (auto structType = asNVVMSupportedResourceStructType(type))
         return _hasNVVMCompatibleStructLayout(codeGenContext, structType);
-    if (auto arrayType = asNVVMSupportedCopyableArrayType(type))
+    if (auto arrayType = asNVVMSupportedHelperArrayType(type))
     {
         IRSizeAndAlignment cudaLayout;
         IRSizeAndAlignment llvmLayout;
@@ -774,6 +822,8 @@ bool _hasNVVMCompatibleCopyableValueLayout(CodeGenContext* codeGenContext, IRTyp
                cudaLayout.size > 0 && cudaLayout.size == llvmLayout.size &&
                _hasNVVMCompatibleCopyableValueLayout(codeGenContext, arrayType->getElementType());
     }
+    if (asNVVMSupportedDeviceCopyableValuePointerType(type))
+        return true;
     if (!isNVVMSupportedNumericValueType(type))
         return false;
 
@@ -933,16 +983,20 @@ bool _hasNVVMCompatibleAggregateStorageLayout(CodeGenContext* codeGenContext, IR
 // lowering will visit.
 void _addNVVMReachableStructTypes(IRType* type, HashSet<IRInst*>& reachableTypes)
 {
+    IRType* pointerValueType = nullptr;
+    if (asNVVMSupportedDeviceCopyableValuePointerType(type, &pointerValueType))
+        type = pointerValueType;
     while (auto arrayType = as<IRArrayType>(type))
     {
-        if (!asNVVMSupportedCopyableArrayType(arrayType) &&
+        if (!asNVVMSupportedHelperArrayType(arrayType) &&
             !asNVVMSupportedAggregateStorageArrayType(arrayType))
             return;
         type = arrayType->getElementType();
     }
     auto structType = as<IRStructType>(type);
     if (!structType ||
-        (!asNVVMSupportedResourceStructType(structType) &&
+        (!asNVVMSupportedHelperStructType(structType) &&
+         !asNVVMSupportedResourceStructType(structType) &&
          !asNVVMSupportedAggregateStorageStructType(structType)) ||
         reachableTypes.contains(structType))
         return;
@@ -1050,7 +1104,7 @@ bool _getNVVMSequentialElement(IRInst* inst, NVVMSequentialElement& outElement)
     }
     else if (!as<IRSwizzle>(inst))
     {
-        if (auto baseArrayType = asNVVMSupportedCopyableArrayType(
+        if (auto baseArrayType = asNVVMSupportedHelperArrayType(
                 base ? base->getDataType() : nullptr,
                 &baseElementCount))
         {
@@ -1279,7 +1333,7 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     if (inst->getOp() == kIROp_MakeArray)
     {
         uint32_t elementCount = 0;
-        auto resultType = asNVVMSupportedCopyableArrayType(inst->getDataType(), &elementCount);
+        auto resultType = asNVVMSupportedHelperArrayType(inst->getDataType(), &elementCount);
         if (!resultType || inst->getOperandCount() != elementCount)
             return false;
         for (uint32_t i = 0; i < elementCount; ++i)
@@ -1296,7 +1350,7 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     if (inst->getOp() == kIROp_MakeArrayFromElement)
     {
         uint32_t elementCount = 0;
-        auto resultType = asNVVMSupportedCopyableArrayType(inst->getDataType(), &elementCount);
+        auto resultType = asNVVMSupportedHelperArrayType(inst->getDataType(), &elementCount);
         IRInst* element = inst->getOperandCount() == 1 ? inst->getOperand(0) : nullptr;
         if (!resultType || !element ||
             !isTypeEqual(element->getDataType(), resultType->getElementType()))
@@ -1308,7 +1362,7 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     }
 
     auto resultType = inst->getOp() == kIROp_MakeStruct
-                          ? asNVVMSupportedCopyableStructType(inst->getDataType())
+                          ? asNVVMSupportedHelperStructType(inst->getDataType())
                           : nullptr;
     if (!resultType)
         return false;
@@ -1347,7 +1401,7 @@ bool _getNVVMAggregateElement(IRInst* inst, NVVMAggregateElement& outElement)
     IRInst* base = getElement ? getElement->getBase() : nullptr;
     uint32_t elementCount = 0;
     auto baseType =
-        asNVVMSupportedCopyableArrayType(base ? base->getDataType() : nullptr, &elementCount);
+        asNVVMSupportedHelperArrayType(base ? base->getDataType() : nullptr, &elementCount);
     auto index = getElement ? _asExecutableInteger32Constant(getElement->getIndex()) : nullptr;
     if (!baseType || !isTypeEqual(inst->getDataType(), baseType->getElementType()) || !index ||
         index->getValue() < 0 || index->getValue() >= elementCount)
@@ -1475,9 +1529,11 @@ void _appendNVVMCanonicalTypeName(StringBuilder& out, IRInst* type)
         _appendNVVMCanonicalTypeName(out, pointerType->getValueType());
         if (pointerType->getOperandCount() > 1)
         {
-            out << ", addressSpace=" << uint32_t(pointerType->getAddressSpace())
-                << ", access=" << uint32_t(pointerType->getAccessQualifier())
+            out << ", addressSpace=" << uint64_t(pointerType->getAddressSpace())
+                << ", access=" << uint64_t(pointerType->getAccessQualifier())
                 << ", operands=" << pointerType->getOperandCount();
+            if (IRType* dataLayout = pointerType->getDataLayout())
+                out << ", layout=" << getIROpInfo(dataLayout->getOp()).name;
         }
         out << ">";
         return;
@@ -1603,6 +1659,28 @@ SlangResult _emitNVVMHalfHelperABIReinterpretation(
         builder.emitValueOperation(module, operation, &value, 1, outValue));
 }
 
+// Widens one pointer whose producer proves global-memory provenance into the helper UserPointer
+// representation. Helper values can also carry local addresses, so their pointer leaves use LLVM
+// generic pointers even though ordinary kernel execution and conventional-global storage keep the
+// producer-proven AS1 representation.
+SlangResult _emitNVVMExecutableUserPointer(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRType* canonicalType,
+    SlangNVVMValueHandle globalPointer,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outPointer)
+{
+    SLANG_RELEASE_ASSERT(asNVVMSupportedDeviceCopyableValuePointerType(canonicalType));
+    SlangNVVMTypeHandle executableType = nullptr;
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(canonicalType, NVVMTypeUse::Value, executableType));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "global-to-generic UserPointer conversion",
+        builder.emitPointerAddressSpaceCast(module, executableType, globalPointer, outPointer));
+}
+
 // Returns an executable signed-i32 literal, excluding layout and other module constants.
 IRIntLit* _asExecutableI32Constant(IRInst* value)
 {
@@ -1651,6 +1729,16 @@ IRIntLit* _asExecutableSelectedIntegerConstant(IRInst* value)
     }
     const IRIntegerValue maximum = (IRIntegerValue(1) << bitWidth) - 1;
     return integerValue >= 0 && integerValue <= maximum ? intLit : nullptr;
+}
+
+// Returns the canonical null literal for an admitted complete CUDA device-pointer type.
+IRPtrLit* _asExecutableNullDevicePointer(IRInst* value)
+{
+    auto pointerLiteral = as<IRPtrLit>(value);
+    return pointerLiteral && !pointerLiteral->getValue() &&
+                   asNVVMSupportedDeviceCopyableValuePointerType(pointerLiteral->getDataType())
+               ? pointerLiteral
+               : nullptr;
 }
 
 // Returns a canonical executable Boolean literal.
@@ -3581,6 +3669,51 @@ struct NVVMResolvedValueOperation
     const char* diagnosticName = nullptr;
 };
 
+struct NVVMPointerBitCast
+{
+    IRInst* value = nullptr;
+    IRPtrTypeBase* pointerType = nullptr;
+    bool resultIsPointer = false;
+};
+
+bool _isNVVMPointerBitPatternType(IRInst* type)
+{
+    uint32_t bitWidth = 0;
+    bool isSigned = false;
+    if (isNVVMSupportedIntegerScalarType(type, &bitWidth, &isSigned))
+        return !isSigned && bitWidth == 64;
+    uint32_t laneCount = 0;
+    return asNVVMSupportedI32VectorType(type, &isSigned, &laneCount) && !isSigned && laneCount == 2;
+}
+
+// Resolves the exact pointer bit transport produced by AnyValue marshalling. The canonical
+// representation is one complete UserPointer and its canonical unsigned 64-bit scalar or 2x32-bit
+// vector payload; no integer-pointer conversion is inferred from an arbitrary numeric bitcast.
+bool _getNVVMPointerBitCast(IRInst* inst, NVVMPointerBitCast& outCast)
+{
+    outCast = {};
+    if (!inst || inst->getOp() != kIROp_BitCast || inst->getOperandCount() != 1)
+        return false;
+
+    IRInst* value = inst->getOperand(0);
+    IRPtrTypeBase* resultPointer =
+        asNVVMSupportedDeviceCopyableValuePointerType(inst->getDataType());
+    IRPtrTypeBase* valuePointer =
+        value ? asNVVMSupportedDeviceCopyableValuePointerType(value->getDataType()) : nullptr;
+    const bool hasResultBits = _isNVVMPointerBitPatternType(inst->getDataType());
+    const bool hasValueBits = value && _isNVVMPointerBitPatternType(value->getDataType());
+    if ((!resultPointer || !hasValueBits || valuePointer || hasResultBits) &&
+        (!valuePointer || !hasResultBits || resultPointer || hasValueBits))
+    {
+        return false;
+    }
+
+    outCast.value = value;
+    outCast.pointerType = resultPointer ? resultPointer : valuePointer;
+    outCast.resultIsPointer = resultPointer != nullptr;
+    return true;
+}
+
 struct NVVMResolvedAtomicOperation
 {
     SlangNVVMAtomicOperationDesc desc = {};
@@ -4026,11 +4159,13 @@ SlangResult _validateSelectedValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
+    if (_asExecutableNullDevicePointer(value))
+        return SLANG_OK;
     IRType* valueType = value ? value->getDataType() : nullptr;
     const bool requiresAvailability =
         valueType &&
         (asNVVMSupportedValueVectorType(valueType) ||
-         (getNVVMResourceValueAlignment(valueType) &&
+         (_getNVVMExecutableValueAlignment(valueType) &&
           !isNVVMSupportedIntegerScalarType(valueType) &&
           !isNVVMSupportedFloatingPointScalarType(valueType) && !isNVVMBoolType(valueType)));
     if (requiresAvailability)
@@ -4076,6 +4211,8 @@ SlangResult _validatePointerValue(
 {
     auto numericPtrType =
         value ? asNVVMSupportedDeviceNumericPointerType(value->getDataType()) : nullptr;
+    auto deviceCopyablePtrType =
+        value ? asNVVMSupportedDeviceCopyableValuePointerType(value->getDataType()) : nullptr;
     NVVMRawBufferElementPointer rawBufferElementPointer;
     const bool hasResourceElementProducer =
         value && (value->getOp() == kIROp_RWStructuredBufferGetElementPtr ||
@@ -4091,6 +4228,8 @@ SlangResult _validatePointerValue(
                                    : nullptr;
     auto localStructPtrType =
         value ? asNVVMSupportedLocalResourceStructPointerType(value->getDataType()) : nullptr;
+    auto localHelperPtrType =
+        value ? asNVVMSupportedLocalHelperValuePointerType(value->getDataType()) : nullptr;
     // A local `var T` and a module-scope groupshared value can both expose the canonical
     // `Ptr<T>` spelling here. The value producer, rather than that shared type, owns the local
     // storage role. Helper parameters are the only other producer admitted by this slice.
@@ -4115,7 +4254,7 @@ SlangResult _validatePointerValue(
     {
         fieldPtrType = nullptr;
     }
-    IRPtrTypeBase* devicePtrType = numericPtrType;
+    IRPtrTypeBase* devicePtrType = numericPtrType ? numericPtrType : deviceCopyablePtrType;
     IRPtrTypeBase* acceptedPtrType = devicePtrType              ? devicePtrType
                                      : sharedElementPtrType     ? sharedElementPtrType
                                      : sharedScalarPtrType      ? sharedScalarPtrType
@@ -4124,6 +4263,7 @@ SlangResult _validatePointerValue(
                                      : localArrayPtrType        ? localArrayPtrType
                                      : sequentialElementPtrType ? sequentialElementPtrType
                                      : localStructPtrType       ? localStructPtrType
+                                     : localHelperPtrType       ? localHelperPtrType
                                                                 : fieldPtrType;
     if (!acceptedPtrType)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
@@ -4153,6 +4293,8 @@ SlangResult _validatePointerValue(
     }
     if (requireWriteAccess && acceptedPtrType->getAccessQualifier() != AccessQualifier::ReadWrite)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("read-only pointer store"));
+    if (_asExecutableNullDevicePointer(value))
+        return SLANG_OK;
     return _validateAvailableValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
@@ -4255,7 +4397,10 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 // Returns whether a type is an accepted canonical value in a helper result.
 bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
-    return as<IRVoidType>(type) || isNVVMSupportedCopyableValueType(type);
+    return as<IRVoidType>(type) || isNVVMSupportedHelperValueType(type) ||
+           asNVVMSupportedLocalCopyableValuePointerType(type) ||
+           asNVVMSupportedLocalHelperValuePointerType(type) ||
+           asNVVMSupportedDeviceCopyableValuePointerType(type);
 }
 
 // Returns whether one exact canonical type can cross a selected helper parameter boundary.
@@ -4264,9 +4409,11 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return isNVVMSupportedCopyableValueType(type) || asNVVMSupportedResourceStructType(type) ||
+    return isNVVMSupportedHelperValueType(type) || asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalResourceStructPointerType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
+           asNVVMSupportedLocalHelperValuePointerType(type) ||
+           asNVVMSupportedDeviceCopyableValuePointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceType(type, surfaceType) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
@@ -4312,8 +4459,34 @@ bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterT
         parameterCopyablePointer &&
         (parameterCopyablePointer->getOp() == kIROp_OutParamType ||
          parameterCopyablePointer->getOp() == kIROp_BorrowInOutParamType);
+    if (argumentCopyablePointer && argumentCopyablePointer->getOp() == kIROp_PtrType &&
+        isMutableCopyableParameter && isTypeEqual(argumentCopyableType, parameterCopyableType))
+    {
+        return true;
+    }
+
+    IRType* argumentHelperType = nullptr;
+    IRType* parameterHelperType = nullptr;
+    auto argumentHelperPointer =
+        asNVVMSupportedLocalHelperValuePointerType(argumentType, &argumentHelperType);
+    auto parameterHelperPointer =
+        asNVVMSupportedLocalHelperValuePointerType(parameterType, &parameterHelperType);
+    const bool isMutableHelperParameter =
+        parameterHelperPointer && (parameterHelperPointer->getOp() == kIROp_OutParamType ||
+                                   parameterHelperPointer->getOp() == kIROp_BorrowInOutParamType);
+    if (argumentHelperPointer && argumentHelperPointer->getOp() == kIROp_PtrType &&
+        argumentHelperPointer->getOperandCount() == 1 && isMutableHelperParameter &&
+        isTypeEqual(argumentHelperType, parameterHelperType))
+    {
+        return true;
+    }
+
+    IRType* parameterDeviceValueType = nullptr;
+    auto parameterDevicePointer =
+        asNVVMSupportedDeviceCopyableValuePointerType(parameterType, &parameterDeviceValueType);
     return argumentCopyablePointer && argumentCopyablePointer->getOp() == kIROp_PtrType &&
-           isMutableCopyableParameter && isTypeEqual(argumentCopyableType, parameterCopyableType);
+           argumentCopyablePointer->getOperandCount() == 1 && parameterDevicePointer &&
+           isTypeEqual(argumentCopyableType, parameterDeviceValueType);
 }
 
 // Returns whether a canonical helper signature needs the generic construction path.
@@ -4662,6 +4835,21 @@ SlangResult _validateNVVMFunction(
                     {
                         break;
                     }
+                    IRType* helperValueType = nullptr;
+                    if (asNVVMSupportedLocalHelperValuePointerType(
+                            inst->getDataType(),
+                            &helperValueType))
+                    {
+                        auto helperStructType = asNVVMSupportedHelperStructType(helperValueType);
+                        if (!helperStructType ||
+                            !_hasNVVMCompatibleStructLayout(codeGenContext, helperStructType))
+                        {
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("local helper-value layout"));
+                        }
+                        break;
+                    }
                     IRStructType* valueType = nullptr;
                     if (!asNVVMSupportedLocalResourceStructPointerType(
                             inst->getDataType(),
@@ -4680,7 +4868,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_Load:
                 {
-                    if (!getNVVMResourceValueAlignment(inst->getDataType()) &&
+                    if (!_getNVVMExecutableValueAlignment(inst->getDataType()) &&
                         !asNVVMSupportedParameterGroupType(inst->getDataType()))
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
                 }
@@ -4749,14 +4937,38 @@ SlangResult _validateNVVMFunction(
             case kIROp_CastIntToFloat:
             case kIROp_CastFloatToInt:
             case kIROp_FloatCast:
-            case kIROp_BitCast:
             case kIROp_Select:
                 {
                     NVVMResolvedValueOperation operation;
                     if (!_resolveNVVMValueOperation(inst, operation))
-                        return _diagnoseUnsupportedIR(
+                        return inst->getOperandCount() == 2
+                                   ? _diagnoseUnsupportedIRTypeRelation(
+                                         codeGenContext,
+                                         getIROpInfo(inst->getOp()).name,
+                                         inst->getOperand(0)->getDataType(),
+                                         inst->getOperand(1)->getDataType())
+                                   : _diagnoseUnsupportedIR(
+                                         codeGenContext,
+                                         UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                    _requireValueOperation(
+                        requirements.valueOperations,
+                        operation.desc,
+                        operation.diagnosticName);
+                }
+                break;
+
+            case kIROp_BitCast:
+                {
+                    NVVMPointerBitCast pointerCast;
+                    if (_getNVVMPointerBitCast(inst, pointerCast))
+                        break;
+                    NVVMResolvedValueOperation operation;
+                    if (!_resolveNVVMValueOperation(inst, operation))
+                        return _diagnoseUnsupportedIRTypeRelation(
                             codeGenContext,
-                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                            "bitCast type",
+                            inst->getOperand(0)->getDataType(),
+                            inst->getDataType());
                     _requireValueOperation(
                         requirements.valueOperations,
                         operation.desc,
@@ -5241,7 +5453,6 @@ SlangResult _validateNVVMFunction(
             case kIROp_CastIntToFloat:
             case kIROp_CastFloatToInt:
             case kIROp_FloatCast:
-            case kIROp_BitCast:
             case kIROp_Select:
                 {
                     NVVMResolvedValueOperation operation;
@@ -5256,6 +5467,47 @@ SlangResult _validateNVVMFunction(
                             availableValues,
                             dominatorTree));
                     }
+                    availableValues.add(inst);
+                }
+                break;
+
+            case kIROp_BitCast:
+                {
+                    NVVMPointerBitCast pointerCast;
+                    if (_getNVVMPointerBitCast(inst, pointerCast))
+                    {
+                        if (pointerCast.resultIsPointer)
+                        {
+                            SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                                codeGenContext,
+                                pointerCast.value,
+                                inst,
+                                availableValues,
+                                dominatorTree));
+                        }
+                        else
+                        {
+                            SLANG_RETURN_ON_FAIL(_validatePointerValue(
+                                codeGenContext,
+                                pointerCast.value,
+                                inst,
+                                availableValues,
+                                dominatorTree,
+                                false,
+                                pointerCast.pointerType->getValueType()));
+                        }
+                        availableValues.add(inst);
+                        break;
+                    }
+
+                    NVVMResolvedValueOperation operation;
+                    SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        inst->getOperand(0),
+                        inst,
+                        availableValues,
+                        dominatorTree));
                     availableValues.add(inst);
                 }
                 break;
@@ -5315,6 +5567,9 @@ SlangResult _validateNVVMFunction(
                         if (asNVVMSupportedLocalResourceStructPointerType(
                                 argument->getDataType()) ||
                             asNVVMSupportedLocalCopyableValuePointerType(argument->getDataType()) ||
+                            asNVVMSupportedLocalHelperValuePointerType(argument->getDataType()) ||
+                            asNVVMSupportedDeviceCopyableValuePointerType(
+                                argument->getDataType()) ||
                             asNVVMSupportedDerivedCopyableValuePointerType(argument->getDataType()))
                         {
                             SLANG_RETURN_ON_FAIL(_validatePointerValue(
@@ -5745,7 +6000,25 @@ SlangResult _validateNVVMFunction(
                         }
                         else
                         {
-                            if (as<IRStructType>(function->getResultType()) ||
+                            if (asNVVMSupportedLocalCopyableValuePointerType(
+                                    function->getResultType()) ||
+                                asNVVMSupportedLocalHelperValuePointerType(
+                                    function->getResultType()) ||
+                                asNVVMSupportedDeviceCopyableValuePointerType(
+                                    function->getResultType()))
+                            {
+                                SLANG_RETURN_ON_FAIL(_validatePointerValue(
+                                    codeGenContext,
+                                    returnInst->getVal(),
+                                    returnInst,
+                                    availableValues,
+                                    dominatorTree,
+                                    false,
+                                    cast<IRPtrTypeBase>(function->getResultType())
+                                        ->getValueType()));
+                            }
+                            else if (
+                                as<IRStructType>(function->getResultType()) ||
                                 as<IRArrayType>(function->getResultType()))
                             {
                                 SLANG_RETURN_ON_FAIL(_validateAvailableValue(
@@ -5963,6 +6236,7 @@ SlangResult _validateNVVMFunction(
 }
 
 using NVVMValueMap = Dictionary<IRInst*, SlangNVVMValueHandle>;
+using NVVMGlobalUserPointerSet = HashSet<IRInst*>;
 
 // Returns an already-lowered SSA value or materializes an exact preflighted scalar literal.
 SlangResult _getLoweredNVVMValue(
@@ -6029,6 +6303,29 @@ SlangResult _getLoweredNVVMValue(
         return SLANG_OK;
     }
 
+    if (auto nullPointer = _asExecutableNullDevicePointer(irValue))
+    {
+        SlangNVVMTypeHandle int64Type = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "null UserPointer integer type",
+            builder.getIntegerType(module, 64, int64Type)));
+        SlangNVVMValueHandle zero = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "null UserPointer bit pattern",
+            builder.getIntegerConstant(module, int64Type, 0, zero)));
+        SlangNVVMTypeHandle pointerType = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            typeContext.lowerType(nullPointer->getDataType(), NVVMTypeUse::Value, pointerType));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "null UserPointer materialization",
+            builder.emitBitCast(module, pointerType, zero, outValue)));
+        valueMap[irValue] = outValue;
+        return SLANG_OK;
+    }
+
     auto floatLit = _asExecutableFloatingPointConstant(irValue);
     SLANG_RELEASE_ASSERT(floatLit);
     SlangNVVMTypeHandle floatingPointType = nullptr;
@@ -6049,6 +6346,61 @@ SlangResult _getLoweredNVVMValue(
         builder
             .getFloatingPointConstant(module, floatingPointType, bitWidth, bitPattern, outValue)));
     valueMap[irValue] = outValue;
+    return SLANG_OK;
+}
+
+// Returns the physical helper representation of one selected value. Most values already have one
+// representation. An exact UserPointer is provenance-sensitive: kernel parameters and pointers
+// loaded from conventional global storage stay AS1 for ordinary memory operations, then widen to
+// AS0 only when a helper value boundary must also admit local addresses.
+SlangResult _getLoweredNVVMHelperValue(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRInst* irValue,
+    NVVMValueMap& valueMap,
+    const NVVMGlobalUserPointerSet& globalUserPointers,
+    NVVMValueMap& helperValueMap,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    if (!asNVVMSupportedDeviceCopyableValuePointerType(irValue->getDataType()) ||
+        !globalUserPointers.contains(irValue))
+    {
+        return _getLoweredNVVMValue(
+            codeGenContext,
+            builder,
+            module,
+            irValue,
+            valueMap,
+            typeContext,
+            outValue);
+    }
+
+    if (auto mappedValue = helperValueMap.tryGetValue(irValue))
+    {
+        outValue = *mappedValue;
+        return SLANG_OK;
+    }
+
+    SlangNVVMValueHandle globalPointer = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        irValue,
+        valueMap,
+        typeContext,
+        globalPointer));
+    SLANG_RETURN_ON_FAIL(_emitNVVMExecutableUserPointer(
+        codeGenContext,
+        builder,
+        module,
+        irValue->getDataType(),
+        globalPointer,
+        typeContext,
+        outValue));
+    helperValueMap[irValue] = outValue;
     return SLANG_OK;
 }
 
@@ -6106,7 +6458,7 @@ SlangResult _emitNVVMScalarIntrinsicOutStore(
     return _requireBuilderOperation(
         codeGenContext,
         "scalar intrinsic recipe out-parameter store",
-        builder.emitStore(module, value, pointer, getNVVMResourceValueAlignment(valueType)));
+        builder.emitStore(module, value, pointer, _getNVVMExecutableValueAlignment(valueType)));
 }
 
 // Emits one finalized scalar intrinsic helper as a bounded graph of queried typed operations. The
@@ -6932,19 +7284,11 @@ SlangResult validateNVVMSupportedIR(
     for (auto function : functions)
     {
         IRType* resultType = function->getResultType();
-        if ((as<IRStructType>(resultType) || as<IRArrayType>(resultType)) &&
-            isNVVMSupportedCopyableValueType(resultType))
-        {
-            _addNVVMReachableStructTypes(resultType, selectedReachableStructTypes);
-        }
+        _addNVVMReachableStructTypes(resultType, selectedReachableStructTypes);
         for (auto parameter : function->getParams())
         {
             IRType* parameterType = parameter->getDataType();
-            if (asNVVMSupportedResourceStructType(parameterType) ||
-                asNVVMSupportedCopyableArrayType(parameterType))
-            {
-                _addNVVMReachableStructTypes(parameterType, selectedReachableStructTypes);
-            }
+            _addNVVMReachableStructTypes(parameterType, selectedReachableStructTypes);
             if (auto elementStruct =
                     _getNVVMRawBufferAggregateElementType(parameter->getDataType()))
             {
@@ -6980,11 +7324,19 @@ SlangResult validateNVVMSupportedIR(
                     copyablePointerValueType,
                     selectedReachableStructTypes);
             }
+            IRType* helperPointerValueType = nullptr;
+            if (asNVVMSupportedLocalHelperValuePointerType(
+                    parameter->getDataType(),
+                    &helperPointerValueType))
+            {
+                _addNVVMReachableStructTypes(helperPointerValueType, selectedReachableStructTypes);
+            }
         }
         for (auto block : function->getBlocks())
         {
             for (auto inst : block->getOrdinaryInsts())
             {
+                _addNVVMReachableStructTypes(inst->getDataType(), selectedReachableStructTypes);
                 IRType* localValueType = nullptr;
                 if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalCopyableValuePointerType(
                                                       inst->getDataType(),
@@ -6999,6 +7351,15 @@ SlangResult validateNVVMSupportedIR(
                 {
                     _addNVVMReachableStructTypes(
                         localResourceValueType,
+                        selectedReachableStructTypes);
+                }
+                IRType* localHelperValueType = nullptr;
+                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalHelperValuePointerType(
+                                                      inst->getDataType(),
+                                                      &localHelperValueType))
+                {
+                    _addNVVMReachableStructTypes(
+                        localHelperValueType,
                         selectedReachableStructTypes);
                 }
             }
@@ -7144,6 +7505,8 @@ SlangResult emitNVVMIRFromLinkedIR(
     NVVMTypeLoweringContext typeContext(codeGenContext, builder, moduleScope.module);
     Dictionary<IRFunc*, SlangNVVMValueHandle> functionMap;
     NVVMValueMap valueMap;
+    NVVMValueMap helperValueMap;
+    NVVMGlobalUserPointerSet globalUserPointers;
     Dictionary<IRBlock*, SlangNVVMBlockHandle> blockMap;
 
     // The canonical global owns storage class, value type, extent, and name. Lower those facts once
@@ -7305,6 +7668,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                     parameterIndex,
                     parameter)));
             valueMap[param] = parameter;
+            if (function == entryPoint &&
+                asNVVMSupportedDeviceCopyableValuePointerType(param->getDataType()))
+            {
+                globalUserPointers.add(param);
+            }
             ++parameterIndex;
         }
     }
@@ -7337,20 +7705,21 @@ SlangResult emitNVVMIRFromLinkedIR(
         }
 
         IRBlock* entryBlock = function->getFirstBlock();
-        if (function != entryPoint)
+        bool hasHalfParameter = false;
+        for (auto param : function->getParams())
         {
-            bool hasHalfParameter = false;
-            for (auto param : function->getParams())
-            {
-                hasHalfParameter = hasHalfParameter || isNVVMFloat16Type(param->getDataType());
-            }
-            if (hasHalfParameter)
-            {
-                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                    codeGenContext,
-                    "Half helper ABI entry-block selection",
-                    builder.setInsertBlock(moduleScope.module, blockMap.getValue(entryBlock))));
-            }
+            hasHalfParameter = hasHalfParameter ||
+                               (function != entryPoint && isNVVMFloat16Type(param->getDataType()));
+        }
+        if (hasHalfParameter)
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "Half helper ABI entry-block selection",
+                builder.setInsertBlock(moduleScope.module, blockMap.getValue(entryBlock))));
+        }
+        if (hasHalfParameter)
+        {
             for (auto param : function->getParams())
             {
                 if (!isNVVMFloat16Type(param->getDataType()))
@@ -7418,16 +7787,21 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 inst->getDataType(),
                                 &valueType))
                         {
-                            IRStructType* structValueType = nullptr;
-                            SLANG_RELEASE_ASSERT(asNVVMSupportedLocalResourceStructPointerType(
-                                inst->getDataType(),
-                                &structValueType));
-                            valueType = structValueType;
+                            if (!asNVVMSupportedLocalHelperValuePointerType(
+                                    inst->getDataType(),
+                                    &valueType))
+                            {
+                                IRStructType* structValueType = nullptr;
+                                SLANG_RELEASE_ASSERT(asNVVMSupportedLocalResourceStructPointerType(
+                                    inst->getDataType(),
+                                    &structValueType));
+                                valueType = structValueType;
+                            }
                         }
                         SlangNVVMTypeHandle loweredValueType = nullptr;
                         SLANG_RETURN_ON_FAIL(
                             typeContext.lowerType(valueType, NVVMTypeUse::Value, loweredValueType));
-                        const uint32_t alignment = getNVVMResourceValueAlignment(valueType);
+                        const uint32_t alignment = _getNVVMExecutableValueAlignment(valueType);
                         SLANG_RELEASE_ASSERT(alignment);
                         SlangNVVMValueHandle loweredStorage = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -7462,7 +7836,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             compactStorageVector
                                 ? getNVVMNumericValueAlignment(
                                       compactStorageVector->getElementType())
-                                : getNVVMResourceValueAlignment(load->getDataType());
+                                : _getNVVMExecutableValueAlignment(load->getDataType());
                         NVVMRawBufferType rawBufferType;
                         NVVMSurfaceType surfaceType;
                         NVVMReadOnlyTextureType sampledTextureType;
@@ -7490,6 +7864,15 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 alignment,
                                 loadFlags,
                                 loweredValue)));
+                        NVVMStructField pointerStorageField;
+                        if (asNVVMSupportedDeviceCopyableValuePointerType(load->getDataType()) &&
+                            _getNVVMStructFieldAddress(
+                                as<IRFieldAddress>(load->getPtr()),
+                                pointerStorageField) &&
+                            pointerStorageField.isConventionalGlobal)
+                        {
+                            globalUserPointers.add(load);
+                        }
                         if (compactStorageVector)
                         {
                             uint32_t elementCount = 0;
@@ -7533,14 +7916,34 @@ SlangResult emitNVVMIRFromLinkedIR(
                     {
                         auto store = cast<IRStore>(inst);
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            store->getVal(),
-                            valueMap,
-                            typeContext,
-                            loweredValue));
+                        IRInst* rootAddress = getRootAddr(store->getPtr());
+                        if (asNVVMSupportedDeviceCopyableValuePointerType(
+                                store->getVal()->getDataType()) &&
+                            rootAddress &&
+                            asNVVMSupportedLocalHelperValuePointerType(rootAddress->getDataType()))
+                        {
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMHelperValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                store->getVal(),
+                                valueMap,
+                                globalUserPointers,
+                                helperValueMap,
+                                typeContext,
+                                loweredValue));
+                        }
+                        else
+                        {
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                store->getVal(),
+                                valueMap,
+                                typeContext,
+                                loweredValue));
+                        }
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -7557,7 +7960,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 moduleScope.module,
                                 loweredValue,
                                 loweredPointer,
-                                getNVVMResourceValueAlignment(store->getVal()->getDataType()))));
+                                _getNVVMExecutableValueAlignment(store->getVal()->getDataType()))));
                     }
                     break;
 
@@ -7718,7 +8121,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_CastIntToFloat:
                 case kIROp_CastFloatToInt:
                 case kIROp_FloatCast:
-                case kIROp_BitCast:
                 case kIROp_Select:
                 case kIROp_WaveMaskBallot:
                     {
@@ -7747,6 +8149,63 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 operation.desc,
                                 inst->getOperandCount() ? loweredOperands : nullptr,
                                 inst->getOperandCount(),
+                                loweredValue)));
+                        valueMap[inst] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_BitCast:
+                    {
+                        NVVMPointerBitCast pointerCast;
+                        if (!_getNVVMPointerBitCast(inst, pointerCast))
+                        {
+                            NVVMResolvedValueOperation operation;
+                            SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                            SlangNVVMValueHandle loweredOperand = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                inst->getOperand(0),
+                                valueMap,
+                                typeContext,
+                                loweredOperand));
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                operation.diagnosticName,
+                                builder.emitValueOperation(
+                                    moduleScope.module,
+                                    operation.desc,
+                                    &loweredOperand,
+                                    1,
+                                    loweredValue)));
+                            valueMap[inst] = loweredValue;
+                            break;
+                        }
+
+                        SlangNVVMValueHandle loweredOperand = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            pointerCast.value,
+                            valueMap,
+                            typeContext,
+                            loweredOperand));
+                        SlangNVVMTypeHandle loweredResultType = nullptr;
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            inst->getDataType(),
+                            NVVMTypeUse::Value,
+                            loweredResultType));
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "pointer bit-pattern transport",
+                            builder.emitBitCast(
+                                moduleScope.module,
+                                loweredResultType,
+                                loweredOperand,
                                 loweredValue)));
                         valueMap[inst] = loweredValue;
                     }
@@ -7799,12 +8258,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                              ++argumentIndex)
                         {
                             SlangNVVMValueHandle loweredArgument = nullptr;
-                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMHelperValue(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
                                 call->getArg(argumentIndex),
                                 valueMap,
+                                globalUserPointers,
+                                helperValueMap,
                                 typeContext,
                                 loweredArgument));
                             if (isNVVMFloat16Type(callee->getParamType(argumentIndex)))
@@ -7898,13 +8359,15 @@ SlangResult emitNVVMIRFromLinkedIR(
                             for (uint32_t i = 0; i < aggregateConstruction.elementCount; ++i)
                             {
                                 SlangNVVMValueHandle loweredElement = nullptr;
-                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMHelperValue(
                                     codeGenContext,
                                     builder,
                                     moduleScope.module,
                                     inst->getOperand(
                                         aggregateConstruction.repeatsSingleElement ? 0 : i),
                                     valueMap,
+                                    globalUserPointers,
+                                    helperValueMap,
                                     typeContext,
                                     loweredElement));
                                 loweredElements.add(loweredElement);
@@ -8542,6 +9005,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 loweredElementOffset,
                                 loweredPointer)));
                         valueMap[inst] = loweredPointer;
+                        if (asNVVMSupportedDeviceCopyableValuePointerType(inst->getDataType()) &&
+                            globalUserPointers.contains(inst->getOperand(0)))
+                        {
+                            globalUserPointers.add(inst);
+                        }
                     }
                     break;
 
@@ -8592,6 +9060,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                                                   : "device i32 array element pointer",
                             pointerResult));
                         valueMap[inst] = loweredPointer;
+                        if (asNVVMSupportedDeviceCopyableValuePointerType(inst->getDataType()) &&
+                            globalUserPointers.contains(inst->getOperand(0)))
+                        {
+                            globalUserPointers.add(inst);
+                        }
                     }
                     break;
 
@@ -9001,12 +9474,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                     {
                         auto returnInst = cast<IRReturn>(inst);
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMHelperValue(
                             codeGenContext,
                             builder,
                             moduleScope.module,
                             returnInst->getVal(),
                             valueMap,
+                            globalUserPointers,
+                            helperValueMap,
                             typeContext,
                             loweredValue));
                         SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
@@ -9135,12 +9610,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                 for (auto param : block->getParams())
                 {
                     SlangNVVMValueHandle loweredArgument = nullptr;
-                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMHelperValue(
                         codeGenContext,
                         builder,
                         moduleScope.module,
                         branch->getArg(phiParameterIndex),
                         valueMap,
+                        globalUserPointers,
+                        helperValueMap,
                         typeContext,
                         loweredArgument));
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(

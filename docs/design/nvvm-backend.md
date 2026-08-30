@@ -6358,6 +6358,35 @@ The three representative gates remain correct; direct O3 PTX assembles with CUDA
 SM80, and SM90. CUDA 13 tooling and physical SM70/SM80/SM90 runtime workers remain explicit
 productionization gaps.
 
+### Slice 139: Provenance-sensitive `UserPointer` helper transport
+
+An exact read-write `UserPointer<T>` in the default buffer layout is now a first-class member of
+the finite helper-value algebra. Fixed arrays and structs may contain these pointer leaves when
+their complete nested shape is otherwise copyable. The canonical source spelling is preserved;
+the compiler does not reconstruct pointer syntax or infer support from a fixture name.
+
+CUDA entry ABI parameters and conventional global-storage pointer values remain address-space-one
+pointers. The emitter records values produced by those canonical global producers and widens them
+to generic address-space-zero pointers only when they cross a helper-value boundary: a helper
+argument or result, a phi, a local helper store, or pointer-bearing aggregate construction. Values
+already produced by helper parameters, helper results, local loads, and pointer reconstruction stay
+generic. This provenance-sensitive boundary is required because unconditionally widening entry
+pointers regresses global loads and atomics even though it makes helper transport legal.
+
+Forward-only builder ABI revision 29 adds generic pointer address-space conversion and pointer-bit
+reinterpretation operations. The compiler uses them for the concrete LLVM operations that cannot
+be expressed through the revision-28 typed operations: `addrspacecast`, `ptrtoint`, and `inttoptr`.
+Mixed-width integer shifts remain an ordinary typed operation; the provider normalizes the shift
+count to the value width before constructing LLVM IR.
+
+Twenty existing workloads become correct at O0 and O3 with no previously correct regression. The
+fixed 452-row census reaches 318 O0 and 323 O3 successes. Among 427 workloads with a healthy NVRTC
+reference, O0/O3/both correctness is 317/321/317 (74.2%/75.2%/74.2%). The helper ABI/type cluster
+falls from 28 to 16, and aggregate/pointer/layout transport falls from 17 to 14. All 40 promoted
+lanes and the 407/407 selected prefix pass. Representative direct O3 PTX remains accepted with
+CUDA 12.9 for SM70, SM80, and SM90; CUDA 13 and physical SM70/SM80/SM90 runtime workers remain
+productionization gaps.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

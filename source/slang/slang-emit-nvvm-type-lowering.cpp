@@ -477,6 +477,165 @@ IRArrayType* asNVVMSupportedCopyableArrayType(IRInst* type, uint32_t* outElement
     return arrayType;
 }
 
+IRPtrTypeBase* asNVVMSupportedDeviceCopyableValuePointerType(IRInst* type, IRType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    auto pointerType = as<IRPtrTypeBase>(type);
+    IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
+    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    if (!pointerType || pointerType->getOp() != kIROp_PtrType ||
+        pointerType->getOperandCount() != 4 ||
+        pointerType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        pointerType->getAddressSpace() != AddressSpace::UserPointer || !dataLayout ||
+        dataLayout->getOp() != kIROp_DefaultBufferLayoutType ||
+        !isNVVMSupportedCopyableValueType(valueType))
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
+static bool _isNVVMSupportedHelperValueType(IRInst* type, HashSet<IRInst*>& activeTypes)
+{
+    if (isNVVMSupportedCopyableValueType(type) ||
+        asNVVMSupportedDeviceCopyableValuePointerType(type))
+    {
+        return true;
+    }
+    if (!type || activeTypes.contains(type))
+        return false;
+
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        auto elementCount = as<IRIntLit>(arrayType->getElementCount());
+        if (arrayType->getOp() != kIROp_ArrayType || arrayType->getOperandCount() != 2 ||
+            !elementCount || elementCount->getValue() <= 0 || elementCount->getValue() > UINT32_MAX)
+            return false;
+        activeTypes.add(type);
+        const bool result =
+            _isNVVMSupportedHelperValueType(arrayType->getElementType(), activeTypes);
+        activeTypes.remove(type);
+        return result;
+    }
+
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return false;
+    activeTypes.add(type);
+    bool hasField = false;
+    for (auto field : structType->getFields())
+    {
+        if (!_isNVVMSupportedHelperValueType(field->getFieldType(), activeTypes))
+        {
+            activeTypes.remove(type);
+            return false;
+        }
+        hasField = true;
+    }
+    activeTypes.remove(type);
+    return hasField;
+}
+
+bool isNVVMSupportedHelperValueType(IRInst* type)
+{
+    HashSet<IRInst*> activeTypes;
+    return _isNVVMSupportedHelperValueType(type, activeTypes);
+}
+
+static uint32_t _getNVVMHelperValueAlignment(IRInst* type, HashSet<IRInst*>& activeTypes)
+{
+    if (const uint32_t copyableAlignment = getNVVMCopyableValueAlignment(type))
+        return copyableAlignment;
+    if (asNVVMSupportedDeviceCopyableValuePointerType(type))
+        return 8;
+    if (!type || activeTypes.contains(type))
+        return 0;
+
+    activeTypes.add(type);
+    uint32_t alignment = 0;
+    bool hasElement = false;
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        alignment = _getNVVMHelperValueAlignment(arrayType->getElementType(), activeTypes);
+        hasElement = alignment != 0;
+    }
+    else if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            const uint32_t fieldAlignment =
+                _getNVVMHelperValueAlignment(field->getFieldType(), activeTypes);
+            if (!fieldAlignment)
+            {
+                alignment = 0;
+                hasElement = false;
+                break;
+            }
+            alignment = Math::Max(alignment, fieldAlignment);
+            hasElement = true;
+        }
+    }
+    activeTypes.remove(type);
+    return hasElement ? alignment : 0;
+}
+
+uint32_t getNVVMHelperValueAlignment(IRInst* type)
+{
+    if (!isNVVMSupportedHelperValueType(type))
+        return 0;
+    HashSet<IRInst*> activeTypes;
+    return _getNVVMHelperValueAlignment(type, activeTypes);
+}
+
+IRArrayType* asNVVMSupportedHelperArrayType(IRInst* type, uint32_t* outElementCount)
+{
+    if (outElementCount)
+        *outElementCount = 0;
+    auto arrayType = as<IRArrayType>(type);
+    auto elementCount = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
+    if (!arrayType || !elementCount || elementCount->getValue() <= 0 ||
+        !isNVVMSupportedHelperValueType(type))
+    {
+        return nullptr;
+    }
+    if (outElementCount)
+        *outElementCount = uint32_t(elementCount->getValue());
+    return arrayType;
+}
+
+IRStructType* asNVVMSupportedHelperStructType(IRInst* type)
+{
+    auto structType = as<IRStructType>(type);
+    return structType && isNVVMSupportedHelperValueType(type) ? structType : nullptr;
+}
+
+IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(IRInst* type, IRType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    auto pointerType = as<IRPtrTypeBase>(type);
+    IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
+    const bool isPlainLocalPointer =
+        pointerType && pointerType->getOp() == kIROp_PtrType && pointerType->getOperandCount() == 1;
+    const bool isMutableParameter = pointerType &&
+                                    (pointerType->getOp() == kIROp_OutParamType ||
+                                     pointerType->getOp() == kIROp_BorrowInOutParamType) &&
+                                    pointerType->getOperandCount() == 1;
+    if (!pointerType || isNVVMSupportedCopyableValueType(valueType) ||
+        !isNVVMSupportedHelperValueType(valueType) ||
+        (!isPlainLocalPointer && !isMutableParameter) ||
+        pointerType->getAddressSpace() != AddressSpace::Generic)
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
 IRPtrTypeBase* asNVVMSupportedLocalCopyableValuePointerType(IRInst* type, IRType** outValueType)
 {
     if (outValueType)
@@ -1242,6 +1401,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
     SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
     IRType* type = field ? field->getFieldType() : nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+           asNVVMSupportedDeviceCopyableValuePointerType(type) ||
            asNVVMSupportedParameterGroupType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceField(field, surfaceType, storageFormat) ||
@@ -1307,6 +1467,9 @@ SlangResult NVVMTypeLoweringContext::_reportUnsupportedType(NVVMTypeUse use) con
     case NVVMTypeUse::HelperParameter:
         construct = "helper function parameter";
         break;
+    case NVVMTypeUse::HelperValue:
+        construct = "helper value type";
+        break;
     case NVVMTypeUse::Value:
         break;
     case NVVMTypeUse::Storage:
@@ -1327,7 +1490,9 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     outType = nullptr;
     const bool isAggregateStorage =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
-    auto& typeMap = isAggregateStorage ? m_aggregateStorageTypeMap : m_typeMap;
+    auto& typeMap = use == NVVMTypeUse::HelperValue ? m_helperABIRepresentationMap
+                    : isAggregateStorage            ? m_aggregateStorageTypeMap
+                                                    : m_typeMap;
     if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
@@ -1338,13 +1503,17 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     IRArrayType* supportedType =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage
             ? asNVVMSupportedAggregateStorageArrayType(type, &elementCount)
-            : asNVVMSupportedCopyableArrayType(type, &elementCount);
+            : asNVVMSupportedHelperArrayType(type, &elementCount);
     SLANG_RELEASE_ASSERT(supportedType);
     SlangNVVMTypeHandle elementType = nullptr;
-    const NVVMTypeUse elementUse = use == NVVMTypeUse::ParameterGroupStorage
-                                       ? NVVMTypeUse::ParameterGroupStorage
-                                   : use == NVVMTypeUse::Storage ? NVVMTypeUse::Storage
-                                                                 : NVVMTypeUse::Value;
+    const NVVMTypeUse elementUse =
+        use == NVVMTypeUse::HelperValue             ? NVVMTypeUse::HelperValue
+        : use == NVVMTypeUse::ParameterGroupStorage ? NVVMTypeUse::ParameterGroupStorage
+        : use == NVVMTypeUse::Storage && isNVVMSupportedHelperValueType(type) &&
+                !isNVVMSupportedCopyableValueType(type)
+            ? NVVMTypeUse::HelperValue
+        : use == NVVMTypeUse::Storage ? NVVMTypeUse::Storage
+                                      : NVVMTypeUse::Value;
     SLANG_RETURN_ON_FAIL(lowerType(type->getElementType(), elementUse, elementType));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         isAggregateStorage ? "fixed aggregate storage array type" : "fixed copyable array type",
@@ -1361,7 +1530,9 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
     outType = nullptr;
     const bool isAggregateStorage =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
-    auto& typeMap = isAggregateStorage ? m_aggregateStorageTypeMap : m_typeMap;
+    auto& typeMap = use == NVVMTypeUse::HelperValue ? m_helperABIRepresentationMap
+                    : isAggregateStorage            ? m_aggregateStorageTypeMap
+                                                    : m_typeMap;
     if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
@@ -1369,8 +1540,11 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
     }
 
     const NVVMTypeUse fieldUse =
-        use == NVVMTypeUse::ParameterGroupStorage ? NVVMTypeUse::ParameterGroupStorage
-        : asNVVMSupportedCopyableStructType(type) ||
+        use == NVVMTypeUse::HelperValue             ? NVVMTypeUse::HelperValue
+        : use == NVVMTypeUse::ParameterGroupStorage ? NVVMTypeUse::ParameterGroupStorage
+        : (asNVVMSupportedHelperStructType(type) && !isNVVMSupportedCopyableValueType(type))
+            ? NVVMTypeUse::HelperValue
+        : asNVVMSupportedHelperStructType(type) ||
                 (use != NVVMTypeUse::Storage && asNVVMSupportedResourceStructType(type))
             ? NVVMTypeUse::Value
             : NVVMTypeUse::Storage;
@@ -1496,17 +1670,19 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
     IRType* canonicalType,
     IRType* pointeeType,
     SlangNVVMAddressSpace addressSpace,
-    SlangNVVMTypeHandle& outType)
+    SlangNVVMTypeHandle& outType,
+    NVVMTypeUse pointeeUse,
+    bool cacheCanonicalType)
 {
     outType = nullptr;
     SlangNVVMTypeHandle loweredPointeeType = nullptr;
     if (auto arrayType = as<IRArrayType>(pointeeType))
     {
-        SLANG_RETURN_ON_FAIL(_lowerArrayType(arrayType, NVVMTypeUse::Value, loweredPointeeType));
+        SLANG_RETURN_ON_FAIL(_lowerArrayType(arrayType, pointeeUse, loweredPointeeType));
     }
     else
     {
-        SLANG_RETURN_ON_FAIL(lowerType(pointeeType, NVVMTypeUse::Value, loweredPointeeType));
+        SLANG_RETURN_ON_FAIL(lowerType(pointeeType, pointeeUse, loweredPointeeType));
     }
 
     // Consider a kernel that copies from `Ptr<int, Read, Device>` to
@@ -1527,7 +1703,8 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
             m_builder.getPointerType(m_module, loweredPointeeType, addressSpace, outType)));
         m_pointerRepresentationMap[key] = outType;
     }
-    m_typeMap[canonicalType] = outType;
+    if (cacheCanonicalType)
+        m_typeMap[canonicalType] = outType;
     return SLANG_OK;
 }
 
@@ -1550,7 +1727,6 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRVectorType* valueVectorType = asNVVMSupportedValueVectorType(type, &valueVectorElementCount);
     IRStructType* structType = as<IRStructType>(type);
     IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
-    const bool isCopyableValue = isNVVMSupportedCopyableValueType(type);
     IRStructType* resourceStructType = asNVVMSupportedResourceStructType(type);
     IRStructType* physicalArrayStructType = asNVVMSupportedPhysicalArrayStructType(type);
     IRStructType* localResourceStructValueType = nullptr;
@@ -1559,9 +1735,19 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRType* localCopyablePointerValueType = nullptr;
     IRPtrTypeBase* localCopyablePointer =
         asNVVMSupportedLocalCopyableValuePointerType(type, &localCopyablePointerValueType);
+    IRType* localHelperPointerValueType = nullptr;
+    IRPtrTypeBase* localHelperPointer =
+        asNVVMSupportedLocalHelperValuePointerType(type, &localHelperPointerValueType);
+    IRType* deviceCopyablePointerValueType = nullptr;
+    IRPtrTypeBase* deviceCopyablePointer =
+        asNVVMSupportedDeviceCopyableValuePointerType(type, &deviceCopyablePointerValueType);
+    const bool isHelperValue = isNVVMSupportedHelperValueType(type);
+    const bool isPointerBearingHelperValue =
+        isHelperValue && !isNVVMSupportedCopyableValueType(type);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
     IRArrayType* fixedCopyableArrayType = asNVVMSupportedCopyableArrayType(type);
+    IRArrayType* fixedHelperArrayType = asNVVMSupportedHelperArrayType(type);
     IRArrayType* aggregateStorageArrayType = asNVVMSupportedAggregateStorageArrayType(type);
     IRVectorType* compactParameterGroupVectorType =
         asNVVMSupportedCompactParameterGroupVectorType(type);
@@ -1593,25 +1779,89 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // helper signature.
     const bool isLegal =
         (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-        (use == NVVMTypeUse::HelperResult && (isVoid || isCopyableValue)) ||
+        (use == NVVMTypeUse::HelperResult &&
+         (isVoid || isHelperValue || localCopyablePointer || localHelperPointer)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
-          deviceArrayPointer || isRawBuffer)) ||
+          deviceCopyablePointer || deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
-         (isCopyableValue || resourceStructType || localResourceStructPointer ||
-          localCopyablePointer || isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
+         (isHelperValue || resourceStructType || localResourceStructPointer ||
+          localCopyablePointer || localHelperPointer || isRawBuffer || isSurface ||
+          isSampledTexture || samplerValue)) ||
+        (use == NVVMTypeUse::HelperValue && isHelperValue) ||
         (use == NVVMTypeUse::Value &&
-         (isCopyableValue || resourceStructType || physicalArrayStructType ||
-          deviceNumericPointer || deviceArrayPointer || isRawBuffer || isBufferDataPointer ||
-          parameterGroup || isSurface || isSampledTexture || samplerValue ||
-          resourceElementPointer || sharedElementPointer)) ||
+         (isHelperValue || resourceStructType || physicalArrayStructType || deviceNumericPointer ||
+          deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup || isSurface ||
+          isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer)) ||
         (use == NVVMTypeUse::Storage &&
          (isInteger || isFloat32 || asNVVMSupported32BitNumericVectorType(type) || structType ||
-          aggregateStorageArrayType || isRawBuffer || parameterGroup || isSurface ||
-          isSampledTexture || samplerStorage || unsizedSamplerArrayStorage)) ||
+          aggregateStorageArrayType || deviceCopyablePointer || isRawBuffer || parameterGroup ||
+          isSurface || isSampledTexture || samplerStorage || unsizedSamplerArrayStorage)) ||
         (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type));
     if (!isLegal)
         return _reportUnsupportedType(use);
+
+    // A finite pointer-bearing helper aggregate has one executable representation whose
+    // UserPointer leaves are LLVM generic pointers. A helper can receive either a kernel device
+    // pointer or `__getAddress` of local storage, so global-only leaves would be incorrect. Keep
+    // this representation separate from launch and conventional-global storage, where the
+    // canonical producer proves global-memory provenance.
+    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
+         use == NVVMTypeUse::Value) &&
+        isPointerBearingHelperValue && !deviceCopyablePointer)
+    {
+        return lowerType(type, NVVMTypeUse::HelperValue, outType);
+    }
+
+    if (use == NVVMTypeUse::HelperValue && isNVVMSupportedCopyableValueType(type))
+        return lowerType(type, NVVMTypeUse::Value, outType);
+
+    if (use == NVVMTypeUse::EntryPointParameter && deviceCopyablePointer)
+    {
+        if (auto mappedType = m_entryParameterRepresentationMap.tryGetValue(type))
+        {
+            outType = *mappedType;
+            return SLANG_OK;
+        }
+        SLANG_RETURN_ON_FAIL(_lowerPointerType(
+            type,
+            deviceCopyablePointerValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            outType,
+            NVVMTypeUse::Value,
+            false));
+        m_entryParameterRepresentationMap[type] = outType;
+        return SLANG_OK;
+    }
+
+    if (use == NVVMTypeUse::Storage && deviceCopyablePointer)
+    {
+        if (auto mappedType = m_aggregateStorageTypeMap.tryGetValue(type))
+        {
+            outType = *mappedType;
+            return SLANG_OK;
+        }
+        SLANG_RETURN_ON_FAIL(_lowerPointerType(
+            type,
+            deviceCopyablePointerValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            outType,
+            NVVMTypeUse::Value,
+            false));
+        m_aggregateStorageTypeMap[type] = outType;
+        return SLANG_OK;
+    }
+
+    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
+         use == NVVMTypeUse::HelperValue || use == NVVMTypeUse::Value) &&
+        deviceCopyablePointer)
+    {
+        return _lowerPointerType(
+            type,
+            deviceCopyablePointerValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            outType);
+    }
 
     // Keep canonical Half values in LLVM's `half` type inside helper bodies, but transport a Half
     // helper parameter or result as i16. libNVVM's O3 NVPTX lowering can otherwise omit the caller
@@ -1655,13 +1905,33 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         return SLANG_OK;
     }
 
-    if (use == NVVMTypeUse::HelperParameter && localCopyablePointer)
+    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) &&
+        localCopyablePointer)
     {
         return _lowerPointerType(
             type,
             localCopyablePointerValueType,
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType);
+    }
+
+    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) &&
+        localHelperPointer)
+    {
+        if (auto mappedType = m_helperABIRepresentationMap.tryGetValue(type))
+        {
+            outType = *mappedType;
+            return SLANG_OK;
+        }
+        SLANG_RETURN_ON_FAIL(_lowerPointerType(
+            type,
+            localHelperPointerValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            outType,
+            NVVMTypeUse::HelperValue,
+            false));
+        m_helperABIRepresentationMap[type] = outType;
+        return SLANG_OK;
     }
 
     if (use == NVVMTypeUse::HelperParameter && localResourceStructPointer)
@@ -1684,7 +1954,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
 
     const bool isAggregateStorage =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
-    auto& typeMap = isAggregateStorage ? m_aggregateStorageTypeMap : m_typeMap;
+    auto& typeMap = use == NVVMTypeUse::HelperValue ? m_helperABIRepresentationMap
+                    : isAggregateStorage            ? m_aggregateStorageTypeMap
+                                                    : m_typeMap;
     if (auto mappedType = typeMap.tryGetValue(type))
     {
         outType = *mappedType;
@@ -1727,7 +1999,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                       .getVectorType(m_module, elementType, valueVectorElementCount, outType)));
     }
     else if (
-        fixedCopyableArrayType ||
+        fixedCopyableArrayType || fixedHelperArrayType ||
         ((use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage) &&
          aggregateStorageArrayType))
     {
@@ -1742,6 +2014,14 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         return _lowerPointerType(
             type,
             deviceNumericPointer->getValueType(),
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            outType);
+    }
+    else if (deviceCopyablePointer)
+    {
+        return _lowerPointerType(
+            type,
+            deviceCopyablePointerValueType,
             SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
             outType);
     }
