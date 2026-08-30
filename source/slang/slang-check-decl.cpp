@@ -10904,7 +10904,11 @@ SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequi
 
     // `locateNextRequirementWitnessLookupFrontier` returns the first missing structural step, not
     // necessarily the originally requested leaf. Each successful mutation therefore restarts the
-    // passive lookup from the original witness and requirement.
+    // passive lookup from the original witness and requirement. Every `continue` below publishes
+    // the table or entry named by that frontier before restarting, so the same missing step cannot
+    // be reported twice. Encountering an entry already owned by an outer request returns
+    // `Recursive` instead of spinning, and every finite witness path therefore either advances to
+    // a later missing step or returns a terminal result.
     for (;;)
     {
         auto frontier = locateNextRequirementWitnessLookupFrontier(
@@ -10999,6 +11003,9 @@ SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequi
                         return result;
                     case RequirementCheckState::Succeeded:
                     case RequirementCheckState::WitnessReady:
+                        // Both states require a dictionary entry. `removeRequirement` clears the
+                        // entry and its state together, while failure paths set `Failed` only after
+                        // removing the entry, so the frontier could not have reported it missing.
                         SLANG_UNEXPECTED("checked requirement has no structural witness");
                     case RequirementCheckState::Unchecked:
                         break;

@@ -1643,9 +1643,16 @@ FIDDLE() namespace Slang
     {
         explicit InterfaceRequirementKey(Decl* requirementDecl);
 
+        /// Creates a key and reports how many generic wrappers were removed from its declaration.
+        static InterfaceRequirementKey createWithGenericWrapperCount(
+            Decl* requirementDecl,
+            UCount& outGenericWrapperCount);
+
         Decl* getDecl() const { return m_decl; }
 
     private:
+        InterfaceRequirementKey(Decl* requirementDecl, UCount* outGenericWrapperCount);
+
         Decl* m_decl;
     };
 
@@ -1662,6 +1669,10 @@ FIDDLE() namespace Slang
     ///
     /// This state cannot be encoded by `RequirementWitness::Flavor`: `Flavor::none` is also the
     /// valid dictionary value of a successfully satisfied optional requirement.
+    /// `ConformanceInterfaceCheckStatus` separately records whole-table traversal. Its state is not
+    /// an aggregate of these entry states: on-demand checking may finish entries while the table is
+    /// still `Unchecked`, and a failed whole-table traversal retains entries that succeeded before
+    /// another requirement failed so later diagnostics can keep using those structural answers.
     enum class RequirementCheckState
     {
         /// No per-requirement check has started.
@@ -1686,7 +1697,8 @@ FIDDLE() namespace Slang
         FIDDLE(...)
         const RequirementDictionary& getRequirementDictionary() { return m_requirementDictionary; }
 
-        void add(Decl* decl, RequirementWitness const& witness);
+        /// Adds a witness while normalizing `requirementDecl` to its table-local requirement key.
+        void add(Decl* requirementDecl, RequirementWitness const& witness);
 
         /// Adds the witness for `key` using the table-local requirement identity.
         void addRequirement(InterfaceRequirementKey key, RequirementWitness const& witness);

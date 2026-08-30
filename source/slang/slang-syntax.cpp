@@ -714,16 +714,36 @@ RequirementWitness RequirementWitness::specialize(
 //
 
 InterfaceRequirementKey::InterfaceRequirementKey(Decl* requirementDecl)
+    : InterfaceRequirementKey(requirementDecl, nullptr)
+{
+}
+
+InterfaceRequirementKey InterfaceRequirementKey::createWithGenericWrapperCount(
+    Decl* requirementDecl,
+    UCount& outGenericWrapperCount)
+{
+    return InterfaceRequirementKey(requirementDecl, &outGenericWrapperCount);
+}
+
+InterfaceRequirementKey::InterfaceRequirementKey(
+    Decl* requirementDecl,
+    UCount* outGenericWrapperCount)
 {
     SLANG_RELEASE_ASSERT(requirementDecl);
+    UCount genericWrapperCount = 0;
     while (auto genericDecl = as<GenericDecl>(requirementDecl))
+    {
+        genericWrapperCount++;
         requirementDecl = genericDecl->inner;
+    }
+    if (outGenericWrapperCount)
+        *outGenericWrapperCount = genericWrapperCount;
     m_decl = requirementDecl;
 }
 
-void WitnessTable::add(Decl* decl, RequirementWitness const& witness)
+void WitnessTable::add(Decl* requirementDecl, RequirementWitness const& witness)
 {
-    m_requirementDictionary.add(decl, witness);
+    addRequirement(InterfaceRequirementKey(requirementDecl), witness);
 }
 
 void WitnessTable::addRequirement(InterfaceRequirementKey key, RequirementWitness const& witness)
