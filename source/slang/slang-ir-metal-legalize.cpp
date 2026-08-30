@@ -211,6 +211,30 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
     }
 };
 
+// Split a bit-cast between a vector and a pointer through a scalar `uint64_t`:
+// MSL rejects the direct cast (`(device T*)(uint2)` fails with "cannot cast from
+// type 'uint2' ... to pointer type"), but allows vector<->scalar `as_type` casts
+// and scalar<->pointer C-style casts. Such casts arise where a 64-bit value carried
+// as `uint2` for cross-target layout uniformity — a dynamic-dispatch handle
+// (`getLoweredHandleType`) or a pointer packed into an any-value payload
+// (`marshalBasicType`) — is reinterpreted as a real pointer.
+static void legalizeVectorPointerBitCast(IRInst* inst)
+{
+    auto toType = inst->getDataType();
+    auto fromType = inst->getOperand(0)->getDataType();
+    bool toIsPointer = as<IRPtrTypeBase>(toType) || as<IRRawPointerTypeBase>(toType);
+    bool fromIsPointer = as<IRPtrTypeBase>(fromType) || as<IRRawPointerTypeBase>(fromType);
+    bool toIsVector = as<IRVectorType>(toType) != nullptr;
+    bool fromIsVector = as<IRVectorType>(fromType) != nullptr;
+    if (!((toIsPointer && fromIsVector) || (toIsVector && fromIsPointer)))
+        return;
+
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+    auto scalarHop = builder.emitBitCast(builder.getUInt64Type(), inst->getOperand(0));
+    inst->setOperand(0, scalarHop);
+}
+
 static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     switch (inst->getOp())
@@ -238,6 +262,9 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
         break;
     case kIROp_MeshOutputRef:
         sink->diagnose(Diagnostics::AssignToRefNotSupported{.location = getDiagnosticPos(inst)});
+        break;
+    case kIROp_BitCast:
+        legalizeVectorPointerBitCast(inst);
         break;
     case kIROp_MetalCastToDepthTexture:
         {
