@@ -2876,10 +2876,10 @@ private:
         return nullptr;
     }
 
-    // Force a concrete requirement projection in `ioType` when semantic checking can produce its
-    // witness. Abstract and recursively owned projections remain symbolic inputs to ordinary
-    // subtype checking. Return false only when checking a concrete requirement failed.
-    bool tryResolveRequirementProjectionForConstraint(Type*& ioType)
+    // Check a requirement projection in `ioType` and resolve it when semantic checking can produce
+    // its witness. Abstract and recursively owned projections remain valid symbolic inputs to
+    // ordinary subtype checking. Return false only when checking a concrete requirement failed.
+    bool checkRequirementProjectionForConstraint(Type*& ioType)
     {
         auto resolution = m_visitor->ensureAndResolveRequirementProjection(ioType);
         switch (resolution.status)
@@ -2914,8 +2914,8 @@ private:
         auto sub = getSub(m_astBuilder, constraintDeclRef);
         auto sup = getSup(m_astBuilder, constraintDeclRef);
 
-        if (!tryResolveRequirementProjectionForConstraint(sub) ||
-            !tryResolveRequirementProjectionForConstraint(sup))
+        if (!checkRequirementProjectionForConstraint(sub) ||
+            !checkRequirementProjectionForConstraint(sup))
             return nullptr;
 
         // The raw declaration also matters for overload ranking: `T : IFoo`

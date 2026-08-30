@@ -10904,13 +10904,15 @@ SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequi
 
     // `locateNextRequirementWitnessLookupFrontier` returns the first missing structural step, not
     // necessarily the originally requested leaf. Each successful mutation therefore restarts the
-    // passive lookup from the original witness and requirement. Every `continue` below publishes
-    // the table or entry named by that frontier before restarting, so the same missing step cannot
-    // be reported twice. Encountering an entry already owned by an outer request returns
-    // `Recursive` instead of spinning, and every finite witness path therefore either advances to
-    // a later missing step or returns a terminal result.
+    // passive lookup from the original witness and requirement. Every path that reaches the bottom
+    // of the loop must set `madeProgress` after publishing the table or entry named by its
+    // frontier; the release assertion makes that restart contract structural rather than merely
+    // documentary. Encountering an entry already owned by an outer request returns `Recursive`
+    // instead of spinning, and every finite witness path therefore either advances to a later
+    // missing step or returns a terminal result.
     for (;;)
     {
+        bool madeProgress = false;
         auto frontier = locateNextRequirementWitnessLookupFrontier(
             m_astBuilder,
             conformanceWitness,
@@ -10957,10 +10959,12 @@ SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequi
                     conformanceSubType,
                     inheritanceDecl,
                     conformanceParent);
+                SLANG_RELEASE_ASSERT(inheritanceDecl->witnessTable);
                 // Publishing the root table can change how a nested `LookupDeclRef` resolves. Make
                 // that change visible before restarting the lookup from its original value.
                 m_astBuilder->incrementEpoch();
-                continue;
+                madeProgress = true;
+                break;
             }
 
         case RequirementWitnessLookupFrontierStatus::MissingEntry:
@@ -11046,10 +11050,13 @@ SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequi
                     // The next lookup step may need to resolve the newly published conformance
                     // witness before it can identify another concrete table.
                     m_astBuilder->incrementEpoch();
-                    continue;
+                    madeProgress = true;
+                    break;
                 }
 
-                switch (ensureConformanceRequirement(witnessTable, declarationRequirementDeclRef))
+                auto checkResult =
+                    ensureConformanceRequirement(witnessTable, declarationRequirementDeclRef);
+                switch (checkResult)
                 {
                 case ConformanceRequirementCheckResult::InProgress:
                     result.status = RequirementLookupStatus::Recursive;
@@ -11058,13 +11065,16 @@ SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequi
                     result.status = RequirementLookupStatus::Failed;
                     return result;
                 case ConformanceRequirementCheckResult::Satisfied:
+                    SLANG_RELEASE_ASSERT(witnessTable->containsRequirement(
+                        InterfaceRequirementKey(declarationRequirementDeclRef.getDecl())));
                     m_astBuilder->incrementEpoch();
-                    continue;
+                    madeProgress = true;
+                    break;
                 }
-                SLANG_UNREACHABLE("unhandled conformance requirement result");
+                break;
             }
         }
-        SLANG_UNREACHABLE("unhandled requirement lookup frontier");
+        SLANG_RELEASE_ASSERT(madeProgress);
     }
 }
 

@@ -380,6 +380,24 @@ static bool _tryLookUpRequirementEntryInTable(
     return true;
 }
 
+/// Selects the branch of `packBranchWitness` whose cardinality is structurally known.
+///
+/// Returning null means that the pack cardinality remains indeterminate. Keeping this dispatch in
+/// one helper prevents passive selection, passive specialization, and forceful frontier lookup from
+/// choosing different branches as the variadic witness representation evolves.
+static SubtypeWitness* _tryGetKnownPackBranchWitness(PackBranchSubtypeWitness* packBranchWitness)
+{
+    switch (getKnownPackCardinality(packBranchWitness->getPackOperand()))
+    {
+    case VariadicPackCardinality::Empty:
+        return packBranchWitness->getEmptyWitness();
+    case VariadicPackCardinality::NonEmpty:
+        return packBranchWitness->getNonEmptyWitness();
+    default:
+        return nullptr;
+    }
+}
+
 /// Follows existing witness tables and returns the unspecialized leaf entry.
 ///
 /// This is the allocation-free passive path used by ordinary `Val::resolve()`. It intentionally
@@ -391,21 +409,13 @@ static RequirementWitness _tryLookUpExistingRequirementWitnessRec(
 {
     if (auto packBranchWitness = as<PackBranchSubtypeWitness>(subtypeWitness))
     {
-        switch (getKnownPackCardinality(packBranchWitness->getPackOperand()))
-        {
-        case VariadicPackCardinality::Empty:
-            return _tryLookUpExistingRequirementWitnessRec(
-                astBuilder,
-                packBranchWitness->getEmptyWitness(),
-                requirementDeclRef);
-        case VariadicPackCardinality::NonEmpty:
-            return _tryLookUpExistingRequirementWitnessRec(
-                astBuilder,
-                packBranchWitness->getNonEmptyWitness(),
-                requirementDeclRef);
-        default:
+        auto selectedWitness = _tryGetKnownPackBranchWitness(packBranchWitness);
+        if (!selectedWitness)
             return RequirementWitness();
-        }
+        return _tryLookUpExistingRequirementWitnessRec(
+            astBuilder,
+            selectedWitness,
+            requirementDeclRef);
     }
 
     if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
@@ -493,21 +503,13 @@ static RequirementWitness _specializeExistingRequirementWitnessRec(
 {
     if (auto packBranchWitness = as<PackBranchSubtypeWitness>(subtypeWitness))
     {
-        switch (getKnownPackCardinality(packBranchWitness->getPackOperand()))
-        {
-        case VariadicPackCardinality::Empty:
-            return _specializeExistingRequirementWitnessRec(
-                astBuilder,
-                packBranchWitness->getEmptyWitness(),
-                requirementWitness);
-        case VariadicPackCardinality::NonEmpty:
-            return _specializeExistingRequirementWitnessRec(
-                astBuilder,
-                packBranchWitness->getNonEmptyWitness(),
-                requirementWitness);
-        default:
+        auto selectedWitness = _tryGetKnownPackBranchWitness(packBranchWitness);
+        if (!selectedWitness)
             return RequirementWitness();
-        }
+        return _specializeExistingRequirementWitnessRec(
+            astBuilder,
+            selectedWitness,
+            requirementWitness);
     }
 
     if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
@@ -605,21 +607,13 @@ static UnspecializedRequirementWitnessLookupFrontier _locateNextRequirementWitne
 
     if (auto packBranchWitness = as<PackBranchSubtypeWitness>(subtypeWitness))
     {
-        switch (getKnownPackCardinality(packBranchWitness->getPackOperand()))
-        {
-        case VariadicPackCardinality::Empty:
-            return _locateNextRequirementWitnessLookupFrontierRec(
-                astBuilder,
-                packBranchWitness->getEmptyWitness(),
-                requirementDeclRef);
-        case VariadicPackCardinality::NonEmpty:
-            return _locateNextRequirementWitnessLookupFrontierRec(
-                astBuilder,
-                packBranchWitness->getNonEmptyWitness(),
-                requirementDeclRef);
-        default:
+        auto selectedWitness = _tryGetKnownPackBranchWitness(packBranchWitness);
+        if (!selectedWitness)
             return result;
-        }
+        return _locateNextRequirementWitnessLookupFrontierRec(
+            astBuilder,
+            selectedWitness,
+            requirementDeclRef);
     }
 
     if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
