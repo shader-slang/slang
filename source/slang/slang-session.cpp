@@ -81,11 +81,21 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
             mapNameToLoadedModules.add(nameToMod);
     }
 
-    m_semanticsForReflection = new SharedSemanticsContext(this, nullptr, nullptr);
 }
 
 SharedSemanticsContext* Linkage::getSemanticsForReflection()
 {
+    // Linkage options are populated after the `Linkage` constructor runs. Defer construction so
+    // ad hoc reflection checking observes the language version configured on the session or
+    // compile request instead of unconditionally capturing the compiler default.
+    std::lock_guard<std::recursive_mutex> lock(getComponentTypeOperationMutex());
+    if (!m_semanticsForReflection)
+    {
+        m_semanticsForReflection = new SharedSemanticsContext(
+            this,
+            m_optionSet.getLanguageVersion(),
+            nullptr);
+    }
     return m_semanticsForReflection.get();
 }
 

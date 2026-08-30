@@ -861,6 +861,13 @@ struct SharedSemanticsContext : public RefObject
     /// The (optional) "primary" module that is the parent to everything that will be checked.
     Module* m_module = nullptr;
 
+    /// The Slang language version whose rules apply to this checking session.
+    ///
+    /// Normal module checking derives this value from the primary module. Ad hoc checking that
+    /// has no primary module must instead choose a version explicitly when it constructs the
+    /// context.
+    SlangLanguageVersion m_languageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
+
     DiagnosticSink* m_sink = nullptr;
 
     // Whether the current module has imported the GLSL module.
@@ -935,10 +942,24 @@ public:
         TranslationUnitRequest* translationUnit = nullptr)
         : m_linkage(linkage)
         , m_module(module)
+        , m_languageVersion(
+              module ? module->getModuleDecl()->languageVersion : SLANG_LANGUAGE_VERSION_UNKNOWN)
         , m_sink(sink)
         , m_environmentModules(environmentModules)
         , m_translationUnitRequest(translationUnit)
     {
+        SLANG_RELEASE_ASSERT(module);
+    }
+
+    SharedSemanticsContext(
+        Linkage* linkage,
+        SlangLanguageVersion languageVersion,
+        DiagnosticSink* sink)
+        : m_linkage(linkage)
+        , m_languageVersion(languageVersion)
+        , m_sink(sink)
+    {
+        SLANG_RELEASE_ASSERT(languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN);
     }
 
     Session* getSession() { return m_linkage->getSessionImpl(); }
@@ -946,6 +967,8 @@ public:
     Linkage* getLinkage() { return m_linkage; }
 
     Module* getModule() { return m_module; }
+
+    SlangLanguageVersion getLanguageVersion() const { return m_languageVersion; }
 
     TranslationUnitRequest* getTranslationUnitRequest() { return m_translationUnitRequest; }
 
@@ -3407,6 +3430,8 @@ public:
 
     /// Applies the pre-202c generic-parameter-count tie-breaker after all ordinary ranking rules.
     /// Returns true only when the compatibility rule selects a unique candidate.
+    /// A source-level caller that acts on a true result must emit the deprecation warning;
+    /// speculative cost probes defer that warning until they materialize the conversion.
     bool tryResolveOverloadUsingLegacyGenericParameterCount(OverloadResolveContext& context);
 
     /// If `declRef` representations a specialization of a generic, returns the number of

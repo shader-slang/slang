@@ -419,7 +419,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
                 if (!parsedExpr)
                     return SLANG_FAIL;
 
-                SharedSemanticsContext sharedSemanticsContext(getLinkage(), nullptr, &sink);
+                SharedSemanticsContext sharedSemanticsContext(
+                    getLinkage(),
+                    getLinkage()->m_optionSet.getLanguageVersion(),
+                    &sink);
                 SemanticsVisitor visitor(&sharedSemanticsContext);
                 auto checkedExpr = visitor.CheckTerm(parsedExpr);
                 if (auto typeType = as<TypeType>(checkedExpr->type.type))
@@ -842,7 +845,10 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
     Expr* typeExpr = linkage->parseTermString(typeStr, scope);
-    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
     type = visitor.TranslateTypeNode(typeExpr);
     auto typeOut = visitor.tryCoerceToProperType(TypeExp(type));

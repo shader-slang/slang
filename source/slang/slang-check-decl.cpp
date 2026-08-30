@@ -351,14 +351,12 @@ static bool isAssociatedTypeDecl(Decl* decl)
 
 bool isSlang2026OrLater(SemanticsVisitor* visitor)
 {
-    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
-           SLANG_LANGUAGE_VERSION_2026;
+    return visitor->getShared()->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_2026;
 }
 
 bool isSlang202cOrLater(SemanticsVisitor* visitor)
 {
-    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
-           SLANG_LANGUAGE_VERSION_202C;
+    return visitor->getShared()->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_202C;
 }
 
 static bool allowExperimentalDynamicDispatch(

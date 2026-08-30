@@ -218,6 +218,77 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(ctor != nullptr);
 }
 
+// Reflection overload resolution has no primary source module, but it still needs an effective
+// Slang language version. Verify that it uses the session option: Slang 2026 applies the deprecated
+// final fallback, while Slang 202c leaves the otherwise-tied candidates ambiguous.
+SLANG_UNIT_TEST(reflectionOverloadUsesSessionLanguageVersion)
+{
+    const char* source = R"(
+        module reflectionVersion;
+
+        public struct BroadResult {}
+        public struct ShapedResult {}
+
+        public BroadResult choose<T : IFloat>(T value)
+        {
+            return BroadResult();
+        }
+
+        __generic<T : __BuiltinFloatingPointType, let N : int>
+        public ShapedResult choose(vector<T, N> value)
+        {
+            return ShapedResult();
+        }
+    )";
+
+    auto resolveReturnType = [&](SlangLanguageVersion languageVersion) -> String
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+        slang::CompilerOptionEntry languageVersionEntry = {};
+        languageVersionEntry.name = slang::CompilerOptionName::LanguageVersion;
+        languageVersionEntry.value.kind = slang::CompilerOptionValueKind::Int;
+        languageVersionEntry.value.intValue0 = languageVersion;
+
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_HLSL;
+        targetDesc.profile = globalSession->findProfile("sm_5_0");
+
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.compilerOptionEntryCount = 1;
+        sessionDesc.compilerOptionEntries = &languageVersionEntry;
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            "reflectionVersion",
+            "reflection-version.slang",
+            source,
+            diagnostics.writeRef());
+        SLANG_CHECK_ABORT(module != nullptr);
+
+        auto layout = module->getLayout();
+        SLANG_CHECK_ABORT(layout != nullptr);
+        auto choose = layout->findFunctionByName("choose");
+        SLANG_CHECK_ABORT(choose != nullptr);
+        auto float3Type = layout->findTypeByName("float3");
+        SLANG_CHECK_ABORT(float3Type != nullptr);
+
+        slang::TypeReflection* argTypes[] = {float3Type};
+        auto resolved = choose->specializeWithArgTypes(1, argTypes);
+        return resolved ? getTypeFullName(resolved->getReturnType()) : String();
+    };
+
+    SLANG_CHECK(resolveReturnType(SLANG_LANGUAGE_VERSION_2026) == "BroadResult");
+    SLANG_CHECK(resolveReturnType(SLANG_LANGUAGE_VERSION_202C).getLength() == 0);
+}
+
 // Regression test for shader-slang/slang#11277. `ModifiedType` wrappers
 // (e.g. the auto-`no_diff` synthesized on a `[Differentiable]` generic's
 // signature, or an explicit `no_diff` on a struct field) used to leak out

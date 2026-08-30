@@ -1840,7 +1840,13 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     // on the best candidate.
     //
     DiagnosticSink sink;
-    SharedSemanticsContext semanticsContext(version->linkage, nullptr, &sink);
+    // Signature help performs ad hoc checking without a primary module so that extension lookup
+    // retains its existing linkage-wide point of view. Its language rules still come from the
+    // parsed document module, including any `#language` directive in that file.
+    SharedSemanticsContext semanticsContext(
+        version->linkage,
+        parsedModule->getModuleDecl()->languageVersion,
+        &sink);
     SemanticsVisitor semanticsVisitor(&semanticsContext);
 
     auto addDeclRef = [&](DeclRef<Decl> declRef)
