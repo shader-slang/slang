@@ -289,40 +289,44 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
 
     if (!type)
     {
-        // Only output diagnostic if we have a sink.
-        if (diagSink)
-        {
-            // This function *can* be called with typeExp with both exp and type = nullptr.
-            // Previous behavior didn't output a diagnostic if originalExpr was null, so this keeps
-            // that behavior.
-            //
-            // Additional we check for ErrorType on expr, because if it's set a diagnostic has
-            // already been output via previous code or via maybeResolveOverloadedExpr.
-            if (originalExpr && (expr == nullptr || as<ErrorType>(expr->type) == nullptr))
-            {
-                // The diagnostic for expectedAType wants to say what it 'got'.
-                // The solution given here, currently is to just use the node name.
-                // How useful that might be could depend, and perhaps some other mechanism
-                // that catagorized 'what' the wrong thing was is. For now this seems sufficient.
-                //
-                // Note that use originalExpr (not expr) because we want original expr for
-                // diagnostic.
+        // This function *can* be called with a `typeExp` whose `exp` and `type` are both null. That
+        // is not a failed type check -- it is the *absence* of a type expression -- so we must
+        // leave the out-param null (callers such as generic default-argument resolution rely on
+        // null to mean "no type here"). We only have a genuine "used a non-type where a type was
+        // expected" failure when `originalExpr` is present, and in that case we yield an
+        // `ErrorType` so the failure representation matches the rest of this function and
+        // downstream consumers can rely on the `as<ErrorType>` convention rather than a null check.
+        bool haveGenuineFailure =
+            originalExpr && (expr == nullptr || as<ErrorType>(expr->type) == nullptr);
 
-                // Get the AST node type info, so we can output a 'got' name
-                auto exprName = _getExprName(originalExpr);
-                StringBuilder whatWeGotStr;
-                whatWeGotStr << "a '" << originalExpr->getClass().getName() << "'";
-                if (exprName.getLength())
-                    whatWeGotStr << " for '" << exprName << "'";
-                diagSink->diagnose(Diagnostics::ExpectedAType{
-                    .whatWeGot = whatWeGotStr.produceString(),
-                    .expr = originalExpr});
-            }
+        // Only output a diagnostic if we have a sink. When `expr`'s type is already an `ErrorType`,
+        // a diagnostic has already been output via previous code or via
+        // `maybeResolveOverloadedExpr`, so `haveGenuineFailure` is false and we neither re-diagnose
+        // nor mint a fresh error.
+        if (diagSink && haveGenuineFailure)
+        {
+            // The diagnostic for expectedAType wants to say what it 'got'.
+            // The solution given here, currently is to just use the node name.
+            // How useful that might be could depend, and perhaps some other mechanism
+            // that catagorized 'what' the wrong thing was is. For now this seems sufficient.
+            //
+            // Note that use originalExpr (not expr) because we want original expr for
+            // diagnostic.
+
+            // Get the AST node type info, so we can output a 'got' name
+            auto exprName = _getExprName(originalExpr);
+            StringBuilder whatWeGotStr;
+            whatWeGotStr << "a '" << originalExpr->getClass().getName() << "'";
+            if (exprName.getLength())
+                whatWeGotStr << " for '" << exprName << "'";
+            diagSink->diagnose(Diagnostics::ExpectedAType{
+                .whatWeGot = whatWeGotStr.produceString(),
+                .expr = originalExpr});
         }
 
         if (outProperType)
         {
-            *outProperType = nullptr;
+            *outProperType = haveGenuineFailure ? m_astBuilder->getErrorType() : nullptr;
         }
         return false;
     }
