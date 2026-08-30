@@ -1920,3 +1920,28 @@ healthy MVP references, O0/O3/both correctness is 275/270/267. Wave/reconvergenc
 from 31 to 19; helper ABI (28) and aggregate/pointer/layout transport (23) are the leading measured
 priorities. All 36 promoted lanes and the 405/405 selected prefix pass, while representative direct
 O3 PTX remains accepted for SM70, SM80, and SM90 with CUDA 12.9.
+
+Slice 137 replaces the bring-up-era 32-bit structured-buffer element list with the established
+selected-numeric value algebra. `collectGlobalUniformParameters` continues to synthesize the keyed
+`GlobalParams` resource fields, buffer lowering continues to produce typed
+`RWStructuredBufferGetElementPtr`/load/store IR, and the direct emitter reuses its generic raw-view,
+pointer, and memory operations. Every external raw structured-buffer boundary now also proves that
+CUDA and provider size/alignment agree. Boolean resource elements and incompatible aggregate
+layouts remain deterministic preflight failures.
+
+The newly reachable conversion corpus exposed a target ABI defect rather than another IR shape.
+libNVVM O3 omitted caller-side parameter initialization for direct LLVM `half` helper arguments.
+Canonical linked IRFunc signatures and helper bodies remain Half, but the direct emitter declares
+scalar Half helper parameters/results as physical i16 and inserts exact bit reinterpretations at
+helper entry, call arguments/results, and every ordinary or specialized helper return. Capability
+preflight records both reinterpretation directions before module creation. Boolean-to-Half/Double
+uses the existing generic integer-to-float family. Builder ABI revision 27 and the isolated LLVM
+provider remain unchanged.
+
+Eleven conversion workloads become correct at both modes and receive 22 direct lanes. The fixed
+452-row census reaches 279 O0 and 283 O3 successes with no old-correct regression. Against 427
+healthy MVP references, O0/O3/both correctness is 278/281/278. Six resource workloads advance from
+aggregate field addressing to their next exact blocker, reducing aggregate/pointer/layout failures
+from 23 to 17; helper ABI types (28), ordinary GenericAsm semantics (21), and wave/reconvergence
+semantics (19) are now the largest healthy-MVP clusters. The selected prefix passes 405/405, and
+representative direct O3 PTX remains accepted for SM70, SM80, and SM90 with CUDA 12.9.

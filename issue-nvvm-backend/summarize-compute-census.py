@@ -18,6 +18,7 @@ AGGREGATE_SHAPES = {
     "basic-block parameter",
     "makeStruct",
     "structured-buffer aggregate layout",
+    "structured-buffer element layout",
     "entry-point parameter",
     "call argument type",
     "global_param",

@@ -3324,8 +3324,27 @@ SLANG_UNIT_TEST(nvvmSlangSelectedScalarTruthinessUsesTypedInequality)
             {
                 continue;
             }
-            SLANG_CHECK(operation.operands[0].kind == FakeNVVMBuilderValueKind::Parameter);
             const SlangNVVMValueTypeDesc& operandType = operation.operandTypes[0];
+            const bool isDirectParameter =
+                operation.operands[0].kind == FakeNVVMBuilderValueKind::Parameter;
+            bool isDecodedHalfParameter = false;
+            if (operation.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation &&
+                operation.operands[0].index >= 0 &&
+                operation.operands[0].index < gFakeNVVMBuilder.scalarOperations.getCount())
+            {
+                const FakeNVVMBuilderScalarOperation& producer =
+                    gFakeNVVMBuilder.scalarOperations[operation.operands[0].index];
+                isDecodedHalfParameter =
+                    operandType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                    operandType.bitWidth == 16 &&
+                    producer.key.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET &&
+                    NVVMSemantics::areSameType(producer.resultType, NVVMSemantics::kFloat16) &&
+                    NVVMSemantics::areSameType(
+                        producer.operandTypes[0],
+                        NVVMSemantics::kUnsignedI16) &&
+                    producer.operands[0].kind == FakeNVVMBuilderValueKind::Parameter;
+            }
+            SLANG_CHECK(isDirectParameter || isDecodedHalfParameter);
             const bool hasIntegerZero =
                 operation.operands[1].kind == FakeNVVMBuilderValueKind::IntegerConstant;
             const bool hasFloatingPointZero =
@@ -6195,7 +6214,7 @@ SLANG_UNIT_TEST(nvvmSlangVectorStructuredBuffersUseGenericTransport)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-SLANG_UNIT_TEST(nvvmSlangRejectsDoubleVectorStructuredBufferBeforeProviderMutation)
+SLANG_UNIT_TEST(nvvmSlangSelectedNumericStructuredBuffersUseGenericTransport)
 {
     _resetDirectNVVMFakes();
     {
@@ -6209,14 +6228,103 @@ SLANG_UNIT_TEST(nvvmSlangRejectsDoubleVectorStructuredBufferBeforeProviderMutati
         ComPtr<slang::IBlob> diagnostics;
         const SlangResult result = _compileSlangWithDirectNVVM(
             globalSession,
-            kDirectNVVMUnsupportedDoubleVectorStructuredBufferSource,
+            kDirectNVVMSelectedNumericStructuredBufferSource,
             code,
             diagnostics);
-        SLANG_CHECK(SLANG_FAILED(result));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("entry-point parameter") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeIndices.getCount() == 2);
+        const Index functionTypeIndex = gFakeNVVMBuilder.functionTypeIndices[0];
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[functionTypeIndex] == 5);
+        const Index parameterOffset =
+            gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionTypeIndex];
+        const FakeNVVMBuilderScalarTypeKind elementTypes[] = {
+            FakeNVVMBuilderScalarTypeKind::Half,
+            FakeNVVMBuilderScalarTypeKind::Double,
+            FakeNVVMBuilderScalarTypeKind::Half2,
+            FakeNVVMBuilderScalarTypeKind::Double2,
+        };
+        for (Index parameterIndex = 0; parameterIndex < SLANG_COUNT_OF(elementTypes);
+             ++parameterIndex)
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.functionParameterTypeKinds[parameterOffset + parameterIndex] ==
+                FakeNVVMBuilderParameterTypeKind::ResourceView);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.functionParameterTypes[parameterOffset + parameterIndex] ==
+                _getFakeNVVMBuilderResourceViewType(elementTypes[parameterIndex]));
+        }
+        SLANG_CHECK(
+            gFakeNVVMBuilder
+                .functionParameterTypeKinds[parameterOffset + SLANG_COUNT_OF(elementTypes)] ==
+            FakeNVVMBuilderParameterTypeKind::Integer);
+
+        const Index helperTypeIndex = gFakeNVVMBuilder.functionTypeIndices[1];
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultKinds[helperTypeIndex] ==
+            FakeNVVMBuilderResultTypeKind::Integer);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[helperTypeIndex] == 1);
+        const Index helperParameterOffset =
+            gFakeNVVMBuilder.functionTypeParameterKindOffsets[helperTypeIndex];
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypeKinds[helperParameterOffset] ==
+            FakeNVVMBuilderParameterTypeKind::Integer);
+
+        bool sawBooleanToHalf = false;
+        bool sawBooleanToDouble = false;
+        Index halfToPhysicalCount = 0;
+        Index physicalToHalfCount = 0;
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET &&
+                operation.operandCount == 1)
+            {
+                halfToPhysicalCount +=
+                    NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kUnsignedI16) &&
+                    NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat16);
+                physicalToHalfCount +=
+                    NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat16) &&
+                    NVVMSemantics::areSameType(
+                        operation.operandTypes[0],
+                        NVVMSemantics::kUnsignedI16);
+            }
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT ||
+                operation.operandCount != 1 ||
+                !NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kBool))
+            {
+                continue;
+            }
+            sawBooleanToHalf =
+                sawBooleanToHalf ||
+                (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                 operation.resultType.bitWidth == 16 && operation.resultType.laneCount == 1);
+            sawBooleanToDouble =
+                sawBooleanToDouble ||
+                (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                 operation.resultType.bitWidth == 64 && operation.resultType.laneCount == 1);
+        }
+        SLANG_CHECK(sawBooleanToHalf);
+        SLANG_CHECK(sawBooleanToDouble);
+        SLANG_CHECK(halfToPhysicalCount == 2);
+        SLANG_CHECK(physicalToHalfCount == 2);
+
+        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 4);
+        const uint32_t expectedAlignments[] = {2, 8, 4, 16};
+        SLANG_CHECK(
+            gFakeNVVMBuilder.storeAlignments.getCount() == SLANG_COUNT_OF(expectedAlignments));
+        for (Index storeIndex = 0; storeIndex < SLANG_COUNT_OF(expectedAlignments); ++storeIndex)
+            SLANG_CHECK(
+                gFakeNVVMBuilder.storeAlignments[storeIndex] == expectedAlignments[storeIndex]);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
@@ -6545,7 +6653,7 @@ NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerSignedGreaterEqualUsesDirectPipeline, Si
 SLANG_UNIT_TEST(nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation)
 {
     static const char* kUnsupportedSources[] = {
-        kDirectNVVMRawRWStructuredBufferF64StoreSource,
+        kDirectNVVMUnsupportedBooleanStructuredBufferSource,
         kDirectNVVMUnsupportedNestedAggregateParameterSource,
         kDirectNVVMIncompatibleStructuredBufferAggregateLayoutSource,
         kDirectNVVMUnsupportedStructuredMatrixWriteSource,

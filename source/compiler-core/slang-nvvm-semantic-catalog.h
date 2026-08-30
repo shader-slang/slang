@@ -67,6 +67,11 @@ inline constexpr SlangNVVMValueTypeDesc kUnsignedI32 = {
     32,
     1,
 };
+inline constexpr SlangNVVMValueTypeDesc kUnsignedI16 = {
+    SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+    16,
+    1,
+};
 inline constexpr SlangNVVMValueTypeDesc kUnsignedI64 = {
     SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
     64,
@@ -958,7 +963,9 @@ inline bool resolveValueOperationFamily(
         return true;
     }
     if (desc.operation == SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT && desc.operandCount == 1 &&
-        isSelectedFloatValue(desc.resultType) && isSelectedIntegerValue(desc.operandTypes[0]) &&
+        isSelectedFloatValue(desc.resultType) &&
+        (isSelectedIntegerValue(desc.operandTypes[0]) ||
+         isSelectedBoolValue(desc.operandTypes[0])) &&
         desc.resultType.laneCount == desc.operandTypes[0].laneCount)
     {
         outResolution = {

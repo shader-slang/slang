@@ -6281,6 +6281,50 @@ All 36 promoted native/direct CUDA lanes pass, and the selected NVVM regression 
 CUDA 12.9 for SM70, SM80, and SM90. CUDA 13 and physical SM70/SM80/SM90 runtime remain
 infrastructure gaps.
 
+### Slice 137: Selected numeric resources and physical Half helper transport
+
+The structured-buffer contract now derives its scalar/vector leaves from the existing selected
+numeric value algebra instead of a separate integer/Float32/32-bit-vector list. The canonical
+producer chain is unchanged: `collectGlobalUniformParameters` packages resource globals into a
+keyed synthesized `GlobalParams` block, HLSL/resource lowering produces typed buffer element
+pointers and loads/stores, and `fixBufferAccessPointerTypes` preserves the selected buffer layout
+on those pointers. Direct NVVM admits that exact IR only when CUDA external size/alignment agrees
+with the provider representation, then uses the existing generic resource-view, pointer-offset,
+load, and store operations. Boolean elements and incompatible aggregate layouts remain rejected
+before provider mutation.
+
+This widening made the conversion fixtures reach their noinline scalar helpers. Boolean-to-Half
+and Boolean-to-Double are ordinary canonical `castIntToFloat` instructions and now resolve through
+the same typed integer-to-float family as selected integer inputs. The remaining O3 mismatches came
+from a physical call defect: generated PTX declared a helper parameter slot and loaded 16 bits in
+the callee, but libNVVM O3 omitted the caller's `st.param.b16` for a direct LLVM `half` argument.
+O0 emitted that store and ran correctly.
+
+Final linked helper signatures remain the semantic source of truth. Only their target call ABI is
+legalized: a scalar Half parameter or result is declared as i16, and exact Half/i16 bit
+reinterpretations cross helper entry, call arguments/results, and all non-void helper-return
+producers. Ordinary `IRReturn`, typed GenericAsm, compound wave, surface, and texture helper bodies
+share `_emitNVVMFunctionValueReturn`, preventing specialized producers from diverging from the
+declared physical result. Capability preflight records both reinterpretation directions before
+module construction. Revision 27 already provides generic integer types and typed bit
+reinterpretation, so no provider callback or ABI revision is added.
+
+Eleven existing conversion workloads are correct at both O0 and O3 and receive 22 direct lanes.
+Three move from preflight to correct in both modes; eight integer-conversion workloads were already
+correct at O0 and move from O3 runtime mismatch to correct because their Half input now crosses the
+helper boundary deterministically. The final 452-row census is correct for 279 workloads at O0 and
+283 at O3, with zero previously correct regression. Among 427 healthy native MVP references,
+O0/O3/both correctness is 278/281/278 (65.1%/65.8%/65.1%). Six former aggregate field-address
+failures expose their later GenericAsm, `unmodified`, or conversion blockers, reducing the healthy
+aggregate/pointer/layout cluster from 23 to 17.
+
+All three representative workload gates remain differentially correct. Median standalone
+NVRTC/direct-O0/direct-O3 compile times and direct PTX sizes remain in the established range;
+direct O3 PTX for all three assembles with CUDA 12.9 for SM70, SM80, and SM90. Runtime comparison
+continues on the local SM120 GPU, while CUDA 13 tooling and physical SM70/80/90 workers remain open
+productionization requirements. The selected unit prefix passes 405/405 and remains a regression
+score rather than the coverage denominator.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

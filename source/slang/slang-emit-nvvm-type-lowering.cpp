@@ -908,9 +908,10 @@ uint32_t getNVVMResourceValueAlignment(IRInst* type)
 
 static bool _isNVVMSupportedResourceElementType(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
-    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupported32BitNumericVectorType(type) ||
-           asNVVMSupportedPhysicalArrayStructType(type) ||
+    // Resource lowering preserves the exact specialized element type in the raw view and every
+    // typed element pointer. Reuse the value algebra that generic type/memory emission already
+    // supports instead of maintaining the older integer/Float32 subset here.
+    return isNVVMSupportedNumericValueType(type) || asNVVMSupportedPhysicalArrayStructType(type) ||
            (as<IRStructType>(type) && _getNVVMResourceValueAlignment(type, activeTypes));
 }
 
@@ -1611,6 +1612,24 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type));
     if (!isLegal)
         return _reportUnsupportedType(use);
+
+    // Keep canonical Half values in LLVM's `half` type inside helper bodies, but transport a Half
+    // helper parameter or result as i16. libNVVM's O3 NVPTX lowering can otherwise omit the caller
+    // parameter store for a direct `half` argument, leaving the callee's value uninitialized.
+    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) &&
+        isNVVMFloat16Type(type))
+    {
+        if (auto mappedType = m_helperABIRepresentationMap.tryGetValue(type))
+        {
+            outType = *mappedType;
+            return SLANG_OK;
+        }
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "physical Half helper ABI type",
+            m_builder.getIntegerType(m_module, 16, outType)));
+        m_helperABIRepresentationMap[type] = outType;
+        return SLANG_OK;
+    }
 
     // NVPTX represents an aggregate kernel parameter as a generic pointer carrying `byval`, while
     // the same canonical Slang struct remains a first-class LLVM struct in ordinary value roles.

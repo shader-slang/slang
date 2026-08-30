@@ -341,6 +341,7 @@ private:
     Dictionary<IRType*, SlangNVVMTypeHandle> m_typeMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_aggregateStorageTypeMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_entryParameterRepresentationMap;
+    Dictionary<IRType*, SlangNVVMTypeHandle> m_helperABIRepresentationMap;
     Dictionary<PointerTypeKey, SlangNVVMTypeHandle> m_pointerRepresentationMap;
 };
 
