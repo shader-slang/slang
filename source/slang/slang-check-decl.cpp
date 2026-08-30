@@ -19167,10 +19167,8 @@ void checkDerivativeOfAttributeImpl(
         // derivative's generic context. Form the corresponding specialized reference to the
         // derivative itself instead of rebuilding an application from the primal's raw generic
         // declaration.
-        declRef = createDefaultSubstitutionsIfNeeded(
-            astBuilder,
-            visitor,
-            funcDecl->getDefaultDeclRef());
+        declRef =
+            createDefaultSubstitutionsIfNeeded(astBuilder, visitor, funcDecl->getDefaultDeclRef());
     }
     else
     {
@@ -19408,10 +19406,7 @@ static void checkDerivativeAttribute(
 
     ArgsWithDirectionInfo imaginaryArguments =
         getImaginaryArgsToForwardDerivative(visitor, primalDeclRef.getDecl(), attr->loc);
-    specializeImaginaryArgumentTypes(
-        visitor->getASTBuilder(),
-        imaginaryArguments,
-        primalDeclRef);
+    specializeImaginaryArgumentTypes(visitor->getASTBuilder(), imaginaryArguments, primalDeclRef);
     checkDerivativeAttributeImpl(
         visitor,
         primalDeclRef,
@@ -19428,11 +19423,7 @@ static void checkDerivativeAttribute(
         return;
     }
 
-    translateFwdDerivativeAttributeToAD2(
-        visitor,
-        derivativeFuncDecl,
-        primalDeclRef,
-        attr);
+    translateFwdDerivativeAttributeToAD2(visitor, derivativeFuncDecl, primalDeclRef, attr);
 }
 
 static void checkDerivativeAttribute(
