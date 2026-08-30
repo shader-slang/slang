@@ -2656,7 +2656,7 @@ void __sincos_impl(vector<T, N> x, out vector<T, N> s, out vector<T, N> c)
     c = cos(x);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1 : int, let L2 : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1 : MatrixLayoutMode, let L2 : MatrixLayoutMode>
 [Differentiable]
 [PrimalSubstituteOf(sincos)]
 [PreferRecompute]

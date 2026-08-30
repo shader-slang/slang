@@ -2548,7 +2548,7 @@ void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
                 matrixType->getElementType(),
                 matrixType->getRowCount(),
                 matrixType->getColumnCount(),
-                getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
+                getASTBuilder()->getIntVal(matrixType->getLayout()->getType(), matrixLayout));
             varDecl->type.type = newMatrixType;
         }
     }

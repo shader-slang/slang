@@ -10912,7 +10912,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     matrixType->getElementType(),
                     matrixType->getRowCount(),
                     matrixType->getColumnCount(),
-                    builder.getIntValue(builder.getIntType(), kMatrixLayoutMode_RowMajor));
+                    builder.getIntValue(
+                        matrixType->getLayout()->getFullType(),
+                        kMatrixLayoutMode_RowMajor));
             }
         }
         return type;
