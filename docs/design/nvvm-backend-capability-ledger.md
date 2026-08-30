@@ -1802,3 +1802,25 @@ values, dynamically selects one, and extracts its field without an aggregate-spe
 lanes. Their 645- and 1,222-byte PTX modules assemble with CUDA 12.9.86 `ptxas -arch=sm_70` to
 2,792- and 3,048-byte cubins. Release host/provider builds pass and the complete NVVM prefix passes
 399/399.
+
+Slice 131 establishes the first broad denominator without changing backend semantics or builder
+ABI 24. The active CUDA runtime universe contains 683 sources. After explicit family exclusions,
+447 sources provide 451 eligible workloads; 429 are initial-MVP lanes and 22 advanced-wave/clock
+extension lanes. Native CUDA/NVRTC O3 is correct for 448/451. Direct O0 compiles/runs 203 and is
+correct for 196; direct O3 compiles/runs 207 and is correct for 192. Differential correctness over
+the 448 healthy native references is 195 at O0 and 190 at O3, with 187 correct at both.
+
+O3 has 244 compiler preflight failures and 15 runtime mismatches. The leading MVP root-cause
+clusters are ordinary intrinsic `GenericAsm` semantics (62), helper ABI type contracts (51),
+aggregate/pointer/layout transport (39), and common wave/reconvergence `GenericAsm` semantics (31).
+The first three account for 152/237 MVP failures and replace fixture count as the immediate
+priority signal. A committed 451-row matrix records each workload's phase, first canonical shape,
+producer/consumer owner, and diagnostic; generated mirrors and raw logs remain ignored.
+
+Three representative gates cover resource aggregates/helpers, parameter-block layout, and
+shared-control/barrier composition; all pass native CUDA and direct O0/O3. CUDA 12.9.86 direct O3
+PTX for each assembles for SM70, SM80, and SM90, while physical runtime is measured on an SM120 RTX
+5090. CUDA 13 tools are unavailable in the local installation. The bounded MVP requires the named
+feature families, these gates, deterministic rejection, CUDA 12/13 validation, and at least 80%
+O0/O3 differential correctness over healthy MVP references. The selected 399/399 prefix remains a
+separate regression score.

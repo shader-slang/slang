@@ -6007,11 +6007,59 @@ struct payloads, computes the packed result, and assembles to a 3,048-byte cubin
 coverage proves generic mutable-pointer, aggregate-construction, sequential-extraction, and call
 operations; Release host/provider builds pass and the complete NVVM prefix passes 399/399.
 
+### Slice 131: Compute-corpus census and usable-backend baseline
+
+The selected 399/399 NVVM prefix is now reported only as regression coverage. A reproducible
+generated-mirror census finds 683 sources with active CUDA compute-runtime directives. Explicitly
+excluding autodiff, cooperative-matrix/FP8, neural, and ray-tracing families leaves 447 eligible
+sources and 451 CUDA workload lanes. Twenty-two advanced wave/quad or device-clock lanes remain
+measured as extensions, producing an initial usable-compute MVP denominator of 429 workloads.
+
+Native CUDA/NVRTC O3 is correct for 448/451 lanes; three are local toolchain/infrastructure
+failures. Direct NVVM O0 compiles and runs 203/451 lanes and returns the expected result for 196;
+direct O3 compiles and runs 207 and returns the expected result for 192. Against the 448 healthy
+native references, differential correctness is 195/448 at O0 and 190/448 at O3, with 187 correct at
+both optimization levels. O0 has 244 preflight failures, four libNVVM failures, and seven runtime
+mismatches. O3 has the same 244 preflight failures and 15 runtime mismatches.
+
+Within the MVP tier, the leading O3 failure clusters are ordinary intrinsic `GenericAsm`
+semantics (62), helper ABI type contracts (51), aggregate/pointer/layout transport (39), and
+common wave/reconvergence `GenericAsm` semantics (31). The first three account for 152/237 MVP
+failures and are the next selected implementation priorities. Every workload's classification,
+first canonical shape, producer/consumer owner, and exact diagnostic is retained in the Slice 131
+census matrix; raw logs remain under ignored `build/nvvm-census/`.
+
+The usable-compute MVP is bounded to conventional compute launch/global ABI; buffers, parameter
+blocks, constant buffers, textures, and samplers; ordinary scalar/vector/matrix operations;
+helpers, control flow, loops, barriers, and mutable local/shared/global storage; common atomics and
+wave operations; deterministic rejection; and CUDA 12/13 SM70/SM80/SM90 validation. Autodiff,
+cooperative matrices, neural kernels, ray tracing/OptiX, RDC/device LTO, dynamic parallelism,
+device syscalls, FP8, advanced wave operations, and source debugging remain outside it. The
+quantitative gate is at least 80% differential correctness at both O0 and O3 over healthy MVP
+references, no unexplained provider/runtime failure in the supported subset, and all representative
+workload/package/toolkit gates passing.
+
+The initial workload gates are `dynamic-dispatch-bindless-texture.slang`, `parameter-block.slang`,
+and `groupshared-multi-barrier-functional.slang`; all pass native CUDA and direct O0/O3. On the
+measured RTX 5090/CUDA 12.9.86 host, direct O3 standalone compile medians are 251--268 ms versus
+373--382 ms for NVRTC O3, but these are exploratory startup-inclusive measurements. Direct O3 PTX
+for all three assembles for SM70, SM80, and SM90. Physical runtime is exercised only on SM120.
+The installed CUDA 13 directory has no tool binaries, so CUDA 13 validation remains an explicit
+infrastructure gap.
+
+Production packaging treats `slang-llvm-nvvm` as an optional compiler-matched LLVM 14 provider at
+builder ABI revision 24. It should ship next to Slang binaries, with
+`SLANG_NVVM_BUILDER_PATH` reserved as the explicit deployment/development override. Sessions cache
+one load result, and direct selection retains deterministic E52016 failure for missing or mismatched
+providers rather than falling back to NVRTC. Provider updates move with the Slang commit and build
+recipe; no backward compatibility is promised across ABI revisions.
+
 The following remain open until their named slice supplies evidence:
 
-- packaging and update policy for the optional NVVM builder module, including whether production
-  owns LLVM 7.0.1 plus an older CMake frontend or LLVM 14.0.6 plus negotiated text;
-- the CUDA toolkit and GPU CI matrix;
+- packaging automation, deployment/install verification, and cache/failure testing for the
+  compiler-matched optional LLVM 14 provider;
+- the CUDA 12/13 physical-GPU CI matrix beyond the measured CUDA 12.9 SM120 runtime and
+  SM70/SM80/SM90 compile/assembly sample;
 - whether NVVM IR should become a public compile target;
 - conventional shader-entry semantics beyond the established CUDA varying legalizer, conventional
   global parameter fields beyond selected integer/float32 scalars, selected fixed natural-layout
@@ -6067,9 +6115,7 @@ The following remain open until their named slice supplies evidence:
 - atomics beyond relaxed global/shared scalar Int32/UInt32 add and relaxed global scalar UInt64
   unsigned max through established writable device pointers, direct structured-buffer elements,
   groupshared scalar globals, and direct groupshared array elements, including every other
-  operation, memory order, value type, pointer shape, and address space, plus a
-  production decision between the proven isolated LLVM 7 bitcode writer, the experimental text
-  bridge, and a future purpose-built bitcode writer;
+  operation, memory order, value type, pointer shape, and address space;
 - wave/subgroup operations beyond lane index, lane count, canonical masked UInt/Int/Float
   read-lane-at, public unmasked UInt/Int/Float read-lane-at, active-mask ballot, and public
   UInt/Int/Float read-lane-first, is-first-lane, any/all-true, and signed/unsigned-i32/Float
