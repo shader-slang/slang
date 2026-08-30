@@ -3,19 +3,13 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
-// Interface A (impls A0, A1) and interface B (impls B0, B1), where BOTH impls of A
-// contain an interface-typed (B) member — an existential field nested inside another
-// existential. The IA values are provided directly as the contents of a
-// RWStructuredBuffer<IA>, so dispatch is fully dynamic: the shader only loads them back
-// and calls evaluate(). This exercises (a) a nested existential unpacked straight from the
-// buffer and (b) two different impls in the same dispatch set each binding their own nested
-// existential independently. The buffer data below hardcodes the box layout, so this test
-// also guards the cross-target ABI: a nested box header is packed `uint2` pairs (alignment 4)
-// on every target — a target-specific scalar 64-bit handle carrier would realign it. The
-// single `uint pos` before `inner` is what makes that observable: it puts the nested box at
-// payload offset 4, where an 8-aligned carrier inserts padding (unlike
-// optional-downcast-struct-with-interface-field.slang, whose nested box sits 8-aligned at
-// offset 32 and cannot detect the difference). Keep `pos` a single 4-byte field.
+// Both impls of IA carry an interface-typed (IB) field — an existential nested inside
+// another existential. The IA values come straight from host-written buffer contents, so
+// dispatch is fully dynamic and each impl binds its own nested existential.
+// The hardcoded buffer data also guards the cross-target layout ABI: box headers are
+// packed `uint2` pairs (alignment 4) on every target. The single `uint pos` before
+// `inner` puts the nested box at payload offset 4, where an 8-aligned handle carrier
+// would insert padding — keep `pos` a single 4-byte field.
 
 [anyValueSize(32)]
 interface IB
