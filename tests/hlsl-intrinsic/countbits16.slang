@@ -1,6 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TODO: metal is currently failing even with emulation, investigate.
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute -profile metallib_2_4
 // No support for uint16_t on fxc - we need SM6.2 and dxil to use uint16_t with d3d12

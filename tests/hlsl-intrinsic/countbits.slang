@@ -3,6 +3,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -wgpu -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl

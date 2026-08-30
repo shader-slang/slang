@@ -1866,3 +1866,22 @@ fixtures. Nine other workloads advance to exact `abs`, `countbits`, Half-convers
 zero old-correct regressions. On 427 healthy MVP references, O0/O3/both correctness is
 225/220/217. The selected regression prefix and representative SM70/80/90 assembly gates remain
 separate validation scores.
+
+Slice 134 groups the post-min/max ordinary-intrinsic inventory by exact final `IRGenericAsm` text
+and specialized signature. Five population-count, two bit-reversal, two high-bit-scan, and two
+low-bit-scan rows form the largest coherent family. The compiler admits only canonical one-block
+CUDA helpers with selected scalar integer operands. Count/scans return exact UInt32; reversal
+preserves the operand type; signed high-bit scans complement negative inputs; and zero scans return
+UInt32 all-ones.
+
+Builder ABI revision 26 adds `COUNT_BITS`, `REVERSE_BITS`, `FIRST_BIT_HIGH`, and `FIRST_BIT_LOW` to
+the existing generic descriptor/query/emit interface. The provider callback is unchanged. LLVM 14
+construction uses typed `ctpop`, `bitreverse`, `ctlz`, and `cttz`; the strict NVVM IR 2.0 writer
+validates all selected declarations before removing LLVM-14-only attributes for the LLVM-7-era
+reader. Vector, wrong-result, malformed-arity, and unsupported-width neighbors remain rejected.
+
+All 11 first blockers become correct at O0 and O3, and all 22 promoted direct lanes pass. The fixed
+452-row census reaches 237 O0 and 233 O3 successes with zero old-correct regressions. Against 427
+healthy MVP references, O0/O3/both correctness is 236/231/228. Ordinary intrinsic failures fall
+from 58 to 47. The selected prefix passes 402/402; representative direct O3 PTX remains accepted by
+CUDA 12.9 `ptxas` for SM70, SM80, and SM90.

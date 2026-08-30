@@ -128,7 +128,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderNegotiatesExactCurrentABI)
         SLANG_CHECK(builder.getValueOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getSurfaceOperationsAPI()->emitOperation != nullptr);
         SLANG_CHECK(builder.getTextureOperationsAPI()->emitOperation != nullptr);
-        SLANG_CHECK(builder.getVersionString().indexOf("builder-abi=25") >= 0);
+        StringBuilder expectedABI;
+        expectedABI << "builder-abi=" << SLANG_NVVM_BUILDER_ABI_REVISION;
+        SLANG_CHECK(builder.getVersionString().indexOf(expectedABI.getUnownedSlice()) >= 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.destroyedLibraryCount == 1);
@@ -6697,6 +6699,165 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     SLANG_CHECK(compatibleAssembly.indexOf("atomicrmw umax i64 addrspace(1)*") >= 0);
     SLANG_CHECK(compatibleAssembly.indexOf("monotonic, align 4") < 0);
     SLANG_CHECK(compatibleAssembly.indexOf("monotonic, align 8") < 0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerBitOperations)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+
+    const uint32_t bitWidths[] = {8, 16, 32, 64};
+    SlangNVVMValueTypeDesc integerTypes[SLANG_COUNT_OF(bitWidths)] = {};
+    for (Index i = 0; i < SLANG_COUNT_OF(bitWidths); ++i)
+    {
+        integerTypes[i] = {
+            SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+            bitWidths[i],
+            1,
+        };
+        const SlangNVVMValueTypeDesc operandTypes[] = {integerTypes[i]};
+        const SlangNVVMValueOperation operations[] = {
+            SLANG_NVVM_VALUE_OP_COUNT_BITS,
+            SLANG_NVVM_VALUE_OP_REVERSE_BITS,
+            SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH,
+            SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW,
+        };
+        for (SlangNVVMValueOperation operation : operations)
+        {
+            const SlangNVVMValueOperationDesc desc = {
+                operation,
+                operation == SLANG_NVVM_VALUE_OP_REVERSE_BITS ? integerTypes[i]
+                                                              : NVVMSemantics::kUnsignedI32,
+                operandTypes,
+                SLANG_COUNT_OF(operandTypes),
+            };
+            SLANG_CHECK(builder.supportsValueOperation(desc));
+        }
+    }
+
+    SlangNVVMValueTypeDesc vectorInteger = integerTypes[2];
+    vectorInteger.laneCount = 2;
+    const SlangNVVMValueTypeDesc vectorOperandTypes[] = {vectorInteger};
+    const SlangNVVMValueOperationDesc unsupportedVectorCount = {
+        SLANG_NVVM_VALUE_OP_COUNT_BITS,
+        NVVMSemantics::kUnsignedI32,
+        vectorOperandTypes,
+        SLANG_COUNT_OF(vectorOperandTypes),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedVectorCount));
+    const SlangNVVMValueTypeDesc wrongResultOperandTypes[] = {integerTypes[2]};
+    const SlangNVVMValueOperationDesc unsupportedWrongCountResult = {
+        SLANG_NVVM_VALUE_OP_COUNT_BITS,
+        integerTypes[2],
+        wrongResultOperandTypes,
+        SLANG_COUNT_OF(wrongResultOperandTypes),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedWrongCountResult));
+    const SlangNVVMValueTypeDesc signedI24 = {
+        SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+        24,
+        1,
+    };
+    const SlangNVVMValueTypeDesc unsupportedWidthOperands[] = {signedI24};
+    const SlangNVVMValueOperationDesc unsupportedWidthReverse = {
+        SLANG_NVVM_VALUE_OP_REVERSE_BITS,
+        signedI24,
+        unsupportedWidthOperands,
+        SLANG_COUNT_OF(unsupportedWidthOperands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedWidthReverse));
+
+    ScopedNVVMBuilderModule module;
+    module.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("integer-bit-operations"), module.module)));
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle parameterTypes[SLANG_COUNT_OF(bitWidths)] = {};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+    for (Index i = 0; i < SLANG_COUNT_OF(bitWidths); ++i)
+    {
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getIntegerType(module.module, bitWidths[i], parameterTypes[i])));
+    }
+    SlangNVVMTypeHandle functionType = nullptr;
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        module.module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("useIntegerBits"),
+        function)));
+    SlangNVVMBlockHandle entryBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
+
+    for (Index i = 0; i < SLANG_COUNT_OF(bitWidths); ++i)
+    {
+        SlangNVVMValueHandle parameter = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, i, parameter)));
+        const SlangNVVMValueTypeDesc operandTypes[] = {integerTypes[i]};
+        const SlangNVVMValueOperation operations[] = {
+            SLANG_NVVM_VALUE_OP_COUNT_BITS,
+            SLANG_NVVM_VALUE_OP_REVERSE_BITS,
+            SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH,
+            SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW,
+        };
+        for (SlangNVVMValueOperation operation : operations)
+        {
+            const SlangNVVMValueOperationDesc desc = {
+                operation,
+                operation == SLANG_NVVM_VALUE_OP_REVERSE_BITS ? integerTypes[i]
+                                                              : NVVMSemantics::kUnsignedI32,
+                operandTypes,
+                SLANG_COUNT_OF(operandTypes),
+            };
+            SlangNVVMValueHandle result = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitValueOperation(module.module, desc, &parameter, 1, result)));
+            SLANG_CHECK_ABORT(result != nullptr);
+        }
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assembly)));
+        const String text = _getBlobText(assembly);
+        for (uint32_t bitWidth : bitWidths)
+        {
+            StringBuilder suffix;
+            suffix << ".i" << bitWidth;
+            SLANG_CHECK(text.indexOf((String("@llvm.ctpop") + suffix).getBuffer()) >= 0);
+            SLANG_CHECK(text.indexOf((String("@llvm.bitreverse") + suffix).getBuffer()) >= 0);
+            SLANG_CHECK(text.indexOf((String("@llvm.ctlz") + suffix).getBuffer()) >= 0);
+            SLANG_CHECK(text.indexOf((String("@llvm.cttz") + suffix).getBuffer()) >= 0);
+        }
+        if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)
+        {
+            SLANG_CHECK(text.indexOf("i1 immarg") >= 0);
+        }
+        else
+        {
+            SLANG_CHECK(text.indexOf("immarg") < 0);
+        }
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("icmp slt")) == 4);
+    }
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceUnaryOperations)

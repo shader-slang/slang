@@ -12,6 +12,7 @@ enum class ValueOperationFamily : uint32_t
 {
     None,
     IntegerUnary,
+    IntegerBit,
     IntegerBinary,
     IntegerCompare,
     FloatUnary,
@@ -713,6 +714,21 @@ inline bool resolveValueOperationFamily(
         outResolution = {
             ValueOperationFamily::IntegerUnary,
             "parameterized integer unary operation"};
+        return true;
+    }
+
+    const bool isIntegerBitOperand =
+        desc.operandCount == 1 && isSelectedScalarInteger(desc.operandTypes[0]);
+    const bool isSameTypeBitResult =
+        isIntegerBitOperand && areSameType(desc.resultType, desc.operandTypes[0]);
+    const bool isUnsignedI32BitResult =
+        isIntegerBitOperand && areSameType(desc.resultType, kUnsignedI32);
+    if ((isSameTypeBitResult && desc.operation == SLANG_NVVM_VALUE_OP_REVERSE_BITS) ||
+        (isUnsignedI32BitResult && (desc.operation == SLANG_NVVM_VALUE_OP_COUNT_BITS ||
+                                    desc.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH ||
+                                    desc.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW)))
+    {
+        outResolution = {ValueOperationFamily::IntegerBit, "scalar integer bit operation"};
         return true;
     }
 

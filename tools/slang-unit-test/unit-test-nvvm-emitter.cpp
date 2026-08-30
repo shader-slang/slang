@@ -7053,6 +7053,81 @@ SLANG_UNIT_TEST(nvvmSlangLibdeviceAndMinMaxOperationsRequestTypedOperations)
 #endif
 }
 
+SLANG_UNIT_TEST(nvvmSlangIntegerBitHelpersRequestTypedOperations)
+{
+#if SLANG_WINDOWS_FAMILY
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMIntegerBitOperationsSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        uint32_t operationCounts[4] = {};
+        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation < SLANG_NVVM_VALUE_OP_COUNT_BITS ||
+                operation.key.operation > SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW)
+            {
+                continue;
+            }
+            SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::Unary);
+            SLANG_CHECK(operation.operandCount == 1);
+            SLANG_CHECK(operation.resultType.laneCount == 1);
+            SLANG_CHECK(operation.operandTypes[0].laneCount == 1);
+            SLANG_CHECK(operation.operandTypes[0].bitWidth == 32);
+            const uint32_t operationIndex =
+                operation.key.operation - SLANG_NVVM_VALUE_OP_COUNT_BITS;
+            ++operationCounts[operationIndex];
+            if (operation.key.operation == SLANG_NVVM_VALUE_OP_REVERSE_BITS)
+            {
+                SLANG_CHECK(
+                    NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[0]));
+            }
+            else
+            {
+                SLANG_CHECK(
+                    NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kUnsignedI32));
+            }
+            if (operation.key.operation == SLANG_NVVM_VALUE_OP_COUNT_BITS ||
+                operation.key.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH)
+            {
+                SLANG_CHECK(operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER);
+            }
+            else
+            {
+                SLANG_CHECK(
+                    operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
+            }
+        }
+        for (uint32_t count : operationCounts)
+            SLANG_CHECK(count == 1);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
 SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 {
     struct UnsupportedCase
@@ -7077,6 +7152,8 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedNestedConstantBufferSource, "'struct field address'"},
         {kDirectNVVMUnsupportedScalarTruthinessSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMUnsupportedMinMaxSignatureSource, "assembly=$P_min($0, $1)"},
+        {kDirectNVVMUnsupportedIntegerBitSignatureSource, "assembly=$P_countbits($0)"},
+        {kDirectNVVMUnsupportedVectorIntegerBitSource, "assembly=$P_reversebits($0)"},
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},

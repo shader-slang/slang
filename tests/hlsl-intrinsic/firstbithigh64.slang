@@ -1,5 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -cpu
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -cuda -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -mtl -compute
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -profile cs_6_0 -shaderobj -render-feature hardware-device

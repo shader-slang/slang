@@ -2084,10 +2084,10 @@ static void _addUniqueAttributeSet(
 // between several declarations, so count unique validated semantic attribute sets. LLVM 14's scalar
 // shuffle and synchronized-vote declarations already use the LLVM-7-compatible
 // convergent/inaccessible-memory/nounwind set, but validate their exact signatures and attributes
-// before serializing the mixed dialect. Generic count-trailing-zeros has the same LLVM 14-only
+// before serializing the mixed dialect. Generic integer scan intrinsics have the same LLVM 14-only
 // optimization attributes as the special-register declarations plus an `immarg` parameter marker;
-// LLVM 7 already understands the intrinsic's signature and semantics once those newer attributes
-// are removed. The provider exposes exactly one shape of each operation; validate every semantic
+// LLVM 7 already understands their signatures and semantics once those newer attributes are
+// removed. The provider exposes exactly one shape of each operation; validate every semantic
 // instruction or declaration before changing its spelling.
 static SlangResult _writeLegacyNVVMAssembly(
     ModuleState* state,
@@ -2095,7 +2095,7 @@ static SlangResult _writeLegacyNVVMAssembly(
 {
     size_t semanticAtomicCount = 0;
     size_t semanticFloatNegateCount = 0;
-    size_t semanticCountTrailingZerosDeclarationCount = 0;
+    size_t semanticIntegerScanDeclarationCount = 0;
     size_t semanticByValueParameterCount = 0;
     llvm::SmallVector<llvm::AttributeSet, 2> semanticLegacyIntrinsicAttributeSets;
     for (llvm::Function& function : *state->module)
@@ -2221,32 +2221,49 @@ static SlangResult _writeLegacyNVVMAssembly(
                     return SLANG_E_NOT_AVAILABLE;
             }
         }
-        else if (intrinsicID == llvm::Intrinsic::cttz)
+        else if (
+            intrinsicID == llvm::Intrinsic::ctpop || intrinsicID == llvm::Intrinsic::bitreverse ||
+            intrinsicID == llvm::Intrinsic::ctlz || intrinsicID == llvm::Intrinsic::cttz)
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
-            llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
-            if (!function.isDeclaration() || function.getReturnType() != int32Type ||
-                function.arg_size() != 2 || functionAttributes.getNumAttributes() != 6 ||
+            llvm::IntegerType* integerType =
+                llvm::dyn_cast<llvm::IntegerType>(function.getReturnType());
+            const bool isScan =
+                intrinsicID == llvm::Intrinsic::ctlz || intrinsicID == llvm::Intrinsic::cttz;
+            const bool isSelectedWidth =
+                integerType &&
+                (integerType->getBitWidth() == 8 || integerType->getBitWidth() == 16 ||
+                 integerType->getBitWidth() == 32 || integerType->getBitWidth() == 64);
+            if (!function.isDeclaration() || !isSelectedWidth ||
+                function.arg_size() != (isScan ? 2u : 1u) ||
+                functionAttributes.getNumAttributes() != 6 ||
                 !function.hasFnAttribute(llvm::Attribute::NoFree) ||
                 !function.hasFnAttribute(llvm::Attribute::NoSync) ||
                 !function.hasFnAttribute(llvm::Attribute::NoUnwind) ||
                 !function.hasFnAttribute(llvm::Attribute::ReadNone) ||
                 !function.hasFnAttribute(llvm::Attribute::Speculatable) ||
                 !function.hasFnAttribute(llvm::Attribute::WillReturn) ||
-                function.getAttributes().getParamAttrs(0).getNumAttributes() != 0 ||
-                function.getAttributes().getParamAttrs(1).getNumAttributes() != 1 ||
-                !function.hasParamAttribute(1, llvm::Attribute::ImmArg))
+                function.getAttributes().getParamAttrs(0).getNumAttributes() != 0)
             {
                 return SLANG_E_NOT_AVAILABLE;
             }
             auto argument = function.arg_begin();
-            if (argument->getType() != int32Type ||
-                (++argument)->getType() != llvm::Type::getInt1Ty(state->context))
+            if (argument->getType() != integerType)
             {
                 return SLANG_E_NOT_AVAILABLE;
             }
+            if (isScan)
+            {
+                ++argument;
+                if (argument->getType() != llvm::Type::getInt1Ty(state->context) ||
+                    function.getAttributes().getParamAttrs(1).getNumAttributes() != 1 ||
+                    !function.hasParamAttribute(1, llvm::Attribute::ImmArg))
+                {
+                    return SLANG_E_NOT_AVAILABLE;
+                }
+                ++semanticIntegerScanDeclarationCount;
+            }
             _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
-            ++semanticCountTrailingZerosDeclarationCount;
         }
         else if (intrinsicID == llvm::Intrinsic::sqrt)
         {
@@ -2337,13 +2354,13 @@ static SlangResult _writeLegacyNVVMAssembly(
     const llvm::StringRef llvm14ExecutionRegisterAttributeMarker(
         " = { nounwind readnone speculatable }");
     const llvm::StringRef legacySpecialRegisterAttributes(" = { nounwind readnone }");
-    const llvm::StringRef countTrailingZerosDeclarationMarker("@llvm.cttz.i32(i32, i1 immarg)");
-    const llvm::StringRef legacyCountTrailingZerosDeclaration("@llvm.cttz.i32(i32, i1)");
+    const llvm::StringRef integerScanParameterMarker("i1 immarg");
+    const llvm::StringRef legacyIntegerScanParameter("i1");
     llvm::StringRef remaining(llvm14Assembly.data(), llvm14Assembly.size());
     size_t rewrittenAtomicCount = 0;
     size_t rewrittenFloatNegateCount = 0;
     size_t rewrittenLegacyIntrinsicAttributeSetCount = 0;
-    size_t rewrittenCountTrailingZerosDeclarationCount = 0;
+    size_t rewrittenIntegerScanDeclarationCount = 0;
     size_t rewrittenByValueParameterCount = 0;
     while (!remaining.empty())
     {
@@ -2394,20 +2411,23 @@ static SlangResult _writeLegacyNVVMAssembly(
                 legacySpecialRegisterAttributes.end());
             ++rewrittenLegacyIntrinsicAttributeSetCount;
         }
-        else if (trimmedLine.startswith("declare i32 @llvm.cttz.i32("))
+        else if (
+            trimmedLine.startswith("declare i") &&
+            (trimmedLine.contains(" @llvm.ctlz.i") || trimmedLine.contains(" @llvm.cttz.i")))
         {
-            const size_t markerIndex = line.find(countTrailingZerosDeclarationMarker);
-            if (markerIndex == llvm::StringRef::npos)
+            const size_t markerIndex = line.find(integerScanParameterMarker);
+            if (markerIndex == llvm::StringRef::npos ||
+                line.find(integerScanParameterMarker, markerIndex + 1) != llvm::StringRef::npos)
                 return SLANG_E_NOT_AVAILABLE;
             const llvm::StringRef prefix = line.take_front(markerIndex);
             const llvm::StringRef suffix =
-                line.drop_front(markerIndex + countTrailingZerosDeclarationMarker.size());
+                line.drop_front(markerIndex + integerScanParameterMarker.size());
             outSerializedData.append(prefix.begin(), prefix.end());
             outSerializedData.append(
-                legacyCountTrailingZerosDeclaration.begin(),
-                legacyCountTrailingZerosDeclaration.end());
+                legacyIntegerScanParameter.begin(),
+                legacyIntegerScanParameter.end());
             outSerializedData.append(suffix.begin(), suffix.end());
-            ++rewrittenCountTrailingZerosDeclarationCount;
+            ++rewrittenIntegerScanDeclarationCount;
         }
         else if (line.contains("byval("))
         {
@@ -2453,8 +2473,7 @@ static SlangResult _writeLegacyNVVMAssembly(
                    rewrittenFloatNegateCount == semanticFloatNegateCount &&
                    rewrittenLegacyIntrinsicAttributeSetCount ==
                        semanticLegacyIntrinsicAttributeSets.size() &&
-                   rewrittenCountTrailingZerosDeclarationCount ==
-                       semanticCountTrailingZerosDeclarationCount &&
+                   rewrittenIntegerScanDeclarationCount == semanticIntegerScanDeclarationCount &&
                    rewrittenByValueParameterCount == semanticByValueParameterCount
                ? SLANG_OK
                : SLANG_E_NOT_AVAILABLE;
@@ -3035,6 +3054,89 @@ static SlangResult _emitValueOperationFamily(
         result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_NOT
                      ? state->builder.CreateNot(llvmOperands[0])
                      : state->builder.CreateNeg(llvmOperands[0]);
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::IntegerBit:
+        {
+            llvm::IntegerType* operandType =
+                llvm::dyn_cast<llvm::IntegerType>(llvmOperands[0]->getType());
+            llvm::IntegerType* int32Type = llvm::Type::getInt32Ty(state->context);
+            if (!operandType || !resultType->isIntegerTy())
+                return SLANG_E_INVALID_ARG;
+
+            llvm::Intrinsic::ID intrinsicID = llvm::Intrinsic::not_intrinsic;
+            switch (operation.operation)
+            {
+            case SLANG_NVVM_VALUE_OP_COUNT_BITS:
+                intrinsicID = llvm::Intrinsic::ctpop;
+                break;
+            case SLANG_NVVM_VALUE_OP_REVERSE_BITS:
+                intrinsicID = llvm::Intrinsic::bitreverse;
+                break;
+            case SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH:
+                intrinsicID = llvm::Intrinsic::ctlz;
+                break;
+            case SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW:
+                intrinsicID = llvm::Intrinsic::cttz;
+                break;
+            default:
+                return SLANG_E_INVALID_ARG;
+            }
+
+            llvm::Value* intrinsicOperand = llvmOperands[0];
+            if (operation.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH &&
+                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER)
+            {
+                llvm::Value* isNegative = state->builder.CreateICmpSLT(
+                    intrinsicOperand,
+                    llvm::ConstantInt::get(operandType, 0));
+                intrinsicOperand = state->builder.CreateSelect(
+                    isNegative,
+                    state->builder.CreateNot(intrinsicOperand),
+                    intrinsicOperand);
+            }
+
+            llvm::Function* intrinsic =
+                llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID, {operandType});
+            llvm::Value* intrinsicResult = nullptr;
+            if (intrinsicID == llvm::Intrinsic::ctlz || intrinsicID == llvm::Intrinsic::cttz)
+            {
+                intrinsicResult = state->builder.CreateCall(
+                    intrinsic,
+                    {intrinsicOperand, llvm::ConstantInt::getFalse(state->context)});
+            }
+            else
+            {
+                intrinsicResult = state->builder.CreateCall(intrinsic, {intrinsicOperand});
+            }
+
+            if (operation.operation == SLANG_NVVM_VALUE_OP_REVERSE_BITS)
+            {
+                result = intrinsicResult;
+                break;
+            }
+
+            llvm::Value* count = state->builder.CreateZExtOrTrunc(intrinsicResult, int32Type);
+            if (operation.operation == SLANG_NVVM_VALUE_OP_COUNT_BITS)
+            {
+                result = count;
+                break;
+            }
+            if (operation.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH)
+            {
+                result = state->builder.CreateSub(
+                    llvm::ConstantInt::get(int32Type, operandType->getBitWidth() - 1),
+                    count);
+                break;
+            }
+
+            llvm::Value* isZero = state->builder.CreateICmpEQ(
+                llvmOperands[0],
+                llvm::ConstantInt::get(operandType, 0));
+            result = state->builder.CreateSelect(
+                isZero,
+                llvm::ConstantInt::getAllOnesValue(int32Type),
+                count);
+        }
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerBinary:
         switch (operation.operation)

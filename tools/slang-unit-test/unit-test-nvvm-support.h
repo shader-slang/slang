@@ -5383,7 +5383,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
             &operation->resultType,
             operation->operandTypes);
     }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::BooleanUnary)
+    if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerBit ||
+        resolution.family == NVVMSemantics::ValueOperationFamily::BooleanUnary)
     {
         gFakeNVVMBuilder.emittedValueOperations.add(
             {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)});
@@ -8555,6 +8556,48 @@ void computeMain(
 }
 )SLANG";
 
+static const char kDirectNVVMUnsupportedIntegerBitSignatureSource[] = R"SLANG(
+uint malformedCountBits(uint value, uint extra)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "$P_countbits($0)";
+    default:
+        return countbits(value) + extra;
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform uint value)
+{
+    *destination = int(malformedCountBits(value, 1));
+}
+)SLANG";
+
+static const char kDirectNVVMUnsupportedVectorIntegerBitSource[] = R"SLANG(
+uint2 malformedReverseBits(uint2 value)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "$P_reversebits($0)";
+    default:
+        return reversebits(value);
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform uint value)
+{
+    *destination = int(malformedReverseBits(uint2(value, value + 1)).x);
+}
+)SLANG";
+
 static const char kDirectNVVMCopyableValueHelperSource[] = R"(
 struct Payload
 {
@@ -10854,6 +10897,19 @@ void computeMain(
     *destination =
         integerMinimum + int(integerMaximum) +
         int(floatMinimum + floatMaximum + doubleMinimum + doubleMaximum);
+}
+)";
+static const char kDirectNVVMIntegerBitOperationsSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int signedValue,
+    uniform uint unsignedValue)
+{
+    destination[0] = int(countbits(signedValue));
+    destination[1] = int(reversebits(unsignedValue));
+    destination[2] = int(firstbithigh(signedValue));
+    destination[3] = int(firstbitlow(unsignedValue));
 }
 )";
 static const char kDirectNVVMIntegerBitAndSource[] = R"(

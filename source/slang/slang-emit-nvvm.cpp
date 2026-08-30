@@ -2559,34 +2559,35 @@ bool _resolveNVVMScalarTruthiness(
     return true;
 }
 
-struct NVVMGenericAsmMinMax
+struct NVVMGenericAsmValueOperation
 {
-    IRParam* parameters[2] = {};
-    SlangNVVMValueTypeDesc operandTypes[2] = {};
+    IRParam* parameters[3] = {};
+    SlangNVVMValueTypeDesc operandTypes[3] = {};
     SlangNVVMValueTypeDesc resultType = {};
     SlangNVVMValueOperation operation = 0;
+    uint32_t operandCount = 0;
     const char* diagnosticName = nullptr;
     bool requiresCUDADeviceLibrary = false;
 
     SlangNVVMValueOperationDesc getOperationDesc() const
     {
-        return {operation, resultType, operandTypes, SLANG_COUNT_OF(operandTypes)};
+        return {operation, resultType, operandTypes, operandCount};
     }
 };
 
-// Recognizes the canonical scalar `min`/`max` implementation emitted by the CUDA prelude. The
-// result and both parameters deliberately have to be the same selected scalar type: integer
-// overloads become typed comparisons and selects, while Float and Double retain CUDA's exact NaN
-// and signed-zero behavior through libdevice.
-bool _resolveNVVMGenericAsmMinMax(
+// Recognizes canonical one-block value helpers emitted by the CUDA prelude. The final assembly
+// spelling selects a semantic operation, while the specialized function signature supplies its
+// exact typed contract. This keeps all accepted overloads on the generic queried value-operation
+// path and leaves source intrinsic names and fixture paths out of lowering.
+bool _resolveNVVMGenericAsmValueOperation(
     IRGenericAsm* genericAsm,
     IRFunc* function,
-    NVVMGenericAsmMinMax& outOperation)
+    NVVMGenericAsmValueOperation& outOperation)
 {
     outOperation = {};
     IRBlock* block = function ? function->getFirstBlock() : nullptr;
     if (!genericAsm || !block || block->getNextBlock() || genericAsm->getParent() != block ||
-        genericAsm->getOperandCount() != 1 || function->getParamCount() != 2)
+        genericAsm->getOperandCount() != 1)
     {
         return false;
     }
@@ -2597,32 +2598,59 @@ bool _resolveNVVMGenericAsmMinMax(
     }
 
     if (genericAsm->getAsm() == toSlice("$P_min($0, $1)"))
+    {
         outOperation.operation = SLANG_NVVM_VALUE_OP_MIN;
+        outOperation.operandCount = 2;
+    }
     else if (genericAsm->getAsm() == toSlice("$P_max($0, $1)"))
+    {
         outOperation.operation = SLANG_NVVM_VALUE_OP_MAX;
+        outOperation.operandCount = 2;
+    }
+    else if (genericAsm->getAsm() == toSlice("$P_countbits($0)"))
+    {
+        outOperation.operation = SLANG_NVVM_VALUE_OP_COUNT_BITS;
+        outOperation.operandCount = 1;
+    }
+    else if (genericAsm->getAsm() == toSlice("$P_reversebits($0)"))
+    {
+        outOperation.operation = SLANG_NVVM_VALUE_OP_REVERSE_BITS;
+        outOperation.operandCount = 1;
+    }
+    else if (genericAsm->getAsm() == toSlice("$P_firstbithigh($0)"))
+    {
+        outOperation.operation = SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH;
+        outOperation.operandCount = 1;
+    }
+    else if (genericAsm->getAsm() == toSlice("$P_firstbitlow($0)"))
+    {
+        outOperation.operation = SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW;
+        outOperation.operandCount = 1;
+    }
     else
         return false;
 
-    outOperation.parameters[0] = function->getFirstParam();
-    if (!outOperation.parameters[0])
-        return false;
-    outOperation.parameters[1] = outOperation.parameters[0]->getNextParam();
-    IRType* resultType = function->getResultType();
-    if (!outOperation.parameters[1] ||
-        !isTypeEqual(outOperation.parameters[0]->getDataType(), resultType) ||
-        !isTypeEqual(outOperation.parameters[1]->getDataType(), resultType) ||
-        !_getNVVMSemanticType(resultType, outOperation.resultType) ||
-        outOperation.resultType.laneCount != 1)
+    if (function->getParamCount() != outOperation.operandCount ||
+        !_getNVVMSemanticType(function->getResultType(), outOperation.resultType))
     {
         return false;
     }
-    outOperation.operandTypes[0] = outOperation.resultType;
-    outOperation.operandTypes[1] = outOperation.resultType;
+
+    IRParam* parameter = function->getFirstParam();
+    for (uint32_t i = 0; i < outOperation.operandCount; ++i)
+    {
+        if (!parameter ||
+            !_getNVVMSemanticType(parameter->getDataType(), outOperation.operandTypes[i]))
+        {
+            return false;
+        }
+        outOperation.parameters[i] = parameter;
+        parameter = parameter->getNextParam();
+    }
+    SLANG_ASSERT(!parameter);
 
     NVVMSemantics::ValueOperationFamilyResolution family;
-    if (!NVVMSemantics::resolveValueOperationFamily(outOperation.getOperationDesc(), family) ||
-        (family.family != NVVMSemantics::ValueOperationFamily::IntegerBinary &&
-         family.family != NVVMSemantics::ValueOperationFamily::FloatBinary))
+    if (!NVVMSemantics::resolveValueOperationFamily(outOperation.getOperationDesc(), family))
     {
         return false;
     }
@@ -3917,7 +3945,7 @@ SlangResult _validateNVVMFunction(
                     const NVVMSemantics::CatalogEntry* semantic =
                         _findNVVMGenericAsmSemantic(genericAsm, function);
                     NVVMScalarTruthiness truthiness;
-                    NVVMGenericAsmMinMax minMaxOperation;
+                    NVVMGenericAsmValueOperation valueOperation;
                     NVVMResolvedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
                     if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
@@ -3928,14 +3956,14 @@ SlangResult _validateNVVMFunction(
                             truthiness.diagnosticName);
                         break;
                     }
-                    if (_resolveNVVMGenericAsmMinMax(genericAsm, function, minMaxOperation))
+                    if (_resolveNVVMGenericAsmValueOperation(genericAsm, function, valueOperation))
                     {
                         _requireValueOperation(
                             requirements.valueOperations,
-                            minMaxOperation.getOperationDesc(),
-                            minMaxOperation.diagnosticName);
+                            valueOperation.getOperationDesc(),
+                            valueOperation.diagnosticName);
                         requirements.requiresCUDADeviceLibrary |=
-                            minMaxOperation.requiresCUDADeviceLibrary;
+                            valueOperation.requiresCUDADeviceLibrary;
                         break;
                     }
                     if (_resolveNVVMSurfaceGenericAsm(genericAsm, function, surfaceOperation))
@@ -6450,17 +6478,20 @@ SlangResult emitNVVMIRFromLinkedIR(
                             break;
                         }
 
-                        NVVMGenericAsmMinMax minMaxOperation;
-                        if (_resolveNVVMGenericAsmMinMax(genericAsm, function, minMaxOperation))
+                        NVVMGenericAsmValueOperation valueOperation;
+                        if (_resolveNVVMGenericAsmValueOperation(
+                                genericAsm,
+                                function,
+                                valueOperation))
                         {
-                            SlangNVVMValueHandle loweredOperands[2] = {};
-                            for (Index i = 0; i < SLANG_COUNT_OF(loweredOperands); ++i)
+                            SlangNVVMValueHandle loweredOperands[3] = {};
+                            for (uint32_t i = 0; i < valueOperation.operandCount; ++i)
                             {
                                 SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                     codeGenContext,
                                     builder,
                                     moduleScope.module,
-                                    minMaxOperation.parameters[i],
+                                    valueOperation.parameters[i],
                                     valueMap,
                                     typeContext,
                                     loweredOperands[i]));
@@ -6468,16 +6499,16 @@ SlangResult emitNVVMIRFromLinkedIR(
                             SlangNVVMValueHandle loweredValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                minMaxOperation.diagnosticName,
+                                valueOperation.diagnosticName,
                                 builder.emitValueOperation(
                                     moduleScope.module,
-                                    minMaxOperation.getOperationDesc(),
+                                    valueOperation.getOperationDesc(),
                                     loweredOperands,
-                                    SLANG_COUNT_OF(loweredOperands),
+                                    valueOperation.operandCount,
                                     loweredValue)));
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                "minimum or maximum return",
+                                "generic value operation return",
                                 builder.emitValueReturn(moduleScope.module, loweredValue)));
                             break;
                         }

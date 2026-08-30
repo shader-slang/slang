@@ -6048,7 +6048,7 @@ The installed CUDA 13 directory has no tool binaries, so CUDA 13 validation rema
 infrastructure gap.
 
 Production packaging treats `slang-llvm-nvvm` as an optional compiler-matched LLVM 14 provider at
-builder ABI revision 25. It should ship next to Slang binaries, with
+builder ABI revision 26. It should ship next to Slang binaries, with
 `SLANG_NVVM_BUILDER_PATH` reserved as the explicit deployment/development override. Sessions cache
 one load result, and direct selection retains deterministic E52016 failure for missing or mismatched
 providers rather than falling back to NVRTC. Provider updates move with the Slang commit and build
@@ -6094,7 +6094,8 @@ The following remain open until their named slice supplies evidence:
   equality/inequality, integer shifts/division/remainder, Float16/Float32 remainder, same-lane
   integer/floating conversion, exact same-lane typed selection, and canonical scalar truthiness
   plus vector `all`/`any` reduction over selected Bool/integer/Float16/Float32 values, and canonical
-  scalar signed/unsigned integer and Float32/Float64 minimum/maximum;
+  scalar signed/unsigned integer and Float32/Float64 minimum/maximum, plus scalar selected-integer
+  population count, bit reversal, and high/low bit scans;
 - pointer and runtime aggregate addressing beyond sign-independent i32 scalar offsets on selected
   numeric device pointers, the exact fixed-i32 device-array subset, and scalar field reads from a
   flat by-value entry struct, plus direct selected-element indexing of canonical
@@ -6182,6 +6183,38 @@ types (28), aggregate/pointer/layout transport (23), and ordinary numeric/bit op
 All three representative workload gates remain correct. Their direct O3 PTX assembles with CUDA
 12.9 for SM70, SM80, and SM90; physical runtime remains on the local SM120 GPU. CUDA 13 and
 physical SM70/80/90 runtime coverage remain productionization gaps.
+
+### Slice 134: Canonical scalar integer bit operations
+
+The post-Slice-133 exact inventory identifies one 11-row integer-bit family: five population-count
+first blockers, two bit reversals, two high-bit scans, and two low-bit scans. The CUDA prelude
+produces one-block `$P_countbits($0)`, `$P_reversebits($0)`, `$P_firstbithigh($0)`, and
+`$P_firstbitlow($0)` helpers. Their specialized signatures, rather than source names or fixture
+paths, are the semantic source of truth.
+
+The compiler now uses one generic one-block value-helper recognizer for these operations and the
+existing scalar min/max family. The shared resolver admits selected 8/16/32/64-bit scalar integer
+operands, exact UInt32 results for count/scans, and same-type results for reversal. Signed
+`firstbithigh` complements negative operands before scanning, while zero scan sentinels are formed
+in UInt32 so narrow values return exact all-ones.
+
+Forward-only builder ABI revision 26 adds four operation IDs to the existing generic typed
+query/emit callback. The isolated LLVM 14 provider constructs `ctpop`, `bitreverse`, `ctlz`, and
+`cttz`. The strict NVVM IR 2.0 serializer validates each intrinsic's identity, selected width,
+signature, and attributes before removing LLVM-14-only declaration attributes for CUDA's
+LLVM-7-era reader; it does not rewrite operation semantics.
+
+All 11 measured workloads become differentially correct at both O0 and O3 and receive direct
+regression lanes. The full 452-row census reaches 237 O0 and 233 O3 successes, with 203 preflight
+failures in each mode and zero previously correct regression. Among 427 MVP rows with a healthy
+native reference, 236 compare correctly at O0, 231 at O3, and 228 at both. The ordinary-intrinsic
+cluster falls from 58 to 47; the leading remaining MVP clusters are ordinary intrinsic semantics
+(47), wave/reconvergence semantics (31), helper ABI contracts (28), aggregate/pointer/layout
+transport (23), and ordinary numeric/bit operations (16).
+
+The selected NVVM prefix passes 402/402 and all 22 promoted lanes pass. The three representative
+workloads remain correct; their direct O3 PTX assembles with CUDA 12.9 for SM70, SM80, and SM90.
+CUDA 13 and physical SM70/80/90 runtime remain infrastructure gaps.
 
 ## Authoritative References
 
