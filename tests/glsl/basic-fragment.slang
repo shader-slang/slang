@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -Wno-120
 #version 310 es
 precision highp float;
 precision highp int;

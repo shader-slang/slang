@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPV): -allow-glsl -target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE_EX(filecheck=SPV): -lang glsl tests/bugs/gh-5339.slang -target spirv-asm -entry computeMain -stage compute -Wno-118
 
 // Test if we are correctly using `Offset` option instead of `ConstOffset`
 // when the offset value is not a compile-time constant.

@@ -11,7 +11,6 @@ namespace Slang
 // ONLY should be used in this compilation unit
 struct CacheOfDataToReplaceOps
 {
-    TargetProgram* target;
     IRModule* module;
     DiagnosticSink* sink;
 
@@ -69,65 +68,60 @@ struct CacheOfDataToReplaceOps
 
     void searchForGlobalsDataNeededInPass()
     {
-        if (target->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
+        for (auto i : module->getGlobalInsts())
         {
-            for (auto i : module->getGlobalInsts())
+            switch (i->getOp())
             {
-                switch (i->getOp())
+            case kIROp_GlobalParam:
+            case kIROp_GlobalVar:
                 {
-
-                case kIROp_GlobalParam:
-                case kIROp_GlobalVar:
+                    for (auto decoration : i->getDecorations())
                     {
-                        for (auto decoration : i->getDecorations())
+                        auto op = decoration->getOp();
+                        if (op == kIROp_VulkanRayPayloadDecoration)
                         {
-                            auto op = decoration->getOp();
-                            if (op == kIROp_VulkanRayPayloadDecoration)
-                            {
-                                m_RayLocationToPayloads.set(
-                                    int(getIntVal(decoration->getOperand(0))),
-                                    i);
-                            }
-                            else if (op == kIROp_VulkanRayPayloadInDecoration)
-                            {
-                                m_RayLocationToPayloads.set(
-                                    int(getIntVal(decoration->getOperand(0))),
-                                    i);
-                            }
-                            else if (op == kIROp_VulkanHitObjectAttributesDecoration)
-                            {
-                                m_RayLocationToAttributes.set(
-                                    int(getIntVal(decoration->getOperand(0))),
-                                    i);
-                            }
-                            else if (op == kIROp_VulkanCallablePayloadDecoration)
-                            {
-                                m_RayLocationToCallables.set(
-                                    int(getIntVal(decoration->getOperand(0))),
-                                    i);
-                            }
-                            else if (op == kIROp_VulkanCallablePayloadInDecoration)
-                            {
-                                m_RayLocationToCallables.set(
-                                    int(getIntVal(decoration->getOperand(0))),
-                                    i);
-                            }
+                            m_RayLocationToPayloads.set(
+                                int(getIntVal(decoration->getOperand(0))),
+                                i);
                         }
-                        break;
+                        else if (op == kIROp_VulkanRayPayloadInDecoration)
+                        {
+                            m_RayLocationToPayloads.set(
+                                int(getIntVal(decoration->getOperand(0))),
+                                i);
+                        }
+                        else if (op == kIROp_VulkanHitObjectAttributesDecoration)
+                        {
+                            m_RayLocationToAttributes.set(
+                                int(getIntVal(decoration->getOperand(0))),
+                                i);
+                        }
+                        else if (op == kIROp_VulkanCallablePayloadDecoration)
+                        {
+                            m_RayLocationToCallables.set(
+                                int(getIntVal(decoration->getOperand(0))),
+                                i);
+                        }
+                        else if (op == kIROp_VulkanCallablePayloadInDecoration)
+                        {
+                            m_RayLocationToCallables.set(
+                                int(getIntVal(decoration->getOperand(0))),
+                                i);
+                        }
                     }
-                case kIROp_Func:
-                    {
-                        funcsToSearch.add(i);
-                        break;
-                    }
-                };
+                    break;
+                }
+            case kIROp_Func:
+                {
+                    funcsToSearch.add(i);
+                    break;
+                }
             }
         }
     }
 
-    CacheOfDataToReplaceOps(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+    CacheOfDataToReplaceOps(IRModule* module, DiagnosticSink* sink)
     {
-        this->target = target;
         this->module = module;
         this->sink = sink;
     }
@@ -171,18 +165,12 @@ void recurseAllOpsToReplace(CacheOfDataToReplaceOps* cache)
     }
 }
 
-void replaceLocationIntrinsicsWithRaytracingObject(
-    IRModule* module,
-    TargetProgram* target,
-    DiagnosticSink* sink)
+void replaceLocationIntrinsicsWithRaytracingObject(IRModule* module, DiagnosticSink* sink)
 {
-    // currently only applies to GLSL syntax
-    CacheOfDataToReplaceOps cache = CacheOfDataToReplaceOps(target, module, sink);
+    // The GLSL-specific SPIR-V assembly operands and Vulkan decorations in the IR are the source
+    // of truth for whether this rewrite applies. If none are present, the traversal is a no-op.
+    CacheOfDataToReplaceOps cache = CacheOfDataToReplaceOps(module, sink);
     cache.searchForGlobalsDataNeededInPass();
-
-    if (target->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
-    {
-        recurseAllOpsToReplace(&cache);
-    }
+    recurseAllOpsToReplace(&cache);
 }
 } // namespace Slang

@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage raygeneration -entry main -target glsl -capability GL_NV_shader_invocation_reorder
-//TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly -capability spvShaderInvocationReorderNV
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayGenSimple.slang -stage raygeneration -entry main -target glsl -capability GL_NV_shader_invocation_reorder -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayGenSimple.slang -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly -capability spvShaderInvocationReorderNV -Wno-118
 
 // CHECK_GLSL-DAG: hitObjectAttributeNV
 // CHECK_SPV-DAG: HitObjectAttributeNV

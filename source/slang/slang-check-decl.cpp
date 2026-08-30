@@ -556,8 +556,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic &&
             !hasSpecializationConstant && decl->initExpr)
         {
-            auto moduleDecl = getModuleDecl(decl);
-            if (!moduleDecl || !moduleDecl->hasModifier<GLSLModuleModifier>())
+            if (!getShared()->isGLSLSourceLanguage())
             {
                 getSink()->diagnose(
                     Diagnostics::ConstGlobalVarWithInitRequiresStatic{.decl = decl});
@@ -2881,7 +2880,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     if (as<NamespaceDeclBase>(varDecl->parentDecl))
     {
-        if (getModuleDecl(varDecl)->hasModifier<GLSLModuleModifier>())
+        if (getShared()->isGLSLSourceLanguage())
         {
             // If we are in GLSL compatiblity mode, we want to treat all global variables
             // without any `uniform` modifiers as true global variables by default.
@@ -17056,8 +17055,11 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
 
     if (getText(moduleDecl->getName()) == "glsl")
     {
-        getShared()->glslModuleDecl = moduleDecl;
-        getShared()->m_isGLSLModuleImported = true;
+        // This is deliberately narrower than selecting GLSL as the source language. The parser
+        // has already run, and all other language-dependent behavior continues to use the
+        // translation unit's effective `sourceLanguage`. Retain only the historical effect that
+        // importing this module enables GLSL's builtin operator rules.
+        getShared()->m_hasImportedGLSLModule = true;
     }
 
     importedModulesList.add(moduleDecl);
@@ -17101,6 +17103,7 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     auto name = decl->moduleNameAndLoc.name;
     if (!name)
         return;
+
     auto scope = getModuleDecl(decl)->ownedScope;
 
     // Try to load a module matching the name

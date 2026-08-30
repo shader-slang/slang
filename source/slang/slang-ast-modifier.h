@@ -162,6 +162,10 @@ class GLSLPrecisionModifier : public Modifier
     FIDDLE(...)
 };
 
+/// Legacy marker retained for AST serialization compatibility.
+///
+/// New front-end code reads the effective language from `TranslationUnitRequest::sourceLanguage`
+/// instead of attaching language mode to the module AST.
 FIDDLE()
 class GLSLModuleModifier : public Modifier
 {

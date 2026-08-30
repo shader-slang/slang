@@ -1,8 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=no-diag):   -DERR=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=warn-diag): -std 2025 -DERR=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=err-diag):  -std 2026 -DERR=1
-//DIAGNOSTIC_TEST:SIMPLE(diag=no-diag):   -DERR=0 -std 2025 -allow-glsl
-//DIAGNOSTIC_TEST:SIMPLE(diag=no-diag):   -DERR=0 -std 2026 -allow-glsl
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=no-diag): -lang glsl tests/diagnostics/volatile.slang -DERR=0 -std 2025 -Wno-118
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=no-diag): -lang glsl tests/diagnostics/volatile.slang -DERR=0 -std 2026 -Wno-118
 //
 // See https://github.com/shader-slang/slang/issues/10614
 

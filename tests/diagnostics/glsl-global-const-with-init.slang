@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -target glsl -stage fragment -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=CHK): -target glsl -stage fragment -entry main -Wno-120
 
 // Test for GLSL mode: global const variables with initializers should be allowed
 // In GLSL mode, global const variables are real constants, not uniform parameters

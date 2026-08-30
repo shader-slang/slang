@@ -2035,11 +2035,8 @@ void convertAtomicToStorageBuffer(
     }
 }
 
-void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram, IRModule* irModule)
+void GLSLReplaceAtomicUint(IRSpecContext* context, IRModule* irModule)
 {
-    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
-        return;
-
     Dictionary<int, List<IRInst*>> bindingToInstMapUnsorted;
     for (auto inst : irModule->getGlobalInsts())
     {
@@ -2155,6 +2152,11 @@ void cloneUsedWitnessTableEntries(IRSpecContext* context)
 LinkedIR linkIR(CodeGenContext* codeGenContext)
 {
     SLANG_PROFILE;
+
+    // Once source modules have been lowered and linked, the IR is the complete definition of the
+    // program. Back-end transformations must be selected from IR operations/decorations or from
+    // target/code-generation options. An input source language, and especially a legacy front-end
+    // option such as `-allow-glsl`, is not a valid back-end policy switch.
 
     auto linkage = codeGenContext->getLinkage();
     auto program = codeGenContext->getProgram();
@@ -2430,10 +2432,11 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // definition.
     diagnoseUnresolvedSymbols(targetReq, codeGenContext->getSink(), state->irModule);
 
-    // type-use reformatter of GLSL types (only if compiler is set to AllowGLSL mode)
-    // which are not supported by SPIRV->Vulkan but is supported by GLSL->Vulkan through
-    // compiler magic tricks
-    GLSLReplaceAtomicUint(context, targetProgram, state->irModule);
+    // Rewrite any GLSL atomic-uint types that reached the linked IR. SPIR-V cannot represent this
+    // GLSL type directly, so the legalization replaces it with a storage-buffer representation.
+    // `kIROp_GLSLAtomicUintType` is the source of truth for whether the rewrite is needed; scanning
+    // a module without that type is harmless.
+    GLSLReplaceAtomicUint(context, state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

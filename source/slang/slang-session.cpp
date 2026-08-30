@@ -1079,8 +1079,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
     // We need to temporarily replace the SourceManager for this CompileRequest
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
 
-    SourceLanguage sourceLanguage = SourceLanguage::Slang;
     SlangLanguageVersion languageVersion = m_optionSet.getLanguageVersion();
+    SourceLanguageDirective sourceLanguageDirective;
 
     auto tokens = preprocessSource(
         srcFile,
@@ -1088,11 +1088,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         nullptr,
         Dictionary<String, String>(),
         this,
-        sourceLanguage,
+        sourceLanguageDirective,
         languageVersion);
-
-    if (sourceLanguage == SourceLanguage::Unknown)
-        sourceLanguage = SourceLanguage::Slang;
 
     return parseTermFromSourceFile(
         getASTBuilder(),
@@ -1100,7 +1097,7 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         &sink,
         scope,
         getNamePool(),
-        sourceLanguage);
+        SourceLanguage::Slang);
 }
 
 UInt Linkage::addTarget(CodeGenTarget target)
@@ -1402,16 +1399,10 @@ RefPtr<Module> Linkage::loadSourceModuleImpl(
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
     translationUnit->setModuleName(name);
-    Stage impliedStage;
+    // Imported source modules default to Slang when their file name does not imply a language.
+    // `parseTranslationUnit()` is the single place that resolves a recognized extension for both
+    // imported modules and ordinary compile-request inputs.
     translationUnit->sourceLanguage = SourceLanguage::Slang;
-
-    // If we are loading from a file with apparaent glsl extension,
-    // set the source language to GLSL to enable GLSL compatibility mode.
-    if ((SourceLanguage)findSourceLanguageFromPath(filePathInfo.getName(), impliedStage) ==
-        SourceLanguage::GLSL)
-    {
-        translationUnit->sourceLanguage = SourceLanguage::GLSL;
-    }
 
     frontEndReq->addTranslationUnit(translationUnit);
 
@@ -2065,20 +2056,43 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         sink,
         translationUnit);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
-    SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
     SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;
 
     auto segments = extractSourceSegments(sourceFile, getSourceManager());
 
     auto preprocessed = preprocessSourceSegments(
         segments,
-        sourceLanguage,
         slangLanguageVersion,
         sink,
         &includeSystem,
         combinedPreprocessorDefinitions,
         this,
         &preprocessorHandler);
+
+    for (auto& segment : preprocessed)
+    {
+        auto& directive = segment.sourceLanguageDirective;
+        if (directive.language == SourceLanguage::Unknown)
+            continue;
+
+        // A semantic `__include` is parsed only after the containing translation unit has already
+        // selected its effective language and parsed its primary sources. It may confirm that
+        // language, but changing it here would leave the existing AST internally inconsistent.
+        if (directive.language != translationUnit->sourceLanguage)
+        {
+            if (translationUnit->sourceLanguageImpliedBySourceContentsLoc.isValid())
+            {
+                sink->diagnose(Diagnostics::ConflictingSourceLanguageDirectives{
+                    .location = directive.location,
+                    .firstLocation = translationUnit->sourceLanguageImpliedBySourceContentsLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::SourceLanguageDirectiveConflictsWithTranslationUnit{
+                    .location = directive.location});
+            }
+        }
+    }
 
     if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
     {

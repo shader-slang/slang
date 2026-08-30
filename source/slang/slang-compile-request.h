@@ -144,6 +144,10 @@ public:
 
     void parseTranslationUnit(TranslationUnitRequest* translationUnit);
 
+    /// Consume the legacy `AllowGLSL` option by explicitly selecting GLSL for every translation
+    /// unit. No later compiler phase may attach independent semantics to that option.
+    void normalizeAllowGLSLInputOption();
+
     // Perform primary semantic checking on all
     // of the translation units in the program
     void checkAllTranslationUnits();
@@ -365,14 +369,13 @@ class ContainerDecl;
 struct PreprocessedSegment
 {
     TokenList tokens;
-    SourceLanguage sourceLanguage;
+    SourceLanguageDirective sourceLanguageDirective;
 };
 
 List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* sourceManager);
 
 List<PreprocessedSegment> preprocessSourceSegments(
     List<SourceFile*> const& segments,
-    SourceLanguage defaultSourceLanguage,
     SlangLanguageVersion& ioLanguageVersion,
     DiagnosticSink* sink,
     IncludeSystem* includeSystem,

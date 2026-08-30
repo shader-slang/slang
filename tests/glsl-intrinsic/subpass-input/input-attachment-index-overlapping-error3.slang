@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage fragment -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage fragment -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage fragment -entry main -Wno-120
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage fragment -entry main -Wno-120
 #version 450
 // CHECK: warning{{.*}}39001
 buffer MyBlockName

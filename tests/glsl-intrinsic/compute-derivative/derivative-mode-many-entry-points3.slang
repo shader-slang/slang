@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK_SPV_SYNTAX): -allow-glsl -fvk-use-entrypoint-name -target spirv
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV_SYNTAX): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-many-entry-points3.slang -fvk-use-entrypoint-name -target spirv -Wno-118
 // CHECK_SPV_SYNTAX: DerivativeGroupQuads{{NV|KHR}}
 
 #ifdef GLSL_SYNTAX

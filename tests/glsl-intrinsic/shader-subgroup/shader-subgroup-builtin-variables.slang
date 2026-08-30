@@ -1,19 +1,19 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_VK
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_VK
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -Wno-120 -stage compute -entry computeMain -target glsl -DTARGET_VK
+//TEST:SIMPLE(filecheck=CHECK_SPV): -Wno-120 -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_VK
 
 // missing implementation of most builtin values due to non trivial translation
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -Wno-120 -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // missing implementation of most builtin values due to non trivial translation
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -Wno-120 -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 //missing implementation of system (varying?) values
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP): -Wno-120 -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -xslang -DTARGET_VK
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly -xslang -DTARGET_VK
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120 -xslang -DTARGET_VK
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120 -emit-spirv-directly -xslang -DTARGET_VK
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -Wno-120
 
 // There are some issues with the Metal backend when using glsl-style syntax - this should be fixed.
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DTARGET_METAL
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -entry computeMain -Wno-120 -xslang -DTARGET_METAL
 
 #version 430
 

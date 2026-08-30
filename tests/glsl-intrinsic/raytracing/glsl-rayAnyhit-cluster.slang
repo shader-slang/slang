@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage anyhit -entry main -target glsl -capability GL_EXT_ray_tracing -capability GL_NV_cluster_acceleration_structure
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayAnyhit-cluster.slang -stage anyhit -entry main -target glsl -capability GL_EXT_ray_tracing -capability GL_NV_cluster_acceleration_structure -Wno-118
 
-//TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage anyhit -entry main -target spirv-assembly -capability SPV_KHR_ray_tracing -capability SPV_NV_cluster_acceleration_structure
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayAnyhit-cluster.slang -emit-spirv-directly -stage anyhit -entry main -target spirv-assembly -capability SPV_KHR_ray_tracing -capability SPV_NV_cluster_acceleration_structure -Wno-118
 
 // CHECK_GLSL: #extension GL_EXT_ray_tracing : require
 // CHECK_GLSL: #extension GL_NV_cluster_acceleration_structure : require

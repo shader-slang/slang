@@ -97,7 +97,7 @@ enum class AllowCaseDefaultStatements : bool
 struct ParserOptions
 {
     bool enableEffectAnnotations = false;
-    bool allowGLSLInput = false;
+    bool isGLSLInput = false;
     bool isInLanguageServer = false;
     bool isCoreModule = false;
     ParsingStage stage = ParsingStage::Body;
@@ -1278,7 +1278,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     AddModifier(&modifierLink, parsedModifier);
                     continue;
                 }
-                else if (parser->options.allowGLSLInput)
+                else if (parser->options.isGLSLInput)
                 {
                     if (AdvanceIf(parser, "flat"))
                     {
@@ -1362,6 +1362,31 @@ static NodeBase* parseImportDecl(Parser* parser, void* /*userData*/)
 {
     auto decl = parser->astBuilder->create<ImportDecl>();
     parseFileReferenceDeclBase(parser, decl);
+
+    if (decl->moduleNameAndLoc.name && getText(decl->moduleNameAndLoc.name) == "glsl")
+    {
+        // Actual GLSL receives a synthetic import in `parseSourceFile`, so spelling it in the
+        // source is redundant. Importing GLSL declarations and operator rules into HLSL is
+        // suspicious but remains a warning for compatibility. Legacy Slang source may still use
+        // the import, but Slang 202c removes that compatibility path.
+        if (parser->sourceLanguage == SourceLanguage::GLSL)
+        {
+            parser->sink->diagnose(
+                Diagnostics::RedundantGlslModuleImport{.location = decl->moduleNameAndLoc.loc});
+        }
+        else if (parser->sourceLanguage == SourceLanguage::HLSL)
+        {
+            parser->sink->diagnose(
+                Diagnostics::GlslModuleImportInHlsl{.location = decl->moduleNameAndLoc.loc});
+        }
+        else if (
+            parser->sourceLanguage == SourceLanguage::Slang &&
+            parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_202C)
+        {
+            parser->sink->diagnose(Diagnostics::GlslModuleImportNotAllowedInSlang202c{
+                .location = decl->moduleNameAndLoc.loc});
+        }
+    }
     return decl;
 }
 
@@ -3529,7 +3554,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 
 static Modifier* findPotentialGLSLInterfaceBlockModifier(Parser* parser, Modifiers& mods)
 {
-    if (!parser->options.allowGLSLInput)
+    if (!parser->options.isGLSLInput)
         return nullptr;
 
     for (auto mod : mods)
@@ -4125,7 +4150,7 @@ static Decl* ParseBufferBlockDecl(
         parser->ReadToken(TokenType::Semicolon);
     }
     else if (
-        parser->options.allowGLSLInput && parser->LookAheadToken(TokenType::Identifier) &&
+        parser->options.isGLSLInput && parser->LookAheadToken(TokenType::Identifier) &&
         parser->LookAheadToken(TokenType::LBracket, 1))
     {
         // GLSL bindless buffers are denoted with [] after the name.
@@ -4186,7 +4211,7 @@ static Decl* ParseBufferBlockDecl(
 static NodeBase* parseHLSLCBufferDecl(Parser* parser, void* /*userData*/)
 {
     // Check for GLSL layout qualifiers when GLSL input is allowed
-    if (parser->options.allowGLSLInput && parser->pendingModifiers)
+    if (parser->options.isGLSLInput && parser->pendingModifiers)
     {
         auto getLayoutArg = [&](const char* defaultLayout)
         {
@@ -5713,7 +5738,7 @@ static void CompleteDecl(
     }
     else
     {
-        if (parser->options.allowGLSLInput)
+        if (parser->options.isGLSLInput)
         {
             addSpecialGLSLModifiersBasedOnType(parser, declToModify, &modifiers);
         }
@@ -5848,7 +5873,7 @@ static DeclBase* ParseDeclWithModifiers(
             }
 
             // This can also be a GLSL style buffer block declaration.
-            if (parser->options.allowGLSLInput)
+            if (parser->options.isGLSLInput)
             {
                 auto getLayoutArg = [&](const char* defaultLayout)
                 {
@@ -6228,7 +6253,7 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
     bool parentIsInterface = containerDecl->astNodeType == ASTNodeType::InterfaceDecl;
     while (!AdvanceIfMatch(parser, matchType, &closingBraceToken))
     {
-        if (parser->options.allowGLSLInput)
+        if (parser->options.isGLSLInput)
         {
             if (parseGLSLGlobalDecl(parser, containerDecl))
                 continue;
@@ -6346,7 +6371,7 @@ void Parser::parseSourceFile(ContainerDecl* program)
         program->loc = tokenReader.peekLoc();
     }
 
-    if (options.allowGLSLInput)
+    if (options.isGLSLInput)
     {
         auto glslName = getName(this, "glsl");
         if (program->nameAndLoc.name != glslName)
@@ -6356,8 +6381,6 @@ void Parser::parseSourceFile(ContainerDecl* program)
             importDecl->scope = currentScope;
             AddMember(currentScope, importDecl);
         }
-        auto glslModuleModifier = astBuilder->create<GLSLModuleModifier>();
-        addModifier(currentModule, glslModuleModifier);
     }
 
     parseDecls(this, program, MatchedTokenType::File);
@@ -9958,7 +9981,7 @@ Expr* parseTermFromSourceFile(
     SourceLanguage sourceLanguage)
 {
     ParserOptions options;
-    options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
+    options.isGLSLInput = sourceLanguage == SourceLanguage::GLSL;
     options.stage = ParsingStage::Body;
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
@@ -9981,9 +10004,7 @@ Stmt* parseUnparsedStmt(
     options.stage = ParsingStage::Body;
     options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
         CompilerOptionName::EnableEffectAnnotations);
-    options.allowGLSLInput =
-        translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
-        sourceLanguage == SourceLanguage::GLSL;
+    options.isGLSLInput = sourceLanguage == SourceLanguage::GLSL;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
@@ -10013,9 +10034,7 @@ void parseSourceFile(
     options.stage = ParsingStage::Decl;
     options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
         CompilerOptionName::EnableEffectAnnotations);
-    options.allowGLSLInput =
-        translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
-        sourceLanguage == SourceLanguage::GLSL;
+    options.isGLSLInput = sourceLanguage == SourceLanguage::GLSL;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
@@ -10284,7 +10303,7 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 
     // While in GLSL compatibility mode, 'shared' = 'groupshared' and not the
     // D3D11 effect syntax.
-    if (parser->options.allowGLSLInput)
+    if (parser->options.isGLSLInput)
     {
         modifier = parser->astBuilder->create<HLSLGroupSharedModifier>();
     }
@@ -10299,7 +10318,7 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
-    if ((!parser->options.allowGLSLInput) &&
+    if ((!parser->options.isGLSLInput) &&
         (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026))
     {
         parser->sink->diagnose(Diagnostics::RemovedModifierUsage{
@@ -10308,7 +10327,7 @@ static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
             .location = parser->tokenReader.peekLoc()});
     }
     else if (
-        (!parser->options.allowGLSLInput) &&
+        (!parser->options.isGLSLInput) &&
         (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025))
     {
         parser->sink->diagnose(Diagnostics::DeprecatedModifierUsage{

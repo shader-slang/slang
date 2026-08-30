@@ -1235,7 +1235,10 @@ void initCommandOptions(CommandOptions& options)
          "-validate-uniformity",
          nullptr,
          "Perform uniformity validation analysis."},
-        {OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language."},
+        {OptionKind::AllowGLSL,
+         "-allow-glsl",
+         nullptr,
+         "Deprecated. Treat every input translation unit as GLSL."},
         {OptionKind::EnableExperimentalPasses,
          "-enable-experimental-passes",
          nullptr,
@@ -1467,14 +1470,20 @@ struct OptionsParser
         bool writeAsSourceBytes = false;
     };
 
-    int addTranslationUnit(SlangSourceLanguage language, Stage impliedStage);
+    int addTranslationUnit(
+        SlangSourceLanguage language,
+        Stage impliedStage,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
-    void addInputSlangPath(String const& path);
+    void addInputSlangPath(
+        String const& path,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
     void addInputForeignShaderPath(
         String const& path,
         SlangSourceLanguage language,
-        Stage impliedStage);
+        Stage impliedStage,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
     static Profile::RawVal findGlslProfileFromPath(const String& path);
 
@@ -1644,10 +1653,17 @@ struct OptionsParser
     String m_currentOptionName;
 };
 
-int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage impliedStage)
+int OptionsParser::addTranslationUnit(
+    SlangSourceLanguage language,
+    Stage impliedStage,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     auto translationUnitIndex = m_rawTranslationUnits.getCount();
     auto translationUnitID = m_compileRequest->addTranslationUnit(language, nullptr);
+
+    auto translationUnit = m_frontEndReq->getTranslationUnit(translationUnitID);
+    translationUnit->sourceLanguageExplicitlyRequested =
+        SourceLanguage(sourceLanguageExplicitlyRequested);
 
     // As a sanity check: the API should be returning the same translation
     // unit index as we maintain internally. This invariant would only
@@ -1666,17 +1682,28 @@ int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage implie
     return int(translationUnitIndex);
 }
 
-void OptionsParser::addInputSlangPath(String const& path)
+void OptionsParser::addInputSlangPath(
+    String const& path,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     // All of the input .slang files will be grouped into a single logical translation unit,
     // which we create lazily when the first .slang file is encountered.
     if (m_slangTranslationUnitIndex == -1)
     {
         m_translationUnitCount++;
-        m_slangTranslationUnitIndex =
-            addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+        m_slangTranslationUnitIndex = addTranslationUnit(
+            SLANG_SOURCE_LANGUAGE_SLANG,
+            Stage::Unknown,
+            sourceLanguageExplicitlyRequested);
     }
 
+    auto translationUnit = m_frontEndReq->getTranslationUnit(
+        m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID);
+    if (sourceLanguageExplicitlyRequested != SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        translationUnit->sourceLanguageExplicitlyRequested =
+            SourceLanguage(sourceLanguageExplicitlyRequested);
+    }
     m_compileRequest->addTranslationUnitSourceFile(
         m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID,
         path.begin());
@@ -1688,10 +1715,12 @@ void OptionsParser::addInputSlangPath(String const& path)
 void OptionsParser::addInputForeignShaderPath(
     String const& path,
     SlangSourceLanguage language,
-    Stage impliedStage)
+    Stage impliedStage,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     m_translationUnitCount++;
-    m_currentTranslationUnitIndex = addTranslationUnit(language, impliedStage);
+    m_currentTranslationUnitIndex =
+        addTranslationUnit(language, impliedStage, sourceLanguageExplicitlyRequested);
 
     m_compileRequest->addTranslationUnitSourceFile(
         m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
@@ -1825,14 +1854,19 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
         {
             m_translationUnitCount++;
             m_slangTranslationUnitIndex =
-                addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+                addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown, sourceLanguage);
         }
+        m_frontEndReq
+            ->getTranslationUnit(
+                m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID)
+            ->sourceLanguageExplicitlyRequested = SourceLanguage(sourceLanguage);
         m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
     }
     else
     {
         m_translationUnitCount++;
-        m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
+        m_currentTranslationUnitIndex =
+            addTranslationUnit(sourceLanguage, Stage::Unknown, sourceLanguage);
     }
 
     const char* sourceBegin =
@@ -1849,19 +1883,20 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
 
 SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langOverride)
 {
-    SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    SlangSourceLanguage sourceLanguageExplicitlyRequested = SlangSourceLanguage(langOverride);
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         auto linkage = m_requestImpl->getLinkage();
         if (linkage->m_optionSet.hasOption(CompilerOptionName::Language))
         {
-            sourceLanguage = linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
-                CompilerOptionName::Language);
+            sourceLanguageExplicitlyRequested =
+                linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
+                    CompilerOptionName::Language);
         }
     }
 
     if (strcmp(inPath, kStdinCommandLinePath) == 0)
-        return addInputStdin(sourceLanguage);
+        return addInputStdin(sourceLanguageExplicitlyRequested);
 
     // look at the extension on the file name to determine
     // how we should handle it.
@@ -1871,27 +1906,34 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
-    else if (
-        path.endsWith(".slang") || hasLiterateFileExtension(path) ||
-        langOverride == SourceLanguage::Slang)
+    Stage stageImpliedByFileExtension = Stage::Unknown;
+    SlangSourceLanguage sourceLanguageImpliedByFileExtension =
+        findSourceLanguageFromPath(path, stageImpliedByFileExtension);
+    SlangSourceLanguage sourceLanguage = sourceLanguageExplicitlyRequested;
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+        sourceLanguage = sourceLanguageImpliedByFileExtension;
+
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
     {
         // Plain old slang code
-        addInputSlangPath(path);
+        addInputSlangPath(path, sourceLanguageExplicitlyRequested);
         return SLANG_OK;
     }
 
     Stage impliedStage = Stage::Unknown;
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
-    {
-        sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
-    }
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+        impliedStage = stageImpliedByFileExtension;
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         m_requestImpl->getSink()->diagnose(Diagnostics::CannotDeduceSourceLanguage{.path = inPath});
         return SLANG_FAIL;
     }
 
-    addInputForeignShaderPath(path, sourceLanguage, impliedStage);
+    addInputForeignShaderPath(
+        path,
+        sourceLanguage,
+        impliedStage,
+        sourceLanguageExplicitlyRequested);
 
     return SLANG_OK;
 }

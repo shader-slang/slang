@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -allow-glsl -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -Wno-120
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -Wno-120 -emit-spirv-directly
 #version 430
 precision highp float;
 precision highp int;

@@ -61,11 +61,21 @@ struct PreprocessorDesc
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 };
 
+/// The first source-language selection discovered while preprocessing one source unit.
+///
+/// The preprocessor diagnoses later conflicting directives and preserves this first selection so
+/// the translation unit can choose one parser mode before any source file is parsed.
+struct SourceLanguageDirective
+{
+    SourceLanguage language = SourceLanguage::Unknown;
+    SourceLoc location;
+};
+
 /// Take a source `file` and preprocess it into a list of tokens.
 TokenList preprocessSource(
     SourceFile* file,
     PreprocessorDesc const& desc,
-    SourceLanguage& outDetectedLanguage,
+    SourceLanguageDirective& outSourceLanguageDirective,
     SlangLanguageVersion& outLanguageVersion);
 
 /// Convenience wrapper for `preprocessSource` when a `Linkage` is available
@@ -75,7 +85,7 @@ TokenList preprocessSource(
     IncludeSystem* includeSystem,
     Dictionary<String, String> const& defines,
     Linkage* linkage,
-    SourceLanguage& outDetectedLanguage,
+    SourceLanguageDirective& outSourceLanguageDirective,
     SlangLanguageVersion& outLanguageVersion,
     PreprocessorHandler* handler = nullptr);
 

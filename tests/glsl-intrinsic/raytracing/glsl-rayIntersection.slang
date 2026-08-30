@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage intersection -entry main -target glsl -allow-glsl 
-//TEST:SIMPLE(filecheck=CHECK_SPV): -stage intersection -entry main -target spirv-assembly -emit-spirv-directly -allow-glsl 
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayIntersection.slang -stage intersection -entry main -target glsl -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayIntersection.slang -stage intersection -entry main -target spirv-assembly -emit-spirv-directly -Wno-118
 
 layout(binding = 0) uniform accelerationStructureEXT as;
 

@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage compute -entry computeMain -allow-glsl -target glsl
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl/ssboMemberMemoryQualifierReadError.slang -stage compute -entry computeMain -target glsl -Wno-118
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl/ssboMemberMemoryQualifierReadError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -Wno-118
 
 volatile buffer MyBlockName1
 {

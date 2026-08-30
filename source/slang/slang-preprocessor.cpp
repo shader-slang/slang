@@ -1320,8 +1320,8 @@ struct Preprocessor
     /// Stores the initiating macro source location.
     SourceLoc initiatingMacroSourceLoc;
 
-    /// Detected source language.
-    SourceLanguage language = SourceLanguage::Unknown;
+    /// Source language and directive location discovered in the source text.
+    SourceLanguageDirective sourceLanguageDirective;
 
     SlangLanguageVersion languageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
 
@@ -4498,6 +4498,27 @@ static void HandleExtensionDirective(PreprocessorDirectiveContext* context)
     SkipToEndOfLine(context);
 }
 
+static void _handleSourceLanguageDirective(
+    PreprocessorDirectiveContext* context,
+    SourceLanguage language)
+{
+    auto& directive = context->m_preprocessor->sourceLanguageDirective;
+    if (directive.language == SourceLanguage::Unknown)
+    {
+        directive.language = language;
+        directive.location = GetDirectiveLoc(context);
+    }
+    else if (directive.language != language)
+    {
+        // A translation unit needs one effective source language before parsing starts. Preserve
+        // the first content-level selection so a later conflicting directive cannot silently
+        // change how only part of the input is parsed.
+        GetSink(context)->diagnose(Diagnostics::ConflictingSourceLanguageDirectives{
+            .location = GetDirectiveLoc(context),
+            .firstLocation = directive.location});
+    }
+}
+
 static void HandleVersionDirective(PreprocessorDirectiveContext* context)
 {
     int version = SLANG_LANGUAGE_VERSION_UNKNOWN;
@@ -4516,7 +4537,7 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
 
     if (isValidGLSLVersion(version))
     {
-        context->m_preprocessor->language = SourceLanguage::GLSL;
+        _handleSourceLanguageDirective(context, SourceLanguage::GLSL);
     }
     else
     {
@@ -4574,7 +4595,7 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
 
         if (isValidSlangLanguageVersion(version))
         {
-            context->m_preprocessor->language = SourceLanguage::Slang;
+            _handleSourceLanguageDirective(context, SourceLanguage::Slang);
             context->m_preprocessor->languageVersion = static_cast<SlangLanguageVersion>(version);
         }
         else
@@ -5015,7 +5036,7 @@ TokenList preprocessSource(
     IncludeSystem* includeSystem,
     Dictionary<String, String> const& defines,
     Linkage* linkage,
-    SourceLanguage& outDetectedLanguage,
+    SourceLanguageDirective& outSourceLanguageDirective,
     SlangLanguageVersion& outLanguageVersion,
     PreprocessorHandler* handler)
 {
@@ -5045,13 +5066,13 @@ TokenList preprocessSource(
         desc.sink->setSourceWarningStateTracker(wst);
     }
 
-    return preprocessSource(file, desc, outDetectedLanguage, outLanguageVersion);
+    return preprocessSource(file, desc, outSourceLanguageDirective, outLanguageVersion);
 }
 
 TokenList preprocessSource(
     SourceFile* file,
     PreprocessorDesc const& desc,
-    SourceLanguage& outDetectedLanguage,
+    SourceLanguageDirective& outSourceLanguageDirective,
     SlangLanguageVersion& outLanguageVersion)
 {
     using namespace preprocessor;
@@ -5187,7 +5208,7 @@ TokenList preprocessSource(
     String s = sb.produceString();
 #endif
 
-    outDetectedLanguage = preprocessor.language;
+    outSourceLanguageDirective = preprocessor.sourceLanguageDirective;
     if (preprocessor.languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN)
         outLanguageVersion = preprocessor.languageVersion;
     return tokens;

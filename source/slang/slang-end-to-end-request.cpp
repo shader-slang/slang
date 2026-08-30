@@ -97,7 +97,13 @@ EndToEndCompileRequest::queryInterface(SlangUUID const& uuid, void** outObject)
     return SLANG_E_NO_INTERFACE;
 }
 
-// Try to infer a single common source language for a request
+// Infer a common input language only for slangc's convenience target selection.
+//
+// This deliberately uses the request-level language available before preprocessing. The
+// command-line tool's target inference is a best-effort DWIM policy layered above the compiler,
+// not part of source-language resolution. A later `#version` or `#language` compatibility override
+// therefore does not revise an already inferred target; users relying on such an override should
+// select their target explicitly.
 static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 {
     SourceLanguage language = SourceLanguage::Unknown;
@@ -124,6 +130,18 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
     SLANG_PROFILE_SECTION(endToEndActions);
+
+    // `-allow-glsl` used to enable an independent collection of parser, semantic, and IR
+    // behaviors without changing the declared language of any translation unit. Forward the
+    // legacy option to the front-end request so it can reduce that option to the single meaning
+    // that all input translation units are GLSL.
+    auto& requestOptions = getOptionSet();
+    if (requestOptions.getBoolOption(CompilerOptionName::AllowGLSL))
+        getFrontEndReq()->optionSet.set(CompilerOptionName::AllowGLSL, true);
+    getFrontEndReq()->normalizeAllowGLSLInputOption();
+
+    // Do not propagate the consumed option into target requests below.
+    requestOptions.options.remove(CompilerOptionName::AllowGLSL);
 
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.

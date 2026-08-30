@@ -28,9 +28,40 @@ public:
     // The parent compile request
     FrontEndCompileRequest* compileRequest = nullptr;
 
-    // The language in which the source file(s)
-    // are assumed to be written
+    /// The effective source language of this translation unit.
+    ///
+    /// A translation unit has exactly one source language. The language explicitly requested by
+    /// an API or command-line caller takes precedence over a language inferred from the primary
+    /// source-file extensions. Source directives are expected to agree with that choice. For
+    /// backward compatibility, preprocessing currently diagnoses but honors a conflicting
+    /// `#version` or `#language` directive before parsing begins.
+    ///
+    /// Parser and semantic-checking code must use only this resolved field. In particular, the
+    /// deprecated request-wide `-allow-glsl` option is normalized into this per-translation-unit
+    /// value before preprocessing and has no independent meaning later in the pipeline.
     SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+
+    /// The language explicitly requested through the API or command-line options, if any.
+    ///
+    /// Normalizing the deprecated `-allow-glsl` option records `GLSL` here because that option's
+    /// only remaining meaning is an explicit request to treat every translation unit as GLSL.
+    SourceLanguage sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
+
+    /// The language agreed on by the primary source-file extensions, if any.
+    ///
+    /// This field is `Unknown` when no extension identifies a language or when the extensions
+    /// disagree. Disagreement is an error unless an explicitly requested language resolves it.
+    SourceLanguage sourceLanguageImpliedByFileExtension = SourceLanguage::Unknown;
+
+    /// The language selected by a primary source-file directive, if any.
+    ///
+    /// A conflicting directive currently overrides the request-level choice only as a backward-
+    /// compatibility concession. The diagnostic makes such a request visible so this behavior can
+    /// eventually become an error instead.
+    SourceLanguage sourceLanguageImpliedBySourceContents = SourceLanguage::Unknown;
+
+    /// The location of the directive that selected `sourceLanguageImpliedBySourceContents`.
+    SourceLoc sourceLanguageImpliedBySourceContentsLoc;
 
     /// Makes any source artifact available as a SourceFile.
     /// If successful any of the source artifacts will be represented by the same index

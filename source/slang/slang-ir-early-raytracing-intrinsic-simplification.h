@@ -9,10 +9,6 @@ namespace Slang
 struct IRModule;
 struct IRGlobalValueWithCode;
 class DiagnosticSink;
-class TargetProgram;
 
-void replaceLocationIntrinsicsWithRaytracingObject(
-    IRModule* module,
-    TargetProgram* target,
-    DiagnosticSink* sink);
+void replaceLocationIntrinsicsWithRaytracingObject(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang

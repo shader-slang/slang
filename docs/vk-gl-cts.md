@@ -34,7 +34,7 @@ At run time the glue does the following for every shader the CTS wants to compil
    this command line:
 
    ```
-   slangc test.slang.<ext> -target spirv -stage <stage> -entry main -allow-glsl -matrix-layout-row-major
+   slangc test.slang.<ext> -target spirv -stage <stage> -entry main -matrix-layout-row-major
    ```
 
    The server returns SPIR-V assembly, which the glue assembles and hands back to the CTS. Running
@@ -239,7 +239,7 @@ cases are vertex+fragment). You can also copy the source out of the `.qpa` log. 
 exactly the options the glue passes:
 
 ```
-slangc.exe test.slang.comp -target spirv -stage compute -entry main -allow-glsl -matrix-layout-row-major -o out.spv
+slangc.exe test.slang.comp -target spirv -stage compute -entry main -matrix-layout-row-major -o out.spv
 ```
 
 Stage names map as `.vert` → `vertex`, `.frag` → `fragment`, `.geom` → `geometry`, `.comp` →

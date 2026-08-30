@@ -1,9 +1,9 @@
-//TEST:SIMPLE(filecheck=VK_VTX): -target spirv -stage vertex -entry vertexMain -allow-glsl
-//TEST:SIMPLE(filecheck=VK_FRAG): -target spirv -stage fragment -entry fragmentMain -allow-glsl
-//TEST:SIMPLE(filecheck=GLSL_VTX): -target glsl -stage vertex -entry vertexMain -allow-glsl
-//TEST:SIMPLE(filecheck=GLSL_FRAG): -target glsl -stage fragment -entry fragmentMain -allow-glsl
-//TEST:SIMPLE(filecheck=HLSL_VTX): -target hlsl -stage vertex -entry vertexMain -allow-glsl
-//TEST:SIMPLE(filecheck=HLSL_FRAG): -target hlsl -stage fragment -entry fragmentMain -allow-glsl
+//TEST:SIMPLE(filecheck=VK_VTX): -target spirv -stage vertex -entry vertexMain -Wno-120
+//TEST:SIMPLE(filecheck=VK_FRAG): -target spirv -stage fragment -entry fragmentMain -Wno-120
+//TEST:SIMPLE(filecheck=GLSL_VTX): -target glsl -stage vertex -entry vertexMain -Wno-120
+//TEST:SIMPLE(filecheck=GLSL_FRAG): -target glsl -stage fragment -entry fragmentMain -Wno-120
+//TEST:SIMPLE(filecheck=HLSL_VTX): -target hlsl -stage vertex -entry vertexMain -Wno-120
+//TEST:SIMPLE(filecheck=HLSL_FRAG): -target hlsl -stage fragment -entry fragmentMain -Wno-120
 
 // Regression test for https://github.com/shader-slang/slang/issues/8683
 //

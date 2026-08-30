@@ -2741,7 +2741,7 @@ Result linkAndOptimizeIR(
 
     if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
     {
-        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, targetProgram, sink);
+        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, sink);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);

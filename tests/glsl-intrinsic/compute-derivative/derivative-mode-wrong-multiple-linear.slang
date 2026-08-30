@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target glsl -DLINEAR_SLANG
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR_SLANG
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target glsl -DLINEAR_SLANG -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target spirv -DLINEAR_SLANG -Wno-118
 
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target glsl -DLINEAR_GLSL
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR_GLSL
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target glsl -DLINEAR_GLSL -Wno-118
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-wrong-multiple-linear.slang -stage compute -entry computeMain -target spirv -DLINEAR_GLSL -Wno-118
 // CHECK: error[E31211]
 
 buffer MyBlockName

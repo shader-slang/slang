@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -Wno-120 -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV): -Wno-120 -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -Wno-120 -emit-spirv-directly
 #version 460
 
 // CHECK_GLSL: void main(

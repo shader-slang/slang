@@ -1,6 +1,6 @@
 // Test that StructuredBuffer of struct with unbounded array is not allowed
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -allow-glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -stage compute -entry computeMain
 
 // Struct containing unbounded array (must be last member)
 struct StructWithUnbounded
