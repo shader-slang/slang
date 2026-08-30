@@ -314,15 +314,10 @@ static RequirementWitnessTableLookupKey _getRequirementWitnessTableLookupKey(
     DeclRef<Decl> requirementDeclRef)
 {
     UCount genericWrapperCount = 0;
-    auto requirementDecl = requirementDeclRef.getDecl();
-    while (auto genericDecl = as<GenericDecl>(requirementDecl))
-    {
-        genericWrapperCount++;
-        requirementDecl = genericDecl->inner;
-    }
-    return RequirementWitnessTableLookupKey(
-        InterfaceRequirementKey(requirementDecl),
+    auto key = InterfaceRequirementKey::createWithGenericWrapperCount(
+        requirementDeclRef.getDecl(),
         genericWrapperCount);
+    return RequirementWitnessTableLookupKey(key, genericWrapperCount);
 }
 
 /// Resolves a stored table entry and restores the outer generic declaration requested by lookup.
@@ -345,17 +340,17 @@ static RequirementWitness _resolveRequirementWitnessForTableLookup(
         return requirementWitness;
     case RequirementWitness::Flavor::declRef:
         {
-            auto satisfyingVal =
+            auto satisfyingDeclRef =
                 as<DeclRefBase>(requirementWitness.getDeclRef().declRefBase->resolve());
-            for (; satisfyingVal && genericWrapperCount > 0;
-                 satisfyingVal = satisfyingVal->getParent())
+            while (satisfyingDeclRef && genericWrapperCount > 0)
             {
-                auto parent = satisfyingVal->getParent();
+                auto parent = satisfyingDeclRef->getParent();
                 if (parent && as<GenericDecl>(parent->getDecl()))
                     genericWrapperCount--;
+                satisfyingDeclRef = parent;
             }
-            SLANG_RELEASE_ASSERT(satisfyingVal && genericWrapperCount == 0);
-            return RequirementWitness(satisfyingVal);
+            SLANG_RELEASE_ASSERT(satisfyingDeclRef && genericWrapperCount == 0);
+            return RequirementWitness(satisfyingDeclRef);
         }
     case RequirementWitness::Flavor::val:
         {
@@ -487,6 +482,10 @@ static RequirementWitness _tryLookUpExistingRequirementWitnessRec(
 ///
 /// A second traversal keeps the structural lookup allocation-free and avoids specializing an
 /// intermediate witness table, which would copy every entry before selecting the next one.
+/// This traversal is deliberately paired with `_tryLookUpExistingRequirementWitnessRec`: every
+/// witness shape accepted by the selection pass must visit the same conformance declarations here,
+/// in the same inner-to-outer order. The forceful frontier traversal below must recognize that same
+/// structural vocabulary, although it stops at the first missing step instead of reaching a leaf.
 static RequirementWitness _specializeExistingRequirementWitnessRec(
     ASTBuilder* astBuilder,
     SubtypeWitness* subtypeWitness,
@@ -569,7 +568,12 @@ RequirementWitness tryLookUpRequirementWitness(
     // entire table only to select one entry from it.
     if (requirementWitness.getFlavor() == RequirementWitness::Flavor::witnessTable)
         return requirementWitness;
-    return _specializeExistingRequirementWitnessRec(astBuilder, subtypeWitness, requirementWitness);
+    auto specializedWitness =
+        _specializeExistingRequirementWitnessRec(astBuilder, subtypeWitness, requirementWitness);
+    // The passive selection pass already proved that this witness shape has a determinate path to
+    // the leaf. A fallthrough here means the paired structural traversals have drifted apart.
+    SLANG_RELEASE_ASSERT(specializedWitness.getFlavor() != RequirementWitness::Flavor::none);
+    return specializedWitness;
 }
 
 static UnspecializedRequirementWitnessLookupFrontier _locateRequirementEntryInTable(
