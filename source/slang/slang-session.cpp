@@ -1399,10 +1399,25 @@ RefPtr<Module> Linkage::loadSourceModuleImpl(
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
     translationUnit->setModuleName(name);
-    // Imported source modules default to Slang when their file name does not imply a language.
-    // `parseTranslationUnit()` is the single place that resolves a recognized extension for both
-    // imported modules and ordinary compile-request inputs.
-    translationUnit->sourceLanguage = SourceLanguage::Slang;
+    // The module-loading API has no source-language parameter, so a session-level `Language`
+    // option is its explicit language-selection mechanism. Preserve that provenance on the
+    // translation unit instead of merely using the option as an initial parser mode: extension
+    // validation and source-directive precedence both depend on knowing that the caller made an
+    // explicit choice.
+    if (m_optionSet.hasOption(CompilerOptionName::Language))
+    {
+        auto sourceLanguage = SourceLanguage(
+            m_optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language));
+        translationUnit->sourceLanguage = sourceLanguage;
+        translationUnit->sourceLanguageExplicitlyRequested = sourceLanguage;
+    }
+    else
+    {
+        // Imported source modules default to Slang when their file name does not imply a language.
+        // `parseTranslationUnit()` is the single place that resolves a recognized extension for
+        // both imported modules and ordinary compile-request inputs.
+        translationUnit->sourceLanguage = SourceLanguage::Slang;
+    }
 
     frontEndReq->addTranslationUnit(translationUnit);
 

@@ -4498,6 +4498,10 @@ static void HandleExtensionDirective(PreprocessorDirectiveContext* context)
     SkipToEndOfLine(context);
 }
 
+/// Record the first language directive in this preprocessing unit and diagnose later conflicts.
+///
+/// Preserving the first location lets the translation-unit layer combine independently
+/// preprocessed primary files while still reporting both sides of a conflict.
 static void _handleSourceLanguageDirective(
     PreprocessorDirectiveContext* context,
     SourceLanguage language)

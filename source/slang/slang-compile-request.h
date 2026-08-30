@@ -373,11 +373,15 @@ class ContainerDecl;
 struct PreprocessedSegment
 {
     TokenList tokens;
+
+    /// The first source-language directive found in this segment, if any.
     SourceLanguageDirective sourceLanguageDirective;
 };
 
+/// Split a physical source file into the source units represented by a literate input.
 List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* sourceManager);
 
+/// Preprocess every segment while preserving their source-language directives and language version.
 List<PreprocessedSegment> preprocessSourceSegments(
     List<SourceFile*> const& segments,
     SlangLanguageVersion& ioLanguageVersion,
@@ -387,6 +391,7 @@ List<PreprocessedSegment> preprocessSourceSegments(
     Linkage* linkage,
     PreprocessorHandler* preprocessorHandler);
 
+/// Parse all segments into one translation unit using its already-resolved effective language.
 void parsePreprocessedSegments(
     List<PreprocessedSegment> const& segments,
     ASTBuilder* astBuilder,

@@ -65,3 +65,41 @@ SLANG_UNIT_TEST(sourceLanguageAllowGLSLNormalizesThroughDeprecatedAPI)
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("warning[E00117]")) >= 0);
     SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("setAllowGLSLInput()")) >= 0);
 }
+
+SLANG_UNIT_TEST(sourceLanguageSessionOptionAppliesToModuleSourceString)
+{
+    // `loadModuleFromSourceString()` does not take a language parameter. A client such as
+    // render-test therefore selects GLSL on the session and may still give its in-memory source a
+    // `.slang` path. This GLSL-only buffer syntax must be parsed according to the explicit session
+    // option rather than the path extension.
+    slang::CompilerOptionEntry sourceLanguageOption = {};
+    sourceLanguageOption.name = slang::CompilerOptionName::Language;
+    sourceLanguageOption.value.kind = slang::CompilerOptionValueKind::Int;
+    sourceLanguageOption.value.intValue0 = SLANG_SOURCE_LANGUAGE_GLSL;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &sourceLanguageOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        unitTestContext->slangGlobalSession->createSession(sessionDesc, session.writeRef())));
+
+    const char* source = R"(
+        #version 450
+        layout(local_size_x = 1) in;
+        buffer OutputBuffer
+        {
+            uint value;
+        } outputBuffer;
+        void main() {}
+    )";
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "explicitGlslModule",
+        "explicit-glsl.slang",
+        source,
+        diagnostics.writeRef()));
+
+    SLANG_CHECK(module != nullptr);
+}

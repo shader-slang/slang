@@ -97,6 +97,8 @@ enum class AllowCaseDefaultStatements : bool
 struct ParserOptions
 {
     bool enableEffectAnnotations = false;
+
+    /// Whether the effective translation-unit language enables GLSL grammar extensions.
     bool isGLSLInput = false;
     bool isInLanguageServer = false;
     bool isCoreModule = false;

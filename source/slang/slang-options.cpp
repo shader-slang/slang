@@ -1470,15 +1470,18 @@ struct OptionsParser
         bool writeAsSourceBytes = false;
     };
 
+    /// Add matching raw/API translation-unit records and preserve explicit-language provenance.
     int addTranslationUnit(
         SlangSourceLanguage language,
         Stage impliedStage,
         SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
+    /// Add a path to the shared Slang translation unit, preserving an explicit override if present.
     void addInputSlangPath(
         String const& path,
         SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
+    /// Add a foreign-language path in its own translation unit with its extension-implied stage.
     void addInputForeignShaderPath(
         String const& path,
         SlangSourceLanguage language,
@@ -1487,7 +1490,8 @@ struct OptionsParser
 
     static Profile::RawVal findGlslProfileFromPath(const String& path);
 
-    SlangResult addInputStdin(SlangSourceLanguage sourceLanguage);
+    /// Add standard input using the required explicitly selected source language.
+    SlangResult addInputStdin(SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
     SlangResult addInputPath(
         char const* inPath,
@@ -1829,7 +1833,7 @@ SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
     SLANG_UNREACHABLE("unexpected stdin read result");
 }
 
-SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
+SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     if (m_stdinConsumed)
     {
@@ -1837,7 +1841,7 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
         return SLANG_FAIL;
     }
 
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         m_sink->diagnose(Diagnostics::CannotDeduceSourceLanguage{.path = kStdinDisplayPath});
         return SLANG_FAIL;
@@ -1848,25 +1852,29 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
     List<Byte> source;
     SLANG_RETURN_ON_FAIL(_readStdin(source));
 
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_SLANG)
     {
         if (m_slangTranslationUnitIndex == -1)
         {
             m_translationUnitCount++;
-            m_slangTranslationUnitIndex =
-                addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown, sourceLanguage);
+            m_slangTranslationUnitIndex = addTranslationUnit(
+                SLANG_SOURCE_LANGUAGE_SLANG,
+                Stage::Unknown,
+                sourceLanguageExplicitlyRequested);
         }
         m_frontEndReq
             ->getTranslationUnit(
                 m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID)
-            ->sourceLanguageExplicitlyRequested = SourceLanguage(sourceLanguage);
+            ->sourceLanguageExplicitlyRequested = SourceLanguage(sourceLanguageExplicitlyRequested);
         m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
     }
     else
     {
         m_translationUnitCount++;
-        m_currentTranslationUnitIndex =
-            addTranslationUnit(sourceLanguage, Stage::Unknown, sourceLanguage);
+        m_currentTranslationUnitIndex = addTranslationUnit(
+            sourceLanguageExplicitlyRequested,
+            Stage::Unknown,
+            sourceLanguageExplicitlyRequested);
     }
 
     const char* sourceBegin =

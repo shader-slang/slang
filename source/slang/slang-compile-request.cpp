@@ -248,6 +248,11 @@ static void _outputIncludes(
     }
 }
 
+/// Merge one preprocessed source unit's language directive into translation-unit provenance.
+///
+/// The first directive selects the parser mode after lower-precedence choices are diagnosed. A
+/// later conflicting directive is rejected because one translation unit cannot be parsed under
+/// multiple language grammars.
 static void _applySourceLanguageDirective(
     TranslationUnitRequest* translationUnit,
     SourceLanguageDirective const& directive,
@@ -380,8 +385,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
     // A translation unit is parsed once. Source-content provenance is populated only by the
     // preprocessing loop below, so a pre-existing value would indicate an unsupported reparse.
-    SLANG_ASSERT(
-        translationUnit->sourceLanguageImpliedBySourceContents == SourceLanguage::Unknown);
+    SLANG_ASSERT(translationUnit->sourceLanguageImpliedBySourceContents == SourceLanguage::Unknown);
     SLANG_ASSERT(!translationUnit->sourceLanguageImpliedBySourceContentsLoc.isValid());
 
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();

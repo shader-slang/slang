@@ -1645,6 +1645,20 @@ static SlangResult _calcCommandLine(
 
             _calcPreprocessorDefines(base, srcTranslationUnit.preprocessorDefinitions, cmd);
 
+            if (srcTranslationUnit.sourceLanguageExplicitlyRequested != SourceLanguage::Unknown)
+            {
+                auto languageName = NameValueUtil::findName(
+                    TypeTextUtil::getLanguageInfos(),
+                    ValueInt(srcTranslationUnit.sourceLanguageExplicitlyRequested));
+                SLANG_RELEASE_ASSERT(languageName.getLength() != 0);
+
+                // Keep `-lang` adjacent to this translation unit's source paths. The command-line
+                // parser consumes those paths as explicit-language inputs, which reproduces a
+                // request such as `-lang glsl shader.slang` instead of re-inferring Slang from the
+                // serialized path.
+                cmd.addArg("-lang");
+                cmd.addArg(languageName);
+            }
 
 #if 0
             if (srcTranslationUnit.moduleName)

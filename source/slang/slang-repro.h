@@ -116,8 +116,14 @@ struct ReproUtil
     // spAddTranslationUnit
     struct TranslationUnitRequestState
     {
-        SourceLanguage language; ///< The resolved effective language.
-        SourceLanguage sourceLanguageExplicitlyRequested; ///< `Unknown` if it was inferred.
+        /// The resolved effective language used to parse the translation unit.
+        SourceLanguage language;
+
+        /// The caller-selected language that command-line extraction must reproduce.
+        ///
+        /// This field is `Unknown` when the effective language was inferred from source paths or
+        /// source directives, in which case extraction must not invent a `-lang` option.
+        SourceLanguage sourceLanguageExplicitlyRequested;
 
         Offset32Ptr<OffsetString> moduleName;
 

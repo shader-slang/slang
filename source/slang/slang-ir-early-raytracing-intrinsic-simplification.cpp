@@ -8,7 +8,11 @@
 
 namespace Slang
 {
-// ONLY should be used in this compilation unit
+/// Indexes the global ray-tracing objects and functions needed by the location-operand rewrite.
+///
+/// The maps are keyed by the integer location encoded in a Vulkan decoration. Keeping separate
+/// maps for payloads, attributes, and callable data prevents equal numeric locations in different
+/// SPIR-V operand roles from being treated as interchangeable.
 struct CacheOfDataToReplaceOps
 {
     IRModule* module;
@@ -20,6 +24,10 @@ struct CacheOfDataToReplaceOps
 
     List<IRInst*> funcsToSearch;
 
+    /// Resolve one location operand to the global object with the corresponding role and location.
+    ///
+    /// Invalid locations are diagnosed and return an integer recovery value so callers can replace
+    /// the malformed operand and allow compilation to continue reporting errors.
     IRInst* getRayVariableFromLocation(IRInst* payloadVariable, Slang::IROp op)
     {
         IRBuilder builder(payloadVariable);
@@ -66,6 +74,7 @@ struct CacheOfDataToReplaceOps
         return resultVariable;
     }
 
+    /// Build the role-specific location indexes and collect functions that may contain operands.
     void searchForGlobalsDataNeededInPass()
     {
         for (auto i : module->getGlobalInsts())
@@ -127,6 +136,7 @@ struct CacheOfDataToReplaceOps
     }
 };
 
+/// Replace location operands nested under SPIR-V assembly blocks in one function subtree.
 void recurseInFuncForOpsToReplace(IRInst* parent, CacheOfDataToReplaceOps* cache)
 {
 
@@ -157,6 +167,7 @@ void recurseInFuncForOpsToReplace(IRInst* parent, CacheOfDataToReplaceOps* cache
         recurseInFuncForOpsToReplace(i, cache);
 }
 
+/// Apply the location-operand rewrite to every function collected from the module.
 void recurseAllOpsToReplace(CacheOfDataToReplaceOps* cache)
 {
     for (auto func : cache->funcsToSearch)

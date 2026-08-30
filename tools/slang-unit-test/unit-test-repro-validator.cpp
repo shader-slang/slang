@@ -1256,6 +1256,40 @@ SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
     SLANG_CHECK(tu1AIndex < tu1BIndex);
 }
 
+SLANG_UNIT_TEST(reproExtractFilesPreservesExplicitSourceLanguage)
+{
+    typedef ReproUtil::RequestState RequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::TranslationUnitRequestState TranslationUnitRequestState;
+
+    OffsetContainer container;
+    auto requestPtr = container.newObject<RequestState>();
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(1);
+    auto sourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto sourceFile = addSourceFileState(container, "explicit-language.slang");
+
+    container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].language = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceFiles = sourceFiles;
+    container[sourceFiles[0]] = sourceFile;
+
+    OffsetBase& base = container.asBase();
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(ReproUtil::extractFiles(base, base.asRaw(requestPtr), fileSystem)));
+
+    ComPtr<ISlangBlob> manifestBlob;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(fileSystem->loadFile("manifest.txt", manifestBlob.writeRef())));
+
+    // The serialized path deliberately has a `.slang` extension. Omitting `-lang glsl` would make
+    // the extracted command line parse it under the wrong language even though replaying the repro
+    // itself uses the preserved explicit selection.
+    String manifest = StringUtil::getString(manifestBlob);
+    SLANG_CHECK(manifest.indexOf(UnownedStringSlice("-lang glsl explicit-language.slang")) >= 0);
+}
+
 SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
 {
     typedef ReproUtil::RequestState RequestState;
@@ -1315,10 +1349,8 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     SLANG_CHECK_ABORT(loadedTu0.sourceFiles.getCount() == 1);
     SLANG_CHECK_ABORT(loadedTu1.sourceFiles.getCount() == 2);
     // Loading and re-saving must not turn an inferred source language into an explicit selection.
-    SLANG_CHECK(
-        loadedTu0.sourceLanguageExplicitlyRequested == SourceLanguage::Unknown);
-    SLANG_CHECK(
-        loadedTu1.sourceLanguageExplicitlyRequested == SourceLanguage::Unknown);
+    SLANG_CHECK(loadedTu0.sourceLanguageExplicitlyRequested == SourceLanguage::Unknown);
+    SLANG_CHECK(loadedTu1.sourceLanguageExplicitlyRequested == SourceLanguage::Unknown);
     SLANG_CHECK(
         strcmp(
             getTranslationUnitSourceFilePath(loadedBase, loadedRequestState, 0, 0),

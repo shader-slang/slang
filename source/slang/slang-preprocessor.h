@@ -66,18 +66,27 @@ struct PreprocessorDesc
 /// the translation unit can choose one parser mode before any source file is parsed.
 struct SourceLanguageDirective
 {
+    /// The selected language, or `Unknown` when the source contains no language directive.
     SourceLanguage language = SourceLanguage::Unknown;
+
+    /// The location of the first directive that selected `language`.
     SourceLoc location;
 };
 
-/// Take a source `file` and preprocess it into a list of tokens.
+/// Preprocess `file` and return its tokens and first source-language directive, if any.
+///
+/// Conflicting directives in the same preprocessing unit are diagnosed and do not replace the
+/// first selection. `outLanguageVersion` changes only when a valid Slang `#language` directive is
+/// present.
 TokenList preprocessSource(
     SourceFile* file,
     PreprocessorDesc const& desc,
     SourceLanguageDirective& outSourceLanguageDirective,
     SlangLanguageVersion& outLanguageVersion);
 
-/// Convenience wrapper for `preprocessSource` when a `Linkage` is available
+/// Preprocess `file` using services and language-server state supplied by `linkage`.
+///
+/// The output and conflict behavior match the `PreprocessorDesc` overload.
 TokenList preprocessSource(
     SourceFile* file,
     DiagnosticSink* sink,

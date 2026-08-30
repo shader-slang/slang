@@ -2035,6 +2035,8 @@ void convertAtomicToStorageBuffer(
     }
 }
 
+/// Replace linked GLSL atomic-uint types with the storage-buffer representation supported by
+/// SPIR-V.
 void GLSLReplaceAtomicUint(IRSpecContext* context, IRModule* irModule)
 {
     Dictionary<int, List<IRInst*>> bindingToInstMapUnsorted;
