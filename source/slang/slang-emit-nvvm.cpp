@@ -488,7 +488,7 @@ struct NVVMEquivalentStructuredBuffer
     NVVMRawBufferType resultType;
 };
 
-// Resolves the selected unsigned-integer structured views used by byte-address legalization.
+// Resolves the selected scalar structured views used by byte-address legalization.
 bool _getNVVMEquivalentStructuredBuffer(IRInst* inst, NVVMEquivalentStructuredBuffer& outConversion)
 {
     outConversion = {};
@@ -509,13 +509,12 @@ bool _getNVVMEquivalentStructuredBuffer(IRInst* inst, NVVMEquivalentStructuredBu
         return false;
     }
 
-    uint32_t bitWidth = 0;
-    bool isSigned = false;
-    if (!isNVVMSupportedIntegerScalarType(
-            outConversion.resultType.structuredElementType,
-            &bitWidth,
-            &isSigned) ||
-        isSigned || (bitWidth != 32 && bitWidth != 64))
+    uint32_t integerBitWidth = 0;
+    const bool isSelectedInteger = isNVVMSupportedIntegerScalarType(
+                                       outConversion.resultType.structuredElementType,
+                                       &integerBitWidth) &&
+                                   (integerBitWidth == 32 || integerBitWidth == 64);
+    if (!isSelectedInteger && !isNVVMFloat32Type(outConversion.resultType.structuredElementType))
     {
         return false;
     }
@@ -4249,7 +4248,12 @@ struct NVVMResolvedAtomicOperation
 {
     SlangNVVMAtomicOperationDesc desc = {};
     IRInst* pointer = nullptr;
-    IRInst* value = nullptr;
+    IRInst* values[2] = {};
+    uint32_t valueCount = 0;
+    NVVMValueRecipeStep valueNegation;
+    int64_t implicitValue = 0;
+    bool hasImplicitValue = false;
+    bool negatesValue = false;
     const char* diagnosticName = nullptr;
 };
 
@@ -4452,7 +4456,7 @@ bool _resolveNVVMAtomicPointer(IRInst* value, NVVMResolvedAtomicPointer& outPoin
         return false;
 
     IRType* sharedScalarType = nullptr;
-    if (asNVVMSupportedSharedIntegerScalarGlobal(value, &sharedScalarType))
+    if (asNVVMSupportedSharedScalarGlobal(value, &sharedScalarType))
     {
         outPointer.type = as<IRPtrTypeBase>(value->getDataType());
         outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
@@ -4488,47 +4492,156 @@ bool _resolveNVVMAtomicPointer(IRInst* value, NVVMResolvedAtomicPointer& outPoin
     return false;
 }
 
-// Resolves one canonical integer atomic to the complete descriptor consumed by both preflight and
-// emission. The memory-order literal is semantic metadata and is not a provider SSA operand.
+// Resolves one canonical scalar atomic to the complete descriptor consumed by both preflight and
+// emission. Memory-order literals are semantic metadata and are not provider SSA operands.
 bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMResolvedAtomicOperation& outOperation)
 {
     outOperation = {};
-    if (!inst || (inst->getOp() != kIROp_AtomicAdd && inst->getOp() != kIROp_AtomicMax) ||
-        inst->getOperandCount() != 3)
+    if (!inst)
+        return false;
+
+    SlangNVVMAtomicOperation providerOperation = 0;
+    uint32_t valueCount = 0;
+    uint32_t successOrderIndex = 0;
+    uint32_t failureOrderIndex = 0;
+    bool hasFailureOrder = false;
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicLoad:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_LOAD;
+        successOrderIndex = 1;
+        break;
+    case kIROp_AtomicStore:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_STORE;
+        valueCount = 1;
+        successOrderIndex = 2;
+        break;
+    case kIROp_AtomicExchange:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_EXCHANGE;
+        valueCount = 1;
+        successOrderIndex = 2;
+        break;
+    case kIROp_AtomicCompareExchange:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_COMPARE_EXCHANGE;
+        valueCount = 2;
+        successOrderIndex = 3;
+        failureOrderIndex = 4;
+        hasFailureOrder = true;
+        break;
+    case kIROp_AtomicAdd:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_ADD;
+        valueCount = 1;
+        successOrderIndex = 2;
+        break;
+    case kIROp_AtomicSub:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_ADD;
+        valueCount = 1;
+        successOrderIndex = 2;
+        outOperation.negatesValue = true;
+        break;
+    case kIROp_AtomicAnd:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_BIT_AND;
+        valueCount = 1;
+        successOrderIndex = 2;
+        break;
+    case kIROp_AtomicOr:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_BIT_OR;
+        valueCount = 1;
+        successOrderIndex = 2;
+        break;
+    case kIROp_AtomicXor:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_BIT_XOR;
+        valueCount = 1;
+        successOrderIndex = 2;
+        break;
+    case kIROp_AtomicMin:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_MIN;
+        valueCount = 1;
+        successOrderIndex = 2;
+        break;
+    case kIROp_AtomicMax:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_MAX;
+        valueCount = 1;
+        successOrderIndex = 2;
+        break;
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+        providerOperation = SLANG_NVVM_ATOMIC_OP_ADD;
+        successOrderIndex = 1;
+        outOperation.hasImplicitValue = true;
+        outOperation.implicitValue = inst->getOp() == kIROp_AtomicInc ? 1 : -1;
+        break;
+    default:
+        return false;
+    }
+    const uint32_t expectedOperandCount = successOrderIndex + 1 + (hasFailureOrder ? 1 : 0);
+    if (inst->getOperandCount() != expectedOperandCount)
         return false;
 
     IRInst* pointer = inst->getOperand(0);
-    IRInst* value = inst->getOperand(1);
-    auto memoryOrder = _asExecutableI32Constant(inst->getOperand(2));
+    auto memoryOrder = _asExecutableI32Constant(inst->getOperand(successOrderIndex));
+    auto failureMemoryOrder = hasFailureOrder
+                                  ? _asExecutableI32Constant(inst->getOperand(failureOrderIndex))
+                                  : memoryOrder;
     NVVMResolvedAtomicPointer resolvedPointer;
     SlangNVVMValueTypeDesc valueType = {};
+    IRType* physicalValueType = nullptr;
     if (!_resolveNVVMAtomicPointer(pointer, resolvedPointer) ||
-        resolvedPointer.type->getAccessQualifier() != AccessQualifier::ReadWrite || !value ||
-        !isTypeEqual(resolvedPointer.type->getValueType(), inst->getDataType()) ||
-        !isTypeEqual(value->getDataType(), inst->getDataType()) ||
-        !_getNVVMSemanticType(inst->getDataType(), valueType) || !memoryOrder ||
-        memoryOrder->getValue() != kIRMemoryOrder_Relaxed)
+        resolvedPointer.type->getAccessQualifier() != AccessQualifier::ReadWrite || !memoryOrder ||
+        !failureMemoryOrder)
     {
         return false;
     }
+    physicalValueType = resolvedPointer.type->getValueType();
+    IRType* atomicValueType = nullptr;
+    if (asNVVMSupportedAtomicType(physicalValueType, &atomicValueType))
+        physicalValueType = atomicValueType;
+    if (memoryOrder->getValue() != kIRMemoryOrder_Relaxed ||
+        failureMemoryOrder->getValue() != kIRMemoryOrder_Relaxed ||
+        !_getNVVMSemanticType(physicalValueType, valueType))
+    {
+        return false;
+    }
+    const bool returnsVoid = providerOperation == SLANG_NVVM_ATOMIC_OP_STORE;
+    if ((returnsVoid && inst->getDataType()->getOp() != kIROp_VoidType) ||
+        (!returnsVoid && !isTypeEqual(physicalValueType, inst->getDataType())))
+    {
+        return false;
+    }
+    for (uint32_t i = 0; i < valueCount; ++i)
+    {
+        IRInst* value = inst->getOperand(i + 1);
+        if (!value || !isTypeEqual(value->getDataType(), physicalValueType))
+            return false;
+        outOperation.values[i] = value;
+    }
 
     outOperation.desc = {
-        inst->getOp() == kIROp_AtomicAdd ? SLANG_NVVM_ATOMIC_OP_ADD : SLANG_NVVM_ATOMIC_OP_MAX,
+        providerOperation,
         valueType,
         resolvedPointer.addressSpace,
+        SLANG_NVVM_MEMORY_ORDER_RELAXED,
         SLANG_NVVM_MEMORY_ORDER_RELAXED,
     };
     if (!NVVMSemantics::isSupported(outOperation.desc))
         return false;
+    if (outOperation.negatesValue)
+    {
+        const SlangNVVMValueTypeDesc operandTypes[] = {valueType};
+        if (!_setNVVMSupportedValueRecipeStep(
+                outOperation.valueNegation,
+                SLANG_NVVM_VALUE_OP_NEGATE,
+                valueType,
+                operandTypes,
+                SLANG_COUNT_OF(operandTypes),
+                "atomic subtract value negation"))
+        {
+            return false;
+        }
+    }
     outOperation.pointer = pointer;
-    outOperation.value = value;
-    if (inst->getOp() == kIROp_AtomicMax)
-        outOperation.diagnosticName = "relaxed global u64 atomic max";
-    else
-        outOperation.diagnosticName =
-            resolvedPointer.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED
-                ? "relaxed shared i32 atomic add"
-                : "relaxed global i32 atomic add";
+    outOperation.valueCount = valueCount;
+    outOperation.diagnosticName = "relaxed scalar atomic operation";
     return true;
 }
 
@@ -4543,7 +4656,8 @@ void _requireAtomicOperation(
         if (requirement.desc.operation == desc.operation &&
             NVVMSemantics::areSameType(requirement.desc.valueType, desc.valueType) &&
             requirement.desc.addressSpace == desc.addressSpace &&
-            requirement.desc.memoryOrder == desc.memoryOrder)
+            requirement.desc.memoryOrder == desc.memoryOrder &&
+            requirement.desc.failureMemoryOrder == desc.failureMemoryOrder)
         {
             return;
         }
@@ -4585,6 +4699,23 @@ void _requireValueOperation(
     for (uint32_t i = 0; i < requirement.operandCount; ++i)
         requirement.operandTypes[i] = desc.operandTypes[i];
     requirements.add(requirement);
+}
+
+void _requireNVVMAtomicOperations(
+    NVVMOperationRequirements& requirements,
+    const NVVMResolvedAtomicOperation& operation)
+{
+    _requireAtomicOperation(
+        requirements.atomicOperations,
+        operation.desc,
+        operation.diagnosticName);
+    if (operation.negatesValue)
+    {
+        _requireValueOperation(
+            requirements.valueOperations,
+            operation.valueNegation.getDesc(),
+            operation.valueNegation.diagnosticName);
+    }
 }
 
 void _requireNVVMStructuredBufferStorageConversion(
@@ -5149,8 +5280,7 @@ SlangResult _validateAvailableValue(
     NVVMConventionalGlobalParams globalParams;
     SlangNVVMValueOperation executionOperation = 0;
     if (value && consumer && value->getModule() == consumer->getModule() &&
-        (asNVVMSupportedSharedIntegerScalarGlobal(value) ||
-         asNVVMSupportedSharedArrayGlobal(value) ||
+        (asNVVMSupportedSharedScalarGlobal(value) || asNVVMSupportedSharedArrayGlobal(value) ||
          _getNVVMConventionalGlobalParams(value, globalParams) ||
          _getNVVMCUDAExecutionGlobalOperation(value, executionOperation)))
     {
@@ -5407,9 +5537,15 @@ SlangResult _validatePointerValue(
             : nullptr;
     auto sharedElementPtrType =
         value ? asNVVMSupportedSharedElementPointerType(value->getDataType()) : nullptr;
-    auto sharedScalarPtrType = value && asNVVMSupportedSharedIntegerScalarGlobal(value)
+    auto sharedScalarPtrType = value && asNVVMSupportedSharedScalarGlobal(value)
                                    ? as<IRPtrTypeBase>(value->getDataType())
                                    : nullptr;
+    // Final legalization preserves whole groupshared-array initialization as one store rooted at
+    // the canonical global. Element access continues through the established element pointer.
+    auto sharedArrayPtrType = value && consumer && consumer->getOp() == kIROp_Store &&
+                                      asNVVMSupportedSharedArrayGlobal(value)
+                                  ? as<IRPtrTypeBase>(value->getDataType())
+                                  : nullptr;
     auto localStructPtrType =
         value ? asNVVMSupportedLocalResourceStructPointerType(value->getDataType()) : nullptr;
     auto localHelperPtrType =
@@ -5448,6 +5584,7 @@ SlangResult _validatePointerValue(
     IRPtrTypeBase* acceptedPtrType = devicePtrType              ? devicePtrType
                                      : sharedElementPtrType     ? sharedElementPtrType
                                      : sharedScalarPtrType      ? sharedScalarPtrType
+                                     : sharedArrayPtrType       ? sharedArrayPtrType
                                      : resourceElementPtrType   ? resourceElementPtrType
                                      : localNumericPtrType      ? localNumericPtrType
                                      : localArrayPtrType        ? localArrayPtrType
@@ -5458,14 +5595,22 @@ SlangResult _validatePointerValue(
                                      : sharedHelperPtrType      ? sharedHelperPtrType
                                                                 : fieldPtrType;
     if (!acceptedPtrType)
-        return _diagnoseUnsupportedIR(codeGenContext, toSlice("device scalar pointer"));
+    {
+        StringBuilder construct;
+        construct << "device scalar pointer: producer="
+                  << (value ? getIROpInfo(value->getOp()).name : "missing")
+                  << ", consumer=" << (consumer ? getIROpInfo(consumer->getOp()).name : "missing");
+        return _diagnoseUnsupportedIR(codeGenContext, construct.getUnownedSlice());
+    }
     IRType* actualPointeeType = acceptedPtrType->getValueType();
     if (!expectedPointeeType || !isTypeEqual(actualPointeeType, expectedPointeeType))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device pointer pointee type"));
+    NVVMResolvedAtomicOperation atomicOperation;
+    const bool isAtomicConsumer =
+        _resolveNVVMAtomicOperation(consumer, atomicOperation) && atomicOperation.pointer == value;
     if (resourceElementPtrType && consumer->getOp() != kIROp_Load &&
         consumer->getOp() != kIROp_Store && consumer->getOp() != kIROp_SwizzledStore &&
-        consumer->getOp() != kIROp_AtomicAdd && consumer->getOp() != kIROp_AtomicMax &&
-        consumer->getOp() != kIROp_Call)
+        !isAtomicConsumer && consumer->getOp() != kIROp_Call)
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
@@ -5909,6 +6054,36 @@ SlangResult _validateNVVMFunctionUses(
     return SLANG_OK;
 }
 
+// Returns the physical symbol for one canonical module-scope groupshared producer. User globals
+// normally carry a mangled name. A synthesized atomic global may be anonymous, so derive a stable
+// private name from its order among the exact shared producers admitted by this backend.
+String _getNVVMSharedGlobalName(IRModule* module, IRGlobalVar* target)
+{
+    if (!module || !target)
+        return String();
+    const UnownedStringSlice mangledName = getMangledName(target);
+    if (mangledName.getLength())
+        return String(mangledName);
+
+    Index sharedIndex = 0;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto globalVar = asNVVMSupportedSharedScalarGlobal(globalInst);
+        if (!globalVar)
+            globalVar = asNVVMSupportedSharedArrayGlobal(globalInst);
+        if (!globalVar)
+            continue;
+        if (globalVar == target)
+        {
+            StringBuilder name;
+            name << "__slang_nvvm_shared_" << sharedIndex;
+            return name.produceString();
+        }
+        ++sharedIndex;
+    }
+    return String();
+}
+
 // Chooses a distinct physical symbol for every emitted function before provider discovery.
 //
 // Linked user functions already carry an entry-point, CUDA export, or mangled name. Generated
@@ -5938,13 +6113,13 @@ SlangResult _collectNVVMFunctionNames(
                 return _diagnoseUnsupportedIR(codeGenContext, toSlice("global storage name"));
             continue;
         }
-        auto globalVar = asNVVMSupportedSharedIntegerScalarGlobal(globalInst);
+        auto globalVar = asNVVMSupportedSharedScalarGlobal(globalInst);
         if (!globalVar)
             globalVar = asNVVMSupportedSharedArrayGlobal(globalInst);
         if (!globalVar)
             continue;
-        const UnownedStringSlice name = getMangledName(globalVar);
-        if (!name.getLength() || !names.add(String(name)))
+        const String name = _getNVVMSharedGlobalName(module, globalVar);
+        if (!name.getLength() || !names.add(name))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("global storage name"));
     }
 
@@ -6279,18 +6454,26 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_AtomicLoad:
+            case kIROp_AtomicStore:
+            case kIROp_AtomicExchange:
+            case kIROp_AtomicCompareExchange:
             case kIROp_AtomicAdd:
+            case kIROp_AtomicSub:
+            case kIROp_AtomicAnd:
+            case kIROp_AtomicOr:
+            case kIROp_AtomicXor:
+            case kIROp_AtomicMin:
             case kIROp_AtomicMax:
+            case kIROp_AtomicInc:
+            case kIROp_AtomicDec:
                 {
                     NVVMResolvedAtomicOperation operation;
                     if (!_resolveNVVMAtomicOperation(inst, operation))
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("selected atomic operation"));
-                    _requireAtomicOperation(
-                        requirements.atomicOperations,
-                        operation.desc,
-                        operation.diagnosticName);
+                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                    _requireNVVMAtomicOperations(requirements, operation);
                 }
                 break;
 
@@ -6865,8 +7048,19 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_AtomicLoad:
+            case kIROp_AtomicStore:
+            case kIROp_AtomicExchange:
+            case kIROp_AtomicCompareExchange:
             case kIROp_AtomicAdd:
+            case kIROp_AtomicSub:
+            case kIROp_AtomicAnd:
+            case kIROp_AtomicOr:
+            case kIROp_AtomicXor:
+            case kIROp_AtomicMin:
             case kIROp_AtomicMax:
+            case kIROp_AtomicInc:
+            case kIROp_AtomicDec:
                 {
                     NVVMResolvedAtomicOperation operation;
                     SLANG_RELEASE_ASSERT(_resolveNVVMAtomicOperation(inst, operation));
@@ -6877,14 +7071,18 @@ SlangResult _validateNVVMFunction(
                         availableValues,
                         dominatorTree,
                         true,
-                        inst->getDataType()));
-                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
-                        codeGenContext,
-                        operation.value,
-                        inst,
-                        availableValues,
-                        dominatorTree));
-                    availableValues.add(inst);
+                        cast<IRPtrTypeBase>(operation.pointer->getDataType())->getValueType()));
+                    for (uint32_t i = 0; i < operation.valueCount; ++i)
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                            codeGenContext,
+                            operation.values[i],
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                    }
+                    if (inst->getOp() != kIROp_AtomicStore)
+                        availableValues.add(inst);
                 }
                 break;
 
@@ -8111,10 +8309,16 @@ SlangResult _emitNVVMAtomicReduction(
     }
 
     SlangNVVMValueHandle originalValue = nullptr;
+    const SlangNVVMValueHandle atomicOperands[] = {pointer, value};
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
         reduction.diagnosticName,
-        builder.emitAtomicOperation(module, reduction.desc, pointer, value, originalValue)));
+        builder.emitAtomicOperation(
+            module,
+            reduction.desc,
+            atomicOperands,
+            SLANG_COUNT_OF(atomicOperands),
+            originalValue)));
     return _requireBuilderOperation(
         codeGenContext,
         "atomic reduction void return",
@@ -9755,7 +9959,7 @@ SlangResult validateNVVMSupportedIR(
         }
         if (as<IRGlobalVar>(globalInst))
         {
-            if (asNVVMSupportedSharedIntegerScalarGlobal(globalInst) ||
+            if (asNVVMSupportedSharedScalarGlobal(globalInst) ||
                 asNVVMSupportedSharedArrayGlobal(globalInst))
                 continue;
             return _diagnoseUnsupportedIR(
@@ -9911,7 +10115,7 @@ SlangResult emitNVVMIRFromLinkedIR(
         }
 
         IRType* sharedStorageType = nullptr;
-        auto globalVar = asNVVMSupportedSharedIntegerScalarGlobal(globalInst, &sharedStorageType);
+        auto globalVar = asNVVMSupportedSharedScalarGlobal(globalInst, &sharedStorageType);
         IRArrayType* arrayType = nullptr;
         if (!globalVar)
         {
@@ -9925,6 +10129,12 @@ SlangResult emitNVVMIRFromLinkedIR(
         SLANG_RETURN_ON_FAIL(
             typeContext.lowerType(sharedStorageType, NVVMTypeUse::Value, loweredStorageType));
         SlangNVVMValueHandle loweredStorage = nullptr;
+        IRType* alignmentType = arrayType ? arrayType->getElementType() : sharedStorageType;
+        IRType* atomicValueType = nullptr;
+        if (asNVVMSupportedAtomicType(alignmentType, &atomicValueType))
+            alignmentType = atomicValueType;
+        const String storageName = _getNVVMSharedGlobalName(linkedIR.module, globalVar);
+        SLANG_RELEASE_ASSERT(storageName.getLength());
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
             "shared global storage declaration",
@@ -9933,8 +10143,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                 loweredStorageType,
                 SLANG_NVVM_LINKAGE_INTERNAL,
                 SLANG_NVVM_ADDRESS_SPACE_SHARED,
-                kNVVMScalar32Alignment,
-                getMangledName(globalVar),
+                getNVVMNumericValueAlignment(alignmentType),
+                storageName.getUnownedSlice(),
                 loweredStorage)));
         valueMap[globalVar] = loweredStorage;
     }
@@ -10664,8 +10874,19 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_AtomicLoad:
+                case kIROp_AtomicStore:
+                case kIROp_AtomicExchange:
+                case kIROp_AtomicCompareExchange:
                 case kIROp_AtomicAdd:
+                case kIROp_AtomicSub:
+                case kIROp_AtomicAnd:
+                case kIROp_AtomicOr:
+                case kIROp_AtomicXor:
+                case kIROp_AtomicMin:
                 case kIROp_AtomicMax:
+                case kIROp_AtomicInc:
+                case kIROp_AtomicDec:
                     {
                         NVVMResolvedAtomicOperation operation;
                         SLANG_RELEASE_ASSERT(_resolveNVVMAtomicOperation(inst, operation));
@@ -10678,26 +10899,67 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredPointer));
-                        SlangNVVMValueHandle loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            operation.value,
-                            valueMap,
-                            typeContext,
-                            loweredValue));
-                        SlangNVVMValueHandle loweredOriginalValue = nullptr;
+                        SlangNVVMValueHandle loweredOperands[3] = {loweredPointer};
+                        size_t loweredOperandCount = 1;
+                        if (operation.hasImplicitValue)
+                        {
+                            auto pointerType =
+                                cast<IRPtrTypeBase>(operation.pointer->getDataType());
+                            SlangNVVMTypeHandle loweredValueType = nullptr;
+                            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                                pointerType->getValueType(),
+                                NVVMTypeUse::Value,
+                                loweredValueType));
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "atomic implicit value",
+                                builder.getIntegerConstant(
+                                    moduleScope.module,
+                                    loweredValueType,
+                                    operation.implicitValue,
+                                    loweredOperands[loweredOperandCount])));
+                            ++loweredOperandCount;
+                        }
+                        else
+                        {
+                            for (uint32_t i = 0; i < operation.valueCount; ++i)
+                            {
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    operation.values[i],
+                                    valueMap,
+                                    typeContext,
+                                    loweredOperands[loweredOperandCount]));
+                                ++loweredOperandCount;
+                            }
+                        }
+                        if (operation.negatesValue)
+                        {
+                            SlangNVVMValueHandle negatedValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                operation.valueNegation,
+                                &loweredOperands[1],
+                                1,
+                                negatedValue));
+                            loweredOperands[1] = negatedValue;
+                        }
+                        SlangNVVMValueHandle loweredResult = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             operation.diagnosticName,
                             builder.emitAtomicOperation(
                                 moduleScope.module,
                                 operation.desc,
-                                loweredPointer,
-                                loweredValue,
-                                loweredOriginalValue)));
-                        valueMap[inst] = loweredOriginalValue;
+                                loweredOperands,
+                                loweredOperandCount,
+                                loweredResult)));
+                        if (inst->getOp() != kIROp_AtomicStore)
+                            valueMap[inst] = loweredResult;
                     }
                     break;
 

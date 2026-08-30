@@ -199,10 +199,8 @@ IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     IRArrayType** outArrayType = nullptr,
     uint32_t* outElementCount = nullptr);
 
-/// Returns an exact canonical uninitialized `groupshared` Int32/UInt32 scalar global.
-IRGlobalVar* asNVVMSupportedSharedIntegerScalarGlobal(
-    IRInst* inst,
-    IRType** outValueType = nullptr);
+/// Returns an exact canonical uninitialized selected atomic-capable `groupshared` scalar global.
+IRGlobalVar* asNVVMSupportedSharedScalarGlobal(IRInst* inst, IRType** outValueType = nullptr);
 
 /// Returns an exact canonical uninitialized groupshared fixed array of numeric helper values.
 IRGlobalVar* asNVVMSupportedSharedArrayGlobal(

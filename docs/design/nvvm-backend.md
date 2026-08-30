@@ -6041,14 +6041,14 @@ workload/package/toolkit gates passing.
 
 The initial workload gates are `dynamic-dispatch-bindless-texture.slang`, `parameter-block.slang`,
 and `groupshared-multi-barrier-functional.slang`; all pass native CUDA and direct O0/O3. On the
-measured RTX 5090/CUDA 12.9.86 host, direct O3 standalone compile medians are 251--268 ms versus
-373--382 ms for NVRTC O3, but these are exploratory startup-inclusive measurements. Direct O3 PTX
+measured RTX 5090/CUDA 12.9.86 host, direct O3 standalone compile medians are 247--265 ms versus
+365--380 ms for NVRTC O3, but these are exploratory startup-inclusive measurements. Direct O3 PTX
 for all three assembles for SM70, SM80, and SM90. Physical runtime is exercised only on SM120.
 The installed CUDA 13 directory has no tool binaries, so CUDA 13 validation remains an explicit
 infrastructure gap.
 
 Production packaging treats `slang-llvm-nvvm` as an optional compiler-matched LLVM 14 provider at
-builder ABI revision 28. It should ship next to Slang binaries, with
+builder ABI revision 30. It should ship next to Slang binaries, with
 `SLANG_NVVM_BUILDER_PATH` reserved as the explicit deployment/development override. Sessions cache
 one load result, and direct selection retains deterministic E52016 failure for missing or mismatched
 providers rather than falling back to NVRTC. Provider updates move with the Slang commit and build
@@ -6496,6 +6496,33 @@ and O3 with zero old-correct regression. The fixed 452-row census reaches 346 O0
 successes. Against 427 healthy MVP references, O0/O3/both correctness is 344/348/344
 (80.6%/81.5%/80.6%). The selected prefix passes 421/421, and the representative direct O3 modules
 assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+### Slice 144: Common relaxed scalar atomic algebra
+
+Canonical atomic instructions now resolve through one descriptor shared by preflight, dominance
+validation, provider capability collection, and emission. The admitted family covers relaxed
+load, store, exchange, compare-exchange, add/subtract, min/max, bitwise and/or/xor, and
+increment/decrement over selected 32/64-bit integer and Float32 global/shared forms. Subtract and
+increment/decrement compose existing typed negation/constants with add.
+
+`Atomic<T>` remains the semantic marker but lowers to one physical `T` storage leaf. Canonical
+byte-address legalization supplies selected signed/unsigned 32/64-bit and Float32 equivalent
+structured views; direct emission does not reconstruct byte offsets. Whole groupshared-array
+pointers are accepted only for canonical initialization stores, and anonymous synthesized shared
+atomic globals receive deterministic target-private names with collision validation.
+
+Forward-only builder ABI revision 30 gives the generic atomic callback an operand array and adds
+load/store/compare-exchange plus failure order to its descriptor. libNVVM rejects LLVM atomic
+load/store text, so the isolated provider lowers load to value-preserving monotonic cmpxchg and
+store to monotonic exchange. Float32 bitwise load/exchange/CAS uses same-width integer transport.
+The strict legacy serializer validates exact RMW/CAS forms and removes LLVM 14's explicit
+alignment suffix before libNVVM consumes the LLVM-7-era dialect.
+
+Eleven existing workloads become correct at both O0 and O3 and receive 22 direct lanes. The fixed
+452-row census reaches 357 O0 and 362 O3 successes with zero old-correct loss. Against 427 healthy
+MVP references, O0/O3/both correctness is 355/359/355 (83.1%/84.1%/83.1%). The selected prefix
+passes 422/422, while representative direct O3 PTX assembles with CUDA 12.9 for SM70, SM80, and
+SM90. CUDA 13 and physical SM70/SM80/SM90 runtime workers remain explicit productionization gaps.
 
 ## Authoritative References
 

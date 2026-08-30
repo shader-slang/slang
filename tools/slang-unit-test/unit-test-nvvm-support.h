@@ -602,6 +602,8 @@ struct FakeNVVMBuilderState
         atomicOperations.clear();
         atomicOperationCallerBlockIndices.clear();
         atomicOperationPointerValueRefs.clear();
+        atomicOperationValueOffsets.clear();
+        atomicOperationValueCounts.clear();
         atomicOperationValueRefs.clear();
         loadPointerValueRefs.clear();
         loadResultTypeKinds.clear();
@@ -951,6 +953,8 @@ struct FakeNVVMBuilderState
     List<SlangNVVMAtomicOperationDesc> atomicOperations;
     List<Index> atomicOperationCallerBlockIndices;
     List<FakeNVVMBuilderValueRef> atomicOperationPointerValueRefs;
+    List<Index> atomicOperationValueOffsets;
+    List<size_t> atomicOperationValueCounts;
     List<FakeNVVMBuilderValueRef> atomicOperationValueRefs;
     List<FakeNVVMBuilderValueRef> loadPointerValueRefs;
     List<FakeNVVMBuilderScalarTypeKind> loadResultTypeKinds;
@@ -1784,7 +1788,7 @@ static SlangNVVMValueHandle _getFakeNVVMBuilderAtomicOperation(Index index = 0)
 
 static bool _getFakeNVVMBuilderAtomicOperationIndex(SlangNVVMValueHandle value, Index& outIndex)
 {
-    for (Index i = 0; i < gFakeNVVMBuilder.atomicOperationValueRefs.getCount(); ++i)
+    for (Index i = 0; i < gFakeNVVMBuilder.atomicOperations.getCount(); ++i)
     {
         if (value == _getFakeNVVMBuilderAtomicOperation(i))
         {
@@ -4985,39 +4989,56 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsAtomicOperationSupported(
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitAtomicOperation(
     SlangNVVMModuleHandle module,
     const SlangNVVMAtomicOperationDesc* operation,
-    SlangNVVMValueHandle pointer,
-    SlangNVVMValueHandle value,
-    SlangNVVMValueHandle* outOldValue)
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
 {
     ++gFakeNVVMBuilder.emitAtomicOperationCallCount;
-    if (outOldValue)
-        *outOldValue = nullptr;
+    if (outValue)
+        *outValue = nullptr;
 
+    const size_t expectedOperandCount =
+        operation && operation->operation == SLANG_NVVM_ATOMIC_OP_LOAD               ? 1
+        : operation && operation->operation == SLANG_NVVM_ATOMIC_OP_COMPARE_EXCHANGE ? 3
+                                                                                     : 2;
     FakeNVVMBuilderValueRef pointerRef;
-    FakeNVVMBuilderValueRef valueRef;
     if (!operation || !NVVMSemantics::isSupported(*operation) ||
         module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
-        !_isFakeNVVMBuilderPointerValue(pointer) ||
-        !_getFakeNVVMBuilderValueRef(pointer, pointerRef) ||
-        !((operation && operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
-              ? _isFakeNVVMBuilderFloatingPointValue(value, operation->valueType.bitWidth)
-              : _isFakeNVVMBuilderIntegerValue(value)) ||
-        !_getFakeNVVMBuilderValueRef(value, valueRef) || !outOldValue ||
-        gFakeNVVMBuilder.atomicOperationValueRefs.getCount() >=
+        !operands || operandCount != expectedOperandCount ||
+        !_isFakeNVVMBuilderPointerValue(operands[0]) ||
+        !_getFakeNVVMBuilderValueRef(operands[0], pointerRef) || !outValue ||
+        gFakeNVVMBuilder.atomicOperations.getCount() >=
             SLANG_COUNT_OF(gFakeNVVMBuilder.atomicOperationStorage))
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    const Index resultIndex = gFakeNVVMBuilder.atomicOperationValueRefs.getCount();
+    const Index resultIndex = gFakeNVVMBuilder.atomicOperations.getCount();
+    const Index valueOffset = gFakeNVVMBuilder.atomicOperationValueRefs.getCount();
+    FakeNVVMBuilderValueRef valueRefs[2];
+    for (size_t i = 1; i < operandCount; ++i)
+    {
+        const bool hasExpectedType =
+            operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
+                ? _isFakeNVVMBuilderFloatingPointValue(operands[i], operation->valueType.bitWidth)
+                : _isFakeNVVMBuilderIntegerValue(operands[i]);
+        if (!hasExpectedType || !_getFakeNVVMBuilderValueRef(operands[i], valueRefs[i - 1]))
+            return SLANG_E_INVALID_ARG;
+    }
+    for (size_t i = 1; i < operandCount; ++i)
+        gFakeNVVMBuilder.atomicOperationValueRefs.add(valueRefs[i - 1]);
     gFakeNVVMBuilder.atomicOperations.add(*operation);
     gFakeNVVMBuilder.atomicOperationCallerBlockIndices.add(
         gFakeNVVMBuilder.currentInsertBlockIndex);
     gFakeNVVMBuilder.atomicOperationPointerValueRefs.add(pointerRef);
-    gFakeNVVMBuilder.atomicOperationValueRefs.add(valueRef);
-    *outOldValue = gFakeNVVMBuilder.returnNullAtomicOperation
-                       ? nullptr
-                       : _getFakeNVVMBuilderAtomicOperation(resultIndex);
+    gFakeNVVMBuilder.atomicOperationValueOffsets.add(valueOffset);
+    gFakeNVVMBuilder.atomicOperationValueCounts.add(operandCount - 1);
+    if (operation->operation != SLANG_NVVM_ATOMIC_OP_STORE)
+    {
+        *outValue = gFakeNVVMBuilder.returnNullAtomicOperation
+                        ? nullptr
+                        : _getFakeNVVMBuilderAtomicOperation(resultIndex);
+    }
     return gFakeNVVMBuilder.failAtomicOperationAfterWrite ? SLANG_FAIL : SLANG_OK;
 }
 
@@ -11851,20 +11872,26 @@ void computeMain(
     InterlockedAdd(*destination, 1.0f);
 }
 )";
-static const char kDirectNVVMAtomicSubSource[] = R"(
+static const char kDirectNVVMCommonSharedAtomicAlgebraSource[] = R"(
+groupshared Atomic<int> atomicValue;
+
 [CUDAKernel]
 void computeMain(
-    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> output)
 {
-    __atomic_sub(*destination, 1);
-}
-)";
-static const char kDirectNVVMAtomicExchangeSource[] = R"(
-[CUDAKernel]
-void computeMain(
-    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
-{
-    InterlockedExchange(*destination, 1);
+    atomicValue.store(0);
+    output[0] = atomicValue.load();
+    output[1] = atomicValue.exchange(1);
+    output[2] = atomicValue.compareExchange(1, 2);
+    output[3] = atomicValue.add(3);
+    output[4] = atomicValue.sub(4);
+    output[5] = atomicValue.max(5);
+    output[6] = atomicValue.min(6);
+    output[7] = atomicValue.and(7);
+    output[8] = atomicValue.or(8);
+    output[9] = atomicValue.xor(9);
+    output[10] = atomicValue.increment();
+    output[11] = atomicValue.decrement();
 }
 )";
 static const char kDirectNVVMAcquireGlobalI32AtomicAddSource[] = R"(
@@ -13599,8 +13626,13 @@ static SlangResult _populateRelaxedGlobalI32AtomicAddKernel(
         SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
         SLANG_NVVM_MEMORY_ORDER_RELAXED,
     };
-    SLANG_RETURN_ON_FAIL(
-        builder.emitAtomicOperation(module, operation, destination, value, oldValue));
+    const SlangNVVMValueHandle atomicOperands[] = {destination, value};
+    SLANG_RETURN_ON_FAIL(builder.emitAtomicOperation(
+        module,
+        operation,
+        atomicOperands,
+        SLANG_COUNT_OF(atomicOperands),
+        oldValue));
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, oldValue, oldValueDestination, 4));
     SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
     SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));

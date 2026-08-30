@@ -997,7 +997,7 @@ IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     return ptrType;
 }
 
-IRGlobalVar* asNVVMSupportedSharedIntegerScalarGlobal(IRInst* inst, IRType** outValueType)
+IRGlobalVar* asNVVMSupportedSharedScalarGlobal(IRInst* inst, IRType** outValueType)
 {
     if (outValueType)
         *outValueType = nullptr;
@@ -1005,9 +1005,17 @@ IRGlobalVar* asNVVMSupportedSharedIntegerScalarGlobal(IRInst* inst, IRType** out
     auto globalVar = as<IRGlobalVar>(inst);
     auto ptrType = globalVar ? globalVar->getDataType() : nullptr;
     IRType* valueType = ptrType ? ptrType->getValueType() : nullptr;
+    IRType* physicalValueType = valueType;
+    IRType* atomicValueType = nullptr;
+    if (asNVVMSupportedAtomicType(valueType, &atomicValueType))
+        physicalValueType = atomicValueType;
+    uint32_t integerBitWidth = 0;
+    const bool isSelectedInteger =
+        isNVVMSupportedIntegerScalarType(physicalValueType, &integerBitWidth) &&
+        (integerBitWidth == 32 || integerBitWidth == 64);
     if (!globalVar || !as<IRGroupSharedRate>(globalVar->getRate()) || globalVar->getFirstBlock() ||
         !ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 1 ||
-        !isNVVMInteger32Type(valueType))
+        (!isSelectedInteger && !isNVVMFloat32Type(physicalValueType)))
     {
         return nullptr;
     }
@@ -1509,7 +1517,8 @@ bool isNVVMSupportedParameterType(IRInst* type)
 
 static bool _isNVVMSupportedStructuredBufferStorageType(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
-    if (isNVVMSupportedNumericValueType(type) || isNVVMBoolType(type))
+    if (isNVVMSupportedNumericValueType(type) || isNVVMBoolType(type) ||
+        asNVVMSupportedAtomicType(type))
         return true;
 
     if (auto vectorType = asNVVMSupportedValueVectorType(type))

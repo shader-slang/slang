@@ -1,6 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal -output-using-type
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
 

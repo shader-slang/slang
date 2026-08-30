@@ -6731,10 +6731,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     SlangNVVMAtomicOperationDesc unsignedI32MaxOperation = unsignedWideMaxOperation;
     unsignedI32MaxOperation.valueType.bitWidth = 32;
     SLANG_CHECK(builder.supportsAtomicOperation(unsignedI32MaxOperation));
+    SlangNVVMAtomicOperationDesc sharedWideMaxOperation = unsignedWideMaxOperation;
+    sharedWideMaxOperation.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
+    SLANG_CHECK(builder.supportsAtomicOperation(sharedWideMaxOperation));
     SlangNVVMAtomicOperationDesc unsupportedWideMaxOperation = unsignedWideMaxOperation;
-    unsupportedWideMaxOperation.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
-    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedWideMaxOperation));
-    unsupportedWideMaxOperation = unsignedWideMaxOperation;
     unsupportedWideMaxOperation.memoryOrder = SLANG_NVVM_MEMORY_ORDER_ACQUIRE;
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedWideMaxOperation));
 
@@ -6771,15 +6771,39 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     unsupportedAtomicOperation = atomicOperation;
     unsupportedAtomicOperation.memoryOrder = SlangNVVMMemoryOrder(SLANG_NVVM_MEMORY_ORDER_COUNT);
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    SlangNVVMAtomicOperationDesc loadOperation = atomicOperation;
+    loadOperation.operation = SLANG_NVVM_ATOMIC_OP_LOAD;
+    SLANG_CHECK(builder.supportsAtomicOperation(loadOperation));
+    SlangNVVMAtomicOperationDesc storeOperation = atomicOperation;
+    storeOperation.operation = SLANG_NVVM_ATOMIC_OP_STORE;
+    SLANG_CHECK(builder.supportsAtomicOperation(storeOperation));
+    SlangNVVMAtomicOperationDesc exchangeOperation = atomicOperation;
+    exchangeOperation.operation = SLANG_NVVM_ATOMIC_OP_EXCHANGE;
+    SLANG_CHECK(builder.supportsAtomicOperation(exchangeOperation));
+    SlangNVVMAtomicOperationDesc compareExchangeOperation = atomicOperation;
+    compareExchangeOperation.operation = SLANG_NVVM_ATOMIC_OP_COMPARE_EXCHANGE;
+    SLANG_CHECK(builder.supportsAtomicOperation(compareExchangeOperation));
+    unsupportedAtomicOperation = compareExchangeOperation;
+    unsupportedAtomicOperation.failureMemoryOrder = SLANG_NVVM_MEMORY_ORDER_ACQUIRE;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
+    SlangNVVMAtomicOperationDesc floatingExchangeOperation = exchangeOperation;
+    floatingExchangeOperation.valueType = NVVMSemantics::kFloat32;
+    floatingExchangeOperation.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
+    SLANG_CHECK(builder.supportsAtomicOperation(floatingExchangeOperation));
 
     auto expectRejected = [&](SlangNVVMModuleHandle targetModule,
                               SlangNVVMValueHandle pointer,
                               SlangNVVMValueHandle addend)
     {
         SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+        const SlangNVVMValueHandle operands[] = {pointer, addend};
         SLANG_CHECK(
-            builder.emitAtomicOperation(targetModule, atomicOperation, pointer, addend, rejected) ==
-            SLANG_E_INVALID_ARG);
+            builder.emitAtomicOperation(
+                targetModule,
+                atomicOperation,
+                operands,
+                SLANG_COUNT_OF(operands),
+                rejected) == SLANG_E_INVALID_ARG);
         SLANG_CHECK(rejected == nullptr);
     };
 
@@ -6831,9 +6855,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, consumerBlock)));
     const SlangNVVMBuilderAtomicOperationsAPI* api = builder.getAtomicOperationsAPI();
     SLANG_CHECK_ABORT(api != nullptr);
+    const SlangNVVMValueHandle directOperands[] = {destination, value};
     SLANG_CHECK(
-        api->emitOperation(module.module, &atomicOperation, destination, value, nullptr) ==
-        SLANG_E_INVALID_ARG);
+        api->emitOperation(
+            module.module,
+            &atomicOperation,
+            directOperands,
+            SLANG_COUNT_OF(directOperands),
+            nullptr) == SLANG_E_INVALID_ARG);
     expectRejected(module.module, nullptr, value);
     expectRejected(module.module, destination, nullptr);
     expectRejected(module.module, value, value);
@@ -6852,22 +6881,59 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     expectRejected(module.module, destination, nonDominatingValue);
 
     SlangNVVMValueHandle oldValue = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitAtomicOperation(module.module, atomicOperation, destination, value, oldValue)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAtomicOperation(
+        module.module,
+        atomicOperation,
+        directOperands,
+        SLANG_COUNT_OF(directOperands),
+        oldValue)));
     SlangNVVMValueHandle sharedOldValue = nullptr;
+    const SlangNVVMValueHandle sharedOperands[] = {sharedDestination, value};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAtomicOperation(
         module.module,
         sharedAtomicOperation,
-        sharedDestination,
-        value,
+        sharedOperands,
+        SLANG_COUNT_OF(sharedOperands),
         sharedOldValue)));
     SlangNVVMValueHandle wideOldValue = nullptr;
+    const SlangNVVMValueHandle wideOperands[] = {wideDestination, wideValue};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAtomicOperation(
         module.module,
         unsignedWideMaxOperation,
-        wideDestination,
-        wideValue,
+        wideOperands,
+        SLANG_COUNT_OF(wideOperands),
         wideOldValue)));
+    const SlangNVVMValueHandle loadOperands[] = {destination};
+    SlangNVVMValueHandle loadedValue = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAtomicOperation(
+        module.module,
+        loadOperation,
+        loadOperands,
+        SLANG_COUNT_OF(loadOperands),
+        loadedValue)));
+    SlangNVVMValueHandle exchangedValue = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAtomicOperation(
+        module.module,
+        exchangeOperation,
+        directOperands,
+        SLANG_COUNT_OF(directOperands),
+        exchangedValue)));
+    const SlangNVVMValueHandle compareExchangeOperands[] = {destination, value, value};
+    SlangNVVMValueHandle comparedValue = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAtomicOperation(
+        module.module,
+        compareExchangeOperation,
+        compareExchangeOperands,
+        SLANG_COUNT_OF(compareExchangeOperands),
+        comparedValue)));
+    SlangNVVMValueHandle storeResult = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAtomicOperation(
+        module.module,
+        storeOperation,
+        directOperands,
+        SLANG_COUNT_OF(directOperands),
+        storeResult)));
+    SLANG_CHECK(storeResult == nullptr);
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.emitStore(module.module, oldValue, oldValueDestination, 4)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(module.module, mergeBlock)));
@@ -6891,8 +6957,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("atomicrmw add i32 addrspace(3)*")) == 1);
     SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("atomicrmw umax i64 addrspace(1)*")) == 1);
     SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("atomicrmw add i64")) == 0);
-    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("monotonic")) == 3);
-    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("align 4")) == 3);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("monotonic")) >= 7);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("align 4")) >= 6);
     SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("align 8")) == 1);
     SLANG_CHECK(assembly.indexOf("monotonic, align 4") >= 0);
     SLANG_CHECK(assembly.indexOf("syncscope(") < 0);
@@ -6900,6 +6966,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     SLANG_CHECK(assembly.indexOf("release") < 0);
     SLANG_CHECK(assembly.indexOf("seq_cst") < 0);
     SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("store i32")) == 1);
+    SLANG_CHECK(assembly.indexOf("load atomic ") < 0);
+    SLANG_CHECK(assembly.indexOf("store atomic ") < 0);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("atomicrmw xchg i32 addrspace(1)*")) == 2);
+    SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("cmpxchg i32 addrspace(1)*")) == 2);
     const Index atomicIndex = assembly.indexOf("atomicrmw add i32 addrspace(1)*");
     const Index storeIndex = assembly.indexOf("store i32");
     SLANG_CHECK_ABORT(atomicIndex >= 0);
@@ -6913,8 +6983,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
         diagnostics)));
     const String compatibleAssembly = _getBlobText(compatibleAssemblyBlob);
     SLANG_CHECK(compatibleAssembly.indexOf("atomicrmw umax i64 addrspace(1)*") >= 0);
-    SLANG_CHECK(compatibleAssembly.indexOf("monotonic, align 4") < 0);
-    SLANG_CHECK(compatibleAssembly.indexOf("monotonic, align 8") < 0);
+    const UnownedStringSlice compatibleAssemblySlice = compatibleAssembly.getUnownedSlice();
+    SLANG_CHECK(
+        _countOccurrences(compatibleAssemblySlice, toSlice("cmpxchg i32 addrspace(1)*")) == 2);
+    SLANG_CHECK(
+        _countOccurrences(compatibleAssemblySlice, toSlice("atomicrmw xchg i32 addrspace(1)*")) ==
+        2);
+    SLANG_CHECK(compatibleAssembly.indexOf("monotonic, align") < 0);
+    SLANG_CHECK(compatibleAssembly.indexOf("atomicrmw add i32 addrspace(1)*") >= 0);
+    SLANG_CHECK(compatibleAssembly.indexOf("atomicrmw umax i64 addrspace(1)*") >= 0);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerBitOperations)

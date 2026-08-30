@@ -288,20 +288,26 @@ bool NVVMIRBuilder::supportsAtomicOperation(const SlangNVVMAtomicOperationDesc& 
 SlangResult NVVMIRBuilder::emitAtomicOperation(
     SlangNVVMModuleHandle module,
     const SlangNVVMAtomicOperationDesc& operation,
-    SlangNVVMValueHandle pointer,
-    SlangNVVMValueHandle value,
-    SlangNVVMValueHandle& outOriginalValue) const
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle& outValue) const
 {
-    outOriginalValue = nullptr;
+    outValue = nullptr;
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
-    if (!pointer || !value)
+    if (!operands || !operandCount)
         return SLANG_E_INVALID_ARG;
     if (!supportsAtomicOperation(operation))
         return SLANG_E_NOT_AVAILABLE;
-    return _validateHandleResult(
-        m_atomicOperations.emitOperation(module, &operation, pointer, value, &outOriginalValue),
-        outOriginalValue);
+    const SlangResult result =
+        m_atomicOperations.emitOperation(module, &operation, operands, operandCount, &outValue);
+    if (operation.operation == SLANG_NVVM_ATOMIC_OP_STORE)
+    {
+        if (SLANG_FAILED(result))
+            return result;
+        return !outValue ? SLANG_OK : SLANG_FAIL;
+    }
+    return _validateHandleResult(result, outValue);
 }
 
 String NVVMIRBuilder::getVersionString() const

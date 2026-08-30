@@ -2064,3 +2064,22 @@ leading healthy-MVP populations are preflight other (11), residual markers (10),
 operations (10), and aggregate/layout, helper ABI, and wave/reconvergence at eight each. The
 selected prefix passes 421/421, and representative direct O3 PTX remains accepted for SM70, SM80,
 and SM90 with CUDA 12.9.
+
+Slice 144 represents the common relaxed scalar atomic family through one compiler-owned
+descriptor. Load, store, exchange, compare-exchange, add/subtract, min/max, bitwise reductions,
+and increment/decrement share exact pointer, type, operand/result, and order classification.
+`Atomic<T>` is a physical `T` storage leaf; selected signed/unsigned 32/64-bit and Float32 raw
+views come only from canonical byte-address legalization. Whole groupshared-array pointers are
+admitted only for canonical initialization stores.
+
+Forward-only provider ABI revision 30 replaces the fixed two-operand RMW call with one descriptor
+and SSA operand array. Subtract/inc/dec compose existing typed operations. The LLVM provider emits
+monotonic RMW/CAS operations; because libNVVM rejects atomic load/store text, load uses a
+value-preserving compare-exchange and store uses exchange. Float32 bitwise operations use
+same-width integer transport. The strict serializer validates exact provider-produced operations
+and removes LLVM 14 cmpxchg/atomicrmw alignment suffixes for the LLVM-7-era reader.
+
+Eleven workloads become correct at O0 and O3 with no old-correct regression and receive 22 direct
+lanes. The fixed census reaches 357 O0 and 362 O3 successes. Against 427 healthy MVP references,
+O0/O3/both correctness is 355/359/355 (83.1%/84.1%/83.1%). The selected prefix passes 422/422;
+representative direct O3 PTX remains accepted with CUDA 12.9 for SM70, SM80, and SM90.

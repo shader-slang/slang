@@ -859,16 +859,19 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerNegate(
 static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     SlangNVVMModuleHandle module,
     const SlangNVVMAtomicOperationDesc* operation,
-    SlangNVVMValueHandle pointer,
-    SlangNVVMValueHandle value,
-    SlangNVVMValueHandle* outOriginalValue)
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
 {
-    if (outOriginalValue)
-        *outOriginalValue = nullptr;
+    if (outValue)
+        *outValue = nullptr;
 
     ModuleState* state = _getModule(module);
-    llvm::Value* llvmPointer = _getValue(pointer);
-    llvm::Value* llvmValue = _getValue(value);
+    const size_t expectedOperandCount =
+        operation && operation->operation == SLANG_NVVM_ATOMIC_OP_LOAD               ? 1
+        : operation && operation->operation == SLANG_NVVM_ATOMIC_OP_COMPARE_EXCHANGE ? 3
+                                                                                     : 2;
+    llvm::Value* llvmPointer = operands && operandCount ? _getValue(operands[0]) : nullptr;
     llvm::PointerType* pointerType = _getLoadablePointerType(state, llvmPointer);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     llvm::Type* pointeeType = pointerType ? pointerType->getNonOpaquePointerElementType() : nullptr;
@@ -882,53 +885,132 @@ static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
         operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
         pointeeType->isFloatingPointTy() &&
         pointeeType->getScalarSizeInBits() == operation->valueType.bitWidth;
-    if (!operation || !Slang::NVVMSemantics::isSupported(*operation) || !outOriginalValue ||
-        !pointerType || pointerType->getAddressSpace() != operation->addressSpace || !pointeeType ||
-        (!hasExpectedIntegerType && !hasExpectedFloatingType) || !insertionBlock || !llvmValue ||
-        llvmValue->getType() != pointeeType ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue))
+    if (!operation || !Slang::NVVMSemantics::isSupported(*operation) || !outValue || !operands ||
+        operandCount != expectedOperandCount || !pointerType ||
+        pointerType->getAddressSpace() != operation->addressSpace || !pointeeType ||
+        (!hasExpectedIntegerType && !hasExpectedFloatingType) || !insertionBlock ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer))
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    llvm::AtomicRMWInst::BinOp llvmOperation = llvm::AtomicRMWInst::BAD_BINOP;
-    switch (operation->operation)
+    llvm::Value* llvmValues[2] = {};
+    for (size_t i = 1; i < operandCount; ++i)
     {
-    case SLANG_NVVM_ATOMIC_OP_ADD:
-        llvmOperation =
-            hasExpectedFloatingType ? llvm::AtomicRMWInst::FAdd : llvm::AtomicRMWInst::Add;
-        break;
-    case SLANG_NVVM_ATOMIC_OP_BIT_AND:
-        llvmOperation = llvm::AtomicRMWInst::And;
-        break;
-    case SLANG_NVVM_ATOMIC_OP_BIT_OR:
-        llvmOperation = llvm::AtomicRMWInst::Or;
-        break;
-    case SLANG_NVVM_ATOMIC_OP_BIT_XOR:
-        llvmOperation = llvm::AtomicRMWInst::Xor;
-        break;
-    case SLANG_NVVM_ATOMIC_OP_MIN:
-        llvmOperation = operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
-                            ? llvm::AtomicRMWInst::Min
-                            : llvm::AtomicRMWInst::UMin;
-        break;
-    case SLANG_NVVM_ATOMIC_OP_MAX:
-        llvmOperation = operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
-                            ? llvm::AtomicRMWInst::Max
-                            : llvm::AtomicRMWInst::UMax;
-        break;
-    default:
-        return SLANG_E_INVALID_ARG;
+        llvmValues[i - 1] = _getValue(operands[i]);
+        if (!llvmValues[i - 1] || llvmValues[i - 1]->getType() != pointeeType ||
+            !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValues[i - 1]))
+        {
+            return SLANG_E_INVALID_ARG;
+        }
     }
-    llvm::Value* originalValue = state->builder.CreateAtomicRMW(
-        llvmOperation,
-        llvmPointer,
-        llvmValue,
-        llvm::Align(operation->valueType.bitWidth / 8),
-        llvm::AtomicOrdering::Monotonic,
-        llvm::SyncScope::System);
-    *outOriginalValue = reinterpret_cast<SlangNVVMValueHandle>(originalValue);
+
+    const llvm::Align alignment(operation->valueType.bitWidth / 8);
+    const llvm::AtomicOrdering ordering = llvm::AtomicOrdering::Monotonic;
+    const llvm::SyncScope::ID syncScope = llvm::SyncScope::System;
+
+    // LLVM and libNVVM spell bitwise floating-point memory operations through an integer pointer
+    // of the same width. The operation preserves every source bit and the final bitcast restores
+    // the exact canonical floating result.
+    llvm::Value* atomicPointer = llvmPointer;
+    llvm::Value* atomicValues[2] = {llvmValues[0], llvmValues[1]};
+    llvm::Type* atomicType = pointeeType;
+    if (hasExpectedFloatingType && operation->operation != SLANG_NVVM_ATOMIC_OP_ADD)
+    {
+        atomicType = llvm::Type::getIntNTy(state->context, operation->valueType.bitWidth);
+        auto atomicPointerType = llvm::PointerType::get(atomicType, operation->addressSpace);
+        atomicPointer = state->builder.CreateBitCast(llvmPointer, atomicPointerType);
+        for (size_t i = 0; i + 1 < operandCount; ++i)
+            atomicValues[i] = state->builder.CreateBitCast(llvmValues[i], atomicType);
+    }
+
+    llvm::Value* originalValue = nullptr;
+    if (operation->operation == SLANG_NVVM_ATOMIC_OP_LOAD)
+    {
+        // libNVVM 2.0 rejects LLVM atomic load/store instructions. A relaxed compare-exchange of
+        // zero with zero is the established value-preserving atomic-read idiom: it returns every
+        // old bit pattern and can write only the identical zero bits already in memory.
+        llvm::Constant* zero = llvm::Constant::getNullValue(atomicType);
+        llvm::AtomicCmpXchgInst* compareExchange = state->builder.CreateAtomicCmpXchg(
+            atomicPointer,
+            zero,
+            zero,
+            alignment,
+            ordering,
+            ordering,
+            syncScope);
+        originalValue = state->builder.CreateExtractValue(compareExchange, 0);
+    }
+    else if (operation->operation == SLANG_NVVM_ATOMIC_OP_STORE)
+    {
+        // A fetch-exchange has the exact relaxed atomic-store effect. Its unused old SSA value is
+        // not exposed, and no unsupported atomic store instruction reaches libNVVM.
+        state->builder.CreateAtomicRMW(
+            llvm::AtomicRMWInst::Xchg,
+            atomicPointer,
+            atomicValues[0],
+            alignment,
+            ordering,
+            syncScope);
+        return SLANG_OK;
+    }
+    else if (operation->operation == SLANG_NVVM_ATOMIC_OP_COMPARE_EXCHANGE)
+    {
+        llvm::AtomicCmpXchgInst* compareExchange = state->builder.CreateAtomicCmpXchg(
+            atomicPointer,
+            atomicValues[0],
+            atomicValues[1],
+            alignment,
+            ordering,
+            ordering,
+            syncScope);
+        originalValue = state->builder.CreateExtractValue(compareExchange, 0);
+    }
+    else
+    {
+        llvm::AtomicRMWInst::BinOp llvmOperation = llvm::AtomicRMWInst::BAD_BINOP;
+        switch (operation->operation)
+        {
+        case SLANG_NVVM_ATOMIC_OP_ADD:
+            llvmOperation =
+                hasExpectedFloatingType ? llvm::AtomicRMWInst::FAdd : llvm::AtomicRMWInst::Add;
+            break;
+        case SLANG_NVVM_ATOMIC_OP_BIT_AND:
+            llvmOperation = llvm::AtomicRMWInst::And;
+            break;
+        case SLANG_NVVM_ATOMIC_OP_BIT_OR:
+            llvmOperation = llvm::AtomicRMWInst::Or;
+            break;
+        case SLANG_NVVM_ATOMIC_OP_BIT_XOR:
+            llvmOperation = llvm::AtomicRMWInst::Xor;
+            break;
+        case SLANG_NVVM_ATOMIC_OP_MIN:
+            llvmOperation = operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                                ? llvm::AtomicRMWInst::Min
+                                : llvm::AtomicRMWInst::UMin;
+            break;
+        case SLANG_NVVM_ATOMIC_OP_MAX:
+            llvmOperation = operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                                ? llvm::AtomicRMWInst::Max
+                                : llvm::AtomicRMWInst::UMax;
+            break;
+        case SLANG_NVVM_ATOMIC_OP_EXCHANGE:
+            llvmOperation = llvm::AtomicRMWInst::Xchg;
+            break;
+        default:
+            return SLANG_E_INVALID_ARG;
+        }
+        originalValue = state->builder.CreateAtomicRMW(
+            llvmOperation,
+            atomicPointer,
+            atomicValues[0],
+            alignment,
+            ordering,
+            syncScope);
+    }
+    if (atomicType != pointeeType)
+        originalValue = state->builder.CreateBitCast(originalValue, pointeeType);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(originalValue);
     return SLANG_OK;
 }
 
@@ -2188,10 +2270,31 @@ static void _addUniqueAttributeSet(
     attributeSets.push_back(attributeSet);
 }
 
+// Checks the one relaxed scalar compare-exchange shape that the provider deliberately emits.
+static bool _isSelectedLegacyAtomicAccess(
+    llvm::Type* valueType,
+    llvm::Value* pointer,
+    llvm::Align alignment,
+    llvm::AtomicOrdering ordering,
+    llvm::SyncScope::ID syncScope,
+    bool isVolatile)
+{
+    auto pointerType = llvm::dyn_cast<llvm::PointerType>(pointer->getType());
+    const unsigned bitWidth = valueType->getScalarSizeInBits();
+    const bool hasSelectedType = valueType->isIntegerTy(32) || valueType->isIntegerTy(64);
+    const bool hasNaturalAlignment = (bitWidth == 32 && alignment == llvm::Align(4)) ||
+                                     (bitWidth == 64 && alignment == llvm::Align(8));
+    return pointerType &&
+           (pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+            pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_SHARED) &&
+           hasSelectedType && hasNaturalAlignment && ordering == llvm::AtomicOrdering::Monotonic &&
+           syncScope == llvm::SyncScope::System && !isVolatile;
+}
+
 // Writes the legacy LLVM textual dialect accepted by libNVVM's documented LLVM 7 reader.
 //
-// LLVM 14 made atomic alignment explicit in assembly, but LLVM 7 gives atomicrmw its natural
-// alignment and rejects the suffix. LLVM 14 also prints unary negation as `fneg`, which the
+// LLVM 14 made atomic alignment explicit in assembly, but LLVM 7 gives atomicrmw and cmpxchg their
+// natural alignment and rejects the suffix. LLVM 14 also prints unary negation as `fneg`, which the
 // libNVVM NVVM-2.0 reader rejects; the older dialect expresses finite scalar negation as
 // `fsub -0.0, value`. Finally, LLVM 14 gives NVVM special-register intrinsics function attributes
 // that the LLVM 7 parser does not know. Removing optimization-only attributes retains each
@@ -2432,45 +2535,69 @@ static SlangResult _writeLegacyNVVMAssembly(
                     continue;
                 }
 
-                auto atomic = llvm::dyn_cast<llvm::AtomicRMWInst>(&instruction);
-                if (!atomic)
+                if (auto atomic = llvm::dyn_cast<llvm::AtomicRMWInst>(&instruction))
+                {
+                    ++semanticAtomicCount;
+                    const unsigned addressSpace = atomic->getPointerAddressSpace();
+                    const unsigned bitWidth = atomic->getType()->getScalarSizeInBits();
+                    const bool hasNaturalAlignment =
+                        (bitWidth == 32 && atomic->getAlign() == llvm::Align(4)) ||
+                        (bitWidth == 64 && atomic->getAlign() == llvm::Align(8));
+                    const bool isAtomicAddressSpace =
+                        addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+                        addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
+                    const bool isSelectedIntegerOperation =
+                        isAtomicAddressSpace && atomic->getType()->isIntegerTy() &&
+                        (bitWidth == 32 || bitWidth == 64) && hasNaturalAlignment &&
+                        (atomic->getOperation() == llvm::AtomicRMWInst::Add ||
+                         atomic->getOperation() == llvm::AtomicRMWInst::And ||
+                         atomic->getOperation() == llvm::AtomicRMWInst::Or ||
+                         atomic->getOperation() == llvm::AtomicRMWInst::Xor ||
+                         atomic->getOperation() == llvm::AtomicRMWInst::Min ||
+                         atomic->getOperation() == llvm::AtomicRMWInst::UMin ||
+                         atomic->getOperation() == llvm::AtomicRMWInst::Max ||
+                         atomic->getOperation() == llvm::AtomicRMWInst::UMax ||
+                         atomic->getOperation() == llvm::AtomicRMWInst::Xchg);
+                    const bool isSelectedGlobalFloatingReduction =
+                        addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
+                        atomic->getType()->isFloatingPointTy() &&
+                        (bitWidth == 32 || bitWidth == 64) && hasNaturalAlignment &&
+                        atomic->getOperation() == llvm::AtomicRMWInst::FAdd;
+                    if ((!isSelectedIntegerOperation && !isSelectedGlobalFloatingReduction) ||
+                        atomic->getOrdering() != llvm::AtomicOrdering::Monotonic ||
+                        atomic->getSyncScopeID() != llvm::SyncScope::System || atomic->isVolatile())
+                    {
+                        return SLANG_E_NOT_AVAILABLE;
+                    }
                     continue;
+                }
 
+                if (auto load = llvm::dyn_cast<llvm::LoadInst>(&instruction))
+                {
+                    // libNVVM 2.0 rejects atomic load/store syntax. The atomic callback lowers
+                    // those source operations to cmpxchg/xchg before this dialect boundary.
+                    if (load->isAtomic())
+                        return SLANG_E_NOT_AVAILABLE;
+                    continue;
+                }
+                if (auto store = llvm::dyn_cast<llvm::StoreInst>(&instruction))
+                {
+                    if (store->isAtomic())
+                        return SLANG_E_NOT_AVAILABLE;
+                    continue;
+                }
+                auto compareExchange = llvm::dyn_cast<llvm::AtomicCmpXchgInst>(&instruction);
+                if (!compareExchange)
+                    continue;
                 ++semanticAtomicCount;
-                const unsigned addressSpace = atomic->getPointerAddressSpace();
-                const unsigned bitWidth = atomic->getType()->getScalarSizeInBits();
-                const bool hasNaturalAlignment =
-                    (bitWidth == 32 && atomic->getAlign() == llvm::Align(4)) ||
-                    (bitWidth == 64 && atomic->getAlign() == llvm::Align(8));
-                const bool isI32Add = atomic->getOperation() == llvm::AtomicRMWInst::Add &&
-                                      atomic->getType()->isIntegerTy(32) &&
-                                      (addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
-                                       addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED) &&
-                                      hasNaturalAlignment;
-                const bool isGlobalU64Max = atomic->getOperation() == llvm::AtomicRMWInst::UMax &&
-                                            atomic->getType()->isIntegerTy(64) &&
-                                            addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
-                                            hasNaturalAlignment;
-                const bool isSelectedGlobalIntegerReduction =
-                    addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
-                    atomic->getType()->isIntegerTy() && (bitWidth == 32 || bitWidth == 64) &&
-                    hasNaturalAlignment &&
-                    (atomic->getOperation() == llvm::AtomicRMWInst::Add ||
-                     atomic->getOperation() == llvm::AtomicRMWInst::And ||
-                     atomic->getOperation() == llvm::AtomicRMWInst::Or ||
-                     atomic->getOperation() == llvm::AtomicRMWInst::Xor ||
-                     atomic->getOperation() == llvm::AtomicRMWInst::Min ||
-                     atomic->getOperation() == llvm::AtomicRMWInst::UMin ||
-                     atomic->getOperation() == llvm::AtomicRMWInst::Max ||
-                     atomic->getOperation() == llvm::AtomicRMWInst::UMax);
-                const bool isSelectedGlobalFloatingReduction =
-                    addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
-                    atomic->getType()->isFloatingPointTy() && (bitWidth == 32 || bitWidth == 64) &&
-                    hasNaturalAlignment && atomic->getOperation() == llvm::AtomicRMWInst::FAdd;
-                if ((!isI32Add && !isGlobalU64Max && !isSelectedGlobalIntegerReduction &&
-                     !isSelectedGlobalFloatingReduction) ||
-                    atomic->getOrdering() != llvm::AtomicOrdering::Monotonic ||
-                    atomic->getSyncScopeID() != llvm::SyncScope::System || atomic->isVolatile())
+                if (!_isSelectedLegacyAtomicAccess(
+                        compareExchange->getCompareOperand()->getType(),
+                        compareExchange->getPointerOperand(),
+                        compareExchange->getAlign(),
+                        compareExchange->getSuccessOrdering(),
+                        compareExchange->getSyncScopeID(),
+                        compareExchange->isVolatile()) ||
+                    compareExchange->getFailureOrdering() != llvm::AtomicOrdering::Monotonic)
                 {
                     return SLANG_E_NOT_AVAILABLE;
                 }
@@ -2568,7 +2695,9 @@ static SlangResult _writeLegacyNVVMAssembly(
             needsLegacyGlobalF32AtomicAdd |= isGlobalF32AtomicAdd;
             needsLegacyGlobalF64AtomicAdd |= isGlobalF64AtomicAdd;
         }
-        else if (trimmedLine.startswith("%") && trimmedLine.contains(atomicMarker))
+        else if (
+            trimmedLine.startswith("%") &&
+            (trimmedLine.contains(atomicMarker) || trimmedLine.contains(" = cmpxchg ")))
         {
             const llvm::StringRef alignmentSuffix =
                 line.endswith(llvm14I32AlignmentSuffix)   ? llvm14I32AlignmentSuffix

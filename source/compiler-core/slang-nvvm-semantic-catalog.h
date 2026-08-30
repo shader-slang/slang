@@ -1071,19 +1071,17 @@ inline bool isSupported(const SlangNVVMValueOperationDesc& desc)
 /// Returns whether an atomic descriptor is in the currently established direct-NVVM family.
 inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
 {
-    const bool isI32 = (desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
-                        desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
-                       desc.valueType.bitWidth == 32 && desc.valueType.laneCount == 1;
-    const bool isI32AtomicAddressSpace = desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
-                                         desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
-    const bool isRelaxedI32Add =
-        desc.operation == SLANG_NVVM_ATOMIC_OP_ADD && isI32 && isI32AtomicAddressSpace;
-    const bool isSelectedIntegerReduction =
-        desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
+    const bool isAtomicAddressSpace = desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+                                      desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
+    const bool isSelectedInteger =
         (desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
          desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
         (desc.valueType.bitWidth == 32 || desc.valueType.bitWidth == 64) &&
-        desc.valueType.laneCount == 1 &&
+        desc.valueType.laneCount == 1;
+    const bool isF32 = desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                       desc.valueType.bitWidth == 32 && desc.valueType.laneCount == 1;
+    const bool isSelectedIntegerReduction =
+        isAtomicAddressSpace && isSelectedInteger &&
         (desc.operation == SLANG_NVVM_ATOMIC_OP_ADD ||
          desc.operation == SLANG_NVVM_ATOMIC_OP_BIT_AND ||
          desc.operation == SLANG_NVVM_ATOMIC_OP_BIT_OR ||
@@ -1095,8 +1093,14 @@ inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
         desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
         (desc.valueType.bitWidth == 32 || desc.valueType.bitWidth == 64) &&
         desc.valueType.laneCount == 1;
-    return (isRelaxedI32Add || isSelectedIntegerReduction || isSelectedFloatingReduction) &&
-           desc.memoryOrder == SLANG_NVVM_MEMORY_ORDER_RELAXED;
+    const bool isCommonMemoryOperation = isAtomicAddressSpace && (isSelectedInteger || isF32) &&
+                                         (desc.operation == SLANG_NVVM_ATOMIC_OP_LOAD ||
+                                          desc.operation == SLANG_NVVM_ATOMIC_OP_STORE ||
+                                          desc.operation == SLANG_NVVM_ATOMIC_OP_EXCHANGE ||
+                                          desc.operation == SLANG_NVVM_ATOMIC_OP_COMPARE_EXCHANGE);
+    return (isSelectedIntegerReduction || isSelectedFloatingReduction || isCommonMemoryOperation) &&
+           desc.memoryOrder == SLANG_NVVM_MEMORY_ORDER_RELAXED &&
+           desc.failureMemoryOrder == SLANG_NVVM_MEMORY_ORDER_RELAXED;
 }
 
 } // namespace NVVMSemantics

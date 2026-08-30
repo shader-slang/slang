@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 29u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 30u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -188,7 +188,7 @@ extern "C"
         size_t operandCount;
     } SlangNVVMValueOperationDesc;
 
-    /** Integer read-modify-write operations. Signedness is carried by `valueType`. */
+    /** Scalar atomic operations. Signedness is carried by `valueType`. */
     typedef uint32_t SlangNVVMAtomicOperation;
 #define SLANG_NVVM_ATOMIC_OP_ADD ((SlangNVVMAtomicOperation)0u)
 #define SLANG_NVVM_ATOMIC_OP_SUBTRACT ((SlangNVVMAtomicOperation)1u)
@@ -198,7 +198,10 @@ extern "C"
 #define SLANG_NVVM_ATOMIC_OP_MIN ((SlangNVVMAtomicOperation)5u)
 #define SLANG_NVVM_ATOMIC_OP_MAX ((SlangNVVMAtomicOperation)6u)
 #define SLANG_NVVM_ATOMIC_OP_EXCHANGE ((SlangNVVMAtomicOperation)7u)
-#define SLANG_NVVM_ATOMIC_OPERATION_COUNT 8u
+#define SLANG_NVVM_ATOMIC_OP_LOAD ((SlangNVVMAtomicOperation)8u)
+#define SLANG_NVVM_ATOMIC_OP_STORE ((SlangNVVMAtomicOperation)9u)
+#define SLANG_NVVM_ATOMIC_OP_COMPARE_EXCHANGE ((SlangNVVMAtomicOperation)10u)
+#define SLANG_NVVM_ATOMIC_OPERATION_COUNT 11u
 
     typedef uint32_t SlangNVVMMemoryOrder;
 #define SLANG_NVVM_MEMORY_ORDER_RELAXED ((SlangNVVMMemoryOrder)0u)
@@ -208,13 +211,15 @@ extern "C"
 #define SLANG_NVVM_MEMORY_ORDER_SEQUENTIALLY_CONSISTENT ((SlangNVVMMemoryOrder)4u)
 #define SLANG_NVVM_MEMORY_ORDER_COUNT 5u
 
-    /** Describes one complete typed atomic read-modify-write overload. */
+    /** Describes one complete typed scalar atomic overload. */
     typedef struct SlangNVVMAtomicOperationDesc
     {
         SlangNVVMAtomicOperation operation;
         SlangNVVMValueTypeDesc valueType;
         SlangNVVMAddressSpace addressSpace;
         SlangNVVMMemoryOrder memoryOrder;
+        /** Used only by compare-exchange; must be relaxed for every other operation. */
+        SlangNVVMMemoryOrder failureMemoryOrder;
     } SlangNVVMAtomicOperationDesc;
 
     typedef uint32_t SlangNVVMSurfaceOperation;
@@ -513,9 +518,9 @@ extern "C"
         SlangNVVMResult(SLANG_NVVM_CALL* emitOperation)(
             SlangNVVMModuleHandle module,
             const SlangNVVMAtomicOperationDesc* operation,
-            SlangNVVMValueHandle pointer,
-            SlangNVVMValueHandle value,
-            SlangNVVMValueHandle* outOriginalValue);
+            const SlangNVVMValueHandle* operands,
+            size_t operandCount,
+            SlangNVVMValueHandle* outValue);
     } SlangNVVMBuilderAtomicOperationsAPI;
 
     typedef struct SlangNVVMBuilderSurfaceOperationsAPI

@@ -61,16 +61,16 @@ public:
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
 
-    /// Queries one complete typed atomic read-modify-write operation.
+    /// Queries one complete typed scalar atomic operation.
     bool supportsAtomicOperation(const SlangNVVMAtomicOperationDesc& operation) const;
 
-    /// Emits one complete typed atomic read-modify-write operation.
+    /// Emits one complete typed scalar atomic operation.
     SlangResult emitAtomicOperation(
         SlangNVVMModuleHandle module,
         const SlangNVVMAtomicOperationDesc& operation,
-        SlangNVVMValueHandle pointer,
-        SlangNVVMValueHandle value,
-        SlangNVVMValueHandle& outOriginalValue) const;
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle& outValue) const;
 
     /// Queries one complete typed surface-resource operation.
     bool supportsSurfaceOperation(const SlangNVVMSurfaceOperationDesc& operation) const;
