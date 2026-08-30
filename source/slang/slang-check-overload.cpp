@@ -2862,6 +2862,23 @@ bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
     return true;
 }
 
+// Return true if `expr` is an integer literal written without a type suffix
+// (e.g. `3` or `0x1F`), as opposed to one with an explicit suffix (e.g. `3u`,
+// `3L`). Only an unsuffixed literal carries the provisional default `int` type
+// that shader-slang/slang#12753's deferral targets; a suffixed literal already
+// has the concrete type the author chose. Slang integer suffixes are composed
+// solely of `u`/`U` and `l`/`L`, so a written suffix always makes the literal's
+// source text end in one of those letters -- none of which are hex digits, so
+// this also correctly treats `0xFF` as unsuffixed.
+static bool isUnsuffixedIntegerLiteralExpr(Expr* expr)
+{
+    auto literal = as<IntegerLiteralExpr>(expr);
+    if (!literal)
+        return false;
+    auto text = literal->token.getContent();
+    return !text.endsWithCaseInsensitive("u") && !text.endsWithCaseInsensitive("l");
+}
+
 // Infer generic arguments for a generic overload candidate.
 DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     DeclRef<GenericDecl> genericDeclRef,
@@ -2974,9 +2991,19 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
             //
             auto argType = unwrapModifiedType(matchedArgs[aa].argType);
             auto paramType = (*innerParameterTypes)[aa];
+
+            // An unsuffixed integer literal carries only the provisional default
+            // type `int`. Flag it so that when it seeds a type-parameter
+            // constraint, the solver holds that constraint until conformance
+            // witnesses have run rather than committing `int` up front. See
+            // shader-slang/slang#12753.
+            UnificationOptions unificationOptions;
+            unificationOptions.fromIntegerLiteralArg =
+                isUnsuffixedIntegerLiteralExpr(matchedArgs[aa].argExpr);
+
             auto canUnify = TryUnifyTypes(
                 inferenceContext,
-                UnificationOptions(),
+                unificationOptions,
                 QualType(argType, paramType.isLeftValue),
                 paramType);
 

@@ -1418,6 +1418,37 @@ private:
     // Run the work-list solver loop.
     bool runWorkList()
     {
+        // The work list runs to quiescence, then any provisional literal
+        // constraints still held for witness inference are released and the list
+        // is drained again. Releasing only after the determinate work has
+        // quiesced is what lets a conformance witness discover a parameter (e.g.
+        // `Element = uint`) before the literal's default `int` merges in, while
+        // still applying the literal when nothing else determines the parameter
+        // (e.g. `id(3)` settles `T = int`). See shader-slang/slang#12753.
+        for (;;)
+        {
+            if (!drainWorkList())
+                return false;
+
+            if (!releaseDeferredLiteralConstraints())
+                break;
+        }
+
+        // If the queue becomes empty while a constraint remains unsolved, then all
+        // remaining work is waiting on arguments that never acquired answers.
+        for (Index constraintIndex = 0; constraintIndex < m_solverConstraints.getCount();
+             constraintIndex++)
+        {
+            if (!m_solverConstraints[constraintIndex].satisfied)
+                return false;
+        }
+        return true;
+    }
+
+    // Drain the queued work list until it is empty, returning false if any
+    // constraint rejects the candidate.
+    bool drainWorkList()
+    {
         // The work list is intentionally not split by argument kind. A default
         // generic argument that needs a witness argument simply blocks, and the
         // witness constraint is free to run next. Conversely, a witness
@@ -1448,16 +1479,29 @@ private:
             if (state == ConstraintSolvingState::MadeProgress)
                 wakeSolverConstraintsAfterProgress(constraintIndex);
         }
+        return true;
+    }
 
-        // If the queue becomes empty while a constraint remains unsolved, then all
-        // remaining work is waiting on arguments that never acquired answers.
+    // Release provisional literal constraints that are still held, re-queuing
+    // them so the next drain applies them. Returns true when at least one
+    // constraint was released, meaning another drain is warranted.
+    bool releaseDeferredLiteralConstraints()
+    {
+        bool releasedAny = false;
         for (Index constraintIndex = 0; constraintIndex < m_solverConstraints.getCount();
              constraintIndex++)
         {
-            if (!m_solverConstraints[constraintIndex].satisfied)
-                return false;
+            auto& constraint = m_solverConstraints[constraintIndex];
+            if (constraint.satisfied)
+                continue;
+            if (!constraint.deferForWitnessInference || constraint.deferralReleased)
+                continue;
+
+            constraint.deferralReleased = true;
+            enqueueSolverConstraint(constraintIndex);
+            releasedAny = true;
         }
-        return true;
+        return releasedAny;
     }
 
     // -------------------------------------------------------------------------
@@ -1566,6 +1610,20 @@ private:
         // unrelated argument changes.
         if (c.satisfied)
             return ConstraintSolvingState::Done;
+
+        // Hold a provisional literal-sourced constraint while its target
+        // parameter is still undetermined. A parameter that also carries a
+        // conformance witness (e.g. `Element` in
+        // `acceptBox<Element, Box : IBox<Element>>(Box, Element)`) must be
+        // discovered from that witness while it is still free; committing the
+        // literal's default `int` first would substitute a concrete `IBox<int>`
+        // into the witness and prevent discovering `Element = uint`. Once the
+        // parameter has any answer, or the work list has quiesced and released
+        // the deferral, the literal is applied and merged normally. See
+        // shader-slang/slang#12753.
+        if (c.deferForWitnessInference && !c.deferralReleased &&
+            getArgState(c.decl) == ArgState::DefaultSubstitutionArg)
+            return ConstraintSolvingState::Blocked;
 
         // Dependent ordinary constraints wait until the values they mention can
         // be substituted. A constraint like `U = T.A` cannot update `U` until
@@ -3703,13 +3761,26 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     // type-join fact that may merge with other argument/parameter facts later.
     auto priority = unificationOptions.optionalConstraint ? ConstraintPriority::Optional
                                                           : ConstraintPriority::Required;
+
+    // A literal-sourced type-join constraint on a plain type parameter is
+    // provisional: hold it until conformance witnesses have run (see
+    // shader-slang/slang#12753). Exact constraints (`T = X` from equality
+    // unification) are never provisional, and pack parameters are excluded so
+    // per-element pack accumulation is left untouched.
+    auto mergeMode = getOrdinaryArgMergeMode(unificationOptions);
+    bool deferForWitnessInference = unificationOptions.fromIntegerLiteralArg &&
+                                    mergeMode == SolverConstraint::OrdinaryArgMergeMode::TypeJoin &&
+                                    !as<GenericTypePackParamDecl>(typeParamDecl);
+
     constraints.discoveredConstraints.add(SolverConstraint::makeOrdinaryArg(
         typeParamDecl,
         type,
         priority,
-        getOrdinaryArgMergeMode(unificationOptions),
+        mergeMode,
         unificationOptions.indexInTypePack,
-        type.isLeftValue));
+        type.isLeftValue,
+        /*potentiallyDependent*/ false,
+        deferForWitnessInference));
 
     return true;
 }

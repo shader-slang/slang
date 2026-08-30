@@ -3009,6 +3009,21 @@ public:
         // `Exact`.
         OrdinaryArgMergeMode ordinaryArgMergeMode = OrdinaryArgMergeMode::TypeJoin;
 
+        // Only used by `OrdinaryArgConstraint`. True when this constraint's type
+        // value comes from an integer-literal argument whose default `int` type
+        // is provisional. The solver holds such a constraint (reports it blocked)
+        // until determinate constraints -- notably interface-conformance
+        // witnesses -- have run, so a parameter like `Element` in
+        // `acceptBox<Element, Box : IBox<Element>>(Box, Element)` can be
+        // discovered as `uint` from `UIntBox : IBox<uint>` before the literal's
+        // `int` merges in. See shader-slang/slang#12753.
+        bool deferForWitnessInference = false;
+
+        // Solver-loop state paired with `deferForWitnessInference`. It is set
+        // once the work list has otherwise quiesced, releasing the held
+        // constraint so it is applied on its next turn.
+        bool deferralReleased = false;
+
         // True when `val` must be substituted through the current generic
         // argument list before it is used. This is used by
         // `OrdinaryArgConstraint` for dependent constraint values such as
@@ -3029,7 +3044,8 @@ public:
             OrdinaryArgMergeMode mergeMode,
             Index indexInPack = 0,
             bool isUsedAsLValue = false,
-            bool potentiallyDependent = false)
+            bool potentiallyDependent = false,
+            bool deferForWitnessInference = false)
         {
             SolverConstraint constraint;
             constraint.kind = Kind::OrdinaryArgConstraint;
@@ -3040,6 +3056,7 @@ public:
             constraint.priority = priority;
             constraint.ordinaryArgMergeMode = mergeMode;
             constraint.potentiallyDependent = potentiallyDependent;
+            constraint.deferForWitnessInference = deferForWitnessInference;
             return constraint;
         }
 
@@ -3490,6 +3507,14 @@ public:
         // True when a discovered type argument must be an exact answer instead
         // of being merged through the usual type-join behavior.
         bool equalityConstraint = false;
+
+        // True when the type-argument constraint is being seeded from an
+        // unsuffixed integer literal argument, whose default `int` type is
+        // provisional. Such a constraint must not commit the generic parameter
+        // before interface conformance witnesses have had a chance to determine
+        // it; the solver therefore holds it until determinate constraints have
+        // run. See shader-slang/slang#12753.
+        bool fromIntegerLiteralArg = false;
     };
 
     // Try to find a unification for two values
