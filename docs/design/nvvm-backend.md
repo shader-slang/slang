@@ -6524,6 +6524,38 @@ MVP references, O0/O3/both correctness is 355/359/355 (83.1%/84.1%/83.1%). The s
 passes 422/422, while representative direct O3 PTX assembles with CUDA 12.9 for SM70, SM80, and
 SM90. CUDA 13 and physical SM70/SM80/SM90 runtime workers remain explicit productionization gaps.
 
+### Slice 145: Canonical ephemeral values and metadata
+
+Direct NVVM now consumes three canonical post-link forms that do not require a source-level CUDA
+expression. `LoadFromUninitializedMemory` accepts the existing finite copyable-value algebra and
+selects one concrete all-zero value per instruction through generic scalar constants and recursive
+vector/aggregate construction. The IR contract explicitly permits an optimization to choose a
+particular value; retaining the completed provider handle in the SSA map ensures every use of that
+instruction observes the same choice. Scalar Int/UInt/Float and a struct containing `float[8]`
+from the measured corpus prove the recursive boundary.
+
+`DebugNoScope`, produced by inlining to close an inlined debug scope, has no executable effect
+because the direct backend does not emit debug information. It is validated and consumed without
+entering the provider value map. A live `getStringHash` is accepted only with the canonical
+`IRStringLit` operand established by GPU type inlining, DCE, and `checkGetStringHashInsts`; direct
+emission applies `getStableHashCode32` to the literal bytes and materializes the exact i32 bit
+pattern. `RequirePrelude` and `RequireComputeDerivative` remain rejected because both carry target
+semantics and cannot be discarded as metadata.
+
+All classification is shared by preflight, SSA availability validation, and emission. Existing
+revision-30 generic constants and aggregate/vector construction express the complete lowering, so
+the provider API and isolated LLVM library are unchanged. Eight workloads become correct at O0
+and O3 with no old-correct identity loss and receive sixteen direct lanes. The fixed census reaches
+365 O0 and 370 O3 successes. Against 427 healthy MVP references, O0/O3/both correctness is
+363/367/363 (85.0%/85.9%/85.0%). The selected prefix passes 423/423.
+
+Representative standalone NVRTC/direct-O3 SM70 compile medians are 390.0/270.3 ms for the
+resource/aggregate/helper gate, 369.7/251.5 ms for the parameter-block gate, and 372.9/255.2 ms
+for the shared-control/barrier gate. Their NVRTC/direct-O3 PTX sizes remain 8889/919, 8839/793,
+and 9190/1404 bytes. Direct O3 PTX assembles with CUDA 12.9 for SM70, SM80, and SM90; runtime
+comparison remains on the local SM120 GPU, while CUDA 13 and physical SM70/80/90 workers are still
+productionization gaps.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

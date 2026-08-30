@@ -7792,6 +7792,68 @@ SLANG_UNIT_TEST(nvvmSlangMaskedWaveScalarHelpersUseGenericLoops)
 #endif
 }
 
+SLANG_UNIT_TEST(nvvmSlangCanonicalEphemeralValuesUseDirectPipeline)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMChosenUndefinedAndDebugMarkerSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool foundChosenFloatZero = false;
+        for (Index index = 0; index < gFakeNVVMBuilder.floatingPointConstantBitPatterns.getCount();
+             ++index)
+        {
+            foundChosenFloatZero |= gFakeNVVMBuilder.floatingPointConstantBitWidths[index] == 32 &&
+                                    gFakeNVVMBuilder.floatingPointConstantBitPatterns[index] == 0;
+        }
+        SLANG_CHECK(foundChosenFloatZero);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMStableStringHashSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool foundStableStringHash = false;
+        for (Index index = 0; index < gFakeNVVMBuilder.integerConstantValues.getCount(); ++index)
+        {
+            foundStableStringHash |= gFakeNVVMBuilder.integerConstantBitWidths[index] == 32 &&
+                                     gFakeNVVMBuilder.integerConstantValues[index] == 1840786589;
+        }
+        SLANG_CHECK(foundStableStringHash);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 {
     struct UnsupportedCase

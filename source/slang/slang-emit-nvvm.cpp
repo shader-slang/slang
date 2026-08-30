@@ -12,6 +12,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -1942,6 +1943,60 @@ IRFloatLit* _asExecutableFloatingPointConstant(IRInst* value)
     auto floatLit = as<IRFloatLit>(value);
     return floatLit && isNVVMSupportedFloatingPointScalarType(floatLit->getDataType()) ? floatLit
                                                                                        : nullptr;
+}
+
+enum class NVVMEphemeralValueKind
+{
+    ChosenUndefined,
+    StableStringHash,
+    IgnoredDebugNoScope,
+};
+
+struct NVVMResolvedEphemeralValue
+{
+    NVVMEphemeralValueKind kind = NVVMEphemeralValueKind::ChosenUndefined;
+    IRType* valueType = nullptr;
+    IRStringLit* stringLiteral = nullptr;
+};
+
+// Resolves canonical values and markers that code generation consumes without a source-level CUDA
+// expression. Every accepted form has one upstream semantic source of truth: SSA construction
+// chooses an arbitrary value, GPU string validation proves the literal, and inlining owns the
+// debug-scope marker.
+bool _resolveNVVMEphemeralValue(IRInst* inst, NVVMResolvedEphemeralValue& outValue)
+{
+    outValue = {};
+    if (!inst)
+        return false;
+
+    switch (inst->getOp())
+    {
+    case kIROp_LoadFromUninitializedMemory:
+        if (!isNVVMSupportedCopyableValueType(inst->getDataType()))
+            return false;
+        outValue.kind = NVVMEphemeralValueKind::ChosenUndefined;
+        outValue.valueType = inst->getDataType();
+        return true;
+
+    case kIROp_GetStringHash:
+        if (inst->getOperandCount() != 1 || !isNVVMSignedI32Type(inst->getDataType()))
+            return false;
+        outValue.stringLiteral = as<IRStringLit>(inst->getOperand(0));
+        if (!outValue.stringLiteral)
+            return false;
+        outValue.kind = NVVMEphemeralValueKind::StableStringHash;
+        outValue.valueType = inst->getDataType();
+        return true;
+
+    case kIROp_DebugNoScope:
+        if (!as<IRVoidType>(inst->getDataType()))
+            return false;
+        outValue.kind = NVVMEphemeralValueKind::IgnoredDebugNoScope;
+        return true;
+
+    default:
+        return false;
+    }
 }
 
 // Matches one canonical Slang type against a provider-owned semantic type role.
@@ -6291,6 +6346,20 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_LoadFromUninitializedMemory:
+            case kIROp_GetStringHash:
+            case kIROp_DebugNoScope:
+                {
+                    NVVMResolvedEphemeralValue value;
+                    if (!_resolveNVVMEphemeralValue(inst, value))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                    }
+                }
+                break;
+
             case kIROp_Load:
                 {
                     IRType* storageType =
@@ -6849,6 +6918,17 @@ SlangResult _validateNVVMFunction(
             {
             case kIROp_Var:
                 availableValues.add(inst);
+                break;
+
+            case kIROp_LoadFromUninitializedMemory:
+            case kIROp_GetStringHash:
+            case kIROp_DebugNoScope:
+                {
+                    NVVMResolvedEphemeralValue value;
+                    SLANG_RELEASE_ASSERT(_resolveNVVMEphemeralValue(inst, value));
+                    if (value.kind != NVVMEphemeralValueKind::IgnoredDebugNoScope)
+                        availableValues.add(inst);
+                }
                 break;
 
             case kIROp_Load:
@@ -7820,6 +7900,106 @@ SlangResult _validateNVVMFunction(
 
 using NVVMValueMap = Dictionary<IRInst*, SlangNVVMValueHandle>;
 using NVVMGlobalUserPointerSet = HashSet<IRInst*>;
+
+// Materializes the one concrete value selected for a canonical
+// `LoadFromUninitializedMemory`. The IR contract permits this choice, and storing the completed
+// handle in the SSA value map makes every use of the instruction observe the same value.
+SlangResult _emitNVVMChosenUndefinedValue(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRType* type,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    outValue = nullptr;
+    SLANG_RELEASE_ASSERT(isNVVMSupportedCopyableValueType(type));
+
+    if (isNVVMSupportedIntegerScalarType(type) || isNVVMBoolType(type))
+    {
+        SlangNVVMTypeHandle loweredType = nullptr;
+        SLANG_RETURN_ON_FAIL(typeContext.lowerType(type, NVVMTypeUse::Value, loweredType));
+        return _requireBuilderOperation(
+            codeGenContext,
+            "chosen undefined integer value",
+            builder.getIntegerConstant(module, loweredType, 0, outValue));
+    }
+
+    uint32_t floatingPointBitWidth = 0;
+    if (isNVVMSupportedFloatingPointScalarType(type, &floatingPointBitWidth))
+    {
+        SlangNVVMTypeHandle loweredType = nullptr;
+        SLANG_RETURN_ON_FAIL(typeContext.lowerType(type, NVVMTypeUse::Value, loweredType));
+        return _requireBuilderOperation(
+            codeGenContext,
+            "chosen undefined floating-point value",
+            builder
+                .getFloatingPointConstant(module, loweredType, floatingPointBitWidth, 0, outValue));
+    }
+
+    uint32_t elementCount = 0;
+    IRType* repeatedElementType = nullptr;
+    bool isVector = false;
+    if (auto vectorType = asNVVMSupportedValueVectorType(type, &elementCount))
+    {
+        repeatedElementType = vectorType->getElementType();
+        isVector = true;
+    }
+    else if (auto arrayType = asNVVMSupportedCopyableArrayType(type, &elementCount))
+    {
+        repeatedElementType = arrayType->getElementType();
+    }
+
+    List<SlangNVVMValueHandle> elements;
+    if (repeatedElementType)
+    {
+        SlangNVVMValueHandle element = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMChosenUndefinedValue(
+            codeGenContext,
+            builder,
+            module,
+            repeatedElementType,
+            typeContext,
+            element));
+        for (uint32_t index = 0; index < elementCount; ++index)
+            elements.add(element);
+    }
+    else
+    {
+        auto structType = asNVVMSupportedCopyableStructType(type);
+        SLANG_RELEASE_ASSERT(structType);
+        for (auto field : structType->getFields())
+        {
+            SlangNVVMValueHandle element = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMChosenUndefinedValue(
+                codeGenContext,
+                builder,
+                module,
+                field->getFieldType(),
+                typeContext,
+                element));
+            elements.add(element);
+        }
+    }
+
+    SlangNVVMTypeHandle loweredType = nullptr;
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(type, NVVMTypeUse::Value, loweredType));
+    return _requireBuilderOperation(
+        codeGenContext,
+        isVector ? "chosen undefined vector value" : "chosen undefined aggregate value",
+        isVector ? builder.emitVectorConstruct(
+                       module,
+                       loweredType,
+                       elements.getBuffer(),
+                       size_t(elements.getCount()),
+                       outValue)
+                 : builder.emitAggregateConstruct(
+                       module,
+                       loweredType,
+                       elements.getBuffer(),
+                       size_t(elements.getCount()),
+                       outValue));
+}
 
 // Returns an already-lowered SSA value or materializes an exact preflighted scalar literal.
 SlangResult _getLoweredNVVMValue(
@@ -10396,6 +10576,54 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 toSlice("slangLocal"),
                                 loweredStorage)));
                         valueMap[inst] = loweredStorage;
+                    }
+                    break;
+
+                case kIROp_LoadFromUninitializedMemory:
+                case kIROp_GetStringHash:
+                case kIROp_DebugNoScope:
+                    {
+                        NVVMResolvedEphemeralValue value;
+                        SLANG_RELEASE_ASSERT(_resolveNVVMEphemeralValue(inst, value));
+                        if (value.kind == NVVMEphemeralValueKind::IgnoredDebugNoScope)
+                            break;
+
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        if (value.kind == NVVMEphemeralValueKind::ChosenUndefined)
+                        {
+                            SLANG_RETURN_ON_FAIL(_emitNVVMChosenUndefinedValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                value.valueType,
+                                typeContext,
+                                loweredValue));
+                        }
+                        else
+                        {
+                            SLANG_RELEASE_ASSERT(
+                                value.kind == NVVMEphemeralValueKind::StableStringHash);
+                            SlangNVVMTypeHandle loweredType = nullptr;
+                            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                                value.valueType,
+                                NVVMTypeUse::Value,
+                                loweredType));
+                            const UnownedStringSlice string = value.stringLiteral->getStringSlice();
+                            const uint32_t hashBits =
+                                getStableHashCode32(string.begin(), string.getLength()).hash;
+                            const int64_t hash = hashBits >= (uint64_t(1) << 31)
+                                                     ? int64_t(hashBits) - (int64_t(1) << 32)
+                                                     : int64_t(hashBits);
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "stable literal string hash",
+                                builder.getIntegerConstant(
+                                    moduleScope.module,
+                                    loweredType,
+                                    hash,
+                                    loweredValue)));
+                        }
+                        valueMap[inst] = loweredValue;
                     }
                     break;
 

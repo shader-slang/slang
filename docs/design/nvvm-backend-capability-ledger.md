@@ -2083,3 +2083,18 @@ Eleven workloads become correct at O0 and O3 with no old-correct regression and 
 lanes. The fixed census reaches 357 O0 and 362 O3 successes. Against 427 healthy MVP references,
 O0/O3/both correctness is 355/359/355 (83.1%/84.1%/83.1%). The selected prefix passes 422/422;
 representative direct O3 PTX remains accepted with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 145 consumes canonical ephemeral post-link values without source reconstruction. One shared
+resolver admits selected copyable `LoadFromUninitializedMemory`, literal `getStringHash`, and the
+semantic-free `DebugNoScope` marker. Undefined instructions select a concrete recursive zero value
+through existing scalar constants and aggregate/vector construction, and the resulting provider
+handle is reused by every SSA consumer. Literal hashing applies the established stable algorithm
+to the string bytes; debug scope closure has no provider representation while direct debug output
+is unsupported.
+
+The LLVM provider and forward-only ABI revision 30 are unchanged. Eight workloads become correct
+at O0 and O3 with no old-correct regression and receive sixteen direct lanes. The fixed census
+reaches 365 O0 and 370 O3 successes. Against 427 healthy MVP references, O0/O3/both correctness is
+363/367/363 (85.0%/85.9%/85.0%). The selected prefix passes 423/423, and representative direct O3
+PTX remains accepted with CUDA 12.9 for SM70, SM80, and SM90. `RequirePrelude` and
+`RequireComputeDerivative` remain explicit target-semantic failures rather than ignored markers.

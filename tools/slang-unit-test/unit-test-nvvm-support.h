@@ -11238,6 +11238,38 @@ static const char kDirectNVVMConventionalParameterizedComputeSource[] = R"(
 void computeMain(uniform int value)
 {}
 )";
+static const char kDirectNVVMChosenUndefinedAndDebugMarkerSource[] = R"(
+RWStructuredBuffer<float> outputBuffer;
+
+[ForceInline]
+float chooseScalarNonVar(int seed)
+{
+    for (int i = 0; i < 2; ++i)
+    {
+        if (i == 0)
+            continue;
+        return float(seed + i);
+    }
+    return float(seed);
+}
+
+[numthreads(1, 1, 1)]
+void computeMain(uint tid : SV_DispatchThreadID)
+{
+    if (tid == 0)
+        outputBuffer[0] = chooseScalarNonVar(4);
+}
+)";
+static const char kDirectNVVMStableStringHashSource[] = R"(
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain(uint tid : SV_DispatchThreadID)
+{
+    if (tid == 0)
+        outputBuffer[0] = getStringHash("Hello World!");
+}
+)";
 static const char kDirectNVVMUnsupportedCallSource[] =
     "[shader(\"compute\")] [numthreads(1, 1, 1)] void computeMain() { "
     "GroupMemoryBarrierWithGroupSync(); }";

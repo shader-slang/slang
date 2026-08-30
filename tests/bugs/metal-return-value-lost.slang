@@ -11,6 +11,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-d3d12 -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -Xslang -O3
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cpu -compute -shaderobj -output-using-type
 //TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-metal -compute -shaderobj -output-using-type -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-wgsl -compute -shaderobj -output-using-type -Xslang -O3
