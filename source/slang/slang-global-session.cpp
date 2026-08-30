@@ -306,6 +306,36 @@ SlangResult Session::getDownstreamCompilerVersion(
     return SLANG_OK;
 }
 
+SlangResult Session::getDownstreamCompilerPath(SlangPassThrough inPassThrough, ISlangBlob** outPath)
+{
+    // Validate at the public boundary exactly as getDownstreamCompilerVersion does: only a real
+    // (non-None), in-range pass-through can name a loadable compiler, and getOrLoadDownstreamCompiler
+    // indexes per-type arrays by the enum value.
+    if (inPassThrough <= SLANG_PASS_THROUGH_NONE || inPassThrough >= SLANG_PASS_THROUGH_COUNT_OF)
+        return SLANG_E_NOT_FOUND;
+
+    // Route through the same lazy-discovery funnel compilation uses, so the reported path is the
+    // library that will actually be used for this pass-through (shared memoized cache; honors
+    // setDownstreamCompilerPath + the standard search order).
+    IDownstreamCompiler* compiler =
+        getOrLoadDownstreamCompiler(PassThroughMode(inPassThrough), nullptr);
+    if (!compiler)
+        return SLANG_E_NOT_FOUND;
+
+    // The path capability is an optional extension queried via castAs, so it does not touch the
+    // IDownstreamCompiler vtable (which is a frozen cross-binary contract with the prebuilt
+    // slang-llvm module). A compiler that predates the capability returns null here.
+    auto pathProvider = as<IDownstreamCompilerPathProvider>(compiler);
+    if (!pathProvider)
+        return SLANG_E_NOT_AVAILABLE;
+
+    // getPath returns SLANG_E_NOT_AVAILABLE for a loaded compiler with no recoverable on-disk path
+    // (executable-based command-line compilers, or targets without shared-library introspection
+    // such as WASM); that stays distinct from the SLANG_E_NOT_FOUND returned above when the
+    // compiler could not be loaded at all.
+    return pathProvider->getPath(outPath);
+}
+
 void Session::writeCoreModuleDoc(String config)
 {
     ASTBuilder* astBuilder = getBuiltinLinkage()->getASTBuilder();

@@ -50,6 +50,10 @@ void* DownstreamCompilerBase::getInterface(const Guid& guid)
     {
         return static_cast<IDownstreamCompiler*>(this);
     }
+    if (guid == IDownstreamCompilerPathProvider::getTypeGuid())
+    {
+        return static_cast<IDownstreamCompilerPathProvider*>(this);
+    }
 
     return nullptr;
 }
@@ -58,6 +62,15 @@ void* DownstreamCompilerBase::getObject(const Guid& guid)
 {
     SLANG_UNUSED(guid);
     return nullptr;
+}
+
+SlangResult DownstreamCompilerBase::getPathFromSymbol(void* symbolInLib, slang::IBlob** outPath)
+{
+    String path = SharedLibraryUtils::getSharedLibraryFileName(symbolInLib);
+    if (path.getLength() == 0)
+        return SLANG_E_NOT_AVAILABLE;
+    *outPath = StringBlob::moveCreate(path).detach();
+    return SLANG_OK;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/

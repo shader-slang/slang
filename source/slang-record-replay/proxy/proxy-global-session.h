@@ -306,6 +306,25 @@ public:
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerPath(SlangPassThrough passThrough, ISlangBlob** outPath) override
+    {
+        RECORD_CALL();
+        RECORD_INPUT(passThrough);
+        PREPARE_POINTER_OUTPUT(outPath);
+        auto result =
+            getActual<slang::IGlobalSession>()->getDownstreamCompilerPath(passThrough, outPath);
+        // On failure the actual API returns without writing *outPath. The record stream has a fixed
+        // schema and must still serialize the output slot, so redirect to the zero-initialized
+        // temporary created by PREPARE_POINTER_OUTPUT above and record a defined null instead of
+        // reading the caller's uninitialized memory (see issue #11865). The caller's memory is left
+        // untouched.
+        if (SLANG_FAILED(result))
+            outPath = &_temp_outPath;
+        RECORD_COM_OUTPUT(outPath);
+        RECORD_RETURN(result);
+    }
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     compileCoreModule(slang::CompileCoreModuleFlags flags) override
     {
         SLANG_UNUSED(flags);

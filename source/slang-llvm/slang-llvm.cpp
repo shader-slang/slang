@@ -113,7 +113,9 @@ using namespace llvm::orc;
 
 using namespace Slang;
 
-class LLVMDownstreamCompiler : public ComBaseObject, public IDownstreamCompiler
+class LLVMDownstreamCompiler : public ComBaseObject,
+                               public IDownstreamCompiler,
+                               public IDownstreamCompilerPathProvider
 {
 public:
     typedef ComBaseObject Super;
@@ -135,6 +137,7 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString)
         SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE
     {
@@ -539,6 +542,19 @@ SlangResult LLVMDownstreamCompiler::getVersionString(slang::IBlob** outVersionSt
     return SLANG_OK;
 }
 
+SlangResult LLVMDownstreamCompiler::getPath(slang::IBlob** outPath)
+{
+    // Recover the slang-llvm shared library's own path from an exported symbol, the same module
+    // getVersionString identifies for its timestamp. This is the library a client would load to
+    // reach the LLVM-backed downstream compiler.
+    String path =
+        SharedLibraryUtils::getSharedLibraryFileName((void*)createLLVMDownstreamCompiler_V4);
+    if (path.getLength() == 0)
+        return SLANG_E_NOT_AVAILABLE;
+    *outPath = StringBlob::moveCreate(path).detach();
+    return SLANG_OK;
+}
+
 void* LLVMDownstreamCompiler::castAs(const Guid& guid)
 {
     if (auto ptr = getInterface(guid))
@@ -554,6 +570,10 @@ void* LLVMDownstreamCompiler::getInterface(const Guid& guid)
         guid == IDownstreamCompiler::getTypeGuid())
     {
         return static_cast<IDownstreamCompiler*>(this);
+    }
+    if (guid == IDownstreamCompilerPathProvider::getTypeGuid())
+    {
+        return static_cast<IDownstreamCompilerPathProvider*>(this);
     }
     return nullptr;
 }

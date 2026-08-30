@@ -4372,6 +4372,29 @@ struct IGlobalSession : public ISlangUnknown
     invalid argument from a compiler that is simply not installed. */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getDownstreamCompilerVersion(SlangPassThrough passThrough, int* outMajor, int* outMinor) = 0;
+
+    /** Get the on-disk path of the downstream/pass-through compiler that Slang will actually load
+    and use for `passThrough`, applying the same lazy discovery and library search order used
+    during compilation. This lets a client locate the exact library Slang selected - for example,
+    the specific NVRTC that will compile CUDA - and load it itself to query capabilities (such as
+    the supported architectures) directly.
+
+    This is not a cheap accessor: the first call for a given `passThrough` performs discovery and
+    loads the downstream library into the process (then memoizes it for subsequent calls).
+
+    The path is recovered from the loaded shared library, so it is available for the shared-library
+    pass-throughs (e.g. NVRTC, DXC, FXC, glslang). A pass-through backed by an executable located
+    on `PATH` (e.g. Clang/GCC/VS) or a target without shared-library introspection (e.g. WASM) has
+    no such path and returns SLANG_E_NOT_AVAILABLE, which the client must keep distinct from
+    SLANG_E_NOT_FOUND (the compiler was not located at all).
+    @param passThrough The downstream compiler to query (e.g. SLANG_PASS_THROUGH_NVRTC).
+    @param outPath Receives the resolved library path as a blob. Set only on SLANG_OK.
+    @return SLANG_OK if the compiler was located, loaded, and its path recovered.
+    SLANG_E_NOT_FOUND if the compiler could not be located or loaded (and likewise for
+    SLANG_PASS_THROUGH_NONE or an out-of-range value). SLANG_E_NOT_AVAILABLE if the compiler was
+    loaded but exposes no recoverable on-disk path. */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerPath(SlangPassThrough passThrough, ISlangBlob** outPath) = 0;
 };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()

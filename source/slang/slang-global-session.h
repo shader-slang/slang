@@ -158,6 +158,8 @@ public:
         SlangPassThrough passThrough,
         int* outMajor,
         int* outMinor) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerPath(SlangPassThrough passThrough, ISlangBlob** outPath) override;
 
     void writeCoreModuleDoc(String config);
     SLANG_NO_THROW SlangResult SLANG_MCALL
