@@ -6556,6 +6556,37 @@ and 9190/1404 bytes. Direct O3 PTX assembles with CUDA 12.9 for SM70, SM80, and 
 comparison remains on the local SM120 GPU, while CUDA 13 and physical SM70/80/90 workers are still
 productionization gaps.
 
+### Slice 146: Canonical aggregate wave legalization
+
+CUDA specialization represents selected vector and matrix wave operations with exact
+`IRGenericAsm` helpers. Vectors normally retain a value result, while matrix lowering intentionally
+uses `Void(T, ..., OutParam<T>)` with `T` represented as fixed arrays of row vectors. Direct NVVM
+now treats those as two transports of one homogeneous aggregate algebra. A recursive compiler
+recipe walks selected 32-bit signed, unsigned, or floating vector/fixed-array leaves, applies the
+established scalar shuffle, reduction, or prefix operation, and reconstructs or stores the exact
+canonical aggregate type. Heterogeneous structs, unsupported widths, and adjacent assembly
+spellings remain rejected.
+
+Scalar and `uint4` converged-mask helpers lower through the established full-mask ballot operation.
+Aggregate floating min/max recipes propagate their libdevice requirement before provider
+discovery. The compiler also chains one compact scalar loop per aggregate leaf and defers phi edges
+until the complete helper CFG is terminated. All operations are expressible through the existing
+revision-30 generic builder interface; the isolated LLVM provider is unchanged.
+
+Nineteen workloads become correct at O0 and O3 with no old-correct identity loss and receive 38
+direct regression lanes. The fixed census reaches 384 O0 and 389 O3 successes. Against 427 healthy
+MVP references, O0/O3/both correctness is 371/375/371 (86.9%/87.8%/86.9%). All eight healthy-MVP
+wave/reconvergence failures are removed; six remaining rows in that cluster are extension-only.
+Three aggregate multi-operation workloads now reach their separate Float64 scalar-wave blocker.
+The selected prefix passes 424/424, and all 57 CUDA lanes in the promoted files pass.
+
+Representative standalone NVRTC/direct-O3 SM70 compile medians are 408.1/269.1 ms for the
+resource/aggregate/helper gate, 375.5/250.0 ms for the parameter-block gate, and 381.9/259.0 ms for
+the shared-control/barrier gate. Their NVRTC/direct-O3 PTX sizes are 8889/919, 8839/793, and
+9190/1404 bytes. Direct O3 PTX assembles with CUDA 12.9 for SM70, SM80, and SM90; runtime comparison
+remains on the local SM120 GPU, while CUDA 13 and physical SM70/SM80/SM90 workers remain open
+productionization requirements.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

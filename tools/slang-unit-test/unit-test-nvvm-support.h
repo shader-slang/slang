@@ -753,12 +753,12 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderParameterStorage parameterStorage[32 * 8];
     FakeNVVMBuilderLoadStorage loadStorage[64];
     FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[128];
-    FakeNVVMBuilderIntrinsicStorage intrinsicStorage[8];
+    FakeNVVMBuilderIntrinsicStorage intrinsicStorage[32];
     FakeNVVMBuilderSurfaceOperationStorage surfaceOperationStorage[32];
     FakeNVVMBuilderTextureOperationStorage textureOperationStorage[16];
     FakeNVVMBuilderIntegerConstantStorage integerConstantStorage[64];
     FakeNVVMBuilderFloatingPointConstantStorage floatingPointConstantStorage[64];
-    FakeNVVMBuilderScalarPhiStorage scalarPhiStorage[8];
+    FakeNVVMBuilderScalarPhiStorage scalarPhiStorage[32];
     FakeNVVMBuilderCallStorage callStorage[32];
     FakeNVVMBuilderPointerOffsetStorage pointerOffsetStorage[16];
     FakeNVVMBuilderByteOffsetPointerStorage byteOffsetPointerStorage[16];
@@ -10535,6 +10535,33 @@ void computeMain(
     destination[lane] = reduction + prefix;
 }
 )";
+static const char kDirectNVVMAggregateWaveOperationsSource[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform uint mask,
+    uniform int sourceLane)
+{
+    uint lane = WaveGetLaneIndex();
+    int2 vectorValue = int2(int(lane) + 1, int(lane) + 2);
+    int2 vectorSum = WaveMaskSum(mask, vectorValue);
+    float2 vectorPrefixMin = WaveMaskPrefixMin(mask, float2(lane + 1, lane + 2));
+
+    matrix<int, 2, 2> matrixValue = matrix<int, 2, 2>(
+        int(lane) + 1,
+        int(lane) + 2,
+        int(lane) + 3,
+        int(lane) + 4);
+    matrix<int, 2, 2> matrixSum = WaveMaskSum(mask, matrixValue);
+    matrix<int, 2, 2> matrixShuffle =
+        WaveMaskReadLaneAt(mask, matrixValue, sourceLane);
+
+    uint convergedMask = WaveGetConvergedMask();
+    uint4 convergedMulti = WaveGetConvergedMulti();
+    destination[lane] = vectorSum.x + vectorSum.y + int(vectorPrefixMin.x) +
+        matrixSum[0][0] + matrixShuffle[1][1] + int(convergedMask + convergedMulti.x);
+}
+)";
 static const char kDirectNVVMUnsupportedMaskedWaveScalarSignatureSource[] = R"SLANG(
 int malformedMaskedWaveSum(int value, uint mask)
 {
@@ -10573,6 +10600,30 @@ void computeMain(
     uniform int mask)
 {
     *destination = int(malformedWaveShuffle(mask, float2(1.0, 2.0), 0).x);
+}
+)SLANG";
+static const char kDirectNVVMUnsupportedAggregateWaveSignatureSource[] = R"SLANG(
+matrix<int, 2, 2> malformedAggregateWaveShuffle(
+    int mask,
+    matrix<int, 2, 2> value,
+    int lane)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
+    default:
+        return value;
+    }
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int mask)
+{
+    matrix<int, 2, 2> value = matrix<int, 2, 2>(1, 2, 3, 4);
+    *destination = malformedAggregateWaveShuffle(mask, value, 0)[0][0];
 }
 )SLANG";
 static const char kDirectNVVMFloat32SubtractSource[] = R"(

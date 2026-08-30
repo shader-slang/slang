@@ -2098,3 +2098,17 @@ reaches 365 O0 and 370 O3 successes. Against 427 healthy MVP references, O0/O3/b
 363/367/363 (85.0%/85.9%/85.0%). The selected prefix passes 423/423, and representative direct O3
 PTX remains accepted with CUDA 12.9 for SM70, SM80, and SM90. `RequirePrelude` and
 `RequireComputeDerivative` remain explicit target-semantic failures rather than ignored markers.
+
+Slice 146 legalizes the canonical CUDA-prelude aggregate wave algebra. Exact assembly plus the
+complete specialized signature selects homogeneous selected-32-bit vector/fixed-array shuffle,
+reduction, or prefix semantics. One recursive compiler recipe covers value-return vectors and the
+intentional lowered-matrix `OutParam<T>` ABI. Scalar and `uint4` converged masks use full-mask
+ballot; floating aggregate min/max propagates libdevice demand. Heterogeneous aggregates,
+unsupported widths, prefix count, rotate, and adjacent signatures remain deterministic failures.
+
+The LLVM provider and forward-only ABI revision 30 are unchanged. Nineteen workloads become
+correct at both modes with zero old-correct regression and receive 38 direct lanes. The fixed
+452-row census reaches 384 O0 and 389 O3 successes. Against 427 healthy MVP references,
+O0/O3/both correctness is 371/375/371 (86.9%/87.8%/86.9%). The selected prefix passes 424/424,
+all 57 CUDA lanes in the promoted files pass, and representative direct O3 PTX assembles with
+CUDA 12.9 for SM70, SM80, and SM90.

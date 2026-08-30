@@ -3825,6 +3825,7 @@ struct NVVMMaskedWaveScalarOperation
     SlangNVVMValueTypeDesc valueType = {};
     uint64_t identityBits = 0;
     const char* diagnosticName = nullptr;
+    bool requiresCUDADeviceLibrary = false;
     NVVMValueRecipeStep remainingIsNonZero;
     NVVMValueRecipeStep remainingNegate;
     NVVMValueRecipeStep isolateLaneBit;
@@ -3836,6 +3837,139 @@ struct NVVMMaskedWaveScalarOperation
     NVVMValueRecipeStep combine;
     NVVMValueRecipeStep select;
 };
+
+struct NVVMMaskedWaveSpelling
+{
+    const char* scalarAssembly;
+    const char* aggregateAssembly;
+    SlangNVVMValueOperation combineOperation;
+    NVVMMaskedWaveScalarMode mode;
+    const char* diagnosticName;
+};
+
+// The CUDA prelude uses the same scalar algebra for a scalar helper and its homogeneous
+// `Multiple` aggregate helper. Keeping both exact final spellings in one table makes the scalar
+// recipe the single semantic source of truth without parsing assembly placeholders.
+static const NVVMMaskedWaveSpelling kNVVMMaskedWaveSpellings[] = {
+    {"_waveSum($1.x, $0)",
+     "_waveSumMultiple($1.x, $0)",
+     SLANG_NVVM_VALUE_OP_ADD,
+     NVVMMaskedWaveScalarMode::Reduction,
+     "masked wave sum"},
+    {"_waveProduct($1.x, $0)",
+     "_waveProductMultiple($1.x, $0)",
+     SLANG_NVVM_VALUE_OP_MULTIPLY,
+     NVVMMaskedWaveScalarMode::Reduction,
+     "masked wave product"},
+    {"_waveMin($1.x, $0)",
+     "_waveMinMultiple($1.x, $0)",
+     SLANG_NVVM_VALUE_OP_MIN,
+     NVVMMaskedWaveScalarMode::Reduction,
+     "masked wave minimum"},
+    {"_waveMax($1.x, $0)",
+     "_waveMaxMultiple($1.x, $0)",
+     SLANG_NVVM_VALUE_OP_MAX,
+     NVVMMaskedWaveScalarMode::Reduction,
+     "masked wave maximum"},
+    {"_waveAnd($1.x, $0)",
+     "_waveAndMultiple($1.x, $0)",
+     SLANG_NVVM_VALUE_OP_BIT_AND,
+     NVVMMaskedWaveScalarMode::Reduction,
+     "masked wave bitwise-and"},
+    {"_waveOr($1.x, $0)",
+     "_waveOrMultiple($1.x, $0)",
+     SLANG_NVVM_VALUE_OP_BIT_OR,
+     NVVMMaskedWaveScalarMode::Reduction,
+     "masked wave bitwise-or"},
+    {"_waveXor($1.x, $0)",
+     "_waveXorMultiple($1.x, $0)",
+     SLANG_NVVM_VALUE_OP_BIT_XOR,
+     NVVMMaskedWaveScalarMode::Reduction,
+     "masked wave bitwise-xor"},
+    {"_wavePrefixSum($1.x, $0) ",
+     "_wavePrefixSumMultiple($1.x, $0) ",
+     SLANG_NVVM_VALUE_OP_ADD,
+     NVVMMaskedWaveScalarMode::ExclusivePrefix,
+     "masked exclusive wave sum"},
+    {"_wavePrefixProduct($1.x, $0) ",
+     "_wavePrefixProductMultiple($1.x, $0) ",
+     SLANG_NVVM_VALUE_OP_MULTIPLY,
+     NVVMMaskedWaveScalarMode::ExclusivePrefix,
+     "masked exclusive wave product"},
+    {"_wavePrefixAnd($1.x, $0) ",
+     "_wavePrefixAndMultiple($1.x, $0) ",
+     SLANG_NVVM_VALUE_OP_BIT_AND,
+     NVVMMaskedWaveScalarMode::ExclusivePrefix,
+     "masked exclusive wave bitwise-and"},
+    {"_wavePrefixOr($1.x, $0) ",
+     "_wavePrefixOrMultiple($1.x, $0) ",
+     SLANG_NVVM_VALUE_OP_BIT_OR,
+     NVVMMaskedWaveScalarMode::ExclusivePrefix,
+     "masked exclusive wave bitwise-or"},
+    {"_wavePrefixXor($1.x, $0) ",
+     "_wavePrefixXorMultiple($1.x, $0) ",
+     SLANG_NVVM_VALUE_OP_BIT_XOR,
+     NVVMMaskedWaveScalarMode::ExclusivePrefix,
+     "masked exclusive wave bitwise-xor"},
+    {"_wavePrefixSum($1.x, $0) + $0",
+     "_wavePrefixSumMultiple($1.x, $0) + $0",
+     SLANG_NVVM_VALUE_OP_ADD,
+     NVVMMaskedWaveScalarMode::InclusivePrefix,
+     "masked inclusive wave sum"},
+    {"_wavePrefixProduct($1.x, $0) * $0",
+     "_wavePrefixProductMultiple($1.x, $0) * $0",
+     SLANG_NVVM_VALUE_OP_MULTIPLY,
+     NVVMMaskedWaveScalarMode::InclusivePrefix,
+     "masked inclusive wave product"},
+    {"_wavePrefixAnd($1.x, $0) & $0",
+     "_wavePrefixAndMultiple($1.x, $0) & $0",
+     SLANG_NVVM_VALUE_OP_BIT_AND,
+     NVVMMaskedWaveScalarMode::InclusivePrefix,
+     "masked inclusive wave bitwise-and"},
+    {"_wavePrefixOr($1.x, $0) | $0",
+     "_wavePrefixOrMultiple($1.x, $0) | $0",
+     SLANG_NVVM_VALUE_OP_BIT_OR,
+     NVVMMaskedWaveScalarMode::InclusivePrefix,
+     "masked inclusive wave bitwise-or"},
+    {"_wavePrefixXor($1.x, $0) ^ $0",
+     "_wavePrefixXorMultiple($1.x, $0) ^ $0",
+     SLANG_NVVM_VALUE_OP_BIT_XOR,
+     NVVMMaskedWaveScalarMode::InclusivePrefix,
+     "masked inclusive wave bitwise-xor"},
+    {"_wavePrefixExclusiveMin(($1).x, $0)",
+     "_wavePrefixExclusiveMinMultiple(($1).x, $0)",
+     SLANG_NVVM_VALUE_OP_MIN,
+     NVVMMaskedWaveScalarMode::ExclusivePrefix,
+     "masked exclusive wave minimum"},
+    {"_wavePrefixExclusiveMax(($1).x, $0)",
+     "_wavePrefixExclusiveMaxMultiple(($1).x, $0)",
+     SLANG_NVVM_VALUE_OP_MAX,
+     NVVMMaskedWaveScalarMode::ExclusivePrefix,
+     "masked exclusive wave maximum"},
+    {"_wavePrefixInclusiveMin(($1).x, $0)",
+     "_wavePrefixInclusiveMinMultiple(($1).x, $0)",
+     SLANG_NVVM_VALUE_OP_MIN,
+     NVVMMaskedWaveScalarMode::InclusivePrefix,
+     "masked inclusive wave minimum"},
+    {"_wavePrefixInclusiveMax(($1).x, $0)",
+     "_wavePrefixInclusiveMaxMultiple(($1).x, $0)",
+     SLANG_NVVM_VALUE_OP_MAX,
+     NVVMMaskedWaveScalarMode::InclusivePrefix,
+     "masked inclusive wave maximum"},
+};
+
+const NVVMMaskedWaveSpelling* _findNVVMMaskedWaveSpelling(
+    const UnownedStringSlice& assembly,
+    bool aggregate)
+{
+    for (const auto& candidate : kNVVMMaskedWaveSpellings)
+    {
+        const char* expected = aggregate ? candidate.aggregateAssembly : candidate.scalarAssembly;
+        if (assembly == UnownedStringSlice(expected))
+            return &candidate;
+    }
+    return nullptr;
+}
 
 bool _setNVVMSupportedValueRecipeStep(
     NVVMValueRecipeStep& step,
@@ -3912,147 +4046,24 @@ bool _getNVVMMaskedWaveScalarIdentity(
     }
 }
 
-// Recognizes the finite scalar masked-wave algebra produced by CUDA specialization. Every row is
-// an exact final assembly spelling plus the complete `T(T, uint4)` signature; emission never parses
-// placeholders or derives a semantic from a source intrinsic or fixture name.
-bool _resolveNVVMMaskedWaveScalarOperation(
-    IRGenericAsm* genericAsm,
-    IRFunc* function,
+// Builds the scalar recipe shared by the scalar helper and every leaf of an admitted homogeneous
+// aggregate helper.
+bool _initializeNVVMMaskedWaveScalarOperation(
+    const NVVMMaskedWaveSpelling& spelling,
+    const SlangNVVMValueTypeDesc& valueType,
     NVVMMaskedWaveScalarOperation& outOperation)
 {
     outOperation = {};
-    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function))
-        return false;
-
-    struct Spelling
-    {
-        const char* assembly;
-        SlangNVVMValueOperation combineOperation;
-        NVVMMaskedWaveScalarMode mode;
-        const char* diagnosticName;
-    };
-    static const Spelling kSpellings[] = {
-        {"_waveSum($1.x, $0)",
-         SLANG_NVVM_VALUE_OP_ADD,
-         NVVMMaskedWaveScalarMode::Reduction,
-         "masked scalar wave sum"},
-        {"_waveProduct($1.x, $0)",
-         SLANG_NVVM_VALUE_OP_MULTIPLY,
-         NVVMMaskedWaveScalarMode::Reduction,
-         "masked scalar wave product"},
-        {"_waveMin($1.x, $0)",
-         SLANG_NVVM_VALUE_OP_MIN,
-         NVVMMaskedWaveScalarMode::Reduction,
-         "masked scalar wave minimum"},
-        {"_waveMax($1.x, $0)",
-         SLANG_NVVM_VALUE_OP_MAX,
-         NVVMMaskedWaveScalarMode::Reduction,
-         "masked scalar wave maximum"},
-        {"_waveAnd($1.x, $0)",
-         SLANG_NVVM_VALUE_OP_BIT_AND,
-         NVVMMaskedWaveScalarMode::Reduction,
-         "masked scalar wave bitwise-and"},
-        {"_waveOr($1.x, $0)",
-         SLANG_NVVM_VALUE_OP_BIT_OR,
-         NVVMMaskedWaveScalarMode::Reduction,
-         "masked scalar wave bitwise-or"},
-        {"_waveXor($1.x, $0)",
-         SLANG_NVVM_VALUE_OP_BIT_XOR,
-         NVVMMaskedWaveScalarMode::Reduction,
-         "masked scalar wave bitwise-xor"},
-        {"_wavePrefixSum($1.x, $0) ",
-         SLANG_NVVM_VALUE_OP_ADD,
-         NVVMMaskedWaveScalarMode::ExclusivePrefix,
-         "masked scalar exclusive wave sum"},
-        {"_wavePrefixProduct($1.x, $0) ",
-         SLANG_NVVM_VALUE_OP_MULTIPLY,
-         NVVMMaskedWaveScalarMode::ExclusivePrefix,
-         "masked scalar exclusive wave product"},
-        {"_wavePrefixAnd($1.x, $0) ",
-         SLANG_NVVM_VALUE_OP_BIT_AND,
-         NVVMMaskedWaveScalarMode::ExclusivePrefix,
-         "masked scalar exclusive wave bitwise-and"},
-        {"_wavePrefixOr($1.x, $0) ",
-         SLANG_NVVM_VALUE_OP_BIT_OR,
-         NVVMMaskedWaveScalarMode::ExclusivePrefix,
-         "masked scalar exclusive wave bitwise-or"},
-        {"_wavePrefixXor($1.x, $0) ",
-         SLANG_NVVM_VALUE_OP_BIT_XOR,
-         NVVMMaskedWaveScalarMode::ExclusivePrefix,
-         "masked scalar exclusive wave bitwise-xor"},
-        {"_wavePrefixSum($1.x, $0) + $0",
-         SLANG_NVVM_VALUE_OP_ADD,
-         NVVMMaskedWaveScalarMode::InclusivePrefix,
-         "masked scalar inclusive wave sum"},
-        {"_wavePrefixProduct($1.x, $0) * $0",
-         SLANG_NVVM_VALUE_OP_MULTIPLY,
-         NVVMMaskedWaveScalarMode::InclusivePrefix,
-         "masked scalar inclusive wave product"},
-        {"_wavePrefixAnd($1.x, $0) & $0",
-         SLANG_NVVM_VALUE_OP_BIT_AND,
-         NVVMMaskedWaveScalarMode::InclusivePrefix,
-         "masked scalar inclusive wave bitwise-and"},
-        {"_wavePrefixOr($1.x, $0) | $0",
-         SLANG_NVVM_VALUE_OP_BIT_OR,
-         NVVMMaskedWaveScalarMode::InclusivePrefix,
-         "masked scalar inclusive wave bitwise-or"},
-        {"_wavePrefixXor($1.x, $0) ^ $0",
-         SLANG_NVVM_VALUE_OP_BIT_XOR,
-         NVVMMaskedWaveScalarMode::InclusivePrefix,
-         "masked scalar inclusive wave bitwise-xor"},
-        {"_wavePrefixExclusiveMin(($1).x, $0)",
-         SLANG_NVVM_VALUE_OP_MIN,
-         NVVMMaskedWaveScalarMode::ExclusivePrefix,
-         "masked scalar exclusive wave minimum"},
-        {"_wavePrefixExclusiveMax(($1).x, $0)",
-         SLANG_NVVM_VALUE_OP_MAX,
-         NVVMMaskedWaveScalarMode::ExclusivePrefix,
-         "masked scalar exclusive wave maximum"},
-        {"_wavePrefixInclusiveMin(($1).x, $0)",
-         SLANG_NVVM_VALUE_OP_MIN,
-         NVVMMaskedWaveScalarMode::InclusivePrefix,
-         "masked scalar inclusive wave minimum"},
-        {"_wavePrefixInclusiveMax(($1).x, $0)",
-         SLANG_NVVM_VALUE_OP_MAX,
-         NVVMMaskedWaveScalarMode::InclusivePrefix,
-         "masked scalar inclusive wave maximum"},
-    };
-
-    const Spelling* spelling = nullptr;
-    for (const auto& candidate : kSpellings)
-    {
-        if (genericAsm->getAsm() == UnownedStringSlice(candidate.assembly))
-        {
-            spelling = &candidate;
-            break;
-        }
-    }
-    if (!spelling || function->getParamCount() != 2)
-        return false;
-
-    IRParam* valueParameter = function->getFirstParam();
-    IRParam* maskParameter = valueParameter ? valueParameter->getNextParam() : nullptr;
-    SlangNVVMValueTypeDesc resultType = {};
-    SlangNVVMValueTypeDesc maskType = {};
-    if (!valueParameter || !maskParameter || maskParameter->getNextParam() ||
-        !_getNVVMSemanticType(function->getResultType(), resultType) ||
-        !_getNVVMSemanticType(valueParameter->getDataType(), outOperation.valueType) ||
-        !_getNVVMSemanticType(maskParameter->getDataType(), maskType) ||
-        !NVVMSemantics::areSameType(resultType, outOperation.valueType) ||
-        maskType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER || maskType.bitWidth != 32 ||
-        maskType.laneCount != 4 ||
-        !_getNVVMMaskedWaveScalarIdentity(
-            spelling->combineOperation,
+    outOperation.valueType = valueType;
+    outOperation.mode = spelling.mode;
+    outOperation.diagnosticName = spelling.diagnosticName;
+    if (!_getNVVMMaskedWaveScalarIdentity(
+            spelling.combineOperation,
             outOperation.valueType,
             outOperation.identityBits))
     {
         return false;
     }
-
-    outOperation.mode = spelling->mode;
-    outOperation.valueParameter = valueParameter;
-    outOperation.maskParameter = maskParameter;
-    outOperation.diagnosticName = spelling->diagnosticName;
 
     const SlangNVVMValueTypeDesc unsignedBinary[] = {
         NVVMSemantics::kUnsignedI32,
@@ -4133,11 +4144,11 @@ bool _resolveNVVMMaskedWaveScalarOperation(
             "masked-wave source value read") ||
         !_setNVVMSupportedValueRecipeStep(
             outOperation.combine,
-            spelling->combineOperation,
+            spelling.combineOperation,
             outOperation.valueType,
             combineOperands,
             2,
-            spelling->diagnosticName) ||
+            spelling.diagnosticName) ||
         !_setNVVMSupportedValueRecipeStep(
             outOperation.select,
             SLANG_NVVM_VALUE_OP_SELECT,
@@ -4148,6 +4159,301 @@ bool _resolveNVVMMaskedWaveScalarOperation(
     {
         return false;
     }
+
+    const SlangNVVMValueOperationDesc combineDesc = outOperation.combine.getDesc();
+    if (const auto semantic = NVVMSemantics::find(combineDesc))
+    {
+        outOperation.requiresCUDADeviceLibrary = semantic->requiresCUDADeviceLibrary;
+    }
+    else
+    {
+        NVVMSemantics::ValueOperationFamilyResolution family;
+        if (!NVVMSemantics::resolveValueOperationFamily(combineDesc, family))
+            return false;
+        outOperation.requiresCUDADeviceLibrary = family.requiresCUDADeviceLibrary;
+    }
+    return true;
+}
+
+// Recognizes the finite scalar masked-wave algebra produced by CUDA specialization. Every row is
+// an exact final assembly spelling plus the complete `T(T, uint4)` signature; emission never parses
+// placeholders or derives a semantic from a source intrinsic or fixture name.
+bool _resolveNVVMMaskedWaveScalarOperation(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMMaskedWaveScalarOperation& outOperation)
+{
+    outOperation = {};
+    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function))
+        return false;
+
+    const NVVMMaskedWaveSpelling* spelling =
+        _findNVVMMaskedWaveSpelling(genericAsm->getAsm(), false);
+    if (!spelling || function->getParamCount() != 2)
+        return false;
+
+    IRParam* valueParameter = function->getFirstParam();
+    IRParam* maskParameter = valueParameter ? valueParameter->getNextParam() : nullptr;
+    SlangNVVMValueTypeDesc resultType = {};
+    SlangNVVMValueTypeDesc valueType = {};
+    SlangNVVMValueTypeDesc maskType = {};
+    if (!valueParameter || !maskParameter || maskParameter->getNextParam() ||
+        !_getNVVMSemanticType(function->getResultType(), resultType) ||
+        !_getNVVMSemanticType(valueParameter->getDataType(), valueType) ||
+        !_getNVVMSemanticType(maskParameter->getDataType(), maskType) ||
+        !NVVMSemantics::areSameType(resultType, valueType) ||
+        maskType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER || maskType.bitWidth != 32 ||
+        maskType.laneCount != 4 ||
+        !_initializeNVVMMaskedWaveScalarOperation(*spelling, valueType, outOperation))
+    {
+        return false;
+    }
+
+    outOperation.valueParameter = valueParameter;
+    outOperation.maskParameter = maskParameter;
+    return true;
+}
+
+enum class NVVMAggregateWaveKind
+{
+    None,
+    Shuffle,
+    MaskedScan,
+    ActiveMask,
+};
+
+struct NVVMAggregateWaveOperation
+{
+    NVVMAggregateWaveKind kind = NVVMAggregateWaveKind::None;
+    IRType* aggregateType = nullptr;
+    IRType* leafType = nullptr;
+    IRParam* valueParameter = nullptr;
+    IRParam* maskParameter = nullptr;
+    IRParam* laneParameter = nullptr;
+    IRParam* resultPointerParameter = nullptr;
+    bool usesImplicitActiveMask = false;
+    bool activeMaskResultIsVector = false;
+    const char* diagnosticName = nullptr;
+    NVVMValueRecipeStep activeMaskStep;
+    NVVMValueRecipeStep shuffleStep;
+    NVVMMaskedWaveScalarOperation maskedScan;
+};
+
+// Returns the one homogeneous 32-bit numeric leaf of an aggregate represented as vectors and
+// fixed arrays. This is the exact structural algebra used by lowered matrices and vector wave
+// overloads; heterogeneous structs and arbitrary storage graphs are intentionally absent.
+bool _getNVVMHomogeneousWaveAggregateLeafType(IRType* type, IRType*& outLeafType)
+{
+    outLeafType = nullptr;
+    uint32_t elementCount = 0;
+    IRType* elementType = nullptr;
+    if (auto vectorType = asNVVMSupportedValueVectorType(type, &elementCount))
+    {
+        elementType = vectorType->getElementType();
+    }
+    else if (auto arrayType = asNVVMSupportedCopyableArrayType(type, &elementCount))
+    {
+        elementType = arrayType->getElementType();
+    }
+    else
+    {
+        return false;
+    }
+    if (elementCount == 0 || !elementType)
+        return false;
+
+    SlangNVVMValueTypeDesc elementSemantic = {};
+    if (_getNVVMSemanticType(elementType, elementSemantic))
+    {
+        const bool isSelectedNumeric =
+            elementSemantic.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+            elementSemantic.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
+            elementSemantic.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+        if (elementSemantic.laneCount == 1)
+        {
+            if (!isSelectedNumeric || elementSemantic.bitWidth != 32)
+                return false;
+            outLeafType = elementType;
+            return true;
+        }
+    }
+
+    return _getNVVMHomogeneousWaveAggregateLeafType(elementType, outLeafType);
+}
+
+bool _isExactNVVMAggregateWaveOutParameter(IRParam* parameter, IRType* aggregateType)
+{
+    IRType* pointeeType = nullptr;
+    auto pointerType =
+        parameter
+            ? asNVVMSupportedLocalCopyableValuePointerType(parameter->getDataType(), &pointeeType)
+            : nullptr;
+    return pointerType && pointerType->getOp() == kIROp_OutParamType &&
+           isTypeEqual(pointeeType, aggregateType);
+}
+
+bool _initializeNVVMActiveMaskStep(NVVMValueRecipeStep& outStep)
+{
+    const SlangNVVMValueTypeDesc operands[] = {
+        NVVMSemantics::kUnsignedI32,
+        NVVMSemantics::kBool,
+    };
+    return _setNVVMSupportedValueRecipeStep(
+        outStep,
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
+        NVVMSemantics::kUnsignedI32,
+        operands,
+        SLANG_COUNT_OF(operands),
+        "CUDA active mask");
+}
+
+// Resolves the exact CUDA-prelude aggregate wave helpers measured by the census. Assembly selects
+// a finite semantic family, while the complete specialized signature proves aggregate structure,
+// mask/lane types, and value-return versus out-parameter transport.
+bool _resolveNVVMAggregateWaveOperation(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMAggregateWaveOperation& outOperation)
+{
+    outOperation = {};
+    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function))
+        return false;
+
+    const UnownedStringSlice assembly = genericAsm->getAsm();
+    if (assembly == toSlice("__activemask()") ||
+        assembly == toSlice("make_uint4(__activemask(), 0, 0, 0)"))
+    {
+        if (function->getParamCount() != 0 ||
+            !_initializeNVVMActiveMaskStep(outOperation.activeMaskStep))
+        {
+            return false;
+        }
+        SlangNVVMValueTypeDesc resultType = {};
+        if (!_getNVVMSemanticType(function->getResultType(), resultType) ||
+            resultType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
+            resultType.bitWidth != 32 || (resultType.laneCount != 1 && resultType.laneCount != 4))
+        {
+            return false;
+        }
+        if ((assembly == toSlice("__activemask()")) != (resultType.laneCount == 1))
+            return false;
+        outOperation.kind = NVVMAggregateWaveKind::ActiveMask;
+        outOperation.activeMaskResultIsVector = resultType.laneCount == 4;
+        outOperation.diagnosticName = outOperation.activeMaskResultIsVector
+                                          ? "CUDA uint4 active mask"
+                                          : "CUDA scalar active mask";
+        return true;
+    }
+
+    const bool isExplicitMaskShuffle = assembly == toSlice("_waveShuffleMultiple($0, $1, $2)");
+    const bool isImplicitMaskShuffle =
+        assembly == toSlice("_waveShuffleMultiple(_getActiveMask(), $0, $1)");
+    if (isExplicitMaskShuffle || isImplicitMaskShuffle)
+    {
+        const UInt expectedParameterCount = isExplicitMaskShuffle ? 4 : 3;
+        if (!as<IRVoidType>(function->getResultType()) ||
+            function->getParamCount() != expectedParameterCount)
+        {
+            return false;
+        }
+
+        IRParam* parameter = function->getFirstParam();
+        IRParam* maskParameter = isExplicitMaskShuffle ? parameter : nullptr;
+        IRParam* valueParameter = isExplicitMaskShuffle ? parameter->getNextParam() : parameter;
+        IRParam* laneParameter = valueParameter ? valueParameter->getNextParam() : nullptr;
+        IRParam* resultPointer = laneParameter ? laneParameter->getNextParam() : nullptr;
+        SlangNVVMValueTypeDesc maskType = {};
+        SlangNVVMValueTypeDesc laneType = {};
+        IRType* leafType = nullptr;
+        if (!valueParameter || !laneParameter || !resultPointer || resultPointer->getNextParam() ||
+            (maskParameter &&
+             (!_getNVVMSemanticType(maskParameter->getDataType(), maskType) ||
+              !NVVMSemantics::areSameType(maskType, NVVMSemantics::kUnsignedI32))) ||
+            !_getNVVMSemanticType(laneParameter->getDataType(), laneType) ||
+            !NVVMSemantics::areSameType(laneType, NVVMSemantics::kSignedI32) ||
+            !_getNVVMHomogeneousWaveAggregateLeafType(valueParameter->getDataType(), leafType) ||
+            !_isExactNVVMAggregateWaveOutParameter(resultPointer, valueParameter->getDataType()))
+        {
+            return false;
+        }
+
+        SlangNVVMValueTypeDesc leafSemantic = {};
+        if (!_getNVVMSemanticType(leafType, leafSemantic))
+            return false;
+        const SlangNVVMValueTypeDesc operands[] = {
+            NVVMSemantics::kUnsignedI32,
+            leafSemantic,
+            NVVMSemantics::kSignedI32,
+        };
+        if (!_setNVVMSupportedValueRecipeStep(
+                outOperation.shuffleStep,
+                SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+                leafSemantic,
+                operands,
+                SLANG_COUNT_OF(operands),
+                "homogeneous aggregate wave shuffle") ||
+            (isImplicitMaskShuffle && !_initializeNVVMActiveMaskStep(outOperation.activeMaskStep)))
+        {
+            return false;
+        }
+
+        outOperation.kind = NVVMAggregateWaveKind::Shuffle;
+        outOperation.aggregateType = valueParameter->getDataType();
+        outOperation.leafType = leafType;
+        outOperation.valueParameter = valueParameter;
+        outOperation.maskParameter = maskParameter;
+        outOperation.laneParameter = laneParameter;
+        outOperation.resultPointerParameter = resultPointer;
+        outOperation.usesImplicitActiveMask = isImplicitMaskShuffle;
+        outOperation.diagnosticName = "homogeneous aggregate wave shuffle";
+        return true;
+    }
+
+    const NVVMMaskedWaveSpelling* spelling = _findNVVMMaskedWaveSpelling(assembly, true);
+    if (!spelling || (function->getParamCount() != 2 && function->getParamCount() != 3))
+        return false;
+
+    IRParam* valueParameter = function->getFirstParam();
+    IRParam* maskParameter = valueParameter ? valueParameter->getNextParam() : nullptr;
+    IRParam* resultPointer = maskParameter ? maskParameter->getNextParam() : nullptr;
+    IRType* leafType = nullptr;
+    SlangNVVMValueTypeDesc maskType = {};
+    if (!valueParameter || !maskParameter ||
+        !_getNVVMHomogeneousWaveAggregateLeafType(valueParameter->getDataType(), leafType) ||
+        !_getNVVMSemanticType(maskParameter->getDataType(), maskType) ||
+        maskType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER || maskType.bitWidth != 32 ||
+        maskType.laneCount != 4)
+    {
+        return false;
+    }
+
+    if (resultPointer)
+    {
+        if (resultPointer->getNextParam() || !as<IRVoidType>(function->getResultType()) ||
+            !_isExactNVVMAggregateWaveOutParameter(resultPointer, valueParameter->getDataType()))
+        {
+            return false;
+        }
+    }
+    else if (!isTypeEqual(function->getResultType(), valueParameter->getDataType()))
+    {
+        return false;
+    }
+
+    SlangNVVMValueTypeDesc leafSemantic = {};
+    if (!_getNVVMSemanticType(leafType, leafSemantic) ||
+        !_initializeNVVMMaskedWaveScalarOperation(*spelling, leafSemantic, outOperation.maskedScan))
+    {
+        return false;
+    }
+
+    outOperation.kind = NVVMAggregateWaveKind::MaskedScan;
+    outOperation.aggregateType = valueParameter->getDataType();
+    outOperation.leafType = leafType;
+    outOperation.valueParameter = valueParameter;
+    outOperation.maskParameter = maskParameter;
+    outOperation.resultPointerParameter = resultPointer;
+    outOperation.diagnosticName = spelling->diagnosticName;
     return true;
 }
 
@@ -4958,6 +5264,34 @@ void _requireNVVMMaskedWaveScalarOperations(
             requirements,
             operation.select.getDesc(),
             operation.select.diagnosticName);
+    }
+}
+
+void _requireNVVMAggregateWaveOperations(
+    NVVMValueOperationRequirements& requirements,
+    const NVVMAggregateWaveOperation& operation)
+{
+    switch (operation.kind)
+    {
+    case NVVMAggregateWaveKind::Shuffle:
+        _requireValueOperation(
+            requirements,
+            operation.shuffleStep.getDesc(),
+            operation.shuffleStep.diagnosticName);
+        if (!operation.usesImplicitActiveMask)
+            return;
+        [[fallthrough]];
+    case NVVMAggregateWaveKind::ActiveMask:
+        _requireValueOperation(
+            requirements,
+            operation.activeMaskStep.getDesc(),
+            operation.activeMaskStep.diagnosticName);
+        return;
+    case NVVMAggregateWaveKind::MaskedScan:
+        _requireNVVMMaskedWaveScalarOperations(requirements, operation.maskedScan);
+        return;
+    default:
+        SLANG_UNEXPECTED("invalid aggregate wave operation");
     }
 }
 
@@ -6614,6 +6948,7 @@ SlangResult _validateNVVMFunction(
                     NVVMScalarIntrinsicRecipe scalarRecipe;
                     NVVMGenericAsmCompoundOperation compoundOperation;
                     NVVMMaskedWaveScalarOperation maskedWaveOperation;
+                    NVVMAggregateWaveOperation aggregateWaveOperation;
                     NVVMResolvedAtomicReduction atomicReduction;
                     NVVMResolvedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
@@ -6657,6 +6992,23 @@ SlangResult _validateNVVMFunction(
                         _requireNVVMMaskedWaveScalarOperations(
                             requirements.valueOperations,
                             maskedWaveOperation);
+                        requirements.requiresCUDADeviceLibrary |=
+                            maskedWaveOperation.requiresCUDADeviceLibrary;
+                        break;
+                    }
+                    if (_resolveNVVMAggregateWaveOperation(
+                            genericAsm,
+                            function,
+                            aggregateWaveOperation))
+                    {
+                        _requireNVVMAggregateWaveOperations(
+                            requirements.valueOperations,
+                            aggregateWaveOperation);
+                        if (aggregateWaveOperation.kind == NVVMAggregateWaveKind::MaskedScan)
+                        {
+                            requirements.requiresCUDADeviceLibrary |=
+                                aggregateWaveOperation.maskedScan.requiresCUDADeviceLibrary;
+                        }
                         break;
                     }
                     if (_resolveNVVMGenericAsmCompoundOperation(
@@ -9518,38 +9870,74 @@ SlangResult _emitNVVMGenericAsmCompoundOperation(
         result);
 }
 
-// Emits one correctness-first scalar masked-wave scan using only the established generic builder
-// algebra. The compact loop visits exactly the set bits in the partition mask. Prefix recipes
-// additionally restrict each accumulated source by its order relative to the current lane.
-SlangResult _emitNVVMMaskedWaveScalarOperation(
+struct NVVMMaskedWavePendingPhi
+{
+    SlangNVVMValueHandle remaining = nullptr;
+    SlangNVVMValueHandle accumulated = nullptr;
+    SlangNVVMValueHandle initialMask = nullptr;
+    SlangNVVMValueHandle initialValue = nullptr;
+    SlangNVVMValueHandle nextRemaining = nullptr;
+    SlangNVVMValueHandle nextAccumulated = nullptr;
+    SlangNVVMBlockHandle sourceBlock = nullptr;
+    SlangNVVMBlockHandle bodyBlock = nullptr;
+};
+
+SlangResult _finishNVVMMaskedWavePhi(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMMaskedWavePendingPhi& pending)
+{
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave initial remaining mask",
+        builder
+            .addPhiIncoming(module, pending.remaining, pending.initialMask, pending.sourceBlock)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave initial accumulated value",
+        builder.addPhiIncoming(
+            module,
+            pending.accumulated,
+            pending.initialValue,
+            pending.sourceBlock)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "masked-wave next remaining mask",
+        builder
+            .addPhiIncoming(module, pending.remaining, pending.nextRemaining, pending.bodyBlock)));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "masked-wave next accumulated value",
+        builder.addPhiIncoming(
+            module,
+            pending.accumulated,
+            pending.nextAccumulated,
+            pending.bodyBlock));
+}
+
+// Emits one scalar result for a validated masked-wave recipe. Returning the value, exit block, and
+// deferred phi edges lets the same control-flow graph serve scalar helpers and each leaf of a
+// canonical aggregate helper. The caller adds the phi edges only after every block is terminated.
+SlangResult _emitNVVMMaskedWaveScalarValue(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle loweredFunction,
     SlangNVVMBlockHandle sourceBlock,
-    IRFunc* function,
+    IRType* scalarType,
+    SlangNVVMValueHandle loweredValue,
+    SlangNVVMValueHandle loweredMaskVector,
     const NVVMMaskedWaveScalarOperation& operation,
-    NVVMValueMap& valueMap,
-    NVVMTypeLoweringContext& typeContext)
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue,
+    SlangNVVMBlockHandle& outExitBlock,
+    NVVMMaskedWavePendingPhi& outPendingPhi)
 {
-    SlangNVVMValueHandle loweredValue = nullptr;
-    SlangNVVMValueHandle loweredMaskVector = nullptr;
-    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-        codeGenContext,
-        builder,
-        module,
-        operation.valueParameter,
-        valueMap,
-        typeContext,
-        loweredValue));
-    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-        codeGenContext,
-        builder,
-        module,
-        operation.maskParameter,
-        valueMap,
-        typeContext,
-        loweredMaskVector));
+    outValue = nullptr;
+    outExitBlock = nullptr;
+    outPendingPhi = {};
+    SLANG_RELEASE_ASSERT(scalarType && loweredValue && loweredMaskVector);
 
     SlangNVVMTypeHandle int32Type = nullptr;
     SlangNVVMTypeHandle valueType = nullptr;
@@ -9557,10 +9945,7 @@ SlangResult _emitNVVMMaskedWaveScalarOperation(
         codeGenContext,
         "masked-wave i32 type",
         builder.getIntegerType(module, 32, int32Type)));
-    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-        operation.valueParameter->getDataType(),
-        NVVMTypeUse::Value,
-        valueType));
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(scalarType, NVVMTypeUse::Value, valueType));
 
     SlangNVVMValueHandle zero = nullptr;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -9779,32 +10164,539 @@ SlangResult _emitNVVMMaskedWaveScalarOperation(
         codeGenContext,
         "masked-wave exit selection",
         builder.setInsertBlock(module, exitBlock)));
+
+    outValue = accumulated;
+    outExitBlock = exitBlock;
+    outPendingPhi = {
+        remaining,
+        accumulated,
+        loweredMask,
+        result,
+        nextRemaining,
+        nextAccumulated,
+        sourceBlock,
+        bodyBlock,
+    };
+    return SLANG_OK;
+}
+
+// Emits one correctness-first scalar masked-wave helper through the shared scalar-value graph.
+SlangResult _emitNVVMMaskedWaveScalarOperation(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle loweredFunction,
+    SlangNVVMBlockHandle sourceBlock,
+    IRFunc* function,
+    const NVVMMaskedWaveScalarOperation& operation,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext)
+{
+    SlangNVVMValueHandle loweredValue = nullptr;
+    SlangNVVMValueHandle loweredMaskVector = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.valueParameter,
+        valueMap,
+        typeContext,
+        loweredValue));
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.maskParameter,
+        valueMap,
+        typeContext,
+        loweredMaskVector));
+
+    SlangNVVMValueHandle result = nullptr;
+    SlangNVVMBlockHandle exitBlock = nullptr;
+    NVVMMaskedWavePendingPhi pendingPhi;
+    SLANG_RETURN_ON_FAIL(_emitNVVMMaskedWaveScalarValue(
+        codeGenContext,
+        builder,
+        module,
+        loweredFunction,
+        sourceBlock,
+        operation.valueParameter->getDataType(),
+        loweredValue,
+        loweredMaskVector,
+        operation,
+        typeContext,
+        result,
+        exitBlock,
+        pendingPhi));
+    SLANG_UNUSED(exitBlock);
     SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
         codeGenContext,
         builder,
         module,
         function,
         operation.diagnosticName,
-        accumulated));
+        result));
+    return _finishNVVMMaskedWavePhi(codeGenContext, builder, module, pendingPhi);
+}
 
-    // The provider validates incoming values against the complete function CFG. Add the edges only
-    // after the source, loop, body, and exit blocks all have terminators.
+SlangResult _emitNVVMActiveMaskValue(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMValueRecipeStep& activeMaskStep,
+    SlangNVVMValueHandle& outMask)
+{
+    SlangNVVMTypeHandle int32Type = nullptr;
+    SlangNVVMTypeHandle boolType = nullptr;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
-        "masked-wave initial remaining mask",
-        builder.addPhiIncoming(module, remaining, loweredMask, sourceBlock)));
+        "active-mask i32 type",
+        builder.getIntegerType(module, 32, int32Type)));
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
-        "masked-wave initial accumulated value",
-        builder.addPhiIncoming(module, accumulated, result, sourceBlock)));
+        "active-mask Boolean type",
+        builder.getIntegerType(module, 1, boolType)));
+    SlangNVVMValueHandle fullMask = nullptr;
+    SlangNVVMValueHandle trueValue = nullptr;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
-        "masked-wave next remaining mask",
-        builder.addPhiIncoming(module, remaining, nextRemaining, bodyBlock)));
+        "active-mask full participation constant",
+        builder.getIntegerConstant(module, int32Type, -1, fullMask)));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "active-mask true constant",
+        builder.getIntegerConstant(module, boolType, 1, trueValue)));
+    const SlangNVVMValueHandle operands[] = {fullMask, trueValue};
     return _requireBuilderOperation(
         codeGenContext,
-        "masked-wave next accumulated value",
-        builder.addPhiIncoming(module, accumulated, nextAccumulated, bodyBlock));
+        activeMaskStep.diagnosticName,
+        builder.emitValueOperation(
+            module,
+            activeMaskStep.getDesc(),
+            operands,
+            SLANG_COUNT_OF(operands),
+            outMask));
+}
+
+SlangResult _emitNVVMWaveAggregateElement(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle aggregate,
+    uint32_t index,
+    SlangNVVMValueHandle& outElement)
+{
+    SlangNVVMTypeHandle indexType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "aggregate wave index type",
+        builder.getIntegerType(module, 32, indexType)));
+    SlangNVVMValueHandle loweredIndex = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "aggregate wave element index",
+        builder.getIntegerConstant(module, indexType, index, loweredIndex)));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "aggregate wave element extraction",
+        builder.emitSequentialElementExtract(module, aggregate, loweredIndex, outElement));
+}
+
+SlangResult _emitNVVMWaveAggregateConstruction(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRType* type,
+    bool isVector,
+    const List<SlangNVVMValueHandle>& elements,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMTypeHandle loweredType = nullptr;
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(type, NVVMTypeUse::Value, loweredType));
+    return _requireBuilderOperation(
+        codeGenContext,
+        isVector ? "aggregate wave vector construction" : "aggregate wave array construction",
+        isVector ? builder.emitVectorConstruct(
+                       module,
+                       loweredType,
+                       elements.getBuffer(),
+                       size_t(elements.getCount()),
+                       outValue)
+                 : builder.emitAggregateConstruct(
+                       module,
+                       loweredType,
+                       elements.getBuffer(),
+                       size_t(elements.getCount()),
+                       outValue));
+}
+
+// Applies one scalar shuffle recursively to the homogeneous leaves proven by the aggregate-wave
+// resolver and reconstructs the exact canonical vector/array type.
+SlangResult _emitNVVMAggregateWaveShuffleValue(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRType* type,
+    IRType* leafType,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle mask,
+    SlangNVVMValueHandle lane,
+    const NVVMValueRecipeStep& shuffleStep,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    if (isTypeEqual(type, leafType))
+    {
+        const SlangNVVMValueHandle operands[] = {mask, value, lane};
+        return _requireBuilderOperation(
+            codeGenContext,
+            shuffleStep.diagnosticName,
+            builder.emitValueOperation(
+                module,
+                shuffleStep.getDesc(),
+                operands,
+                SLANG_COUNT_OF(operands),
+                outValue));
+    }
+
+    uint32_t elementCount = 0;
+    IRType* elementType = nullptr;
+    const bool isVector = asNVVMSupportedValueVectorType(type, &elementCount) != nullptr;
+    if (isVector)
+        elementType = cast<IRVectorType>(type)->getElementType();
+    else if (auto arrayType = asNVVMSupportedCopyableArrayType(type, &elementCount))
+        elementType = arrayType->getElementType();
+    SLANG_RELEASE_ASSERT(elementType && elementCount > 0);
+
+    List<SlangNVVMValueHandle> elements;
+    for (uint32_t index = 0; index < elementCount; ++index)
+    {
+        SlangNVVMValueHandle element = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            _emitNVVMWaveAggregateElement(codeGenContext, builder, module, value, index, element));
+        SlangNVVMValueHandle shuffledElement = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMAggregateWaveShuffleValue(
+            codeGenContext,
+            builder,
+            module,
+            elementType,
+            leafType,
+            element,
+            mask,
+            lane,
+            shuffleStep,
+            typeContext,
+            shuffledElement));
+        elements.add(shuffledElement);
+    }
+    return _emitNVVMWaveAggregateConstruction(
+        codeGenContext,
+        builder,
+        module,
+        type,
+        isVector,
+        elements,
+        typeContext,
+        outValue);
+}
+
+// Applies one scalar masked scan to every aggregate leaf in sequence. Each leaf loop starts in the
+// preceding leaf's exit block; deferred phi edges are finalized after the final result transport
+// terminates the complete helper CFG.
+SlangResult _emitNVVMAggregateMaskedWaveValue(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle loweredFunction,
+    SlangNVVMBlockHandle sourceBlock,
+    IRType* type,
+    IRType* leafType,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle maskVector,
+    const NVVMMaskedWaveScalarOperation& operation,
+    NVVMTypeLoweringContext& typeContext,
+    List<NVVMMaskedWavePendingPhi>& pendingPhis,
+    SlangNVVMValueHandle& outValue,
+    SlangNVVMBlockHandle& outExitBlock)
+{
+    if (isTypeEqual(type, leafType))
+    {
+        NVVMMaskedWavePendingPhi pendingPhi;
+        SLANG_RETURN_ON_FAIL(_emitNVVMMaskedWaveScalarValue(
+            codeGenContext,
+            builder,
+            module,
+            loweredFunction,
+            sourceBlock,
+            leafType,
+            value,
+            maskVector,
+            operation,
+            typeContext,
+            outValue,
+            outExitBlock,
+            pendingPhi));
+        pendingPhis.add(pendingPhi);
+        return SLANG_OK;
+    }
+
+    uint32_t elementCount = 0;
+    IRType* elementType = nullptr;
+    const bool isVector = asNVVMSupportedValueVectorType(type, &elementCount) != nullptr;
+    if (isVector)
+        elementType = cast<IRVectorType>(type)->getElementType();
+    else if (auto arrayType = asNVVMSupportedCopyableArrayType(type, &elementCount))
+        elementType = arrayType->getElementType();
+    SLANG_RELEASE_ASSERT(elementType && elementCount > 0);
+
+    List<SlangNVVMValueHandle> elements;
+    SlangNVVMBlockHandle currentBlock = sourceBlock;
+    for (uint32_t index = 0; index < elementCount; ++index)
+    {
+        SlangNVVMValueHandle element = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            _emitNVVMWaveAggregateElement(codeGenContext, builder, module, value, index, element));
+        SlangNVVMValueHandle scannedElement = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMAggregateMaskedWaveValue(
+            codeGenContext,
+            builder,
+            module,
+            loweredFunction,
+            currentBlock,
+            elementType,
+            leafType,
+            element,
+            maskVector,
+            operation,
+            typeContext,
+            pendingPhis,
+            scannedElement,
+            currentBlock));
+        elements.add(scannedElement);
+    }
+    SLANG_RETURN_ON_FAIL(_emitNVVMWaveAggregateConstruction(
+        codeGenContext,
+        builder,
+        module,
+        type,
+        isVector,
+        elements,
+        typeContext,
+        outValue));
+    outExitBlock = currentBlock;
+    return SLANG_OK;
+}
+
+SlangResult _emitNVVMAggregateWaveResult(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRFunc* function,
+    const NVVMAggregateWaveOperation& operation,
+    SlangNVVMValueHandle result,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext)
+{
+    if (!operation.resultPointerParameter)
+    {
+        return _emitNVVMFunctionValueReturn(
+            codeGenContext,
+            builder,
+            module,
+            function,
+            operation.diagnosticName,
+            result);
+    }
+
+    SlangNVVMValueHandle resultPointer = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.resultPointerParameter,
+        valueMap,
+        typeContext,
+        resultPointer));
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "aggregate wave out-parameter store",
+        builder.emitStore(
+            module,
+            result,
+            resultPointer,
+            _getNVVMExecutableValueAlignment(operation.aggregateType))));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "aggregate wave void return",
+        builder.emitReturnVoid(module));
+}
+
+SlangResult _emitNVVMAggregateWaveOperation(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle loweredFunction,
+    SlangNVVMBlockHandle sourceBlock,
+    IRFunc* function,
+    const NVVMAggregateWaveOperation& operation,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext)
+{
+    if (operation.kind == NVVMAggregateWaveKind::ActiveMask)
+    {
+        SlangNVVMValueHandle activeMask = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMActiveMaskValue(
+            codeGenContext,
+            builder,
+            module,
+            operation.activeMaskStep,
+            activeMask));
+        SlangNVVMValueHandle result = activeMask;
+        if (operation.activeMaskResultIsVector)
+        {
+            SlangNVVMTypeHandle int32Type = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "active-mask vector element type",
+                builder.getIntegerType(module, 32, int32Type)));
+            SlangNVVMValueHandle zero = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "active-mask vector zero",
+                builder.getIntegerConstant(module, int32Type, 0, zero)));
+            SlangNVVMTypeHandle resultType = nullptr;
+            SLANG_RETURN_ON_FAIL(
+                typeContext.lowerType(function->getResultType(), NVVMTypeUse::Value, resultType));
+            const SlangNVVMValueHandle elements[] = {activeMask, zero, zero, zero};
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "active-mask vector construction",
+                builder.emitVectorConstruct(
+                    module,
+                    resultType,
+                    elements,
+                    SLANG_COUNT_OF(elements),
+                    result)));
+        }
+        return _emitNVVMFunctionValueReturn(
+            codeGenContext,
+            builder,
+            module,
+            function,
+            operation.diagnosticName,
+            result);
+    }
+
+    SlangNVVMValueHandle value = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.valueParameter,
+        valueMap,
+        typeContext,
+        value));
+
+    if (operation.kind == NVVMAggregateWaveKind::Shuffle)
+    {
+        SlangNVVMValueHandle mask = nullptr;
+        if (operation.usesImplicitActiveMask)
+        {
+            SLANG_RETURN_ON_FAIL(_emitNVVMActiveMaskValue(
+                codeGenContext,
+                builder,
+                module,
+                operation.activeMaskStep,
+                mask));
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                codeGenContext,
+                builder,
+                module,
+                operation.maskParameter,
+                valueMap,
+                typeContext,
+                mask));
+        }
+        SlangNVVMValueHandle lane = nullptr;
+        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+            codeGenContext,
+            builder,
+            module,
+            operation.laneParameter,
+            valueMap,
+            typeContext,
+            lane));
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMAggregateWaveShuffleValue(
+            codeGenContext,
+            builder,
+            module,
+            operation.aggregateType,
+            operation.leafType,
+            value,
+            mask,
+            lane,
+            operation.shuffleStep,
+            typeContext,
+            result));
+        return _emitNVVMAggregateWaveResult(
+            codeGenContext,
+            builder,
+            module,
+            function,
+            operation,
+            result,
+            valueMap,
+            typeContext);
+    }
+
+    SLANG_RELEASE_ASSERT(operation.kind == NVVMAggregateWaveKind::MaskedScan);
+    SlangNVVMValueHandle maskVector = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.maskParameter,
+        valueMap,
+        typeContext,
+        maskVector));
+    List<NVVMMaskedWavePendingPhi> pendingPhis;
+    SlangNVVMValueHandle result = nullptr;
+    SlangNVVMBlockHandle exitBlock = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMAggregateMaskedWaveValue(
+        codeGenContext,
+        builder,
+        module,
+        loweredFunction,
+        sourceBlock,
+        operation.aggregateType,
+        operation.leafType,
+        value,
+        maskVector,
+        operation.maskedScan,
+        typeContext,
+        pendingPhis,
+        result,
+        exitBlock));
+    SLANG_UNUSED(exitBlock);
+    SLANG_RETURN_ON_FAIL(_emitNVVMAggregateWaveResult(
+        codeGenContext,
+        builder,
+        module,
+        function,
+        operation,
+        result,
+        valueMap,
+        typeContext));
+    for (const auto& pendingPhi : pendingPhis)
+    {
+        SLANG_RETURN_ON_FAIL(_finishNVVMMaskedWavePhi(codeGenContext, builder, module, pendingPhi));
+    }
+    return SLANG_OK;
 }
 
 } // namespace
@@ -11624,6 +12516,25 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 blockMap.getValue(as<IRBlock>(genericAsm->getParent())),
                                 function,
                                 maskedWaveOperation,
+                                valueMap,
+                                typeContext));
+                            break;
+                        }
+
+                        NVVMAggregateWaveOperation aggregateWaveOperation;
+                        if (_resolveNVVMAggregateWaveOperation(
+                                genericAsm,
+                                function,
+                                aggregateWaveOperation))
+                        {
+                            SLANG_RETURN_ON_FAIL(_emitNVVMAggregateWaveOperation(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                functionMap.getValue(function),
+                                blockMap.getValue(as<IRBlock>(genericAsm->getParent())),
+                                function,
+                                aggregateWaveOperation,
                                 valueMap,
                                 typeContext));
                             break;
