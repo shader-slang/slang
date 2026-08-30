@@ -1,0 +1,83 @@
+source	source_test_ordinal	selection_tags	rationale
+bindings/nested-parameter-block-2.slang	0	parameter-layout,aggregate-pointer	Nested parameter blocks and aggregate transport.
+bindings/nested-parameter-block-3.slang	0	parameter-layout,aggregate-pointer	Deeper nested parameter-block layout.
+compute/cbuffer-legalize.slang	1	parameter-layout,mixed-resources	Constant-buffer legalization with resource output.
+compute/constexpr.slang	0	parameter-layout,mixed-resources,large	Large constexpr and constant-buffer combination.
+compute/func-cbuffer-param.slang	0	parameter-layout,helper-generic	Constant-buffer values crossing helper calls.
+compute/buffer-type-splitting.slang	1	mixed-resources,aggregate-pointer	Buffer type splitting and aggregate storage.
+compute/texture-get-dimensions.slang	1	mixed-resources,helper-generic	Texture queries across ordinary helper lowering.
+compute/texture-subscript-multisample.slang	2	mixed-resources	Multisampled texture access and result comparison.
+optimization/func-resource-result/func-resource-result-complex.slang	0	mixed-resources,helper-generic	Complex resource result crossing helper boundaries.
+optimization/func-resource-result/func-resource-result-simple.slang	0	mixed-resources,helper-generic	Minimal control for resource-valued helper results.
+bugs/empty-struct-parameter-block.slang	0	parameter-layout,aggregate-pointer,large	Empty aggregate inside a parameter-block layout.
+bugs/parameter-block-load.slang	0	parameter-layout,mixed-resources	Parameter-block resource loading.
+bugs/gh-6657-bindless-uniform.slang	3	parameter-layout,mixed-resources,aggregate-pointer	Bindless-style uniform/resource combination.
+bugs/gh-6657-nonbindless-uniform.slang	4	parameter-layout,mixed-resources,aggregate-pointer	Non-bindless comparison for the same layout family.
+language-feature/dynamic-dispatch/constantbuffer-struct-interface-field.slang	0	parameter-layout,helper-generic	Interface values nested in a constant buffer.
+language-feature/dynamic-dispatch/constantbuffer-struct-interface-array.slang	0	parameter-layout,helper-generic,aggregate-pointer	Array of interface-bearing constant-buffer fields.
+language-feature/dynamic-dispatch/parameterblock-struct-interface-field.slang	0	parameter-layout,helper-generic	Interface field nested in a parameter block.
+language-feature/generics/generic-shader-object-cbuffer.slang	3	parameter-layout,helper-generic	Generic shader-object constant-buffer transport.
+language-feature/generics/generic-shader-object-cbuffer2.slang	3	parameter-layout,helper-generic	Second generic constant-buffer specialization shape.
+language-feature/generics/parameter-block-unify.slang	0	parameter-layout,helper-generic	Generic unification across parameter-block values.
+compute/generic-diamond-pattern-2.slang	0	helper-generic,large	Larger diamond-shaped generic call graph.
+compute/generic-interface-method.slang	0	helper-generic,large	Generic interface method helper graph.
+compute/generics-constrained.slang	0	helper-generic	Constrained generic specialization and calls.
+compute/nested-generics2.slang	0	helper-generic	Nested generic specialization and helper transport.
+compute/interface-shader-param.slang	0	helper-generic,mixed-resources,large	Interface shader parameter with resource use.
+compute/multi-interface.slang	0	helper-generic	Multiple interface conformances in one kernel.
+language-feature/dynamic-dispatch/many-impls.slang	0	helper-generic,aggregate-pointer,control-flow	Many implementations selected through dynamic dispatch.
+language-feature/dynamic-dispatch/array-of-interfaces-interproc.slang	0	helper-generic,aggregate-pointer,large	Interprocedural arrays of interface values.
+language-feature/dynamic-dispatch/dispatch-many-conformances.slang	0	helper-generic,control-flow	Dispatch over many conformances.
+language-feature/dynamic-dispatch/derived-interface.slang	0	helper-generic,matrix-layout,control-flow	Derived-interface dispatch with aggregate values.
+language-feature/dynamic-dispatch/generic-method.slang	0	helper-generic	Generic method through dynamic dispatch.
+language-feature/dynamic-dispatch/nested-interface-types.slang	0	helper-generic,aggregate-pointer	Nested interface type transport.
+language-feature/dynamic-dispatch/ptr-to-interface-double-indirect.slang	0	helper-generic,aggregate-pointer	Double-indirect pointer to interface storage.
+language-feature/dynamic-dispatch/with-data.slang	0	helper-generic,aggregate-pointer	Interface payload data and helper calls.
+language-feature/generics/generic-arithmetic-coerce.slang	0	helper-generic,matrix-layout,large	Large generic arithmetic and matrix coercion graph.
+language-feature/generics/generic-interface-linkage.slang	0	helper-generic,large	Generic interface linkage across helpers.
+language-feature/generics/variadic-pack-query-pack-conformance.slang	0	helper-generic,large	Variadic conformance and pack-query call graph.
+language-feature/dynamic-dispatch/anyvalue-bulk-copy.slang	0	helper-generic,aggregate-pointer,matrix-layout,large	Large AnyValue aggregate copy workload.
+language-feature/dynamic-dispatch/missing-anyvaluesize-mixed-self-ref.slang	0	helper-generic,aggregate-pointer,large	Self-referential mixed AnyValue representation.
+language-feature/dynamic-dispatch/dynamic-func-dynamic-output-2.slang	0	helper-generic,aggregate-pointer	Dynamic function with aggregate output transport.
+compute/pointer-emit.slang	0	aggregate-pointer,large	Pointer emission across a larger kernel.
+compute/inout.slang	0	aggregate-pointer,helper-generic	Inout value crossing helper calls.
+compute/struct-make.slang	0	aggregate-pointer	Aggregate construction and storage.
+compute/static-const-matrix-array.slang	0	matrix-layout,aggregate-pointer	Static constant matrix-array transport.
+compute/non-square-column-major.slang	0	matrix-layout,aggregate-pointer	Non-square column-major matrix storage.
+language-feature/pointer/data-layouts.slang	1	parameter-layout,aggregate-pointer	Pointer data-layout differences at the entry ABI.
+language-feature/pointer/ptr-to-groupshared.slang	0	aggregate-pointer,shared-barrier	Pointer transport into groupshared storage.
+language-feature/pointer/groupshared-ptr-of-device.slang	1	aggregate-pointer,shared-barrier,mixed-resources	Device pointers stored in groupshared memory.
+language-feature/pointer/coherent-load-store-groupshared.slang	1	aggregate-pointer,shared-barrier	Coherent operations over groupshared pointers.
+language-feature/types/opaque/inout-param-opaque-type-in-struct.slang	0	aggregate-pointer,mixed-resources	Opaque resource nested in an inout aggregate.
+language-feature/types/opaque/return-opaque-type-in-struct.slang	0	aggregate-pointer,mixed-resources	Opaque resource returned inside an aggregate.
+language-feature/tuple/tuple-expand-call.slang	0	aggregate-pointer,helper-generic	Tuple expansion across a call boundary.
+language-feature/tuple/tuple-concat.slang	0	aggregate-pointer	Tuple concatenation and storage.
+language-feature/tuple/tuple-parameter.slang	0	parameter-layout,aggregate-pointer	Tuple entry-parameter layout.
+optimization/arrray-storage-lowering.slang	1	matrix-layout,aggregate-pointer,parameter-layout	Array storage lowering with layout-sensitive values.
+bugs/type-legalize-bug-1.slang	0	parameter-layout,helper-generic	Type legalization across parameter and helper boundaries.
+bugs/force-inline-array.slang	0	aggregate-pointer,control-flow	Forced-inline array transport through control flow.
+bugs/array-of-array-in-sb.slang	0	aggregate-pointer,mixed-resources	Nested arrays in structured-buffer storage.
+language-feature/anyvalue-matrix-layout.slang	0	matrix-layout,aggregate-pointer	AnyValue matrix layout preservation.
+bugs/generic-default-matrix.slang	0	matrix-layout,helper-generic	Generic default matrix transport.
+bugs/matrix-divided-by-scalar.slang	0	matrix-layout	Ordinary non-square matrix arithmetic.
+bugs/op-assignment-unify-mat.slang	0	matrix-layout,helper-generic	Matrix compound assignment and overload unification.
+compute/atomics-buffer.slang	0	atomic-wave,mixed-resources	Buffer atomics combined with resource access.
+bugs/array-size-groupshared.slang	0	shared-barrier,helper-generic,control-flow	Generic array sizing in groupshared storage.
+bugs/atomic-coerce.slang	0	atomic-wave,mixed-resources	Atomic operand coercion on a buffer.
+bugs/byte-address-buffer-interlocked-add-f32.slang	0	atomic-wave,mixed-resources	Floating atomic on byte-address storage.
+bugs/generic-groupshared.slang	0	shared-barrier,helper-generic	Generic values in groupshared storage.
+bugs/addr-scope-fix.slang	0	shared-barrier,aggregate-pointer	Address scopes and groupshared lifetime.
+language-feature/pointer/redundant-coherent-load.slang	1	aggregate-pointer,shared-barrier	Coherent pointer load and alias simplification.
+language-feature/pointer/coherent-load-store-physical-storage-buffer.slang	1	aggregate-pointer,mixed-resources	Coherent load/store through device buffer pointers.
+ir/loop-inversion.slang	1	control-flow,large	Large loop inversion workload.
+ir/loop-unroll-3.slang	0	control-flow	Loop-unroll interaction with aggregate values.
+ir/loop-unroll-induction.slang	0	control-flow	Induction-variable unrolling.
+ir/loop-unroll-non-induction.slang	0	control-flow	Non-induction loop-unroll analysis.
+ir/ssa-reg-alloc.slang	0	control-flow	SSA register allocation over loops and joins.
+ir/loop-dce.slang	0	control-flow	Loop dead-code elimination and runtime result.
+compute/multiple-continue-sites.slang	0	control-flow	Multiple continue edges in one kernel.
+compute/ssa-reduce-bug.slang	0	control-flow,aggregate-pointer	SSA reduction with aggregate state.
+bugs/nested-switch-continue-in-loop.slang	2	control-flow	Nested switch and continue interaction.
+bugs/mutating/mutating-call-in-loop-dce.slang	0	control-flow,helper-generic	Mutating helper calls retained through loop DCE.
+bugs/gh-7748-switch-continue-bug.slang	0	control-flow	Switch/continue regression workload.
+compute/conditional-link-time-const.slang	0	control-flow,helper-generic	Link-time constants controlling helper branches.

@@ -94,6 +94,18 @@ def _get_ptx_target(ptx_path: Path) -> int:
     return int(match.group(1))
 
 
+def _load_workloads(path: Path) -> list[dict[str, str]]:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    workloads = document.get("workloads")
+    if not isinstance(workloads, list) or not workloads:
+        raise SystemExit(f"workload manifest has no workloads: {path}")
+    required_fields = {"name", "source", "census_id"}
+    for workload in workloads:
+        if not isinstance(workload, dict) or not required_fields.issubset(workload):
+            raise SystemExit(f"invalid workload record in {path}: {workload!r}")
+    return workloads
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
@@ -103,6 +115,11 @@ def parse_arguments() -> argparse.Namespace:
         type=Path,
         default=Path("build/nvvm-census/results.tsv"),
         help="census result rows supplying end-to-end timings",
+    )
+    parser.add_argument(
+        "--workloads",
+        type=Path,
+        help="optional JSON workload manifest; defaults to the three frozen MVP gates",
     )
     parser.add_argument("--repetitions", type=int, default=3)
     return parser.parse_args()
@@ -125,9 +142,17 @@ def main() -> int:
         else args.census_results
     )
     census_timings = _load_census_timings(census_results)
+    workloads = WORKLOADS
+    if args.workloads:
+        workload_path = (
+            (repo_root / args.workloads).resolve()
+            if not args.workloads.is_absolute()
+            else args.workloads.resolve()
+        )
+        workloads = _load_workloads(workload_path)
     measurements: list[dict[str, object]] = []
 
-    for workload in WORKLOADS:
+    for workload in workloads:
         for configuration in COMPILE_CONFIGURATIONS:
             stem = f"{workload['name']}-{configuration['name']}"
             ptx_path = output_root / f"{stem}.ptx"

@@ -6587,6 +6587,37 @@ the shared-control/barrier gate. Their NVRTC/direct-O3 PTX sizes are 8889/919, 8
 remains on the local SM120 GPU, while CUDA 13 and physical SM70/SM80/SM90 workers remain open
 productionization requirements.
 
+### Slice 147: Frozen regression corpus and rolling discovery corpus
+
+The 452-workload census represented by Slice 146 is frozen as corpus v1. Its 427 healthy-MVP
+denominator and O0/O3/both metrics remain a historical regression contract; later discovery cannot
+add, remove, or reclassify those rows. Before every discovery run, tooling verifies the frozen 452
+rows, 448 sources, 427 healthy MVP references, and 371/375/371 correct numerators.
+
+A separate rolling manifest selects 82 repository-local compare-compute sources absent from corpus
+v1. Selection emphasizes helper/generic graphs, nested parameter and constant buffers, mixed
+resources, aggregate/pointer transport, shared/barrier/atomic combinations, matrix layouts, and
+larger control-flow kernels. It records the existing source-test ordinal and semantic rationale,
+not the direct result. A disposable mirror changes only target execution arguments, preserving the
+source, inputs, checks, and indexed expected output.
+
+Native NVRTC O3 supplies 72 healthy references. Direct O0, O3, and both-mode correctness are each
+45/72; all three denominators remain separate from corpus v1. Across all 82 rows, each direct mode
+has 45 correct, 28 compiler preflight, one provider, seven infrastructure/capability, and one
+runtime-mismatch result. The healthy failures are 26 preflight and one provider result. Complete
+quoted shapes, producers, diagnostics, and raw evidence live in the discovery-only TSV/JSON.
+
+Discovery independently confirms aggregate/pointer representation and helper ABI as the leading
+cross-corpus priorities. It finds 13 healthy aggregate/pointer/layout blockers and seven helper-ABI
+blockers, while corpus v1 retains eight-row leading clusters in each broad family. Denominators are
+not combined. Corpus v1 remains at 86.9% both-mode correctness, so no corpus v2 is proposed.
+
+Three larger discovery workloads pass native and both direct modes. Direct O3 standalone compile
+medians are 274--307 ms versus 381--428 ms for NVRTC O3 in the current exploratory samples, and
+direct O3 PTX is 647--1171 bytes versus 8586--9168 bytes. CUDA 12.9 `ptxas` accepts the direct O3
+outputs for SM70, SM80, and SM90. These remain uncontrolled exploratory measurements; runtime is on
+the local SM120 GPU, while CUDA 13 and physical SM70/SM80/SM90 workers remain open requirements.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

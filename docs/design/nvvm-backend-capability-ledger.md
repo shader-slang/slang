@@ -2112,3 +2112,17 @@ correct at both modes with zero old-correct regression and receive 38 direct lan
 O0/O3/both correctness is 371/375/371 (86.9%/87.8%/86.9%). The selected prefix passes 424/424,
 all 57 CUDA lanes in the promoted files pass, and representative direct O3 PTX assembles with
 CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 147 freezes that 452-workload/427-healthy-MVP state as corpus v1 and adds a separate rolling
+discovery census. Its explicit 82-source manifest has zero corpus-v1 overlap and preserves existing
+repository source, input, and expected-output contracts in generated CUDA lanes. Native NVRTC has
+72 healthy references. Direct O0, O3, and both-mode correctness are each 45/72; all discovery
+denominators and artifacts remain separate from corpus v1.
+
+The discovery healthy Pareto finds 13 aggregate/pointer/layout first blockers, seven helper-ABI
+blockers, two entry-parameter ABI blockers, two function-identity blockers, and three independent
+one-row shapes. This independently confirms the same two leading reusable families still visible
+in corpus v1 without combining their denominators. The slice changes no production compiler,
+provider, ABI, or checked-in test directive and unlocks zero workloads; the 45 successes establish
+the discovery baseline for later generalization measurements. Corpus v1 remains at 371/427
+both-mode correctness, so no corpus v2 is proposed.

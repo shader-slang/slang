@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "generic-diamond-call-graph",
+      "source": "tests/compute/generic-diamond-pattern-2.slang",
+      "census_id": "compute/generic-diamond-pattern-2.slang#discovery-1"
+    },
+    {
+      "name": "generic-arithmetic-matrix",
+      "source": "tests/language-feature/generics/generic-arithmetic-coerce.slang",
+      "census_id": "language-feature/generics/generic-arithmetic-coerce.slang#discovery-1"
+    },
+    {
+      "name": "large-loop-control-flow",
+      "source": "tests/ir/loop-inversion.slang",
+      "census_id": "ir/loop-inversion.slang#discovery-1"
+    }
+  ]
+}
