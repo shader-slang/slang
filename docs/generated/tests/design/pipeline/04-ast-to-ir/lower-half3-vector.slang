@@ -11,7 +11,7 @@
 
 // Boundary: storage axis — `half` element inside a 3-wide vector.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform vector<half, 3> v;
 uniform RWStructuredBuffer<vector<half, 3>> buf;

@@ -14,7 +14,7 @@
 // rather than a folded constant, and the emitted text is the C-like
 // `a * b`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main

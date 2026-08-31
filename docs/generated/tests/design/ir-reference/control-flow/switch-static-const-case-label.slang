@@ -14,7 +14,7 @@
 // scrutinee comes from a uniform so that constant folding cannot
 // collapse the switch.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 static const int LOW = 7;
 static const int HIGH = 42;

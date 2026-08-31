@@ -20,7 +20,7 @@
 // inside `func %makeDefault` typed by the generic parameter, so each
 // observation names the undecomposable type it came from.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IThing { int get(); }
 struct Impl : IThing { int get() { return 7; } }

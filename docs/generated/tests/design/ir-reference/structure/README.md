@@ -27,7 +27,7 @@ organize a module rather than compute a value — `func`, `generic`, `call`,
 Every claim in the catalog is of the form "AST declaration X produces
 structural opcode Y in parent/child shape Z", which is a pre-codegen
 observation, so the whole bundle uses one directive shape —
-`-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute` — and
+`-target spirv-asm -dump-ir -o - -entry main -stage compute` — and
 FileCheck reads the IR dump. There is deliberately **no** per-target emission
 fan-out: none of these claims is target-dependent, and repeating the same
 `-dump-ir` observation under `-target metal` / `-target wgsl` would assert

@@ -14,7 +14,7 @@
 // (one repeated three times), demonstrating the cross-axis
 // upsample case.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float2 v;
 uniform RWStructuredBuffer<float4> buf;

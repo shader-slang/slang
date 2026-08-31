@@ -1135,6 +1135,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
 
+    bool hasAlreadyRegisteredPayloadWriteback(IRType* payloadType) const
+    {
+        return m_payloadWritebacks.findFirstIndex(
+                   [&](const PayloadWritebackInfo& writeback)
+                   { return writeback.payloadType == payloadType; }) != -1;
+    }
+
     // Get C++ size and alignment of a type using CUDA layout rules.
     // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
     // vector alignment to match CUDA C++ compiler behavior and the prelude's layout.
@@ -1206,6 +1213,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+
+                // Empty-type legalization preserves non-optimizable empty fields as `void` so
+                // that field indices stay stable. The field occupies no storage, but make-struct
+                // still needs a matching operand until void cleanup removes both of them.
+                if (as<IRVoidType>(fieldType))
+                {
+                    fieldVals.add(builder->getVoidValue());
+                    continue;
+                }
+
                 // Align to field alignment before reading
                 int fieldAlign = getTypeCppAlignment(fieldType, builder);
                 ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
@@ -1435,6 +1452,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+
+                // A legalized empty field has no storage, so it contributes no alignment or data.
+                if (as<IRVoidType>(fieldType))
+                    continue;
+
                 // Align to field alignment before writing
                 int fieldAlign = getTypeCppAlignment(fieldType, builder);
                 ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
@@ -2308,6 +2330,20 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             {
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
+
+                // The incoming value of an `inout` register payload is read once,
+                // on the `VaryingInput` pass; its outgoing value is produced by the
+                // write-back registered on that same pass. The `VaryingOutput` pass
+                // therefore has no register read to perform, so return an empty
+                // value (making the output assignment a no-op) rather than emitting
+                // a redundant readback. Match by payload type so that a distinct
+                // payload using the pointer-packing fallback still reaches its own
+                // output assignment.
+                if (info.kind == LayoutResourceKind::VaryingOutput &&
+                    hasAlreadyRegisteredPayloadWriteback(info.type))
+                {
+                    return LegalizedVaryingVal();
+                }
 
                 // Only use register-based payload for hit/miss/anyhit shaders
                 // Raygen shaders pass payload TO TraceRay, not receive it FROM registers

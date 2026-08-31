@@ -120,6 +120,7 @@
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
+#include "slang-ir-thread-switch-on-constant-phi.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-translate.h"
@@ -611,6 +612,26 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_CastInterfaceToTaggedUnionPtr:
         result.taggedUnion = true;
+        result.untaggedUnion = true;
+        result.tagOps = true;
+        result.tagType = true;
+        break;
+    case kIROp_AssumeAddress:
+        result.assumeAddress = true;
+        break;
+    case kIROp_UntaggedUnionType:
+    case kIROp_NoneTypeElement:
+        result.untaggedUnion = true;
+        break;
+    case kIROp_GetTagOfElementInSet:
+    case kIROp_GetTagForSuperSet:
+    case kIROp_GetTagForSubSet:
+    case kIROp_GetTagForMappedSet:
+        result.tagOps = true;
+        result.tagType = true;
+        break;
+    case kIROp_SetTagType:
+        result.tagType = true;
         break;
     case kIROp_InOutImplicitCast:
     case kIROp_OutImplicitCast:
@@ -1033,6 +1054,12 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Scan the IR module and determine which lowering/legalization passes are needed.
+    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
+    requiredLoweringPassSet = {};
+    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
+
+    if (requiredLoweringPassSet.assumeAddress)
     {
         bool validate = !isCPUTarget(targetRequest) && !isCUDATarget(targetRequest);
         SLANG_PASS(validateAndRemoveAssumeAddress, validate, sink);
@@ -1041,11 +1068,6 @@ Result linkAndOptimizeIR(
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
-
-    // Scan the IR module and determine which lowering/legalization passes are needed.
-    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
-    requiredLoweringPassSet = {};
-    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     // Debug info is added by the front-end. If the target cannot express debug info, or if the user
     // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
@@ -1698,14 +1720,17 @@ Result linkAndOptimizeIR(
             requiredLoweringPassSet.reinterpret = true;
     }
 
-    SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
+    if (requiredLoweringPassSet.untaggedUnion)
+        SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
     if (requiredLoweringPassSet.reinterpret)
         SLANG_PASS(lowerReinterpret, targetProgram, sink);
 
     SLANG_PASS(lowerSequentialIDTagCasts, codeGenContext->getLinkage(), sink);
-    SLANG_PASS(lowerTagInsts, sink);
-    SLANG_PASS(lowerTagTypes);
+    if (requiredLoweringPassSet.tagOps)
+        SLANG_PASS(lowerTagInsts, sink);
+    if (requiredLoweringPassSet.tagType)
+        SLANG_PASS(lowerTagTypes);
 
     SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
 
@@ -1817,6 +1842,14 @@ Result linkAndOptimizeIR(
     {
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
     }
+
+    // Must run after SSA construction (so the switch selector is a phi) and
+    // before any target-specific structured-CFG legalization (so the rewritten
+    // CFG is what those passes consume). Registered outside the branch above so
+    // it runs at every optimization level: at `-O0` the selector is made a phi
+    // by the SCCP + DCE step, at higher levels by `simplifyIR`. When the
+    // selector is not yet a phi the pass finds nothing to thread and is a no-op.
+    SLANG_PASS(threadSwitchOnConstantPhi);
 
     // Report checkpointing information.
     if (codeGenContext->shouldReportCheckpointIntermediates())

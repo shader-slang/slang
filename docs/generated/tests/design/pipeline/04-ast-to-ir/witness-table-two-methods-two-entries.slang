@@ -14,7 +14,7 @@
 // the concrete implementations" — at two methods, the table carries
 // two entries, naming each requirement and each implementation.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IShape { int area(); int perim(); }
 struct Sq : IShape {

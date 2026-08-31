@@ -15,7 +15,7 @@
 // 8-byte pointer size and its 8-byte alignment). If a pointee layout were
 // stored it would have to occupy one of those two operand slots.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct S
 {
