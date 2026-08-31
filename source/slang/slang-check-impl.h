@@ -1297,6 +1297,10 @@ public:
         }
     }
 
+    // This context stores a non-owning pointer. Reject a temporary owner so that its destruction
+    // cannot leave `m_shared` dangling; callers with a `RefPtr` must keep that owner in a local.
+    SemanticsContext(RefPtr<SharedSemanticsContext>&&) = delete;
+
     SharedSemanticsContext* getShared() { return m_shared; }
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
@@ -1642,6 +1646,9 @@ struct SemanticsVisitor : public SemanticsContext
         : Super(shared)
     {
     }
+
+    // Keep direct visitor construction subject to the ownership rule on `SemanticsContext`.
+    SemanticsVisitor(RefPtr<SharedSemanticsContext>&&) = delete;
 
     SemanticsVisitor(SemanticsContext const& context)
         : Super(context)
@@ -3451,9 +3458,11 @@ public:
     /// `context.bestCandidate` at that storage, clears `context.bestCandidates`, and returns true.
     /// On failure, leaves `context` unchanged and returns false.
     ///
-    /// The final source-level callers, `ResolveInvoke` and `_coerce`, must emit the deprecation
-    /// warning when this returns true. Speculative conversion-cost probes must defer the warning
-    /// until they materialize the conversion. Any new caller must follow the same policy.
+    /// The final source-level call sites are `ResolveInvoke` and `_coerce`. A caller must emit the
+    /// deprecation warning when this returns true and it is materializing a source-level expression.
+    /// `ResolveInvoke` always materializes; `_coerce` does so only when it receives both `outToExpr`
+    /// and `sink`. A speculative conversion-cost probe must stay silent and let the eventual
+    /// materialization warn. Any new caller must follow the same policy.
     bool tryResolveOverloadUsingLegacyGenericParameterCountFallback(
         OverloadResolveContext& context);
 

@@ -65,9 +65,18 @@ Slang language version 2026 brings these changes on top of Slang 2025:
 Slang language version 202c brings these changes on top of Slang 2026:
 
 - The generic-parameter-count overload tie-breaker has been removed.
-  In earlier language versions, when all ordinary ranking rules left generic overloads tied, Slang selected the candidate with fewer required generic parameters and emitted a deprecation warning.
-  When the current compiler operates in a pre-202c mode, ordinary rules such as scope and `OverloadRank` run first and may silently select a different candidate than an older compiler selected.
-  The warning is emitted only when every ordinary rule leaves the candidates tied and the generic-parameter-count fallback then selects a unique candidate.
+  Older compilers treated required generic-parameter count as an ordinary ranking rule and
+  preferred the candidate with fewer required parameters at that fixed point in overload
+  resolution.
+  When the current compiler operates in a pre-202c language mode, ordinary rules such as scope and
+  `OverloadRank` run first.
+  Only when every ordinary rule leaves the candidates tied does it use generic-parameter count as a
+  compatibility fallback and emit a deprecation warning if that fallback selects a unique
+  candidate.
+  This reordering can silently select a different candidate than an older compiler when an ordinary
+  rule now resolves the call before the compatibility fallback is reached.
+  The warning is diagnostic `40021`; suppress it with `-warnings-disable 40021` or promote it to an
+  error with `-warnings-as-errors 40021`.
   Such a call is ambiguous in Slang 202c unless another ranking rule distinguishes the candidates.
   A non-generic overload is more specific than an otherwise-equivalent specialization of a
   generic, including when all of the generic parameters have defaults; that ordinary rule applies
