@@ -14,7 +14,7 @@
 // `return_val(void_constant)`. This is the doc's "ReturnStmt → IRReturn"
 // claim. The dump opcode name is `return_val`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

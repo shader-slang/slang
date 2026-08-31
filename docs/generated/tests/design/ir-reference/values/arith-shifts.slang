@@ -13,7 +13,7 @@
 // surface the `shl` / `shr` opcodes the doc lists in the Arithmetic
 // and bitwise table.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform uint ua;

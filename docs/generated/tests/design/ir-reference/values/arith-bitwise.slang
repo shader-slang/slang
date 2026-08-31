@@ -13,7 +13,7 @@
 // cross-cutting bundle does not cover. A single function combines
 // all four so the IR dump surfaces each.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint a;
 uniform uint b;

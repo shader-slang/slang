@@ -16,8 +16,8 @@
 // A test that only pinned one mode could not tell a mode operand from a
 // constant.
 
-//TEST:SIMPLE(filecheck=ROW):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -matrix-layout-row-major
-//TEST:SIMPLE(filecheck=COL):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=ROW):-target spirv-asm -dump-ir -o - -entry main -stage compute -matrix-layout-row-major
+//TEST:SIMPLE(filecheck=COL):-target spirv-asm -dump-ir -o - -entry main -stage compute -matrix-layout-column-major
 
 cbuffer CB
 {

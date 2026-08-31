@@ -15,7 +15,7 @@
 // instruction whose result is `Float`, pulling from the narrowest to
 // the platform-default float.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half v;
 uniform RWStructuredBuffer<float> buf;

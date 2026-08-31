@@ -14,7 +14,7 @@
 // dump. A domain-shader parameter `OutputPatch<HS_OUT, 4>` surfaces
 // the `OutputPatch` opcode in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage domain -entry domainMain -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage domain -entry domainMain -dump-ir -o -
 
 struct HS_OUT
 {

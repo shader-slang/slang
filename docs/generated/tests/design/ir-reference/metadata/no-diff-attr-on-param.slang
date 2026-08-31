@@ -15,7 +15,7 @@
 // `Attributed` type, showing the marker travels with the parameter's type
 // rather than as a decoration on the function.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<float> buf;
 

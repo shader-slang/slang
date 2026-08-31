@@ -15,7 +15,7 @@
 // `global_param` while `gState` is typed `Ptr(Int)` under `global_var`. A
 // regression that gave `global_param` a pointer result would fail the first.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int gIn;
 uniform RWStructuredBuffer<int> buf;

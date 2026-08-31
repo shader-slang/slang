@@ -52,7 +52,7 @@ Coverage follows the doc's own decomposition:
   statements ahead of a switch's first `case` label.
 
 The primary observation mechanism is
-`-target spirv-asm -dump-ir -o /dev/null` followed by FileCheck against
+`-target spirv-asm -dump-ir -o -` followed by FileCheck against
 the IR dump, anchored on a user-named function (`func %main` or a
 helper) to cut through the preamble of capability sets, core-module
 imports, and differentiation glue. Almost every claim here is a
