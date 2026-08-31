@@ -13,7 +13,7 @@
 // structured buffer. The opcode shape documented for `Load` should
 // still appear with the literal `0 : Int` carried in operand 2.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> rwbuf;
 

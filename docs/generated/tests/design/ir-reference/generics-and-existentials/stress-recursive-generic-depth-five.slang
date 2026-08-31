@@ -11,7 +11,7 @@
 // Stresses nesting depth of generic application. Five levels of `Box` must
 // produce five nested `specialize` values with `Int` innermost; the CHECK
 // spells the whole nest, so a flattened or truncated representation fails.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct Box<T> { T val; };
 

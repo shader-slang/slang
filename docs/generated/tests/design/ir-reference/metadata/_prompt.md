@@ -31,10 +31,10 @@ attribute and inline-asm families) or by an early IR pass (the remaining
 IR snapshot, and the observation point for nearly every test is:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 ```
 
-`-o /dev/null` keeps target code off stdout so the dump is the only output;
+`-o -` keeps target code off stdout so the dump is the only output;
 `-target` is required or compilation stops before the dump is produced.
 
 Records that a pass creates rather than lowering are read from that pass's own
@@ -268,7 +268,7 @@ for claims the doc does not state.
 Default:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 ```
 
 Variants this bundle legitimately needs:

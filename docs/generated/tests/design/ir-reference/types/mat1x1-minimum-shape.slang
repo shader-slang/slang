@@ -13,7 +13,7 @@
 // Int, 1 : Int, layout) in the IR. The minimum row/col shape of 1x1
 // surfaces `Mat(Float, 1 : Int, 1 : Int, ...)` in the dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform matrix<float, 1, 1> m;
 uniform RWStructuredBuffer<float> buf;

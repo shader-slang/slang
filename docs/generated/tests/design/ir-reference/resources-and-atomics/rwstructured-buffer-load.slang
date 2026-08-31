@@ -14,7 +14,7 @@
 // pointer followed by an ordinary load. The index is thread-derived, and
 // the CHECK pins the two-operand form in the user body.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> rwbuf;
 

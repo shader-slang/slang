@@ -21,7 +21,7 @@
 // `cooperative_vector` capability; the IR opcode is visible at
 // LOWER-TO-IR regardless.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int ia;
 uniform int ib;

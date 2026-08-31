@@ -16,7 +16,7 @@
 // `witness_table_t(%IShape)` but differ in the concrete-type
 // parenthesised application.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IShape { float area(); }
 struct Circle : IShape { float r; float area() { return 3.14 * r * r; } }

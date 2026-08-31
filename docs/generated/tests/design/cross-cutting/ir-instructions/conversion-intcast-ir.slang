@@ -13,7 +13,7 @@
 // `floatCast`). A constructor-style `int64_t(a)` on a non-constant
 // `int` produces the `intCast` opcode in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int64_t> buf;
