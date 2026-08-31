@@ -17,7 +17,7 @@
 // results together, which is only possible if the builder built the outer
 // level from the per-atom-set conjunctions.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

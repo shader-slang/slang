@@ -16,7 +16,7 @@
 // the generic bodies in the IR dump and pin the witness line immediately
 // feeding each extract.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

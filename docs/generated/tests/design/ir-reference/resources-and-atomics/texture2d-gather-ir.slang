@@ -12,7 +12,7 @@
 // `Gather` is the four-texel-fetch sampling variant from the doc's
 // sampling-and-combined-samplers section.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture2D<float4> tex;
 uniform SamplerState samp;

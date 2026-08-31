@@ -15,7 +15,7 @@
 // still composes — the buffer type names the struct, and the struct's
 // `field` rows preserve each Vec.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Complex { float3 pos; float2 uv; float4 col; }
 

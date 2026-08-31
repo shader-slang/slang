@@ -13,7 +13,7 @@
 // `count` operands intact at the degenerate width. This boundary probe takes the zero-width extract — count = 0 —
 // as the lower edge of the bit-field width range.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint a;
 uniform RWStructuredBuffer<uint> buf;

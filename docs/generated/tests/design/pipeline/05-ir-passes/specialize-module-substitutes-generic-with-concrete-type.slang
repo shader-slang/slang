@@ -16,7 +16,7 @@
 // This is the main specialization driver in the
 // `slang-ir-specialize.cpp` row of the doc table.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-before specializeModule -dump-ir-after specializeModule -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-before specializeModule -dump-ir-after specializeModule -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

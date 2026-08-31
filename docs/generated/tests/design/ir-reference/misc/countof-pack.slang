@@ -15,7 +15,7 @@
 // requires the inst's operand to be the generic's pack parameter rather than a
 // folded literal.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

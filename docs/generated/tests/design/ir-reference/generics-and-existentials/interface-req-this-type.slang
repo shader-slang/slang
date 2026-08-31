@@ -12,7 +12,7 @@
 // position: the interface declares a requirement about whatever type conforms,
 // so the receiver is `this_type(%IFoo)` rather than any concrete struct. The
 // CHECK asserts that spelling inside the entry's type operand.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

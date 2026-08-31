@@ -15,7 +15,7 @@
 // parameter surfaces the `TriangleStream` opcode parameterised by its
 // element-type struct in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-profile sm_5_0 -stage geometry -entry main -target hlsl -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-profile sm_5_0 -stage geometry -entry main -target hlsl -dump-ir -o -
 
 // SV_Position cannot decorate an array directly; wrap each input vertex
 // in a struct that carries the semantic.

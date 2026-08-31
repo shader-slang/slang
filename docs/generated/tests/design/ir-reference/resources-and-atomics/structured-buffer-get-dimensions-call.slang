@@ -15,8 +15,8 @@
 // second, unanchored directive shows the opcode itself does exist in the
 // dump — inside the specialized library function, not in the user body.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
-//TEST:SIMPLE(filecheck=OPC):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
+//TEST:SIMPLE(filecheck=OPC):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform StructuredBuffer<int> sbuf;
 uniform RWStructuredBuffer<uint> rwbuf;
