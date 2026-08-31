@@ -17,7 +17,7 @@
 // "no function found matching entry point name 'main'" fires
 // (attached to the first source line of the translation unit).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 /*CHECK:

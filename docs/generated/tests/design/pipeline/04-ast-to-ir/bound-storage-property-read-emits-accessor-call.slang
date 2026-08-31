@@ -17,7 +17,7 @@
 // lowers to a direct `get_field_addr` — the contrast shows the accessor call is
 // property-specific, not a general struct-member effect.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

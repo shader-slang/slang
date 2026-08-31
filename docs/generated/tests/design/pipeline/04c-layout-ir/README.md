@@ -32,12 +32,16 @@ target gate, the input-attachment-index space exemption, the bindless
 descriptor-heap placement, and the diagnostics that abort binding.
 
 **Layout-IR-shape tests** use
-`-target <T> -dump-ir -o /dev/null -entry main -stage compute`. The layout
+`-target <T> -dump-ir -o - -entry main -stage compute`. The layout
 module is never dumped under a header of its own; its effects appear once
 link merges it into the post-link IR, so these tests pin `CHECK-NOT`
 patterns to the pre-link `### LOWER-TO-IR:` block and positive `CHECK`
-patterns to the first post-link block,
-`### AFTER validateAndRemoveAssumeAddress:`. Only the _structure_ of the
+patterns to the first post-link block. That block is matched as
+<code>### AFTER &#123;&#123;[A-Za-z0-9_]+&#125;&#125;:</code> rather than
+by pass name, because the claim is about the earliest post-link snapshot
+and not about any particular pass: which pass runs first there changes as
+passes are gated on `RequiredLoweringPassSet` flags and skipped when the
+module holds nothing for them to do. Only the _structure_ of the
 layout instructions is asserted (`varLayout(`, `offset(`,
 `structTypeLayout(`, `parameterGroupTypeLayout(`, `EntryPointLayout(`,
 `[layout(%N)]`); the numeric operands inside them are per-target by

@@ -14,7 +14,7 @@
 // `interface_req_entry` row scales to five distinct methods, each
 // preserving the requirement name in source order.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IFive {
     int a(int x);

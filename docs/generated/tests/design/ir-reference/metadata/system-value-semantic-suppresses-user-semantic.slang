@@ -15,7 +15,7 @@
 // pins the system-value attribute for `SV_DispatchThreadID` and the CHECK-NOT
 // asserts no `userSemantic` naming an `SV_` string was also emitted.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

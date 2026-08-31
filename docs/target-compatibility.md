@@ -204,7 +204,7 @@ In practice to write shader code that works across D3D12 and VK you should have 
 
 ## tex.Load
 
-tex.Load is only supported on CUDA for Texture1D. Additionally CUDA only allows such access for linear memory, meaning the bound texture can also not have mip maps. Load _is_ allowed on RWTexture types of other dimensions including 1D on CUDA.
+tex.Load on a read-only texture is supported on CUDA for `Texture1D`, `Texture2D`, `Texture3D`, and the 1D/2D array forms; the mip map selection argument is ignored (the fetch reads the base level). Load is also allowed on RWTexture types on CUDA. Note: half-typed textures are not supported for Load or SampleLevel on CUDA (use a float texture).
 
 <a id="full-bool"></a>
 

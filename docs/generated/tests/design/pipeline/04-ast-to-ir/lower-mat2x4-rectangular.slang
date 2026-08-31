@@ -13,7 +13,7 @@
 // Verifies that the IR's Mat(...) row-then-column operand order
 // matches the source's R x C declaration order.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float2x4 m;
 uniform RWStructuredBuffer<float> buf;

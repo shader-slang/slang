@@ -18,7 +18,7 @@
 // that distinguishes `logicalAnd` from the bitwise `and`. The `cmpGT`
 // lines above them prove both operands were materialised first.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

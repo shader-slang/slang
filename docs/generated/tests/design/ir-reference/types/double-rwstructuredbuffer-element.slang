@@ -13,7 +13,7 @@
 // A `RWStructuredBuffer<double>` exposes the 64-bit floating-point
 // scalar as the element-type operand.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<double> buf;
 

@@ -55,7 +55,7 @@ Testable consequences:
 
 - **"Pass X runs in the pre-link region"** — compile with
   `//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir
--o /dev/null -entry main -stage compute` and FileCheck the
+-o - -entry main -stage compute` and FileCheck the
   `### LOWER-TO-IR:` block for the post-pass shape. The block header
   itself is constant text and a useful anchor:
   ```
@@ -169,7 +169,7 @@ Testable consequences:
    items.
 2. 12–18 `.slang` test files. Most are
    `//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir
--o /dev/null -entry main -stage compute` (the prompt's required
+-o - -entry main -stage compute` (the prompt's required
    directive). Two or three may be `DIAGNOSTIC_TEST` for the
    validation passes that surface diagnostics.
 
@@ -202,7 +202,7 @@ does not make.
 Default required directive for IR observation tests:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 ```
 
 Anchor `CHECK` patterns at `### LOWER-TO-IR:`, then at
@@ -253,7 +253,7 @@ These are in addition to the universal lessons in `_common.md`.
 - [ ] Every test's `doc_ref` resolves to an anchor in
       `pipeline/04b-pre-link-passes.md`.
 - [ ] All IR-observation tests use the canonical
-      `-target spirv-asm -dump-ir -o /dev/null -entry main
+      `-target spirv-asm -dump-ir -o - -entry main
 -stage compute` directive.
 - [ ] Diagnostic tests use `DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):` and
       verbatim error text from the runner's suggested annotations.

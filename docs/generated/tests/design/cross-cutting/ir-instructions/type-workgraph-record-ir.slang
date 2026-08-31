@@ -18,7 +18,7 @@
 // struct — which is only true if the element type is an operand of the type
 // inst rather than baked into a distinct opcode per record struct.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry myNode -profile lib_6_8 -experimental-feature -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry myNode -profile lib_6_8 -experimental-feature -dump-ir -o -
 
 import experimental.workgraph;
 

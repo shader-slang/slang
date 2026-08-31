@@ -14,7 +14,7 @@
 // a runtime condition, so no store can be folded away; the CHECKs assert one
 // packing inst per assigned value, each pairing its own value with its own
 // witness.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

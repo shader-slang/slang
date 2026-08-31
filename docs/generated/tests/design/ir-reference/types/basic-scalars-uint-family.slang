@@ -14,7 +14,7 @@
 // cover each unsigned-integer width surfaces all four opcodes in the
 // IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct UInts { uint8_t a; uint16_t b; uint c; uint64_t d; }
 
