@@ -162,10 +162,11 @@ class GLSLPrecisionModifier : public Modifier
     FIDDLE(...)
 };
 
-/// Legacy marker retained for AST serialization compatibility.
+/// Legacy marker retained so module ASTs serialized by older Slang versions can be deserialized.
 ///
-/// New front-end code reads the effective language from `TranslationUnitRequest::sourceLanguage`
-/// instead of attaching language mode to the module AST.
+/// `FIDDLE` must continue registering this node type for those artifacts, but the current
+/// front-end intentionally neither creates nor interprets it. New code reads the effective
+/// language exclusively from `TranslationUnitRequest::sourceLanguage`.
 FIDDLE()
 class GLSLModuleModifier : public Modifier
 {

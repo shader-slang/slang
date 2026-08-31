@@ -46,8 +46,9 @@ SLANG_UNIT_TEST(sourceLanguageAllowGLSLNormalizesThroughDeprecatedAPI)
         unitTestContext->slangGlobalSession->createCompileRequest(request.writeRef())));
 
     // The deprecated request-wide API must be reduced to the same effective per-translation-unit
-    // language as the command-line option. Deliberately pass both an explicit Slang language and a
-    // `.slang` path so this GLSL-only syntax cannot compile unless that normalization takes effect.
+    // language as the command-line option. It deliberately takes precedence over an explicit
+    // non-GLSL selection: pass both an explicit Slang language and a `.slang` path so this
+    // GLSL-only syntax cannot compile unless that normalization takes effect.
     int translationUnit =
         request->addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, "forcedGlslLanguage");
     request->addTranslationUnitSourceString(

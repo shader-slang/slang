@@ -152,6 +152,11 @@ public:
     /// and code-generation logic then consult that per-translation-unit selection rather than the
     /// deprecated request-wide flag.
     ///
+    /// The legacy option deliberately takes precedence over an existing non-GLSL selection from
+    /// `-lang` or `addTranslationUnit`. Retaining both would recreate a hybrid mode where the
+    /// translation unit declares one language while unrelated phases independently enable GLSL
+    /// behavior; the deprecation diagnostic instead states that every input is treated as GLSL.
+    ///
     /// The end-to-end request calls this before inferring a default target, and front-end execution
     /// calls it again for API clients that bypass the end-to-end path. The first call removes the
     /// option, making every subsequent call a no-op without repeating its diagnostic.

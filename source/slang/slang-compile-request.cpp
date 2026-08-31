@@ -296,12 +296,18 @@ static void _applySourceLanguageDirective(
     }
 }
 
-/// Resolve the extension-implied language of the primary source files and diagnose every
-/// disagreement with an explicitly requested language.
+/// Resolve the extension-implied language of the primary source files and diagnose conflicts.
 ///
-/// Slang command-line inputs may share a translation unit, while API callers may construct a
-/// multi-file translation unit directly. Performing this check here ensures that every primary
-/// file participates in the same validation before either entry path begins parsing.
+/// With an explicit language, every recognized extension that disagrees emits
+/// `ExplicitSourceLanguageOverridesFileExtension`, and the explicit language remains effective.
+/// It also resolves any disagreement among the extensions, so that disagreement does not emit
+/// `ConflictingSourceFileExtensionLanguages`. Without an explicit language, differing recognized
+/// extensions emit that conflict; their shared provenance is recorded as `Unknown`, while the
+/// first recognized language is retained only as a deterministic parser recovery mode.
+///
+/// Slang command-line inputs may share a translation unit, while API callers may construct one
+/// directly with multiple files. Resolving them together ensures that every primary file
+/// participates in the same validation before either entry path begins parsing.
 static void _resolveSourceLanguageFromPrimarySourceFiles(
     TranslationUnitRequest* translationUnit,
     List<SourceFile*> const& primarySourceFiles,
@@ -714,13 +720,14 @@ void FrontEndCompileRequest::normalizeAllowGLSLInputOption()
         // code-generation code from growing separate notions of a "GLSL mode."
         getSink()->diagnose(Diagnostics::DeprecatedAllowGlslOption{});
 
+        // The legacy request-wide switch deliberately wins over an explicit non-GLSL selection.
+        // Keeping both would recreate the old hybrid mode where a translation unit declared one
+        // language while independent compiler phases enabled GLSL behavior. E00117 states this
+        // compatibility rule: every input translation unit is treated as GLSL.
         for (auto translationUnit : translationUnits)
         {
-            if (translationUnit->sourceLanguageExplicitlyRequested != SourceLanguage::GLSL)
-            {
-                translationUnit->sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
-                translationUnit->sourceLanguage = SourceLanguage::GLSL;
-            }
+            translationUnit->sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
+            translationUnit->sourceLanguage = SourceLanguage::GLSL;
         }
     }
 
