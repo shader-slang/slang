@@ -246,13 +246,9 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        // `source` may be null for a source module loaded from a file at
-        // `path`. Read the file here, via the session file system, and reuse the
-        // one blob for both the digest below and the load (it is passed to
-        // loadModuleImpl, so loadSourceModuleImpl consumes it directly): this
-        // keeps digesting and compilation on identical bytes, and covers sources
-        // reachable only through the session file system, which the File::exists
-        // gate on the null-blob fallback below would miss.
+        // When `source` is null, read the file at `path` and reuse the one blob
+        // for the digest and the load so both see identical bytes, incl.
+        // session-only sources the File::exists fallback below cannot see.
         ComPtr<ISlangBlob> sourceBlob(source);
         if (!sourceBlob && blobType == ModuleBlobType::Source && path)
         {
