@@ -1,5 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 interface IGetter
 {

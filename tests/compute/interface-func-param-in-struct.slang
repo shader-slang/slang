@@ -1,6 +1,8 @@
 // Tests specializing a function with existential-struct-typed param.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
 
 [anyValueSize(8)]

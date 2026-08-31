@@ -7098,7 +7098,6 @@ NVVM_SCALAR_DIRECT_TEST(nvvmSlangIntegerSignedGreaterEqualUsesDirectPipeline, Si
 SLANG_UNIT_TEST(nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation)
 {
     static const char* kUnsupportedSources[] = {
-        kDirectNVVMUnsupportedNestedAggregateParameterSource,
         kDirectNVVMIncompatibleStructuredBufferAggregateLayoutSource,
         kDirectNVVMUnsupportedStructuredMatrixWriteSource,
     };
@@ -7128,7 +7127,6 @@ SLANG_UNIT_TEST(nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMuta
         SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
     }
 }
-
 
 SLANG_UNIT_TEST(nvvmSlangRetainsOnlySelectedCUDAKernel)
 {

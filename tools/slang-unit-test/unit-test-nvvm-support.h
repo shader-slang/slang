@@ -12345,22 +12345,6 @@ void computeMain(
     output[0] = loaded.x + int(stored.w);
 }
 )";
-static const char kDirectNVVMUnsupportedNestedAggregateParameterSource[] = R"(
-struct Inner
-{
-    uint value;
-};
-
-struct Outer
-{
-    Inner inner;
-};
-
-[CUDAKernel]
-void computeMain(uniform Outer value)
-{
-}
-)";
 static const char kDirectNVVMRawRWStructuredBufferU32AtomicAddSource[] = R"(
 [CUDAKernel]
 void computeMain(RWStructuredBuffer<uint> destination, uniform uint index)

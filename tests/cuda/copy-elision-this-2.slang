@@ -1,4 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -compute
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -compute -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST:SIMPLE(filecheck=CUDA): -stage compute -entry computeMain -target cuda -O3
 
 struct Data

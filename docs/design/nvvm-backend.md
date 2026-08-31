@@ -6931,6 +6931,34 @@ optional structured-buffer gate measures 251.4 ms and 590-byte PTX at direct O3 
 gate measures 253.1 ms and 645-byte PTX versus 365.2 ms and 8584 bytes; direct O0 emits 2198-byte
 PTX. These remain exploratory measurements.
 
+### Slice 160: Resource-aggregate parameter transport
+
+Direct NVVM now carries the established finite resource-struct value algebra across both compute
+parameter boundaries. A raw aggregate launch parameter keeps the NVPTX physical ABI established
+for scalar structs: a generic pointer with exact LLVM `byval` pointee and CUDA alignment. The
+emitter records that physical pointer separately and materializes one invariant aggregate load for
+ordinary semantic uses such as helper calls. Entry-field extraction still uses the physical
+pointer for typed GEP and aligned invariant field loads.
+
+Collected conventional globals remain a distinct representation. A finite resource struct is one
+field of the synthesized constant-address-space global block, is validated recursively for exact
+CUDA/LLVM size and field offsets, and is accessed through the existing keyed field-address path.
+It never acquires the launch parameter's `byval` wrapper. Both paths reuse
+`asNVVMSupportedResourceStructType` and existing generic struct, pointer, attribute, GEP, and load
+operations; provider ABI revision 30 is unchanged.
+
+Four frozen-v1 workloads and discovery `interface-shader-param` become correct at O0 and O3 and
+gain ten permanent direct lanes. Frozen v1 remains exactly 452 workloads/427 healthy references
+and reaches 390/394/390 O0/O3/both-mode correctness (91.3%/92.3%/91.3%), with zero old-correct
+loss. Discovery remains exactly 82/72 and reaches 61/61/61 (84.7%), also with zero loss. A selected
+generic parameter-block entry workload remains at its independent parameter-group launch ABI
+blocker. The selected prefix passes 427/427.
+
+All seventeen representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+The new conventional aggregate/helper gate measures 258.1 ms and 797-byte PTX at direct O3 SM70
+versus 370.3 ms and 8770 bytes through NVRTC O3; direct O0 measures 255.1 ms and emits 22133-byte
+PTX. These remain exploratory measurements.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

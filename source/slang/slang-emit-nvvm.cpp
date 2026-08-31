@@ -366,6 +366,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         NVVMReadOnlyTextureType sampledTextureType;
         SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
         return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
+               asNVVMSupportedResourceStructType(fieldType) ||
                asNVVMSupportedDeviceCopyableValuePointerType(fieldType) ||
                asNVVMSupportedParameterGroupType(fieldType) ||
                getNVVMSupportedSurfaceField(outAddress.field, surfaceType, storageFormat) ||
@@ -855,7 +856,7 @@ bool _getNVVMByValueParameterAlignment(
     uint32_t& outAlignment)
 {
     outAlignment = 0;
-    if (!codeGenContext || !asNVVMSupportedScalarStructType(type))
+    if (!codeGenContext || !asNVVMSupportedResourceStructType(type))
         return false;
 
     IRSizeAndAlignment layout;
@@ -6968,10 +6969,18 @@ SlangResult _validateNVVMFunction(
                 codeGenContext,
                 toSlice("structured-buffer element layout"));
         }
-        if (isEntryPoint && asNVVMSupportedScalarStructType(param->getDataType()))
+        if (isEntryPoint && asNVVMSupportedResourceStructType(param->getDataType()))
         {
             uint32_t alignment = 0;
             if (!_getNVVMByValueParameterAlignment(codeGenContext, param->getDataType(), alignment))
+            {
+                return _diagnoseUnsupportedIR(
+                    codeGenContext,
+                    toSlice("entry-point parameter layout"));
+            }
+            if (!_hasNVVMCompatibleStructLayout(
+                    codeGenContext,
+                    as<IRStructType>(param->getDataType())))
             {
                 return _diagnoseUnsupportedIR(
                     codeGenContext,
@@ -11516,6 +11525,16 @@ SlangResult validateNVVMSupportedIR(
                 _addNVVMReachableStructTypes(parameterGroupStruct, selectedReachableStructTypes);
             }
             IRStructType* elementStruct = _getNVVMRawBufferAggregateElementType(fieldType);
+            if (auto resourceStruct = asNVVMSupportedResourceStructType(fieldType))
+            {
+                if (!_hasNVVMCompatibleStructLayout(codeGenContext, resourceStruct))
+                {
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("conventional resource-struct layout"));
+                }
+                _addNVVMReachableStructTypes(resourceStruct, selectedReachableStructTypes);
+            }
             NVVMRawBufferType rawBufferType;
             if (getNVVMSupportedRawBufferType(fieldType, rawBufferType) &&
                 !_hasNVVMCompatibleRawBufferElementLayout(codeGenContext, fieldType))
@@ -11770,6 +11789,7 @@ SlangResult emitNVVMIRFromLinkedIR(
     Dictionary<IRFunc*, SlangNVVMValueHandle> functionMap;
     NVVMValueMap valueMap;
     NVVMValueMap helperValueMap;
+    NVVMValueMap entryAggregatePointerMap;
     NVVMGlobalUserPointerSet globalUserPointers;
     Dictionary<IRBlock*, SlangNVVMBlockHandle> blockMap;
 
@@ -11885,7 +11905,7 @@ SlangResult emitNVVMIRFromLinkedIR(
             size_t parameterIndex = 0;
             for (auto parameter : function->getParams())
             {
-                if (asNVVMSupportedScalarStructType(parameter->getDataType()))
+                if (asNVVMSupportedResourceStructType(parameter->getDataType()))
                 {
                     SlangNVVMTypeHandle aggregateType = nullptr;
                     SLANG_RETURN_ON_FAIL(typeContext.lowerType(
@@ -11930,6 +11950,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                     parameter)));
             valueMap[param] = parameter;
             if (function == entryPoint &&
+                asNVVMSupportedResourceStructType(param->getDataType()))
+            {
+                entryAggregatePointerMap[param] = parameter;
+            }
+            if (function == entryPoint &&
                 asNVVMSupportedDeviceCopyableValuePointerType(param->getDataType()))
             {
                 globalUserPointers.add(param);
@@ -11967,16 +11992,23 @@ SlangResult emitNVVMIRFromLinkedIR(
 
         IRBlock* entryBlock = function->getFirstBlock();
         bool hasHalfParameter = false;
+        bool hasEntryAggregateValueParameter = false;
         for (auto param : function->getParams())
         {
             hasHalfParameter = hasHalfParameter ||
                                (function != entryPoint && isNVVMFloat16Type(param->getDataType()));
+            hasEntryAggregateValueParameter =
+                hasEntryAggregateValueParameter ||
+                (function == entryPoint &&
+                 asNVVMSupportedResourceStructType(param->getDataType()) &&
+                 !asNVVMSupportedScalarStructType(param->getDataType()));
         }
-        if (hasHalfParameter)
+        if (hasHalfParameter || hasEntryAggregateValueParameter)
         {
             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                 codeGenContext,
-                "Half helper ABI entry-block selection",
+                hasHalfParameter ? "Half helper ABI entry-block selection"
+                                 : "aggregate entry-parameter block selection",
                 builder.setInsertBlock(moduleScope.module, blockMap.getValue(entryBlock))));
         }
         if (hasHalfParameter)
@@ -11993,6 +12025,38 @@ SlangResult emitNVVMIRFromLinkedIR(
                     false,
                     valueMap.getValue(param),
                     loweredValue));
+                valueMap[param] = loweredValue;
+            }
+        }
+        if (hasEntryAggregateValueParameter)
+        {
+            // Consider `kernel(uniform Params params) { helper(params); }`, where `Params`
+            // contains a resource. NVPTX exposes `params` as the physical `byval` pointer created
+            // above, but `helper` takes the ordinary first-class struct. Load that semantic value
+            // once while retaining the pointer in `entryAggregatePointerMap` for direct field
+            // addressing.
+            for (auto param : function->getParams())
+            {
+                if (!asNVVMSupportedResourceStructType(param->getDataType()) ||
+                    asNVVMSupportedScalarStructType(param->getDataType()))
+                    continue;
+
+                SlangNVVMValueHandle loweredPointer = valueMap.getValue(param);
+                uint32_t alignment = 0;
+                SLANG_RELEASE_ASSERT(_getNVVMByValueParameterAlignment(
+                    codeGenContext,
+                    param->getDataType(),
+                    alignment));
+                SlangNVVMValueHandle loweredValue = nullptr;
+                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                    codeGenContext,
+                    "by-value aggregate parameter load",
+                    builder.emitLoad(
+                        moduleScope.module,
+                        loweredPointer,
+                        alignment,
+                        SLANG_NVVM_LOAD_FLAG_INVARIANT,
+                        loweredValue)));
                 valueMap[param] = loweredValue;
             }
         }
@@ -13721,15 +13785,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                         auto fieldExtract = cast<IRFieldExtract>(inst);
                         NVVMStructField resolvedField;
                         SLANG_RELEASE_ASSERT(_getNVVMStructFieldValue(fieldExtract, resolvedField));
-                        SlangNVVMValueHandle loweredBase = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            fieldExtract->getBase(),
-                            valueMap,
-                            typeContext,
-                            loweredBase));
                         SlangNVVMValueHandle loweredValue = nullptr;
                         // CUDA kernel structs are pointer-backed `byval` parameters, but `IRParam`
                         // also represents phi values in later blocks. Consider an interface value
@@ -13741,9 +13796,12 @@ SlangResult emitNVVMIRFromLinkedIR(
                         const bool isPointerBackedEntryParameter =
                             function == entryPoint && as<IRParam>(fieldExtract->getBase()) &&
                             fieldExtract->getBase()->getParent() == function->getFirstBlock() &&
-                            asNVVMSupportedScalarStructType(fieldExtract->getBase()->getDataType());
+                            asNVVMSupportedResourceStructType(
+                                fieldExtract->getBase()->getDataType());
                         if (isPointerBackedEntryParameter)
                         {
+                            SlangNVVMValueHandle loweredBase =
+                                entryAggregatePointerMap.getValue(fieldExtract->getBase());
                             SlangNVVMValueHandle loweredFieldPointer = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
@@ -13754,7 +13812,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     resolvedField.fieldIndex,
                                     loweredFieldPointer)));
                             const uint32_t alignment =
-                                getNVVMNumericValueAlignment(fieldExtract->getDataType());
+                                _getNVVMExecutableValueAlignment(fieldExtract->getDataType());
                             SLANG_RELEASE_ASSERT(alignment);
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
@@ -13768,6 +13826,15 @@ SlangResult emitNVVMIRFromLinkedIR(
                         }
                         else
                         {
+                            SlangNVVMValueHandle loweredBase = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                fieldExtract->getBase(),
+                                valueMap,
+                                typeContext,
+                                loweredBase));
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
                                 "first-class aggregate field extraction",

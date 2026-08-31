@@ -1594,6 +1594,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
     SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
     IRType* type = field ? field->getFieldType() : nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
+           asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedDeviceCopyableValuePointerType(type) ||
            asNVVMSupportedParameterGroupType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
@@ -1625,7 +1626,8 @@ bool isNVVMSupportedParameterType(IRInst* type)
 {
     NVVMRawBufferType rawBufferType;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupportedScalarStructType(type) || asNVVMSupportedDeviceNumericPointerType(type) ||
+           asNVVMSupportedResourceStructType(type) ||
+           asNVVMSupportedDeviceNumericPointerType(type) ||
            asNVVMSupportedDeviceArrayPointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType);
 }
@@ -2009,7 +2011,6 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     uint32_t valueVectorElementCount = 0;
     IRVectorType* valueVectorType = asNVVMSupportedValueVectorType(type, &valueVectorElementCount);
     IRStructType* structType = as<IRStructType>(type);
-    IRStructType* scalarStructType = asNVVMSupportedScalarStructType(type);
     IRStructType* resourceStructType = asNVVMSupportedResourceStructType(type);
     IRStructType* physicalArrayStructType = asNVVMSupportedPhysicalArrayStructType(type);
     IRStructType* localResourceStructValueType = nullptr;
@@ -2078,7 +2079,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
          (isVoid || isHelperValue || resourceStructType || localCopyablePointer ||
           localHelperPointer || isRawBuffer || isSampledTexture)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
-         (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
+         (isInteger || isFloat32 || resourceStructType || deviceNumericPointer ||
           deviceCopyablePointer || deviceArrayPointer || isRawBuffer)) ||
         (use == NVVMTypeUse::HelperParameter &&
          (isHelperValue || resourceStructType || localResourceStructPointer ||
@@ -2219,7 +2220,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // NVPTX represents an aggregate kernel parameter as a generic pointer carrying `byval`, while
     // the same canonical Slang struct remains a first-class LLVM struct in ordinary value roles.
     // Keep this physical ABI representation separate from the canonical value-type cache.
-    if (use == NVVMTypeUse::EntryPointParameter && scalarStructType)
+    if (use == NVVMTypeUse::EntryPointParameter && resourceStructType)
     {
         if (auto mappedType = m_entryParameterRepresentationMap.tryGetValue(type))
         {

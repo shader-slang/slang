@@ -2281,3 +2281,17 @@ The two frozen optional-resource workloads become correct at O0 and O3 and gain 
 Frozen v1 reaches 386/390/386 over its unchanged 427 healthy denominator; discovery remains
 60/60/60 over 72. Both have zero old-correct loss. The selected prefix passes 427/427, and all
 sixteen direct-O3 measurement gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 160 carries finite resource structs across both compute parameter boundaries. Raw aggregate
+launch parameters retain their generic-pointer `byval` ABI while one invariant load supplies the
+first-class semantic value used by helpers. Direct entry-field extraction retains a separate map
+to the physical pointer. Finite resource structs in the synthesized conventional global block stay
+ordinary immutable constant-address-space fields, reached by the existing keyed field path. Both
+boundaries require recursive CUDA/LLVM layout compatibility.
+
+The generic revision-30 provider interface is unchanged. Four frozen-v1 workloads and one
+discovery workload become correct at O0 and O3 and gain ten direct lanes. Frozen v1 reaches
+390/394/390 over its unchanged 427 healthy denominator; discovery reaches 61/61/61 over 72. Both
+have zero old-correct loss. A parameter-block-valued entry parameter remains a distinct launch-ABI
+blocker. The selected prefix passes 427/427, and all seventeen direct-O3 measurement gates assemble
+with CUDA 12.9 for SM70, SM80, and SM90.
