@@ -14,7 +14,7 @@
 // 1) are used so a transposed lowering cannot accidentally match; the CHECK
 // pins the exact triple and then the `func %main` the decoration sits on.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o -
 
 import experimental.workgraph;
 

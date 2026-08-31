@@ -13,7 +13,7 @@
 // The IR dump shows each integer literal as `<N> : UInt8` directly
 // on the store opcode that writes the value into the buffer.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<uint8_t> buf;
 

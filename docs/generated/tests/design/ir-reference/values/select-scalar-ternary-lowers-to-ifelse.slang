@@ -16,7 +16,7 @@
 // asserts no `select(` appears in the function at all — the absence is
 // the observation that distinguishes this case from the `bool3` one.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform bool c;
 uniform int x;
