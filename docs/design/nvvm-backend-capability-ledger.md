@@ -2196,3 +2196,15 @@ reaches 54/54/54 over 72. Both have zero old-correct loss and no remaining funct
 cluster. `generic-interface-nested` advances to the provider-owned by-value aggregate field-pointer
 failure and remains unsupported. The selected unit prefix passes 427/427, and all twelve discovery
 measurement gates assemble at direct O3 with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 153 distinguishes physical launch parameters from later-block SSA parameters. Both use the
+canonical `IRParam` instruction, but only values owned by a function's first block participate in
+its ABI. Aggregate field extraction in an entry function therefore uses pointer GEP plus invariant
+load only for a first-block scalar aggregate parameter carrying CUDA `byval`; a merge-block tuple
+uses the existing first-class aggregate extraction operation.
+
+The generic provider interface remains revision 30. Three frozen dynamic-dispatch workloads become
+correct at O0 and O3 and gain six direct lanes. Frozen v1 reaches 380/384/380 over its unchanged 427
+healthy denominator with zero old-correct loss. Discovery remains 54/54/54 over 72 with zero loss.
+The selected unit prefix passes 427/427, and all twelve discovery measurement gates assemble at
+direct O3 with CUDA 12.9 for SM70, SM80, and SM90.

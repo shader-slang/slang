@@ -13237,11 +13237,16 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredBase));
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        // CUDA kernel structs are pointer-backed `byval` parameters. Helper structs
-                        // are ordinary first-class aggregate parameters, matching their canonical
-                        // value type and every aggregate load or call result.
+                        // CUDA kernel structs are pointer-backed `byval` parameters, but `IRParam`
+                        // also represents phi values in later blocks. Consider an interface value
+                        // selected by an `if`: existential lowering sends each tagged tuple to a
+                        // merge-block parameter, then extracts its tag. That tuple is an ordinary
+                        // first-class aggregate, not part of the launch ABI. Only a parameter owned
+                        // by the entry block received the pointer representation and `byval`
+                        // attributes above.
                         const bool isPointerBackedEntryParameter =
                             function == entryPoint && as<IRParam>(fieldExtract->getBase()) &&
+                            fieldExtract->getBase()->getParent() == function->getFirstBlock() &&
                             asNVVMSupportedScalarStructType(fieldExtract->getBase()->getDataType());
                         if (isPointerBackedEntryParameter)
                         {

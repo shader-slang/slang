@@ -6746,6 +6746,32 @@ variadic-pack gate measures 239.5 ms and 646 bytes versus 351.1 ms and 8585 byte
 uncontrolled exploratory measurements, and the large direct-O0 PTX for both gates is recorded as
 an optimization-quality signal rather than a correctness failure.
 
+### Slice 153: Entry parameter role classification
+
+An `IRParam` is not necessarily a physical function parameter. Parameters owned by the first block
+form the function ABI, while parameters of later blocks are SSA phi values. Direct NVVM now checks
+that parent-block relationship before treating an aggregate entry-point value as a pointer-backed
+CUDA `byval` parameter.
+
+This distinction matters after existential lowering. A branch can construct two tagged tuples and
+pass them to a merge-block parameter; extracting the tuple tag is an ordinary first-class aggregate
+operation. The old `as<IRParam>` check instead sent that tuple to `emitStructFieldPointer`, where the
+typed provider correctly rejected a struct value as a pointer. First-block aggregate launch
+parameters continue to use struct GEP plus invariant load, and later-block aggregates use the
+existing `emitAggregateElementExtract` operation. Provider ABI revision 30 is unchanged.
+
+Three frozen-v1 dynamic-dispatch workloads become correct at O0 and O3 and gain six permanent
+direct lanes. Frozen corpus v1 remains exactly 452 workloads/427 healthy references and reaches
+380/384/380 O0/O3/both-mode correctness with zero old-correct loss. Discovery remains exactly
+82 workloads/72 healthy references and 54/54/54 with zero old-correct loss. The selected NVVM unit
+prefix remains 427/427, including the existing physical `byval` contract coverage.
+
+All twelve established discovery measurement gates assemble through CUDA 12.9 at direct O3 for
+SM70, SM80, and SM90. The existential-call-graph gate measures 271.9 ms and 1007-byte PTX at direct
+O3 SM70 versus 365.7 ms and 8946 bytes through NVRTC O3. These remain uncontrolled exploratory
+measurements. Aggregate address/layout transport and helper ABI are the largest remaining shared
+families; their separate pointer producers are not widened by this role fix.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
