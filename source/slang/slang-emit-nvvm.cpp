@@ -303,6 +303,37 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     return isNVVMSupportedAggregateStorageType(fieldType);
 }
 
+// Resolves the canonical pointer-like SSA value produced by loading one exact parameter-group
+// field. Consider this example:
+//
+//     struct Globals { ParameterBlock<Material> material; }
+//     Globals globals;
+//     Material value = globals.material;
+//
+// Entry-point-uniform lowering first emits `fieldAddress(globals, material)`, then loads the
+// `ParameterBlock<Material>` pointer, and finally loads `Material` through that SSA value. The
+// middle value has parameter-group type rather than `Ptr<Material>`, so retain its exact field
+// producer here instead of admitting arbitrary load results as device pointers.
+bool _getNVVMLoadedParameterGroupPointer(IRInst* inst, IRType*& outElementType)
+{
+    outElementType = nullptr;
+    auto load = as<IRLoad>(inst);
+    IRType* elementType = nullptr;
+    auto parameterGroupType =
+        load ? asNVVMSupportedParameterGroupType(load->getDataType(), &elementType) : nullptr;
+    auto fieldAddress = load ? as<IRFieldAddress>(load->getPtr()) : nullptr;
+    NVVMStructField storageField;
+    if (!parameterGroupType || !fieldAddress ||
+        !_getNVVMStructFieldAddress(fieldAddress, storageField) ||
+        !isTypeEqual(storageField.field->getFieldType(), parameterGroupType))
+    {
+        return false;
+    }
+
+    outElementType = elementType;
+    return true;
+}
+
 // Resolves one resource-capable field extraction by canonical struct key and exact result type.
 bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructField& outField)
 {
@@ -5936,6 +5967,37 @@ SlangResult _validatePointerValue(
     bool requireWriteAccess,
     IRType* expectedPointeeType)
 {
+    IRType* loadedParameterGroupElementType = nullptr;
+    if (_getNVVMLoadedParameterGroupPointer(value, loadedParameterGroupElementType))
+    {
+        if (!hasNVVMParameterGroupStorageValueRepresentation(loadedParameterGroupElementType))
+        {
+            return _diagnoseUnsupportedIR(
+                codeGenContext,
+                toSlice("loaded parameter-group value representation"));
+        }
+        if (!consumer || consumer->getOp() != kIROp_Load || requireWriteAccess)
+        {
+            StringBuilder construct;
+            construct << "immutable loaded parameter-group access: consumer="
+                      << (consumer ? getIROpInfo(consumer->getOp()).name : "missing");
+            return _diagnoseUnsupportedIR(codeGenContext, construct.getUnownedSlice());
+        }
+        if (!expectedPointeeType ||
+            !isTypeEqual(loadedParameterGroupElementType, expectedPointeeType))
+        {
+            return _diagnoseUnsupportedIR(
+                codeGenContext,
+                toSlice("loaded parameter-group pointee type"));
+        }
+        return _validateAvailableValue(
+            codeGenContext,
+            value,
+            consumer,
+            availableValues,
+            dominatorTree);
+    }
+
     auto numericPtrType =
         value ? asNVVMSupportedDeviceNumericPointerType(value->getDataType()) : nullptr;
     auto deviceCopyablePtrType =
@@ -11547,6 +11609,15 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Load:
                     {
                         auto load = cast<IRLoad>(inst);
+                        IRType* loadedParameterGroupElementType = nullptr;
+                        const bool isLoadedParameterGroupPointer =
+                            _getNVVMLoadedParameterGroupPointer(
+                                load->getPtr(),
+                                loadedParameterGroupElementType);
+                        SLANG_RELEASE_ASSERT(
+                            !isLoadedParameterGroupPointer ||
+                            hasNVVMParameterGroupStorageValueRepresentation(
+                                loadedParameterGroupElementType));
                         IRType* structuredStorageType =
                             _getNVVMStructuredBufferStoragePointerValueType(load->getPtr());
                         IRVectorType* compactStorageVector =
@@ -11588,7 +11659,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                         }
                         SLANG_RELEASE_ASSERT(alignment);
                         const SlangNVVMLoadFlags loadFlags =
-                            isPointerToImmutableLocation(getRootAddr(load->getPtr()))
+                            isLoadedParameterGroupPointer ||
+                                    isPointerToImmutableLocation(getRootAddr(load->getPtr()))
                                 ? SLANG_NVVM_LOAD_FLAG_INVARIANT
                                 : SLANG_NVVM_LOAD_FLAG_NONE;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(

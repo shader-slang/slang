@@ -1695,6 +1695,79 @@ SLANG_UNIT_TEST(nvvmSlangConventionalScalarConstantBufferUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangLoadedParameterGroupValueUsesExactImmutablePointer)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult compileResult = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMLoadedParameterGroupValueSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(compileResult))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool sawLoadedParameterGroupValue = false;
+        for (Index loadIndex = 0; loadIndex < gFakeNVVMBuilder.loadResultTypeKinds.getCount();
+             ++loadIndex)
+        {
+            if (gFakeNVVMBuilder.loadResultTypeKinds[loadIndex] ==
+                FakeNVVMBuilderScalarTypeKind::ScalarStruct)
+            {
+                sawLoadedParameterGroupValue = true;
+                SLANG_CHECK(
+                    gFakeNVVMBuilder.loadFlags[loadIndex] == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+            }
+        }
+        SLANG_CHECK(sawLoadedParameterGroupValue);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMUnsupportedLoadedCompactParameterGroupValueSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        const String diagnosticText = _getBlobText(diagnostics);
+        SLANG_CHECK(diagnosticText.indexOf("E52017") >= 0);
+        SLANG_CHECK(diagnosticText.indexOf("loaded parameter-group value representation") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation)
 {
     _resetDirectNVVMFakes();

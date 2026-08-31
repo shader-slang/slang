@@ -297,6 +297,9 @@ IRParameterGroupType* asNVVMSupportedParameterGroupType(
     IRInst* type,
     IRType** outElementType = nullptr);
 
+/// Returns whether parameter-group storage and an ordinary SSA value use the same provider type.
+bool hasNVVMParameterGroupStorageValueRepresentation(IRInst* type);
+
 /// Returns whether `field` is admitted in the conventional CUDA parameter block.
 bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field);
 

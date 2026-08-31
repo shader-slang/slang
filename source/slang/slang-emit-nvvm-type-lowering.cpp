@@ -1504,6 +1504,79 @@ IRParameterGroupType* asNVVMSupportedParameterGroupType(IRInst* type, IRType** o
     return parameterGroupType;
 }
 
+static bool _hasNVVMParameterGroupStorageValueRepresentation(
+    IRInst* type,
+    HashSet<IRInst*>& activeTypes)
+{
+    if (isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type))
+        return true;
+
+    if (asNVVMSupported32BitNumericVectorType(type))
+        return !asNVVMSupportedCompactParameterGroupVectorType(type);
+
+    // Fixed numeric arrays and physical matrix wrappers deliberately delegate parameter-group
+    // storage lowering to ordinary value lowering. Keep those producer-owned identities explicit
+    // instead of trying to infer provider type equality from their children.
+    if (asNVVMSupportedNumericArrayType(type) || asNVVMSupportedPhysicalArrayStructType(type))
+        return true;
+
+    NVVMRawBufferType rawBufferType;
+    NVVMSurfaceType surfaceType;
+    NVVMReadOnlyTextureType sampledTextureType;
+    if (getNVVMSupportedRawBufferType(type, rawBufferType) ||
+        getNVVMSupportedSurfaceType(type, surfaceType) ||
+        getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
+        asNVVMSupportedSamplerValueType(type) || asNVVMSupportedParameterGroupType(type))
+    {
+        return true;
+    }
+
+    // A UserPointer leaf is intentionally global in parameter-group storage and generic as an
+    // ordinary value. Whole-value loads need an explicit conversion before that family is legal.
+    if (!type || asNVVMSupportedDeviceCopyableValuePointerType(type) || activeTypes.contains(type))
+    {
+        return false;
+    }
+
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        if (!asNVVMSupportedAggregateStorageArrayType(arrayType))
+            return false;
+        activeTypes.add(type);
+        const bool result = _hasNVVMParameterGroupStorageValueRepresentation(
+            arrayType->getElementType(),
+            activeTypes);
+        activeTypes.remove(type);
+        return result;
+    }
+
+    auto structType = asNVVMSupportedAggregateStorageStructType(type);
+    if (!structType)
+        return false;
+
+    activeTypes.add(type);
+    bool hasField = false;
+    for (auto field : structType->getFields())
+    {
+        if (!_hasNVVMParameterGroupStorageValueRepresentation(field->getFieldType(), activeTypes))
+        {
+            activeTypes.remove(type);
+            return false;
+        }
+        hasField = true;
+    }
+    activeTypes.remove(type);
+    return hasField;
+}
+
+bool hasNVVMParameterGroupStorageValueRepresentation(IRInst* type)
+{
+    if (!isNVVMSupportedAggregateStorageType(type))
+        return false;
+    HashSet<IRInst*> activeTypes;
+    return _hasNVVMParameterGroupStorageValueRepresentation(type, activeTypes);
+}
+
 bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
 {
     NVVMRawBufferType rawBufferType;

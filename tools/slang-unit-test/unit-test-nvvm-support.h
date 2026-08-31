@@ -10175,6 +10175,46 @@ void computeMain()
     outputBuffer[0] = params.value;
 }
 )";
+static const char kDirectNVVMLoadedParameterGroupValueSource[] = R"(
+struct Params
+{
+    uint value;
+};
+
+ConstantBuffer<Params> params;
+RWStructuredBuffer<uint> outputBuffer;
+
+uint readValue(Params value)
+{
+    return value.value;
+}
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    outputBuffer[0] = readValue(params);
+}
+)";
+static const char kDirectNVVMUnsupportedLoadedCompactParameterGroupValueSource[] = R"(
+struct Params
+{
+    float3 value;
+};
+
+ConstantBuffer<Params> params;
+RWStructuredBuffer<float> outputBuffer;
+
+float readValue(Params value)
+{
+    return value.value.x;
+}
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    outputBuffer[0] = readValue(params);
+}
+)";
 static const char kDirectNVVMCompactParameterGroupVectorSource[] = R"(
 cbuffer VectorParams
 {

@@ -4,6 +4,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

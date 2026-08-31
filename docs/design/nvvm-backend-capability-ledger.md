@@ -2143,3 +2143,17 @@ load chains at four rows and typed struct-field pointers at three. Frozen corpus
 ID/source selection keeps its 452 identities fixed while current dynamic repository discovery has
 grown to 456. The selected prefix passes 424/424, and five measured discovery representatives
 assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 149 admits the canonical loaded parameter-group value chain. An exact resolved struct field
+produces an `IRLoad<ParameterBlock<T>>` or `IRLoad<ConstantBuffer<T>>`; that semantic wrapper is an
+immutable pointer to `T` only when the declared field type matches and recursive parameter-group
+storage has the same provider representation as an ordinary `T` value. Compact vector3 and stored
+`UserPointer` leaves remain rejected because their physical and value representations differ.
+
+The generic revision-30 provider interface is unchanged. Three discovery workloads become correct
+in both modes and receive six direct regression lanes. Discovery reaches 50/72 O0, O3, and
+both-mode correctness with no old-correct loss; the former four-row loaded-pointer cluster is
+eliminated. One remaining row advances to a sequential aggregate-pointer blocker without being
+counted as correct. Frozen corpus v1 remains 371/375/371 over its 427 healthy-MVP denominator with
+zero old-correct regression. The selected prefix passes 425/425, and eight measured discovery
+representatives assemble with CUDA 12.9 for SM70, SM80, and SM90.

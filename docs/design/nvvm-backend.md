@@ -6648,6 +6648,33 @@ old-correct regression, even though permanent discovery promotions raise current
 to 456 workloads. The selected prefix passes 424/424. CUDA 12.9 `ptxas` accepts the two new and
 three established discovery representatives at SM70, SM80, and SM90.
 
+### Slice 149: Canonical loaded parameter-group values
+
+A whole `ParameterBlock<T>` or `ConstantBuffer<T>` element load now preserves the semantic pointer
+created by canonical entry-uniform lowering. Direct NVVM admits only an `IRLoad` of an exact
+parameter-group field resolved by the established struct-field-address classifier. The field's
+declared wrapper type must match the load result, and the only consumer is an immutable exact-type
+`IRLoad<T>` whose producer dominates it. Calls, phis, selects, arbitrary loaded pointers, and
+writable uses remain outside the contract.
+
+The element also needs identical `ParameterGroupStorage` and ordinary `Value` provider
+representations. A finite recursive classifier reuses existing lowering decisions for scalars,
+arrays, physical matrix wrappers, resource handles, nested parameter groups, and structs. It
+rejects cycles, compact vector3 storage versus value-vector spelling, and global-storage versus
+generic-value `UserPointer` leaves. Emission shares the producer resolver, marks the load invariant,
+and uses the existing typed load. Provider ABI revision 30 is unchanged.
+
+Three discovery workloads become correct in both modes and gain six permanent direct lanes:
+generic constant-buffer/resource graphs, generic scalar parameter-group unification, and
+texture/sampler tuple parameters. Discovery reaches 50/72 O0, O3, and both-mode correctness with
+zero old-correct regression. The fourth measured row advances to an independent sequential-element
+pointer blocker and remains unpromoted.
+
+Frozen corpus v1 remains 371/375/371 over its 427 healthy-MVP denominator with zero old-correct
+regression. The selected prefix passes 425/425. All eight measured discovery representatives
+assemble with CUDA 12.9 at direct O3 for SM70, SM80, and SM90. The two corpus denominators remain
+separate, and no corpus v2 is proposed.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
