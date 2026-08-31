@@ -18386,13 +18386,24 @@ struct ArgsWithDirectionInfo
     ParamPassingMode thisArgDirection;
 };
 
-// Applies a resolved primal specialization to the dummy arguments used to validate its derivative.
+// States whether derivative validation still needs to match the primal and derivative's outer
+// generic signatures. An inverse-placement forward derivative uses `AlreadyResolved` because
+// higher-order overload resolution has already selected a compatible primal specialization.
+enum class PrimalGenericSignatureResolution
+{
+    Resolve,
+    AlreadyResolved,
+};
+
+// Applies a resolved primal specialization to the imaginary argument types in place. Consider a
+// derivative over `vector<T, N>` that selects a primal declared over `U`: the substitution rewrites
+// the primal's imaginary `U` arguments into the derivative's `T` context before validation.
 static void specializeImaginaryArgumentTypes(
     ASTBuilder* astBuilder,
     ArgsWithDirectionInfo& args,
-    DeclRef<FunctionDeclBase> funcDeclRef)
+    DeclRef<FunctionDeclBase> primalDeclRef)
 {
-    SubstitutionSet substitutions(funcDeclRef);
+    SubstitutionSet substitutions(primalDeclRef);
     for (auto arg : args.args)
         arg->type.type = substituteType(substitutions, astBuilder, arg->type.type);
     if (args.thisArg)
@@ -18400,6 +18411,9 @@ static void specializeImaginaryArgumentTypes(
             substituteType(substitutions, astBuilder, args.thisArg->type.type);
 }
 
+// Checks a derivative against a primal declaration reference. `genericSignatureResolution`
+// determines whether this function must infer a mapping between their outer generic signatures or
+// preserve the specialized primal reference that higher-order overload resolution already chose.
 template<typename TDerivativeAttr>
 void checkDerivativeAttributeImpl(
     SemanticsVisitor* visitor,
@@ -18409,9 +18423,11 @@ void checkDerivativeAttributeImpl(
     const List<ParamPassingMode>& expectedParamDirections,
     Expr* expectedThisArg,
     ParamPassingMode expectedThisArgDirection,
-    bool shouldResolveGenericArguments)
+    PrimalGenericSignatureResolution genericSignatureResolution)
 {
     auto funcDecl = funcDeclRef.getDecl();
+    bool shouldResolveGenericSignature =
+        genericSignatureResolution == PrimalGenericSignatureResolution::Resolve;
     if (isInterfaceRequirement(funcDecl))
     {
         visitor->getSink()->diagnose(
@@ -18428,7 +18444,7 @@ void checkDerivativeAttributeImpl(
     // If this is a generic, we want to wrap the call to the derivative method
     // with the generic parameters of the source.
     //
-    if (shouldResolveGenericArguments && as<GenericDecl>(funcDecl->parentDecl) &&
+    if (shouldResolveGenericSignature && as<GenericDecl>(funcDecl->parentDecl) &&
         !as<GenericAppExpr>(attr->funcExpr))
     {
         auto genericDecl = as<GenericDecl>(funcDecl->parentDecl);
@@ -18657,8 +18673,9 @@ void checkDerivativeAttributeImpl(
                 }
             }
 
-            // If the two decls are under different generic contexts, we'll need to check that
-            // they agree and specialize the attribute's decl-ref accordingly.
+            // When higher-order resolution has not already selected a primal specialization, the
+            // two generic contexts must agree and the attribute's declaration reference must be
+            // specialized accordingly.
             //
 
             auto originalNextGeneric =
@@ -18666,7 +18683,7 @@ void checkDerivativeAttributeImpl(
             auto derivativeNextGeneric = visitor->findNextOuterGeneric(
                 visitor->getOuterGenericOrSelf(calleeDeclRef->declRef.getDecl()));
 
-            if (shouldResolveGenericArguments &&
+            if (shouldResolveGenericSignature &&
                 ((!originalNextGeneric) != (!derivativeNextGeneric)))
             {
                 // Diagnostic for when one is generic and the other is not.
@@ -18676,7 +18693,7 @@ void checkDerivativeAttributeImpl(
                 return;
             }
 
-            if (shouldResolveGenericArguments && originalNextGeneric != derivativeNextGeneric)
+            if (shouldResolveGenericSignature && originalNextGeneric != derivativeNextGeneric)
             {
                 // If the two generic containers are not the same, but are compatible, we can
                 // unify them.
@@ -18732,7 +18749,7 @@ error:;
         .attr = attr->loc});
 }
 
-// Checks a forward-placement derivative using the primal's ordinary generic context.
+// Checks a direct-placement derivative using the primal's ordinary generic context.
 template<typename TDerivativeAttr>
 void checkDerivativeAttributeImpl(
     SemanticsVisitor* visitor,
@@ -18756,7 +18773,7 @@ void checkDerivativeAttributeImpl(
         expectedParamDirections,
         expectedThisArg,
         expectedThisArgDirection,
-        true);
+        PrimalGenericSignatureResolution::Resolve);
 }
 
 template<typename TDerivativeAttr>
@@ -19115,6 +19132,7 @@ void checkDerivativeOfAttributeImpl(
                 visitor->getSink()->diagnose(
                     Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{
                         .attr = derivativeOfAttr->loc});
+                return;
             }
         }
     }
@@ -19191,6 +19209,7 @@ void checkDerivativeOfAttributeImpl(
     derivativeAttr->funcExpr = declRefExpr;
     if constexpr (std::is_same_v<TDerivativeAttr, ForwardDerivativeAttribute>)
     {
+        SLANG_ASSERT(calleeDeclRef.is<FunctionDeclBase>());
         checkDerivativeAttribute(
             visitor,
             calleeDeclRef.as<FunctionDeclBase>(),
@@ -19207,6 +19226,10 @@ void checkDerivativeOfAttributeImpl(
 }
 
 
+// Synthesizes an AD 2.0 forward-derivative extension. `primalDeclRef` supplies the specialized
+// function type being extended, while `extensionContextFuncDecl` supplies the generic and module
+// context in which the derivative reference is valid. They differ for inverse placement because
+// the selected primal specialization is expressed in the derivative declaration's generic context.
 static void translateFwdDerivativeAttributeToAD2(
     SemanticsVisitor* visitor,
     FunctionDeclBase* extensionContextFuncDecl,
@@ -19415,7 +19438,7 @@ static void checkDerivativeAttribute(
         imaginaryArguments.directions,
         imaginaryArguments.thisArg,
         imaginaryArguments.thisArgDirection,
-        false);
+        PrimalGenericSignatureResolution::AlreadyResolved);
 
     if (!as<DeclRefExpr>(attr->funcExpr))
     {

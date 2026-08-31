@@ -1,4 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_6_0 -entry computeMain -line-directive-mode none
+//TEST:COMPARE_COMPUTE(filecheck-buffer=RESULT): -cpu -output-using-type
+
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [Differentiable]
@@ -45,3 +48,4 @@ void computeMain()
 // CHECK: testFunctionForward
 // CHECK: 3.0f
 // CHECK: testFunctionForward
+// RESULT: 6.0
