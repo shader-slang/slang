@@ -50,18 +50,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     set(slang_glslang_version_script
         "${CMAKE_CURRENT_SOURCE_DIR}/slang-glslang.version-script"
     )
-    if(NOT WIN32 AND NOT APPLE)
-        add_supported_cxx_linker_flags(
-            slang-glslang
-            PRIVATE
-            "-Wl,--version-script=${slang_glslang_version_script}"
-        )
-        set_property(
-            TARGET slang-glslang
-            APPEND
-            PROPERTY LINK_DEPENDS "${slang_glslang_version_script}"
-        )
-    elseif(APPLE)
+    if(APPLE)
         file(
             READ
             "${slang_glslang_version_script}"
@@ -167,6 +156,17 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             TARGET slang-glslang
             APPEND
             PROPERTY LINK_DEPENDS "${_slang_glslang_exported_symbols_file}"
+        )
+    elseif(NOT WIN32)
+        add_supported_cxx_linker_flags(
+            slang-glslang
+            PRIVATE
+            "-Wl,--version-script=${slang_glslang_version_script}"
+        )
+        set_property(
+            TARGET slang-glslang
+            APPEND
+            PROPERTY LINK_DEPENDS "${slang_glslang_version_script}"
         )
     endif()
 endif()
