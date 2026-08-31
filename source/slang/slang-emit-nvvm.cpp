@@ -1821,6 +1821,18 @@ SlangResult _diagnoseUnsupportedIR(
 void _appendNVVMCanonicalTypeName(StringBuilder& out, IRInst* type)
 {
     SLANG_RELEASE_ASSERT(type);
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        out << "Array<";
+        _appendNVVMCanonicalTypeName(out, arrayType->getElementType());
+        out << ", ";
+        if (auto elementCount = as<IRIntLit>(arrayType->getElementCount()))
+            out << elementCount->getValue();
+        else
+            out << getIROpInfo(arrayType->getElementCount()->getOp()).name;
+        out << ">";
+        return;
+    }
     if (auto pointerType = as<IRPtrTypeBase>(type))
     {
         out << getIROpInfo(type->getOp()).name << "<";
@@ -6264,10 +6276,14 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 // Returns whether a type is an accepted canonical value in a helper result.
 bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
+    NVVMRawBufferType rawBufferType;
+    NVVMReadOnlyTextureType sampledTextureType;
     return as<IRVoidType>(type) || isNVVMSupportedHelperValueType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
-           asNVVMSupportedDeviceCopyableValuePointerType(type);
+           asNVVMSupportedDeviceCopyableValuePointerType(type) ||
+           getNVVMSupportedRawBufferType(type, rawBufferType) ||
+           getNVVMSupportedReadOnlyTextureType(type, sampledTextureType);
 }
 
 // Returns whether one exact canonical type can cross a selected helper parameter boundary.
@@ -6846,7 +6862,12 @@ SlangResult _validateNVVMFunction(
                     }
                     if (!storageType && !_getNVVMExecutableValueAlignment(inst->getDataType()) &&
                         !asNVVMSupportedParameterGroupType(inst->getDataType()))
-                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("load result type"));
+                    {
+                        return _diagnoseUnsupportedIRType(
+                            codeGenContext,
+                            "load result type",
+                            inst->getDataType());
+                    }
                     if (storageType)
                     {
                         _requireNVVMStructuredBufferStorageConversion(

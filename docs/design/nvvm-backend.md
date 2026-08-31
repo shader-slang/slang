@@ -6696,6 +6696,29 @@ Nine measured discovery workloads assemble with CUDA 12.9 at direct O3 for SM70,
 the newly measured local-pointer gate has a 242.3 ms SM70 direct-O3 compile median and 645-byte PTX,
 versus 347.1 ms and 8584 bytes for native NVRTC O3. These measurements remain exploratory.
 
+### Slice 151: Canonical resource helper results
+
+Selected raw-buffer views and read-only texture handles may now cross ordinary helper result
+boundaries with the same physical representation already used for helper parameters and body
+values. Raw buffers remain the canonical `{global element pointer, i64 count}` struct produced by
+`_lowerRawBufferType`; sampled textures remain 64-bit CUDA handles. Linked-IR preflight and
+role-sensitive type lowering use the existing exact resource classifiers, while generic function,
+call, and return operations preserve the resulting provider type unchanged.
+
+The generic revision-30 provider interface and isolated LLVM implementation are unchanged. One
+discovery workload returning `RWStructuredBuffer<int>` becomes correct in both modes and gains two
+permanent direct lanes. Discovery reaches 52/52/52 O0/O3/both correctness over the unchanged 72
+healthy references with zero old-correct loss. Frozen corpus v1 remains exactly 452/427 and
+372/376/372 with zero old-correct loss. The selected prefix passes 427/427.
+
+Two rows advance to independent, now-exact blockers rather than being widened here. The complex
+texture workload first loads `Array<Texture2D, 2>` from its synthesized conventional-global block;
+the frozen reinterpret workload first takes a `DescriptorHandle` field address. The load diagnostic
+now includes its canonical array type, allowing discovery Pareto ownership at the exact producer.
+All ten measured discovery gates assemble with CUDA 12.9 at direct O3 for SM70, SM80, and SM90.
+The new raw-buffer-result gate measures 243.5 ms and 732-byte PTX at direct O3 SM70 versus 357.8 ms
+and 8705 bytes through NVRTC O3; these remain uncontrolled exploratory measurements.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

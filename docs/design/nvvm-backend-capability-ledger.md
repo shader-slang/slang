@@ -2168,3 +2168,17 @@ frozen corpus v1, which reaches 372/376/372 O0/O3/both over the unchanged 427 he
 `compute/pointer-emit` becomes correct in discovery, which reaches 51/51/51 over its unchanged 72
 healthy denominator. Both corpora have zero old-correct loss, the selected prefix passes 426/426,
 and nine measured discovery gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 151 admits canonical raw-buffer and read-only-texture values as ordinary helper results.
+Preflight and `NVVMTypeUse::HelperResult` reuse the established exact classifiers; raw views keep
+their `{global pointer, count}` provider struct and sampled textures keep their i64 handle. Generic
+function declaration, call, return, and body consumption require the same exact provider type.
+The provider interface remains revision 30.
+
+The simple raw-buffer-result discovery workload becomes correct at O0 and O3 and gains two direct
+lanes. Discovery reaches 52/52/52 over its unchanged 72 healthy references with zero old-correct
+loss. Frozen corpus v1 remains 372/376/372 over 427 with zero old-correct loss. The complex texture
+row advances to an exact `IRLoad<Array<Texture2D, 2>>` conventional-global blocker, and the frozen
+reinterpret row advances to a `DescriptorHandle` field-address blocker; neither is counted as
+supported. The selected prefix passes 427/427, and ten measured discovery gates assemble with
+CUDA 12.9 for SM70, SM80, and SM90.

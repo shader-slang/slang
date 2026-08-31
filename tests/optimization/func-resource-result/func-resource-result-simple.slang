@@ -1,6 +1,8 @@
 // func-resource-result-simple.slang
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl

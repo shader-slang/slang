@@ -170,6 +170,12 @@ def _preflight_cluster(exact_shape: str) -> tuple[str, str]:
             "helper-aggregate-result-abi",
             "post-specialization linked IRFunc aggregate result; _validateNVVMHelperTarget",
         )
+    if exact_shape.startswith("load result type: Array<"):
+        return (
+            "resource-array-value-load",
+            "collectEntryPointUniforms -> synthesized GlobalParams resource-array field -> "
+            "IRLoad; _validateNVVMFunction",
+        )
     if exact_shape == "makeUInt64":
         return (
             "anyvalue-uint64-reconstruction",

@@ -5763,6 +5763,107 @@ SLANG_UNIT_TEST(nvvmSlangRawBufferViewsCrossHelperParametersByValue)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangResourceViewsCrossHelperResultsByValue)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMResourceResultHelperSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        Index rawBufferHelper = -1;
+        Index textureHelper = -1;
+        for (Index functionIndex = 0; functionIndex < gFakeNVVMBuilder.functionNames.getCount();
+             ++functionIndex)
+        {
+            const String& name = gFakeNVVMBuilder.functionNames[functionIndex];
+            if (name.indexOf("preserveDestination") >= 0)
+                rawBufferHelper = functionIndex;
+            else if (name.indexOf("preserveTexture") >= 0)
+                textureHelper = functionIndex;
+        }
+        SLANG_CHECK_ABORT(rawBufferHelper >= 0);
+        SLANG_CHECK_ABORT(textureHelper >= 0);
+
+        const Index rawBufferFunctionType =
+            gFakeNVVMBuilder.functionTypeIndices[rawBufferHelper];
+        const Index textureFunctionType = gFakeNVVMBuilder.functionTypeIndices[textureHelper];
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultKinds[rawBufferFunctionType] ==
+            FakeNVVMBuilderResultTypeKind::ResourceView);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultTypes[rawBufferFunctionType] ==
+            _getFakeNVVMBuilderResourceViewType(FakeNVVMBuilderScalarTypeKind::Float));
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionTypeResultKinds[textureFunctionType] ==
+            FakeNVVMBuilderResultTypeKind::Integer);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionFlags[rawBufferHelper] ==
+            SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionFlags[textureHelper] ==
+            SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+
+        bool sawRawBufferCall = false;
+        bool sawTextureCall = false;
+        Index rawBufferCall = -1;
+        for (Index callIndex = 0;
+             callIndex < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount();
+             ++callIndex)
+        {
+            if (gFakeNVVMBuilder.callCalleeFunctionIndices[callIndex] == rawBufferHelper)
+            {
+                sawRawBufferCall = true;
+                rawBufferCall = callIndex;
+                SLANG_CHECK(
+                    gFakeNVVMBuilder.callResultKinds[callIndex] ==
+                    FakeNVVMBuilderResultTypeKind::ResourceView);
+            }
+            if (gFakeNVVMBuilder.callCalleeFunctionIndices[callIndex] == textureHelper)
+            {
+                sawTextureCall = true;
+                SLANG_CHECK(
+                    gFakeNVVMBuilder.callResultKinds[callIndex] ==
+                    FakeNVVMBuilderResultTypeKind::Integer);
+            }
+        }
+        SLANG_CHECK(sawRawBufferCall);
+        SLANG_CHECK(sawTextureCall);
+
+        bool sawRawBufferCallExtraction = false;
+        for (const auto& base : gFakeNVVMBuilder.aggregateElementBaseValueRefs)
+        {
+            sawRawBufferCallExtraction |=
+                base.kind == FakeNVVMBuilderValueKind::Call && base.index == rawBufferCall;
+        }
+        SLANG_CHECK(sawRawBufferCallExtraction);
+        SLANG_CHECK(gFakeNVVMBuilder.textureOperations.getCount() == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangRawBufferDataPointersUseGenericPipeline)
 {
     _resetDirectNVVMFakes();
