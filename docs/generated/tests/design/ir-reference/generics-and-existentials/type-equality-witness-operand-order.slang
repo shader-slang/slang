@@ -13,7 +13,7 @@
 // int` clause is discharged for `T = S` because `S.A` is `int`, so the witness
 // is an equality fact; the CHECK pins its two type operands and its
 // `witness_table_t(Int)` result type.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IHasA { associatedtype A; A get(); };
 struct S : IHasA { typealias A = int; int get() { return 7; } };

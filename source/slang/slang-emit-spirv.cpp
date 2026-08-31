@@ -7560,6 +7560,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_TextureType:
         case kIROp_SamplerStateType:
         case kIROp_SamplerComparisonStateType:
+        case kIROp_SubpassInputType:
             descriptorElementType = ensureInst(valueType);
             break;
         case kIROp_RaytracingAccelerationStructureType:

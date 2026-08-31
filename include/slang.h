@@ -1307,6 +1307,32 @@ typedef uint32_t SlangSizeT;
                  //   debug information: using it with `-g0`, or without any `-g` option (both
                  //   resolve to no debug info), is an error. Only affects SPIR-V output.
 
+        TraceCoverageBindlessIndex =
+            158, // int: Synthesize `__slang_coverage` as an unbounded
+                 //   descriptor array of structured buffers rather than a single
+                 //   buffer, and index it with this value:
+                 //   `__slang_coverage[N][slot]`. Many separately compiled
+                 //   shaders sharing one pipeline then occupy a single
+                 //   descriptor binding instead of one binding each, and each
+                 //   shader's buffer is sized independently by the host.
+                 //
+                 //   Where the array itself lives is a separate decision, made
+                 //   with `TraceCoverageBinding` (or left to auto-allocation).
+                 //   Note for hosts: if the descriptor array is declared with
+                 //   `VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT`,
+                 //   Vulkan requires it to be the highest-numbered binding in
+                 //   its set. A fixed `descriptorCount` carries no such
+                 //   restriction. Either way it is the host's layout to satisfy
+                 //   and the compiler cannot see it.
+                 //
+                 //   The index is a compile-time constant and therefore part of
+                 //   the compiled artifact: a host that keys a shader cache on
+                 //   the compiled output must derive it from a stable shader
+                 //   identity rather than from load order, or an unchanged
+                 //   shader recompiles whenever that order shifts. Supplying it
+                 //   at pipeline creation instead would remove that constraint;
+                 //   see issue #12541. SPIR-V and GLSL only.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
@@ -4850,6 +4876,16 @@ enum class CoverageBranchArmKind : uint32_t
 
 inline constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 
+/// `SyntheticResourceInfo::arraySize` when the synthetic resource is an
+/// unbounded (runtime-sized) descriptor array, so the compiler cannot
+/// know how many descriptors the host will supply.
+///
+/// Spelled the same way as `SLANG_UNBOUNDED_SIZE` (`~size_t(0)`) rather
+/// than casting it down: both mean "every bit set" in their respective
+/// widths, but narrowing the 64-bit macro to 32 bits is a truncating
+/// conversion that MSVC rejects under warnings-as-errors (C4310).
+inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = ~uint32_t(0);
+
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
 /// `structSize` for ABI-versioned struct growth: future revisions
@@ -5088,7 +5124,23 @@ struct SyntheticResourceInfo
     BindingType bindingType = BindingType::Unknown;
 
     /// Number of logical resources in the synthetic binding. Most
-    /// current instrumentation resources are scalar (`1`).
+    /// instrumentation resources are scalar (`1`).
+    ///
+    /// `kUnboundedSyntheticResourceArraySize` when the resource is an
+    /// unbounded descriptor array whose descriptor count is a host
+    /// runtime decision the compiler cannot see -- the coverage buffer
+    /// under `-trace-coverage-bindless-index` is declared this way
+    /// deliberately, so that a shader does not constrain how many
+    /// shaders the host binds alongside it. A host sizing a descriptor
+    /// array must not read this as a count.
+    ///
+    /// For coverage, this sentinel and `bindlessIndex >= 0` are set
+    /// together and always agree, so testing either one identifies the
+    /// bindless form. They are separate fields because they answer
+    /// different questions -- `arraySize` describes the binding's shape
+    /// for any synthetic resource, while `bindlessIndex` says which
+    /// element this shader uses -- and a future synthetic resource
+    /// could be an unbounded array without having a per-shader index.
     uint32_t arraySize = 1;
 
     /// Whether the resource is global/root-scoped or attached to a
@@ -5135,6 +5187,22 @@ struct SyntheticResourceInfo
     /// returned pointer is valid for the lifetime of the metadata
     /// object.
     const char* debugName = nullptr;
+
+    /// Index of this shader's element within the synthetic resource's
+    /// descriptor array, or `-1` when the resource is bound as a single
+    /// descriptor rather than as an element of an array.
+    ///
+    /// Coverage sets this from `-trace-coverage-bindless-index`. In that
+    /// form `__slang_coverage` is an unbounded array of buffers, so a
+    /// single `(space, binding)` serves every shader in a pipeline and
+    /// each shader accesses `__slang_coverage[bindlessIndex]`. Reading it
+    /// back here saves a host from having to track the value it passed at
+    /// compile time in order to report on the result.
+    ///
+    /// This field is past the v1 struct size, so it is only written when
+    /// the caller's `structSize` covers it. A caller compiled against an
+    /// older header keeps its own struct layout and never sees it.
+    int32_t bindlessIndex = -1;
 };
 
 struct ISyntheticResourceMetadata : public ISlangCastable

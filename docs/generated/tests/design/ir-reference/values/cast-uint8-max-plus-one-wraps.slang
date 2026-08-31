@@ -14,7 +14,7 @@
 // `255 : UInt8`; `uint8_t(256)` is one past the MAX and lowers as
 // `0 : UInt8` — the wrap is observed inline on the store.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<uint8_t> buf;
 

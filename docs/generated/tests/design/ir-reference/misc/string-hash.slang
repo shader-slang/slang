@@ -15,7 +15,7 @@
 // is anchored at its own helper and quotes the literal text inside the inst,
 // so an operand that had already been folded to an integer would not match.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<uint> outputBuffer;
 

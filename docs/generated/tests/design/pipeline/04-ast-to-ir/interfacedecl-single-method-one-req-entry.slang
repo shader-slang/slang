@@ -14,7 +14,7 @@
 // and three / eight cases. The doc claim "InterfaceDecl ->
 // IRInterfaceType plus per-method requirement insts" must hold here.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IOne { int act(int v); }
 struct A : IOne { int act(int v) { return v + 1; } }

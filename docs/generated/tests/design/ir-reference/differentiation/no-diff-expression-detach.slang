@@ -16,7 +16,7 @@
 // value as its operand. Wrapping the load rather than the address is what makes
 // `no_diff` on local-array indexing behave the same as on a resource read.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform int idx;

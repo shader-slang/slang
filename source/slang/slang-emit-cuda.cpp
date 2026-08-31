@@ -1319,8 +1319,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             IRType* elementType = arrayType->getElementType();
 
             // Emit braces for the FixedArray struct.
-
+            m_writer->emit("{ ");
             _emitInitializerList(elementType, inst->getOperands(), Index(inst->getOperandCount()));
+            m_writer->emit(" }");
 
             return true;
         }

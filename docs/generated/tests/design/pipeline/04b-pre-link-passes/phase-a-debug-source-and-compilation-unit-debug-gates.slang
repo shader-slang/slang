@@ -17,9 +17,9 @@
 // `-g1` (Minimal), and no `-g` at all -- and the CHECKs assert which of
 // the two insts is present in each snapshot.
 
-//TEST:SIMPLE(filecheck=STD):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g2
-//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
-//TEST:SIMPLE(filecheck=NONE):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=STD):-target spirv-asm -dump-ir -o - -entry main -stage compute -g2
+//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=NONE):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

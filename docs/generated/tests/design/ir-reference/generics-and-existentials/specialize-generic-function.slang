@@ -14,7 +14,7 @@
 // `call specialize(<generic>, Int)` spelling at the call site, which can only
 // appear if lowering built a `specialize` rather than a directly-resolved
 // callee.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

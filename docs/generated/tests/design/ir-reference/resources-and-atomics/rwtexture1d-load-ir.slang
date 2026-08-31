@@ -12,7 +12,7 @@
 // `RWTexture1D<T>` element-read uses the `[]` operator; the helper
 // is parameterized by 1D shape + isRW=1.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWTexture1D<float4> rwtex;
 uniform RWStructuredBuffer<float4> outbuf;
