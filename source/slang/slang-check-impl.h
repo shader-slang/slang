@@ -3459,10 +3459,10 @@ public:
     /// On failure, leaves `context` unchanged and returns false.
     ///
     /// The final source-level call sites are `ResolveInvoke` and `_coerce`. A caller must emit the
-    /// deprecation warning when this returns true and it is materializing a source-level expression.
-    /// `ResolveInvoke` always materializes; `_coerce` does so only when it receives both `outToExpr`
-    /// and `sink`. A speculative conversion-cost probe must stay silent and let the eventual
-    /// materialization warn. Any new caller must follow the same policy.
+    /// deprecation warning when this returns true and it is materializing a source-level
+    /// expression. `ResolveInvoke` always materializes; `_coerce` does so only when it receives
+    /// both `outToExpr` and `sink`. A speculative conversion-cost probe must stay silent and let
+    /// the eventual materialization warn. Any new caller must follow the same policy.
     bool tryResolveOverloadUsingLegacyGenericParameterCountFallback(
         OverloadResolveContext& context);
 
