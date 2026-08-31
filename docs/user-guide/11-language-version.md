@@ -66,7 +66,8 @@ Slang language version 202c brings these changes on top of Slang 2026:
 
 - The generic-parameter-count overload tie-breaker has been removed.
   In earlier language versions, when all ordinary ranking rules left generic overloads tied, Slang selected the candidate with fewer required generic parameters and emitted a deprecation warning.
-  Those earlier versions now apply the compatibility tie-breaker only after ordinary rules such as scope and `OverloadRank`, so an ordinary rule can select a different candidate than older compilers selected without emitting this warning.
+  When the current compiler operates in a pre-202c mode, ordinary rules such as scope and `OverloadRank` run first and may silently select a different candidate than an older compiler selected.
+  The warning is emitted only when every ordinary rule leaves the candidates tied and the generic-parameter-count fallback then selects a unique candidate.
   Such a call is ambiguous in Slang 202c unless another ranking rule distinguishes the candidates.
   A non-generic overload remains more specific than an otherwise-equivalent specialization of a generic; that ordinary rule is unchanged in Slang 202c.
 - Casting a literal `0` to a user-defined struct type (e.g., `(MyStruct)0`) has lost its special meaning, and

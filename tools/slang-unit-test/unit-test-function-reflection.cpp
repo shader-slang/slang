@@ -294,6 +294,8 @@ SLANG_UNIT_TEST(reflectionOverloadUsesSessionLanguageVersion)
 {
     SLANG_CHECK(
         resolveChooseReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_2026) == "BroadResult");
+    // The diagnostics test proves that the 202c overload set is ambiguous. This assertion only
+    // verifies that reflection applies that language policy instead of selecting the 2026 result.
     SLANG_CHECK(
         resolveChooseReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_202C).getLength() == 0);
 }

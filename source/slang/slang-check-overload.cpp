@@ -2404,14 +2404,14 @@ bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCountFallbac
         return false;
     }
 
-    // `bestCandidates` normally contains candidates with the same status because candidate status
-    // is itself an ordinary ranking criterion. Check every candidate here instead of making that
-    // representation invariant part of the legacy compatibility fallback's contract.
+    // Candidate status is an ordinary ranking criterion, so a frontier is homogeneous. A tied
+    // frontier of failed candidates is useful for the ordinary overload diagnostic, but the
+    // compatibility fallback must not turn one of those failures into a selected declaration.
+    auto candidateStatus = context.bestCandidates[0].status;
     for (auto& candidate : context.bestCandidates)
-    {
-        if (candidate.status != OverloadCandidate::Status::Applicable)
-            return false;
-    }
+        SLANG_ASSERT(candidate.status == candidateStatus);
+    if (candidateStatus != OverloadCandidate::Status::Applicable)
+        return false;
 
     // Before Slang 202c, generic parameter count was used as a proxy for specificity. Consider
     // this example:

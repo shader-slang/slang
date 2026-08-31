@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=LEGACY): -std 2026
 //DIAGNOSTIC_TEST:SIMPLE(diag=SLANG202C): -std 202c
-//DIAGNOSTIC_TEST:SIMPLE(diag=ERROR): -std 2026 -warnings-as-errors 40021
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR): -std 2026 -warnings-as-errors 40021
 //DIAGNOSTIC_TEST:SIMPLE(diag=DISABLED): -std 2026 -warnings-disable 40021
 
 struct BroadResult
@@ -67,6 +67,14 @@ GenericResult preferNonGeneric<T>(T value)
     return GenericResult();
 }
 
+void equalGenericCount<T>(T first, float3 second)
+{
+}
+
+void equalGenericCount<T>(float3 first, T second)
+{
+}
+
 BroadResult rankedChoose<T : IFloat>(T value)
 {
     return BroadResult();
@@ -87,7 +95,7 @@ void test()
     BroadResult result = choose(float3(0.0));
 //LEGACY: deprecated generic-parameter-count overload tie-breaker
 //LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
-//ERROR: deprecated generic-parameter-count overload tie-breaker
+//ERROR: error[E40021]: deprecated generic-parameter-count overload tie-breaker
 //ERROR: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
 //SLANG202C: ambiguous call to 'choose' with arguments of type (vector<float,3>)
 
@@ -97,16 +105,33 @@ void test()
     FixedShapeResult shapeResult = chooseShape(float3(0.0));
 //LEGACY: deprecated generic-parameter-count overload tie-breaker
 //LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
-//ERROR: deprecated generic-parameter-count overload tie-breaker
+//ERROR: error[E40021]: deprecated generic-parameter-count overload tie-breaker
 //ERROR: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
 //SLANG202C: ambiguous call to 'chooseShape' with arguments of type (vector<float,3>)
 
+    // Equal required generic-parameter counts cannot select a unique compatibility candidate. The
+    // call therefore remains ambiguous in every language and warning mode, without diagnostic
+    // 40021.
+    equalGenericCount(float3(0.0), float3(0.0));
+//LEGACY: ambiguous call to 'equalGenericCount' with arguments of type (vector<float,3>, vector<float,3>)
+//LEGACY: candidate: func equalGenericCount<vector<float,3>>(float3, float3) -> void
+//LEGACY: candidate: func equalGenericCount<vector<float,3>>(float3, float3) -> void
+//SLANG202C: ambiguous call to 'equalGenericCount' with arguments of type (vector<float,3>, vector<float,3>)
+//SLANG202C: candidate: func equalGenericCount<vector<float,3>>(float3, float3) -> void
+//SLANG202C: candidate: func equalGenericCount<vector<float,3>>(float3, float3) -> void
+//ERROR: ambiguous call to 'equalGenericCount' with arguments of type (vector<float,3>, vector<float,3>)
+//DISABLED: ambiguous call to 'equalGenericCount' with arguments of type (vector<float,3>, vector<float,3>)
+//DISABLED: candidate: func equalGenericCount<vector<float,3>>(float3, float3) -> void
+//DISABLED: candidate: func equalGenericCount<vector<float,3>>(float3, float3) -> void
+
     // An otherwise-equivalent non-generic declaration accepts a strict subset of the generic
     // overload's domain. This ordinary specificity rule is unchanged in Slang 202c and does not
-    // use or warn about the compatibility fallback.
+    // use or warn about the compatibility fallback. The distinct result types make the assignment
+    // verify which overload was selected.
     NonGenericResult nonGenericResult = preferNonGeneric(1);
 
     // OverloadRank is an ordinary ranking criterion, so it resolves this call before the legacy
-    // fallback is considered in both language versions.
+    // fallback is considered in both language versions. The distinct result types make the
+    // assignment verify which overload was selected.
     RankedResult rankedResult = rankedChoose(float3(0.0));
 }
