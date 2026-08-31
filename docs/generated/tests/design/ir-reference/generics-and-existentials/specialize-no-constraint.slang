@@ -13,7 +13,7 @@
 // type. The CHECK closes the `specialize(...)` list right after `Int` and then
 // opens the call's own argument list, which fails if a witness operand were
 // appended.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

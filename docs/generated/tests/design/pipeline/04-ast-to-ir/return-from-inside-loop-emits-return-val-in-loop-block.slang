@@ -15,7 +15,7 @@
 // that lowering encodes the return as a terminator irrespective of
 // nesting.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int n;
 uniform int target;

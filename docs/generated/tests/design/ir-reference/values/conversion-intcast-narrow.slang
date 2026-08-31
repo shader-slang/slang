@@ -14,7 +14,7 @@
 // `int(uint)`; this test exercises narrowing and widening + 64-bit
 // extension to confirm the same opcode handles all of them.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int16_t> sbuf;

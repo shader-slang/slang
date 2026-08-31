@@ -14,7 +14,7 @@
 // accessed by address, the inner `get_field_addr` produces a
 // `Ptr(%Foo)` whose pointee is the inner struct type.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Foo { int x; }
 struct Bar { Foo f; int y; }

@@ -14,7 +14,7 @@
 // `### AFTER eliminateDeadCode:` headers exist in a default
 // SPIR-V dump.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after eliminateDeadCode -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after eliminateDeadCode -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

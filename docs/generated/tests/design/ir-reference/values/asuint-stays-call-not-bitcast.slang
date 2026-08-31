@@ -19,7 +19,7 @@
 // carries a `targetIntrinsic` decoration naming the HLSL spelling, and
 // that no `bitCast` inst appears in the function at all.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<uint> buf;
 

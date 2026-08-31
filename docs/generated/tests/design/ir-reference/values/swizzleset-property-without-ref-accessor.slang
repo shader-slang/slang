@@ -20,7 +20,7 @@
 // setter — and that no `swizzledStore` appears, which is what proves
 // the non-addressable base selected the functional-update form.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float4 gv;
 uniform float fa;
