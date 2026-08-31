@@ -23,6 +23,14 @@ struct VariableShapeResult
 {
 }
 
+struct NonGenericResult
+{
+}
+
+struct GenericResult
+{
+}
+
 BroadResult choose<T : IFloat>(T value)
 //SLANG202C:^^^^^^ candidate: func choose<vector<float,3>>(float3) -> BroadResult
 {
@@ -47,6 +55,16 @@ VariableShapeResult chooseShape(vector<T, N> value)
 //SLANG202C:        ^^^^^^^^^^^ candidate: func chooseShape<float, 3>(float3) -> VariableShapeResult
 {
     return VariableShapeResult();
+}
+
+NonGenericResult preferNonGeneric(int value)
+{
+    return NonGenericResult();
+}
+
+GenericResult preferNonGeneric<T>(T value)
+{
+    return GenericResult();
 }
 
 BroadResult rankedChoose<T : IFloat>(T value)
@@ -82,6 +100,11 @@ void test()
 //ERROR: deprecated generic-parameter-count overload tie-breaker
 //ERROR: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
 //SLANG202C: ambiguous call to 'chooseShape' with arguments of type (vector<float,3>)
+
+    // An otherwise-equivalent non-generic declaration accepts a strict subset of the generic
+    // overload's domain. This ordinary specificity rule is unchanged in Slang 202c and does not
+    // use or warn about the compatibility fallback.
+    NonGenericResult nonGenericResult = preferNonGeneric(1);
 
     // OverloadRank is an ordinary ranking criterion, so it resolves this call before the legacy
     // fallback is considered in both language versions.

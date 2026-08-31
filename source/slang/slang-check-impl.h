@@ -3447,14 +3447,14 @@ public:
     int CompareOverloadCandidates(OverloadCandidate* left, OverloadCandidate* right);
 
     /// Applies the pre-202c generic-parameter-count tie-breaker after all ordinary ranking rules.
-    /// Returns true only when the compatibility rule selects a unique candidate.
+    /// Returns true only when the legacy compatibility fallback selects a unique candidate.
     /// A source-level caller that acts on a true result must emit the deprecation warning;
     /// speculative cost probes defer that warning until they materialize the conversion.
-    bool tryResolveOverloadUsingLegacyGenericParameterCount(OverloadResolveContext& context);
+    bool tryResolveOverloadUsingLegacyGenericParameterCountFallback(
+        OverloadResolveContext& context);
 
-    /// If `declRef` representations a specialization of a generic, returns the number of
-    /// specialized generic arguments. Otherwise, returns zero.
-    ///
+    /// Returns the number of required parameters on the generic specialized by `declRef`, or zero
+    /// when `declRef` is not the inner declaration of a generic.
     Int getSpecializedParamCount(DeclRef<Decl> const& declRef);
 
     /// Compare items `left` and `right` produced by lookup, to see if one should be favored for

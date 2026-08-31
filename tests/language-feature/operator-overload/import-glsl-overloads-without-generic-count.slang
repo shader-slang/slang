@@ -33,9 +33,14 @@ void computeMain()
     float2x2 identity = float2x2(1.0, 0.0, 0.0, 1.0);
     float2x2 product = left * identity;
 
+    half2x2 halfLeft = half2x2(1.0h, 2.0h, 3.0h, 4.0h);
+    half2x2 halfIdentity = half2x2(1.0h, 0.0h, 0.0h, 1.0h);
+    half2x2 halfProduct = halfLeft * halfIdentity;
+
     float4 vectorValue = float4(1.0, 2.0, 3.0, 4.0);
     bool vectorsEqual = vectorValue == vectorValue;
     outputBuffer[0] = vectorsEqual ? product[0][1] : 0.0;
+    outputBuffer[1] = halfProduct[0][1];
 }
 
-// CHECK: OpMatrixTimesMatrix
+// CHECK-COUNT-2: OpMatrixTimesMatrix

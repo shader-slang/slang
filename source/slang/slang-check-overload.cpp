@@ -1833,13 +1833,11 @@ bool isInterfaceRequirement(ASTBuilder* builder, DeclRef<Decl> const& declRef)
     return false;
 }
 
-/// If `declRef` representations a specialization of a generic, returns the number of specialized
-/// generic arguments. Otherwise, returns zero.
-///
-Int SemanticsVisitor::getSpecializedParamCount(DeclRef<Decl> const& declRef)
+/// Returns the parent generic when `declRef` names that generic's inner declaration.
+static DeclRef<GenericDecl> _getSpecializedGenericParent(DeclRef<Decl> const& declRef)
 {
     if (!declRef)
-        return 0;
+        return DeclRef<GenericDecl>();
 
     // A specialization of a generic must point at the
     // "inner" declaration of a generic. That means that
@@ -1847,7 +1845,7 @@ Int SemanticsVisitor::getSpecializedParamCount(DeclRef<Decl> const& declRef)
     //
     auto parentGeneric = declRef.getParent().as<GenericDecl>();
     if (!parentGeneric)
-        return 0;
+        return DeclRef<GenericDecl>();
     //
     // Furthermore, the declaration we are considering
     // must be the single "inner" declaration of the
@@ -1855,6 +1853,17 @@ Int SemanticsVisitor::getSpecializedParamCount(DeclRef<Decl> const& declRef)
     // parameter).
     //
     if (parentGeneric.getDecl()->inner != declRef.getDecl())
+        return DeclRef<GenericDecl>();
+
+    return parentGeneric;
+}
+
+/// Returns the number of required parameters on the generic specialized by `declRef`.
+/// Returns zero when `declRef` is not the inner declaration of a generic.
+Int SemanticsVisitor::getSpecializedParamCount(DeclRef<Decl> const& declRef)
+{
+    auto parentGeneric = _getSpecializedGenericParent(declRef);
+    if (!parentGeneric)
         return 0;
 
     return CountParameters(parentGeneric).required;
@@ -2147,6 +2156,15 @@ int SemanticsVisitor::compareOverloadCandidateSpecificity(
     if (left.declRef.equals(right.declRef))
         return -1;
 
+    // A non-generic declaration accepts a strict subset of the calls accepted by an otherwise
+    // equivalent generic specialization. Preserve that semantic relationship as an ordinary
+    // ranking rule; unlike comparing two generics' parameter counts, it is not a compatibility
+    // heuristic and remains valid in Slang 202c.
+    bool leftIsSpecializedGeneric = _getSpecializedGenericParent(left.declRef) != nullptr;
+    bool rightIsSpecializedGeneric = _getSpecializedGenericParent(right.declRef) != nullptr;
+    if (leftIsSpecializedGeneric != rightIsSpecializedGeneric)
+        return int(leftIsSpecializedGeneric) - int(rightIsSpecializedGeneric);
+
     // A principled specificity comparison would determine whether one candidate's accepted
     // argument domain is a strict subset of the other's. Slang does not implement that comparison
     // yet, so structural relationships such as `vector<T, 3>` versus `vector<T, N>` remain tied
@@ -2378,7 +2396,7 @@ int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, Overloa
     return 0;
 }
 
-bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCount(
+bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCountFallback(
     OverloadResolveContext& context)
 {
     if (isSlang202cOrLater(this) || context.bestCandidates.getCount() < 2)
@@ -2388,7 +2406,7 @@ bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCount(
 
     // `bestCandidates` normally contains candidates with the same status because candidate status
     // is itself an ordinary ranking criterion. Check every candidate here instead of making that
-    // representation invariant part of the compatibility rule's contract.
+    // representation invariant part of the legacy compatibility fallback's contract.
     for (auto& candidate : context.bestCandidates)
     {
         if (candidate.status != OverloadCandidate::Status::Applicable)
@@ -2405,8 +2423,8 @@ bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCount(
     // fixed-size overload. The proxy is not valid in general, though: constraints can make a
     // declaration with more generic parameters applicable to a narrower set of arguments.
     // `bestCandidates` contains exactly the candidates that remain tied after every ordinary
-    // ranking criterion, so applying the legacy rule here makes it the final compatibility
-    // fallback instead of allowing it to override a meaningful comparison such as `OverloadRank`.
+    // ranking criterion, so applying the legacy compatibility fallback here prevents it from
+    // overriding a meaningful comparison such as `OverloadRank`.
     Index bestCandidateIndex = 0;
     Int bestGenericParameterCount =
         getSpecializedParamCount(context.bestCandidates[bestCandidateIndex].item.declRef);
@@ -3463,8 +3481,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         AddOverloadCandidates(funcExpr, context);
     }
 
-    if (tryResolveOverloadUsingLegacyGenericParameterCount(context))
+    if (tryResolveOverloadUsingLegacyGenericParameterCountFallback(context))
     {
+        // `ResolveInvoke` is final source-level resolution, never a speculative cost probe, so a
+        // successful legacy compatibility fallback always reports its deprecation here.
         getSink()->diagnose(
             Diagnostics::DeprecatedGenericParameterCountOverloadTieBreaker{.location = expr->loc});
     }
