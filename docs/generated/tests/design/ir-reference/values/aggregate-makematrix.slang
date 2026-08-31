@@ -13,7 +13,7 @@
 // "matrix-constructor calls". A `float3x3(...)` constructor with
 // nine uniform float operands produces the opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<float3x3> mbuf;

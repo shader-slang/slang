@@ -15,7 +15,7 @@
 // together show the operand is a per-modifier tag rather than a constant.
 // The doc does not publish the encoding; that is recorded as a doc gap.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<float> buf;
 

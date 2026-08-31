@@ -12,7 +12,7 @@
 // Boundary probe: large positive byte offset near INT_MAX (rounded down
 // to the nearest 4-byte alignment).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform ByteAddressBuffer babuf;
 uniform RWStructuredBuffer<uint> rwbuf;

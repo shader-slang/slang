@@ -15,7 +15,7 @@
 // `interface_req_entry(<key>, Func(...))` line and an
 // `interface(...)` declaration.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IFoo { int doIt(int x); }
 struct A : IFoo { int doIt(int x) { return x + 1; } }
