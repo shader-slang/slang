@@ -147,6 +147,11 @@ public:
     /// Consume the legacy `AllowGLSL` option by explicitly selecting GLSL for every translation
     /// unit. No later compiler phase may attach independent semantics to that option.
     ///
+    /// For example, a request containing two `.slang` inputs plus `-allow-glsl` is normalized to
+    /// two translation units that each record an explicit GLSL selection. Parser, semantic, IR,
+    /// and code-generation logic then consult that per-translation-unit selection rather than the
+    /// deprecated request-wide flag.
+    ///
     /// The end-to-end request calls this before inferring a default target, and front-end execution
     /// calls it again for API clients that bypass the end-to-end path. The first call removes the
     /// option, making every subsequent call a no-op without repeating its diagnostic.

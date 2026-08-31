@@ -2095,6 +2095,11 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         // language, but changing it here would leave the existing AST internally inconsistent.
         if (directive.language != translationUnit->sourceLanguage)
         {
+            // Use E00121 when a primary source directive selected the effective language: its
+            // retained location lets the diagnostic identify both conflicting directives. If the
+            // effective language came only from an API request or file extension, there is no
+            // earlier directive to cite, so E00123 instead explains that the unit was already
+            // parsed under the other language.
             if (translationUnit->sourceLanguageImpliedBySourceContentsLoc.isValid())
             {
                 sink->diagnose(Diagnostics::ConflictingSourceLanguageDirectives{

@@ -250,9 +250,11 @@ static void _outputIncludes(
 
 /// Merge one preprocessed source unit's language directive into translation-unit provenance.
 ///
-/// The first directive selects the parser mode after lower-precedence choices are diagnosed. A
-/// later conflicting directive is rejected because one translation unit cannot be parsed under
-/// multiple language grammars.
+/// Consider a `.slang` input that was explicitly selected as Slang but starts with `#version 450`.
+/// The first directive diagnoses that it overrides the lower-precedence request, then selects GLSL
+/// so every primary source in the translation unit is parsed under one grammar. If a later primary
+/// source says `#language 2026`, this function diagnoses the conflict and retains the first GLSL
+/// selection; a translation unit cannot be reparsed under multiple language grammars.
 static void _applySourceLanguageDirective(
     TranslationUnitRequest* translationUnit,
     SourceLanguageDirective const& directive,

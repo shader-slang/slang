@@ -1929,6 +1929,11 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     }
 
     Stage impliedStage = Stage::Unknown;
+    // A stage-bearing extension belongs to the source-language convention that defined it.
+    // Consider `shader.vert -lang hlsl`: `.vert` means both GLSL and vertex input, but once the
+    // explicit HLSL selection overrides GLSL, carrying over only the vertex half would combine
+    // incompatible provenance. Require an explicit `-stage` instead; a matching or inferred
+    // language may continue to use the extension-implied stage.
     if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN ||
         sourceLanguageExplicitlyRequested == sourceLanguageImpliedByFileExtension)
     {

@@ -8,6 +8,19 @@
 
 namespace Slang
 {
+bool isRayTracingLocationOperand(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
+    case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
+    case kIROp_SPIRVAsmOperandRayCallableFromLocation:
+        return true;
+    default:
+        return false;
+    }
+}
+
 /// Indexes the global ray-tracing objects and functions needed by the location-operand rewrite.
 ///
 /// The maps are keyed by the integer location encoded in a Vulkan decoration. Keeping separate
@@ -30,6 +43,8 @@ struct CacheOfDataToReplaceOps
     /// the malformed operand and allow compilation to continue reporting errors.
     IRInst* getRayVariableFromLocation(IRInst* payloadVariable, Slang::IROp op)
     {
+        SLANG_ASSERT(isRayTracingLocationOperand(op));
+
         IRBuilder builder(payloadVariable);
         IRInst** varLayoutPointsTo = nullptr;
         int intLitValue = -1;
@@ -45,9 +60,9 @@ struct CacheOfDataToReplaceOps
             {
                 varLayoutPointsTo = m_RayLocationToAttributes.tryGetValue(intLitValue);
             }
-            else if (kIROp_SPIRVAsmOperandRayCallableFromLocation == op)
+            else
             {
-                SLANG_ASSERT(kIROp_SPIRVAsmOperandRayCallableFromLocation == op); // final case
+                SLANG_ASSERT(kIROp_SPIRVAsmOperandRayCallableFromLocation == op);
                 varLayoutPointsTo = m_RayLocationToCallables.tryGetValue(intLitValue);
             }
         }
@@ -144,22 +159,16 @@ void recurseInFuncForOpsToReplace(IRInst* parent, CacheOfDataToReplaceOps* cache
     {
         for (auto i : parent->getChildren())
         {
-            switch (i->getOp())
+            if (isRayTracingLocationOperand(i->getOp()))
             {
-            case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
-            case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
-            case kIROp_SPIRVAsmOperandRayCallableFromLocation:
-                {
-                    auto op = i->getOperand(0);
-                    IRInst* globalVar = cache->getRayVariableFromLocation(op, i->getOp());
-                    auto builder = IRBuilder(i);
-                    builder.setInsertBefore(i);
-                    auto spirvASM = builder.emitSPIRVAsmOperandInst(globalVar);
-                    i->replaceUsesWith(spirvASM);
-                    i->removeAndDeallocate();
-                    break;
-                }
-            };
+                auto op = i->getOperand(0);
+                IRInst* globalVar = cache->getRayVariableFromLocation(op, i->getOp());
+                auto builder = IRBuilder(i);
+                builder.setInsertBefore(i);
+                auto spirvASM = builder.emitSPIRVAsmOperandInst(globalVar);
+                i->replaceUsesWith(spirvASM);
+                i->removeAndDeallocate();
+            }
         }
     }
 

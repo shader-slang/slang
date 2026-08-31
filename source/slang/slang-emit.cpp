@@ -430,6 +430,11 @@ void calcRequiredLoweringPassSet(
             result.autodiff = true;
     }
 
+    // The replacement pass owns the opcode classification so this scan cannot silently omit a
+    // location-operand role that the pass knows how to consume.
+    if (isRayTracingLocationOperand(inst->getOp()))
+        result.rayTracingLocationOperand = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
@@ -547,13 +552,6 @@ void calcRequiredLoweringPassSet(
     case kIROp_GlobalOutputDecoration:
     case kIROp_GetWorkGroupSize:
         result.globalVaryingVar = true;
-        break;
-    case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
-    case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
-    case kIROp_SPIRVAsmOperandRayCallableFromLocation:
-        // AST-to-IR lowering emits these operands before the required-pass scan, so this flag can
-        // gate the later whole-module replacement traversal without a false negative.
-        result.rayTracingLocationOperand = true;
         break;
     case kIROp_BindExistentialSlotsDecoration:
         result.bindExistential = true;

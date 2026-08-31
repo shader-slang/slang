@@ -55,9 +55,10 @@ public:
 
     /// The language selected by a primary source-file directive, if any.
     ///
-    /// A conflicting directive currently overrides the request-level choice only as a backward-
-    /// compatibility concession. The diagnostic makes such a request visible so this behavior can
-    /// eventually become an error instead.
+    /// The first primary-source directive is retained here. If it conflicts with an API request or
+    /// file-extension choice, preprocessing diagnoses but honors it as a backward-compatibility
+    /// concession. A later directive for the same language confirms the selection; a later
+    /// directive for a different language is a fatal conflict and does not replace this field.
     SourceLanguage sourceLanguageImpliedBySourceContents = SourceLanguage::Unknown;
 
     /// The location of the directive that selected `sourceLanguageImpliedBySourceContents`.

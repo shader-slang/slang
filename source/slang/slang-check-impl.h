@@ -945,6 +945,9 @@ struct SharedSemanticsContext : public RefObject
 
 public:
     /// Whether the translation unit being checked uses the GLSL source language.
+    ///
+    /// A null translation-unit request denotes a module/reflection checking context that has no
+    /// parser-language provenance, so it cannot establish GLSL source semantics and returns false.
     bool isGLSLSourceLanguage()
     {
         return m_translationUnitRequest &&
