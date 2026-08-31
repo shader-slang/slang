@@ -2404,7 +2404,8 @@ bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCountFallbac
         return false;
     }
 
-    // Candidate status is an ordinary ranking criterion, so a frontier is homogeneous. A tied
+    // `CompareOverloadCandidates` ranks status first, and `AddOverloadCandidateInner` retains only
+    // candidates for which that comparison returns zero, so a frontier is homogeneous. A tied
     // frontier of failed candidates is useful for the ordinary overload diagnostic, but the
     // compatibility fallback must not turn one of those failures into a selected declaration.
     auto candidateStatus = context.bestCandidates[0].status;

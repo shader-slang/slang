@@ -96,6 +96,9 @@ RefPtr<SharedSemanticsContext> Linkage::getSemanticsForReflection()
     {
         m_semanticsForReflection = new SharedSemanticsContext(this, languageVersion, nullptr);
     }
+    // A `SemanticsVisitor` stores only a raw pointer to its shared context. Callers must retain this
+    // returned `RefPtr` in a local for the entire checking operation instead of constructing a
+    // visitor from a temporary, because a later option change can replace the cached member.
     return m_semanticsForReflection;
 }
 
