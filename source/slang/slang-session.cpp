@@ -247,14 +247,17 @@ slang::IModule* Linkage::loadModuleFromBlob(
     try
     {
         // `source` may be null for a source module loaded from a file at
-        // `path`. Materialize the file up front: the digest below then reflects
-        // the real source, and passing the blob to loadModuleImpl loads through
-        // the session file system (SourceBlobWithPathInfoArtifactRepresentation,
-        // as the by-name path does) instead of the File::exists gate below.
+        // `path`. Read the file here, via the session file system, and reuse the
+        // one blob for both the digest below and the load (it is passed to
+        // loadModuleImpl, so loadSourceModuleImpl consumes it directly): this
+        // keeps digesting and compilation on identical bytes, and covers sources
+        // reachable only through the session file system, which the File::exists
+        // gate on the null-blob fallback below would miss.
         ComPtr<ISlangBlob> sourceBlob(source);
         if (!sourceBlob && blobType == ModuleBlobType::Source && path)
         {
-            // A failed read leaves sourceBlob null; the guard below diagnoses.
+            // A custom file system may return failure while still writing a
+            // blob; treat any failure as "no source" so the guard below runs.
             if (SLANG_FAILED(getFileSystemExt()->loadFile(path, sourceBlob.writeRef())))
                 sourceBlob.setNull();
         }
