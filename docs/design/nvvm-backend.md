@@ -6906,6 +6906,31 @@ and 875-byte PTX at direct O3 SM70 versus 387.0 ms and 8841 bytes through NVRTC 
 measures 247.9 ms and emits 2807-byte PTX. These remain exploratory measurements. Provider ABI
 revision 30 and both active corpus denominators remain unchanged.
 
+### Slice 159: Selected optional-resource default values
+
+Direct NVVM now materializes the exact resource placeholders retained when optional-none lowering
+constructs an irrelevant payload. A selected `StructuredBuffer<T>` uses its established
+`{global T pointer, i64 count}` raw-view representation with a null pointer and zero count. A
+selected `DescriptorHandle<Texture2D<...>>` or `DescriptorHandle<SamplerState>` uses zero in the
+same i64 representation as its underlying resource.
+
+One shared resolver proves zero operands and the exact admitted type before provider creation.
+Emission composes existing typed integer constants, pointer types, integer-to-pointer conversion,
+and aggregate construction. Bare resources, byte-address buffers, writable surfaces, unrelated
+defaultable values, and arbitrary recursive default construction remain rejected. Provider ABI
+revision 30 is unchanged.
+
+The two motivating frozen-v1 workloads become correct at O0 and O3 and gain four permanent direct
+lanes. Frozen v1 remains exactly 452 workloads/427 healthy references and reaches 386/390/386
+O0/O3/both-mode correctness (90.4%/91.3%/90.4%), with zero old-correct loss. Discovery remains
+exactly 82/72 and 60/60/60 (83.3%), also with zero loss. The selected prefix passes 427/427.
+
+All sixteen representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90. The
+optional structured-buffer gate measures 251.4 ms and 590-byte PTX at direct O3 SM70 versus
+361.0 ms and 8570 bytes through NVRTC O3; direct O0 emits 6968-byte PTX. The optional descriptor
+gate measures 253.1 ms and 645-byte PTX versus 365.2 ms and 8584 bytes; direct O0 emits 2198-byte
+PTX. These remain exploratory measurements.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

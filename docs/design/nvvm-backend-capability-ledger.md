@@ -2270,3 +2270,14 @@ helper-aggregate-result cluster. Frozen v1 remains 384/388/384 over 427 with zer
 Its optional-resource row advances to an independent `defaultConstruct<StructuredBuffer<int>>`
 blocker. The selected prefix passes 427/427, and fourteen direct-O3 measurement gates assemble for
 SM70, SM80, and SM90.
+
+Slice 159 admits zero-operand `IRDefaultConstruct` only for selected raw structured buffers and
+selected texture/sampler descriptor handles. The former materializes the established raw-view
+provider struct with a null global pointer and zero count; the latter materializes zero in its
+established i64 alias representation. Existing generic typed operations express both recipes, so
+provider ABI revision 30 is unchanged.
+
+The two frozen optional-resource workloads become correct at O0 and O3 and gain four direct lanes.
+Frozen v1 reaches 386/390/386 over its unchanged 427 healthy denominator; discovery remains
+60/60/60 over 72. Both have zero old-correct loss. The selected prefix passes 427/427, and all
+sixteen direct-O3 measurement gates assemble with CUDA 12.9 for SM70, SM80, and SM90.

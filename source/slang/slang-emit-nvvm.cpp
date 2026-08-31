@@ -1713,6 +1713,54 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     return true;
 }
 
+enum class NVVMDefaultResourceValueKind
+{
+    RawStructuredBuffer,
+    DescriptorHandle,
+};
+
+struct NVVMDefaultResourceValue
+{
+    IRType* resultType = nullptr;
+    NVVMDefaultResourceValueKind kind = NVVMDefaultResourceValueKind::RawStructuredBuffer;
+    NVVMRawBufferType rawBufferType;
+};
+
+// Resolves the exact resource leaves retained when optional lowering constructs the irrelevant
+// payload of `none`. Raw structured buffers use their established pointer/count view, while the
+// selected texture and sampler descriptor handles are aliases of an i64 resource handle.
+bool _resolveNVVMDefaultResourceValue(
+    IRInst* inst,
+    NVVMDefaultResourceValue& outDefaultValue)
+{
+    outDefaultValue = {};
+    if (!as<IRDefaultConstruct>(inst) || inst->getOperandCount() != 0)
+        return false;
+
+    auto resultType = inst->getDataType();
+    NVVMRawBufferType rawBufferType;
+    if (getNVVMSupportedRawBufferType(resultType, rawBufferType) &&
+        rawBufferType.kind == NVVMRawBufferKind::Structured)
+    {
+        outDefaultValue.resultType = resultType;
+        outDefaultValue.kind = NVVMDefaultResourceValueKind::RawStructuredBuffer;
+        outDefaultValue.rawBufferType = rawBufferType;
+        return true;
+    }
+
+    IRType* resourceType = nullptr;
+    NVVMReadOnlyTextureType textureType;
+    if (asNVVMSupportedDescriptorHandleType(resultType, &resourceType) &&
+        (getNVVMSupportedReadOnlyTextureType(resourceType, textureType) ||
+         asNVVMSupportedSamplerValueType(resourceType)))
+    {
+        outDefaultValue.resultType = resultType;
+        outDefaultValue.kind = NVVMDefaultResourceValueKind::DescriptorHandle;
+        return true;
+    }
+    return false;
+}
+
 struct NVVMAggregateElement
 {
     IRInst* base = nullptr;
@@ -7121,6 +7169,19 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_DefaultConstruct:
+                {
+                    NVVMDefaultResourceValue defaultValue;
+                    if (!_resolveNVVMDefaultResourceValue(inst, defaultValue))
+                    {
+                        return _diagnoseUnsupportedIRType(
+                            codeGenContext,
+                            "default construct type",
+                            inst->getDataType());
+                    }
+                }
+                break;
+
             case kIROp_Add:
             case kIROp_Sub:
             case kIROp_Mul:
@@ -7748,6 +7809,14 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree));
+                    availableValues.add(inst);
+                }
+                break;
+
+            case kIROp_DefaultConstruct:
+                {
+                    NVVMDefaultResourceValue defaultValue;
+                    SLANG_RELEASE_ASSERT(_resolveNVVMDefaultResourceValue(inst, defaultValue));
                     availableValues.add(inst);
                 }
                 break;
@@ -8736,6 +8805,82 @@ SlangResult _emitNVVMChosenUndefinedValue(
                        elements.getBuffer(),
                        size_t(elements.getCount()),
                        outValue));
+}
+
+// Materializes one preflighted resource placeholder retained by optional-none lowering. The
+// provider representation is the same exact value type used for non-default resource values.
+SlangResult _emitNVVMDefaultResourceValue(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMDefaultResourceValue& defaultValue,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    outValue = nullptr;
+    SLANG_RELEASE_ASSERT(defaultValue.resultType);
+
+    if (defaultValue.kind == NVVMDefaultResourceValueKind::DescriptorHandle)
+    {
+        SlangNVVMTypeHandle handleType = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            typeContext.lowerType(defaultValue.resultType, NVVMTypeUse::Value, handleType));
+        return _requireBuilderOperation(
+            codeGenContext,
+            "default descriptor handle",
+            builder.getIntegerConstant(module, handleType, 0, outValue));
+    }
+
+    SLANG_RELEASE_ASSERT(
+        defaultValue.kind == NVVMDefaultResourceValueKind::RawStructuredBuffer &&
+        defaultValue.rawBufferType.structuredElementType);
+    const NVVMTypeUse elementUse =
+        isNVVMSupportedStructuredBufferStorageType(
+            defaultValue.rawBufferType.structuredElementType)
+            ? NVVMTypeUse::StructuredBufferStorage
+            : NVVMTypeUse::Value;
+    SlangNVVMTypeHandle elementType = nullptr;
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+        defaultValue.rawBufferType.structuredElementType,
+        elementUse,
+        elementType));
+    SlangNVVMTypeHandle dataPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "default raw-buffer data-pointer type",
+        builder.getPointerType(
+            module,
+            elementType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            dataPointerType)));
+    SlangNVVMTypeHandle countType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "default raw-buffer count type",
+        builder.getIntegerType(module, 64, countType)));
+    SlangNVVMValueHandle zero = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "default raw-buffer zero",
+        builder.getIntegerConstant(module, countType, 0, zero)));
+    SlangNVVMValueHandle nullDataPointer = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "default raw-buffer null data pointer",
+        builder.emitBitCast(module, dataPointerType, zero, nullDataPointer)));
+    SlangNVVMTypeHandle rawBufferType = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        typeContext.lowerType(defaultValue.resultType, NVVMTypeUse::Value, rawBufferType));
+    const SlangNVVMValueHandle elements[] = {nullDataPointer, zero};
+    return _requireBuilderOperation(
+        codeGenContext,
+        "default raw-buffer view",
+        builder.emitAggregateConstruct(
+            module,
+            rawBufferType,
+            elements,
+            SLANG_COUNT_OF(elements),
+            outValue));
 }
 
 // Returns an already-lowered SSA value or materializes an exact preflighted scalar literal.
@@ -12329,6 +12474,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                             moduleScope.module,
                             construction,
                             valueMap,
+                            typeContext,
+                            loweredValue));
+                        valueMap[inst] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_DefaultConstruct:
+                    {
+                        NVVMDefaultResourceValue defaultValue;
+                        SLANG_RELEASE_ASSERT(
+                            _resolveNVVMDefaultResourceValue(inst, defaultValue));
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_emitNVVMDefaultResourceValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            defaultValue,
                             typeContext,
                             loweredValue));
                         valueMap[inst] = loweredValue;
