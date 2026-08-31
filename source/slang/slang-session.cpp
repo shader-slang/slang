@@ -94,8 +94,7 @@ SharedSemanticsContext* Linkage::getSemanticsForReflection()
     if (!m_semanticsForReflection ||
         m_semanticsForReflection->getLanguageVersion() != languageVersion)
     {
-        m_semanticsForReflection =
-            new SharedSemanticsContext(this, languageVersion, nullptr);
+        m_semanticsForReflection = new SharedSemanticsContext(this, languageVersion, nullptr);
     }
     return m_semanticsForReflection.get();
 }

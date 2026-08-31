@@ -953,7 +953,8 @@ public:
         , m_sink(sink)
         , m_environmentModules(environmentModules)
         , m_translationUnitRequest(translationUnit)
-    {}
+    {
+    }
 
     SharedSemanticsContext(
         Linkage* linkage,
