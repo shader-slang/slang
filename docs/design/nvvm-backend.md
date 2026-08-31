@@ -6797,6 +6797,35 @@ through CUDA 12.9 at direct O3 for SM70, SM80, and SM90. The existential-special
 measures 278.6 ms and 1007-byte PTX at direct O3 SM70 versus 376.0 ms and 8946 bytes through NVRTC
 O3. These remain uncontrolled exploratory measurements.
 
+### Slice 155: Finite group-shared value storage
+
+Group-shared globals now store the same finite value algebra already admitted across ordinary
+helper boundaries: selected scalars, fixed arrays, structs, tuples, existential aggregates, and
+selected pointer-bearing values. One `NVVMSharedGlobal` descriptor classifies the canonical
+uninitialized `IRGlobalVar`, its finite storage type, and its executable alignment type. This
+replaces separate numeric scalar and array paths.
+
+The global's `IRGroupSharedRate` is the source of CUDA address-space-3 provenance. Final linked IR
+may spell its pointer as either one-operand `Ptr<T>` or exact
+`Ptr<T, ReadWrite, Generic>`; derived array elements and helper parameters preserve explicit
+group-shared pointer types. Sequential and field-address resolution therefore classifies the
+canonical global producer before shape-identical local pointer alternatives. A helper-call
+relation accepts only that direct global value or a pointer whose type explicitly preserves
+address space 3. Layout compatibility is proved before provider mutation, and emission reuses the
+existing typed global, load/store, GEP, and call operations. Provider ABI revision 30 is unchanged.
+
+One frozen-v1 existential aggregate and three discovery workloads become correct at O0 and O3 and
+gain eight permanent direct lanes. Frozen corpus v1 remains exactly 452 workloads/427 healthy
+references and reaches 381/385/381 O0/O3/both-mode correctness, with zero old-correct loss.
+Discovery remains exactly 82/72 and reaches 58/58/58, also with zero loss. A fifth discovery row
+now reaches the independent provider-owned conversion from an address-space-1 pointer value to a
+generic `UserPointer`; it remains unsupported and is not counted as unlocked.
+
+The selected NVVM unit prefix passes 427/427. All established representative direct-O3 workloads
+assemble with CUDA 12.9 for SM70, SM80, and SM90. The existential gate measures 287.2 ms and
+1007-byte PTX at direct O3 SM70 versus 385.3 ms and 8946 bytes through NVRTC O3; direct O0 emits
+60001-byte PTX. These measurements remain exploratory.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

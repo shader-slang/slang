@@ -131,7 +131,7 @@ IRPtrTypeBase* asNVVMSupportedHelperReferencePointerType(
     IRInst* type,
     IRType** outValueType = nullptr);
 
-// Recognizes an explicit numeric groupshared pointer carried through a helper signature.
+/// Returns an exact group-shared pointer to a finite helper value carried through a helper.
 IRPtrTypeBase* asNVVMSupportedSharedHelperPointerType(
     IRInst* type,
     IRType** outValueType = nullptr);
@@ -199,16 +199,20 @@ IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     IRArrayType** outArrayType = nullptr,
     uint32_t* outElementCount = nullptr);
 
-/// Returns an exact canonical uninitialized selected atomic-capable `groupshared` scalar global.
-IRGlobalVar* asNVVMSupportedSharedScalarGlobal(IRInst* inst, IRType** outValueType = nullptr);
+/// Describes one canonical module-scope group-shared storage producer.
+struct NVVMSharedGlobal
+{
+    IRGlobalVar* globalVar = nullptr;
+    IRType* storageType = nullptr;
+    IRType* alignmentType = nullptr;
+};
 
-/// Returns an exact canonical uninitialized groupshared fixed array of numeric helper values.
-IRGlobalVar* asNVVMSupportedSharedArrayGlobal(
+/// Resolves an uninitialized group-shared global containing a finite helper value or atomic scalar.
+bool getNVVMSupportedSharedGlobal(
     IRInst* inst,
-    IRArrayType** outArrayType = nullptr,
-    uint32_t* outElementCount = nullptr);
+    NVVMSharedGlobal* outGlobal = nullptr);
 
-/// Returns a canonical scalar-layout groupshared pointer to one numeric helper value.
+/// Returns a canonical scalar-layout group-shared pointer to one finite helper value.
 IRPtrTypeBase* asNVVMSupportedSharedElementPointerType(IRInst* type);
 
 /// Describes which operations a canonical raw buffer view permits.

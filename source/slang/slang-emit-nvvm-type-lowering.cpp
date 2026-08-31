@@ -705,7 +705,7 @@ IRPtrTypeBase* asNVVMSupportedSharedHelperPointerType(IRInst* type, IRType** out
         pointerType->getAccessQualifier() != AccessQualifier::ReadWrite ||
         pointerType->getAddressSpace() != AddressSpace::GroupShared || !dataLayout ||
         dataLayout->getOp() != kIROp_DefaultBufferLayoutType ||
-        !isNVVMSupportedNumericValueType(valueType))
+        !isNVVMSupportedHelperValueType(valueType))
     {
         return nullptr;
     }
@@ -1033,61 +1033,37 @@ IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     return ptrType;
 }
 
-IRGlobalVar* asNVVMSupportedSharedScalarGlobal(IRInst* inst, IRType** outValueType)
+bool getNVVMSupportedSharedGlobal(IRInst* inst, NVVMSharedGlobal* outGlobal)
 {
-    if (outValueType)
-        *outValueType = nullptr;
+    if (outGlobal)
+        *outGlobal = {};
 
     auto globalVar = as<IRGlobalVar>(inst);
     auto ptrType = globalVar ? globalVar->getDataType() : nullptr;
     IRType* valueType = ptrType ? ptrType->getValueType() : nullptr;
-    IRType* physicalValueType = valueType;
+    IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
     IRType* atomicValueType = nullptr;
-    if (asNVVMSupportedAtomicType(valueType, &atomicValueType))
-        physicalValueType = atomicValueType;
-    uint32_t integerBitWidth = 0;
-    const bool isSelectedInteger =
-        isNVVMSupportedIntegerScalarType(physicalValueType, &integerBitWidth) &&
-        (integerBitWidth == 32 || integerBitWidth == 64);
+    const bool isAtomic = asNVVMSupportedAtomicType(valueType, &atomicValueType) != nullptr;
+    const bool hasCanonicalPointerType =
+        ptrType && ptrType->getOp() == kIROp_PtrType &&
+        (ptrType->getOperandCount() == 1 ||
+         (ptrType->getOperandCount() == 3 &&
+          ptrType->getAccessQualifier() == AccessQualifier::ReadWrite &&
+          ptrType->getAddressSpace() == AddressSpace::Generic && !dataLayout));
     if (!globalVar || !as<IRGroupSharedRate>(globalVar->getRate()) || globalVar->getFirstBlock() ||
-        !ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 1 ||
-        (!isSelectedInteger && !isNVVMFloat32Type(physicalValueType)))
+        !hasCanonicalPointerType ||
+        (!isAtomic && !isNVVMSupportedHelperValueType(valueType)))
     {
-        return nullptr;
+        return false;
     }
 
-    if (outValueType)
-        *outValueType = valueType;
-    return globalVar;
-}
-
-IRGlobalVar* asNVVMSupportedSharedArrayGlobal(
-    IRInst* inst,
-    IRArrayType** outArrayType,
-    uint32_t* outElementCount)
-{
-    if (outArrayType)
-        *outArrayType = nullptr;
-    if (outElementCount)
-        *outElementCount = 0;
-
-    auto globalVar = as<IRGlobalVar>(inst);
-    auto ptrType = globalVar ? globalVar->getDataType() : nullptr;
-    IRArrayType* arrayType = nullptr;
-    uint32_t elementCount = 0;
-    if (!globalVar || !as<IRGroupSharedRate>(globalVar->getRate()) || globalVar->getFirstBlock() ||
-        !ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 1 ||
-        !(arrayType = asNVVMSupportedNumericArrayType(ptrType->getValueType(), &elementCount)) ||
-        !isNVVMSupportedHelperValueType(arrayType->getElementType()))
+    if (outGlobal)
     {
-        return nullptr;
+        outGlobal->globalVar = globalVar;
+        outGlobal->storageType = valueType;
+        outGlobal->alignmentType = isAtomic ? atomicValueType : valueType;
     }
-
-    if (outArrayType)
-        *outArrayType = arrayType;
-    if (outElementCount)
-        *outElementCount = elementCount;
-    return globalVar;
+    return true;
 }
 
 IRPtrTypeBase* asNVVMSupportedSharedElementPointerType(IRInst* type)
@@ -1095,7 +1071,7 @@ IRPtrTypeBase* asNVVMSupportedSharedElementPointerType(IRInst* type)
     auto ptrType = as<IRPtrTypeBase>(type);
     IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
     if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
-        !isNVVMSupportedNumericValueType(ptrType->getValueType()) ||
+        !isNVVMSupportedHelperValueType(ptrType->getValueType()) ||
         ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
         ptrType->getAddressSpace() != AddressSpace::GroupShared || !dataLayout ||
         dataLayout->getOp() != kIROp_ScalarBufferLayoutType)

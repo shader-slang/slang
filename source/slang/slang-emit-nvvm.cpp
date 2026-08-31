@@ -190,12 +190,20 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
 
     IRStructType* structType = nullptr;
     NVVMConventionalGlobalParams globalParams;
+    NVVMSharedGlobal sharedGlobal;
     const bool isConventionalGlobal =
         _getNVVMConventionalGlobalParams(fieldAddress->getBase(), globalParams);
     if (isConventionalGlobal)
     {
         structType = globalParams.elementType;
         outAddress.isConventionalGlobal = true;
+    }
+    else if (getNVVMSupportedSharedGlobal(fieldAddress->getBase(), &sharedGlobal))
+    {
+        structType = asNVVMSupportedHelperStructType(sharedGlobal.storageType);
+        if (!structType)
+            return false;
+        outAddress.isMutable = true;
     }
     else if (auto parentFieldAddress = as<IRFieldAddress>(fieldAddress->getBase()))
     {
@@ -308,6 +316,15 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
                     &helperValueType))
             {
                 SLANG_UNUSED(devicePointer);
+                structType = asNVVMSupportedHelperStructType(helperValueType);
+                if (!structType)
+                    return false;
+                outAddress.isMutable = true;
+            }
+            else if (asNVVMSupportedSharedHelperPointerType(
+                         fieldAddress->getBase()->getDataType(),
+                         &helperValueType))
+            {
                 structType = asNVVMSupportedHelperStructType(helperValueType);
                 if (!structType)
                     return false;
@@ -667,9 +684,17 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     IRInst* base = inst->getOperand(0);
     IRInst* index = inst->getOperand(1);
     IRArrayType* arrayType = nullptr;
-    auto baseType =
-        base ? asNVVMSupportedLocalNumericArrayPointerType(base->getDataType(), &arrayType)
-             : nullptr;
+    IRPtrTypeBase* baseType = nullptr;
+    NVVMSharedGlobal sharedGlobal;
+    bool isSharedGlobalBase = false;
+    if (base && getNVVMSupportedSharedGlobal(base, &sharedGlobal))
+    {
+        arrayType = asNVVMSupportedHelperArrayType(sharedGlobal.storageType);
+        baseType = arrayType ? as<IRPtrTypeBase>(base->getDataType()) : nullptr;
+        isSharedGlobalBase = baseType != nullptr;
+    }
+    if (!baseType && base)
+        baseType = asNVVMSupportedLocalNumericArrayPointerType(base->getDataType(), &arrayType);
     if (!baseType && base)
         baseType = asNVVMSupportedLocalCopyableArrayPointerType(base->getDataType(), &arrayType);
     if (!baseType && base)
@@ -767,7 +792,8 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     const AccessQualifier expectedAccess =
         baseType ? baseType->getAccessQualifier() : AccessQualifier::ReadWrite;
     const AddressSpace expectedAddressSpace =
-        baseType ? baseType->getAddressSpace() : AddressSpace::Generic;
+        isSharedGlobalBase ? AddressSpace::GroupShared
+                           : baseType ? baseType->getAddressSpace() : AddressSpace::Generic;
     const bool hasCanonicalLocalLayout =
         (resultType && (resultType->getOperandCount() == 1 || resultType->getOperandCount() == 3) &&
          !resultLayout) ||
@@ -4974,20 +5000,23 @@ bool _resolveNVVMAtomicPointer(IRInst* value, NVVMResolvedAtomicPointer& outPoin
     if (!value)
         return false;
 
-    IRType* sharedScalarType = nullptr;
-    if (asNVVMSupportedSharedScalarGlobal(value, &sharedScalarType))
+    NVVMSharedGlobal sharedGlobal;
+    if (getNVVMSupportedSharedGlobal(value, &sharedGlobal))
     {
         outPointer.type = as<IRPtrTypeBase>(value->getDataType());
         outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
-        return outPointer.type && isTypeEqual(outPointer.type->getValueType(), sharedScalarType);
+        return outPointer.type &&
+               isTypeEqual(outPointer.type->getValueType(), sharedGlobal.storageType);
     }
 
     if (value->getOp() == kIROp_GetElementPtr && value->getOperandCount() == 2)
     {
-        IRArrayType* sharedArrayType = nullptr;
+        NVVMSharedGlobal sharedArray;
         auto resultType = asNVVMSupportedSharedElementPointerType(value->getDataType());
-        if (asNVVMSupportedSharedArrayGlobal(value->getOperand(0), &sharedArrayType) &&
-            resultType &&
+        auto sharedArrayType = getNVVMSupportedSharedGlobal(value->getOperand(0), &sharedArray)
+                                   ? asNVVMSupportedHelperArrayType(sharedArray.storageType)
+                                   : nullptr;
+        if (sharedArrayType && resultType &&
             isTypeEqual(sharedArrayType->getElementType(), resultType->getValueType()))
         {
             outPointer.type = resultType;
@@ -5827,7 +5856,7 @@ SlangResult _validateAvailableValue(
     NVVMConventionalGlobalParams globalParams;
     SlangNVVMValueOperation executionOperation = 0;
     if (value && consumer && value->getModule() == consumer->getModule() &&
-        (asNVVMSupportedSharedScalarGlobal(value) || asNVVMSupportedSharedArrayGlobal(value) ||
+        (getNVVMSupportedSharedGlobal(value) ||
          _getNVVMConventionalGlobalParams(value, globalParams) ||
          _getNVVMCUDAExecutionGlobalOperation(value, executionOperation)))
     {
@@ -6115,15 +6144,10 @@ SlangResult _validatePointerValue(
             : nullptr;
     auto sharedElementPtrType =
         value ? asNVVMSupportedSharedElementPointerType(value->getDataType()) : nullptr;
-    auto sharedScalarPtrType = value && asNVVMSupportedSharedScalarGlobal(value)
+    NVVMSharedGlobal sharedGlobal;
+    auto sharedGlobalPtrType = value && getNVVMSupportedSharedGlobal(value, &sharedGlobal)
                                    ? as<IRPtrTypeBase>(value->getDataType())
                                    : nullptr;
-    // Final legalization preserves whole groupshared-array initialization as one store rooted at
-    // the canonical global. Element access continues through the established element pointer.
-    auto sharedArrayPtrType = value && consumer && consumer->getOp() == kIROp_Store &&
-                                      asNVVMSupportedSharedArrayGlobal(value)
-                                  ? as<IRPtrTypeBase>(value->getDataType())
-                                  : nullptr;
     auto localStructPtrType =
         value ? asNVVMSupportedLocalResourceStructPointerType(value->getDataType()) : nullptr;
     auto localHelperPtrType =
@@ -6161,8 +6185,7 @@ SlangResult _validatePointerValue(
     IRPtrTypeBase* devicePtrType = numericPtrType ? numericPtrType : deviceCopyablePtrType;
     IRPtrTypeBase* acceptedPtrType = devicePtrType              ? devicePtrType
                                      : sharedElementPtrType     ? sharedElementPtrType
-                                     : sharedScalarPtrType      ? sharedScalarPtrType
-                                     : sharedArrayPtrType       ? sharedArrayPtrType
+                                     : sharedGlobalPtrType      ? sharedGlobalPtrType
                                      : resourceElementPtrType   ? resourceElementPtrType
                                      : localNumericPtrType      ? localNumericPtrType
                                      : localArrayPtrType        ? localArrayPtrType
@@ -6342,19 +6365,43 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
            asNVVMSupportedSamplerValueType(type);
 }
 
-// Returns whether one canonical call argument satisfies an exact helper parameter. A mutable
-// borrow and an explicit thread-local context parameter deliberately have distinct source types
-// from the local pointer passed to them, while each preserves the same selected aggregate and
-// lowers to one typed generic pointer.
-bool _isSupportedNVVMHelperArgumentType(IRType* argumentType, IRType* parameterType)
+// Returns the exact group-shared pointer values whose source type is allowed to omit address-space
+// provenance. A module global carries that provenance on its GroupShared rate. Explicit helper and
+// element pointers preserve address space 3 directly in their type.
+IRPtrTypeBase* _asNVVMSupportedSharedPointerValue(IRInst* value)
 {
+    auto pointerType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
+    if (!pointerType)
+        return nullptr;
+    if (asNVVMSupportedSharedHelperPointerType(pointerType) ||
+        asNVVMSupportedSharedElementPointerType(pointerType))
+    {
+        return pointerType;
+    }
+
+    NVVMSharedGlobal sharedGlobal;
+    return getNVVMSupportedSharedGlobal(value, &sharedGlobal) &&
+                   isNVVMSupportedHelperValueType(pointerType->getValueType())
+               ? pointerType
+               : nullptr;
+}
+
+// Returns whether one canonical call argument satisfies an exact helper parameter. A mutable
+// borrow, a group-shared root, and an explicit thread-local context parameter deliberately have
+// distinct source types from the pointer parameter, while each retains exact producer provenance
+// and lowers to one typed pointer in the corresponding provider address space.
+bool _isSupportedNVVMHelperArgument(IRInst* argument, IRType* parameterType)
+{
+    IRType* argumentType = argument ? argument->getDataType() : nullptr;
+    if (!argumentType)
+        return false;
     if (isTypeEqual(argumentType, parameterType))
         return true;
 
     IRType* parameterSharedValueType = nullptr;
     auto parameterSharedPointer =
         asNVVMSupportedSharedHelperPointerType(parameterType, &parameterSharedValueType);
-    auto argumentSharedPointer = asNVVMSupportedSharedElementPointerType(argumentType);
+    auto argumentSharedPointer = _asNVVMSupportedSharedPointerValue(argument);
     if (parameterSharedPointer && argumentSharedPointer &&
         isTypeEqual(argumentSharedPointer->getValueType(), parameterSharedValueType))
     {
@@ -6650,11 +6697,10 @@ String _getNVVMSharedGlobalName(IRModule* module, IRGlobalVar* target)
     Index sharedIndex = 0;
     for (auto globalInst : module->getGlobalInsts())
     {
-        auto globalVar = asNVVMSupportedSharedScalarGlobal(globalInst);
-        if (!globalVar)
-            globalVar = asNVVMSupportedSharedArrayGlobal(globalInst);
-        if (!globalVar)
+        NVVMSharedGlobal sharedGlobal;
+        if (!getNVVMSupportedSharedGlobal(globalInst, &sharedGlobal))
             continue;
+        auto globalVar = sharedGlobal.globalVar;
         if (globalVar == target)
         {
             StringBuilder name;
@@ -6699,11 +6745,10 @@ SlangResult _collectNVVMFunctionNames(
                 return _diagnoseUnsupportedIR(codeGenContext, toSlice("global storage name"));
             continue;
         }
-        auto globalVar = asNVVMSupportedSharedScalarGlobal(globalInst);
-        if (!globalVar)
-            globalVar = asNVVMSupportedSharedArrayGlobal(globalInst);
-        if (!globalVar)
+        NVVMSharedGlobal sharedGlobal;
+        if (!getNVVMSupportedSharedGlobal(globalInst, &sharedGlobal))
             continue;
+        auto globalVar = sharedGlobal.globalVar;
         const String name = _getNVVMSharedGlobalName(module, globalVar);
         if (!name.getLength() || !names.add(name))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("global storage name"));
@@ -7786,9 +7831,9 @@ SlangResult _validateNVVMFunction(
                          ++argumentIndex)
                     {
                         IRInst* argument = call->getArg(argumentIndex);
-                        if (!argument || !_isSupportedNVVMHelperArgumentType(
-                                             argument->getDataType(),
-                                             callee->getParamType(argumentIndex)))
+                        if (!_isSupportedNVVMHelperArgument(
+                                argument,
+                                callee->getParamType(argumentIndex)))
                         {
                             return argument ? _diagnoseUnsupportedIRTypeRelation(
                                                   codeGenContext,
@@ -8030,12 +8075,7 @@ SlangResult _validateNVVMFunction(
                                                              basePointer->getDataType(),
                                                              &arrayType)
                                                        : nullptr;
-                    IRArrayType* sharedArrayType = nullptr;
-                    auto sharedGlobal =
-                        asNVVMSupportedSharedArrayGlobal(basePointer, &sharedArrayType);
                     auto resultPointerType = asNVVMSupportedDevicePointerType(inst->getDataType());
-                    auto sharedResultPointerType =
-                        asNVVMSupportedSharedElementPointerType(inst->getDataType());
                     const bool isDeviceArrayElement =
                         basePointerType && resultPointerType && arrayType &&
                         basePointerType->getAddressSpace() ==
@@ -8043,12 +8083,7 @@ SlangResult _validateNVVMFunction(
                         basePointerType->getAccessQualifier() ==
                             resultPointerType->getAccessQualifier() &&
                         isTypeEqual(arrayType->getElementType(), resultPointerType->getValueType());
-                    const bool isSharedArrayElement = sharedGlobal && sharedArrayType &&
-                                                      sharedResultPointerType &&
-                                                      isTypeEqual(
-                                                          sharedArrayType->getElementType(),
-                                                          sharedResultPointerType->getValueType());
-                    if (!isDeviceArrayElement && !isSharedArrayElement)
+                    if (!isDeviceArrayElement)
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -11244,6 +11279,15 @@ SlangResult validateNVVMSupportedIR(
             }
         }
     }
+    // A group-shared global is also a canonical type root. Its pointer spelling does not make the
+    // pointee reachable through ordinary SSA-type traversal, so collect the finite storage value
+    // directly from the producer before auditing retained module-scope type declarations.
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        NVVMSharedGlobal sharedGlobal;
+        if (getNVVMSupportedSharedGlobal(globalInst, &sharedGlobal))
+            _addNVVMReachableStructTypes(sharedGlobal.storageType, selectedReachableStructTypes);
+    }
     // Linking can retain module-scope types, layouts, capabilities, and constants needed to spell
     // the reachable functions. IRStructKey is also layout-only identity retained for raw CUDA
     // parameter layouts. A selected struct used by a reachable signature, local, or raw structured
@@ -11262,9 +11306,20 @@ SlangResult validateNVVMSupportedIR(
         }
         if (as<IRGlobalVar>(globalInst))
         {
-            if (asNVVMSupportedSharedScalarGlobal(globalInst) ||
-                asNVVMSupportedSharedArrayGlobal(globalInst))
+            NVVMSharedGlobal sharedGlobal;
+            if (getNVVMSupportedSharedGlobal(globalInst, &sharedGlobal))
+            {
+                if (!_hasNVVMCompatibleCopyableValueLayout(
+                        codeGenContext,
+                        sharedGlobal.alignmentType))
+                {
+                    return _diagnoseUnsupportedIRType(
+                        codeGenContext,
+                        "shared global storage layout",
+                        sharedGlobal.storageType);
+                }
                 continue;
+            }
             return _diagnoseUnsupportedIR(
                 codeGenContext,
                 UnownedStringSlice(getIROpInfo(globalInst->getOp()).name));
@@ -11417,25 +11472,16 @@ SlangResult emitNVVMIRFromLinkedIR(
             continue;
         }
 
-        IRType* sharedStorageType = nullptr;
-        auto globalVar = asNVVMSupportedSharedScalarGlobal(globalInst, &sharedStorageType);
-        IRArrayType* arrayType = nullptr;
-        if (!globalVar)
-        {
-            globalVar = asNVVMSupportedSharedArrayGlobal(globalInst, &arrayType);
-            sharedStorageType = arrayType;
-        }
-        if (!globalVar)
+        NVVMSharedGlobal sharedGlobal;
+        if (!getNVVMSupportedSharedGlobal(globalInst, &sharedGlobal))
             continue;
+        auto globalVar = sharedGlobal.globalVar;
+        IRType* sharedStorageType = sharedGlobal.storageType;
 
         SlangNVVMTypeHandle loweredStorageType = nullptr;
         SLANG_RETURN_ON_FAIL(
             typeContext.lowerType(sharedStorageType, NVVMTypeUse::Value, loweredStorageType));
         SlangNVVMValueHandle loweredStorage = nullptr;
-        IRType* alignmentType = arrayType ? arrayType->getElementType() : sharedStorageType;
-        IRType* atomicValueType = nullptr;
-        if (asNVVMSupportedAtomicType(alignmentType, &atomicValueType))
-            alignmentType = atomicValueType;
         const String storageName = _getNVVMSharedGlobalName(linkedIR.module, globalVar);
         SLANG_RELEASE_ASSERT(storageName.getLength());
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -11446,7 +11492,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 loweredStorageType,
                 SLANG_NVVM_LINKAGE_INTERNAL,
                 SLANG_NVVM_ADDRESS_SPACE_SHARED,
-                getNVVMNumericValueAlignment(alignmentType),
+                _getNVVMExecutableValueAlignment(sharedGlobal.alignmentType),
                 storageName.getUnownedSlice(),
                 loweredStorage)));
         valueMap[globalVar] = loweredStorage;
@@ -13234,8 +13280,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                                                   loweredPointer);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            asNVVMSupportedSharedArrayGlobal(inst->getOperand(0))
-                                ? "shared array element pointer"
+                            getNVVMSupportedSharedGlobal(inst->getOperand(0))
+                                ? "shared aggregate element pointer"
                             : isBufferElement     ? "raw buffer scalar element pointer"
                             : isSequentialElement ? "numeric sequential element pointer"
                                                   : "device i32 array element pointer",

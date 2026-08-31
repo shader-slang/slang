@@ -2221,3 +2221,17 @@ direct lanes. Discovery reaches 55/55/55 over its unchanged 72 healthy reference
 descriptor workloads now report their next independent raw-view bit-transport, default-construct,
 or `AnyValue` packing blocker. The selected prefix passes 427/427, and all twelve measurement gates
 assemble at direct O3 for SM70, SM80, and SM90.
+
+Slice 155 unifies canonical group-shared globals under one finite-value storage descriptor. The
+global's `IRGroupSharedRate` owns physical address-space-3 provenance even when final IR uses the
+one-operand or exact generic pointer spelling. Array elements, struct fields, and helper calls keep
+their exact typed relations; helper arguments must be either the direct shared global or an
+explicit group-shared pointer. Existing recursive helper representation and layout checks are
+reused, and provider ABI revision 30 is unchanged.
+
+One frozen existential aggregate and three discovery workloads become correct at O0 and O3 and
+gain eight direct lanes. Frozen v1 reaches 381/385/381 over its unchanged 427 healthy denominator;
+discovery reaches 58/58/58 over 72. Both have zero old-correct loss. The selected prefix passes
+427/427, and established direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90. A
+pointer-bearing shared array advances to the independent provider-owned address-space-1 to generic
+`UserPointer` conversion failure and remains unsupported.
