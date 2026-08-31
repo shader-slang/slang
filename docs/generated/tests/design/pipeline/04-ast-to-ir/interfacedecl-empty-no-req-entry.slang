@@ -15,7 +15,7 @@
 // to an `interface` instruction but has no
 // `interface_req_entry(...)` rows attached.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IEmpty { }
 struct A : IEmpty { int v; }

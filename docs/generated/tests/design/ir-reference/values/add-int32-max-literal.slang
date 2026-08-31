@@ -14,7 +14,7 @@
 // signed-32 range should appear verbatim as `2147483647 : Int` in
 // the operand syntax of an `add` instruction.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

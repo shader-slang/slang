@@ -13,7 +13,7 @@
 // the IR. The smallest nontrivial extent (1) surfaces as `Array(Int, 1
 // : Int)` on the dumped field.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Holder { int data[1]; }
 uniform Holder s;

@@ -11,7 +11,7 @@
 
 // Boundary: storage axis — vector with `int64_t` element type.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform vector<int64_t, 3> v;
 uniform RWStructuredBuffer<int> buf;

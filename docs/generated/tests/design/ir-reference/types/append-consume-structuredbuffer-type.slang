@@ -17,7 +17,7 @@
 // shows the surface flavour picks the opcode and the layout marker is
 // carried as the second operand.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 AppendStructuredBuffer<int> appendBuf;
 ConsumeStructuredBuffer<int> consumeBuf;

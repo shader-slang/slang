@@ -15,7 +15,7 @@
 // is what makes the report attributable to a specific variable rather than to
 // a position in the block.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g
 
 uniform RWStructuredBuffer<int> buf;
 

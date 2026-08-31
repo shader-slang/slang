@@ -14,7 +14,7 @@
 // places this under the same `floatCast` opcode as half<->float
 // transitions.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double da;
 uniform RWStructuredBuffer<float> buf;

@@ -15,7 +15,7 @@
 // attribute) and then requires that same id to appear as the second operand of
 // an `Attributed` type -- the wrapper the doc says carries it.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 RWTexture2D<unorm float4> tex;
 

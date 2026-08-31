@@ -13,7 +13,7 @@
 // IRMul / IREq as illustrative arithmetic opcodes; division is the
 // implied counterpart for `/` operator. Verifies the `div` opcode.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;
