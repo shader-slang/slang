@@ -1672,8 +1672,265 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     }
 }
 
-bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* decl)
+// A single data-driven modifier-validity rule: a modifier of class `modifierClass` applied to a
+// node of class `nodeClass` has the given `disposition`. Both axes are `SyntaxClass`es, so a rule
+// may name an abstract base (e.g. `CallableDecl`) and thereby cover all of its concrete subclasses.
+struct ModifierValidityRule
 {
+    SyntaxClass<NodeBase> nodeClass;
+    SyntaxClass<NodeBase> modifierClass;
+    ModifierValidityDisposition disposition;
+};
+
+// The data-driven modifier-validity rules. The first matching rule (in array order) wins; a pair
+// matching no rule has no disposition here (`NoDisposition`). Rules whose applicability depends on
+// a runtime predicate this class-only table cannot express (global-vs-local, parent-struct, GLSL
+// mode, ...) are intentionally absent and are decided by `queryLegacyModifierValidityOnDecl`
+// instead. Consequently an `Allowed` rule must hold unconditionally for its whole (node class,
+// modifier class) range: because a matching rule takes precedence over the legacy decision, an
+// `Allowed` rule that overlapped a runtime-conditional legacy restriction would silently permit
+// the cases that restriction rejects.
+static const ModifierValidityRule kModifierValidityRules[] = {
+    // Modifiers that are only meaningful on callable declarations.
+    {getSyntaxClass<CallableDecl>(),
+     getSyntaxClass<InlineModifier>(),
+     ModifierValidityDisposition::Allowed},
+    {getSyntaxClass<CallableDecl>(),
+     getSyntaxClass<IntrinsicOpModifier>(),
+     ModifierValidityDisposition::Allowed},
+    {getSyntaxClass<CallableDecl>(),
+     getSyntaxClass<SpecializedForTargetModifier>(),
+     ModifierValidityDisposition::Allowed},
+    {getSyntaxClass<CallableDecl>(),
+     getSyntaxClass<PrefixModifier>(),
+     ModifierValidityDisposition::Allowed},
+    {getSyntaxClass<CallableDecl>(),
+     getSyntaxClass<PostfixModifier>(),
+     ModifierValidityDisposition::Allowed},
+
+    // `export` (the `import`-re-export marker) is only meaningful on an `import` declaration.
+    {getSyntaxClass<ImportDecl>(),
+     getSyntaxClass<ExportedModifier>(),
+     ModifierValidityDisposition::Allowed},
+
+    // `inline` is meaningful only on a callable, not on an aggregate type declaration.
+    {getSyntaxClass<AggTypeDecl>(),
+     getSyntaxClass<InlineModifier>(),
+     ModifierValidityDisposition::Error},
+
+    // A geometry-shader input primitive qualifier belongs on a geometry-shader parameter, not on
+    // an aggregate type declaration, where it has no meaning. This is diagnosed leniently (a
+    // warning today, an error in newer language versions) because such usage has historically been
+    // silently accepted.
+    {getSyntaxClass<AggTypeDecl>(),
+     getSyntaxClass<HLSLGeometryShaderInputPrimitiveTypeModifier>(),
+     ModifierValidityDisposition::ErrorInNewLanguageVersion},
+};
+
+// Index over `kModifierValidityRules`, bucketed by concrete modifier tag so a query only scans the
+// rules that mention the queried modifier. Populated once by the constructor and only read
+// thereafter (not a compiler-enforced `const`), which is what makes sharing it safe.
+struct ModifierRuleIndex
+{
+    // `firstModifierTag` is the tag of the `Modifier` base class; `buckets[t - firstModifierTag]`
+    // holds the indices (in author order) of every rule whose `modifierClass` covers concrete
+    // modifier tag `t`.
+    Int firstModifierTag = 0;
+    List<List<Index>> buckets;
+
+    ModifierRuleIndex()
+    {
+        auto modifierClass = getSyntaxClass<Modifier>();
+        firstModifierTag = Int(modifierClass.getTag());
+        const Int modifierTagCount = modifierClass.getInfo()->tagCount;
+        buckets.setCount(modifierTagCount);
+
+        for (Index ruleIndex = 0; ruleIndex < Index(SLANG_COUNT_OF(kModifierValidityRules));
+             ++ruleIndex)
+        {
+            auto& rule = kModifierValidityRules[ruleIndex];
+            const Int ruleFirstTag = Int(rule.modifierClass.getTag());
+            const Int ruleTagCount = rule.modifierClass.getInfo()->tagCount;
+            for (Int tag = ruleFirstTag; tag < ruleFirstTag + ruleTagCount; ++tag)
+            {
+                const Int bucket = tag - firstModifierTag;
+                // A rule's `modifierClass` must be within the `Modifier` subtree. Fail loudly on
+                // an out-of-contract authored row rather than indexing out of bounds in release.
+                SLANG_RELEASE_ASSERT(bucket >= 0 && bucket < modifierTagCount);
+                buckets[bucket].add(ruleIndex);
+            }
+        }
+
+#if defined(_DEBUG)
+        // Authoring safety: with first-match-wins, two different-disposition rows whose concrete
+        // (modifier, node) pairs overlap are only unambiguous when the *earlier* row (`a`, since
+        // we iterate `a < b`) is strictly more specific than the later one — i.e. the specific
+        // exception precedes its general fallback. Anything else is a footgun and is flagged:
+        // general-before-specific (the specific row is dead), exact duplicates with conflicting
+        // dispositions, or a partial overlap where neither row contains the other.
+        for (Index a = 0; a < Index(SLANG_COUNT_OF(kModifierValidityRules)); ++a)
+        {
+            for (Index b = a + 1; b < Index(SLANG_COUNT_OF(kModifierValidityRules)); ++b)
+            {
+                auto& ra = kModifierValidityRules[a];
+                auto& rb = kModifierValidityRules[b];
+                if (ra.disposition == rb.disposition)
+                    continue;
+                // Bind through the const `SyntaxClassBase::isSubClassOf`; the derived
+                // `SyntaxClass<T>::isSubClassOf` is non-const and would not apply to these const
+                // rule fields.
+                SyntaxClassBase const& aNode = ra.nodeClass;
+                SyntaxClassBase const& bNode = rb.nodeClass;
+                SyntaxClassBase const& aMod = ra.modifierClass;
+                SyntaxClassBase const& bMod = rb.modifierClass;
+                const bool aNodeInB = aNode.isSubClassOf(bNode);
+                const bool bNodeInA = bNode.isSubClassOf(aNode);
+                const bool aModInB = aMod.isSubClassOf(bMod);
+                const bool bModInA = bMod.isSubClassOf(aMod);
+                // The rows can conflict on a concrete pair only if both axes overlap.
+                const bool nodesOverlap = aNodeInB || bNodeInA;
+                const bool modsOverlap = aModInB || bModInA;
+                // `a` covers exactly the same classes as `b` on both axes (mutual subclass).
+                const bool equalBothAxes = aNodeInB && bNodeInA && aModInB && bModInA;
+                // `a` (the earlier row) is strictly more specific than `b`: contained in `b` on
+                // both axes and not identical to it.
+                const bool aStrictlyMoreSpecific = aNodeInB && aModInB && !equalBothAxes;
+                const bool ambiguous = nodesOverlap && modsOverlap && !aStrictlyMoreSpecific;
+                SLANG_ASSERT(!ambiguous);
+            }
+        }
+#endif
+    }
+
+    // Return the disposition of the first rule (in author order) whose modifier class covers
+    // concrete `modifierTag` and whose node class covers `nodeClass`, or `NoDisposition` if no rule
+    // applies.
+    ModifierValidityDisposition query(ASTNodeType modifierTag, SyntaxClassBase nodeClass) const
+    {
+        const Int bucket = Int(modifierTag) - firstModifierTag;
+        if (bucket < 0 || bucket >= buckets.getCount())
+            return ModifierValidityDisposition::NoDisposition;
+        for (auto ruleIndex : buckets[bucket])
+        {
+            auto& rule = kModifierValidityRules[ruleIndex];
+            if (nodeClass.isSubClassOf(rule.nodeClass))
+                return rule.disposition;
+        }
+        return ModifierValidityDisposition::NoDisposition;
+    }
+};
+
+// The rule array is a compile-time constant, so the index is read-only after its constructor runs
+// and safe to share across compiles. Build it lazily under the C++11 thread-safe function-local
+// static guard.
+static const ModifierRuleIndex& getModifierRuleIndex()
+{
+    static ModifierRuleIndex index;
+    return index;
+}
+
+// Decide the disposition of a modifier applied to a declaration using the legacy per-declaration
+// rules, whose applicability can depend on runtime predicates the data-driven table cannot express.
+// Defined below; forward-declared here because `queryModifierValidityOnSyntax` consults it.
+static ModifierValidityDisposition queryLegacyModifierValidityOnDecl(
+    bool isGLSLInput,
+    ASTNodeType modifierType,
+    Decl* decl);
+
+ModifierValidityDisposition queryModifierValidityOnSyntax(
+    SemanticsVisitor* visitor,
+    Modifier* modifier,
+    SyntaxNodeBase* node)
+{
+    // A data-driven rule, when one applies, is authoritative.
+    auto disposition = getModifierRuleIndex().query(modifier->astNodeType, node->getClass());
+    if (disposition != ModifierValidityDisposition::NoDisposition)
+        return disposition;
+
+    // Otherwise, for a declaration, fall back to the legacy per-declaration rules.
+    if (auto decl = as<Decl>(node))
+    {
+        auto moduleDecl = getModuleDecl(decl);
+        bool isGLSLInput = visitor->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
+        if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
+            isGLSLInput = true;
+        return queryLegacyModifierValidityOnDecl(isGLSLInput, modifier->astNodeType, decl);
+    }
+
+    return ModifierValidityDisposition::NoDisposition;
+}
+
+ModifierValidityDisposition queryModifierValidityOnType(Modifier* modifier, Type* type)
+{
+    return getModifierRuleIndex().query(modifier->astNodeType, type->getClass());
+}
+
+ModifierValidityDisposition diagnoseModifierValidityIfNeeded(
+    SemanticsVisitor* visitor,
+    Modifier* modifier,
+    ModifierValidityDisposition disposition)
+{
+    auto sink = visitor->getSink();
+    switch (disposition)
+    {
+    case ModifierValidityDisposition::Allowed:
+        return ModifierValidityDisposition::Allowed;
+
+    case ModifierValidityDisposition::Error:
+        sink->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
+        return ModifierValidityDisposition::Error;
+
+    case ModifierValidityDisposition::ErrorInNewLanguageVersion:
+        // Invalid, but for source compatibility this is only an error in newer language versions;
+        // older versions get a warning and keep the modifier.
+        if (isSlang202cOrLater(visitor))
+        {
+            sink->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
+            return ModifierValidityDisposition::Error;
+        }
+        sink->diagnose(Diagnostics::ModifierNotApplicableHere{.modifier = modifier});
+        return ModifierValidityDisposition::Allowed;
+
+    case ModifierValidityDisposition::NoDisposition:
+        // The rules do not enumerate every valid modifier/subject pair (for example, a
+        // geometry-shader input primitive qualifier such as `triangle` is valid on a
+        // geometry-shader parameter but is not listed), so a modifier no rule speaks to is accepted
+        // with no diagnostic rather than rejected, to avoid rejecting valid constructs.
+        return ModifierValidityDisposition::Allowed;
+    }
+    return ModifierValidityDisposition::Allowed;
+}
+
+ModifierValidityDisposition validateModifierForType(
+    SemanticsVisitor* visitor,
+    Modifier* modifier,
+    Type* type)
+{
+    // `type` is the type the modifier is applied to; callers that might not have a resolved type
+    // (for example, an unresolved base expression) must guard the call rather than pass null.
+    SLANG_ASSERT(type);
+
+    // Only a modifier a rule explicitly rules on is diagnosed here; one no rule speaks to is left
+    // for the per-modifier type handling (`checkTypeModifier`) to judge, so it is not diagnosed
+    // twice.
+    auto disposition = queryModifierValidityOnType(modifier, type);
+    if (disposition == ModifierValidityDisposition::NoDisposition)
+        return ModifierValidityDisposition::Allowed;
+    return diagnoseModifierValidityIfNeeded(visitor, modifier, disposition);
+}
+
+// Decide the disposition of a modifier applied to a declaration using rules whose applicability
+// can depend on runtime predicates the data-driven table cannot express (global-vs-local, GLSL
+// mode, the parent struct's attributes, and so on). A modifier the switch explicitly restricts and
+// rejects yields `Error`; a modifier the switch does not restrict at all yields `NoDisposition`.
+static ModifierValidityDisposition queryLegacyModifierValidityOnDecl(
+    bool isGLSLInput,
+    ASTNodeType modifierType,
+    Decl* decl)
+{
+    auto verdict = [](bool allowed)
+    { return allowed ? ModifierValidityDisposition::Allowed : ModifierValidityDisposition::Error; };
+
     switch (modifierType)
     {
         // In addition to the above cases, these are also present on empty
@@ -1692,15 +1949,16 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
         // If we are in GLSL mode, also allow these but otherwise fall to
         // the regular check
         if (isGLSLInput && as<EmptyDecl>(decl) && isGlobalDecl(decl))
-            return true;
+            return ModifierValidityDisposition::Allowed;
         [[fallthrough]];
 
     case ASTNodeType::RefModifier:
     case ASTNodeType::BorrowModifier:
     case ASTNodeType::GLSLBufferModifier:
     case ASTNodeType::GLSLPatchModifier:
-        return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
-               as<GLSLInterfaceBlockDecl>(decl);
+        return verdict(
+            (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
+            as<GLSLInterfaceBlockDecl>(decl));
     case ASTNodeType::RayPayloadAccessSemantic:
     case ASTNodeType::RayPayloadReadSemantic:
     case ASTNodeType::RayPayloadWriteSemantic:
@@ -1710,34 +1968,37 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
             if (auto structDecl = as<StructDecl>(varDecl->parentDecl))
             {
                 if (structDecl->findModifier<RayPayloadAttribute>())
-                    return true;
+                    return ModifierValidityDisposition::Allowed;
             }
         }
-        return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
-               as<GLSLInterfaceBlockDecl>(decl);
+        return verdict(
+            (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
+            as<GLSLInterfaceBlockDecl>(decl));
 
     case ASTNodeType::GLSLWriteOnlyModifier:
     case ASTNodeType::GLSLReadOnlyModifier:
     case ASTNodeType::GLSLVolatileModifier:
     case ASTNodeType::GLSLRestrictModifier:
         if (isGLSLInput)
-            return (as<VarDeclBase>(decl) && (isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
-                    as<GLSLInterfaceBlockDecl>(decl)) ||
-                   as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl));
-        return (
+            return verdict(
+                (as<VarDeclBase>(decl) && (isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
+                 as<GLSLInterfaceBlockDecl>(decl)) ||
+                as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl)));
+        return verdict(
             as<VarDeclBase>(decl) && (isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
             as<GLSLInterfaceBlockDecl>(decl));
 
     case ASTNodeType::GloballyCoherentModifier:
     case ASTNodeType::HLSLVolatileModifier:
         if (isGLSLInput)
-            return as<VarDecl>(decl) &&
-                       (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) ||
-                        as<GLSLInterfaceBlockDecl>(decl)) ||
-                   as<VarDeclBase>(decl) && isGlobalDecl(decl) || as<ParamDecl>(decl) ||
-                   (as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl)));
-        return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) ||
-                                     as<GLSLInterfaceBlockDecl>(decl));
+            return verdict(
+                as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) ||
+                                      as<GLSLInterfaceBlockDecl>(decl)) ||
+                as<VarDeclBase>(decl) && isGlobalDecl(decl) || as<ParamDecl>(decl) ||
+                (as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl))));
+        return verdict(
+            as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) ||
+                                  as<GLSLInterfaceBlockDecl>(decl)));
 
         // Allowed only on parameters, struct fields and global variables.
     case ASTNodeType::InterpolationModeModifier:
@@ -1749,18 +2010,20 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::PerVertexModifier:
     case ASTNodeType::HLSLUniformModifier:
     case ASTNodeType::DynamicUniformModifier:
-        return (as<VarDeclBase>(decl) &&
-                (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)))) ||
-               as<ParamDecl>(decl);
+        return verdict(
+            (as<VarDeclBase>(decl) &&
+             (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)))) ||
+            as<ParamDecl>(decl));
 
     case ASTNodeType::HLSLSemantic:
     case ASTNodeType::HLSLLayoutSemantic:
     case ASTNodeType::HLSLRegisterSemantic:
     case ASTNodeType::HLSLPackOffsetSemantic:
     case ASTNodeType::HLSLSimpleSemantic:
-        return (as<VarDeclBase>(decl) &&
-                (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)))) ||
-               as<ParamDecl>(decl) || as<FuncDecl>(decl);
+        return verdict(
+            (as<VarDeclBase>(decl) &&
+             (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)))) ||
+            as<ParamDecl>(decl) || as<FuncDecl>(decl));
 
         // Allowed only on functions
     case ASTNodeType::IntrinsicOpModifier:
@@ -1768,25 +2031,27 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::InlineModifier:
     case ASTNodeType::PrefixModifier:
     case ASTNodeType::PostfixModifier:
-        return as<CallableDecl>(decl);
+        return verdict(as<CallableDecl>(decl));
 
     case ASTNodeType::PublicModifier:
     case ASTNodeType::PrivateModifier:
     case ASTNodeType::InternalModifier:
-        return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) ||
-               as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) ||
-               as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) || as<InheritanceDecl>(decl);
+        return verdict(
+            as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) ||
+            as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) ||
+            as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) || as<InheritanceDecl>(decl));
 
     case ASTNodeType::BuiltinModifier:
     case ASTNodeType::ExternModifier:
     case ASTNodeType::HLSLExportModifier:
     case ASTNodeType::ExternCppModifier:
-        return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) ||
-               as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) ||
-               as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) || as<InheritanceDecl>(decl);
+        return verdict(
+            as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) ||
+            as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) ||
+            as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) || as<InheritanceDecl>(decl));
 
     case ASTNodeType::ExportedModifier:
-        return as<ImportDecl>(decl);
+        return verdict(as<ImportDecl>(decl));
 
     case ASTNodeType::ConstModifier:
     case ASTNodeType::HLSLStaticModifier:
@@ -1796,7 +2061,7 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     // modifier would be rejected before checkModifier() ever runs.
     case ASTNodeType::ConstExprModifier:
     case ASTNodeType::PreciseModifier:
-        return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
+        return verdict(as<VarDeclBase>(decl) || as<CallableDecl>(decl));
 
     case ASTNodeType::ActualGlobalModifier:
     case ASTNodeType::MatrixLayoutModifier:
@@ -1807,24 +2072,25 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::HLSLColumnMajorLayoutModifier:
     case ASTNodeType::GLSLRowMajorLayoutModifier:
     case ASTNodeType::HLSLEffectSharedModifier:
-        return as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl);
+        return verdict(as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl));
 
     case ASTNodeType::GLSLPrecisionModifier:
-        return as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl) || as<CallableDecl>(decl);
+        return verdict(
+            as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl) || as<CallableDecl>(decl));
     case ASTNodeType::HLSLGroupSharedModifier:
         // groupshared must be global or static.
         if (!as<VarDeclBase>(decl))
-            return false;
-        return isGlobalDecl(decl) || isEffectivelyStatic(decl);
+            return ModifierValidityDisposition::Error;
+        return verdict(isGlobalDecl(decl) || isEffectivelyStatic(decl));
     case ASTNodeType::DynModifier:
-        return as<InterfaceDecl>(decl) || as<VarDecl>(decl) || as<ParamDecl>(decl);
+        return verdict(as<InterfaceDecl>(decl) || as<VarDecl>(decl) || as<ParamDecl>(decl));
     case ASTNodeType::OverrideModifier:
         {
             Decl* parent = getParentDecl(decl);
-            return as<FunctionDeclBase>(decl) && as<AggTypeDeclBase>(parent);
+            return verdict(as<FunctionDeclBase>(decl) && as<AggTypeDeclBase>(parent));
         }
     default:
-        return true;
+        return ModifierValidityDisposition::NoDisposition;
     }
 }
 
@@ -1951,22 +2217,15 @@ Modifier* SemanticsVisitor::checkModifier(
         return checkedAttr;
     }
 
-    if (auto decl = as<Decl>(syntaxNode))
+    // `ignoreUnallowedModifier` keeps the modifier without validating it: it is set for modifiers
+    // that propagate from a shared-modifier group (which may be valid on some of the declarations
+    // they cover but not others) and while gathering completion suggestions.
+    if (!ignoreUnallowedModifier)
     {
-        auto moduleDecl = getModuleDecl(decl);
-        bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
-
-        if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
-            isGLSLInput = true;
-        if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
-        {
-            if (!ignoreUnallowedModifier)
-            {
-                getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = m});
-                return nullptr;
-            }
-            return m;
-        }
+        auto disposition = queryModifierValidityOnSyntax(this, m, syntaxNode);
+        if (diagnoseModifierValidityIfNeeded(this, m, disposition) ==
+            ModifierValidityDisposition::Error)
+            return nullptr;
     }
 
     if (as<ConstExprModifier>(m))

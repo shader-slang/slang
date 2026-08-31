@@ -9306,6 +9306,13 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
     List<Val*> modifierVals;
     for (auto modifier : expr->modifiers)
     {
+        // Drop a modifier that is not allowed on the type; the per-modifier handling below stays
+        // the authority on any modifier the validation does not itself reject. Skip validation when
+        // the base did not resolve to a type (an error was already diagnosed for the base).
+        if (baseType &&
+            validateModifierForType(this, modifier, baseType) == ModifierValidityDisposition::Error)
+            continue;
+
         if (auto matrixLayoutModifier = as<MatrixLayoutModifier>(modifier))
         {
             if (auto matrixType = as<MatrixExpressionType>(baseType))

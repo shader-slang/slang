@@ -59,6 +59,67 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
+/// Whether a modifier is valid on the subject (the declaration, type, or other construct) it was
+/// applied to.
+///
+/// Validity checking is split into two steps: first *determine* the disposition for a modifier and
+/// its subject, then *diagnose* based on that disposition. This enum is the value passed between
+/// those steps, so it must be able to express every outcome the determination step can reach,
+/// including the case where nothing has an opinion about the modifier on that subject.
+enum class ModifierValidityDisposition
+{
+    /// The modifier is valid on its subject; accept it with no diagnostic.
+    Allowed,
+
+    /// The modifier is invalid on its subject and must be rejected with an error, regardless of
+    /// language version.
+    Error,
+
+    /// The modifier is invalid on its subject, but for source compatibility this is only an error
+    /// in newer language versions; in older versions it is a warning and the modifier is accepted.
+    ErrorInNewLanguageVersion,
+
+    /// Nothing has an opinion about this modifier on this subject. Kept distinct from `Allowed` so
+    /// a caller that consults more than one source of rules can tell "no opinion" apart from an
+    /// explicit acceptance, and can leave such a modifier for another validator to judge.
+    NoDisposition,
+};
+
+/// Determine whether `modifier` is valid on the declaration/statement/other syntax node it was
+/// applied to. Consults the data-driven validity rules together with the legacy per-declaration
+/// rules and returns the resulting disposition. This is a pure decision: it emits no diagnostic.
+ModifierValidityDisposition queryModifierValidityOnSyntax(
+    SemanticsVisitor* visitor,
+    Modifier* modifier,
+    SyntaxNodeBase* node);
+
+/// Determine whether `modifier` is valid when applied to the type `type` (as in a modified-type
+/// expression such as `const int`). Consults the data-driven validity rules and returns the
+/// resulting disposition. This is a pure decision: it emits no diagnostic.
+ModifierValidityDisposition queryModifierValidityOnType(Modifier* modifier, Type* type);
+
+/// Emit the diagnostic (if any) called for by `disposition` for `modifier` at its source location,
+/// and reduce `disposition` to the resulting accept/reject decision: `Allowed` when the modifier
+/// should be kept, `Error` when it should be dropped. `Allowed` and `NoDisposition` emit nothing
+/// and return `Allowed`; `Error` emits an error and returns `Error`; `ErrorInNewLanguageVersion`
+/// emits an error and returns `Error` in newer language versions, or emits a warning and returns
+/// `Allowed` otherwise.
+ModifierValidityDisposition diagnoseModifierValidityIfNeeded(
+    SemanticsVisitor* visitor,
+    Modifier* modifier,
+    ModifierValidityDisposition disposition);
+
+/// Validate `modifier` where it is applied to the non-null type `type` (as in a modified-type
+/// expression): determine its disposition, emit any diagnostic that disposition calls for, and
+/// return the accept/reject decision (`Error` when the caller should drop the modifier). Only a
+/// modifier a rule explicitly rules on is diagnosed here; one no rule speaks to is returned as
+/// `Allowed` and left for the general per-modifier type handling to judge, so it is not diagnosed
+/// twice.
+ModifierValidityDisposition validateModifierForType(
+    SemanticsVisitor* visitor,
+    Modifier* modifier,
+    Type* type);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
