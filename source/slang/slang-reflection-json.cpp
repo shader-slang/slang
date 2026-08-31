@@ -78,7 +78,7 @@ private:
 static void emitReflectionVarInfoJSON(
     PrettyWriter& writer,
     slang::VariableReflection* var,
-    ReflectionTracker& currentReflectionStatus);
+    ReflectionTracker& reflectionTracker);
 static void emitReflectionTypeLayoutJSON(
     PrettyWriter& writer,
     slang::TypeLayoutReflection* type,
@@ -759,32 +759,22 @@ static void emitReflectionTypeInfoJSON(
             writer.maybeComma();
 
             auto structType = type;
-            if (reflectionTracker.canRecurseIntoType(structType))
-            {
-                reflectionTracker.recordVisitedType(structType);
-                writer << "\"fields\": [\n";
-                writer.indent();
+            reflectionTracker.recordVisitedType(structType);
+            writer << "\"fields\": [\n";
+            writer.indent();
 
-                auto fieldCount = structType->getFieldCount();
-                for (uint32_t ff = 0; ff < fieldCount; ++ff)
-                {
-                    if (ff != 0)
-                        writer << ",\n";
-                    emitReflectionVarInfoJSON(
-                        writer,
-                        structType->getFieldByIndex(ff),
-                        reflectionTracker);
-                }
-                writer.dedent();
-                writer << "\n]";
-            }
-            else
+            auto fieldCount = structType->getFieldCount();
+            for (uint32_t ff = 0; ff < fieldCount; ++ff)
             {
-                auto structName = structType->getName();
-                SLANG_RELEASE_ASSERT(structName != nullptr && structName[0] != '\0');
-                writer << "\"valueType\": ";
-                writer.writeEscapedString(UnownedStringSlice(structName));
+                if (ff != 0)
+                    writer << ",\n";
+                emitReflectionVarInfoJSON(
+                    writer,
+                    structType->getFieldByIndex(ff),
+                    reflectionTracker);
             }
+            writer.dedent();
+            writer << "\n]";
         }
         break;
 
@@ -929,7 +919,7 @@ static void emitReflectionTypeLayoutKindInfoJSON(
             if (typeName && typeName[0])
             {
                 // Avoid recursing into a pointer to self.
-                // Additionally, if the pointer points to a scalar type avoid expanding the type
+                // Additionally, only expand when the pointer points to a struct
                 // int* p becomes -> { "kind": "pointer", "valueType": "int" }
                 if (reflectionTracker.canRecurseIntoType(valueType) &&
                     valueType->getKind() == slang::TypeReflection::Kind::Struct)
@@ -1192,7 +1182,7 @@ static void emitReflectionTypeJSON(
 static void emitReflectionVarInfoJSON(
     PrettyWriter& writer,
     slang::VariableReflection* var,
-    ReflectionTracker& currentReflectionStatus)
+    ReflectionTracker& reflectionTracker)
 {
     emitReflectionNameInfoJSON(writer, var->getName());
 
@@ -1200,7 +1190,7 @@ static void emitReflectionVarInfoJSON(
 
     writer << ",\n";
     writer << "\"type\": ";
-    emitReflectionTypeJSON(writer, var->getType(), currentReflectionStatus);
+    emitReflectionTypeJSON(writer, var->getType(), reflectionTracker);
 }
 
 static void emitReflectionParamJSON(
@@ -1337,7 +1327,7 @@ static void emitEntryPointParamJSON(
 static void emitReflectionTypeParamJSON(
     PrettyWriter& writer,
     slang::TypeParameterReflection* typeParam,
-    ReflectionTracker& currentReflectionStatus)
+    ReflectionTracker& reflectionTracker)
 {
     writer << "{\n";
     writer.indent();
@@ -1354,10 +1344,7 @@ static void emitReflectionTypeParamJSON(
         writer << "{\n";
         writer.indent();
         CommaTrackerRAII commaTracker(writer);
-        emitReflectionTypeInfoJSON(
-            writer,
-            typeParam->getConstraintByIndex(ee),
-            currentReflectionStatus);
+        emitReflectionTypeInfoJSON(writer, typeParam->getConstraintByIndex(ee), reflectionTracker);
         writer.dedent();
         writer << "\n}";
     }
