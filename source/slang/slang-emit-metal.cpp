@@ -842,6 +842,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastDescriptorHandleToUInt64:
         {
             // Metal: DescriptorHandle is a pointer; emit C-style cast to ulong.
+            // Precedence-wrapped like the kIROp_BitCast case below (#12732).
             EmitOpInfo outerPrec = inOuterPrec;
             bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(ulong)(");
@@ -853,6 +854,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastUInt64ToDescriptorHandle:
         {
             // Metal: cast integer back to pointer type.
+            // Precedence-wrapped like the kIROp_BitCast case below (#12732).
             EmitOpInfo outerPrec = inOuterPrec;
             bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(");
