@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#parser
-//META: doc_section_digest=27f3acccf1dfb3b65737707c2253f03d2be2f611459aaabcf0ced5dde22202b8
+//META: doc_section_digest=c39eecf47526b6e548c8ccebdb5fde86d82376490c6f2ece4b5dc9a3f0f3f30a
 //META: purpose=Verifies a comma operator within an expression-statement parses and both side-effects execute left-to-right.
 //META: intent=characterization
 //META: covers=source/slang/slang-parser.cpp

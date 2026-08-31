@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/tokens.md#punctuation-and-structural-symbols
-//META: doc_section_digest=331202b5055004c6a3a2e21e3a2bafdff2033c1d416bc5c5865225736d0e5a1d
+//META: doc_section_digest=ec873659d95b0f115041298559c29781da8ac778d588e899bee7e084b8ff56cb
 //META: purpose=The three-character spelling `...` lexes as a single `Ellipsis` token, which the preprocessor consumes as a variadic macro parameter list.
 //META: intent=functional
 //META: pipeline_stage=preprocess

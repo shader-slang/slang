@@ -1437,11 +1437,7 @@ static void addLinkageDecoration(
     }
     for (auto modifier : decl->modifiers)
     {
-        if (as<PublicModifier>(modifier))
-        {
-            builder->addPublicDecoration(inst);
-        }
-        else if (as<HLSLExportModifier>(modifier))
+        if (as<HLSLExportModifier>(modifier))
         {
             builder->addHLSLExportDecoration(inst);
             builder->addKeepAliveDecoration(inst);
@@ -9231,6 +9227,36 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         return false;
     }
 
+    /// Return the first structurally non-empty statement in a `switch` body, or null if there is
+    /// none. Mirrors the traversal in `hasSwitchCases`: `{ ... }` is unwrapped and a `SeqStmt` is
+    /// searched in order. Only `EmptyStmt` is treated as nothing, so `switch (x) { }` and
+    /// `switch (x) { ; }` both yield null, while `switch (x) { foo(); }` yields the `foo();`
+    /// statement. Anything else counts, including a declaration that emits no instructions --
+    /// consistent with how the sibling unreachable-code sites classify statements.
+    Stmt* findFirstNonEmptyStmt(Stmt* inStmt)
+    {
+        Stmt* stmt = inStmt;
+        while (auto blockStmt = as<BlockStmt>(stmt))
+        {
+            stmt = blockStmt->body;
+        }
+
+        if (!stmt || as<EmptyStmt>(stmt))
+            return nullptr;
+
+        if (auto seqStmt = as<SeqStmt>(stmt))
+        {
+            for (auto childStmt : seqStmt->stmts)
+            {
+                if (auto nonEmptyStmt = findFirstNonEmptyStmt(childStmt))
+                    return nonEmptyStmt;
+            }
+            return nullptr;
+        }
+
+        return stmt;
+    }
+
     // Given a statement that appears as (or in) the body
     // of a `switch` statement
     void lowerSwitchCases(Stmt* inStmt, SwitchStmtInfo* info)
@@ -9557,6 +9583,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             // If we don't have any case/default then nothing inside switch can be executed (other
             // than condition) so we are done.
+            //
+            // Control can enter a switch body only through the dispatch to a case/default label,
+            // so with no labels at all the whole body is unreachable. Warn about it rather than
+            // discarding it silently; an empty body discards nothing, so stay quiet there.
+            if (auto discardedStmt = findFirstNonEmptyStmt(stmt->body))
+                context->getSink()->diagnose(Diagnostics::UnreachableCode{.stmt = discardedStmt});
             return;
         }
 
@@ -15294,30 +15326,33 @@ static void lowerFrontEndEntryPointToIR(
     // The SPIR-V back-end emits all three from this single decoration. Reading the inferred
     // capability set rather than the attribute directly covers the direct, call-graph, and
     // `[require(spvShader64BitIndexingEXT)]` cases uniformly.
-    if (auto inferredCaps = entryPointFuncDecl->inferredCapabilityRequirements)
+    // Read the entry point's inferred requirements, which include stage-dependent contributions
+    // such as `SV_` semantic capabilities. `validateEntryPoint` runs before front-end IR lowering
+    // and always stores a (possibly empty but non-null) frozen set here, so this is never null for
+    // a front-end entry point.
+    auto inferredCaps = entryPoint->getInferredCapabilityRequirements();
+    SLANG_RELEASE_ASSERT(inferredCaps);
+    CapabilitySet caps{inferredCaps};
+    bool requiresShader64BitIndexing = false;
+    // Scan for membership of the atom in *any* alternative of the capability set. We iterate
+    // `getAtomSets()` rather than calling `caps.implies(spvShader64BitIndexingEXT)` because
+    // `implies()` is AND-across-all-alternatives: it would only report the atom when *every*
+    // target alternative requires it, which is too strict for a presence test.
+    for (auto atomSet : caps.getAtomSets())
     {
-        CapabilitySet caps{inferredCaps};
-        bool requiresShader64BitIndexing = false;
-        // Scan for membership of the atom in *any* alternative of the capability set. We iterate
-        // `getAtomSets()` rather than calling `caps.implies(spvShader64BitIndexingEXT)` because
-        // `implies()` is AND-across-all-alternatives: it would only report the atom when *every*
-        // target alternative requires it, which is too strict for a presence test.
-        for (auto atomSet : caps.getAtomSets())
+        for (auto atomVal : atomSet)
         {
-            for (auto atomVal : atomSet)
+            if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
             {
-                if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
-                {
-                    requiresShader64BitIndexing = true;
-                    break;
-                }
-            }
-            if (requiresShader64BitIndexing)
+                requiresShader64BitIndexing = true;
                 break;
+            }
         }
         if (requiresShader64BitIndexing)
-            builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
+            break;
     }
+    if (requiresShader64BitIndexing)
+        builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
 }
 
 static void lowerProgramEntryPointToIR(
@@ -16487,6 +16522,19 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     auto latestSpirvAtom = getLatestSpirvAtom();
     auto latestMetalAtom = getLatestMetalAtom();
 
+    // Map each entry-point function declaration to the capability set inferred for it *as an entry
+    // point*, which can exceed the function declaration's own requirements (see
+    // `EntryPoint::getInferredCapabilityRequirements`). The layout list below is keyed by
+    // `DeclRef<FuncDecl>`, so we look up the owning `EntryPoint` here to read its stored set.
+    Dictionary<FuncDecl*, CapabilitySetVal*> entryPointInferredCaps;
+    for (Index i = 0; i < program->getEntryPointCount(); ++i)
+    {
+        auto entryPoint = program->getEntryPoint(i);
+        if (auto entryPointFuncDecl = entryPoint->getFuncDecl())
+            entryPointInferredCaps[entryPointFuncDecl] =
+                entryPoint->getInferredCapabilityRequirements();
+    }
+
     for (auto entryPointLayout : programLayout->entryPoints)
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
@@ -16514,7 +16562,12 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
         auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
         SLANG_ASSERT(asFuncDecl);
-        CapabilitySet set{asFuncDecl->inferredCapabilityRequirements};
+        // Every layout entry point is one of the program's entry points (both come from the same
+        // component-type walk), so its inferred capability set — which can exceed the function
+        // declaration's own requirements — is always in the map.
+        auto found = entryPointInferredCaps.tryGetValue(asFuncDecl);
+        SLANG_RELEASE_ASSERT(found);
+        CapabilitySet set{*found};
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)

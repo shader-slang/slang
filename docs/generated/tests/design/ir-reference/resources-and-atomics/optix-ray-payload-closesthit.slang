@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#raytracing-payload
-//META: doc_section_digest=bfb83cd10d15abad13aafd042e8b0e23ed62e4221ddd83671237bccf2fbb3073
+//META: doc_section_digest=67617f4eb68ef6a0c6b50b0fba002690b874dbf4cf412014b8b61a11403f1548
 //META: purpose=A `closesthit` entry point on `-target cuda` with a `[raypayload]` struct emits `optixGetPayload_N` and `optixGetAttribute_N`, the user-visible artifact of the `getOptiXRayPayloadPtr` / `getOptiXHitAttribute` opcodes synthesized during target legalization.
 //META: intent=functional
 //META: pipeline_stage=lower

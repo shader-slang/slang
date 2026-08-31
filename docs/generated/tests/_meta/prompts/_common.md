@@ -201,6 +201,31 @@ omit the heading. Bundle-specific sections (e.g. `## Sibling-bundle
 overlap`, `## Catalog coverage`, `## Codes dropped`) may appear after
 the four canonical sections but never between them.
 
+**Never write a raw `{{` or `{%` anywhere in the README body — not even
+inside a code span or fence.** The README carries YAML front-matter, so
+the GitHub Pages Jekyll build treats it as a page and runs Liquid over
+the whole body before Markdown; `{{`/`{%` open Liquid tags. A `{{` that
+Liquid cannot close aborts the entire site build — in
+`float2x2 m = {{1,2},{3,4}}` the scan for `}}` stops at the first single
+`}`, so the tag is never terminated. A `{{...}}` that _is_ terminated
+(e.g. a FileCheck `{{.*}}` wildcard) instead gets evaluated as a template
+expression (usually rendering empty), so the literal text does not
+survive on the page. The README is also read on github.com, where Liquid is not
+processed, so a `{% raw %}` wrapper or an HTML entity inside a backtick
+span is wrong too — both show up literally there. Two spellings are safe
+on both surfaces:
+
+- Where whitespace does not matter, space the braces: write
+  `float2x2 m = { {1,2},{3,4} }`, not `{{1,2},{3,4}}`.
+- Where the exact token matters (a FileCheck `{{...}}` pattern), show it
+  in a raw `<code>` element with numeric brace entities:
+  `<code>&#123;&#123;.*&#125;&#125;</code>` renders as `{{.*}}` on both
+  github.com and Pages. (`_meta/` prose files have no front-matter, so
+  Jekyll copies them verbatim and they may use `{{...}}` freely — this
+  rule is only for the front-matter-bearing bundle READMEs.)
+
+`regenerate.py lint` enforces this and fails the build on any raw opener.
+
 ```markdown
 # Tests for <bundle-key>
 
@@ -292,14 +317,14 @@ to add.
   multiple sections, pick the most specific anchor and mention the
   others in the Gap cell.
 - **Kind** is one value from the controlled vocabulary:
-  | Kind | When to use |
-  | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-  | `missing-example` | Doc names a claim but does not include a minimal example shader that exercises it. |
-  | `missing-surface` | Doc names an IR / AST / internal construct but does not name the user-level syntax or builtin that produces it. |
-  | `undocumented-behavior` | Observed compiler behavior is real and reachable but the doc is silent about it (no claim, no caveat, no warning).|
-  | `cascading-only-mention` | Doc describes a diagnostic or behavior that is always shadowed in practice by an earlier diagnostic or pass. |
-  | `ambiguous-claim` | Doc claim has more than one reasonable interpretation; tests cannot anchor to it without making a guess. |
-  | `drift-from-source` | Observed compiler behavior contradicts what the doc says (e.g., doc says "lowers to `select`" but actually emits `ifElse`). |
+  | Kind                     | When to use                                                                                                                 |
+  | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+  | `missing-example`        | Doc names a claim but does not include a minimal example shader that exercises it.                                          |
+  | `missing-surface`        | Doc names an IR / AST / internal construct but does not name the user-level syntax or builtin that produces it.             |
+  | `undocumented-behavior`  | Observed compiler behavior is real and reachable but the doc is silent about it (no claim, no caveat, no warning).          |
+  | `cascading-only-mention` | Doc describes a diagnostic or behavior that is always shadowed in practice by an earlier diagnostic or pass.                |
+  | `ambiguous-claim`        | Doc claim has more than one reasonable interpretation; tests cannot anchor to it without making a guess.                    |
+  | `drift-from-source`      | Observed compiler behavior contradicts what the doc says (e.g., doc says "lowers to `select`" but actually emits `ifElse`). |
 - **Gap** is one to three sentences naming what the doc lacks, in the
   voice of a reader of the doc. Quote the doc literally when the gap
   is about its exact wording. Do **not** describe internal compiler
@@ -610,10 +635,39 @@ match: ...`, `see declaration of ...`). Rules:
      **not** omit it when unannotated diagnostics remain — exhaustive mode
      then fails.
 
+8. **Pin only what the claim depends on.** Rules 1–7 ask whether a token
+   is _volatile_. This one asks whether it is _relevant_. A token can be
+   perfectly stable and still not belong in the CHECK, and pinning it
+   makes the test fail on unrelated compiler changes that leave the claim
+   true. Before pinning a token, ask: **if this token changed, would the
+   anchored claim be false?** If no, wildcard it or leave it out.
+
+   The recurring offenders are declaration specifiers and qualifiers
+   sitting next to the thing under test — `__device__`, `__global__`,
+   `__noinline__`, `inline`, `static`, `precise` — and decorations the
+   claim never mentions.
+
+   For a claim that `in` parameters are passed **by value**, the CUDA
+   signature line is about the parameter list, not the specifiers:
+
+   - ✅ `// CUDA: void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})`
+   - ❌ `// CUDA: __device__ void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})`
+
+   The second broke when `[noinline]` started emitting `__noinline__`
+   between `__device__` and `void`. Every parameter was still passed by
+   value, so the claim was untouched and only the scaffolding moved.
+
+   This is not licence to loosen the token that _carries_ the claim. In
+   that same test the `(int val_...)` shape — no `*`, no `&` — **is** the
+   assertion and must stay tight. Loosen the scaffolding, never the
+   subject. (Rule 6 forbids weakening a CHECK to force green; that is
+   about the subject. This rule is about everything around it.)
+
 **Bottom line:** keep patterns loose (`{{...}}`, `-DAG`, error codes,
-opcodes) and structural. Every time you are tempted to write an exact id,
-name, ordering, or full message string, ask "will codegen or the harness
-render this differently?" — if yes, loosen it.
+opcodes) and structural. Ask two questions of every token you are tempted
+to pin: "will codegen or the harness render this differently?" (rules 1–7)
+and "does the anchored claim actually depend on it?" (rule 8). Loosen it
+if the answer is yes to the first or no to the second.
 
 If a claim is genuinely unobservable through any `slang-test`
 directive even with full runner access (e.g., the claim is about a
@@ -920,10 +974,38 @@ emits …" — HLSL/GLSL/SPIRV-asm/Metal/WGSL/CUDA/CPP/Torch text. This is
 also what users see, so it is the most stable contract.
 
 **Combining `-dump-ir` with target emit** requires both
-`-target <text-target>` and `-o /dev/null`. Without `-target` the
-compile stops early; without `-o /dev/null` the target text mixes
-with IR on stdout and FileCheck fails. With both, IR goes to stdout
-and the target text is discarded.
+`-target <text-target>` and `-o -`. Without `-target` the compile
+stops early, so there is no target-specific IR to observe.
+
+Use `-o -`, never an absolute path. `slang-test` rejects an absolute
+output path in a directive because it cannot be reproduced on the
+other platforms the suite runs on — `/dev/null` has no Windows
+spelling — and a directive that uses one fails to parse at all,
+before the compiler runs. A relative path is allowed, but writes a
+scratch file next to the test, so prefer `-o -` unless the test is
+actually about the written artifact.
+
+`-o -` does not mix the two outputs, because they never share a
+stream: the `-dump-ir` dump is written to **stderr** and the target
+text to **stdout**, and `slang-test` composes the FileCheck input as
+
+```
+result code = <n>
+standard error = {
+  <the IR dump>
+}
+standard output = {
+  <the emitted target text>
+}
+```
+
+so the target text always lands in a block *after* the entire IR
+dump. An ordered `CHECK` / `CHECK-LABEL` / `CHECK-NEXT` anchored in
+the IR dump is therefore unaffected by it. The one thing to keep in
+mind: a `CHECK-NOT` or `CHECK-DAG` whose region runs to the end of
+the input now also scans the emitted target text, so bound such a
+directive with a following `CHECK-LABEL` when it is meant to cover
+only the IR.
 
 **Other -dump-ir hazards** that the agent must guard against:
 

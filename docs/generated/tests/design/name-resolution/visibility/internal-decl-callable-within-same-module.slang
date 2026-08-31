@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#per-keyword-semantics
-//META: doc_section_digest=7d96ab9817d6f6251e2148b7d4d9959fb9ec73041354e919db537f46458d416e
+//META: doc_section_digest=ebfc49836128c7e9971b31b38afdd2b935a0855d064addaba8054032eebfd297
 //META: purpose=An `internal` decl is visible from any file in the same module; a free function calls another module-local `internal` function successfully.
 //META: intent=functional
 //META: pipeline_stage=check

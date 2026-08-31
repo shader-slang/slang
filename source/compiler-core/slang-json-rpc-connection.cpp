@@ -277,18 +277,31 @@ SlangResult JSONRPCConnection::waitForResult(Int timeOutInMs)
     // Invalidate m_jsonRoot before waitForResult, because when waitForResult fail,
     // we don't want to use the result from the previous read.
     m_jsonRoot.reset();
+    m_readError = ReadError::None;
 
-    SLANG_RETURN_ON_FAIL(m_connection->waitForResult(timeOutInMs));
+    const SlangResult waitResult = m_connection->waitForResult(timeOutInMs);
+    if (SLANG_FAILED(waitResult))
+    {
+        _updateReadErrorFromTransport();
+        return waitResult;
+    }
     return tryReadMessage();
 }
 
 SlangResult JSONRPCConnection::tryReadMessage()
 {
     m_jsonRoot.reset();
+    m_readError = ReadError::None;
 
-    SLANG_RETURN_ON_FAIL(m_connection->update());
+    const SlangResult updateResult = m_connection->update();
+    if (SLANG_FAILED(updateResult))
+    {
+        _updateReadErrorFromTransport();
+        return updateResult;
+    }
     if (!m_connection->hasContent())
     {
+        _updateReadErrorFromTransport();
         return SLANG_OK;
     }
 
@@ -305,12 +318,42 @@ SlangResult JSONRPCConnection::tryReadMessage()
         m_connection->consumeContent();
         if (SLANG_FAILED(res))
         {
+            m_readError = ReadError::Protocol;
             // if we can't parse JSON, we return with id of 'null' as per the standard
             return sendError(JSONRPC::ErrorCode::ParseError, JSONValue::makeNull());
         }
     }
 
     return SLANG_OK;
+}
+
+void JSONRPCConnection::_updateReadErrorFromTransport()
+{
+    switch (m_connection->getReadState())
+    {
+    case HTTPPacketConnection::ReadState::Closed:
+        m_readError = ReadError::ConnectionClosed;
+        break;
+    case HTTPPacketConnection::ReadState::Error:
+        switch (m_connection->getReadError())
+        {
+        case HTTPPacketConnection::ReadError::InvalidHeader:
+            m_readError = ReadError::Protocol;
+            break;
+        case HTTPPacketConnection::ReadError::UnexpectedEnd:
+            m_readError = ReadError::ConnectionClosed;
+            break;
+        case HTTPPacketConnection::ReadError::Stream:
+        case HTTPPacketConnection::ReadError::None:
+            m_readError = ReadError::Transport;
+            break;
+        }
+        break;
+    default:
+        // Header or Content with no transport error means the caller stopped waiting before a
+        // complete packet arrived. Done is handled by tryReadMessage and likewise has no error.
+        break;
+    }
 }
 
 JSONRPCMessageType JSONRPCConnection::getMessageType()

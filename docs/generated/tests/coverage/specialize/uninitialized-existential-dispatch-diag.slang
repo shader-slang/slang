@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T14:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#dispatchers-and-existential-specialization
-//META: doc_section_digest=f9a2d5320ce13ef68d98ed961e6a7c6f951e9c3524d9cf700922c296e85c0f83
+//META: doc_section_digest=281f505f04ffec7b524f03c8f78892260d45c554e3e06b9a86d32cfe7c6ec9c0
 //META: purpose=Dynamic dispatch on an interface value left uninitialized on one control-flow path is rejected with E50101.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-typeflow-specialize.cpp

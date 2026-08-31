@@ -32,7 +32,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
 
-from lib import analyze, manifest
+from lib import analyze, corpus, manifest
 
 from lib.buckets import (TREE, BUCKET_ORDER, BUCKET_COLOR, API_TREE,
                          API_BUCKET_ORDER, buckets, api_buckets, timer_ms)
@@ -399,7 +399,9 @@ def _workload_source(spec):
     height-capped and scrollable, so a long file costs scroll depth inside the
     box rather than page layout.
     """
-    return spec.default_size, list(spec.gen(spec.default_size).items())
+    # via corpus, not spec.gen: a static workload has no generator, and the
+    # page should render its real sources just the same.
+    return spec.default_size, list(corpus.sources(spec, spec.default_size).items())
 
 
 # Copy-to-clipboard support for the workload pages' code blocks. Kept as two
@@ -821,9 +823,9 @@ if __name__ == "__main__":
 # workload would pass this even with windowing restored.
 _SPEC = manifest.BY_NAME["reflection_layout"]
 _n, _files = _workload_source(_SPEC)
-_gen = _SPEC.gen(_n)
+_gen = corpus.sources(_SPEC, _n)
 assert [fn for fn, _ in _files] == list(_gen), \
-    "_workload_source must list every generated file, in generator order"
+    "_workload_source must list every file, in the order corpus.sources returns them"
 for _fn, _src in _files:
     assert _src == _gen[_fn], \
         f"_workload_source must return {_fn} verbatim — no windowing, no elision"

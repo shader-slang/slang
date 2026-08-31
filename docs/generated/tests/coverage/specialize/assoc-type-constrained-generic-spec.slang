@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T14:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#type-flow-specialization
-//META: doc_section_digest=3336b3eca9be44409095a66507ff80c6aa09351d36bfe0e1b016252f5eb2c95d
+//META: doc_section_digest=50142146a2d3663b95e1c9185f8cc106e919b92f32f63da3bab649a7bb070c03
 //META: purpose=A generic constrained by an associated-type equality (where C.Element == int) specializes and calls the conformer's method, returning its stored value.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-typeflow-specialize.cpp

@@ -3421,6 +3421,59 @@ struct TypeFlowSpecializationContext
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
     }
 
+    // Collect functions reachable from an entry point by following `IRCall`
+    // callees. Seeds from `isEntryPoint` so the seed set matches the lowering
+    // pass's work-list seed.
+    //
+    // Two things about what the walk follows are load-bearing for callers:
+    //   - It stops at a callee with no body (`getFirstBlock()` is null), so an
+    //     imported/intrinsic declaration terminates the walk rather than being
+    //     recorded as reachable-but-opaque.
+    //   - It resolves an `IRSpecialize` callee to the underlying generic's
+    //     `IRFunc` via `getGenericReturnVal`, so a generic callee is recorded as
+    //     the one unspecialized `IRFunc` and all of its specializations collapse
+    //     onto that entry. The set is therefore "generic functions that are
+    //     called", not "specializations that will be emitted" — the right
+    //     granularity for the per-function scan that consumes it, since the
+    //     lookup insts we diagnose live in the generic body.
+    //
+    // This is a direct-call *under*-approximation of "reaches codegen": it does
+    // not follow function-value or witness-table edges, so a function reached
+    // only through those (e.g. a witness method invoked solely via dynamic
+    // dispatch) is not in the set. That is a deliberate, bounded limitation of
+    // the consuming diagnostic, documented at its call site — not a claim that
+    // every emitted body is covered.
+    void collectFuncsReachableFromEntryPoints(HashSet<IRFunc*>& outReachable)
+    {
+        List<IRFunc*> workList;
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (func && isEntryPoint(func) && outReachable.add(func))
+                workList.add(func);
+        }
+        while (workList.getCount())
+        {
+            auto func = workList.getLast();
+            workList.removeLast();
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto call = as<IRCall>(inst);
+                    if (!call)
+                        continue;
+                    auto callee = call->getCallee();
+                    if (auto specialize = as<IRSpecialize>(callee))
+                        callee = getGenericReturnVal(specialize->getBase());
+                    auto calleeFunc = as<IRFunc>(callee);
+                    if (calleeFunc && calleeFunc->getFirstBlock() && outReachable.add(calleeFunc))
+                        workList.add(calleeFunc);
+                }
+            }
+        }
+    }
+
     // After specialization has lowered every dispatch site it could, walk any
     // remaining `lookupWitnessMethod` insts whose witness-table operand is not
     // a concrete `IRWitnessTable` and whose interface has no registered
@@ -3440,41 +3493,35 @@ struct TypeFlowSpecializationContext
     // against pre-PR behaviour where DCE simply removed them.
     void diagnoseUnresolvedLookupWitnesses()
     {
+        HashSet<IRFunc*> reachableFromEntryPoint;
+        collectFuncsReachableFromEntryPoints(reachableFromEntryPoint);
         for (auto globalInst : module->getGlobalInsts())
         {
             auto func = as<IRFunc>(globalInst);
             if (!func)
                 continue;
-            // Only diagnose lookups inside top-level functions
-            // that codegen actually emits as standalone callable
-            // bodies — shader entry points plus the various
-            // export decorations (CUDA kernels, DLL exports,
-            // extern-C, etc.). Those are the bodies that survive
-            // into codegen unchanged, so any unresolved lookup
-            // there will reach the unhandled-inst ICE the walker
-            // exists to prevent.
+            // Diagnose lookups in an entry point or a helper reachable from one
+            // via direct calls. Restricting to reachable functions is what keeps
+            // the slangpy carve-out working: `sgl/device/print.slang`'s
+            // `write_arg(IPrintable)` is directly called, so it now falls inside
+            // this set, but its `IPrintable` has registered conformances (the
+            // call sites supply concrete types via generic-pack expansion), so
+            // the zero-conformance gate below sees a nonzero count and skips it.
+            // In other words, the zero-conformance gate — not the old
+            // entry-point-only restriction — is what actually suppresses that
+            // false positive; the entry-point restriction was simply stronger
+            // than it needed to be.
             //
-            // Use the same `isEntryPoint(func)` predicate that
-            // `performDynamicInstLowering` uses to seed its work-
-            // list, so the walker's diagnostic coverage matches
-            // the lowering pass's coverage exactly.
-            //
-            // For non-entry-point helper functions, the typeflow
-            // pass cannot tell whether the helper is reachable
-            // (callers may exist but be themselves dead) or whether
-            // the helper is going to be inlined / DCE'd before
-            // codegen. Diagnosing those is a false positive — the
-            // canonical example is imported-library helpers like
-            // slangpy's `sgl/device/print.slang::write_arg(IPrintable)`
-            // whose `IPrintable arg` parameter is type-erased only
-            // inside the helper. The actual call sites supply
-            // concrete types via generic-pack expansion, but the
-            // pre-inlined helper body still contains an unresolved
-            // lookup at the moment the walker runs. If a real
-            // unresolved lookup escapes into codegen via a non-
-            // entry-point helper, the underlying ICE still fires
-            // and points at the same source location.
-            if (!isEntryPoint(func))
+            // This gate is a direct-call under-approximation, not a completeness
+            // guarantee. A function reached only through a witness-table or
+            // function-value edge is not in `reachableFromEntryPoint`, so if such
+            // a function's body held a lookup on some *other* zero-conformance
+            // interface, that lookup would still reach codegen undiagnosed and
+            // ICE. This is a bounded, known gap: it is strictly better than the
+            // previous entry-point-only behaviour and covers the reported case
+            // (#12486, a directly-reachable helper), but it does not claim to
+            // catch every unresolved dispatch that reaches emit.
+            if (!isEntryPoint(func) && !reachableFromEntryPoint.contains(func))
                 continue;
             for (auto block : func->getBlocks())
             {

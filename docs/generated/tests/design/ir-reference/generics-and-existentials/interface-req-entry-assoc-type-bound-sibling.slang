@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
-//META: doc_section_digest=55d24b9cb1e17ce70457d4ac3ad5c2fd829e24b2244903cc228160630ca43d8f
+//META: doc_section_digest=c07446d42292314ac54df96997ac71db597f857c5d132648cd782bcb15b2b00f
 //META: purpose=An associated-type bound is a sibling interface_req_entry carrying witness_table_t(bound), not an entry nested inside the associated type's own entry.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -14,7 +14,7 @@
 // — the conformance every implementer must supply for its chosen `A`. The
 // CHECK-DAGs pin both, and the final one fixes the interface's operand list at
 // three sibling entries.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IBar { int bar(int x); };
 interface IHasAssoc { associatedtype A : IBar; A make(int x); };

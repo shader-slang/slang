@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 watched_paths_digest: 81b9bf99f9379fb9fd8dcb82308357fc736c12a7fe7fd8190eb6452a6af8f585
 source_doc: docs/generated/design/ast-reference/base.md
-source_doc_digest: 77b566113820e8973669be9beddaaf1bd23a3dcb5ed9e27ee5493be985ad6b8e
+source_doc_digest: 7a6e4ce1e37b832e536d92b516233432432eeab672ca22cdf5f4d6cab03a04ba
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -64,10 +64,48 @@ revision of the doc; this revision states more per-class claims (the
 of the type an `Expr` carries), and each added file covers one of them.
 The file count remains well under the manifest's `size_cap_files: 30`.
 
+## Claims
+
+Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md). This page is
+mostly a description of the AST's internal class hierarchy, so the enumeration
+separates the statements a compiled program can reveal from those that are
+properties of the compiler's own headers. The latter are listed here for
+completeness and carried in `## Untested claims` with reason
+`internal-source-fact`.
+
+**User-observable**
+
+1. A comma-separated declaration declares independent `Decl`s: `int a = 1, b = 2;` declares two.
+2. Because the group node is a `ModifiableSyntaxNode`, modifiers written once in front of a group apply to every name it declares (`static const int P = 3, Q = 4;` makes both `static const`).
+3. A struct's fields group the same way (`int x, y;`).
+4. A declaration is keyed by its parent as well as its name, so the same simple name declared in two different containers stays distinguishable at a member-access site.
+5. `nameAndLoc` pairs the name with the location of the *name token* rather than the whole declaration, which is why a conflicting-declaration diagnostic puts its caret under the name.
+6. A `QualType` records l-value-ness as well as the type, which is what makes `f() = 5` a "left of `=` is not an l-value" error rather than a type error.
+7. A `Modifier` retains the spelling that introduced it, and that spelling is what an attribute diagnostic quotes back (`unknown attribute 'NoSuchAttributeXyz'`).
+8. `Stmt` derives from `ModifiableSyntaxNode`, which is why an attribute may be written in front of a statement at all, and why several may be stacked.
+9. Every parsed AST node carries a `SourceLoc`, so a check-time error is reported at the offending construct's own location.
+10. `Val`s are deduplicated (hash-consed) by the `ASTBuilder`, so two spellings of the same compile-time value denote one node.
+11. `DeclRefBase` names a declaration together with optional generic substitutions, so one generic declaration yields distinct decl-refs per specialization.
+12. A `Scope` is created during parsing and attached to the container declaration that owns it.
+13. `capabilityRequirementProvenance` records, per atom, the decl reference that caused a capability requirement, so a capability diagnostic can point back at the use that introduced it.
+14. `KnownBuiltinDeclName` membership gates behaviour rather than only speeding lookup: `isDifferentiableInterfaceBuiltin` defines the differentiable-interface family whose conformance witness-table entries the linker defers when a program does not use auto-diff.
+
+**Internal-source facts** (no observable consequence in a compiled program)
+
+15. `NodeBase` carries an `ASTNodeType` tag and a back-pointer to its `ASTBuilder`, and is not a syntax node (no `SourceLoc`).
+16. The `ASTNodeType` enum is FIDDLE-generated and powers `as<T>()` / `dynamicCast<T>()` via `NodeBase::getClass()`.
+17. `SyntaxNode` adds no state of its own; `loc` is inherited from `SyntaxNodeBase`.
+18. `DeclBase` has exactly two subclasses, `Decl` and the concrete group node.
+19. `Val` uses a generic `m_operands` list rather than per-class fields.
+20. `Type::m_astBuilderForReflection` exists for the reflection API only.
+21. The support-type table (`DeclRef<T>`, `Modifiers`, `QualType`, `SubstitutionSet`, `LookupResult`, `NameLoc`, `TypeExp`, `WitnessTable`, `SyntaxClass<T>`, `BuiltinOperationKind`, the diagnostic helpers, `Scope`) describes helpers that wrap or describe nodes rather than `NodeBase` subclasses.
+22. `SubstitutionSet::substitutionCache` points at a `SubstitutionCache` whose definition is outside this page's watched paths.
+
 ## Functional coverage
 
 | Claim                                                                                                                                                                                                  | Intent     | Anchor                                                                                                       | Tests                                                                                            |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| C3: A struct's fields group through the same DeclBase group node as a comma-separated local, and a modifier written once in front of a grouped member reaches every name. | boundary   | [#declbase-modifiablesyntaxnode](../../../../design/ast-reference/base.md#declbase-modifiablesyntaxnode) | [`declbase-group-struct-fields-and-static-const.slang`](declbase-group-struct-fields-and-static-const.slang) |
 | A Decl's nameAndLoc pairs the declared name with the source location of the name token, so a conflicting-declaration diagnostic points at the name column rather than at the start of the declaration. | negative   | [#decl-declbase](../../../../design/ast-reference/base.md#decl-declbase)                                     | [`decl-name-loc-in-redefinition.slang`](decl-name-loc-in-redefinition.slang)                     |
 | Every Decl carries a name and a parent ContainerDecl, so the same simple name declared in two different parents stays distinguishable at a member-access site.                                         | functional | [#decl-declbase](../../../../design/ast-reference/base.md#decl-declbase)                                     | [`decl-name-and-parent.slang`](decl-name-and-parent.slang)                                       |
 | A DeclBase can represent a group of declarations, so one piece of syntax that declares several names produces several independently usable declarations.                                               | functional | [#declbase-modifiablesyntaxnode](../../../../design/ast-reference/base.md#declbase-modifiablesyntaxnode)     | [`declbase-group-multiple-names.slang`](declbase-group-multiple-names.slang)                     |

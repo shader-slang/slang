@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/tokens.md#operators
-//META: doc_section_digest=550a0192a6afb09af85247a77178d5fab8cb5d39df779b64f7ef5add0140b9d5
+//META: doc_section_digest=ed91c7b6d6cd5adc6d847babeaaa96bdb8e0cf1bae7a7fa6718e5d2bdcb70b4f
 //META: purpose=Each multi-character comparison / logical / increment spelling (`<<`, `>>`, `==`, `!=`, `>=`, `<=`, `&&`, `\|\|`, `++`, `--`) lexes as one operator token.
 //META: intent=functional
 //META: pipeline_stage=lex

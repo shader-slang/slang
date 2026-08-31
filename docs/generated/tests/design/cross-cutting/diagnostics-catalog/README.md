@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: bd9544c9296f5ba8dd2b729d71b1a8975bbb02d919e8ce1a3daa7f3a042bd2f2
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 066feab8065801e4e72259431701afaabfae819e2f03a3d824d35d6e71c8d213
 source_doc: docs/generated/design/cross-cutting/diagnostics.md
-source_doc_digest: cf4549984d77058ce8ae9d000fdff44d4589213159b727d44360500b4f179da6
+source_doc_digest: 36a849c720b2096b99269b3399cb0b5b1faf225f7fe4a666aac539d87e0844ca
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -38,6 +38,88 @@ named (see `## Codes dropped`). It also repaired the annotation marker across th
 bundle: the runner only recognises `//CHECK:` with no space after the slashes, so the
 previously-shipped `// CHECK:` lines parsed as ordinary comments and every such test
 passed while asserting nothing.
+
+## Claims
+
+This bundle is the one whose claims are not doc sections. Its narrative doc
+supplies a small set of framing claims about what a catalog entry _is_ and how a
+reader should treat it; the bulk of the enumeration is a **claim family** whose
+members are the individual entries of the diagnostic catalog, and whose
+ground-truth listing is the committed snapshot
+[`_meta/diagnostics-catalog/catalog.txt`](../../../_meta/diagnostics-catalog/catalog.txt)
+rather than any prose. The list below therefore has three parts: the framing
+claims (F1-F7), the per-entry family and how it is decomposed (E1), and the
+accounting that decomposition produces. Every claim appears in exactly one of
+`## Functional coverage` or `## Untested claims`, except where the accounting
+below says explicitly that a subset is unenumerated — that shortfall is the
+coverage gap this enumeration reveals.
+
+### Framing claims (from the source doc)
+
+**`#error-code-namespace`**
+
+- **F1.** Diagnostic ids live in a single shared integer namespace, managed
+  centrally alongside a unique `name`, and are rendered to the user as `E<code>`.
+  — every test in this bundle
+- **F2.** Names and codes must both be unique, diagnostics that share a code must
+  share a severity, and a code must not be bound to one name in the Lua catalog and
+  a different name in a C++ `DIAGNOSTIC(...)` catalog. — _untested:
+  `internal-source-fact`_ (build-time validation of the catalog source)
+- **F3.** A short `intentional_shared_code_list` exempts deliberately multi-bound
+  codes — negative sentinels, the `10000` illegal-character variants, the `39999`
+  overload/lookup umbrella, the `99999` internal-error catch-all, and the JSON
+  catalog's `20001`-`20012` range. — [`20001-unexpected-token-expected-token-type.slang`](20001-unexpected-token-expected-token-type.slang),
+  [`10000-illegal-character-hex.slang`](10000-illegal-character-hex.slang)
+- **F4.** For a multi-bound code the rendered header carries the id and the message
+  but never the name, so the message text is the only discriminator. — _untested:
+  `needs-unit-test`_ (recorded against `getDiagnosticById` below)
+- **F5.** A catalog entry is a diagnostic the compiler _can_ emit; it is not a
+  promise that some input reaches it, and its summary line does not identify the
+  construct that triggers it. — this is the claim `## Codes dropped` records
+  evidence for, and the doc's own two worked examples (`expected-array-expression`
+  `30020`, `cannot-convert-array-of-smaller-to-larger-size` `30024`) are tested in
+  the sibling `design/cross-cutting/diagnostics` bundle
+  (`get-count-on-non-array-reports-no-member.slang`,
+  `smaller-to-larger-array-reports-type-mismatch.slang`)
+- **F6.** Guessing an input from an entry's name is unreliable; the regression tests
+  are the record of which entries have a demonstrated reproduction. — the whole
+  bundle plus `## Codes dropped`
+
+**`#diagnostic-definitions` / `#severity-levels` / `#internal-compiler-errors`**
+
+- **F7.** The declaring helper fixes the entry's severity, and with it the kind of
+  condition it describes: `err`, `warning` and `standalone_note` entries report on
+  the input, `fatal` entries report a condition the compiler cannot continue past,
+  and `internal` entries (`internal-compiler-error`, `unimplemented`, `unexpected`,
+  all code `99999`) report the compiler's own failure, so input reaching one is a
+  compiler defect rather than a supported reproduction. — _untested:
+  `implementation-detail`_ (the reason `99999` has no test here)
+
+### The per-entry claim family
+
+- **E1.** For each entry in the diagnostic catalog, the claim is: _the compiler
+  emits `E<code>` from a minimum single-file reproduction._ One `DIAGNOSTIC_TEST`
+  per entry is the decomposition; the entry's `code<TAB>severity<TAB>name<TAB>message`
+  rendering is the `doc_section_digest`, printed by
+  `_meta/regenerate.py catalog-digest <code>`.
+
+### Accounting for E1 against the committed snapshot
+
+| Population                                                       | Count | Where it appears                                                                  |
+| ---------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------- |
+| Entries in `_meta/diagnostics-catalog/catalog.txt`                | 695   | the snapshot                                                                      |
+| Entries with a test in this bundle                                | 331   | `## Functional coverage`                                                          |
+| Entries with a `## Codes dropped` row instead of a test           | 67    | `## Codes dropped`                                                                |
+| Entries with neither a test nor a dropped row                     | 297   | `## Untested claims`, as one `(unclassified)` row — **this is the coverage gap**  |
+| Tests citing a code the snapshot does not contain                 | 8     | `## Functional coverage`; see the snapshot-freshness note under `## Catalog coverage` |
+
+The 297-entry shortfall is real and is the thing this enumeration exists to
+surface: before there was a `## Claims` section, `## Functional coverage` listed
+only the entries that already had a test, so an entry with no reproduction was
+invisible. Closing it means writing a reproduction per entry (or a
+`## Codes dropped` row explaining why none exists), which is a sweep of its own
+rather than something this pass attempts; the 8 tests citing absent codes cannot
+be resolved at all until the snapshot is re-extracted.
 
 ## Functional coverage
 
@@ -387,6 +469,8 @@ passed while asserting nothing.
 
 | Claim                                                                                                                                                                                                     | Reason                | Anchor                                                                                                                                                  | Why untested                                                                                                                                                                                                                            |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claim family E1, unenumerated remainder.** 297 of the 695 entries in the committed catalog snapshot have neither a `DIAGNOSTIC_TEST` in this bundle nor a `## Codes dropped` row, so for each of them the claim "the compiler emits `E<code>` from a minimum single-file reproduction" is neither demonstrated nor recorded as unreachable. | (unclassified)        | [#error-code-namespace](../../../../design/cross-cutting/diagnostics.md#error-code-namespace)                                                           | Each one needs its own minimum reproduction attempt, which is a per-code sweep rather than a single test. The right next pass is: attempt a reproduction per remaining entry, add a `DIAGNOSTIC_TEST` where one is found and a `## Codes dropped` row naming the shadowing code where one is not. Deliberately left `(unclassified)` because the population is mixed — some of these entries are user-reachable and some are `internal` / `fatal` entries that F7 already rules out.                                                                             |
+| **Snapshot-absent codes.** Eight tests here (`20020`, `20104`, `29117`, `30059`, `30069`, `32001`, `38014`, `40018`) cite catalog codes the committed snapshot does not contain, so their `doc_section_digest` is anchored to an entry that cannot be recomputed and lint cannot tell whether their claim still holds. | (unclassified)        | [#error-code-namespace](../../../../design/cross-cutting/diagnostics.md#error-code-namespace)                                                           | The tests themselves pass — the compiler does emit those codes — but the claim they are anchored to is unverifiable until `_meta/diagnostics-catalog/catalog.txt` is re-extracted from the current catalog sources. No extractor is committed, so re-extraction is a separate task; see the snapshot-freshness note under `## Catalog coverage`.                                                                             |
 | The `Severity` enumerators are held equal to the public `SLANG_SEVERITY_*` constants by a `static_assert`, so API callers observe the same numeric values.                                                | needs-unit-test       | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                                                     | The equality is a compile-time assertion in a header; no compiler input can observe it. A C++ unit test comparing `Severity::Error` against `SLANG_SEVERITY_ERROR` is what would verify it.                                             |
 | The `WarningLevel` enumerators are kept in step with the public `SlangWarningLevel` constants by a neighbouring `static_assert`.                                                                          | needs-unit-test       | [#warning-groups](../../../../design/cross-cutting/diagnostics.md#warning-groups)                                                                       | Same shape as the `Severity` parity claim: a build-time assertion with no diagnostic surface. A C++ unit test over the two enums would verify it.                                                                                       |
 | `getEnabledWarningLevels` / `setEnabledWarningLevels` expose the raw enabled-group mask so it can be copied between sinks.                                                                                | needs-unit-test       | [#warning-groups](../../../../design/cross-cutting/diagnostics.md#warning-groups)                                                                       | Copying a mask between two sinks requires constructing sinks directly; `slangc` exposes only the `-W` spellings that set bits on its own sink.                                                                                          |
@@ -416,6 +500,35 @@ passed while asserting nothing.
 | `source/slang/slang-diagnostics.lua` + `source/compiler-core/*-diagnostic-defs.h` | 801              | 339                    | 84                   | 68                     |
 
 Per-anchor split of the 339 tests: 330 anchored at `source/slang/slang-diagnostics.lua`, 9 at a `source/compiler-core/*-diagnostic-defs.h` catalog.
+
+### Snapshot freshness (not fixed by this pass)
+
+The committed snapshot
+[`_meta/diagnostics-catalog/catalog.txt`](../../../_meta/diagnostics-catalog/catalog.txt)
+is the ground truth for both the `doc_section_digest` of every test here and the
+E1 accounting under `## Claims`, and it has fallen behind the catalog sources.
+Three independent symptoms:
+
+1. **Population disagreement.** The snapshot's own header says `Total codes: 695`,
+   while the table above — written from a live extraction at the previous
+   regeneration — says 801. The 106-entry difference means neither number can be
+   trusted as the current catalog size.
+2. **Nineteen drifted entries.** Full-suite lint reports 19 tests whose cited
+   entry has changed since they were anchored to it: codes 10000, 10001, 10002,
+   10003, 10004, 10005, 10010, 10012, 20001, 20002, 20005, 30509, 30516, 40011,
+   40015, 45100, 45102, 45104, and 100001. Their `doc_section_digest` no longer
+   matches `_meta/regenerate.py catalog-digest <code>`.
+3. **Eight absent codes.** Tests cite 20020, 20104, 29117, 30059, 30069, 32001,
+   38014 and 40018, none of which the snapshot contains, so lint cannot recompute
+   a digest for them at all. All eight tests pass — the compiler does emit those
+   codes — so the snapshot is behind the compiler, not the other way round.
+
+This pass deliberately does **not** re-extract the snapshot or re-stamp the 19
+drifted digests. No extractor is committed alongside the snapshot, so
+re-extracting means first writing (and reviewing) the tool that produces it;
+re-stamping the digests from the current, stale snapshot would only hide the
+drift behind a fresh hash. Both belong to a separate task, tracked here so the
+next session does not mistake the warnings for noise.
 
 ## Codes dropped (could not reach from minimum input)
 

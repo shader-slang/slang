@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#inputs-and-outputs
-//META: doc_section_digest=325192a5d2be9d9ec0f3812a36230d5c900a48f1c7af5d97ada17cd1926349b1
+//META: doc_section_digest=3818e672e7a18026a0b8da65a28b332ecca673b023400f4ffc5b7524324873b4
 //META: purpose=The checker attaches a Type to every Expr, so a mixed int/float sum is typed float and selects the float overload at the enclosing call.
 //META: intent=functional
 //META: pipeline_stage=check
