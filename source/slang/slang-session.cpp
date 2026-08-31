@@ -246,7 +246,29 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        SHA1::Digest sourceDigest = computeSourceBlobDigest(source);
+        // A null `source` blob together with a `path` is supported for source
+        // modules: the module's source is then loaded from the file at `path`
+        // (see loadSourceModuleImpl). #10996 made the content digest below
+        // unconditional (it feeds the module-name fallback, the #10957
+        // name-collision check, and setSourceDigest), so when there is no
+        // in-memory source we materialize the file's contents here and digest
+        // those instead — mirroring the by-name search path, which digests the
+        // file contents it loaded (see findAndLoadModule).
+        ComPtr<ISlangBlob> sourceBlob(source);
+        if (!sourceBlob && blobType == ModuleBlobType::Source && path)
+            getFileSystemExt()->loadFile(path, sourceBlob.writeRef());
+
+        if (!sourceBlob)
+        {
+            // Neither an in-memory blob nor a readable file at `path`: report a
+            // diagnostic rather than asserting on a null blob, which would
+            // crash shipping builds on valid public-API input (#12852).
+            sink.diagnose(Diagnostics::CannotOpenFile{.path = path ? String(path) : String()});
+            sink.getBlobIfNeeded(outDiagnostics);
+            return nullptr;
+        }
+
+        SHA1::Digest sourceDigest = computeSourceBlobDigest(sourceBlob);
 
         String moduleNameStr = moduleName;
         if (!moduleName)
@@ -295,7 +317,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
             }
         }
         RefPtr<Module> module =
-            loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
+            loadModuleImpl(name, pathInfo, sourceBlob, SourceLoc(), &sink, nullptr, blobType);
         if (module)
             module->setSourceDigest(sourceDigest);
         sink.getBlobIfNeeded(outDiagnostics);

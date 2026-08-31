@@ -100,6 +100,44 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
     SLANG_CHECK(modFileReload != nullptr);
     SLANG_CHECK(modFileReload == modFile);
 
+    // #12852: a module loaded via loadModuleFromSource with a null `source`
+    // blob (its source read from the file at `path`) must still receive a
+    // content digest, so the #10957 name-collision check fires on a later
+    // conflicting load under the same name. Use a fresh file that has not been
+    // loaded yet.
+    SLANG_CHECK(memoryFileSystem.saveFile("mod_path.slang", sourceA, strlen(sourceA)) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagPathLoad;
+    auto modPath = fileSession->loadModuleFromSource(
+        "mod_path",
+        "mod_path.slang",
+        nullptr,
+        diagPathLoad.writeRef());
+    SLANG_CHECK(modPath != nullptr);
+
+    // Same name + same file (null source) -> returns the cached module.
+    ComPtr<slang::IBlob> diagPathReload;
+    auto modPathReload = fileSession->loadModuleFromSource(
+        "mod_path",
+        "mod_path.slang",
+        nullptr,
+        diagPathReload.writeRef());
+    SLANG_CHECK(modPathReload == modPath);
+
+    // Same name, different source contents -> collision error (E38202),
+    // proving the path-load digest participates in the collision check.
+    ComPtr<slang::IBlob> diagPathCollision;
+    auto modPathCollision = fileSession->loadModuleFromSourceString(
+        "mod_path",
+        "mod_path.slang",
+        sourceB,
+        diagPathCollision.writeRef());
+    SLANG_CHECK(modPathCollision == nullptr);
+    SLANG_CHECK(diagPathCollision != nullptr);
+    const char* pathCollideText =
+        diagPathCollision ? (const char*)diagPathCollision->getBufferPointer() : "";
+    SLANG_CHECK(strstr(pathCollideText, "38202") != nullptr);
+
     // Loading "mod" with a *different* source must now fail and emit a
     // diagnostic pointing at the collision, rather than silently returning
     // the previously cached module.

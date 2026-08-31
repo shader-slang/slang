@@ -1,9 +1,11 @@
 // unit-test-load-module-from-source.cpp
 
+#include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <cstring>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -264,5 +266,63 @@ SLANG_UNIT_TEST(loadModuleFromSource)
             moduleName);
 
         SLANG_CHECK(infoResult == SLANG_E_INVALID_ARG);
+    }
+
+    // Test 7: Regression for #12852. Passing a null `source` blob together with
+    // a `path` is the supported "load a module from a file on disk" pattern; it
+    // must load the file rather than tripping SLANG_RELEASE_ASSERT(blob) in
+    // computeSourceBlobDigest. An unreadable path must yield a diagnostic, not a
+    // crash.
+    {
+        const char* fileSource = R"(
+            [shader("compute")][numthreads(1,1,1)]
+            void fileMain() {}
+        )";
+
+        ComPtr<ISlangFileSystemExt> fileSystem =
+            ComPtr<ISlangFileSystemExt>(new MemoryFileSystem());
+        auto& memoryFileSystem = *static_cast<MemoryFileSystem*>(fileSystem.get());
+        SLANG_CHECK(
+            memoryFileSystem.saveFile("from-file.slang", fileSource, strlen(fileSource)) ==
+            SLANG_OK);
+
+        slang::SessionDesc fileSessionDesc = sessionDesc;
+        fileSessionDesc.fileSystem = fileSystem;
+        ComPtr<slang::ISession> fileSession;
+        SLANG_CHECK(
+            globalSession->createSession(fileSessionDesc, fileSession.writeRef()) == SLANG_OK);
+
+        // 7a: null source + readable path -> module loads from the file.
+        {
+            ComPtr<slang::IModule> module;
+            ComPtr<ISlangBlob> diagnostics;
+            module = fileSession->loadModuleFromSource(
+                "fileModule",
+                "from-file.slang",
+                nullptr,
+                diagnostics.writeRef());
+            SLANG_CHECK(module != nullptr);
+            if (diagnostics)
+            {
+                const char* diagText = (const char*)diagnostics->getBufferPointer();
+                SLANG_CHECK(strstr(diagText, "error") == nullptr);
+            }
+        }
+
+        // 7b: null source + unreadable path -> nullptr and a diagnostic naming
+        // the path, instead of asserting on the null blob.
+        {
+            ComPtr<slang::IModule> module;
+            ComPtr<ISlangBlob> diagnostics;
+            module = fileSession->loadModuleFromSource(
+                "missingModule",
+                "does-not-exist.slang",
+                nullptr,
+                diagnostics.writeRef());
+            SLANG_CHECK(module == nullptr);
+            SLANG_CHECK(diagnostics != nullptr);
+            const char* diagText = diagnostics ? (const char*)diagnostics->getBufferPointer() : "";
+            SLANG_CHECK(strstr(diagText, "does-not-exist.slang") != nullptr);
+        }
     }
 }
