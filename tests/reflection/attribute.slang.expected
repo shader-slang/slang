@@ -655,24 +655,7 @@ standard output = {
                             "name": "attrib",
                             "type": {
                                 "kind": "pointer",
-                                "valueType": {
-                                    "kind": "struct",
-                                    "name": "StructWithAttribute",
-                                    "fields": [
-
-                                    ],
-                                    "userAttribs": [
-                                        {
-                                            "name": "ReflectThroughPointer",
-                                            "arguments": [
-
-                                            ]
-                                        }
-                                    ],
-                                    "sizes": [
-
-                                    ]
-                                },
+                                "valueType": "StructWithAttribute",
                                 "sizes": [
 
                                 ]

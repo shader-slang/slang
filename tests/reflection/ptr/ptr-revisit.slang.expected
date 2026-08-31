@@ -6,57 +6,42 @@ standard output = {
     "version": "1.1",
     "parameters": [
         {
-            "name": "genericPtr",
-            "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0},
+            "name": "inputBuffer",
+            "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0},
             "type": {
-                "kind": "pointer",
-                "valueType": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
                     "kind": "struct",
-                    "name": "GenericStruct",
+                    "name": "Holder",
                     "fields": [
                         {
-                            "name": "someT",
-                            "type": {
-                                "kind": "scalar",
-                                "scalarType": "int32",
-                                "sizes": [
-                                    {"kind": "uniform", "value": 4, "alignment": 4}
-                                ]
-                            },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
-                        },
-                        {
-                            "name": "values",
-                            "type": {
-                                "kind": "array",
-                                "elementCount": 4,
-                                "elementType": {
-                                    "kind": "scalar",
-                                    "scalarType": "int32",
-                                    "sizes": [
-                                        {"kind": "uniform", "value": 4, "alignment": 4}
-                                    ]
-                                },
-                                "uniformStride": 4,
-                                "sizes": [
-                                    {"kind": "uniform", "value": 16, "alignment": 4}
-                                ]
-                            },
-                            "binding": {"kind": "uniform", "offset": 4, "size": 16, "elementStride": 4}
-                        },
-                        {
-                            "name": "genericPtr",
+                            "name": "p",
                             "type": {
                                 "kind": "pointer",
                                 "valueType": {
                                     "kind": "struct",
-                                    "name": "GenericStruct",
+                                    "name": "Middle",
                                     "fields": [
                                         {
-                                            "name": "someT",
+                                            "name": "a",
                                             "type": {
-                                                "kind": "scalar",
-                                                "scalarType": "float32",
+                                                "kind": "struct",
+                                                "name": "Inner",
+                                                "fields": [
+                                                    {
+                                                        "name": "x",
+                                                        "type": {
+                                                            "kind": "scalar",
+                                                            "scalarType": "int32",
+                                                            "sizes": [
+                                                                {"kind": "uniform", "value": 4, "alignment": 4}
+                                                            ]
+                                                        },
+                                                        "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
+                                                    }
+                                                ],
                                                 "sizes": [
                                                     {"kind": "uniform", "value": 4, "alignment": 4}
                                                 ]
@@ -64,59 +49,53 @@ standard output = {
                                             "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                                         },
                                         {
-                                            "name": "values",
+                                            "name": "b",
                                             "type": {
-                                                "kind": "array",
-                                                "elementCount": 2,
-                                                "elementType": {
-                                                    "kind": "scalar",
-                                                    "scalarType": "int32",
-                                                    "sizes": [
-                                                        {"kind": "uniform", "value": 4, "alignment": 4}
-                                                    ]
-                                                },
-                                                "uniformStride": 4,
+                                                "kind": "struct",
+                                                "name": "Inner",
+                                                "fields": [
+                                                    {
+                                                        "name": "x",
+                                                        "type": {
+                                                            "kind": "scalar",
+                                                            "scalarType": "int32",
+                                                            "sizes": [
+                                                                {"kind": "uniform", "value": 4, "alignment": 4}
+                                                            ]
+                                                        },
+                                                        "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
+                                                    }
+                                                ],
                                                 "sizes": [
-                                                    {"kind": "uniform", "value": 8, "alignment": 4}
+                                                    {"kind": "uniform", "value": 4, "alignment": 4}
                                                 ]
                                             },
-                                            "binding": {"kind": "uniform", "offset": 4, "size": 8, "elementStride": 4}
-                                        },
-                                        {
-                                            "name": "genericPtr",
-                                            "type": {
-                                                "kind": "pointer",
-                                                "valueType": "GenericStruct",
-                                                "sizes": [
-                                                    {"kind": "uniform", "value": 8, "alignment": 8}
-                                                ]
-                                            },
-                                            "binding": {"kind": "uniform", "offset": 16, "size": 8, "elementStride": 0}
+                                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                                         }
                                     ],
                                     "sizes": [
-                                        {"kind": "uniform", "value": 24, "alignment": 8}
+                                        {"kind": "uniform", "value": 8, "alignment": 4}
                                     ]
                                 },
                                 "sizes": [
                                     {"kind": "uniform", "value": 8, "alignment": 8}
                                 ]
                             },
-                            "binding": {"kind": "uniform", "offset": 24, "size": 8, "elementStride": 0}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
                         }
                     ],
                     "sizes": [
-                        {"kind": "uniform", "value": 32, "alignment": 8}
+                        {"kind": "uniform", "value": 8, "alignment": 8}
                     ]
                 },
                 "sizes": [
-                    {"kind": "uniform", "value": 8, "alignment": 8}
+                    {"kind": "uniform", "value": 16, "alignment": 8}
                 ]
             }
         },
         {
             "name": "outputBuffer",
-            "binding": {"kind": "uniform", "offset": 8, "size": 16, "elementStride": 0},
+            "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 0},
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
@@ -139,19 +118,40 @@ standard output = {
         "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0},
         "parameters": [
             {
-                "name": "genericPtr",
-                "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0},
+                "name": "inputBuffer",
+                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0},
                 "type": {
-                    "kind": "pointer",
-                    "valueType": "GenericStruct",
+                    "kind": "resource",
+                    "baseShape": "structuredBuffer",
+                    "access": "readWrite",
+                    "resultType": {
+                        "kind": "struct",
+                        "name": "Holder",
+                        "fields": [
+                            {
+                                "name": "p",
+                                "type": {
+                                    "kind": "pointer",
+                                    "valueType": "Middle",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 8, "alignment": 8}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 8, "alignment": 8}
+                        ]
+                    },
                     "sizes": [
-                        {"kind": "uniform", "value": 8, "alignment": 8}
+                        {"kind": "uniform", "value": 16, "alignment": 8}
                     ]
                 }
             },
             {
                 "name": "outputBuffer",
-                "binding": {"kind": "uniform", "offset": 8, "size": 16, "elementStride": 0},
+                "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 0},
                 "type": {
                     "kind": "resource",
                     "baseShape": "structuredBuffer",
