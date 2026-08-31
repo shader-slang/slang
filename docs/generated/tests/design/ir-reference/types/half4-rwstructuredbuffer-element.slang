@@ -14,7 +14,7 @@
 // surfaces the full `Vec(Half, 4 : Int)` as the buffer's element-type
 // operand.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<half4> buf;
 uniform half4 v;

@@ -17,7 +17,7 @@
 // call is ordinary integer arithmetic — no atomic opcode is produced at
 // this stage.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> rwbuf;
 

@@ -11,7 +11,7 @@
 
 // Boundary: pure-value-inst row, 64-bit unsigned side.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint64_t a;
 uniform uint64_t b;

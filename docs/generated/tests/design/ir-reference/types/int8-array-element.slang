@@ -13,7 +13,7 @@
 // Array(Int8, N : Int). An `int8_t[4]` global_param surfaces
 // `Array(Int8, 4 : Int)` in the dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t v[4];
 uniform RWStructuredBuffer<int> buf;
