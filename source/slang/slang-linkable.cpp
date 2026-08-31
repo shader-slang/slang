@@ -865,7 +865,8 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
 Expr* ComponentType::tryResolveOverloadedExpr(Expr* exprIn)
 {
     auto linkage = getLinkage();
-    SemanticsContext context(linkage->getSemanticsForReflection());
+    auto sharedSemanticsContext = linkage->getSemanticsForReflection();
+    SemanticsContext context(sharedSemanticsContext);
     SemanticsVisitor visitor(context);
     return visitor.maybeResolveOverloadedExpr(exprIn, LookupMask::Function, nullptr);
 }
@@ -969,7 +970,8 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    SemanticsContext context(linkage->getSemanticsForReflection());
+    auto sharedSemanticsContext = linkage->getSemanticsForReflection();
+    SemanticsContext context(sharedSemanticsContext);
     context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
@@ -1039,7 +1041,8 @@ Expr* ComponentType::findDeclFromStringInType(
     {
         expr = linkage->parseTermString(name, scope);
     }
-    SemanticsContext context(linkage->getSemanticsForReflection());
+    auto sharedSemanticsContext = linkage->getSemanticsForReflection();
+    SemanticsContext context(sharedSemanticsContext);
     context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
@@ -1117,7 +1120,8 @@ Expr* ComponentType::findDeclFromStringInType(
 
 bool ComponentType::isSubType(Type* subType, Type* superType)
 {
-    SemanticsContext context(getLinkage()->getSemanticsForReflection());
+    auto sharedSemanticsContext = getLinkage()->getSemanticsForReflection();
+    SemanticsContext context(sharedSemanticsContext);
     SemanticsVisitor visitor(context);
 
     return (visitor.isSubtype(subType, superType, IsSubTypeOptions::None) != nullptr);

@@ -965,19 +965,19 @@ public:
         SLANG_RELEASE_ASSERT(languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN);
     }
 
-    /// Creates a context for a producer where the primary module is legitimately optional.
+    /// Creates a context for an ad hoc checking operation whose primary module may be absent.
     ///
-    /// A present module supplies the source language policy. Otherwise, the producer must provide
-    /// the language version that applies to its ad hoc checking operation.
+    /// A present module supplies the source-language policy and the moduleless version is ignored.
+    /// Otherwise, the caller must provide the version for the ad hoc operation.
     static RefPtr<SharedSemanticsContext> createForOptionalModule(
         Linkage* linkage,
         Module* module,
-        SlangLanguageVersion fallbackLanguageVersion,
+        SlangLanguageVersion modulelessLanguageVersion,
         DiagnosticSink* sink)
     {
         if (module)
             return new SharedSemanticsContext(linkage, module, sink);
-        return new SharedSemanticsContext(linkage, fallbackLanguageVersion, sink);
+        return new SharedSemanticsContext(linkage, modulelessLanguageVersion, sink);
     }
 
     Session* getSession() { return m_linkage->getSessionImpl(); }

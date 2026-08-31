@@ -8,6 +8,8 @@ import glsl;
 
 RWStructuredBuffer<float> outputBuffer;
 
+// These formerly overlapping operations only need to type-check unambiguously in both language
+// modes; code generation is covered separately by `computeMain`.
 void typeCheckRemovedOverloads(
     half2x2 halfMatrix,
     double2x2 doubleMatrix,

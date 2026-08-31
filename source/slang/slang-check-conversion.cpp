@@ -2636,9 +2636,10 @@ bool SemanticsVisitor::_coerce(
 
     bool usedLegacyGenericParameterCount =
         tryResolveOverloadUsingLegacyGenericParameterCount(overloadContext);
-    // Cost probes call `_coerce` without asking it to construct an expression. Apply the
-    // compatibility rule during a probe so its cost remains usable, but wait until the conversion
-    // is reified before warning at the source expression.
+    // `canCoerce` performs a speculative cost probe by passing a null `outToExpr`; materialized
+    // conversions pass storage for the result. Apply the compatibility rule in both cases, but
+    // warn only for a materialized conversion with a diagnostic sink. A null sink explicitly
+    // requests a non-diagnostic operation, so there is nowhere to report the deprecation.
     if (usedLegacyGenericParameterCount && outToExpr && sink)
     {
         sink->diagnose(Diagnostics::DeprecatedGenericParameterCountOverloadTieBreaker{

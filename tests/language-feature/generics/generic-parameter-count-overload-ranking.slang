@@ -1,5 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=LEGACY): -std 2026
 //DIAGNOSTIC_TEST:SIMPLE(diag=SLANG202C): -std 202c
+//DIAGNOSTIC_TEST:SIMPLE(diag=ERROR): -std 2026 -warnings-as-errors 40021
+//DIAGNOSTIC_TEST:SIMPLE(diag=DISABLED): -std 2026 -warnings-disable 40021
 
 struct BroadResult
 {
@@ -67,6 +69,8 @@ void test()
     BroadResult result = choose(float3(0.0));
 //LEGACY: deprecated generic-parameter-count overload tie-breaker
 //LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
+//ERROR: deprecated generic-parameter-count overload tie-breaker
+//ERROR: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
 //SLANG202C: ambiguous call to 'choose' with arguments of type (vector<float,3>)
 
     // The fixed-size overload accepts a strict subset of the variable-size overload's domain, but
@@ -75,6 +79,8 @@ void test()
     FixedShapeResult shapeResult = chooseShape(float3(0.0));
 //LEGACY: deprecated generic-parameter-count overload tie-breaker
 //LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
+//ERROR: deprecated generic-parameter-count overload tie-breaker
+//ERROR: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
 //SLANG202C: ambiguous call to 'chooseShape' with arguments of type (vector<float,3>)
 
     // OverloadRank is an ordinary ranking criterion, so it resolves this call before the legacy

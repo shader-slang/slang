@@ -82,7 +82,7 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     }
 }
 
-SharedSemanticsContext* Linkage::getSemanticsForReflection()
+RefPtr<SharedSemanticsContext> Linkage::getSemanticsForReflection()
 {
     // Linkage options are populated after the `Linkage` constructor runs. Defer construction so
     // ad hoc reflection checking observes the language version configured on the session or
@@ -96,7 +96,7 @@ SharedSemanticsContext* Linkage::getSemanticsForReflection()
     {
         m_semanticsForReflection = new SharedSemanticsContext(this, languageVersion, nullptr);
     }
-    return m_semanticsForReflection.get();
+    return m_semanticsForReflection;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -528,7 +528,8 @@ bool Linkage::isSpecialized(DeclRef<Decl> declRef)
     //
     // If it's not specialized, then declRef will be the one with default substitutions.
     //
-    SemanticsVisitor visitor(getSemanticsForReflection());
+    auto sharedSemanticsContext = getSemanticsForReflection();
+    SemanticsVisitor visitor(sharedSemanticsContext);
 
     auto decl = declRef.getDecl();
     while (decl && !as<GenericDecl>(decl))
@@ -580,7 +581,8 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     List<Type*> argTypes,
     DiagnosticSink* sink)
 {
-    SemanticsVisitor visitor(getSemanticsForReflection());
+    auto sharedSemanticsContext = getSemanticsForReflection();
+    SemanticsVisitor visitor(sharedSemanticsContext);
     SemanticsVisitor::ExprLocalScope scope;
     visitor = visitor.withSink(sink).withExprLocalScope(&scope);
 
@@ -639,7 +641,8 @@ DeclRef<Decl> Linkage::specializeGeneric(
     SLANG_AST_BUILDER_RAII(getASTBuilder());
     SLANG_ASSERT(declRef);
 
-    SemanticsVisitor visitor(getSemanticsForReflection());
+    auto sharedSemanticsContext = getSemanticsForReflection();
+    SemanticsVisitor visitor(sharedSemanticsContext);
     visitor = visitor.withSink(sink);
 
     auto genericDeclRef = getGenericParentDeclRef(getASTBuilder(), &visitor, declRef);
@@ -707,7 +710,8 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
         {
         case slang::ContainerType::ConstantBuffer:
             {
-                SemanticsVisitor visitor(getSemanticsForReflection());
+                auto sharedSemanticsContext = getSemanticsForReflection();
+                SemanticsVisitor visitor(sharedSemanticsContext);
                 auto layoutType = getASTBuilder()->getDefaultLayoutType();
                 Type* cbType = visitor.getConstantBufferType(type, layoutType);
                 containerTypeReflection = cbType;
@@ -864,7 +868,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
 
     try
     {
-        SemanticsVisitor visitor(getSemanticsForReflection());
+        auto sharedSemanticsContext = getSemanticsForReflection();
+        SemanticsVisitor visitor(sharedSemanticsContext);
         visitor = visitor.withSink(&sink);
 
         auto witness = visitor.isSubtype(
