@@ -247,17 +247,25 @@ slang::IModule* Linkage::loadModuleFromBlob(
     try
     {
         // `source` may be null for a source module loaded from a file at
-        // `path`; materialize the file first so the content digest below is
-        // computed from the real source rather than a null blob.
+        // `path`. Materialize the file up front: the digest below then reflects
+        // the real source, and passing the blob to loadModuleImpl loads through
+        // the session file system (SourceBlobWithPathInfoArtifactRepresentation,
+        // as the by-name path does) instead of the File::exists gate below.
         ComPtr<ISlangBlob> sourceBlob(source);
         if (!sourceBlob && blobType == ModuleBlobType::Source && path)
-            getFileSystemExt()->loadFile(path, sourceBlob.writeRef());
+        {
+            // A failed read leaves sourceBlob null; the guard below diagnoses.
+            if (SLANG_FAILED(getFileSystemExt()->loadFile(path, sourceBlob.writeRef())))
+                sourceBlob.setNull();
+        }
 
         if (!sourceBlob)
         {
-            // No usable source. A null `source` is a supported spelling for a
-            // source-module load (load-from-path), so diagnose this user-facing
-            // input rather than asserting on it (#12852).
+            // Reached with nothing to load: a source `path` that could not be
+            // read, an absent `path`, or a null IR blob. `source` is user-facing
+            // input that may legitimately be null (a source module loads from
+            // `path`), so diagnose rather than assert (#12852); the message
+            // names `path` when there is one.
             sink.diagnose(Diagnostics::CannotOpenFile{.path = path ? String(path) : String()});
             sink.getBlobIfNeeded(outDiagnostics);
             return nullptr;

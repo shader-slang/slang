@@ -104,7 +104,8 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
     // `path`, and its digest must be the file's content digest. A fresh file is
     // required here; reloading an already-loaded file under a new name is a
     // separate, unrelated path-dedup case.
-    SLANG_CHECK(memoryFileSystem.saveFile("mod_path.slang", sourceA, strlen(sourceA)) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        memoryFileSystem.saveFile("mod_path.slang", sourceA, strlen(sourceA)) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagPathLoad;
     auto modPath = fileSession->loadModuleFromSource(

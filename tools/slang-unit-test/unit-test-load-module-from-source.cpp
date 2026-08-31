@@ -319,4 +319,26 @@ SLANG_UNIT_TEST(loadModuleFromSource)
             SLANG_CHECK(strstr(diagText, "does-not-exist.slang") != nullptr);
         }
     }
+
+    // #12852: the null-blob guard must not assert on the COM entry points the C
+    // wrappers reject early — a null IR blob and a null `path` both return null
+    // with a diagnostic.
+    {
+        ComPtr<slang::IModule> module;
+
+        ComPtr<ISlangBlob> irDiagnostics;
+        module = session->loadModuleFromIRBlob(
+            "irNullBlob",
+            "ir.slang",
+            nullptr,
+            irDiagnostics.writeRef());
+        SLANG_CHECK(module == nullptr);
+        SLANG_CHECK(irDiagnostics != nullptr);
+
+        ComPtr<ISlangBlob> noPathDiagnostics;
+        module =
+            session->loadModuleFromSource("noPath", nullptr, nullptr, noPathDiagnostics.writeRef());
+        SLANG_CHECK(module == nullptr);
+        SLANG_CHECK(noPathDiagnostics != nullptr);
+    }
 }
