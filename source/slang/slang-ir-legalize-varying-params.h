@@ -27,6 +27,12 @@ void legalizeEntryPointVaryingParamsForCPU(
 
 void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink);
 
+// Flatten the aggregate attribute operand of each portable `ReportHit` (lowered to a
+// `kIROp_ReportOptiXIntersection` marker) into scalar OptiX attribute-register leaves. Must run
+// before the generic empty-type / varying-parameter legalization passes, which do not understand
+// the aggregate operand of the marker op.
+void legalizeOptiXReportIntersectionsForCUDA(IRModule* module, DiagnosticSink* sink);
+
 void legalizeEntryPointVaryingParamsForMetal(
     IRModule* module,
     DiagnosticSink* sink,

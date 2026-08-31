@@ -1378,6 +1378,35 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return true;
         }
+    case kIROp_ReportOptiXIntersection:
+        {
+            // optixReportIntersection(tHit, hitKind, a0..aN). The CUDA legalization pass has
+            // already flattened the aggregate into scalar leaves (operands 2..N), one per attribute
+            // register. A float leaf is bit-reinterpreted with `__float_as_uint`, the exact inverse
+            // of the reader's `__int_as_float(optixGetAttribute_N())`, because CUDA lowers
+            // `IRBitCast` as a numeric C cast, not a bit cast.
+            m_writer->emit("optixReportIntersection(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            for (UInt i = 2; i < inst->getOperandCount(); ++i)
+            {
+                m_writer->emit(", ");
+                auto leaf = inst->getOperand(i);
+                if (leaf->getDataType()->getOp() == kIROp_FloatType)
+                {
+                    m_writer->emit("__float_as_uint(");
+                    emitOperand(leaf, getInfo(EmitOp::General));
+                    m_writer->emit(")");
+                }
+                else
+                {
+                    emitOperand(leaf, getInfo(EmitOp::General));
+                }
+            }
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_GetOptiXSbtDataPtr:
         {
             m_writer->emit("((");

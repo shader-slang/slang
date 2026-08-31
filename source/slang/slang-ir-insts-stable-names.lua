@@ -874,5 +874,6 @@ return {
 	["imageGatherOffset"] = 898,
 	["getNaturalAlignment"] = 899,
 	["Type.PtrTypeBase.SPIRVUntypedPtr"] = 900,
-	["Attr.TypeAlignment"] = 901
+	["Attr.TypeAlignment"] = 901,
+	["reportOptiXIntersection"] = 902
 }
