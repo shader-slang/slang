@@ -630,7 +630,8 @@ void initCommandOptions(CommandOptions& options)
          "Statements that provably execute together share one counter and one "
          "runtime probe, which keeps instrumented shader code small without "
          "changing reported per-line results; the manifest therefore reports "
-         "fewer counters than source entries. "
+         "no more counters than source entries, and fewer whenever a "
+         "straight-line region is coalesced. "
          "When writing compiled output to a file, slangc also emits "
          "`<output>.coverage-manifest.json` mapping source coverage entries to counters."},
         {OptionKind::TraceFunctionCoverage,

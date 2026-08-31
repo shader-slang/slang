@@ -66,8 +66,9 @@ equals counter index: line coverage already shares one counter across
 the entries of a straight-line region, so `getCounterCount()` is never
 larger than the entry count and is usually smaller. The two are equal
 when only function and/or branch coverage is enabled, since those modes
-use dedicated counters -- so rely on `<=`, not on the counts differing. Size the readback buffer from
-`getCounterCount()`, and accumulate per entry rather than per counter —
+use dedicated counters — rely on `<=`, not on the counts differing.
+Size the readback buffer from `getCounterCount()`, and accumulate per
+entry rather than per counter —
 a counter does not identify a single source location. Future
 source-region coverage may add ranged entries with derived counters
 without changing the binding contract. (`getBufferInfo()` remains available as a legacy

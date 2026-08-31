@@ -419,8 +419,10 @@ highest-leverage near-term picks.
 
 `ICoverageTracingMetadata` is intentionally source-entry based rather
 than LCOV-line-only. Every marker emits one entry, with
-`counterMode == Count` and `counterIndex` pointing at the runtime
-counter slot, but entries and counters are not one-to-one: line
+`counterMode` reporting the selected recording mode (`Count` by
+default, `Boolean` under `-trace-coverage-boolean`) and `counterIndex`
+pointing at the runtime counter slot, but entries and counters are not
+one-to-one: line
 coverage coalesces the entries of a straight-line region onto a shared
 counter, so `getCounterCount()` is never larger than the entry count,
 and smaller whenever a straight-line region is coalesced. A compile that

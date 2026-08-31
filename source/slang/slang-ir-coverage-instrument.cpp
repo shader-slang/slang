@@ -917,11 +917,14 @@ static IRFunc* getStaticallyResolvedCallee(IRInst* callee)
 // walk terminating without letting an optimistic answer escape into
 // other functions' cached results.
 //
-// Known gap: the ray-tracing hit terminators (`IgnoreHit`,
-// `AcceptHitAndEndSearch`) end the invocation at the target level, but
-// Slang's IR models them as ordinary `void` core-module functions that
-// return to their caller, so this analysis cannot see them. There is
-// no `[noreturn]` concept in the IR to key off. Marking them in the
+// Known gap: any core-module intrinsic that abandons the invocation —
+// the ray-tracing hit terminators `IgnoreHit` and `AcceptHitAndEndSearch`
+// are the concrete examples today — lowers to a `GenericAsm` terminator
+// like every other intrinsic, and `mayNotReturn` treats `GenericAsm` as
+// a normal exit (see the comment on that case below). So this is not a
+// gap specific to those two names: it is general to any present or
+// future abandoning intrinsic modeled the same way. Slang's IR has no
+// `[noreturn]` concept to key off instead. Marking them in the
 // core module is the principled fix and is tracked separately.
 struct CoverageFunctionExitAnalysis
 {
@@ -1081,29 +1084,36 @@ static void assignCoverageCounterSlots(
             auto previousOp = markerOps[openGroup];
             if (previousOp->getParent() == markerOp->getParent())
             {
-                // Two preconditions from `collectCoverageMarkerOps`, which
-                // walks each function's blocks in order and each block's
-                // insts in position order: markers from one block arrive
-                // contiguously, and within a block they arrive in position
-                // order. The walk below relies on the second — it scans
-                // forward from `previousOp` looking for `markerOp`, so if
-                // the two were ever reversed it would run to the end of the
-                // block without finding it and skip the split check
-                // entirely. Assert rather than trust a collection order
-                // defined 200 lines away.
-                SLANG_ASSERT(previousOp != markerOp);
                 // Same block: the run continues unless something
                 // between the two markers can abandon the invocation.
+                // The scan below relies on a precondition from
+                // `collectCoverageMarkerOps`, which walks each function's
+                // blocks in order and each block's insts in position
+                // order: markers from one block arrive contiguously and
+                // in position order, so `markerOp` is reachable by
+                // scanning forward from `previousOp`. The assert after
+                // the loop checks that invariant directly — that the
+                // forward scan actually reached `markerOp` whenever it
+                // did not already stop at a split — rather than the
+                // weaker `previousOp != markerOp`, which a reversed pair
+                // would also satisfy while still running off the end of
+                // the block and silently skipping the split check.
                 joinsOpenGroup = true;
-                for (auto inst = previousOp->getNextInst(); inst && inst != markerOp;
-                     inst = inst->getNextInst())
+                bool foundMarkerOp = false;
+                for (auto inst = previousOp->getNextInst(); inst; inst = inst->getNextInst())
                 {
+                    if (inst == markerOp)
+                    {
+                        foundMarkerOp = true;
+                        break;
+                    }
                     if (exitAnalysis.mayNotFallThrough(inst))
                     {
                         joinsOpenGroup = false;
                         break;
                     }
                 }
+                SLANG_ASSERT(foundMarkerOp || !joinsOpenGroup);
             }
         }
 

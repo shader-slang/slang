@@ -158,10 +158,15 @@ entries reading one slot produce exactly the LCOV records that
 dedicated slots did. What changes is `counterCount`, which drops
 markedly below the entry count — roughly half on the bundled demos.
 
-Known gap: the ray-tracing hit terminators (`IgnoreHit`,
-`AcceptHitAndEndSearch`) end the invocation at the target level, but
-Slang's IR models them as ordinary `void` functions that return
-normally, so the analysis cannot currently see them.
+Known gap: any core-module intrinsic that abandons the invocation lowers
+to a `GenericAsm` terminator like every other intrinsic, and the exit
+analysis treats `GenericAsm` as a normal exit — so the gap is general to
+any present or future abandoning intrinsic modeled that way, not
+specific to a fixed list. The ray-tracing hit terminators `IgnoreHit`
+and `AcceptHitAndEndSearch` are the concrete examples today: they end
+the invocation at the target level, but Slang's IR models them as
+ordinary `void` functions that return normally, so the analysis cannot
+currently see them.
 
 ## Function Coverage: `-trace-function-coverage`
 
