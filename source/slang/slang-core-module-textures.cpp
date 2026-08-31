@@ -256,14 +256,24 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             StringBuilder params;
             int paramCount = 0;
 
+            // Metal and WGSL lower a combined `Sampler2D` into a `{texture, sampler}` pair (see
+            // `lowerCombinedTextureSamplers`, which runs for HLSL/Metal/WGSL/CPU only), injecting a
+            // sampler operand at index 1. `GetDimensions` is a texture-only query, so its
+            // positional
+            // `$N` string is numbered without that sampler; prefix it with the `$q` marker so the
+            // expander skips the injected sampler. On a plain texture `$q` is a no-op. CUDA is not
+            // in the lowering set — its combined `Sampler2D` stays a single `CUtexObject`, so no
+            // marker is needed. See `IntrinsicExpandContext::_emitSpecial` and
+            // shader-slang/slang#11669.
             StringBuilder metal;
+            metal << "$q";
             const char* metalMipLevel = "0";
 
             StringBuilder cuda;
             cuda << "{";
 
             StringBuilder wgsl;
-            wgsl << "{";
+            wgsl << "$q{";
 
             if (includeMipInfo)
             {

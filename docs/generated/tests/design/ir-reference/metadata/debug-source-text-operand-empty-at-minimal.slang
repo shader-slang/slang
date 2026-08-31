@@ -16,7 +16,7 @@
 // observation is that this is what makes a `-g1` dump safe to pattern-match:
 // nothing in the dump echoes the patterns being matched against it.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<int> buf;
 

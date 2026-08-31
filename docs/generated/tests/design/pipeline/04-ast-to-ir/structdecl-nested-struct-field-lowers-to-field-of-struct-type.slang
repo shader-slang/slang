@@ -15,7 +15,7 @@
 // name appears as the type operand of the outer's field row.
 // `o.inner.x = a` lowers to chained `get_field_addr`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Inner { int x; }
 struct Outer { Inner inner; int z; }
