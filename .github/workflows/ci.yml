@@ -288,6 +288,52 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       warnings-as-errors: false
 
+  # Unit tests for non-exported source/slang entry points. These need SLANG_LIB_TYPE=STATIC, a
+  # configuration no other CI job builds, so they get their own workflow. They
+  # build only the slang-static-unit-test target and run on GitHub-hosted runners
+  # (no GPU needed), so they add no load to the self-hosted Windows pool.
+  static-unit-test-linux-debug-gcc-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: debug
+      runs-on: '["ubuntu-24.04-arm"]'
+
+  static-unit-test-macos-debug-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+
+  static-unit-test-windows-debug-cl-x86_64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["windows-2022"]'
+
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
     needs: [filter, wait-for-human-priority]
@@ -317,14 +363,75 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "build"]'
 
+  # Windows ARM64 build. GitHub-hosted, native — not cross-compiled.
+  # Deliberately NOT added to check-ci's required needs list below: this
+  # repo has zero real-world CI runs on this image yet (only
+  # workflow_dispatch spikes during validation, before it merged). A
+  # day-old GA image can still have rough edges a required check
+  # shouldn't gate every PR merge on. Promote to required once it has run
+  # cleanly across several PRs.
+  build-windows-debug-cl-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      # Required by ci-slang-build.yml's GCP Workload Identity auth step
+      # (LLVM GCS cache); id-token is never part of the default GITHUB_TOKEN.
+      id-token: write
+      contents: read
+    with:
+      os: windows
+      compiler: cl
+      platform: aarch64
+      config: debug
+      runs-on: '["windows-11-vs2026-arm"]'
+      build-llvm: true
+
+  build-windows-release-cl-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: windows
+      compiler: cl
+      platform: aarch64
+      config: release
+      runs-on: '["windows-11-vs2026-arm"]'
+      build-llvm: true
+
   # Vet-and-approve gate for the Falcor-only rebuild below. A job that
   # calls a reusable workflow via `uses:` cannot itself carry
   # `environment:` (GitHub only allows name/uses/with/secrets/needs/if/
   # permissions on such jobs), so the approval gate has to live on this
   # plain job instead, with the build depending on it.
+  #
+  # Skipped on `merge_group`: every commit reaching the merge queue already
+  # passed this same gate as a `pull_request` run (`check-ci`, which
+  # includes `test-falcor`, is a required status check, so a PR cannot
+  # become mergeable -- and therefore cannot enter the queue -- without an
+  # allowlisted actor or reviewer having already released this gate once).
+  # The merge-queue run only recompiles the PR's already-vetted commits
+  # merged onto a newer `master`; it introduces no code that has not
+  # already cleared Falcor approval. Skipping here avoids asking an
+  # approver to re-click a gate whose outcome is already determined,
+  # without weakening the gate for its actual purpose: keeping unvetted,
+  # first-look PR code off internal Falcor compute.
+  #
+  # A skipped job here does NOT by itself let the build below proceed --
+  # see the `if` on build-windows-release-cl-x86_64-gpu-falcor, which
+  # explicitly opts back in to running after a skip.
   falcor-build-approval-gate:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: needs.filter.outputs.should-run == 'true' && github.event_name != 'merge_group'
     environment: falcor-ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -357,9 +464,23 @@ jobs:
   # known, accepted cost: a real Falcor regression needing a code fix
   # already forces a full re-run via a new commit, so this only affects
   # the narrower case of a transient retry with no code change.
+  #
+  # On `merge_group`, falcor-build-approval-gate above is skipped rather
+  # than run. GitHub Actions does NOT treat a skipped `needs` job as
+  # satisfying a dependent job by default -- "If a job fails or is
+  # skipped, all jobs that need it are skipped unless the jobs use a
+  # conditional expression that causes the job to continue" (GitHub Actions
+  # docs). So this job's `if` must explicitly opt back in with `always()`
+  # and then re-check the gate's own result: proceed when the gate
+  # succeeded (the ordinary pull_request path) or was itself skipped
+  # (the merge_group path added above), but still stop if the gate ran
+  # and failed or was cancelled.
   build-windows-release-cl-x86_64-gpu-falcor:
     needs: [filter, falcor-build-approval-gate]
-    if: needs.filter.outputs.should-run == 'true'
+    if: >-
+      always() && needs.filter.outputs.should-run == 'true' &&
+      (needs.falcor-build-approval-gate.result == 'success' ||
+      needs.falcor-build-approval-gate.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -505,6 +626,40 @@ jobs:
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+
+  # Windows ARM64 test (GitHub-hosted, native, CPU only — no GPU on this
+  # hosted image).
+  test-windows-debug-cl-aarch64:
+    needs: [filter, build-windows-debug-cl-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: aarch64
+      config: debug
+      runs-on: '["windows-11-vs2026-arm"]'
+      full-gpu-tests: false
+      # full-gpu-tests: false alone only disables full-GPU-test setup; the
+      # -api expression it selects still defaults to "all", which the
+      # Linux ARM64 jobs above handle via tests/expected-failure-no-gpu.txt.
+      # That denylist hasn't been validated against this new, GPU-less
+      # platform, so restrict directly to cpu+llvm via cpu-only instead of
+      # relying on it.
+      cpu-only: true
+
+  test-windows-release-cl-aarch64:
+    needs: [filter, build-windows-release-cl-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: aarch64
+      config: release
+      runs-on: '["windows-11-vs2026-arm"]'
+      full-gpu-tests: false
+      cpu-only: true
 
   # Windows GPU tests (self-hosted).
   # Each config is split into three parallel jobs to reduce wall-clock time:
@@ -723,6 +878,12 @@ jobs:
             exit 1
           fi
 
+  # Deliberately NOT added to check-ci's required needs list below: the
+  # Falcor 1 bridge (vet/approve flow, KVM environment, approval gate) is
+  # still being tuned, so it still runs and reports status on every PR that
+  # runs CI at all (see the `filter` job above for what skips CI entirely),
+  # but its result does not yet block merge. Promote it back to required
+  # once the vet/approve balance has settled.
   test-falcor:
     needs: [filter, build-windows-release-cl-x86_64-gpu-falcor]
     if: needs.filter.outputs.should-run == 'true'
@@ -732,6 +893,25 @@ jobs:
     uses: ./.github/workflows/ci-falcor-test.yml
     with:
       slang-artifact-name: slang-tests-windows-x86_64-cl-release-falcor
+
+  # Not gated behind falcor-ci approval (runs on an ungated Windows perf
+  # runner, not the KVM bridge), so it depends directly on the eagerly-built,
+  # ungated artifact from build-windows-release-cl-x86_64-gpu rather than
+  # waiting on the approval-gated build-windows-release-cl-x86_64-gpu-falcor.
+  # A single `uses:` job can only carry one `needs:` list, so this needed its
+  # own caller job separate from test-falcor above, fixing an artifact-not-
+  # found failure: test-falcor-perf previously had no needs: at all and
+  # could start before build-windows-release-cl-x86_64-gpu had finished
+  # uploading its artifact.
+  test-falcor-perf:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/ci-falcor-perf-test.yml
+    with:
+      slang-artifact-name: slang-tests-windows-x86_64-cl-release
 
   test-compile-regression:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -769,6 +949,9 @@ jobs:
         build-macos-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
+        static-unit-test-linux-debug-gcc-aarch64,
+        static-unit-test-macos-debug-clang-aarch64,
+        static-unit-test-windows-debug-cl-x86_64,
         test-windows-release-cl-x86_64-gpu-dx,
         test-windows-release-cl-x86_64-gpu-vk,
         test-windows-release-cl-x86_64-gpu-cuda,
@@ -793,7 +976,7 @@ jobs:
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
         check-capability-atoms-ref,
-        test-falcor,
+        test-falcor-perf,
         test-compile-regression,
         test-benchmark,
         wait-for-human-priority,

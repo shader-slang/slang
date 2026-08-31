@@ -13,7 +13,7 @@
 // Verifies that lowering keeps this under the same `intCast` shape as the
 // signed-narrow and same-rank-flip cases.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint a;
 uniform RWStructuredBuffer<int8_t> buf;

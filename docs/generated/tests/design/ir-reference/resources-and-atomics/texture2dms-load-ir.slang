@@ -13,7 +13,7 @@
 // doc's `imageLoad` row mentions an "auxCoord1" operand that
 // corresponds to the sample index.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture2DMS<float4> tex;
 uniform RWStructuredBuffer<float4> outbuf;

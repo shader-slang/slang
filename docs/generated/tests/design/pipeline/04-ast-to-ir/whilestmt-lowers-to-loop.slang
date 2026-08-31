@@ -14,7 +14,7 @@
 // terminator in IR — the same opcode as `for` — confirming the
 // row's claim.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

@@ -18,7 +18,7 @@
 // iteration's values as branch arguments. We CHECK for the absence
 // of any `phi` opcode and the presence of `param` inside the loop.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

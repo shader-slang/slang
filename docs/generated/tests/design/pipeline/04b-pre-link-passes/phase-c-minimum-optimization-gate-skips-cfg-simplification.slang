@@ -17,8 +17,8 @@
 // block still ends in a bare `unconditionalBranch` to the block holding
 // the store. The `-NEXT` CHECKs pin exactly that one-line difference.
 
-//TEST:SIMPLE(filecheck=DEFAULT):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=MINOPT):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -minimum-slang-optimization
+//TEST:SIMPLE(filecheck=DEFAULT):-target spirv-asm -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=MINOPT):-target spirv-asm -dump-ir -o - -entry main -stage compute -minimum-slang-optimization
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

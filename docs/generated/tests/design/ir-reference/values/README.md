@@ -29,7 +29,7 @@ exposes; for an indexed opcode it means the lower edge, the upper edge,
 and the rejected out-of-range case.
 
 The primary observation point is `-target <text-target> -dump-ir
--o /dev/null`, FileChecked against the IR dump, because nearly every claim
+-o -`, FileChecked against the IR dump, because nearly every claim
 in this doc is about which opcode lowering emits rather than about emitted
 target text. Patterns are anchored at `func %main` or a user-named callee
 so the large IR preamble cannot satisfy them, operands come from `uniform`
