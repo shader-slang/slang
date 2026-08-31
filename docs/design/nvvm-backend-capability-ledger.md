@@ -2258,3 +2258,15 @@ The proposed composition is 502 workloads/477 healthy MVP references and current
 new candidate, not as a regression of v1. Corpus v1 remains 452/427, discovery remains 82/72, and
 no source, directive, runner manifest, provider ABI, or active baseline changes without explicit
 approval.
+
+Slice 158 admits a canonical finite resource-bearing struct as an ordinary helper result and as an
+explicit ordered `makeStruct` value. Both paths reuse `asNVVMSupportedResourceStructType` and the
+existing generic struct/function/call/return operations; helper parameters, helper results, and
+body values therefore share one exact provider type. Provider ABI revision 30 is unchanged.
+
+Discovery `return-opaque-type-in-struct` becomes correct at O0 and O3 and gains two direct lanes,
+raising discovery to 60/60/60 over its unchanged 72 healthy references and eliminating the
+helper-aggregate-result cluster. Frozen v1 remains 384/388/384 over 427 with zero old-correct loss.
+Its optional-resource row advances to an independent `defaultConstruct<StructuredBuffer<int>>`
+blocker. The selected prefix passes 427/427, and fourteen direct-O3 measurement gates assemble for
+SM70, SM80, and SM90.

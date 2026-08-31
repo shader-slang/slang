@@ -1633,8 +1633,9 @@ struct NVVMAggregateConstruction
 };
 
 // Resolves a canonical aggregate value whose complete ordered element sequence is explicit in
-// final IR. Matrix legalization produces fixed arrays, while complex bit-cast lowering produces
-// ordinary structs. Both map directly to the provider's aggregate-generic construction operation.
+// final IR. Matrix legalization produces fixed arrays, while ordinary and resource-bearing
+// structs preserve their declared field sequence. All map directly to the provider's
+// aggregate-generic construction operation.
 bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outConstruction)
 {
     outConstruction = {};
@@ -1687,6 +1688,8 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     auto resultType = inst->getOp() == kIROp_MakeStruct
                           ? asNVVMSupportedHelperStructType(inst->getDataType())
                           : nullptr;
+    if (!resultType && inst->getOp() == kIROp_MakeStruct)
+        resultType = asNVVMSupportedResourceStructType(inst->getDataType());
     if (!resultType && inst->getOp() == kIROp_MakeStruct)
         resultType = asNVVMSupportedPhysicalArrayStructType(inst->getDataType());
     if (!resultType)
@@ -6418,6 +6421,7 @@ bool _isSupportedNVVMHelperResultType(IRInst* type)
     NVVMRawBufferType rawBufferType;
     NVVMReadOnlyTextureType sampledTextureType;
     return as<IRVoidType>(type) || isNVVMSupportedHelperValueType(type) ||
+           asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
            asNVVMSupportedDeviceCopyableValuePointerType(type) ||

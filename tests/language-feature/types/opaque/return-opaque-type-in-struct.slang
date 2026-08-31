@@ -4,6 +4,8 @@
 // aggregate type that includes an opaque type
 
 //TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE:-cuda -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute):COMPARE_COMPUTE:-cuda -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 //DISABLE_TEST(compute):COMPARE_COMPUTE: -llvm
 

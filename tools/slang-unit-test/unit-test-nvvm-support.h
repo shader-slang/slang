@@ -9105,6 +9105,11 @@ float4 sampleResource(ResourceParam value)
     return value.texture.SampleLevel(value.sampler, float2(0.0), 0.0) + value.base;
 }
 
+ResourceParam preserveResource(ResourceParam value)
+{
+    return value;
+}
+
 [CUDAKernel]
 void computeMain()
 {
@@ -9112,6 +9117,7 @@ void computeMain()
     value.texture = texture;
     value.sampler = sampler;
     value.base = -0.5;
+    value = preserveResource(value);
     destination[0] = sampleResource(value).x;
 }
 )";

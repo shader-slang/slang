@@ -2075,8 +2075,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isLegal =
         (use == NVVMTypeUse::EntryPointResult && isVoid) ||
         (use == NVVMTypeUse::HelperResult &&
-         (isVoid || isHelperValue || localCopyablePointer || localHelperPointer || isRawBuffer ||
-          isSampledTexture)) ||
+         (isVoid || isHelperValue || resourceStructType || localCopyablePointer ||
+          localHelperPointer || isRawBuffer || isSampledTexture)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isInteger || isFloat32 || scalarStructType || deviceNumericPointer ||
           deviceCopyablePointer || deviceArrayPointer || isRawBuffer)) ||

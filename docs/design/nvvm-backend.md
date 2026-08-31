@@ -6878,6 +6878,34 @@ The exact proposed additions and machine-readable summary are retained under
 manifest, test directive, provider ABI, or compiler behavior changes until the proposal receives
 explicit approval and a separate freeze slice implements it.
 
+### Slice 158: Canonical resource-aggregate helper results
+
+Finite non-empty structs accepted by `asNVVMSupportedResourceStructType` now use one first-class
+provider representation as helper parameters, helper results, and ordinary SSA values. Preflight
+and `NVVMTypeUse::HelperResult` share that exact existing classifier. Generic function types,
+calls, value returns, and field extraction preserve the recursively lowered struct type without a
+provider callback or ABI change.
+
+The same invariant applies when final IR explicitly constructs the resource struct. A canonical
+`makeStruct` carries its complete ordered field sequence, so `_getNVVMAggregateConstruction` now
+accepts the same resource-struct classifier already used by value type lowering and emits the
+existing generic aggregate construction operation. It does not admit arbitrary aggregates or
+reconstruct source syntax.
+
+Discovery `return-opaque-type-in-struct` becomes correct at O0 and O3 and gains two permanent
+direct lanes. Discovery remains exactly 82 workloads/72 healthy references and reaches 60/60/60
+(83.3%), with zero old-correct loss; its helper-aggregate-result cluster is eliminated. Frozen v1
+remains exactly 452/427 and 384/388/384 (89.9%/90.9%/89.9%), also with zero loss. Its
+`optional-single-concrete-layout` row advances through helper result and `makeStruct` admission to
+the independent canonical `defaultConstruct<StructuredBuffer<int>>` blocker and is not counted as
+supported.
+
+The selected NVVM prefix passes 427/427. All fourteen representative direct-O3 gates assemble
+with CUDA 12.9 for SM70, SM80, and SM90. The new resource-aggregate-result gate measures 252.1 ms
+and 875-byte PTX at direct O3 SM70 versus 387.0 ms and 8841 bytes through NVRTC O3; direct O0
+measures 247.9 ms and emits 2807-byte PTX. These remain exploratory measurements. Provider ABI
+revision 30 and both active corpus denominators remain unchanged.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

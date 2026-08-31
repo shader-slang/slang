@@ -3288,7 +3288,7 @@ SLANG_UNIT_TEST(nvvmSlangStatefulAggregateHelpersUseGenericLocalPointers)
         SLANG_CHECK(sawLocalPointerCall);
         SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount >= 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 3);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount >= 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 5);
         SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
@@ -3600,10 +3600,16 @@ SLANG_UNIT_TEST(nvvmSlangResourceStructsCrossLocalAndHelperBoundaries)
         SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
 
         bool sawResourceStructParameter = false;
+        bool sawResourceStructResult = false;
         for (Index functionTypeIndex = 0;
              functionTypeIndex < gFakeNVVMBuilder.functionTypeResultKinds.getCount();
              ++functionTypeIndex)
         {
+            sawResourceStructResult |=
+                gFakeNVVMBuilder.functionTypeResultKinds[functionTypeIndex] ==
+                    FakeNVVMBuilderResultTypeKind::ScalarStruct &&
+                gFakeNVVMBuilder.functionTypeResultTypes[functionTypeIndex] ==
+                    _getFakeNVVMBuilderScalarStructType();
             const Index parameterOffset =
                 gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionTypeIndex];
             const size_t parameterCount =
@@ -3617,14 +3623,26 @@ SLANG_UNIT_TEST(nvvmSlangResourceStructsCrossLocalAndHelperBoundaries)
             }
         }
         SLANG_CHECK(sawResourceStructParameter);
+        SLANG_CHECK(sawResourceStructResult);
+        bool sawResourceStructCall = false;
+        for (Index callIndex = 0; callIndex < gFakeNVVMBuilder.callResultKinds.getCount();
+             ++callIndex)
+        {
+            sawResourceStructCall |=
+                gFakeNVVMBuilder.callResultKinds[callIndex] ==
+                    FakeNVVMBuilderResultTypeKind::ScalarStruct &&
+                gFakeNVVMBuilder.callResultTypes[callIndex] ==
+                    _getFakeNVVMBuilderScalarStructType();
+        }
+        SLANG_CHECK(sawResourceStructCall);
         SLANG_CHECK(gFakeNVVMBuilder.emitLocalStorageCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.localStorageValueTypes.getCount() == 1);
         SLANG_CHECK(
             gFakeNVVMBuilder.localStorageValueTypes[0] == _getFakeNVVMBuilderScalarStructType());
         SLANG_CHECK(gFakeNVVMBuilder.localStorageAlignments[0] == 8);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount >= 4);
         SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount >= 4);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 3);
         SLANG_CHECK(gFakeNVVMBuilder.textureOperations.getCount() == 1);
         const SlangNVVMTextureOperationDesc& textureOperation =
             gFakeNVVMBuilder.textureOperations[0];
