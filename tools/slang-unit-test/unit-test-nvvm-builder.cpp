@@ -3453,6 +3453,16 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("fpext <2 x half>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fptrunc <2 x float>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fptosi <2 x half>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("to <2 x double>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fadd <2 x double>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fsub <2 x double>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fmul <2 x double>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fdiv <2 x double>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("frem <2 x double>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fcmp olt <2 x double>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fptosi <2 x double>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fpext <2 x float>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fptrunc <2 x double>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("add <2 x i32>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("shl <2 x i32>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("lshr <2 x i32>")) >= 0);
@@ -3611,13 +3621,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         2,
     };
     const SlangNVVMValueTypeDesc float64x2Operands[] = {float64x2, float64x2};
-    const SlangNVVMValueOperationDesc unsupportedFloatRemainder = {
+    const SlangNVVMValueOperationDesc supportedFloatRemainder = {
         SLANG_NVVM_VALUE_OP_REMAINDER,
         float64x2,
         float64x2Operands,
         SLANG_COUNT_OF(float64x2Operands),
     };
-    SLANG_CHECK(!builder.supportsValueOperation(unsupportedFloatRemainder));
+    SLANG_CHECK(builder.supportsValueOperation(supportedFloatRemainder));
 
     const SlangNVVMValueOperationDesc unsupportedVectorFloatMinimum = {
         SLANG_NVVM_VALUE_OP_MIN,
@@ -3626,6 +3636,20 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_COUNT_OF(float64x2Operands),
     };
     SLANG_CHECK(!builder.supportsValueOperation(unsupportedVectorFloatMinimum));
+
+    const SlangNVVMValueTypeDesc float64x5 = {
+        SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+        64,
+        5,
+    };
+    const SlangNVVMValueTypeDesc float64x5Operands[] = {float64x5, float64x5};
+    const SlangNVVMValueOperationDesc unsupportedFloat64LaneCount = {
+        SLANG_NVVM_VALUE_OP_ADD,
+        float64x5,
+        float64x5Operands,
+        SLANG_COUNT_OF(float64x5Operands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedFloat64LaneCount));
 
     const SlangNVVMValueTypeDesc float16 = NVVMSemantics::kFloat16;
     const SlangNVVMValueTypeDesc float32 = NVVMSemantics::kFloat32;

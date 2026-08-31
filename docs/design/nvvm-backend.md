@@ -7040,6 +7040,25 @@ healthy references and reaches 394/398/394 O0/O3/both-mode correctness; discover
 PTX contains `match.any.sync.b32`, and all 24 representative direct-O3 gates assemble with CUDA
 12.9 for SM70, SM80, and SM90.
 
+### Slice 164: Fixed Float64 vector algebra
+
+Direct NVVM now treats fixed Float64 vectors of two through four lanes as ordinary selected
+floating values. Numeric and matrix legalization canonically leave these values as LLVM-compatible
+fixed vectors (matrix rows are vectors inside fixed arrays), so the existing generic typed value
+interface can emit component-wise arithmetic, comparisons, conversions, reinterpretation, and
+selection without another callback or provider ABI revision.
+
+Admission remains operation-specific after type selection. Scalar libdevice contracts such as
+minimum and maximum are not widened to vectors, mixed element widths retain rejection, and vectors
+wider than four lanes remain outside the selected representation. Provider ABI revision 31 is
+unchanged.
+
+The reduced Float64 vector and matrix workloads become correct at O0 and O3 and gain four permanent
+direct lanes. Frozen corpus v1 remains exactly 452 workloads/427 healthy references and reaches
+396/400/396 O0/O3/both-mode correctness (92.7%/93.7%/92.7%), with zero old-correct loss.
+Discovery remains exactly 82/72 and 64/64/64. The selected prefix passes 433/433, and all 26
+representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

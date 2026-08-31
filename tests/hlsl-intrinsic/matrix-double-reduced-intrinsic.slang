@@ -7,6 +7,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -output-using-type -shaderobj -render-feature hardware-device
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj -render-feature double
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type -shaderobj
 

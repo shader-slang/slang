@@ -2336,3 +2336,14 @@ O0 and O3 and gain six direct lanes. Frozen v1 reaches 394/398/394 over its unch
 denominator; discovery remains 64/64/64 over 72. Both have zero old-correct loss. The selected
 prefix passes 432/432, generated PTX contains `match.any.sync.b32`, and all 24 direct-O3
 measurement gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 164 widens the established selected floating-value representation to fixed Float64 vectors
+of two through four lanes. Existing generic typed families then cover ordinary component-wise
+arithmetic, comparison, integer/float and float-width conversion, reinterpretation, and selection;
+their exact operand/result checks remain the source of truth. Scalar-only libdevice operations,
+mixed widths, and wider vectors remain rejected. Provider ABI revision 31 is unchanged.
+
+The reduced Float64 vector and matrix workloads become correct at O0 and O3 and gain four direct
+lanes. Frozen v1 reaches 396/400/396 over its unchanged 427 healthy denominator; discovery remains
+64/64/64 over 72. Both have zero old-correct loss. The selected prefix passes 433/433, and all 26
+representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
