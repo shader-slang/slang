@@ -6675,6 +6675,27 @@ regression. The selected prefix passes 425/425. All eight measured discovery rep
 assemble with CUDA 12.9 at direct O3 for SM70, SM80, and SM90. The two corpus denominators remain
 separate, and no corpus v2 is proposed.
 
+### Slice 150: Composable local aggregate addresses
+
+Canonical local aggregate pointer operations now compose across fixed-array selection and member
+selection. When an `IRFieldAddress` uses an `IRGetElementPtr` base, the field resolver reuses the
+existing sequential-element proof for aggregate relation, result pointee, layout, address space,
+and access. It then performs the established key lookup and exact field/result type check. Exact
+copyable `out`/`inout` helper parameters and immutable `BorrowInParam` roots reuse their existing
+helper ABI classifiers; field selection inherits root mutability and cannot widen access.
+
+The generic revision-30 provider interface is unchanged. One frozen-v1 workload and one discovery
+workload become correct in both modes and receive four direct regression lanes. Frozen corpus v1
+remains exactly 452/427 and reaches 372/376/372 O0/O3/both correctness with zero old-correct loss.
+Discovery remains 82/72 and reaches 51/51/51 with zero old-correct loss. The selected regression
+prefix passes 426/426.
+
+The remaining discovery typed-field rows are fields in collected global blocks whose sibling
+storage types are independently unsupported, so they are not admitted by local pointer widening.
+Nine measured discovery workloads assemble with CUDA 12.9 at direct O3 for SM70, SM80, and SM90;
+the newly measured local-pointer gate has a 242.3 ms SM70 direct-O3 compile median and 645-byte PTX,
+versus 347.1 ms and 8584 bytes for native NVRTC O3. These measurements remain exploratory.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

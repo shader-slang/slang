@@ -4,6 +4,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -slang -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -vk -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -cuda -compute -output-using-type -shaderobj
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 // Uses barriers, so not yet supported on LLVM.
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -llvm -compute -output-using-type -shaderobj
 

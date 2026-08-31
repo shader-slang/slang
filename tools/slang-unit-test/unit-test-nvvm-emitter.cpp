@@ -3708,6 +3708,53 @@ SLANG_UNIT_TEST(nvvmSlangAggregateValueArraysAndMutableHelpersUseGenericOperatio
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangComposesLocalAggregateElementAndFieldAddresses)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMComposableAggregateAddressSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        bool sawSequentialFieldBase = false;
+        bool sawHelperParameterFieldBase = false;
+        for (const auto base : gFakeNVVMBuilder.structFieldPointerBaseValueRefs)
+        {
+            sawSequentialFieldBase |=
+                base.kind == FakeNVVMBuilderValueKind::SequentialElementPointer;
+            sawHelperParameterFieldBase |= base.kind == FakeNVVMBuilderValueKind::Parameter;
+        }
+        SLANG_CHECK(sawSequentialFieldBase);
+        SLANG_CHECK(sawHelperParameterFieldBase);
+        SLANG_CHECK(gFakeNVVMBuilder.getArrayTypeCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitSequentialElementPointerCallCount >= 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount >= 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangResourceArrayStorageUsesGenericAggregateOperations)
 {
     _resetDirectNVVMFakes();

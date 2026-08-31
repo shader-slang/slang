@@ -168,9 +168,20 @@ struct NVVMStructField
     bool isMutable = false;
 };
 
-// Resolves the aggregate-address shapes with executable representations: a field in the collected
-// CUDA parameter block, a selected value in a loaded parameter group, the sole array field in
-// canonical physical resource storage, or a selected field in mutable resource-struct storage.
+struct NVVMSequentialElementPointer
+{
+    IRInst* base = nullptr;
+    IRInst* index = nullptr;
+    IRType* aggregateType = nullptr;
+    IRPtrTypeBase* resultType = nullptr;
+    bool isImmutable = false;
+};
+
+bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer& outPointer);
+
+// Resolves the aggregate-address shapes with executable representations. These include fields in
+// collected CUDA parameters, loaded parameter groups, local/helper storage, and fields selected
+// after an already-proved sequential aggregate element. Every child inherits its root access.
 bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& outAddress)
 {
     outAddress = {};
@@ -230,36 +241,88 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     }
     else
     {
-        IRType* helperValueType = nullptr;
-        if (asNVVMSupportedLocalHelperValuePointerType(
-                fieldAddress->getBase()->getDataType(),
-                &helperValueType))
+        IRType* copyableValueType = nullptr;
+        auto localCopyablePointer = asNVVMSupportedLocalCopyableValuePointerType(
+            fieldAddress->getBase()->getDataType(),
+            &copyableValueType);
+        IRType* helperReferenceValueType = nullptr;
+        auto helperReference = as<IRParam>(fieldAddress->getBase())
+                                   ? asNVVMSupportedHelperReferencePointerType(
+                                         fieldAddress->getBase()->getDataType(),
+                                         &helperReferenceValueType)
+                                   : nullptr;
+        structType = localCopyablePointer
+                         ? asNVVMSupportedCopyableStructType(copyableValueType)
+                         : nullptr;
+        if (structType)
         {
-            structType = asNVVMSupportedHelperStructType(helperValueType);
-            if (!structType)
-                return false;
+            // Consider `void initialize(out Payload value) { value.count = 1; }`. The helper ABI
+            // already proves the exact `OutParam<Payload>` representation; field selection only
+            // needs to retain that mutable root role.
             outAddress.isMutable = true;
         }
-        else if (
-            auto devicePointer = asNVVMSupportedDeviceCopyableValuePointerType(
-                fieldAddress->getBase()->getDataType(),
-                &helperValueType))
+        else if (helperReference)
         {
-            SLANG_UNUSED(devicePointer);
-            structType = asNVVMSupportedHelperStructType(helperValueType);
+            // Consider `int read(__constref Payload value) { return value.count; }`. Only an exact
+            // helper parameter can own this canonical borrow, and selecting a field cannot turn
+            // its read-only pointer into writable storage.
+            structType = asNVVMSupportedHelperStructType(helperReferenceValueType);
             if (!structType)
                 return false;
-            outAddress.isMutable = true;
+            outAddress.isMutable =
+                helperReference->getAccessQualifier() == AccessQualifier::ReadWrite;
+        }
+        else if (fieldAddress->getBase()->getOp() == kIROp_GetElementPtr)
+        {
+            // Consider `Payload values[2]; values[index].count = 1;`. The element resolver proves
+            // the array, index, result pointee, and access before this field resolver composes the
+            // next canonical selection.
+            NVVMSequentialElementPointer parentElement;
+            if (!_getNVVMSequentialElementPointer(fieldAddress->getBase(), parentElement))
+                return false;
+            structType = asNVVMSupportedHelperStructType(parentElement.resultType->getValueType());
+            if (!structType)
+            {
+                structType =
+                    asNVVMSupportedResourceStructType(parentElement.resultType->getValueType());
+            }
+            if (!structType)
+                return false;
+            outAddress.isMutable = !parentElement.isImmutable;
         }
         else
         {
-            IRType* parameterGroupElementType = nullptr;
-            if (!asNVVMSupportedParameterGroupType(
+            IRType* helperValueType = nullptr;
+            if (asNVVMSupportedLocalHelperValuePointerType(
                     fieldAddress->getBase()->getDataType(),
-                    &parameterGroupElementType) ||
-                !(structType = as<IRStructType>(parameterGroupElementType)))
+                    &helperValueType))
             {
-                return false;
+                structType = asNVVMSupportedHelperStructType(helperValueType);
+                if (!structType)
+                    return false;
+                outAddress.isMutable = true;
+            }
+            else if (
+                auto devicePointer = asNVVMSupportedDeviceCopyableValuePointerType(
+                    fieldAddress->getBase()->getDataType(),
+                    &helperValueType))
+            {
+                SLANG_UNUSED(devicePointer);
+                structType = asNVVMSupportedHelperStructType(helperValueType);
+                if (!structType)
+                    return false;
+                outAddress.isMutable = true;
+            }
+            else
+            {
+                IRType* parameterGroupElementType = nullptr;
+                if (!asNVVMSupportedParameterGroupType(
+                        fieldAddress->getBase()->getDataType(),
+                        &parameterGroupElementType) ||
+                    !(structType = as<IRStructType>(parameterGroupElementType)))
+                {
+                    return false;
+                }
             }
         }
     }
@@ -591,15 +654,6 @@ bool _getNVVMRawBufferElementPointer(IRInst* inst, NVVMRawBufferElementPointer& 
     outPointer.resultType = resultType;
     return true;
 }
-
-struct NVVMSequentialElementPointer
-{
-    IRInst* base = nullptr;
-    IRInst* index = nullptr;
-    IRType* aggregateType = nullptr;
-    IRPtrTypeBase* resultType = nullptr;
-    bool isImmutable = false;
-};
 
 // Resolves one selected element address rooted in an admitted fixed array or vector. Immutable
 // parameter-group and physical-storage roots retain that property through every nested index.

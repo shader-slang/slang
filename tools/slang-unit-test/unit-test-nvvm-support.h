@@ -9119,6 +9119,36 @@ void computeMain(
 }
 )";
 
+static const char kDirectNVVMComposableAggregateAddressSource[] = R"(
+struct Payload
+{
+    int2 lanes;
+    int value;
+};
+
+void initialize(out Payload value, int input)
+{
+    value.lanes = int2(input, input + 1);
+    value.value = input + 2;
+}
+
+int readValue(__constref Payload value)
+{
+    return value.lanes.x + value.value;
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform int index)
+{
+    Payload values[2];
+    initialize(values[index & 1], 3);
+    values[index & 1].value += 1;
+    *destination = readValue(values[index & 1]);
+}
+)";
+
 static const char kDirectNVVMResourceArrayStorageSource[] = R"(
 RWStructuredBuffer<int> sources[2];
 RWStructuredBuffer<int> destination;

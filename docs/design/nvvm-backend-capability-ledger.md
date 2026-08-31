@@ -2157,3 +2157,14 @@ eliminated. One remaining row advances to a sequential aggregate-pointer blocker
 counted as correct. Frozen corpus v1 remains 371/375/371 over its 427 healthy-MVP denominator with
 zero old-correct regression. The selected prefix passes 425/425, and eight measured discovery
 representatives assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 150 composes exact local aggregate address producers. A field may follow a sequential
+fixed-array element only after the established element resolver proves its complete typed relation,
+and helper fields reuse the accepted copyable `out`/`inout` or immutable reference root. Field-key
+identity, exact declared/result pointee equality, and inherited access remain mandatory.
+
+The generic revision-30 provider interface is unchanged. `pointer/const-ref` becomes correct in
+frozen corpus v1, which reaches 372/376/372 O0/O3/both over the unchanged 427 healthy denominator.
+`compute/pointer-emit` becomes correct in discovery, which reaches 51/51/51 over its unchanged 72
+healthy denominator. Both corpora have zero old-correct loss, the selected prefix passes 426/426,
+and nine measured discovery gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
