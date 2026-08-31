@@ -2208,3 +2208,16 @@ correct at O0 and O3 and gain six direct lanes. Frozen v1 reaches 380/384/380 ov
 healthy denominator with zero old-correct loss. Discovery remains 54/54/54 over 72 with zero loss.
 The selected unit prefix passes 427/427, and all twelve discovery measurement gates assemble at
 direct O3 with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 154 selects CUDA `DescriptorHandle<T>` as an alias of the already-supported resource value
+representation for `T`. The classifier is exact and limited to selected raw buffers, read-only
+textures, and samplers. Recursive storage/helper classifiers preserve the handle leaf,
+and the two canonical handle/resource conversion instructions are identities only when their
+opposite semantic type is exactly `T`. Provider ABI revision 30 is unchanged.
+
+The bindless structured-buffer discovery representative becomes correct at O0 and O3 and gains two
+direct lanes. Discovery reaches 55/55/55 over its unchanged 72 healthy references; frozen v1 stays
+380/384/380 over 427. Both corpora have zero old-correct loss and retain exact identities. Frozen
+descriptor workloads now report their next independent raw-view bit-transport, default-construct,
+or `AnyValue` packing blocker. The selected prefix passes 427/427, and all twelve measurement gates
+assemble at direct O3 for SM70, SM80, and SM90.

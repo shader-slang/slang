@@ -2,6 +2,8 @@
 //TEST:REFLECTION(filecheck=CHECK_REFLECTION):-stage compute -entry computeMain -target cuda -no-codegen
 //TEST:REFLECTION(filecheck=CHECK_METAL):-stage compute -entry computeMain -target metal -no-codegen
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RUNTIME):-cpu -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RUNTIME):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RUNTIME):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 // Test that DescriptorHandle<T> in a structured buffer is correctly reflected
 // and works at runtime on bindless targets

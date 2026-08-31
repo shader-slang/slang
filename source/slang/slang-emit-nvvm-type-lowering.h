@@ -286,6 +286,11 @@ bool getNVVMSupportedReadOnlyTextureType(IRInst* type, NVVMReadOnlyTextureType& 
 /// Returns an accepted ordinary CUDA sampler value, excluding comparison samplers.
 IRSamplerStateTypeBase* asNVVMSupportedSamplerValueType(IRInst* type);
 
+/// Returns an exact CUDA descriptor handle whose resource has a selected direct value type.
+IRDescriptorHandleType* asNVVMSupportedDescriptorHandleType(
+    IRInst* type,
+    IRType** outResourceType = nullptr);
+
 /// Returns an accepted storage-only CUDA sampler placeholder.
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type);
 

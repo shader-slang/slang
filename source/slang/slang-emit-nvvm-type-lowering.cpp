@@ -347,6 +347,7 @@ static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>&
     if (getNVVMSupportedRawBufferType(type, rawBufferType) ||
         getNVVMSupportedSurfaceType(type, surfaceType) ||
         getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
+        asNVVMSupportedDescriptorHandleType(type) ||
         asNVVMSupportedSamplerStorageType(type) ||
         asNVVMSupportedDeviceCopyableValuePointerType(type))
     {
@@ -534,7 +535,8 @@ IRPtrTypeBase* asNVVMSupportedDeviceCopyableValuePointerType(IRInst* type, IRTyp
 static bool _isNVVMSupportedHelperValueType(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
     if (isNVVMSupportedCopyableValueType(type) ||
-        asNVVMSupportedDeviceCopyableValuePointerType(type))
+        asNVVMSupportedDeviceCopyableValuePointerType(type) ||
+        asNVVMSupportedDescriptorHandleType(type))
     {
         return true;
     }
@@ -584,6 +586,8 @@ static uint32_t _getNVVMHelperValueAlignment(IRInst* type, HashSet<IRInst*>& act
         return copyableAlignment;
     if (asNVVMSupportedDeviceCopyableValuePointerType(type))
         return 8;
+    if (asNVVMSupportedDescriptorHandleType(type))
+        return getNVVMResourceValueAlignment(type);
     if (!type || activeTypes.contains(type))
         return 0;
 
@@ -1125,6 +1129,10 @@ static uint32_t _getNVVMResourceValueAlignment(IRInst* type, HashSet<IRInst*>& a
     if (isNVVMBoolType(type))
         return 1;
 
+    IRType* descriptorResourceType = nullptr;
+    if (asNVVMSupportedDescriptorHandleType(type, &descriptorResourceType))
+        return _getNVVMResourceValueAlignment(descriptorResourceType, activeTypes);
+
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
@@ -1470,6 +1478,30 @@ IRSamplerStateTypeBase* asNVVMSupportedSamplerValueType(IRInst* type)
                                                            : nullptr;
 }
 
+IRDescriptorHandleType* asNVVMSupportedDescriptorHandleType(
+    IRInst* type,
+    IRType** outResourceType)
+{
+    if (outResourceType)
+        *outResourceType = nullptr;
+
+    auto handleType = as<IRDescriptorHandleType>(type);
+    IRType* resourceType = handleType ? handleType->getResourceType() : nullptr;
+    NVVMRawBufferType rawBufferType;
+    NVVMReadOnlyTextureType sampledTextureType;
+    if (!handleType ||
+        (!getNVVMSupportedRawBufferType(resourceType, rawBufferType) &&
+         !getNVVMSupportedReadOnlyTextureType(resourceType, sampledTextureType) &&
+         !asNVVMSupportedSamplerValueType(resourceType)))
+    {
+        return nullptr;
+    }
+
+    if (outResourceType)
+        *outResourceType = resourceType;
+    return handleType;
+}
+
 IRSamplerStateTypeBase* asNVVMSupportedSamplerStorageType(IRInst* type)
 {
     return as<IRSamplerStateTypeBase>(type);
@@ -1526,6 +1558,7 @@ static bool _hasNVVMParameterGroupStorageValueRepresentation(
     if (getNVVMSupportedRawBufferType(type, rawBufferType) ||
         getNVVMSupportedSurfaceType(type, surfaceType) ||
         getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
+        asNVVMSupportedDescriptorHandleType(type) ||
         asNVVMSupportedSamplerValueType(type) || asNVVMSupportedParameterGroupType(type))
     {
         return true;
@@ -1590,6 +1623,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceField(field, surfaceType, storageFormat) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
+           asNVVMSupportedDescriptorHandleType(type) ||
            asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type) ||
            asNVVMSupportedAggregateStorageArrayType(type);
@@ -1623,7 +1657,7 @@ bool isNVVMSupportedParameterType(IRInst* type)
 static bool _isNVVMSupportedStructuredBufferStorageType(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
     if (isNVVMSupportedNumericValueType(type) || isNVVMBoolType(type) ||
-        asNVVMSupportedAtomicType(type))
+        asNVVMSupportedAtomicType(type) || asNVVMSupportedDescriptorHandleType(type))
         return true;
 
     if (auto vectorType = asNVVMSupportedValueVectorType(type))
@@ -2047,6 +2081,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         asNVVMSupportedParameterGroupType(type, &parameterGroupElementType);
     IRSamplerStateTypeBase* samplerStorage = asNVVMSupportedSamplerStorageType(type);
     IRSamplerStateTypeBase* samplerValue = asNVVMSupportedSamplerValueType(type);
+    IRType* descriptorResourceType = nullptr;
+    IRDescriptorHandleType* descriptorHandle =
+        asNVVMSupportedDescriptorHandleType(type, &descriptorResourceType);
     IRUnsizedArrayType* unsizedSamplerArrayStorage =
         asNVVMSupportedUnsizedSamplerArrayStorageType(type);
     IRPtrTypeBase* resourceElementPointer =
@@ -2081,11 +2118,27 @@ SlangResult NVVMTypeLoweringContext::lowerType(
          (isInteger || isFloat32 || asNVVMSupported32BitNumericVectorType(type) || structType ||
           aggregateStorageArrayType || deviceCopyablePointer || isRawBuffer || parameterGroup ||
           isSurface || isSampledTexture || samplerStorage || unsizedSamplerArrayStorage ||
-          atomicType)) ||
+          atomicType || descriptorHandle)) ||
         (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type)) ||
         (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage);
     if (!isLegal)
         return _reportUnsupportedType(use);
+
+    // CUDA's canonical layout producer defines `DescriptorHandle<T>` to have exactly the layout
+    // of `T` on bindless targets. The selected handle families also carry the same SSA value as
+    // their resource: the two descriptor conversion instructions below are therefore identities.
+    // Preserve that producer-owned representation instead of inventing an integer handle ABI.
+    if (descriptorHandle)
+    {
+        if (auto mappedType = m_typeMap.tryGetValue(type))
+        {
+            outType = *mappedType;
+            return SLANG_OK;
+        }
+        SLANG_RETURN_ON_FAIL(lowerType(descriptorResourceType, NVVMTypeUse::Value, outType));
+        m_typeMap[type] = outType;
+        return SLANG_OK;
+    }
 
     // `Atomic<T>` is a storage semantic wrapper. CUDA and LLVM both represent its physical
     // payload as `T`; only atomic operations may access pointers to that storage.

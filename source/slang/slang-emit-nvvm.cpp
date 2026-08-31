@@ -353,6 +353,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
                asNVVMSupportedParameterGroupType(fieldType) ||
                getNVVMSupportedSurfaceField(outAddress.field, surfaceType, storageFormat) ||
                getNVVMSupportedReadOnlyTextureType(fieldType, sampledTextureType) ||
+               asNVVMSupportedDescriptorHandleType(fieldType) ||
                asNVVMSupportedSamplerValueType(fieldType) ||
                getNVVMSupportedRawBufferType(fieldType, rawBufferType) ||
                asNVVMSupportedAggregateStorageArrayType(fieldType);
@@ -932,7 +933,7 @@ bool _hasNVVMCompatibleCopyableValueLayout(CodeGenContext* codeGenContext, IRTyp
     }
     if (asNVVMSupportedDeviceCopyableValuePointerType(type))
         return true;
-    if (!isNVVMSupportedNumericValueType(type))
+    if (!isNVVMSupportedNumericValueType(type) && !asNVVMSupportedDescriptorHandleType(type))
         return false;
 
     // Structured-buffer and aggregate-storage pointer arithmetic use the provider type's physical
@@ -4726,6 +4727,42 @@ bool _getNVVMPointerBitCast(IRInst* inst, NVVMPointerBitCast& outCast)
     return true;
 }
 
+// Resolves only the identity conversions emitted by buffer-element lowering around an exact
+// `DescriptorHandle<T>`. CUDA's bindless layout producer defines that handle as `T` itself, so a
+// conversion is executable without a provider operation precisely when both canonical types name
+// the same selected resource. This does not admit integer descriptor encodings or search through
+// other casts.
+bool _getNVVMDescriptorHandleConversion(IRInst* inst, IRInst*& outValue)
+{
+    outValue = nullptr;
+    if (!inst || inst->getOperandCount() != 1 ||
+        (inst->getOp() != kIROp_CastDescriptorHandleToResource &&
+         inst->getOp() != kIROp_CastResourceToDescriptorHandle))
+    {
+        return false;
+    }
+
+    IRInst* value = inst->getOperand(0);
+    IRType* resourceType = nullptr;
+    if (inst->getOp() == kIROp_CastDescriptorHandleToResource)
+    {
+        if (!value ||
+            !asNVVMSupportedDescriptorHandleType(value->getDataType(), &resourceType) ||
+            inst->getDataType() != resourceType)
+        {
+            return false;
+        }
+    }
+    else if (!asNVVMSupportedDescriptorHandleType(inst->getDataType(), &resourceType) || !value ||
+             value->getDataType() != resourceType)
+    {
+        return false;
+    }
+
+    outValue = value;
+    return true;
+}
+
 struct NVVMResolvedAtomicOperation
 {
     SlangNVVMAtomicOperationDesc desc = {};
@@ -7003,6 +7040,19 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_CastDescriptorHandleToResource:
+            case kIROp_CastResourceToDescriptorHandle:
+                {
+                    IRInst* value = nullptr;
+                    if (!_getNVVMDescriptorHandleConversion(inst, value))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                    }
+                }
+                break;
+
             case kIROp_BitCast:
                 {
                     NVVMPointerBitCast pointerCast;
@@ -7601,6 +7651,21 @@ SlangResult _validateNVVMFunction(
                             availableValues,
                             dominatorTree));
                     }
+                    availableValues.add(inst);
+                }
+                break;
+
+            case kIROp_CastDescriptorHandleToResource:
+            case kIROp_CastResourceToDescriptorHandle:
+                {
+                    IRInst* value = nullptr;
+                    SLANG_RELEASE_ASSERT(_getNVVMDescriptorHandleConversion(inst, value));
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        value,
+                        inst,
+                        availableValues,
+                        dominatorTree));
                     availableValues.add(inst);
                 }
                 break;
@@ -12106,6 +12171,24 @@ SlangResult emitNVVMIRFromLinkedIR(
                             builder,
                             moduleScope.module,
                             operation,
+                            valueMap,
+                            typeContext,
+                            loweredValue));
+                        valueMap[inst] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_CastDescriptorHandleToResource:
+                case kIROp_CastResourceToDescriptorHandle:
+                    {
+                        IRInst* value = nullptr;
+                        SLANG_RELEASE_ASSERT(_getNVVMDescriptorHandleConversion(inst, value));
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            value,
                             valueMap,
                             typeContext,
                             loweredValue));

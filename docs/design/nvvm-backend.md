@@ -6772,6 +6772,31 @@ O3 SM70 versus 365.7 ms and 8946 bytes through NVRTC O3. These remain uncontroll
 measurements. Aggregate address/layout transport and helper ABI are the largest remaining shared
 families; their separate pointer producers are not widened by this role fix.
 
+### Slice 154: CUDA descriptor-handle representation
+
+On CUDA, the canonical layout producer defines `DescriptorHandle<T>` to have `T`'s representation.
+Direct NVVM now preserves that rule for handles whose underlying raw buffer, read-only texture, or
+sampler already has a selected value representation. One central classifier feeds
+resource alignment, aggregate and structured storage, helper values, parameter groups,
+conventional globals, and role-sensitive type lowering. The lowered handle is the existing
+provider type for `T`, not a universal integer encoding.
+
+The canonical `CastDescriptorHandleToResource` and `CastResourceToDescriptorHandle` instructions
+are emitted as value identities only when the opposite type is exactly the handle's resource type.
+No operand-graph search, integer reinterpretation, or provider operation is introduced. The generic
+provider interface remains revision 30.
+
+Discovery `gh-6657-bindless-uniform` becomes correct at O0 and O3 and gains two permanent direct
+lanes. Discovery remains exactly 82 workloads/72 healthy references and reaches 55/55/55, with
+zero old-correct loss. Frozen corpus v1 remains exactly 452/427 and 380/384/380, also with zero
+loss. Its descriptor rows advance to three independently owned blockers: raw-view bit transport,
+default construction, and 16-byte `AnyValue` packing. They are not counted as supported.
+
+The selected NVVM unit prefix passes 427/427. All twelve established measurement gates assemble
+through CUDA 12.9 at direct O3 for SM70, SM80, and SM90. The existential-specialization gate
+measures 278.6 ms and 1007-byte PTX at direct O3 SM70 versus 376.0 ms and 8946 bytes through NVRTC
+O3. These remain uncontrolled exploratory measurements.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
