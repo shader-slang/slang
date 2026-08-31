@@ -9,7 +9,8 @@
 // TODO(JS): Doesn't currently work on Vulkan - 3rd value in output appears incorrect
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 //TEST:SIMPLE(filecheck=NVVM):-target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -profile cs_6_2 -capability cuda_sm_7_0 -O3 -o -
 //NVVM: suld.b.1d.b16.zero

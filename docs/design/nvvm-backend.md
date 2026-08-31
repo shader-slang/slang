@@ -7079,6 +7079,26 @@ Discovery remains exactly 82/72 and advances to 66/66/66 with exactly two gains 
 selected prefix passes 433/433, and all 28 representative direct-O3 gates assemble with CUDA 12.9
 for SM70, SM80, and SM90.
 
+### Slice 166: O0-compatible Half vector construction
+
+CUDA 12.9 libNVVM accepts native Half vector arithmetic, comparison, conversion, extraction, and
+helper transport at O0, but rejects a runtime `insertelement <N x half>` for N=2 through 4. The same
+module is accepted at O3 because libNVVM's internal optimization removes or legalizes that shape;
+Slang's O0 and O3 provider input is otherwise byte-identical.
+
+The isolated LLVM provider now owns one vector-construction invariant. Ordinary vectors use native
+lane insertion. A Half vector bitcasts each already-validated scalar lane to i16, constructs the
+corresponding `<N x i16>`, and bitcasts the completed vector once to `<N x half>`. This preserves
+all payload bits and lane order without running an optimization pass, changing Slang semantics, or
+rewriting serialized text. Generic vector construction, scalar broadcast, and typed surface-load
+reconstruction share this helper. Provider ABI revision 31 is unchanged.
+
+Four healthy frozen-v1 workloads and one native-reference-unhealthy Half workload become correct at
+O0 and gain five permanent direct O0 lanes. Frozen v1 remains exactly 452 workloads/427 healthy
+references and reaches 400/400/400 O0/O3/both-mode correctness (93.7%), with zero old-correct loss.
+Discovery remains exactly 82/72 at 66/66/66. The selected prefix passes 433/433, and all 30
+representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

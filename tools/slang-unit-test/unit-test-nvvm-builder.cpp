@@ -3489,7 +3489,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("select i1")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("insertelement <2 x i1>")) >= 0);
         SLANG_CHECK(_countOccurrences(text, toSlice("extractelement <2 x i1>")) >= 2);
-        SLANG_CHECK(_countOccurrences(text, toSlice("insertelement <2 x half>")) == 2);
+        SLANG_CHECK(_countOccurrences(text, toSlice("insertelement <2 x half>")) == 0);
+        SLANG_CHECK(_countOccurrences(text, toSlice("insertelement <2 x i16>")) == 2);
+        SLANG_CHECK(text.indexOf(toSlice("bitcast <2 x i16>")) >= 0);
         SLANG_CHECK(_countOccurrences(text, toSlice("extractelement <2 x half>")) == 1);
         SLANG_CHECK(_countOccurrences(text, toSlice("select i1")) >= 2);
         SLANG_CHECK(_countOccurrences(text, toSlice("insertelement")) >= 20);

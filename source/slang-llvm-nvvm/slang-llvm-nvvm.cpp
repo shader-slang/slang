@@ -1620,6 +1620,37 @@ static SlangResult SLANG_NVVM_CALL _emitSequentialElementExtract(
     return SLANG_OK;
 }
 
+// Constructs one already-validated fixed vector in the representation accepted by libNVVM.
+// Consider `half2(a, b)`: CUDA 12.9 libNVVM accepts native Half2 arithmetic at O0 but rejects a
+// runtime `insertelement <2 x half>`. Inserting the exact lane bits into the corresponding i16
+// vector and bitcasting only the completed value preserves lane order and every Half payload. All
+// other element types retain ordinary native vector insertion.
+static llvm::Value* _createNVVMVectorConstruct(
+    ModuleState* state,
+    llvm::FixedVectorType* vectorType,
+    llvm::ArrayRef<llvm::Value*> elements)
+{
+    llvm::Type* constructionElementType = vectorType->getElementType();
+    llvm::FixedVectorType* constructionType = vectorType;
+    const bool useHalfBitTransport = constructionElementType->isHalfTy();
+    if (useHalfBitTransport)
+    {
+        constructionElementType = llvm::Type::getInt16Ty(state->context);
+        constructionType =
+            llvm::FixedVectorType::get(constructionElementType, vectorType->getNumElements());
+    }
+
+    llvm::Value* result = llvm::UndefValue::get(constructionType);
+    for (size_t i = 0; i < elements.size(); ++i)
+    {
+        llvm::Value* element =
+            useHalfBitTransport ? state->builder.CreateBitCast(elements[i], constructionElementType)
+                                : elements[i];
+        result = state->builder.CreateInsertElement(result, element, uint64_t(i));
+    }
+    return useHalfBitTransport ? state->builder.CreateBitCast(result, vectorType) : result;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitVectorConstruct(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle vectorType,
@@ -1653,9 +1684,7 @@ static SlangResult SLANG_NVVM_CALL _emitVectorConstruct(
         llvmElements.push_back(element);
     }
 
-    llvm::Value* result = llvm::UndefValue::get(llvmVectorType);
-    for (size_t i = 0; i < elementCount; ++i)
-        result = state->builder.CreateInsertElement(result, llvmElements[i], uint64_t(i));
+    llvm::Value* result = _createNVVMVectorConstruct(state, llvmVectorType, llvmElements);
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
@@ -3479,11 +3508,12 @@ static llvm::Value* _materializeBroadcastOperand(
         return value;
     if (declaredType.laneCount != 1 || operationLaneCount < 2 || operationLaneCount > 4)
         return nullptr;
-    llvm::Value* result =
-        llvm::UndefValue::get(llvm::FixedVectorType::get(value->getType(), operationLaneCount));
+    llvm::SmallVector<llvm::Value*, 4> elements;
     for (uint32_t lane = 0; lane < operationLaneCount; ++lane)
-        result = state->builder.CreateInsertElement(result, value, lane);
-    return result;
+        elements.push_back(value);
+    llvm::FixedVectorType* vectorType =
+        llvm::FixedVectorType::get(value->getType(), operationLaneCount);
+    return _createNVVMVectorConstruct(state, vectorType, elements);
 }
 
 static SlangResult _emitValueOperationFamily(
@@ -4213,7 +4243,7 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
     }
     else
     {
-        result = llvm::UndefValue::get(semanticElementType);
+        llvm::SmallVector<llvm::Value*, 4> laneValues;
         for (uint32_t lane = 0; lane < operation->elementType.laneCount; ++lane)
         {
             llvm::Value* bits = state->builder.CreateExtractValue(call, {lane});
@@ -4222,8 +4252,12 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
                 operation->storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16
                     ? state->builder.CreateFPExt(physicalValue, semanticScalarType)
                     : physicalValue;
-            result = state->builder.CreateInsertElement(result, laneValue, lane);
+            laneValues.push_back(laneValue);
         }
+        result = _createNVVMVectorConstruct(
+            state,
+            llvm::cast<llvm::FixedVectorType>(semanticElementType),
+            laneValues);
     }
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;

@@ -2360,3 +2360,16 @@ four permanent direct lanes. Discovery advances from 64/64/64 to 66/66/66 over i
 healthy references, with exactly two gains and no loss. Frozen v1 remains 396/400/396 over its
 unchanged 427 healthy denominator with zero old-correct loss. The selected prefix passes 433/433,
 and all 28 representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 166 closes the CUDA 12.9 libNVVM O0 Half construction boundary. Reduced direct-libNVVM probes
+show that native Half vector arithmetic, comparison, conversion, extraction, and helper calls are
+valid at O0, while runtime `insertelement <N x half>` is rejected for N=2 through 4. The provider's
+single vector-construction helper now builds those values as exact `<N x i16>` lane bits followed
+by one vector bitcast. Generic construction, scalar broadcast, and surface reconstruction share the
+same representation; other element types retain native insertion and ABI revision 31 is unchanged.
+
+Four healthy frozen workloads and the unhealthy-reference `half-vector-calc` row become correct at
+O0 and gain five permanent direct lanes. Frozen v1 advances from 396/400/396 to 400/400/400 over its
+unchanged 427 healthy denominator, with exactly four gains and no loss. Discovery remains 66/66/66
+over 72 with no change. The selected prefix passes 433/433, the focused fixtures pass 10/10, and all
+30 representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
