@@ -60,6 +60,20 @@ D param3;
 [StructVarParam(1)] int globalInt2;
 
 
+[__AttributeUsage(_AttributeTargets.Struct)]
+struct ReflectThroughPointerAttribute {}
+
+[ReflectThroughPointer]
+struct StructWithAttribute {
+
+};
+
+struct StructWithPointer {
+    StructWithAttribute* attrib;
+};
+
+StructWithPointer po;
+
 [MyStruct(2, 3.0, "main")]
 [MyStruct(-2, -3.0, "")]
 [numthreads(1, 1, 1)]
