@@ -1544,6 +1544,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return m_NonSemanticDebugInfoExtInst;
     }
 
+    SpvInst* m_debugInfoNone = nullptr;
+
+    SpvInst* getDebugInfoNone()
+    {
+        if (m_debugInfoNone)
+            return m_debugInfoNone;
+        m_debugInfoNone = emitOpDebugInfoNone(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst());
+        return m_debugInfoNone;
+    }
+
     /// The SPIRV OpExtInstImport inst that represents the NonSemantic debug info
     /// extended instruction set.
     SpvInst* m_NonSemanticDebugPrintfExtInst = nullptr;
@@ -10912,9 +10926,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    IRInst* getName(IRInst* inst)
+    IRStringLit* getName(IRInst* inst)
     {
-        IRInst* nameOperand = nullptr;
+        IRStringLit* nameOperand = nullptr;
         for (auto decor : inst->getDecorations())
         {
             if (auto nameHint = as<IRNameHintDecoration>(decor))
@@ -11128,7 +11142,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 col,
                 scope,
                 name,
-                builder.getIntValue(builder.getUIntType(), structSizeAlignment.size * 8),
+                ensureInst(
+                    builder.getIntValue(builder.getUIntType(), structSizeAlignment.size * 8)),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
                 members);
         }
@@ -11291,6 +11306,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRInst* source = m_defaultDebugSource;
         IRInst* line = builder.getIntValue(builder.getUIntType(), 0);
         IRInst* col = line;
+        auto linkageName = builder.getStringValue(
+            (StringBuilder() << "@" << name->getStringSlice()).getUnownedSlice());
 
         // Emit a composite debug type (struct-like for most types)
         return emitOpDebugTypeComposite(
@@ -11304,8 +11321,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             line,
             col,
             scope,
-            name,
-            builder.getIntValue(builder.getUIntType(), 0), // Size (unknown)
+            linkageName,
+            getDebugInfoNone(),
             builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
             List<SpvInst*>()); // No members
     }
