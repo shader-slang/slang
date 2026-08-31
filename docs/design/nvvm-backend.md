@@ -6826,6 +6826,33 @@ assemble with CUDA 12.9 for SM70, SM80, and SM90. The existential gate measures 
 1007-byte PTX at direct O3 SM70 versus 385.3 ms and 8946 bytes through NVRTC O3; direct O0 emits
 60001-byte PTX. These measurements remain exploratory.
 
+### Slice 156: Canonical UInt64 word reconstruction
+
+Direct NVVM now executes the canonical `makeUInt64(low, high)` instruction retained by AnyValue
+unmarshalling. The exact accepted shape is scalar `UInt64` with ordered scalar `UInt32` low and high
+words. A compiler-owned recipe zero-extends both words, shifts the high word left by 32, and
+combines the disjoint bit ranges with bitwise-or. Preflight records every typed operation before
+provider creation, and ordinary SSA validation proves both operands.
+
+The implementation uses the existing generic integer-conversion, shift, constant, and bitwise
+operations in provider ABI revision 30. It does not add a `makeUInt64` callback, accept signed or
+vector alternatives, change AnyValue layout, or reconstruct source syntax. The recipe matches both
+`IRBuilder::emitMakeUInt64`'s canonical producer contract and the established ordinary LLVM
+backend lowering.
+
+Three frozen-v1 AnyValue layout workloads and discovery `anyvalue-bulk-copy` become correct at O0
+and O3 and gain eight permanent direct lanes. Frozen v1 remains exactly 452 workloads/427 healthy
+references and reaches 384/388/384 O0/O3/both-mode correctness (89.9%/90.9%/89.9%), with zero
+old-correct loss. Discovery remains exactly 82/72 and reaches 59/59/59 (81.9%), also with zero
+loss. The selected NVVM prefix passes 427/427, and all 20 directives in the four promoted files
+pass.
+
+All thirteen representative direct-O3 workloads assemble with CUDA 12.9 for SM70, SM80, and SM90.
+The new AnyValue gate measures 356.5 ms and 1240-byte PTX at direct O3 SM70 versus 482.8 ms and
+9850 bytes through NVRTC O3; direct O0 emits 182309-byte PTX. These remain exploratory
+measurements. Reaching 89.9% both-mode correctness triggers a separate deduplicated corpus-v2
+proposal, but neither denominator changes in this slice.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

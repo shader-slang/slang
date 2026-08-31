@@ -4137,6 +4137,72 @@ bool _setNVVMSupportedValueRecipeStep(
     return NVVMSemantics::isSupported(step.getDesc());
 }
 
+// Describes the canonical low-word/high-word reconstruction emitted by AnyValue unmarshalling.
+// Both inputs are semantic UInt32 values; zero extension makes the provider's signless i64
+// representation independent of the source words' high bits.
+struct NVVMUInt64WordConstruction
+{
+    IRInst* lowWord = nullptr;
+    IRInst* highWord = nullptr;
+    NVVMValueRecipeStep wordConversion;
+    NVVMValueRecipeStep highWordShift;
+    NVVMValueRecipeStep combine;
+};
+
+bool _resolveNVVMUInt64WordConstruction(
+    IRInst* inst,
+    NVVMUInt64WordConstruction& outConstruction)
+{
+    outConstruction = {};
+    if (!inst || inst->getOp() != kIROp_MakeUInt64 || inst->getOperandCount() != 2 ||
+        inst->getDataType()->getOp() != kIROp_UInt64Type)
+    {
+        return false;
+    }
+
+    IRInst* lowWord = inst->getOperand(0);
+    IRInst* highWord = inst->getOperand(1);
+    if (!lowWord || !highWord || !isNVVMUnsignedI32Type(lowWord->getDataType()) ||
+        !isNVVMUnsignedI32Type(highWord->getDataType()))
+    {
+        return false;
+    }
+
+    const SlangNVVMValueTypeDesc conversionOperands[] = {NVVMSemantics::kUnsignedI32};
+    const SlangNVVMValueTypeDesc binaryOperands[] = {
+        NVVMSemantics::kUnsignedI64,
+        NVVMSemantics::kUnsignedI64,
+    };
+    if (!_setNVVMSupportedValueRecipeStep(
+            outConstruction.wordConversion,
+            SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+            NVVMSemantics::kUnsignedI64,
+            conversionOperands,
+            SLANG_COUNT_OF(conversionOperands),
+            "UInt64 word zero extension") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outConstruction.highWordShift,
+            SLANG_NVVM_VALUE_OP_SHIFT_LEFT,
+            NVVMSemantics::kUnsignedI64,
+            binaryOperands,
+            SLANG_COUNT_OF(binaryOperands),
+            "UInt64 high-word shift") ||
+        !_setNVVMSupportedValueRecipeStep(
+            outConstruction.combine,
+            SLANG_NVVM_VALUE_OP_BIT_OR,
+            NVVMSemantics::kUnsignedI64,
+            binaryOperands,
+            SLANG_COUNT_OF(binaryOperands),
+            "UInt64 word combination"))
+    {
+        return false;
+    }
+
+    outConstruction.lowWord = lowWord;
+    outConstruction.highWord = highWord;
+    return true;
+}
+
 // Returns the exact identity used by one scalar masked reduction or prefix. The bit pattern is
 // interpreted through the already-validated scalar type, so integer signedness and Float32
 // infinities remain explicit properties of the recipe rather than host-language conversions.
@@ -5493,6 +5559,19 @@ void _requireNVVMScalarIntrinsicRecipeOperations(
         const NVVMValueRecipeStep& step = recipe.steps[i];
         _requireValueOperation(requirements, step.getDesc(), step.diagnosticName);
     }
+}
+
+void _requireNVVMUInt64WordConstructionOperations(
+    NVVMValueOperationRequirements& requirements,
+    const NVVMUInt64WordConstruction& construction)
+{
+    const NVVMValueRecipeStep* steps[] = {
+        &construction.wordConversion,
+        &construction.highWordShift,
+        &construction.combine,
+    };
+    for (auto step : steps)
+        _requireValueOperation(requirements, step->getDesc(), step->diagnosticName);
 }
 
 // Resolves canonical Slang value operations to either a fixed exact row or one bounded family.
@@ -7023,6 +7102,21 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_MakeUInt64:
+                {
+                    NVVMUInt64WordConstruction construction;
+                    if (!_resolveNVVMUInt64WordConstruction(inst, construction))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("canonical UInt64 word construction"));
+                    }
+                    _requireNVVMUInt64WordConstructionOperations(
+                        requirements.valueOperations,
+                        construction);
+                }
+                break;
+
             case kIROp_Add:
             case kIROp_Sub:
             case kIROp_Mul:
@@ -7630,6 +7724,27 @@ SlangResult _validateNVVMFunction(
                     {
                         availableValues.add(inst);
                     }
+                }
+                break;
+
+            case kIROp_MakeUInt64:
+                {
+                    NVVMUInt64WordConstruction construction;
+                    SLANG_RELEASE_ASSERT(
+                        _resolveNVVMUInt64WordConstruction(inst, construction));
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        construction.lowWord,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        construction.highWord,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    availableValues.add(inst);
                 }
                 break;
 
@@ -9030,6 +9145,72 @@ SlangResult _getNVVMRecipeIntegerConstant(
         codeGenContext,
         "scalar intrinsic recipe integer constant",
         builder.getIntegerConstant(module, integerType, value, outValue));
+}
+
+SlangResult _emitNVVMUInt64WordConstruction(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMUInt64WordConstruction& construction,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMValueHandle words32[2] = {};
+    IRInst* semanticWords[] = {construction.lowWord, construction.highWord};
+    for (uint32_t i = 0; i < SLANG_COUNT_OF(semanticWords); ++i)
+    {
+        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+            codeGenContext,
+            builder,
+            module,
+            semanticWords[i],
+            valueMap,
+            typeContext,
+            words32[i]));
+    }
+
+    SlangNVVMValueHandle words64[2] = {};
+    for (uint32_t i = 0; i < SLANG_COUNT_OF(words32); ++i)
+    {
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            construction.wordConversion,
+            &words32[i],
+            1,
+            words64[i]));
+    }
+
+    SlangNVVMValueHandle shiftAmount = nullptr;
+    SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
+        codeGenContext,
+        builder,
+        module,
+        64,
+        32,
+        shiftAmount));
+    const SlangNVVMValueHandle shiftOperands[] = {words64[1], shiftAmount};
+    SlangNVVMValueHandle shiftedHighWord = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        construction.highWordShift,
+        shiftOperands,
+        SLANG_COUNT_OF(shiftOperands),
+        shiftedHighWord));
+
+    const SlangNVVMValueHandle combineOperands[] = {words64[0], shiftedHighWord};
+    return _emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        construction.combine,
+        combineOperands,
+        SLANG_COUNT_OF(combineOperands),
+        outValue);
 }
 
 SlangResult _emitNVVMAtomicReduction(
@@ -12129,6 +12310,24 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 loweredResult)));
                         if (!operation.value)
                             valueMap[inst] = loweredResult;
+                    }
+                    break;
+
+                case kIROp_MakeUInt64:
+                    {
+                        NVVMUInt64WordConstruction construction;
+                        SLANG_RELEASE_ASSERT(
+                            _resolveNVVMUInt64WordConstruction(inst, construction));
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_emitNVVMUInt64WordConstruction(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            construction,
+                            valueMap,
+                            typeContext,
+                            loweredValue));
+                        valueMap[inst] = loweredValue;
                     }
                     break;
 

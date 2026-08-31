@@ -2235,3 +2235,15 @@ discovery reaches 58/58/58 over 72. Both have zero old-correct loss. The selecte
 427/427, and established direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90. A
 pointer-bearing shared array advances to the independent provider-owned address-space-1 to generic
 `UserPointer` conversion failure and remains unsupported.
+
+Slice 156 lowers exact `makeUInt64(UInt, UInt) -> UInt64` retained by AnyValue unmarshalling. A
+compiler-owned recipe zero-extends the ordered low and high words, shifts the high word left by 32,
+and combines them with bitwise-or. Preflight queries the existing typed conversion, shift, and or
+descriptors before provider creation. Provider ABI revision 30 is unchanged.
+
+Three frozen AnyValue layout workloads and discovery `anyvalue-bulk-copy` become correct at O0 and
+O3 and gain eight direct lanes. Frozen v1 reaches 384/388/384 over its unchanged 427 healthy
+denominator; discovery reaches 59/59/59 over 72. Both have zero old-correct loss. The selected
+prefix passes 427/427, and thirteen direct-O3 measurement gates assemble for SM70, SM80, and SM90.
+Frozen both-mode correctness is now 89.9%, so a deduplicated corpus-v2 proposal is due before any
+long-term baseline change; this slice changes neither corpus.

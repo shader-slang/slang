@@ -5,6 +5,8 @@
 // win, and that types which are NOT byte-compatible stay on the safe per-field path.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CPP):-target cpp -stage compute -entry computeMain
 
