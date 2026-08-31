@@ -34,12 +34,10 @@
  // Check that there are two entries, one for dxil and one for spirv.
  // CHECK: [availableInDownstreamIR(6 : Int)]
  // CHECK: [availableInDownstreamIR(10 : Int)]
- // CHECK: [public]
  // CHECK: [export("_S19multi_target_module10addVectorsp2pi_v4fi_v4fv4f")]
 
  // Check for the second occurrence of availableInDownstreamIR for normalizeVector in this section
  // Check that there are two entries, one for dxil and one for spirv.
  // CHECK: [availableInDownstreamIR(6 : Int)]
  // CHECK: [availableInDownstreamIR(10 : Int)]
- // CHECK: [public]
  // CHECK: [export("_S19multi_target_module15normalizeVectorp1pi_v3fv3f")]

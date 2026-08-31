@@ -15,7 +15,7 @@
 // operand list at all -- which is the observable consequence of the emitter
 // creating it with no operands even though the declaration allows one.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<int> buf;
 

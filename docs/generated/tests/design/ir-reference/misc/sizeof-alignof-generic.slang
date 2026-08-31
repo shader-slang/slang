@@ -16,7 +16,7 @@
 // `alignOf(%T..., ScalarLayout)`, so an inst emitted with the type operand
 // alone would not match.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<uint> outputBuffer;
 

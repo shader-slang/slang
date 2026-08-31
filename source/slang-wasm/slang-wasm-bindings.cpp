@@ -16,10 +16,8 @@ EMSCRIPTEN_BINDINGS(slang)
     function("getCompileTargets", &slang::wgsl::getCompileTargets);
 
     class_<slang::wgsl::GlobalSession>("GlobalSession")
-        .function(
-            "createSession",
-            &slang::wgsl::GlobalSession::createSession,
-            allow_raw_pointers());
+        .function("createSession", &slang::wgsl::GlobalSession::createSession, allow_raw_pointers())
+        .function("getBuiltinModuleSource", &slang::wgsl::GlobalSession::getBuiltinModuleSource);
 
     function("createGlobalSession", &slang::wgsl::createGlobalSession, allow_raw_pointers());
 

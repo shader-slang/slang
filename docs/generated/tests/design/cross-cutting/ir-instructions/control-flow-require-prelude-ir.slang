@@ -18,7 +18,7 @@
 // a "backend hint" rather than an ordinary statement, since the text appears
 // before the function it was written inside.
 
-//TEST:SIMPLE(filecheck=IR):-target cpp -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target cpp -dump-ir -o - -stage compute -entry main
 //TEST:SIMPLE(filecheck=CPP):-target cpp -stage compute -entry main
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main

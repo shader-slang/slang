@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "a",
@@ -309,10 +310,325 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "a",
+                "binding": {"kind": "subElementRegisterSpace", "index": 2},
+                "type": {
+                    "kind": "parameterBlock",
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "A",
+                        "fields": [
+                            {
+                                "name": "au",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+                            },
+                            {
+                                "name": "at1",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    },
+                                    "sizes": [
+                                        {"kind": "shaderResource", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "shaderResource", "index": 0}
+                            },
+                            {
+                                "name": "at2",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    },
+                                    "sizes": [
+                                        {"kind": "shaderResource", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "shaderResource", "index": 1}
+                            },
+                            {
+                                "name": "as",
+                                "type": {
+                                    "kind": "samplerState",
+                                    "sizes": [
+                                        {"kind": "samplerState", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "samplerState", "index": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "shaderResource", "value": 2},
+                            {"kind": "samplerState", "value": 1},
+                            {"kind": "uniform", "value": 16, "alignment": 16}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "bindings": [
+                            {"kind": "constantBuffer", "index": 0},
+                            {"kind": "subElementRegisterSpace", "index": 0}
+                        ]
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "name": "A",
+                            "fields": [
+                                {
+                                    "name": "au",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 16, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+                                },
+                                {
+                                    "name": "at1",
+                                    "type": {
+                                        "kind": "resource",
+                                        "baseShape": "texture2D",
+                                        "resultType": {
+                                            "kind": "vector",
+                                            "elementCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "sizes": [
+                                            {"kind": "shaderResource", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "shaderResource", "index": 0}
+                                },
+                                {
+                                    "name": "at2",
+                                    "type": {
+                                        "kind": "resource",
+                                        "baseShape": "texture2D",
+                                        "resultType": {
+                                            "kind": "vector",
+                                            "elementCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "sizes": [
+                                            {"kind": "shaderResource", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "shaderResource", "index": 1}
+                                },
+                                {
+                                    "name": "as",
+                                    "type": {
+                                        "kind": "samplerState",
+                                        "sizes": [
+                                            {"kind": "samplerState", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "samplerState", "index": 0}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "shaderResource", "value": 2},
+                                {"kind": "samplerState", "value": 1},
+                                {"kind": "uniform", "value": 16, "alignment": 16}
+                            ]
+                        },
+                        "bindings": [
+                            {"kind": "shaderResource", "index": 0, "count": 2},
+                            {"kind": "samplerState", "index": 0},
+                            {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0}
+                        ]
+                    },
+                    "sizes": [
+                        {"kind": "subElementRegisterSpace", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "b",
+                "binding": {"kind": "subElementRegisterSpace", "index": 3},
+                "type": {
+                    "kind": "parameterBlock",
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "B",
+                        "fields": [
+                            {
+                                "name": "bu",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+                            },
+                            {
+                                "name": "bt",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    },
+                                    "sizes": [
+                                        {"kind": "shaderResource", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "shaderResource", "index": 0}
+                            },
+                            {
+                                "name": "bs",
+                                "type": {
+                                    "kind": "samplerState",
+                                    "sizes": [
+                                        {"kind": "samplerState", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "samplerState", "index": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "shaderResource", "value": 1},
+                            {"kind": "samplerState", "value": 1},
+                            {"kind": "uniform", "value": 16, "alignment": 16}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "bindings": [
+                            {"kind": "constantBuffer", "index": 0},
+                            {"kind": "subElementRegisterSpace", "index": 0}
+                        ]
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "name": "B",
+                            "fields": [
+                                {
+                                    "name": "bu",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 16, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+                                },
+                                {
+                                    "name": "bt",
+                                    "type": {
+                                        "kind": "resource",
+                                        "baseShape": "texture2D",
+                                        "resultType": {
+                                            "kind": "vector",
+                                            "elementCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "sizes": [
+                                            {"kind": "shaderResource", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "shaderResource", "index": 0}
+                                },
+                                {
+                                    "name": "bs",
+                                    "type": {
+                                        "kind": "samplerState",
+                                        "sizes": [
+                                            {"kind": "samplerState", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "samplerState", "index": 0}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "shaderResource", "value": 1},
+                                {"kind": "samplerState", "value": 1},
+                                {"kind": "uniform", "value": 16, "alignment": 16}
+                            ]
+                        },
+                        "bindings": [
+                            {"kind": "shaderResource", "index": 0},
+                            {"kind": "samplerState", "index": 0},
+                            {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0}
+                        ]
+                    },
+                    "sizes": [
+                        {"kind": "subElementRegisterSpace", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},

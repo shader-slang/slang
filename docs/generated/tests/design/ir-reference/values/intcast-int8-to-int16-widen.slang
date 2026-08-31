@@ -13,7 +13,7 @@
 // doc places this under the same `intCast` opcode that handles all
 // other int-int reshapes.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t i8a;
 uniform RWStructuredBuffer<int16_t> buf;
