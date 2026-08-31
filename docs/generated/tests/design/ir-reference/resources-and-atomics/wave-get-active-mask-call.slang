@@ -15,7 +15,7 @@
 // HLSL, GLSL, SPIR-V, Metal, and CUDA directives then pin each backend's
 // own ballot expression, which is what the call resolves to at emit.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry main

@@ -12,7 +12,7 @@
 // Array of Int64 elements surfaces Array(Int64, N : Int) in the IR
 // dump. An `int64_t[3]` global_param surfaces `Array(Int64, 3 : Int)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int64_t v[3];
 uniform RWStructuredBuffer<int> buf;

@@ -15,7 +15,7 @@
 // both `func %other` and `func %main` still appear in the post-Phase-D
 // snapshot, which is only possible if each entry point was lowered.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

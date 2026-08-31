@@ -16,7 +16,7 @@
 // IR while the emitted HLSL never has to interpret it. The CHECK pins the
 // arm block ending on GenericAsm with the verbatim asm text as its operand.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

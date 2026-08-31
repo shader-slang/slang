@@ -17,7 +17,7 @@
 // name hint and require the value bound to it to be a single
 // `ForwardDifferentiate(%sq)` operand-form value rather than a function body.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;
