@@ -15,7 +15,7 @@
 // `[export("...main...")]` linkage decoration next to its `[layout(...)]`,
 // i.e. the stub resolved against the executable-side symbol.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

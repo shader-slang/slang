@@ -15,7 +15,7 @@
 // definition in the merged layout block; the offset operand is what
 // encodes the binding/byte placement the parameter-binding pass decided.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

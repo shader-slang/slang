@@ -16,7 +16,7 @@
 // directly (the ternary `?:` lowers instead to short-circuit
 // `ifElse` — recorded as a doc gap in README.md).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform bool c;
 uniform int x;

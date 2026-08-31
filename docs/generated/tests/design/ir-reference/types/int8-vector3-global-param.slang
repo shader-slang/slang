@@ -13,7 +13,7 @@
 // as a global_param. Pairing the narrow `Int8` scalar with
 // elementCount 3 surfaces `Vec(Int8, 3 : Int)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform vector<int8_t, 3> v;
 uniform RWStructuredBuffer<int> buf;
