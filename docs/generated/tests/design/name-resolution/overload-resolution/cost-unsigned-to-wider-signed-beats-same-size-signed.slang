@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#conversion-costs
-//META: doc_section_digest=d77239a753c95159f4db29b226999df363503e43e2ce42ec3d20143496696e2b
+//META: doc_section_digest=45a19e6a6506ddb836a3ebca70fa59e866619b52b9904fc36ec1843e2627f208
 //META: purpose=kConversionCost_UnsignedToSignedPromotion (200) is cheaper than kConversionCost_SameSizeUnsignedToSignedConversion (300), so a uint argument prefers int64_t over int.
 //META: intent=boundary
 //META: pipeline_stage=check

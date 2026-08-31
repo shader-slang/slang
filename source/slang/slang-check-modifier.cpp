@@ -1975,10 +1975,8 @@ Modifier* SemanticsVisitor::checkModifier(
         // "must be a compile-time constant at the call site". On a variable
         // declaration it is not supported — warn and treat it as `const` so
         // that common idioms like `static constexpr uint N = 4` compile.
-        // On a function declaration, `constexpr` is silently accepted and
-        // ignored (no warning), intentionally: warning on function-level
-        // constexpr is out of scope for this PR and would be a separate
-        // diagnostic with its own discussion.
+        // On a callable declaration Slang does not evaluate the callable at
+        // compile time, so the modifier is a no-op — warn and leave it in place.
         if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
         {
             // Reject `constexpr T* p;` — C-style pointer const is disallowed
@@ -2000,6 +1998,13 @@ Modifier* SemanticsVisitor::checkModifier(
             constMod->loc = m->loc;
             constMod->keywordName = getSession()->getNameObj("const");
             return constMod;
+        }
+        // A `constexpr` parameter (`ParamDecl : VarDeclBase`) is a supported feature and is
+        // matched by neither branch, so it stays silent; `CallableDecl` is disjoint from
+        // `VarDeclBase`, so this branch cannot also fire for it.
+        else if (as<CallableDecl>(syntaxNode))
+        {
+            getSink()->diagnose(Diagnostics::ConstexprOnCallableIgnored{.modifier = m});
         }
     }
     if (as<ConstModifier>(m))

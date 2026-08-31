@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#spirvasmoperand
-//META: doc_section_digest=b2230695d92295db8f6572962ce2cbfc6a94232db497c990333151c10edf01d5
+//META: doc_section_digest=30d7b2afee044e4800553745578314d872096bca3b9b7d00e70fdc652dd523c8
 //META: purpose=Each token of an inline-asm instruction becomes a typed operand instruction: the result marker and a named id are distinct operand kinds carried in the SPIRVAsmInst operand list.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
@@ -17,7 +17,7 @@
 // next -- a substitution only possible because each token is its own
 // instruction.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<float> buf;
 

@@ -36,6 +36,28 @@ public:
 
     InstIterator begin();
     InstIterator end();
+
+    // Returns the number of bytes a `Call` transfers for parameter `paramIndex` from `argOperand`,
+    // the argument at the call site: the smaller of the callee parameter's own slot size
+    // (`m_parameterOffsets[paramIndex+1] - m_parameterOffsets[paramIndex]`) and the argument
+    // operand's recorded size. It is the single source of truth shared by the executor
+    // (`callHandler`) and the validator (`validateCurrentInstruction`'s `VMOp::Call` case) so the
+    // two cannot drift apart about which bytes a `Call` touches.
+    //
+    // The argument size bounds the read: a callee slot may be wider than the argument (e.g. a
+    // 4-byte float in a slot padded to 8 bytes for a later pointer parameter's alignment), and
+    // reading only the argument's bytes stays within the operand.
+    //
+    // The slot size bounds the write: an operand's recorded size is not always a tight byte count
+    // for its value (a projected field can retain the size of the aggregate it came from), so
+    // bounding by the slot keeps the write within the callee's reserved parameter bytes. Any slot
+    // bytes past the copy are alignment padding outside the parameter value, so their contents are
+    // never interpreted as part of that value and do not affect behavior.
+    uint32_t getCallArgumentCopySize(uint32_t paramIndex, const VMExecOperand& argOperand) const
+    {
+        uint32_t slotStride = m_parameterOffsets[paramIndex + 1] - m_parameterOffsets[paramIndex];
+        return Math::Min(slotStride, (uint32_t)argOperand.size);
+    }
 };
 
 struct StackFrame

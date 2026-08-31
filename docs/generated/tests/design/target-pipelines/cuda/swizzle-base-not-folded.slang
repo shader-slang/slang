@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-d-cuda-emit-and-downstream-tools
-//META: doc_section_digest=5fafdc04391fe1499bf74bfe01420955a8364571f1b55e362cc671d3444538c9
+//META: doc_section_digest=6125db2deed527f9850790324fd3a09c7d0cd76e0bbeee263f331f56a3527a81
 //META: purpose=A multi-component swizzle base is never folded into its use sites on CUDA, so the base stays one named temporary and the swizzle is rebuilt element by element as float3 { base.x, base.y, base.z }.
 //META: intent=functional
 //META: pipeline_stage=emit

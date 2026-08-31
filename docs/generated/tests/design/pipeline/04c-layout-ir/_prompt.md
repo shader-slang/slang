@@ -45,9 +45,8 @@ The layout IR module itself does **not** get its own `### LAYOUT-IR:`
 dump section. Instead, after the per-translation-unit executable IR is
 emitted (`### LOWER-TO-IR:`), the layout module is merged into the
 post-link IR before the post-link pipeline runs. The **first
-`### AFTER <pass>:` block** in `-dump-ir` output (e.g.
-`### AFTER validateAndRemoveAssumeAddress:`) is therefore the earliest
-post-link snapshot, and the layout decorations attached by
+`### AFTER <pass>:` block** in `-dump-ir` output is therefore the
+earliest post-link snapshot, and the layout decorations attached by
 `createIRModuleForLayout` are visible there as:
 
 - `[layout(%N)]` decorations on stub globals (`global_param`,
@@ -183,7 +182,7 @@ value flavor")`). The doc names this as a hard crash for
    items.
 2. 8–14 `.slang` test files. All are
    `//TEST:SIMPLE(filecheck=CHECK):-target <T> -dump-ir
--o /dev/null -entry main -stage compute` for `T` in
+-o - -entry main -stage compute` for `T` in
    `{spirv-asm, hlsl}` (occasionally also `glsl` or `metal` when
    the claim is target-comparison). The `size_cap_files` cap is 30;
    staying in the 8-14 range keeps each test laser-focused on one
@@ -213,13 +212,13 @@ does not make.
 Default required directive for layout-IR observation tests:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 ```
 
 or, when verifying the same observation on a different target:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 ```
 
 Anchor `CHECK` patterns at the **first `### AFTER ...:` block** (the
@@ -228,10 +227,22 @@ merged in). The `### LOWER-TO-IR:` block (pre-link executable IR) is
 the right place for `CHECK-NOT` patterns asserting the absence of
 layout decorations, since the layout module has not been merged at
 that point. Note that FileCheck patterns are evaluated in order; use
-`// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:` to pin
-subsequent `CHECK` lines to the post-link snapshot. Be aware that
-identifiers inside the IR dump (`%N`) are renumbered at each pass
-boundary, so use FileCheck regex-variable captures
+`// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:` to pin subsequent
+`CHECK` lines to the post-link snapshot.
+
+**Never spell out the pass name in that label.** The claim these tests
+make is about a _position_ in the dump — the earliest post-link
+snapshot — not about any particular pass. Which pass happens to run
+first there is an implementation detail that changes: passes get
+gated on `RequiredLoweringPassSet` flags so they are skipped when the
+module holds nothing for them to do (issue #11917), and a gated-out
+pass emits no `### AFTER <pass>:` header at all. Pinning the name
+makes the test fail the day that pass is gated, renamed or reordered,
+even though nothing it asserts has changed. The regex label matches
+whichever pass is first and is immune to all three.
+
+Be aware that identifiers inside the IR dump (`%N`) are renumbered at
+each pass boundary, so use FileCheck regex-variable captures
 (`[[#%layout_id:]]`) when referencing the same instruction across
 multiple `CHECK` lines.
 
@@ -280,7 +291,7 @@ These are in addition to the universal lessons in `_common.md`.
 - [ ] Every test's `doc_ref` resolves to an anchor in
       `pipeline/04c-layout-ir.md`.
 - [ ] All tests use the canonical
-      `-target <T> -dump-ir -o /dev/null -entry main -stage compute`
+      `-target <T> -dump-ir -o - -entry main -stage compute`
       directive, with `T` chosen to make the claim observable.
 - [ ] No test asserts on the order in which the layout-IR
       construction steps run; only post-construction observable

@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 watched_paths_digest: e3702b2bb4b3b93680f0aa20c0d2faddbe420daf72e125260bb8e1dca2064879
 source_doc: docs/generated/design/cross-cutting/core-module.md
-source_doc_digest: 01ecdc2cb8dd909148390b350a26194c62dcf5b532f38a1eb614359783989fea
+source_doc_digest: 8a07deafba5dc7572bcacbecabb22795b7a4076682bd55d6de5676859c77f0df
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -44,6 +44,95 @@ code can _see_ and what a target _emits_:
 
 Per the bundle prompt, no test here exercises an atomic intrinsic.
 
+## Claims
+
+Flat enumeration of every normative, testable statement the source doc
+makes, grouped by the doc's own headings. Roughly half this page is
+build-system and embedding machinery rather than language surface, so the
+list is split: **A. User-observable claims** are the ones a compiled
+shader or a `slangc` invocation can witness; **B. Internal-source and
+build facts** are statements about CMake options, generated headers, C++
+classes and file composition, which are enumerated here for completeness
+and all carry a row in `## Untested claims`. Every claim below appears in
+exactly one of the two tables.
+
+### A. User-observable claims
+
+**`#what-ships-with-the-compiler`**
+
+1. The core module is a set of Slang `*.meta.slang` sources embedded into `libslang` so the compiler can use them at compile time. — `core-module-named-core-import.slang`
+2. The GLSL module is an analogous embedded module shipping GLSL-flavoured names. — `glsl-module-import-glsl-name.slang`
+3. The standard modules are separately compiled `.slang-module` files loaded on demand by an `import` whose qualified name maps to a subdirectory (`import slang.neural`, `import experimental.workgraph`). — `standard-module-workgraph-import-resolves.slang`, `standard-module-workgraph-not-implicit.slang`
+4. Per-target preludes are C / C++ / CUDA headers shipped alongside emitted text targets and are not Slang source. — `prelude-cpp-referenced-from-emit.slang`, `prelude-cuda-referenced-from-emit.slang`
+
+**`#core-module`**
+
+5. `core.meta.slang` declares the base types `int8_t`, `int32_t`, `int64_t`, `float`, `half`, `double` and the pointer / size types. — `core-scalar-aliases-are-builtin-types.slang`, `core-size-aliases-resolve.slang`, `core-int8-min-return-boundary.slang`, `core-int32-min-max-boundary.slang`, `core-uint32-max-plus-one-wraps.slang`
+6. The core module is a Slang module declared with the `core` name via `public module core;`. — `core-module-named-core-import.slang`
+7. `hlsl.meta.slang` supplies the HLSL-compatibility names `Texture2D`, `RWTexture2D` and `StructuredBuffer`. — `hlsl-structuredbuffer-per-target.slang`, `hlsl-texture2d-sampler-per-target.slang`
+8. `diff.meta.slang` supplies the derivative `attribute_syntax` declarations, the `NullDifferential` type, and the `IDifferentiable` / `IDifferentiablePtrType` conformances for `Array`, `Optional` and `Tuple`. — `diff-module-attributes-and-conformances.slang`
+9. `diff.meta.slang` also supplies the PyTorch-facing `TensorView`, `DiffTensorView` and `TorchTensor` types. — _untested: `gpu-cuda`_
+10. An HLSL-compatibility name is not a call on every target: these intrinsics are a `__target_switch` whose `default` body is emitted as a generated helper where no case matches. — `hlsl-intrinsic-mul-per-target.slang`, `hlsl-intrinsic-dot-per-target.slang`, `hlsl-intrinsic-length-per-target.slang`
+11. `mul(m, v)` on a `float4x4` and a `float4` emits `mul(m, v)` on HLSL. — `hlsl-intrinsic-mul-per-target.slang`
+12. The same `mul` emits `(v * m)` — the `*` operator, not a call — on GLSL, Metal and WGSL. — `hlsl-intrinsic-mul-per-target.slang`
+13. The same `mul` emits `OpVectorTimesMatrix` on SPIR-V. — `hlsl-intrinsic-mul-per-target.slang`
+14. The same `mul` emits a generated `mul_<n>` helper from the `default` body on CUDA and C++. — `hlsl-intrinsic-mul-per-target.slang`
+15. `dot` keeps its name on HLSL, GLSL, Metal and WGSL, becomes `OpDot` on SPIR-V, and falls through to a generated `dot_<n>` helper on CUDA and C++. — `hlsl-intrinsic-dot-per-target.slang`
+16. `length` keeps its name on HLSL, GLSL, Metal and WGSL, becomes the `GLSL.std.450` `Length` extended instruction on SPIR-V, and falls through to a generated `length_<n>` helper on CUDA and C++. — `hlsl-intrinsic-length-per-target.slang`
+17. `__target_intrinsic(<target>, <text>)` gives a declaration a per-target spelling, the example being the `hlsl` and `cuda` spellings of `RayDesc`. — _untested: `gpu-dxr`_
+
+**`#what-the-core-module-provides`**
+
+18. The core module opens with `public module core;` and a block of scalar aliases `float16_t`, `float32_t`, `float64_t`, `int32_t`, `uint32_t`, `size_t`, `usize_t`, `ssize_t`. — `core-scalar-aliases-are-builtin-types.slang`, `core-size-aliases-resolve.slang`
+19. Modifier syntax (`constexpr`, `globallycoherent`, `pervertex`, ...) is declared via `syntax` declarations, and these are real modifiers rather than merely accepted spellings. — `core-globallycoherent-syntax-modifier.slang`
+20. A `globallycoherent` buffer emits `globallycoherent` on HLSL, `coherent` on GLSL and a `Coherent` decoration on SPIR-V. — `core-globallycoherent-syntax-modifier.slang`
+21. The declarations cover scalar / vector / matrix types. — `core-vector-matrix-types-per-target.slang`
+22. Operator overloads are mapped onto IR opcodes with `__intrinsic_op`. — `core-scalar-aliases-are-builtin-types.slang`, `core-uint32-max-plus-one-wraps.slang`
+23. Implicit-conversion costs are declared with `__implicit_conversion`. — `core-implicit-conversion-admitted.slang`
+24. `IRangedValue` and its per-scalar extensions are declared here. — `core-irangedvalue-generic-extensions.slang`
+25. `Optional` and `Tuple` are declared here. — `core-optional-and-tuple-without-import.slang`
+26. `IDifferentiable` and the `DifferentialPair` magic type are declared in the core module itself, not in the diff meta-module. — `core-differentialpair-declared-in-core.slang`
+27. `Optional<T>` exposes the `hasValue` and `value` properties. — `core-optional-and-tuple-without-import.slang`
+28. `Optional<T>` has an implicit conversion from `T`. — `core-optional-and-tuple-without-import.slang`
+29. `Optional<T>` has the `none` literal, which is also what default initialization produces. — `core-optional-and-tuple-without-import.slang`, `core-optional-default-init-is-none.slang`
+30. `Tuple<each T>` has positional members `_0`, `_1`, ... and is constructed with `makeTuple`. — `core-optional-and-tuple-without-import.slang`, `core-tuple-positional-swizzle.slang`
+31. Those positional members also compose into swizzles (`t._2_1_0`). — `core-tuple-positional-swizzle.slang`
+32. `IRangedValue` supplies `static const This maxValue` and `minValue`, per scalar type, through the conforming extensions. — `core-irangedvalue-generic-extensions.slang`
+33. All three of `Optional`, `Tuple` and `IRangedValue` are usable with no `import`. — `core-optional-and-tuple-without-import.slang`, `core-irangedvalue-generic-extensions.slang`, `core-optional-default-init-is-none.slang`
+34. The HLSL meta-module layers in HLSL-named texture / sampler / buffer types and their intrinsics so HLSL code compiles unchanged. — `hlsl-texture2d-sampler-per-target.slang`, `hlsl-structuredbuffer-per-target.slang`
+35. `float32_t` boundary values — `-0.0` distinct from `+0.0`, NaN unequal to itself, `±inf` from division by zero — are representable. — `core-float32-negative-zero-boundary.slang`, `core-float32-nan-boundary.slang`, `core-float32-infinity-boundary.slang`
+
+**`#glsl-module`**
+
+36. `glsl.meta.slang` provides GLSL-flavoured aliases (`vec3`, `mat4`, `gl_*` system values). — `glsl-module-aliases-per-target.slang`, `glsl-module-not-loaded-by-default.slang`
+37. The global session loads the GLSL builtin module at creation time when `SlangGlobalSessionDesc::enableGLSL` is set. — _untested: `needs-unit-test`_
+38. A later `import glsl` retrieves that already-loaded builtin module. — `glsl-module-import-glsl-name.slang`
+
+**`#standard-modules`**
+
+39. `findStandardModulePath` resolves `slang.neural` to `slang/neural.slang-module` and `experimental.workgraph` to `experimental/workgraph.slang-module`. — `standard-module-neural-experimental-gate.slang`, `standard-module-workgraph-import-resolves.slang`
+40. The experimental module declares `[ExperimentalModule] module workgraph;` and holds the node attributes, the input / output record types and the `BarrierMemoryTypeFlags` / `BarrierSemanticFlags` enums with the `Barrier` overloads. — `standard-module-workgraph-import-resolves.slang`
+41. `[ExperimentalModule]` gates the import rather than merely labelling the module: importing one without enabling experimental features is an error naming the resolved module path and the `-experimental-feature` option. — `standard-module-neural-experimental-gate.slang`
+
+**`#preludes`**
+
+42. Prelude text is prepended to textual target output and is output-side: it does not participate in front-end checking. — `prelude-cpp-referenced-from-emit.slang`, `prelude-cuda-referenced-from-emit.slang`
+43. The command-line tools override the language prelude with text that `#include`s the header, so the head of a `-target cpp` emit is `#include "<install-dir>/slang-cpp-prelude.h"`. — `prelude-cpp-referenced-from-emit.slang`
+44. The generated entry point that follows is marked with `SLANG_PRELUDE_EXPORT`, a macro the header defines. — `prelude-cpp-referenced-from-emit.slang`
+45. `-target cuda` is the same shape with `slang-cuda-prelude.h`. — `prelude-cuda-referenced-from-emit.slang`
+46. GLSL, Metal, WGSL and SPIR-V do not use a `prelude/` header in the same way. — `prelude-absent-from-glsl-metal-wgsl-spirv.slang`
+
+### B. Internal-source and build facts
+
+47. The neural module declares `[ExperimentalModule] module neural;` and `__include`s a named set of sources, whose `unit-test/` subdirectory compiles only under a develop build. — _untested: `internal-source-fact`_
+48. The build substitutes `SLANG_STANDARD_MODULE_DIR_NAME`, the install directory and the per-module file-name variables into `slang-standard-module-config.h.in`. — _untested: `internal-source-fact`_
+49. Each standard module is compiled at build time with `-load-core-module` pointing at the core archive, and `neural/` always uses `slang-bootstrap` while `experimental/` prefers `slangc` when `SLANG_EMBED_CORE_MODULE` and `SLANG_ENABLE_SLANGC` are both on. — _untested: `internal-source-fact`_
+50. `SLANG_EMBED_CORE_MODULE` ON versus OFF changes where `*.meta.slang` errors surface, and `SLANG_EMBED_CORE_MODULE_SOURCE` controls whether the original source text is embedded too. — _untested: `compile-time-toggle`_
+51. One `slang-bootstrap -compile-core-module` run produces `slang-core-module-without-timestamp.bin` plus the embeddable core-module and GLSL-module headers, wired through `generate_core_module_headers`. — _untested: `needs-cli-test`_
+52. The runtime cache is `[uint64_t library timestamp][serialized module bytes]`, a zero timestamp is a rejected failure sentinel, `slang-core-module.bin` and `slang-core-module-without-timestamp.bin` are different artifacts, and a packaging step that rewrites timestamps makes the runtime regenerate the cache. — _untested: `needs-unit-test`_
+53. The five-step procedure for adding a new built-in: choose the home module, declare it with `__intrinsic_op` / `__target_intrinsic`, add a prelude entry, rebuild through `generate_core_module_headers`, add tests. — _untested: `process-doc`_
+54. The full intrinsic list is deliberately out of scope for this page, which defers to the `*.meta.slang` files. — _untested: `internal-source-fact`_
+
 ## Functional coverage
 
 | Claim                                                                                                                                                                                                                                                                               | Intent     | Anchor                                                                                                          | Tests                                                                                                |
@@ -73,6 +162,8 @@ Per the bundle prompt, no test here exercises an atomic intrinsic.
 | Each core-module scalar alias names the same builtin type it aliases: int32_t is int, uint32_t is uint, float32_t is float, float64_t is double and float16_t is half.                                                                                                              | functional | [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-scalar-aliases-are-builtin-types.slang`](core-scalar-aliases-are-builtin-types.slang)         |
 | IDifferentiable and the DifferentialPair magic type are declared in the core module itself, so a differentiable function and fwd_diff work without importing the diff meta-module.                                                                                                  | functional | [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-differentialpair-declared-in-core.slang`](core-differentialpair-declared-in-core.slang)       |
 | Optional&lt;T&gt; and Tuple&lt;T...&gt; are core-module types, usable from user code with no import.                                                                                                                                                                                | functional | [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-optional-and-tuple-without-import.slang`](core-optional-and-tuple-without-import.slang)       |
+| A core-module Tuple's positional members compose into a swizzle, so t.\_2_1_0 yields a reordered Tuple with no import.                                                                                                                                                              | functional | [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-tuple-positional-swizzle.slang`](core-tuple-positional-swizzle.slang)                         |
+| Default initialization of a core-module Optional&lt;T&gt; produces the same empty state as the none literal.                                                                                                                                                                       | boundary   | [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-optional-default-init-is-none.slang`](core-optional-default-init-is-none.slang)               |
 | The core module's \_\_implicit_conversion declarations admit int-to-float argument conversion while an exact-match overload still wins over a converting one.                                                                                                                       | functional | [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-implicit-conversion-admitted.slang`](core-implicit-conversion-admitted.slang)                 |
 | The core module's vector and matrix types are emitted in each target's own spelling: float3/float4x4 on HLSL, vec3/mat3x3 on GLSL, vec3&lt;f32&gt;/mat3x3&lt;f32&gt; on WGSL, float3/matrix&lt;float,..&gt; on Metal, float3/makeMatrix on CUDA and Vector/Matrix templates on C++. | functional | [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-vector-matrix-types-per-target.slang`](core-vector-matrix-types-per-target.slang)             |
 | The globallycoherent modifier declared by the core module's syntax declarations reaches emit as HLSL globallycoherent, GLSL coherent and the SPIR-V Coherent decoration.                                                                                                            | functional | [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-globallycoherent-syntax-modifier.slang`](core-globallycoherent-syntax-modifier.slang)         |
@@ -100,110 +191,6 @@ Per the bundle prompt, no test here exercises an atomic intrinsic.
 
 | Anchor                                                                                                          | Kind                  | Gap                                                                                                                                                                                                                                                                                                                  | Suggested addition                                                                                                                                                                                                                          |
 | --------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#core-module](../../../../design/cross-cutting/core-module.md#core-module)                                     | missing-example       | The section names `mul`, `dot` and `length` as HLSL-compatibility intrinsics but never shows what any of them becomes on a non-HLSL target, so a reader cannot tell that `mul` stops being a call at all on GLSL / Metal / WGSL while `dot` and `length` keep their names there.                                     | Add a "one intrinsic, several spellings" table under this section giving the emitted form of `mul` for HLSL, GLSL, SPIR-V, Metal, WGSL, CUDA and C++, with a two-line source snippet above it.                                              |
 | [#glsl-module](../../../../design/cross-cutting/core-module.md#glsl-module)                                     | undocumented-behavior | The section says the GLSL builtin module is loaded "at creation time when `SlangGlobalSessionDesc::enableGLSL` is set" and that `import glsl` then retrieves it, but it does not say what happens when a compile that never set `enableGLSL` writes `import glsl;` — which `slangc` accepts.                         | Add a sentence stating whether `import glsl` loads the module on demand when `enableGLSL` was not set, and name the `slangc` flag (`-allow-glsl`) that makes the GLSL names available without an explicit import.                           |
-| [#preludes](../../../../design/cross-cutting/core-module.md#preludes)                                           | missing-surface       | The prelude table lists header files and their target, but a reader cannot tell what a prelude looks like in the output. These tests had to discover empirically that the C++ and CUDA emit contain an `#include` of the header path plus markers such as `SLANG_PRELUDE_EXPORT` that the header defines.            | Add a three-line excerpt of a `-target cpp` emit showing the `#include "slang-cpp-prelude.h"` line and one macro the header defines, so the "prepended to textual target output" claim has a concrete shape.                                |
-| [#standard-modules](../../../../design/cross-cutting/core-module.md#standard-modules)                           | undocumented-behavior | The section records that both modules declare `[ExperimentalModule]` but never says what that attribute does to a consumer. In practice `import slang.neural` and `import experimental.workgraph` are both refused with E00104 until experimental features are enabled.                                              | Add one sentence after the module table stating that `[ExperimentalModule]` makes the import fail with E00104 unless the compile enables experimental features, and name the `slangc` flag (`-experimental-feature`).                       |
-| [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | missing-surface       | The section says the core module "declares modifier syntax (`constexpr`, `globallycoherent`, `pervertex`, ...) via `syntax` declarations" but does not say which of those modifiers survive to emitted code and in what form; of the three named, only `globallycoherent` was found to have a target-visible marker. | Add a note to the modifier list marking which modifiers are target-visible (e.g. `globallycoherent` → HLSL `globallycoherent`, GLSL `coherent`, SPIR-V `Coherent`) and which are front-end-only.                                            |
-| [#what-the-core-module-provides](../../../../design/cross-cutting/core-module.md#what-the-core-module-provides) | missing-surface       | The section lists `Optional`, `Tuple` and the `IRangedValue` interface among the core module's declarations but gives no API sketch, so a reader cannot tell how to observe any of them; the members these tests use (`hasValue` / `value` / `none`, `_0`, `minValue` / `maxValue`) were found by inspection.        | Add a one-line member list per type — `Optional<T>`: `hasValue`, `value`, the `none` literal; `Tuple<T...>`: positional `_0`, `_1`; `IRangedValue`: `static const This minValue` / `maxValue` — or link to the user-guide section for each. |
+| [#standard-modules](../../../../design/cross-cutting/core-module.md#standard-modules)                           | undocumented-behavior | The section now says `[ExperimentalModule]` "gates the import" and that the error names the module path and the `-experimental-feature` option, but it still does not give the error code, so a regression test has to discover it. The code is E00104 for both `import slang.neural` and `import experimental.workgraph`. | Add the code to the existing sentence — `[ExperimentalModule]` makes the import fail with E00104 — so the claim can be pinned by code rather than by message text.                                                                          |
 
-## Claim index
-
-Numbered enumeration of the claims extracted from the source doc,
-grouped by its headings. Every entry appears in exactly one of the two
-tables above.
-
-**`#what-ships-with-the-compiler`**
-
-1. Three families ship: the embedded core module, the embedded GLSL
-   module, and separately compiled standard modules loaded on demand by
-   an `import` whose qualified name maps to a subdirectory (covered
-   collectively by the module-identity, GLSL-module and standard-module
-   rows).
-2. Per-target preludes are C / C++ / CUDA headers shipped alongside
-   emitted text targets and are not Slang source.
-
-**`#core-module`**
-
-3. `core.meta.slang` declares the base types (`int8_t`, `int32_t`,
-   `int64_t`, `float`, `half`, `double`, pointer / size types) and type
-   aliases.
-4. The core module is a Slang module declared with the `core` name via
-   `public module core;`.
-5. `hlsl.meta.slang` supplies the HLSL-compatibility names —
-   `Texture2D`, `RWTexture2D`, `StructuredBuffer` — and the intrinsics
-   `mul`, `dot`, `length`.
-6. `diff.meta.slang` supplies the derivative `attribute_syntax`
-   declarations, the `NullDifferential` type, and `IDifferentiable` /
-   `IDifferentiablePtrType` conformances for `Array`, `Optional` and
-   `Tuple`.
-7. `diff.meta.slang` also supplies the PyTorch-facing `TensorView`,
-   `DiffTensorView` and `TorchTensor` types. _(untested: `gpu-cuda`)_
-8. `__target_intrinsic(<target>, <text>)` gives a declaration a
-   per-target spelling, e.g. the `hlsl` and `cuda` spellings of
-   `RayDesc`. _(untested: `gpu-dxr`)_
-
-**`#what-the-core-module-provides`**
-
-9. The file opens with `public module core;` and a block of scalar
-   aliases (`float16_t`, `float32_t`, `float64_t`, `int32_t`,
-   `uint32_t`, `size_t`, `usize_t`, `ssize_t`).
-10. Modifier syntax (`constexpr`, `globallycoherent`, `pervertex`, ...)
-    is declared through `syntax` declarations.
-11. The declarations cover scalar / vector / matrix types.
-12. Operator overloads are mapped onto IR opcodes with `__intrinsic_op`
-    and implicit-conversion costs are declared with
-    `__implicit_conversion`.
-13. The `IRangedValue` interface and its per-scalar extensions are
-    declared here.
-14. `Optional` and `Tuple` are declared here.
-15. `IDifferentiable` and the `DifferentialPair` magic type are declared
-    in the core module, not in the diff meta-module.
-16. The HLSL meta-module layers in HLSL-named texture / sampler / buffer
-    types and their intrinsics so HLSL code compiles unchanged.
-
-**`#glsl-module`**
-
-17. `glsl.meta.slang` provides GLSL-flavoured aliases (`vec3`, `mat4`,
-    `gl_*` system values).
-18. The GLSL builtin module is loaded at global-session creation when
-    `SlangGlobalSessionDesc::enableGLSL` is set. _(untested:
-    `needs-unit-test`)_
-19. A later `import glsl` retrieves that already-loaded builtin module.
-
-**`#standard-modules`**
-
-20. `slang.neural` resolves to `slang/neural.slang-module` and
-    `experimental.workgraph` to `experimental/workgraph.slang-module`.
-21. The neural module declares `[ExperimentalModule] module neural;` and
-    pulls in the rest of its directory with `__include`. _(composition
-    untested: `internal-source-fact`)_
-22. The experimental module declares
-    `[ExperimentalModule] module workgraph;` and holds the node
-    attributes, the input / output record types, and the
-    `BarrierMemoryTypeFlags` / `BarrierSemanticFlags` enums.
-23. The build substitutes the module directory and file-name variables
-    into `slang-standard-module-config.h.in`, and
-    `findStandardModulePath` appends the qualified name plus
-    `.slang-module`. _(untested: `internal-source-fact`)_
-
-**`#preludes`**
-
-24. Prelude text is prepended to textual target output and is
-    output-side: it does not participate in front-end checking.
-25. `slang-cpp-prelude.h` serves C++ shader output and
-    `slang-cuda-prelude.h` serves CUDA.
-26. GLSL, Metal, WGSL and SPIR-V do not use a `prelude/` header in the
-    same way.
-
-**`#building-the-core-module`, `#the-runtime-core-module-cache`, `#adding-a-new-built-in`, `#what-is-not-in-this-document`**
-
-27. `SLANG_EMBED_CORE_MODULE` ON vs OFF changes where meta-source errors
-    surface. _(untested: `compile-time-toggle`)_
-28. One `slang-bootstrap` run produces the standalone archive and the two
-    embeddable headers. _(untested: `needs-cli-test`)_
-29. The runtime cache is `[uint64_t timestamp][module bytes]` with a zero
-    timestamp as the failure sentinel. _(untested: `needs-unit-test`)_
-30. The steps for adding a new built-in. _(untested: `process-doc`)_
-31. The full intrinsic list is deliberately out of scope for this doc.
-    _(untested: `internal-source-fact`)_

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#naming-and-provenance
-//META: doc_section_digest=c55006c0bcfdbf481cbed2ad87133c84b45c1a360af8f94519a6b15522ec2953
+//META: doc_section_digest=27db05e9ed21dcf7b3b3b503ce38c4b1487eb65c172fd7c96e296073bd39b0e5
 //META: purpose=A nameHint decoration also attaches to function parameters carrying the declared parameter name.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -14,7 +14,7 @@
 // the `param %tid` line it precedes, which is the shape a backend relies on
 // when it names the emitted variable after the source parameter.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

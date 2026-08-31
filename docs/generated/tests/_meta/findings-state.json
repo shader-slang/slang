@@ -201,8 +201,13 @@
       "url": "https://github.com/shader-slang/slang/issues/12493"
     },
     "getstringhash-nonliteral-argument-sigsegv": {
-      "dup_of": 12440,
-      "title": "getStringHash on a non-literal String segfaults instead of E41023"
+      "issue": 12440,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "title": "getStringHash on a non-literal String segfaults instead of E41023",
+      "url": "https://github.com/shader-slang/slang/issues/12440"
     },
     "grammar-do-catch-cpu-execution-sigsegv": {
       "issue": 12499,

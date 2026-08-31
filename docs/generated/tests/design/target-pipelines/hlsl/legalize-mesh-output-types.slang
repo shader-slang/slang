@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-c-hlsl-legalization-lowering-phi-elimination
-//META: doc_section_digest=4fecf4dd0bb701e665017f724328ac296a661dcd280fb45d1f2915bcbd0fc67a
+//META: doc_section_digest=53a2379796e273cdb95b30642542c77045c0b9200b2085bfda75a33dd67487c6
 //META: purpose=legalizeMeshOutputTypes is gated on reqSet.meshOutput and runs in Phase C for a mesh-stage entry point; the HLSL emission preserves the explicit per-vertex and per-primitive output declarations and the SetMeshOutputCounts call.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

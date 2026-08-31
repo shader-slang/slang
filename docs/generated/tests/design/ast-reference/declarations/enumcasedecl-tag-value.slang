@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#enumdecl-and-enumcasedecl
-//META: doc_section_digest=c018493cff4ea0d125fd96032328c7a624df200e9019bef0883c86de143f6642
+//META: doc_section_digest=251490201dcfc0b19979a5dc8ef85362085273b02d52eb3644361b8c66763bf0
 //META: purpose=An EnumCaseDecl carries the case's tag value; converting the case to its underlying integer yields exactly that value.
 //META: intent=functional
 //META: pipeline_stage=check

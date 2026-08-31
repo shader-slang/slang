@@ -16,7 +16,7 @@
 // captured and must appear as the lookup key of two distinct
 // witness_table_entry rows (one in each struct's table).
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct GradA : IDifferentiable { float v; }
 struct GradB : IDifferentiable { float w; }

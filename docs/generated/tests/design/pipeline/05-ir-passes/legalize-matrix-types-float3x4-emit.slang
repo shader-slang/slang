@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#type-and-value-legalization
-//META: doc_section_digest=857d9a7b5620991cb161cbee5d5f843c16e973d3c494110ba22777ebfea3d38f
+//META: doc_section_digest=3e3c1fa508130c56014c50d7c74ee56f2e557c277dfbc86c712dbb9373bf794a
 //META: purpose=Expansion: legalize-matrix-types lowers a Slang `matrix<float, 3, 4>` into a target-shaped matrix on HLSL (`float3x4`) and GLSL (`mat3x4` / `mat4x3`-style spelling).
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

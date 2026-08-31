@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#error-recovery
-//META: doc_section_digest=490a9dc1fa74d15b5c32d617920911d5d9b67dbf1c0dd0c9637afde42b648b85
+//META: doc_section_digest=ecd97134efc1fb844f5467e390d9248d7c2f8f41cabf069e67d46c245cea2ef3
 //META: purpose=Resynchronization skips a balanced bracketed or parenthesised region whole, so garbage nested inside `[...]` and `(...)` adds no extra diagnostics.
 //META: intent=negative
 //META: pipeline_stage=parse

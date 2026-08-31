@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#backends
-//META: doc_section_digest=b39e80b2c14d1286101fea456d02c0ad8020250e1022fdc6eccd5a974bcbef9d
+//META: doc_section_digest=4c9727df0c383d0b7f12c2f3e71feb78bbba71d1bad80cd7ab19a86ad4cfc825
 //META: purpose=Boundary: the smallest workgroup `[numthreads(1, 1, 1)]` is still emitted explicitly by every backend rather than collapsed or omitted.
 //META: intent=boundary
 //META: pipeline_stage=emit

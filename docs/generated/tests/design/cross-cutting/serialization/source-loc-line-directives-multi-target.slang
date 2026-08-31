@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#source-location-serialization
-//META: doc_section_digest=0b9df2a75e79b7e8b6026192b354673f12b076885b33df7d9612c34bd2b3f441
+//META: doc_section_digest=ae999a9ca10102d601efa25676c15bb84b077c450aa17af1e8655c2470159d1f
 //META: purpose=Each source location keeps its originating file path and line number all the way to emit, appearing as a #line directive naming this file on every C-family text target and as an OpSource marker on SPIR-V.
 //META: intent=functional
 //META: pipeline_stage=emit
