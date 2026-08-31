@@ -874,5 +874,8 @@ return {
 	["imageGatherOffset"] = 898,
 	["getNaturalAlignment"] = 899,
 	["Type.PtrTypeBase.SPIRVUntypedPtr"] = 900,
-	["Attr.TypeAlignment"] = 901
+	["Attr.TypeAlignment"] = 901,
+	["Type.PtrTypeBase.RefReadOnlyParam"] = 902,
+	["Type.PtrTypeBase.RefWriteOnlyParam"] = 903,
+	["Type.PtrTypeBase.ConsumeParam"] = 904
 }

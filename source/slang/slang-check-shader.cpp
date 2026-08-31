@@ -2789,6 +2789,12 @@ Type* getParamTypeWithModeWrapper(
         return astBuilder->getBorrowInOutParamType(paramValueType);
     case ParamPassingMode::Ref:
         return astBuilder->getRefParamType(paramValueType);
+    case ParamPassingMode::RefReadOnly:
+        return astBuilder->getRefReadOnlyParamType(paramValueType);
+    case ParamPassingMode::RefWriteOnly:
+        return astBuilder->getRefWriteOnlyParamType(paramValueType);
+    case ParamPassingMode::Consume:
+        return astBuilder->getConsumeParamType(paramValueType);
     default:
         SLANG_UNEXPECTED("unhandled parameter-passing mode");
         UNREACHABLE_RETURN(paramValueType);

@@ -1070,6 +1070,21 @@ std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
         auto constRefParamType = as<BorrowInParamType>(paramTypeWithDirection);
         return {constRefParamType->getValueType(), ParamPassingMode::BorrowIn};
     }
+    else if (as<RefReadOnlyParamType>(paramTypeWithDirection))
+    {
+        auto refReadOnlyParamType = as<RefReadOnlyParamType>(paramTypeWithDirection);
+        return {refReadOnlyParamType->getValueType(), ParamPassingMode::RefReadOnly};
+    }
+    else if (as<RefWriteOnlyParamType>(paramTypeWithDirection))
+    {
+        auto refWriteOnlyParamType = as<RefWriteOnlyParamType>(paramTypeWithDirection);
+        return {refWriteOnlyParamType->getValueType(), ParamPassingMode::RefWriteOnly};
+    }
+    else if (as<ConsumeParamType>(paramTypeWithDirection))
+    {
+        auto consumeParamType = as<ConsumeParamType>(paramTypeWithDirection);
+        return {consumeParamType->getValueType(), ParamPassingMode::Consume};
+    }
     else
     {
         return {paramTypeWithDirection, ParamPassingMode::In};

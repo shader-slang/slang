@@ -338,6 +338,9 @@ local function getBasicTypesForBuilderMethods()
 		"AttributedType", -- Uses dynamic operand list
 		"RefParamType", -- Has high-level helper that takes AddressSpace parameters
 		"BorrowInParamType", -- Has high-level helper that takes AddressSpace parameters
+		"RefReadOnlyParamType", -- Has high-level helper that takes AddressSpace parameters
+		"RefWriteOnlyParamType", -- Has high-level helper that takes AddressSpace parameters
+		"ConsumeParamType", -- Has high-level helper that takes AddressSpace parameters
 		"FuncType", -- the result and params have always been given in the "wrong" order, and the IRAttr oddness at the end
 		-- Identity semantics - use createXxxType() instead of getXxxType()
 		"StructType",

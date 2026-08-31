@@ -3489,6 +3489,9 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
+    IRRefReadOnlyParamType* getRefReadOnlyParamType(IRType* valueType, AddressSpace addrSpace);
+    IRRefWriteOnlyParamType* getRefWriteOnlyParamType(IRType* valueType, AddressSpace addrSpace);
+    IRConsumeParamType* getConsumeParamType(IRType* valueType, AddressSpace addrSpace);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,

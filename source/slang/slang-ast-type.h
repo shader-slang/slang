@@ -901,6 +901,30 @@ class BorrowInParamType : public ParamPassingModeType
     void _toTextOverride(StringBuilder& out);
 };
 
+// The type for a read-only by-reference parameter, e.g., `__ref_readonly T`.
+FIDDLE()
+class RefReadOnlyParamType : public ParamPassingModeType
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
+// The type for a write-only by-reference parameter, e.g., `__ref_writeonly T`.
+FIDDLE()
+class RefWriteOnlyParamType : public ParamPassingModeType
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
+// The type for a by-value ownership-transfer parameter, e.g., `__consume T`.
+FIDDLE()
+class ConsumeParamType : public ParamPassingModeType
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
 /// A reference type that is explicitly named somewhere in code (`Ref<T>`).
 ///
 /// The explicit reference types are distinct from the

@@ -2020,6 +2020,9 @@ struct TypeFlowSpecializationContext
                         case ParameterDirectionInfo::Kind::BorrowInOut:
                         case ParameterDirectionInfo::Kind::BorrowIn:
                         case ParameterDirectionInfo::Kind::Ref:
+                        case ParameterDirectionInfo::Kind::RefReadOnly:
+                        case ParameterDirectionInfo::Kind::RefWriteOnly:
+                        case ParameterDirectionInfo::Kind::Consume:
                             {
                                 IRBuilder builder(module);
                                 if (!argInfo)
@@ -6971,6 +6974,9 @@ struct TypeFlowSpecializationContext
             case ParameterDirectionInfo::Kind::BorrowInOut:
             case ParameterDirectionInfo::Kind::BorrowIn:
             case ParameterDirectionInfo::Kind::Ref:
+            case ParameterDirectionInfo::Kind::RefReadOnly:
+            case ParameterDirectionInfo::Kind::RefWriteOnly:
+            case ParameterDirectionInfo::Kind::Consume:
                 {
                     callArgs.add(arg);
                     break;

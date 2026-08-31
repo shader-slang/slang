@@ -78,10 +78,15 @@ struct ParameterDirectionInfo
         BorrowIn,
         Out,
         BorrowInOut,
-        Ref
+        Ref,
+        RefReadOnly,
+        RefWriteOnly,
+        Consume
     } kind;
 
-    // For Ref and BorrowInOut
+    // Carried by the address-passing modes (Ref, BorrowIn, RefReadOnly,
+    // RefWriteOnly, Consume), which wrap a pointer-like type; unused for In / Out /
+    // BorrowInOut.
     AddressSpace addressSpace;
 
     ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)

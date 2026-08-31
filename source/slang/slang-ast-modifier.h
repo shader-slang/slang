@@ -374,6 +374,32 @@ class BorrowModifier : public Modifier
     FIDDLE(...)
 };
 
+// `__ref_readonly` modifier for a read-only by-reference parameter (pointer sugar,
+// same address, no copies, no exclusivity), as distinct from a `borrow` (which may
+// copy into a temporary). See `ParamPassingMode::RefReadOnly`.
+FIDDLE()
+class RefReadOnlyModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// `__ref_writeonly` modifier for a write-only by-reference parameter. See
+// `ParamPassingMode::RefWriteOnly`.
+FIDDLE()
+class RefWriteOnlyModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// `__consume` modifier for a by-value ownership-transfer parameter: ownership passes
+// caller->callee, the argument is initialized on entry and left uninitialized on any
+// non-error return. See `ParamPassingMode::Consume`.
+FIDDLE()
+class ConsumeModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // This is a special sentinel modifier that gets added
 // to the list when we have multiple variable declarations
 // all sharing the same modifiers:

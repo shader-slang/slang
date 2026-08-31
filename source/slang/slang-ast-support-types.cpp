@@ -109,6 +109,15 @@ void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
     case ParamPassingMode::BorrowIn:
         sb << "constref";
         break;
+    case ParamPassingMode::RefReadOnly:
+        sb << "ref_readonly";
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        sb << "ref_writeonly";
+        break;
+    case ParamPassingMode::Consume:
+        sb << "consume";
+        break;
     default:
         sb << "(" << int(direction) << ")";
         break;

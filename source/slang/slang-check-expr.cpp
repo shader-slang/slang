@@ -5527,7 +5527,8 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
         // support autodiff, but it is not clear what a correct
         // one-size-fits-all behavior should be in that case.
         //
-        if (as<RefParamType>(primalParamType))
+        if (as<RefParamType>(primalParamType) || as<RefReadOnlyParamType>(primalParamType) ||
+            as<RefWriteOnlyParamType>(primalParamType) || as<ConsumeParamType>(primalParamType))
             return primalParamWrapperType;
 
         // Given a primal type that is a wrapper like `Out<T>`, we can
@@ -5781,6 +5782,9 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
                 break;
             }
         case ParamPassingMode::Ref:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
+        case ParamPassingMode::Consume:
             {
                 // Not allowed..
                 SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
