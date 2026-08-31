@@ -6853,6 +6853,31 @@ The new AnyValue gate measures 356.5 ms and 1240-byte PTX at direct O3 SM70 vers
 measurements. Reaching 89.9% both-mode correctness triggers a separate deduplicated corpus-v2
 proposal, but neither denominator changes in this slice.
 
+### Slice 157: Proposed compute corpus v2
+
+The frozen-v1 both-mode score reached the previously defined approximately-90% checkpoint, so a
+bounded corpus-v2 composition is now proposed without changing any active baseline. The candidate
+keeps all 452 exact v1 workload identities and adds 50 unique healthy discovery workloads with zero
+v1 source overlap.
+
+The additions are deduplicated by role. Twenty-three rows preserve one representative for each
+exact selection-tag combination that was already correct at the Slice 147 discovery baseline. All
+14 workloads unlocked by Slices 148–156 remain because each protects a newly supported invariant.
+All 13 remaining healthy failures remain because each carries a live canonical
+producer/type/operation blocker. Twenty-two tag-duplicate original successes and ten rows without a
+healthy native CUDA reference are excluded.
+
+The candidate would contain 502 workloads/477 healthy MVP references. At Slice 156 capability it
+would report 421 O0, 425 O3, and 421 both-mode successes (88.3%/89.1%/88.3%). Its lower headline is
+intentional: the denominator adds difficult ABI, aggregate, pointer, resource, and provider shapes
+rather than reclassifying existing progress. Native CUDA is correct for 499 of all 502 rows; the
+three inherited v1 infrastructure rows remain outside the healthy denominator.
+
+The exact proposed additions and machine-readable summary are retained under
+`issue-nvvm-backend`. Corpus v1 remains 452/427 and discovery remains 82/72. No runner default,
+manifest, test directive, provider ABI, or compiler behavior changes until the proposal receives
+explicit approval and a separate freeze slice implements it.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

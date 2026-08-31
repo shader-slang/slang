@@ -1,0 +1,51 @@
+id	inclusion_class	rationale
+compute/struct-make.slang#discovery-1	baseline-tag-representative	Aggregate construction and pointer transport.
+compute/inout.slang#discovery-1	baseline-tag-representative	Aggregate inout transport across an ordinary helper.
+bugs/array-of-array-in-sb.slang#discovery-1	baseline-tag-representative	Nested aggregate storage combined with structured resources.
+bugs/byte-address-buffer-interlocked-add-f32.slang#discovery-1	baseline-tag-representative	Floating atomic operation combined with byte-address resources.
+bugs/nested-switch-continue-in-loop.slang#discovery-1	baseline-tag-representative	Nested switch and continue control flow.
+compute/ssa-reduce-bug.slang#discovery-1	baseline-tag-representative	Control flow combined with aggregate pointer state.
+bugs/mutating/mutating-call-in-loop-dce.slang#discovery-1	baseline-tag-representative	Mutating helper calls inside optimized loops.
+ir/loop-inversion.slang#discovery-1	baseline-tag-representative	Large loop-control-flow and optimization gate.
+compute/multi-interface.slang#discovery-1	baseline-tag-representative	Ordinary generic helper graph with multiple interfaces.
+language-feature/dynamic-dispatch/dynamic-func-dynamic-output-2.slang#discovery-1	baseline-tag-representative	Dynamic helper dispatch with aggregate output transport.
+language-feature/dynamic-dispatch/many-impls.slang#discovery-1	baseline-tag-representative	Many dynamic implementations with aggregate control flow.
+language-feature/dynamic-dispatch/missing-anyvaluesize-mixed-self-ref.slang#discovery-1	baseline-tag-representative	Large self-referential dynamic graph with aggregate payloads.
+language-feature/dynamic-dispatch/dispatch-many-conformances.slang#discovery-1	baseline-tag-representative	Dynamic helper dispatch across many conformances and branches.
+compute/generic-diamond-pattern-2.slang#discovery-1	baseline-tag-representative	Large diamond-shaped generic call graph.
+language-feature/dynamic-dispatch/derived-interface.slang#discovery-1	baseline-tag-representative	Matrix values in derived-interface control flow.
+language-feature/generics/generic-arithmetic-coerce.slang#discovery-1	baseline-tag-representative	Large generic arithmetic and matrix coercion graph.
+bugs/matrix-divided-by-scalar.slang#discovery-1	baseline-tag-representative	Ordinary matrix layout and scalar arithmetic.
+language-feature/anyvalue-matrix-layout.slang#discovery-1	baseline-tag-representative	AnyValue aggregate transport with matrix layout.
+bugs/generic-default-matrix.slang#discovery-1	baseline-tag-representative	Generic helper operations over default-layout matrices.
+bugs/empty-struct-parameter-block.slang#discovery-1	baseline-tag-representative	Large parameter-block layout with aggregate pointers.
+language-feature/dynamic-dispatch/constantbuffer-struct-interface-field.slang#discovery-1	baseline-tag-representative	Constant-buffer layout with interface-bearing helper data.
+language-feature/dynamic-dispatch/constantbuffer-struct-interface-array.slang#discovery-1	baseline-tag-representative	Constant-buffer interface arrays and aggregate pointers.
+bugs/addr-scope-fix.slang#discovery-1	baseline-tag-representative	Shared memory, barriers, and aggregate pointer scope.
+bindings/nested-parameter-block-2.slang#discovery-1	newly-unlocked-invariant	Recursive parameter-group field and loaded-value transport.
+bugs/array-size-groupshared.slang#discovery-1	newly-unlocked-invariant	Canonical group-shared fixed-array storage.
+bugs/generic-groupshared.slang#discovery-1	newly-unlocked-invariant	Generic group-shared fixed-array storage.
+bugs/gh-6657-bindless-uniform.slang#discovery-1	newly-unlocked-invariant	Descriptor-handle representation inside structured storage.
+compute/cbuffer-legalize.slang#discovery-1	newly-unlocked-invariant	Loaded constant-buffer value used through a helper.
+compute/pointer-emit.slang#discovery-1	newly-unlocked-invariant	Composable local array-element and struct-field addresses.
+language-feature/dynamic-dispatch/anyvalue-bulk-copy.slang#discovery-1	newly-unlocked-invariant	UInt64 word reconstruction in a large AnyValue graph.
+language-feature/dynamic-dispatch/array-of-interfaces-interproc.slang#discovery-1	newly-unlocked-invariant	Existential specialization across an interprocedural call graph.
+language-feature/generics/generic-shader-object-cbuffer.slang#discovery-1	newly-unlocked-invariant	Generic loaded constant-buffer resource graph.
+language-feature/generics/parameter-block-unify.slang#discovery-1	newly-unlocked-invariant	Scalar parameter-group unification and loaded value.
+language-feature/generics/variadic-pack-query-pack-conformance.slang#discovery-1	newly-unlocked-invariant	Variadic type-pack specialization identity.
+language-feature/pointer/ptr-to-groupshared.slang#discovery-1	newly-unlocked-invariant	Group-shared aggregate pointer across a helper call.
+language-feature/tuple/tuple-parameter.slang#discovery-1	newly-unlocked-invariant	Tuple containing texture and sampler parameter values.
+optimization/func-resource-result/func-resource-result-simple.slang#discovery-1	newly-unlocked-invariant	Raw resource view returned from a helper.
+bindings/nested-parameter-block-3.slang#discovery-1	remaining-healthy-failure	Helper aggregate parameter ABI for a resource-bearing Scene.
+bugs/force-inline-array.slang#discovery-1	remaining-healthy-failure	Global device pointer to generic UserPointer conversion.
+bugs/parameter-block-load.slang#discovery-1	remaining-healthy-failure	Sequential pointer derived from loaded parameter-group storage.
+bugs/type-legalize-bug-1.slang#discovery-1	remaining-healthy-failure	Resource field pointer in a legalized aggregate.
+compute/buffer-type-splitting.slang#discovery-1	remaining-healthy-failure	Aggregate storage layout across buffer type splitting.
+compute/interface-shader-param.slang#discovery-1	remaining-healthy-failure	Conventional entry-point parameter ABI for interface data.
+compute/static-const-matrix-array.slang#discovery-1	remaining-healthy-failure	Canonical fixed-array value construction.
+language-feature/dynamic-dispatch/ptr-to-interface-double-indirect.slang#discovery-1	remaining-healthy-failure	Double-indirect helper pointer parameter ABI.
+language-feature/generics/generic-shader-object-cbuffer2.slang#discovery-1	remaining-healthy-failure	Generic entry-point parameter ABI for shader-object data.
+language-feature/pointer/groupshared-ptr-of-device.slang#discovery-1	remaining-healthy-failure	Shared storage containing device UserPointer values.
+language-feature/types/opaque/return-opaque-type-in-struct.slang#discovery-1	remaining-healthy-failure	Opaque aggregate helper result ABI.
+optimization/arrray-storage-lowering.slang#discovery-1	remaining-healthy-failure	Borrowed aggregate helper parameter after array storage lowering.
+optimization/func-resource-result/func-resource-result-complex.slang#discovery-1	remaining-healthy-failure	Fixed array of texture values loaded from conventional globals.

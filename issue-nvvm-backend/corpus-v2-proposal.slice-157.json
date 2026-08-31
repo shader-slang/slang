@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "status": "proposed-only",
+  "composition": {
+    "frozen_v1_rows": 452,
+    "baseline_tag_representatives": 23,
+    "newly_unlocked_invariants": 14,
+    "remaining_healthy_failures": 13,
+    "total_rows": 502,
+    "total_sources": 498
+  },
+  "exclusions_from_discovery": {
+    "tag_duplicate_original_successes": 22,
+    "unhealthy_native_references": 10
+  },
+  "healthy_mvp": {
+    "denominator": 477,
+    "o0_correct": 421,
+    "o0_percent": 88.3,
+    "o3_correct": 425,
+    "o3_percent": 89.1,
+    "both_correct": 421,
+    "both_percent": 88.3,
+    "both_failures": 56
+  },
+  "all_rows_native_reference": {
+    "correct": 499,
+    "infrastructure": 3
+  },
+  "identity_checks": {
+    "unique_addition_ids": 50,
+    "frozen_v1_id_overlap": 0,
+    "frozen_v1_source_overlap": 0,
+    "unhealthy_additions": 0
+  },
+  "approval_required_before_freeze": true
+}

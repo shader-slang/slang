@@ -2247,3 +2247,14 @@ denominator; discovery reaches 59/59/59 over 72. Both have zero old-correct loss
 prefix passes 427/427, and thirteen direct-O3 measurement gates assemble for SM70, SM80, and SM90.
 Frozen both-mode correctness is now 89.9%, so a deduplicated corpus-v2 proposal is due before any
 long-term baseline change; this slice changes neither corpus.
+
+Slice 157 proposes, but does not declare, a deduplicated corpus v2. The candidate retains all 452
+frozen-v1 identities and adds 50 healthy zero-overlap discovery rows: 23 one-per-tag original
+success representatives, all 14 newly unlocked invariants, and all 13 remaining healthy failures.
+It excludes 22 tag-duplicate original successes and ten unhealthy native-reference rows.
+
+The proposed composition is 502 workloads/477 healthy MVP references and currently measures
+421/425/421 O0/O3/both correctness (88.3%/89.1%/88.3%). The harder denominator is reported as a
+new candidate, not as a regression of v1. Corpus v1 remains 452/427, discovery remains 82/72, and
+no source, directive, runner manifest, provider ABI, or active baseline changes without explicit
+approval.
