@@ -1021,7 +1021,7 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isCUDATarget(targetRequest))
     {
         SLANG_PASS(preparePortableStructuralRayTracingEntryPoints, irEntryPoints);
         outLinkedIR.entryPoints = irEntryPoints;
@@ -1443,7 +1443,8 @@ Result linkAndOptimizeIR(
     }
 
     if (requiredLoweringPassSet.structuralRayTracingTrace &&
-        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest)))
+        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+         isCUDATarget(targetRequest)))
     {
         SLANG_PASS(synthesizePortableStructuralRayTracingEntryPoints, irEntryPoints, sink);
         outLinkedIR.entryPoints = irEntryPoints;
@@ -1735,14 +1736,16 @@ Result linkAndOptimizeIR(
     }
 
     if (requiredLoweringPassSet.structuralRayTracingTrace &&
-        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest)))
+        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+         isCUDATarget(targetRequest)))
         SLANG_PASS(lowerPortableStructuralRayTracingOperations);
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     SLANG_PASS(performForceInlining);
 
     if (requiredLoweringPassSet.structuralRayTracingStageInput &&
-        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest)))
+        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+         isCUDATarget(targetRequest)))
         SLANG_PASS(lowerPortableStructuralRayTracingStageInputOperations);
 
     // Specialization can introduce dead code that could trip
