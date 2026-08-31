@@ -14,7 +14,7 @@
 // capability, so the compile targets HLSL at `cs_6_6` rather than
 // SPIR-V; the CHECK pins the three-operand opcode in the user body.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o /dev/null -stage compute -entry main -profile cs_6_6
+//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o - -stage compute -entry main -profile cs_6_6
 
 uniform StructuredBuffer<int> sbuf;
 uniform RWStructuredBuffer<int> rwbuf;

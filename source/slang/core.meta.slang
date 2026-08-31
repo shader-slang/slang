@@ -5408,7 +5408,7 @@ semantic sv_waveindex
 
 semantic sv_barycentrics
 {
-    [require(fragment)]
+    [require(fragment, fragmentshaderbarycentric)]
     get : float3;
 }
 

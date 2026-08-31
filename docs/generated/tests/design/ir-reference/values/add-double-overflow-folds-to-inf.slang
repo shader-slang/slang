@@ -15,7 +15,7 @@
 // the IEEE-754 inf marker for the overflowing print path. The
 // payload itself is preserved (verified by downstream emit).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double da;
 uniform RWStructuredBuffer<double> buf;

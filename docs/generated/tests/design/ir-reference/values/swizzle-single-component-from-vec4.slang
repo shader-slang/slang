@@ -13,7 +13,7 @@
 // N-vector to make an M-vector". The smoke test covers the
 // M=3 case; this boundary probe takes M=1, the lower-edge length.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float4 v;
 uniform RWStructuredBuffer<float> buf;

@@ -17,7 +17,7 @@
 // position and a `Bool` result, so a three-operand or type-only encoding would
 // not match.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IShape { float area(); }
 struct Circle : IShape { float r; float area() { return r * r; } }

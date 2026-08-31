@@ -15,7 +15,7 @@
 // named `gTex` field key and follow its var layout to both attributes, so a
 // kind that moved off operand 0 would fail rather than silently re-read.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 Texture2D<float4> gTex;
 RWStructuredBuffer<float> gOut;

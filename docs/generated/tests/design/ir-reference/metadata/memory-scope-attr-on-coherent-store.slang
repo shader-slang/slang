@@ -15,7 +15,7 @@
 // emitted `store` to carry both ids, in that order, after its pointer and
 // value operands.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry computeMain -stage compute -capability vk_mem_model
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry computeMain -stage compute -capability vk_mem_model
 
 uniform int* inputBuffer;
 uniform int* outputBuffer;

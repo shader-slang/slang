@@ -13,7 +13,7 @@
 // width but signed source. Verifies that lowering keeps signed and unsigned
 // int-to-float bit-reinterprets under one `bitCast` opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<float> buf;

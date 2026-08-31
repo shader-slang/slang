@@ -16,7 +16,7 @@
 // asserts that the opcode shape is unchanged in IR by the warning
 // path.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint a;
 uniform RWStructuredBuffer<uint> buf;

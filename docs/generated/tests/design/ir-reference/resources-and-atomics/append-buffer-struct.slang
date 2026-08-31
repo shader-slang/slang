@@ -14,7 +14,7 @@
 // CHECK requires one `StructuredBufferAppend(%abuf, ...)` under
 // `func %main` — the struct is not split into per-field appends.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Item { int a; float b; }
 uniform AppendStructuredBuffer<Item> abuf;

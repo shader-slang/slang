@@ -14,7 +14,7 @@
 // generic's own block, above the `func` it parameterises. The CHECKs bind that
 // value and then assert the call inside the function body uses exactly it,
 // which is only possible if the lookup is an ordinary SSA value.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

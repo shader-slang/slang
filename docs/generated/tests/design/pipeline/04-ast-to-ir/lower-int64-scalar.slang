@@ -11,7 +11,7 @@
 
 // Boundary: storage axis — global `int64_t` parameter surface.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int64_t a;
 uniform RWStructuredBuffer<int> buf;

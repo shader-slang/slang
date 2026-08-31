@@ -14,7 +14,7 @@
 // visible. The orchestrator interleaves cleanup throughout the
 // post-link pipeline.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after eliminateDeadCode -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after eliminateDeadCode -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;
