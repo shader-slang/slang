@@ -1136,6 +1136,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
 
+    bool hasAlreadyRegisteredPayloadWriteback(IRType* payloadType) const
+    {
+        return m_payloadWritebacks.findFirstIndex(
+                   [&](const PayloadWritebackInfo& writeback)
+                   { return writeback.payloadType == payloadType; }) != -1;
+    }
+
     // Get C++ size and alignment of a type using CUDA layout rules.
     // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
     // vector alignment to match CUDA C++ compiler behavior and the prelude's layout.
@@ -2336,6 +2343,20 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             {
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
+
+                // The incoming value of an `inout` register payload is read once,
+                // on the `VaryingInput` pass; its outgoing value is produced by the
+                // write-back registered on that same pass. The `VaryingOutput` pass
+                // therefore has no register read to perform, so return an empty
+                // value (making the output assignment a no-op) rather than emitting
+                // a redundant readback. Match by payload type so that a distinct
+                // payload using the pointer-packing fallback still reaches its own
+                // output assignment.
+                if (info.kind == LayoutResourceKind::VaryingOutput &&
+                    hasAlreadyRegisteredPayloadWriteback(info.type))
+                {
+                    return LegalizedVaryingVal();
+                }
 
                 // Only use register-based payload for hit/miss/anyhit shaders
                 // Raygen shaders pass payload TO TraceRay, not receive it FROM registers
