@@ -15,7 +15,7 @@
 // `key` inst and then requires that same value to appear in the selector
 // position of the access, so the access cannot be resolving by name.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int v;
 uniform RWStructuredBuffer<int> buf;

@@ -486,13 +486,15 @@ void callHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
     // Copy arguments to the callee's working set.
     for (uint32_t i = 0; i < funcHeader->parameterCount; ++i)
     {
+        auto& srcOperand = inst->getOperand(i + 2);
         auto dst = newWorkingSetPtr + func.m_parameterOffsets[i];
-        auto src = (uint8_t*)inst->getOperand(i + 2).getPtr();
+        auto src = (uint8_t*)srcOperand.getPtr();
 
-        // func.m_parameterOffsets should be initialized to contain parameterCount+1 elements,
-        // where the last element is the total size of the parameters.
-        auto nextParamOffset = func.m_parameterOffsets[i + 1];
-        memcpy(dst, src, nextParamOffset - func.m_parameterOffsets[i]);
+        // pushFrame does not zero the callee frame, so any slot bytes beyond what is copied here
+        // are left uninitialized. That suffix is alignment padding outside the parameter value, so
+        // its contents are never interpreted as part of the parameter (see getCallArgumentCopySize
+        // for how the copy size is bounded).
+        memcpy(dst, src, func.getCallArgumentCopySize(i, srcOperand));
     }
     ctx->m_currentWorkingSet = newWorkingSetPtr;
     ctx->m_currentFuncCode = func.m_codeBuffer.getBuffer();

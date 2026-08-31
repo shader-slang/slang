@@ -13,7 +13,7 @@
 // struct-field types in the IR dump. A struct whose fields cover each
 // of these scalar widths surfaces all four opcodes in one IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Ints { int8_t a; int16_t b; int c; int64_t d; }
 

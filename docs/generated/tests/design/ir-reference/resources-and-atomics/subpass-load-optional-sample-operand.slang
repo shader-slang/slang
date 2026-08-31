@@ -19,7 +19,7 @@
 // two-operand form pins the literal sample index, which is the only thing
 // that distinguishes it from the nullary form in the dump text.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage fragment -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage fragment -entry main
 
 SubpassInput<float4> input;
 SubpassInputMS<float4> inputMS;

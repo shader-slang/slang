@@ -3,7 +3,7 @@
 # This script runs when a new ephemeral Windows GPU VM boots. It:
 # 1. Removes any pre-existing runner service from the base image
 # 2. Updates the preinstalled GitHub Actions runner if its version differs
-#    from $RunnerVersion (no-op when the image is already up to date)
+#    from GitHub's latest release (no-op when the image is already current)
 # 3. Reads the JIT (just-in-time) runner config from GCP instance metadata
 # 4. Configures the GitHub Actions runner with the JIT config
 # 5. Runs the runner (executes one job, then exits)
@@ -16,14 +16,6 @@ $ErrorActionPreference = "Stop"
 
 $runnerDir = "C:\actions-runner"
 $logFile = "C:\actions-runner\startup.log"
-
-# When this version differs from the runner binary baked into the GCP image,
-# the script downloads and extracts the matching release before registration.
-# Bumping this constant + redeploying the scaler is enough to roll out a new
-# runner version without rebuilding the GCP image. Image rebakes are an
-# optimization to skip the per-boot download cost.
-$RunnerVersion = "2.334.0"
-$RunnerSha256 = "a0c896f3acf37841cc17f392a38111d39501e56f2990434567f027ee89cf8981"
 
 function Write-Log {
     param([string]$Message)
@@ -97,18 +89,50 @@ catch {
 }
 
 # Step 0.5: Update the runner binary if the image has a stale version.
-# When the baked binary already matches $RunnerVersion this is a sub-second
-# version-check no-op; only mismatched versions pay the download cost.
+# When the baked binary already matches GitHub's latest release this is a
+# sub-second version-check no-op; only mismatched versions pay the download
+# cost.
 $installedRunnerVersion = Get-InstalledRunnerVersion
 if (-not $installedRunnerVersion) {
     $installedRunnerVersion = "unknown"
 }
 Write-Log "Current Actions runner version: $installedRunnerVersion"
 
-if ($installedRunnerVersion -ne $RunnerVersion) {
-    Write-Log "Updating Actions runner to v${RunnerVersion}..."
+# Ask GitHub for the latest release instead of comparing against a hardcoded
+# pin. A hardcoded $RunnerVersion constant previously went stale twice
+# (2026-04-29, 2026-08-11): GitHub deprecates old runner binaries and rejects
+# their registration attempts, so every VM booted with the stale pin baked in
+# died before it could pick up a job, and someone had to notice the outage
+# and bump the constant by hand. Querying "latest" removes that manual step;
+# every boot self-heals against whatever GitHub currently accepts.
+try {
+    $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/actions/runner/releases/latest" -UseBasicParsing -TimeoutSec 30
+    $latestRunnerVersion = $latestRelease.tag_name.TrimStart("v")
+}
+catch {
+    Stop-WithFailure "Failed to determine latest Actions runner version from GitHub API: $_"
+}
+if (-not $latestRunnerVersion) {
+    Stop-WithFailure "Failed to determine latest Actions runner version from GitHub API"
+}
+Write-Log "Latest Actions runner version: $latestRunnerVersion"
+
+# GitHub started publishing a "digest" field on every release asset in June
+# 2025 (https://github.blog/changelog/2025-06-03-releases-now-expose-digests-for-release-assets/),
+# so tracking "latest" does not have to give up checksum verification —
+# read it from the same release object already fetched above instead of
+# issuing a second request.
+$runnerAssetName = "actions-runner-win-x64-${latestRunnerVersion}.zip"
+$runnerAsset = $latestRelease.assets | Where-Object { $_.name -eq $runnerAssetName } | Select-Object -First 1
+if (-not $runnerAsset -or -not $runnerAsset.digest) {
+    Stop-WithFailure "Failed to determine SHA-256 digest for ${runnerAssetName} from GitHub API"
+}
+$expectedHash = ($runnerAsset.digest -replace '^sha256:', '').ToLowerInvariant()
+
+if ($installedRunnerVersion -ne $latestRunnerVersion) {
+    Write-Log "Updating Actions runner to v${latestRunnerVersion}..."
     $runnerArchive = Join-Path $env:TEMP ("actions-runner-{0}.zip" -f ([guid]::NewGuid().ToString("N")))
-    $runnerUrl = "https://github.com/actions/runner/releases/download/v${RunnerVersion}/actions-runner-win-x64-${RunnerVersion}.zip"
+    $runnerUrl = "https://github.com/actions/runner/releases/download/v${latestRunnerVersion}/${runnerAssetName}"
 
     # Retry the download a few times to tolerate transient network errors,
     # mirroring the curl --retry 3 behaviour on the Linux side.
@@ -128,34 +152,33 @@ if ($installedRunnerVersion -ne $RunnerVersion) {
         }
     }
     if (-not $downloadOk) {
-        Stop-WithFailure "Failed to download Actions runner v${RunnerVersion} after ${downloadAttempts} attempts" $runnerArchive
+        Stop-WithFailure "Failed to download Actions runner v${latestRunnerVersion} after ${downloadAttempts} attempts" $runnerArchive
     }
 
     try {
         $actualHash = (Get-FileHash -Path $runnerArchive -Algorithm SHA256).Hash.ToLowerInvariant()
     }
     catch {
-        Stop-WithFailure "Failed to hash Actions runner v${RunnerVersion}: $_" $runnerArchive
+        Stop-WithFailure "Failed to hash Actions runner v${latestRunnerVersion}: $_" $runnerArchive
     }
 
-    $expectedHash = $RunnerSha256.ToLowerInvariant()
     if ($actualHash -ne $expectedHash) {
-        Stop-WithFailure "Actions runner v${RunnerVersion} checksum verification failed (expected ${RunnerSha256}, got ${actualHash})" $runnerArchive
+        Stop-WithFailure "Actions runner v${latestRunnerVersion} checksum verification failed (expected ${expectedHash}, got ${actualHash})" $runnerArchive
     }
 
     try {
         Expand-Archive -Path $runnerArchive -DestinationPath $runnerDir -Force
     }
     catch {
-        Stop-WithFailure "Failed to extract Actions runner v${RunnerVersion}: $_" $runnerArchive
+        Stop-WithFailure "Failed to extract Actions runner v${latestRunnerVersion}: $_" $runnerArchive
     }
 
     Remove-Item $runnerArchive -Force -ErrorAction SilentlyContinue
 
     $updatedRunnerVersion = Get-InstalledRunnerVersion
     Write-Log "Actions runner version after update: $(if ($updatedRunnerVersion) { $updatedRunnerVersion } else { 'unknown' })"
-    if ($updatedRunnerVersion -ne $RunnerVersion) {
-        Stop-WithFailure "Runner version mismatch after update (expected ${RunnerVersion}, got $(if ($updatedRunnerVersion) { $updatedRunnerVersion } else { 'unknown' }))"
+    if ($updatedRunnerVersion -ne $latestRunnerVersion) {
+        Stop-WithFailure "Runner version mismatch after update (expected ${latestRunnerVersion}, got $(if ($updatedRunnerVersion) { $updatedRunnerVersion } else { 'unknown' }))"
     }
 }
 
