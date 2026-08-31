@@ -4057,7 +4057,7 @@ warning(
     "deprecated generic-parameter-count overload tie-breaker",
     span {
         loc = "location",
-        message = "overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c"
+        message = "overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c"
     }
 )
 

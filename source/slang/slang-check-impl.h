@@ -1298,7 +1298,8 @@ public:
     }
 
     // This context stores a non-owning pointer. Reject a temporary owner so that its destruction
-    // cannot leave `m_shared` dangling; callers with a `RefPtr` must keep that owner in a local.
+    // cannot leave `m_shared` dangling. An lvalue `RefPtr` intentionally reaches the raw-pointer
+    // constructor through its implicit conversion while the caller keeps that owner in a local.
     SemanticsContext(RefPtr<SharedSemanticsContext>&&) = delete;
 
     SharedSemanticsContext* getShared() { return m_shared; }
@@ -1647,7 +1648,8 @@ struct SemanticsVisitor : public SemanticsContext
     {
     }
 
-    // Keep direct visitor construction subject to the ownership rule on `SemanticsContext`.
+    // Keep direct visitor construction subject to the ownership rule on `SemanticsContext`; an
+    // lvalue `RefPtr` still reaches the raw-pointer constructor through its implicit conversion.
     SemanticsVisitor(RefPtr<SharedSemanticsContext>&&) = delete;
 
     SemanticsVisitor(SemanticsContext const& context)
@@ -3454,21 +3456,23 @@ public:
     int CompareOverloadCandidates(OverloadCandidate* left, OverloadCandidate* right);
 
     /// Applies the pre-202c generic-parameter-count tie-breaker after all ordinary ranking rules.
-    /// On success, moves the unique selected candidate into `context.bestCandidateStorage`, points
+    /// On success, copies the unique selected candidate into `context.bestCandidateStorage`, points
     /// `context.bestCandidate` at that storage, clears `context.bestCandidates`, and returns true.
+    /// When `warningSink` is non-null, also emits the deprecation warning at `warningLocation`.
     /// On failure, leaves `context` unchanged and returns false.
     ///
-    /// The final source-level call sites are `ResolveInvoke` and `_coerce`. A caller must emit the
-    /// deprecation warning when this returns true and it is materializing a source-level
-    /// expression. `ResolveInvoke` always materializes; `_coerce` does so only when it receives
-    /// both `outToExpr` and `sink`. A speculative conversion-cost probe must stay silent and let
-    /// the eventual materialization warn. Any new caller must follow the same policy.
+    /// The final source-level call sites are `ResolveInvoke` and `_coerce`. `ResolveInvoke` always
+    /// materializes an expression and passes its sink. `_coerce` passes its sink only when it also
+    /// receives `outToExpr`; a speculative conversion-cost probe passes null so that the eventual
+    /// materialization reports the warning.
     bool tryResolveOverloadUsingLegacyGenericParameterCountFallback(
-        OverloadResolveContext& context);
+        OverloadResolveContext& context,
+        SourceLoc warningLocation,
+        DiagnosticSink* warningSink);
 
-    /// Returns the number of required parameters on the generic specialized by `declRef`, or zero
-    /// when `declRef` is not the inner declaration of a generic.
-    Int getSpecializedParamCount(DeclRef<Decl> const& declRef);
+    /// Returns the required parameter count of the generic whose inner declaration `declRef`
+    /// names, or zero when `declRef` does not name a generic's inner declaration.
+    Int getRequiredGenericParameterCount(DeclRef<Decl> const& declRef);
 
     /// Compare items `left` and `right` produced by lookup, to see if one should be favored for
     /// overloading.

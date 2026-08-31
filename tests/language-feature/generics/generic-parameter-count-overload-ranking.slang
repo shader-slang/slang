@@ -112,9 +112,9 @@ void test()
     // the parameter count no longer breaks the tie.
     BroadResult result = choose(float3(0.0));
 //LEGACY: deprecated generic-parameter-count overload tie-breaker
-//LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
+//LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c
 //ERROR: error[E40021]: deprecated generic-parameter-count overload tie-breaker
-//ERROR: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
+//ERROR: overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c
 //SLANG202C: ambiguous call to 'choose' with arguments of type (vector<float,3>)
 
     // The fixed-size overload accepts a strict subset of the variable-size overload's domain, but
@@ -122,9 +122,9 @@ void test()
     // happens to choose the fixed-size declaration; Slang 202c conservatively reports ambiguity.
     FixedShapeResult shapeResult = chooseShape(float3(0.0));
 //LEGACY: deprecated generic-parameter-count overload tie-breaker
-//LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
+//LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c
 //ERROR: error[E40021]: deprecated generic-parameter-count overload tie-breaker
-//ERROR: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
+//ERROR: overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c
 //SLANG202C: ambiguous call to 'chooseShape' with arguments of type (vector<float,3>)
 
     // Equal required generic-parameter counts cannot select a unique compatibility candidate. The

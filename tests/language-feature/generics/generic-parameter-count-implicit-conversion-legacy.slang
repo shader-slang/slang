@@ -41,11 +41,11 @@ void test()
 {
     acceptConverted(float3(0.0));
 //CHECK:                  ^ deprecated generic-parameter-count overload tie-breaker
-//CHECK:                  ^ overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
+//CHECK:                  ^ overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c
 
     // A compatibility-selected conversion must not enter the implicit-cast cache. This second
     // conversion therefore resolves the tie again and emits its own warning.
     acceptConverted(float3(1.0));
 //CHECK:                  ^ deprecated generic-parameter-count overload tie-breaker
-//CHECK:                  ^ overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
+//CHECK:                  ^ overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c
 }

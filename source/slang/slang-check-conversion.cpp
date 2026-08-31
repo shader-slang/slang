@@ -2634,18 +2634,15 @@ bool SemanticsVisitor::_coerce(
         AddTypeOverloadCandidates(toType, overloadContext);
     }
 
-    bool usedLegacyGenericParameterCountFallback =
-        tryResolveOverloadUsingLegacyGenericParameterCountFallback(overloadContext);
     // `canCoerce` performs a speculative cost probe by passing a null `outToExpr`; materialized
     // conversions pass storage for the result. Apply the legacy compatibility fallback in both
-    // cases, but warn only for a materialized conversion with a diagnostic sink. A null sink
-    // explicitly requests a non-diagnostic operation, so there is nowhere to report the
-    // deprecation.
-    if (usedLegacyGenericParameterCountFallback && outToExpr && sink)
-    {
-        sink->diagnose(Diagnostics::DeprecatedGenericParameterCountOverloadTieBreaker{
-            .location = overloadContext.loc});
-    }
+    // cases, but supply the sink only for a materialized conversion. A null sink explicitly
+    // requests a non-diagnostic operation, so there is nowhere to report the deprecation.
+    bool usedLegacyGenericParameterCountFallback =
+        tryResolveOverloadUsingLegacyGenericParameterCountFallback(
+            overloadContext,
+            overloadContext.loc,
+            outToExpr ? sink : nullptr);
 
     // After all of the overload candidates have been added
     // to the context and processed, we need to see whether

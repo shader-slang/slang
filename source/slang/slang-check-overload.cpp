@@ -1834,7 +1834,7 @@ bool isInterfaceRequirement(ASTBuilder* builder, DeclRef<Decl> const& declRef)
 }
 
 /// Returns the parent generic when `declRef` names that generic's inner declaration.
-static DeclRef<GenericDecl> _getSpecializedGenericParent(DeclRef<Decl> const& declRef)
+static DeclRef<GenericDecl> _getGenericParentOfInnerDeclRef(DeclRef<Decl> const& declRef)
 {
     if (!declRef)
         return DeclRef<GenericDecl>();
@@ -1858,11 +1858,11 @@ static DeclRef<GenericDecl> _getSpecializedGenericParent(DeclRef<Decl> const& de
     return parentGeneric;
 }
 
-/// Returns the number of required parameters on the generic specialized by `declRef`.
-/// Returns zero when `declRef` is not the inner declaration of a generic.
-Int SemanticsVisitor::getSpecializedParamCount(DeclRef<Decl> const& declRef)
+/// Returns the required parameter count of the generic whose inner declaration `declRef` names.
+/// Returns zero when `declRef` does not name a generic's inner declaration.
+Int SemanticsVisitor::getRequiredGenericParameterCount(DeclRef<Decl> const& declRef)
 {
-    auto parentGeneric = _getSpecializedGenericParent(declRef);
+    auto parentGeneric = _getGenericParentOfInnerDeclRef(declRef);
     if (!parentGeneric)
         return 0;
 
@@ -2163,10 +2163,10 @@ int SemanticsVisitor::compareOverloadCandidateSpecificity(
     // does not. Preserve that semantic relationship as an ordinary ranking rule; unlike comparing
     // two generics' parameter counts, it is not a compatibility heuristic and remains valid in
     // Slang 202c.
-    bool leftIsSpecializedGeneric = _getSpecializedGenericParent(left.declRef) != nullptr;
-    bool rightIsSpecializedGeneric = _getSpecializedGenericParent(right.declRef) != nullptr;
-    if (leftIsSpecializedGeneric != rightIsSpecializedGeneric)
-        return int(leftIsSpecializedGeneric) - int(rightIsSpecializedGeneric);
+    bool leftIsGenericInnerDecl = _getGenericParentOfInnerDeclRef(left.declRef) != nullptr;
+    bool rightIsGenericInnerDecl = _getGenericParentOfInnerDeclRef(right.declRef) != nullptr;
+    if (leftIsGenericInnerDecl != rightIsGenericInnerDecl)
+        return int(leftIsGenericInnerDecl) - int(rightIsGenericInnerDecl);
 
     // A principled specificity comparison would determine whether one candidate's accepted
     // argument domain is a strict subset of the other's. Slang does not implement that comparison
@@ -2400,7 +2400,9 @@ int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, Overloa
 }
 
 bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCountFallback(
-    OverloadResolveContext& context)
+    OverloadResolveContext& context,
+    SourceLoc warningLocation,
+    DiagnosticSink* warningSink)
 {
     if (isSlang202cOrLater(this) || context.bestCandidates.getCount() < 2)
     {
@@ -2411,6 +2413,8 @@ bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCountFallbac
     // candidates for which that comparison returns zero, so a frontier is homogeneous. A tied
     // frontier of failed candidates is useful for the ordinary overload diagnostic, but the
     // compatibility fallback must not turn one of those failures into a selected declaration.
+    // Every candidate in `bestCandidates` has the same status, so element zero represents the
+    // entire frontier.
     auto candidateStatus = context.bestCandidates[0].status;
     for (auto& candidate : context.bestCandidates)
         SLANG_ASSERT(candidate.status == candidateStatus);
@@ -2431,13 +2435,13 @@ bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCountFallbac
     // overriding a meaningful comparison such as `OverloadRank`.
     Index bestCandidateIndex = 0;
     Int bestGenericParameterCount =
-        getSpecializedParamCount(context.bestCandidates[bestCandidateIndex].item.declRef);
+        getRequiredGenericParameterCount(context.bestCandidates[bestCandidateIndex].item.declRef);
     bool hasUniqueBestCandidate = true;
 
     for (Index i = 1; i < context.bestCandidates.getCount(); ++i)
     {
         Int genericParameterCount =
-            getSpecializedParamCount(context.bestCandidates[i].item.declRef);
+            getRequiredGenericParameterCount(context.bestCandidates[i].item.declRef);
         if (genericParameterCount < bestGenericParameterCount)
         {
             bestCandidateIndex = i;
@@ -2456,6 +2460,11 @@ bool SemanticsVisitor::tryResolveOverloadUsingLegacyGenericParameterCountFallbac
     context.bestCandidateStorage = context.bestCandidates[bestCandidateIndex];
     context.bestCandidate = &context.bestCandidateStorage;
     context.bestCandidates.clear();
+    if (warningSink)
+    {
+        warningSink->diagnose(Diagnostics::DeprecatedGenericParameterCountOverloadTieBreaker{
+            .location = warningLocation});
+    }
     return true;
 }
 
@@ -3485,13 +3494,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         AddOverloadCandidates(funcExpr, context);
     }
 
-    if (tryResolveOverloadUsingLegacyGenericParameterCountFallback(context))
-    {
-        // `ResolveInvoke` is final source-level resolution, never a speculative cost probe, so a
-        // successful legacy compatibility fallback always reports its deprecation here.
-        getSink()->diagnose(
-            Diagnostics::DeprecatedGenericParameterCountOverloadTieBreaker{.location = expr->loc});
-    }
+    tryResolveOverloadUsingLegacyGenericParameterCountFallback(context, expr->loc, getSink());
 
     if (context.bestCandidates.getCount() > 0)
     {
