@@ -2347,3 +2347,16 @@ The reduced Float64 vector and matrix workloads become correct at O0 and O3 and 
 lanes. Frozen v1 reaches 396/400/396 over its unchanged 427 healthy denominator; discovery remains
 64/64/64 over 72. Both have zero old-correct loss. The selected prefix passes 433/433, and all 26
 representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 165 makes explicit aggregate Storage use outrank the optional helper-value representation
+when recursively lowering struct fields. A `UserPointer<T>` field in synthesized conventional
+global storage therefore remains a physical LLVM AS1 pointer until the established executable
+helper boundary converts it once to generic AS0. Pointer-bearing group-shared storage carries that
+generic value in AS3 memory without changing the pointer value itself. The provider retains its
+strict identity, pointee, insertion-point, and address-space checks; ABI revision 31 is unchanged.
+
+Discovery `force-inline-array` and `groupshared-ptr-of-device` become correct at O0 and O3 and gain
+four permanent direct lanes. Discovery advances from 64/64/64 to 66/66/66 over its unchanged 72
+healthy references, with exactly two gains and no loss. Frozen v1 remains 396/400/396 over its
+unchanged 427 healthy denominator with zero old-correct loss. The selected prefix passes 433/433,
+and all 28 representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.

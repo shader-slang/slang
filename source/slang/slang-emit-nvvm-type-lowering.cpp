@@ -1860,6 +1860,10 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
         use == NVVMTypeUse::HelperValue               ? NVVMTypeUse::HelperValue
         : use == NVVMTypeUse::StructuredBufferStorage ? NVVMTypeUse::StructuredBufferStorage
         : use == NVVMTypeUse::ParameterGroupStorage   ? NVVMTypeUse::ParameterGroupStorage
+        // Conventional global storage is producer-proven device memory even when the aggregate
+        // also has a valid helper-value representation. Preserve that storage role recursively so
+        // UserPointer fields remain AS1 until they cross an executable helper-value boundary.
+        : use == NVVMTypeUse::Storage ? NVVMTypeUse::Storage
         : (asNVVMSupportedHelperStructType(type) && !isNVVMSupportedCopyableValueType(type))
             ? NVVMTypeUse::HelperValue
         : asNVVMSupportedHelperStructType(type) ||

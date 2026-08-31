@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "workloads": [
+    { "name": "generic-diamond-call-graph", "source": "tests/compute/generic-diamond-pattern-2.slang", "census_id": "compute/generic-diamond-pattern-2.slang#discovery-1" },
+    { "name": "generic-arithmetic-matrix", "source": "tests/language-feature/generics/generic-arithmetic-coerce.slang", "census_id": "language-feature/generics/generic-arithmetic-coerce.slang#discovery-1" },
+    { "name": "large-loop-control-flow", "source": "tests/ir/loop-inversion.slang", "census_id": "ir/loop-inversion.slang#discovery-1" },
+    { "name": "nested-parameter-block-resources", "source": "tests/bindings/nested-parameter-block-2.slang", "census_id": "bindings/nested-parameter-block-2.slang#discovery-1" },
+    { "name": "constant-buffer-resource-helper", "source": "tests/compute/cbuffer-legalize.slang", "census_id": "compute/cbuffer-legalize.slang#discovery-1" },
+    { "name": "generic-cbuffer-resource-graph", "source": "tests/language-feature/generics/generic-shader-object-cbuffer.slang", "census_id": "language-feature/generics/generic-shader-object-cbuffer.slang#discovery-1" },
+    { "name": "scalar-parameter-group-unification", "source": "tests/language-feature/generics/parameter-block-unify.slang", "census_id": "language-feature/generics/parameter-block-unify.slang#discovery-1" },
+    { "name": "tuple-texture-sampler-parameter", "source": "tests/language-feature/tuple/tuple-parameter.slang", "census_id": "language-feature/tuple/tuple-parameter.slang#discovery-1" },
+    { "name": "composable-local-aggregate-pointers", "source": "tests/compute/pointer-emit.slang", "census_id": "compute/pointer-emit.slang#discovery-1" },
+    { "name": "raw-buffer-helper-result", "source": "tests/optimization/func-resource-result/func-resource-result-simple.slang", "census_id": "optimization/func-resource-result/func-resource-result-simple.slang#discovery-1" },
+    { "name": "existential-specialization-call-graph", "source": "tests/language-feature/dynamic-dispatch/array-of-interfaces-interproc.slang", "census_id": "language-feature/dynamic-dispatch/array-of-interfaces-interproc.slang#discovery-1" },
+    { "name": "variadic-pack-specialization", "source": "tests/language-feature/generics/variadic-pack-query-pack-conformance.slang", "census_id": "language-feature/generics/variadic-pack-query-pack-conformance.slang#discovery-1" },
+    { "name": "anyvalue-word-reconstruction", "source": "tests/language-feature/dynamic-dispatch/anyvalue-bulk-copy.slang", "census_id": "language-feature/dynamic-dispatch/anyvalue-bulk-copy.slang#discovery-1" },
+    { "name": "resource-aggregate-helper-result", "source": "tests/language-feature/types/opaque/return-opaque-type-in-struct.slang", "census_id": "language-feature/types/opaque/return-opaque-type-in-struct.slang#discovery-1" },
+    { "name": "optional-structured-buffer-payload", "source": "tests/language-feature/dynamic-dispatch/optional-single-concrete-layout.slang", "census_id": "language-feature/dynamic-dispatch/optional-single-concrete-layout.slang#cuda-1" },
+    { "name": "optional-descriptor-handles", "source": "tests/language-feature/optional-descriptor-handle.slang", "census_id": "language-feature/optional-descriptor-handle.slang#cuda-1" },
+    { "name": "conventional-aggregate-helper-transport", "source": "tests/cuda/copy-elision-this-2.slang", "census_id": "cuda/copy-elision-this-2.slang#cuda-1" },
+    { "name": "nested-parameter-group-method-graph", "source": "tests/bindings/nested-parameter-block-3.slang", "census_id": "bindings/nested-parameter-block-3.slang#discovery-1" },
+    { "name": "generic-parameter-group-entry", "source": "tests/language-feature/generics/generic-shader-object-cbuffer2.slang", "census_id": "language-feature/generics/generic-shader-object-cbuffer2.slang#discovery-1" },
+    { "name": "recursive-structured-buffer-storage", "source": "tests/bugs/gh-5776.slang", "census_id": "bugs/gh-5776.slang#cuda-1" },
+    { "name": "structured-buffer-vector-subobject", "source": "tests/bugs/parameter-block-load.slang", "census_id": "bugs/parameter-block-load.slang#discovery-1" },
+    { "name": "active-mask-switch", "source": "tests/hlsl-intrinsic/active-mask/switch.slang", "census_id": "hlsl-intrinsic/active-mask/switch.slang#cuda-1" },
+    { "name": "active-mask-switch-no-default", "source": "tests/hlsl-intrinsic/active-mask/switch-no-default.slang", "census_id": "hlsl-intrinsic/active-mask/switch-no-default.slang#cuda-1" },
+    { "name": "divergent-switch-reconvergence", "source": "tests/language-feature/execution-model/wave-switch-divergence-functional.slang", "census_id": "language-feature/execution-model/wave-switch-divergence-functional.slang#cuda-1" },
+    { "name": "float64-vector-algebra", "source": "tests/hlsl-intrinsic/vector-double-reduced-intrinsic.slang", "census_id": "hlsl-intrinsic/vector-double-reduced-intrinsic.slang#cuda-1" },
+    { "name": "float64-matrix-row-algebra", "source": "tests/hlsl-intrinsic/matrix-double-reduced-intrinsic.slang", "census_id": "hlsl-intrinsic/matrix-double-reduced-intrinsic.slang#cuda-1" },
+    { "name": "conventional-global-user-pointer-helper", "source": "tests/bugs/force-inline-array.slang", "census_id": "bugs/force-inline-array.slang#discovery-1" },
+    { "name": "groupshared-user-pointer-transport", "source": "tests/language-feature/pointer/groupshared-ptr-of-device.slang", "census_id": "language-feature/pointer/groupshared-ptr-of-device.slang#discovery-1" }
+  ]
+}

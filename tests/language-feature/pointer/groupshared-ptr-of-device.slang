@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv -capability vk_mem_model+sm_6_0+spvGroupNonUniformBallot
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -capability vk_mem_model+sm_6_0+spvGroupNonUniformBallot
+//TEST(compute, nvvm):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 // Tests if we pass-through and handle pointers via groupshared-memory correctly.
 // Ensure SPIRV emits coherent operations here

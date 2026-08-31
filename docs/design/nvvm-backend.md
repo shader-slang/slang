@@ -7059,6 +7059,26 @@ direct lanes. Frozen corpus v1 remains exactly 452 workloads/427 healthy referen
 Discovery remains exactly 82/72 and 64/64/64. The selected prefix passes 433/433, and all 26
 representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
 
+### Slice 165: UserPointer storage-to-helper transport
+
+Direct NVVM now preserves an explicit aggregate Storage use recursively before considering whether
+the same struct also has a valid helper-value representation. This distinction matters for a
+`UserPointer<T>` field in the synthesized conventional global block: the field is physical device
+memory and therefore lowers as LLVM address space 1, while a pointer-bearing local or helper value
+uses the generic executable address space 0.
+
+The existing executable-value boundary performs the one required typed AS1-to-AS0 conversion.
+Group-shared aggregates may then store that generic pointer value in AS3 memory and load it again
+without changing the pointer's address space. The provider continues to reject identity casts,
+mismatched pointees, and unsupported address spaces; provider ABI revision 31 is unchanged.
+
+The conventional-global helper and group-shared pointer-transport workloads become correct at O0
+and O3 and gain four permanent direct lanes. Frozen corpus v1 remains exactly 452 workloads/427
+healthy references at 396/400/396 O0/O3/both-mode correctness, with zero old-correct loss.
+Discovery remains exactly 82/72 and advances to 66/66/66 with exactly two gains and no loss. The
+selected prefix passes 433/433, and all 28 representative direct-O3 gates assemble with CUDA 12.9
+for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
