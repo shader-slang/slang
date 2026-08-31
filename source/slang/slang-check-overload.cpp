@@ -2157,9 +2157,12 @@ int SemanticsVisitor::compareOverloadCandidateSpecificity(
         return -1;
 
     // A non-generic declaration accepts a strict subset of the calls accepted by an otherwise
-    // equivalent generic specialization. Preserve that semantic relationship as an ordinary
-    // ranking rule; unlike comparing two generics' parameter counts, it is not a compatibility
-    // heuristic and remains valid in Slang 202c.
+    // equivalent generic specialization. This relationship depends on whether the declaration is
+    // generic, not on how many of its parameters are required: a generic whose parameters all have
+    // defaults still accepts explicit specialization arguments that the non-generic declaration
+    // does not. Preserve that semantic relationship as an ordinary ranking rule; unlike comparing
+    // two generics' parameter counts, it is not a compatibility heuristic and remains valid in
+    // Slang 202c.
     bool leftIsSpecializedGeneric = _getSpecializedGenericParent(left.declRef) != nullptr;
     bool rightIsSpecializedGeneric = _getSpecializedGenericParent(right.declRef) != nullptr;
     if (leftIsSpecializedGeneric != rightIsSpecializedGeneric)

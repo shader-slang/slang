@@ -67,6 +67,16 @@ GenericResult preferNonGeneric<T>(T value)
     return GenericResult();
 }
 
+NonGenericResult preferNonGenericWithDefault(int value)
+{
+    return NonGenericResult();
+}
+
+GenericResult preferNonGenericWithDefault<T = int>(int value)
+{
+    return GenericResult();
+}
+
 void equalGenericCount<T>(T first, float3 second)
 {
 }
@@ -152,6 +162,11 @@ void test()
     // use or warn about the compatibility fallback. The distinct result types make the assignment
     // verify which overload was selected.
     NonGenericResult nonGenericResult = preferNonGeneric(1);
+
+    // The non-generic rule depends on the presence of a generic specialization, not its number of
+    // required parameters. Even though `T` has a default, the generic declaration also accepts
+    // explicit specialization arguments and therefore has the broader domain.
+    NonGenericResult defaultedNonGenericResult = preferNonGenericWithDefault(1);
 
     // OverloadRank is an ordinary ranking criterion, so it resolves this call before the legacy
     // fallback is considered in both language versions. The distinct result types make the

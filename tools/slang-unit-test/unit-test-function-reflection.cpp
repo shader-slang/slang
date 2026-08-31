@@ -34,26 +34,40 @@ static const char* kLanguageVersionOverloadSource = R"(
     {
         return ShapedResult();
     }
+
+    public BroadResult rankedChoose<T : IFloat>(T value)
+    {
+        return BroadResult();
+    }
+
+    __generic<T : __BuiltinFloatingPointType, let N : int>
+    [OverloadRank(1)]
+    public ShapedResult rankedChoose(vector<T, N> value)
+    {
+        return ShapedResult();
+    }
 )";
 
-// Resolves the return type selected for `choose(float3)` in `layout`.
-static String resolveChooseReturnType(slang::ProgramLayout* layout)
+// Resolves the return type selected for `functionName(float3)` in `layout`.
+static String resolveFunctionReturnType(slang::ProgramLayout* layout, const char* functionName)
 {
     SLANG_CHECK_ABORT(layout != nullptr);
-    auto choose = layout->findFunctionByName("choose");
-    SLANG_CHECK_ABORT(choose != nullptr);
+    auto function = layout->findFunctionByName(functionName);
+    SLANG_CHECK_ABORT(function != nullptr);
     auto float3Type = layout->findTypeByName("float3");
     SLANG_CHECK_ABORT(float3Type != nullptr);
 
     slang::TypeReflection* argTypes[] = {float3Type};
-    auto resolved = choose->specializeWithArgTypes(1, argTypes);
+    auto resolved = function->specializeWithArgTypes(1, argTypes);
     return resolved ? getTypeFullName(resolved->getReturnType()) : String();
 }
 
-// Resolves the return type of `choose(float3)` through reflection in a fresh session configured
-// for `languageVersion`. A fresh session isolates the version policy under test from module and
+// Resolves `functionName(float3)` through reflection in a fresh session configured for
+// `languageVersion`. A fresh session isolates the version policy under test from module and
 // reflection caches created by the other case.
-static String resolveChooseReturnTypeForLanguageVersion(SlangLanguageVersion languageVersion)
+static String resolveFunctionReturnTypeForLanguageVersion(
+    SlangLanguageVersion languageVersion,
+    const char* functionName)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -84,7 +98,7 @@ static String resolveChooseReturnTypeForLanguageVersion(SlangLanguageVersion lan
         diagnostics.writeRef());
     SLANG_CHECK_ABORT(module != nullptr);
 
-    return resolveChooseReturnType(module->getLayout());
+    return resolveFunctionReturnType(module->getLayout(), functionName);
 }
 
 // Test that the reflection API provides correct info about entry point and ordinary functions.
@@ -293,11 +307,19 @@ SLANG_UNIT_TEST(functionReflection)
 SLANG_UNIT_TEST(reflectionOverloadUsesSessionLanguageVersion)
 {
     SLANG_CHECK(
-        resolveChooseReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_2026) == "BroadResult");
-    // The diagnostics test proves that the 202c overload set is ambiguous. This assertion only
-    // verifies that reflection applies that language policy instead of selecting the 2026 result.
+        resolveFunctionReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_2026, "choose") ==
+        "BroadResult");
+    // The public reflection specialization API reports failure as null and does not expose its
+    // diagnostic sink. First prove that 202c reflection can resolve this same pair of candidate
+    // shapes when the ordinary OverloadRank rule distinguishes them. The diagnostics test proves
+    // that the otherwise-identical `choose` overload set fails specifically because it is
+    // ambiguous, while the final assertion verifies that reflection applies that policy.
     SLANG_CHECK(
-        resolveChooseReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_202C).getLength() == 0);
+        resolveFunctionReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_202C, "rankedChoose") ==
+        "ShapedResult");
+    SLANG_CHECK(
+        resolveFunctionReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_202C, "choose")
+            .getLength() == 0);
 }
 
 // Legacy compile requests can process command-line options after reflection has initialized its
@@ -319,13 +341,13 @@ SLANG_UNIT_TEST(reflectionRefreshesChangedLanguageVersion)
     SLANG_CHECK_ABORT(spCompile(request) == SLANG_OK);
 
     auto layout = slang::ShaderReflection::get(request);
-    SLANG_CHECK(resolveChooseReturnType(layout) == "BroadResult");
+    SLANG_CHECK(resolveFunctionReturnType(layout, "choose") == "BroadResult");
 
     const char* slang202cArgs[] = {"-std", "202c"};
     SLANG_CHECK_ABORT(
         spProcessCommandLineArguments(request, slang202cArgs, SLANG_COUNT_OF(slang202cArgs)) ==
         SLANG_OK);
-    SLANG_CHECK(resolveChooseReturnType(layout).getLength() == 0);
+    SLANG_CHECK(resolveFunctionReturnType(layout, "choose").getLength() == 0);
 
     spDestroyCompileRequest(request);
     spDestroySession(session);

@@ -3447,9 +3447,13 @@ public:
     int CompareOverloadCandidates(OverloadCandidate* left, OverloadCandidate* right);
 
     /// Applies the pre-202c generic-parameter-count tie-breaker after all ordinary ranking rules.
-    /// Returns true only when the legacy compatibility fallback selects a unique candidate.
-    /// A source-level caller that acts on a true result must emit the deprecation warning;
-    /// speculative cost probes defer that warning until they materialize the conversion.
+    /// On success, moves the unique selected candidate into `context.bestCandidateStorage`, points
+    /// `context.bestCandidate` at that storage, clears `context.bestCandidates`, and returns true.
+    /// On failure, leaves `context` unchanged and returns false.
+    ///
+    /// The final source-level callers, `ResolveInvoke` and `_coerce`, must emit the deprecation
+    /// warning when this returns true. Speculative conversion-cost probes must defer the warning
+    /// until they materialize the conversion. Any new caller must follow the same policy.
     bool tryResolveOverloadUsingLegacyGenericParameterCountFallback(
         OverloadResolveContext& context);
 
