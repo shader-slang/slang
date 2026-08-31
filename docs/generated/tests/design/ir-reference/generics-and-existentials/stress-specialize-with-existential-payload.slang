@@ -12,7 +12,7 @@
 // call site: the argument is widened to `IFoo` by `makeExistential` while the
 // callee is built by `specialize`. The CHECKs assert both opcodes appear, in
 // the order the argument is prepared before the call.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

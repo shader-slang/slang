@@ -17,7 +17,7 @@
 // indices — the form only a deferred swizzled l-value can produce, as opposed
 // to a `get_element_addr` per component.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float a;
 uniform RWStructuredBuffer<float4> buf;

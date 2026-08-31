@@ -12,7 +12,7 @@
 // Upper edge of the signed-64 range. The integer literal stays in
 // 64-bit form and rides as the inline payload of an `add`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int64_t a;
 uniform RWStructuredBuffer<int64_t> buf;

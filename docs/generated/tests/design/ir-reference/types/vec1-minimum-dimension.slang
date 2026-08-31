@@ -14,7 +14,7 @@
 // `uniform vector<float,1>` surfaces `Vec(Float, 1 : Int)` in the
 // dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform vector<float, 1> v;
 uniform RWStructuredBuffer<float> buf;

@@ -14,7 +14,7 @@
 // must hold at higher field counts; verifies eight `field(...)`
 // rows under the struct header.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Big {
     int a; int b; int c; int d;

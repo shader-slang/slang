@@ -13,7 +13,7 @@
 // conversion) and `castFloatToInt` (float-to-int truncation).
 // Constructor-style casts on uniform operands surface each.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform float fa;
