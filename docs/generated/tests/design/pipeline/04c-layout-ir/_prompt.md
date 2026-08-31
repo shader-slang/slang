@@ -183,7 +183,7 @@ value flavor")`). The doc names this as a hard crash for
    items.
 2. 8–14 `.slang` test files. All are
    `//TEST:SIMPLE(filecheck=CHECK):-target <T> -dump-ir
--o /dev/null -entry main -stage compute` for `T` in
+-o - -entry main -stage compute` for `T` in
    `{spirv-asm, hlsl}` (occasionally also `glsl` or `metal` when
    the claim is target-comparison). The `size_cap_files` cap is 30;
    staying in the 8-14 range keeps each test laser-focused on one
@@ -213,13 +213,13 @@ does not make.
 Default required directive for layout-IR observation tests:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 ```
 
 or, when verifying the same observation on a different target:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 ```
 
 Anchor `CHECK` patterns at the **first `### AFTER ...:` block** (the
@@ -280,7 +280,7 @@ These are in addition to the universal lessons in `_common.md`.
 - [ ] Every test's `doc_ref` resolves to an anchor in
       `pipeline/04c-layout-ir.md`.
 - [ ] All tests use the canonical
-      `-target <T> -dump-ir -o /dev/null -entry main -stage compute`
+      `-target <T> -dump-ir -o - -entry main -stage compute`
       directive, with `T` chosen to make the claim observable.
 - [ ] No test asserts on the order in which the layout-IR
       construction steps run; only post-construction observable
