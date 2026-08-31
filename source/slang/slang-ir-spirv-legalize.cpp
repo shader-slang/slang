@@ -3348,9 +3348,22 @@ static void removeUnreachableCodeAfterDiscardForOpKill(
 namespace
 {
 
-// Read the integer word behind a spirv_asm operand, but only when it is an enum or literal. Result
-// and `__truncate` operands carry no integer value (`getValue()` would assert reading operand 0),
-// so report failure for those and let the caller treat the instruction as unknown.
+// Same-block subgroup-ballot deduplication (shader-slang/slang#12847).
+//
+// The whole strategy stated once, so the helpers below read as steps of a known plan rather than
+// puzzle pieces: scan each basic block in order, keeping a per-block list of the canonical
+// OpGroupNonUniformBallot blocks seen so far; when a later ballot is equivalent to an earlier one,
+// replace it with that earlier result; and clear the list at any instruction that could change
+// which lanes participate, so a surviving candidate is always still valid where it is reused.
+// `asCanonicalBallot` + `ballotsAreEquivalent` recognize and compare only the exact
+// `WaveActiveBallot` shape; `mayChangeSubgroupParticipation` + `isMaskReadOnlyAsm` decide what
+// fences the list.
+
+// Read the integer word behind a spirv_asm operand, but only for the operand kinds that actually
+// carry a constant word -- an enum or a literal. This guard is semantic first: a Result or inst-ref
+// operand is not a constant (getValue() returns null for a Result operand, it does not assert), and
+// a `__truncate` pseudo-op additionally has no operand 0, so reading its value would assert. Reject
+// anything that is not an enum or literal and let the caller treat the instruction as unknown.
 bool tryGetSpvAsmConstant(IRSPIRVAsmOperand* operand, SpvWord& outValue)
 {
     if (operand->getOp() != kIROp_SPIRVAsmOperandEnum &&
@@ -3375,7 +3388,7 @@ bool tryGetSpvAsmOpcode(IRSPIRVAsmInst* asmInst, SpvWord& outOpcode)
 // (instruction order, the GroupNonUniformBallot capability value, and the Subgroup execution scope)
 // keeps merging restricted to this exact pattern, so it can never drop an unrelated observable
 // instruction or a differing capability that happened to share a spirv_asm block.
-IRSPIRVAsmInst* getCanonicalBallot(IRInst* inst)
+IRSPIRVAsmInst* asCanonicalBallot(IRInst* inst)
 {
     auto asmBlock = as<IRSPIRVAsm>(inst);
     if (!asmBlock)
@@ -3469,9 +3482,13 @@ bool mayChangeSubgroupParticipation(IRInst* inst)
 }
 
 // Whether `inst` is a spirv_asm block that only reads the subgroup mask and so must not fence a
-// pending ballot. This admits the `OpGroupNonUniformBallotBitCount` block that
-// WaveActiveCountBits/WavePrefixCountBits emit between their two ballots; any block with an opcode
-// outside this allowed set falls through to the fail-closed fence.
+// pending ballot. Invariant for anything added to the allowed set below: the opcode must provably
+// only read the active-lane set and be unable to demote, terminate, or otherwise change which lanes
+// participate -- a matching block is exempted from the participation fence, so the whole merge's
+// value-preservation rests on this list. `OpGroupNonUniformBallotBitCount` (the bit-count that
+// WaveActiveCountBits/WavePrefixCountBits emit between their two ballots) satisfies it: it consumes
+// a ballot mask to produce a count and does not affect participation. Any block with an opcode
+// outside this set falls through to the fail-closed fence.
 bool isMaskReadOnlyAsm(IRInst* inst)
 {
     auto asmBlock = as<IRSPIRVAsm>(inst);
@@ -3494,31 +3511,35 @@ bool isMaskReadOnlyAsm(IRInst* inst)
     return true;
 }
 
+// A canonical ballot already seen earlier in the current block: the spirv_asm block together with
+// its already-validated OpGroupNonUniformBallot instruction, so the scan never re-derives what
+// asCanonicalBallot proved when the block was added. Candidates are canonical by construction.
+struct SeenBallot
+{
+    IRSPIRVAsm* block;
+    IRSPIRVAsmInst* ballot;
+};
+
 // Within one basic block, replace each `OpGroupNonUniformBallot` whose value an earlier identical
 // ballot already computed with that earlier result, so a program that ballots the same predicate
 // for both WaveActiveCountBits and WavePrefixCountBits emits a single ballot
 // (shader-slang/slang#12847). The candidate set is per block (same-block only) and is cleared by
 // any instruction that might change subgroup participation between the two ballots, so the
 // replacement is always value-preserving.
-bool mergeDuplicateBallotsInBlock(IRBlock* block)
+void mergeDuplicateBallotsInBlock(IRBlock* block)
 {
-    bool changed = false;
-    List<IRSPIRVAsm*> candidates;
+    List<SeenBallot> candidates;
     for (auto inst : block->getModifiableChildren())
     {
-        if (auto ballot = getCanonicalBallot(inst))
+        if (auto ballot = asCanonicalBallot(inst))
         {
             auto asmBlock = cast<IRSPIRVAsm>(inst);
             IRSPIRVAsm* match = nullptr;
-            for (auto candidate : candidates)
+            for (const auto& candidate : candidates)
             {
-                if (ballotsAreEquivalent(
-                        candidate,
-                        getCanonicalBallot(candidate),
-                        asmBlock,
-                        ballot))
+                if (ballotsAreEquivalent(candidate.block, candidate.ballot, asmBlock, ballot))
                 {
-                    match = candidate;
+                    match = candidate.block;
                     break;
                 }
             }
@@ -3526,11 +3547,10 @@ bool mergeDuplicateBallotsInBlock(IRBlock* block)
             {
                 asmBlock->replaceUsesWith(match);
                 asmBlock->removeAndDeallocate();
-                changed = true;
             }
             else
             {
-                candidates.add(asmBlock);
+                candidates.add(SeenBallot{asmBlock, ballot});
             }
             continue;
         }
@@ -3539,21 +3559,18 @@ bool mergeDuplicateBallotsInBlock(IRBlock* block)
         if (!isMaskReadOnlyAsm(inst) && mayChangeSubgroupParticipation(inst))
             candidates.clear();
     }
-    return changed;
 }
 
-bool mergeDuplicateBallots(IRModule* module)
+void mergeDuplicateBallots(IRModule* module)
 {
-    bool changed = false;
     for (auto globalInst : module->getGlobalInsts())
     {
         auto code = as<IRGlobalValueWithCode>(globalInst);
         if (!code)
             continue;
         for (auto block : code->getBlocks())
-            changed |= mergeDuplicateBallotsInBlock(block);
+            mergeDuplicateBallotsInBlock(block);
     }
-    return changed;
 }
 
 } // namespace
@@ -3570,8 +3587,10 @@ void legalizeIRForSPIRV(
 
     // Collapse structurally-identical subgroup ballots within a basic block so that, e.g.,
     // WaveActiveCountBits(p) and WavePrefixCountBits(p) share one OpGroupNonUniformBallot. Run
-    // after simplification (so the shared predicate is already deduplicated) and before
-    // eliminateDeadCode below reclaims the now-unused ballot block.
+    // after simplification so the shared predicate has already been deduplicated into one SSA
+    // value, which is what lets the pass recognize the two ballots as identical by operand pointer
+    // identity. The pass removes each merged-away ballot itself (replaceUsesWith +
+    // removeAndDeallocate), so it does not depend on the later eliminateDeadCode for cleanup.
     mergeDuplicateBallots(module);
 
     // Remove unreachable code after discard for SPIRV versions that emit OpKill.

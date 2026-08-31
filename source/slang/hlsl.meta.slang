@@ -17789,6 +17789,7 @@ uint _WaveCountBits(uint4 value)
 
 // Counts a subgroup ballot's set bits over the lanes preceding the current one (an exclusive prefix
 // scan), as opposed to `_WaveCountBits`, which reduces over all lanes.
+/// @category wave
 __spirv_version(1.3)
 [require(spirv, subgroup_ballot)]
 uint _WavePrefixCountBits(uint4 value)
