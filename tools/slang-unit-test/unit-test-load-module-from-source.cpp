@@ -268,11 +268,8 @@ SLANG_UNIT_TEST(loadModuleFromSource)
         SLANG_CHECK(infoResult == SLANG_E_INVALID_ARG);
     }
 
-    // Test 7: Regression for #12852. Passing a null `source` blob together with
-    // a `path` is the supported "load a module from a file on disk" pattern; it
-    // must load the file rather than tripping SLANG_RELEASE_ASSERT(blob) in
-    // computeSourceBlobDigest. An unreadable path must yield a diagnostic, not a
-    // crash.
+    // #12852: a null `source` with a valid `path` loads the module from that
+    // file; an unreadable `path` diagnoses rather than asserts.
     {
         const char* fileSource = R"(
             [shader("compute")][numthreads(1,1,1)]
@@ -292,7 +289,6 @@ SLANG_UNIT_TEST(loadModuleFromSource)
         SLANG_CHECK(
             globalSession->createSession(fileSessionDesc, fileSession.writeRef()) == SLANG_OK);
 
-        // 7a: null source + readable path -> module loads from the file.
         {
             ComPtr<slang::IModule> module;
             ComPtr<ISlangBlob> diagnostics;
@@ -309,8 +305,6 @@ SLANG_UNIT_TEST(loadModuleFromSource)
             }
         }
 
-        // 7b: null source + unreadable path -> nullptr and a diagnostic naming
-        // the path, instead of asserting on the null blob.
         {
             ComPtr<slang::IModule> module;
             ComPtr<ISlangBlob> diagnostics;

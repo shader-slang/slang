@@ -100,11 +100,10 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
     SLANG_CHECK(modFileReload != nullptr);
     SLANG_CHECK(modFileReload == modFile);
 
-    // #12852: a module loaded via loadModuleFromSource with a null `source`
-    // blob (its source read from the file at `path`) must still receive a
-    // content digest, so the #10957 name-collision check fires on a later
-    // conflicting load under the same name. Use a fresh file that has not been
-    // loaded yet.
+    // #12852: loadModuleFromSource with a null `source` reads the file at
+    // `path`, and its digest must be the file's content digest. A fresh file is
+    // required here; reloading an already-loaded file under a new name is a
+    // separate, unrelated path-dedup case.
     SLANG_CHECK(memoryFileSystem.saveFile("mod_path.slang", sourceA, strlen(sourceA)) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagPathLoad;
@@ -115,17 +114,17 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
         diagPathLoad.writeRef());
     SLANG_CHECK(modPath != nullptr);
 
-    // Same name + same file (null source) -> returns the cached module.
-    ComPtr<slang::IBlob> diagPathReload;
-    auto modPathReload = fileSession->loadModuleFromSource(
+    // Reloading the same name with the identical contents as a string returns
+    // the cached module, so the path-load digest is the file's content digest
+    // (a path-based digest would differ and spuriously collide here).
+    ComPtr<slang::IBlob> diagPathSame;
+    auto modPathSame = fileSession->loadModuleFromSourceString(
         "mod_path",
         "mod_path.slang",
-        nullptr,
-        diagPathReload.writeRef());
-    SLANG_CHECK(modPathReload == modPath);
+        sourceA,
+        diagPathSame.writeRef());
+    SLANG_CHECK(modPathSame == modPath);
 
-    // Same name, different source contents -> collision error (E38202),
-    // proving the path-load digest participates in the collision check.
     ComPtr<slang::IBlob> diagPathCollision;
     auto modPathCollision = fileSession->loadModuleFromSourceString(
         "mod_path",
