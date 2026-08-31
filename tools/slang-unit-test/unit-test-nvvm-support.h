@@ -9347,6 +9347,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 }
 )";
 
+static const char kDirectNVVMReadOnlyStructuredMatrixMemorySource[] = R"(
+StructuredBuffer<float2x2> matrixBuffer;
+RWStructuredBuffer<float> outputBuffer;
+
+[CUDAKernel]
+void computeMain()
+{
+    outputBuffer[0] = matrixBuffer[0][0][0];
+}
+)";
+
 static const char kDirectNVVMUnsupportedStructuredMatrixWriteSource[] = R"(
 RWStructuredBuffer<float4x4> matrixBuffer;
 
@@ -12338,6 +12349,7 @@ void computeMain(
 {
     int4 loaded = source[0];
     destination[0].wzyx = float4(1.0, 2.0, 3.0, 4.0);
+    destination[0][0] = 5.0;
     float4 stored = destination[0];
     output[0] = loaded.x + int(stored.w);
 }

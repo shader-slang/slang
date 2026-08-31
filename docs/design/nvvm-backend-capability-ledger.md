@@ -2311,3 +2311,16 @@ Two discovery workloads become correct at O0 and O3 and gain four direct lanes. 
 63/63/63 over its unchanged 72 healthy references; frozen v1 remains 390/394/390 over 427. Both
 have zero old-correct loss. The selected prefix passes 427/427, and all nineteen direct-O3
 measurement gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 162 admits structured-buffer element pointers only through the exact
+`IRRWStructuredBufferGetElementPtr` producer. Final Slang generic and storage-buffer address-space
+spellings both map to the established LLVM global resource pointer after the selected buffer kind,
+access, element type, result pointer, and i32 index are proved. Exact fixed-array and vector child
+GEPs reuse the generic sequential-pointer operation and propagate read-only provenance. Arbitrary
+storage-buffer pointers and immutable pointer escapes remain rejected. Provider ABI revision 30 is
+unchanged.
+
+Frozen `gh-5776` and discovery `parameter-block-load` become correct at O0 and O3 and gain four
+direct lanes. Frozen v1 reaches 391/395/391 over its unchanged 427 healthy denominator; discovery
+reaches 64/64/64 over 72. Both have zero old-correct loss. The selected prefix passes 428/428, and
+all 21 direct-O3 measurement gates assemble with CUDA 12.9 for SM70, SM80, and SM90.

@@ -6995,6 +6995,29 @@ versus 361.6 ms and 9096 bytes through NVRTC O3; direct O0 emits 4513-byte PTX. 
 parameter-group entry gate measures 237.9 ms and 847-byte PTX versus 357.8 ms and 8897 bytes;
 direct O0 emits 4592-byte PTX. These remain exploratory measurements.
 
+### Slice 162: Structured-buffer subobject pointers
+
+Direct NVVM now treats the exact `IRRWStructuredBufferGetElementPtr` producer as the source of
+truth for both mutable structured-buffer elements and read-only physical structured-buffer
+storage. The resolver proves the selected structured-buffer kind and access, i32 element index,
+exact resource/result element relation, and pointer layout before either preflight or emission may
+use the pointer. Final address-space specialization can spell that result as Slang generic or
+storage-buffer memory; both lower to the established LLVM global resource pointer only under this
+producer proof.
+
+An exact `IRGetElementPtr` may compose from that root when the pointee is a supported fixed array
+or numeric vector. It reuses the generic sequential-element pointer operation, preserves the root
+address space and access qualifier, and propagates read-only provenance through nested indices.
+Read-only roots can therefore feed exact child addressing and loads but cannot escape to stores,
+atomics, or calls. Physical storage/value conversion remains owned by the existing structured-
+buffer load path. Provider ABI revision 30 is unchanged.
+
+Frozen `gh-5776` and discovery `parameter-block-load` become correct at O0 and O3 and gain four
+permanent direct lanes. Frozen corpus v1 remains exactly 452 workloads/427 healthy references and
+reaches 391/395/391 O0/O3/both-mode correctness; discovery remains exactly 82/72 and reaches
+64/64/64. Both have zero old-correct loss. The selected prefix passes 428/428, and all 21
+representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

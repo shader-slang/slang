@@ -509,6 +509,48 @@ struct NVVMStructuredBufferLoad
     SlangNVVMLoadFlags flags = SLANG_NVVM_LOAD_FLAG_NONE;
 };
 
+struct NVVMStructuredBufferElementPointer
+{
+    IRInst* buffer = nullptr;
+    IRInst* elementIndex = nullptr;
+    NVVMRawBufferType bufferType;
+    IRPtrTypeBase* resultType = nullptr;
+};
+
+// Resolves the pointer-form structured-buffer access retained for mutable elements and physical
+// read-only storage. The buffer owns access; the pointer spelling alone cannot make a read-only
+// StructuredBuffer writable.
+bool _getNVVMStructuredBufferElementPointer(
+    IRInst* inst,
+    NVVMStructuredBufferElementPointer& outPointer)
+{
+    outPointer = {};
+    if (!inst || inst->getOp() != kIROp_RWStructuredBufferGetElementPtr ||
+        inst->getOperandCount() != 2)
+    {
+        return false;
+    }
+
+    IRInst* buffer = inst->getOperand(0);
+    IRInst* elementIndex = inst->getOperand(1);
+    NVVMRawBufferType bufferType;
+    auto resultType =
+        asNVVMSupportedRWStructuredBufferElementPointerType(inst->getDataType());
+    if (!buffer || !elementIndex || !isNVVMInteger32Type(elementIndex->getDataType()) ||
+        !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
+        bufferType.kind != NVVMRawBufferKind::Structured || !resultType ||
+        !isNVVMRawBufferElementType(bufferType, resultType->getValueType()))
+    {
+        return false;
+    }
+
+    outPointer.buffer = buffer;
+    outPointer.elementIndex = elementIndex;
+    outPointer.bufferType = bufferType;
+    outPointer.resultType = resultType;
+    return true;
+}
+
 // Resolves a canonical structured-buffer value load and its exact physical load contract.
 bool _getNVVMStructuredBufferLoad(IRInst* inst, NVVMStructuredBufferLoad& outLoad)
 {
@@ -714,6 +756,10 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     IRPtrTypeBase* baseType = nullptr;
     NVVMSharedGlobal sharedGlobal;
     bool isSharedGlobalBase = false;
+    bool isImmutable = false;
+    NVVMStructuredBufferElementPointer resourceElement;
+    const bool hasResourceElementBase =
+        base && _getNVVMStructuredBufferElementPointer(base, resourceElement);
     if (base && getNVVMSupportedSharedGlobal(base, &sharedGlobal))
     {
         arrayType = asNVVMSupportedHelperArrayType(sharedGlobal.storageType);
@@ -733,8 +779,16 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         if (!arrayType)
             baseType = nullptr;
     }
+    if (!baseType && hasResourceElementBase)
+    {
+        baseType = resourceElement.resultType;
+        arrayType = baseType ? asNVVMSupportedHelperArrayType(baseType->getValueType()) : nullptr;
+        if (!arrayType)
+            baseType = nullptr;
+        else
+            isImmutable = resourceElement.bufferType.access == NVVMBufferAccess::ReadOnly;
+    }
     IRType* aggregateType = arrayType;
-    bool isImmutable = false;
 
     if (!arrayType && base)
     {
@@ -782,8 +836,17 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     if (!arrayType && base)
     {
         IRType* valueType = nullptr;
-        IRPtrTypeBase* numericPointer =
-            asNVVMSupportedLocalNumericPointerType(base->getDataType(), &valueType);
+        IRPtrTypeBase* numericPointer = nullptr;
+        if (hasResourceElementBase)
+        {
+            numericPointer = resourceElement.resultType;
+            valueType = numericPointer ? numericPointer->getValueType() : nullptr;
+            if (numericPointer)
+                isImmutable = resourceElement.bufferType.access == NVVMBufferAccess::ReadOnly;
+        }
+        if (!numericPointer)
+            numericPointer =
+                asNVVMSupportedLocalNumericPointerType(base->getDataType(), &valueType);
         if (!numericPointer && base->getOp() == kIROp_FieldAddress)
         {
             NVVMStructField fieldAddress;
@@ -6292,9 +6355,13 @@ SlangResult _validatePointerValue(
     auto deviceCopyablePtrType =
         value ? asNVVMSupportedDeviceCopyableValuePointerType(value->getDataType()) : nullptr;
     NVVMRawBufferElementPointer rawBufferElementPointer;
+    NVVMStructuredBufferElementPointer structuredBufferElementPointer;
+    const bool hasStructuredBufferElementProducer =
+        value &&
+        _getNVVMStructuredBufferElementPointer(value, structuredBufferElementPointer);
     const bool hasResourceElementProducer =
-        value && (value->getOp() == kIROp_RWStructuredBufferGetElementPtr ||
-                  _getNVVMRawBufferElementPointer(value, rawBufferElementPointer));
+        hasStructuredBufferElementProducer ||
+        (value && _getNVVMRawBufferElementPointer(value, rawBufferElementPointer));
     auto resourceElementPtrType =
         hasResourceElementProducer
             ? asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType())
@@ -6366,13 +6433,26 @@ SlangResult _validatePointerValue(
     NVVMResolvedAtomicOperation atomicOperation;
     const bool isAtomicConsumer =
         _resolveNVVMAtomicOperation(consumer, atomicOperation) && atomicOperation.pointer == value;
+    NVVMSequentialElementPointer childElementPointer;
+    const bool hasSequentialChild =
+        consumer && consumer->getOp() == kIROp_GetElementPtr && consumer->getOperandCount() == 2 &&
+        consumer->getOperand(0) == value &&
+        _getNVVMSequentialElementPointer(consumer, childElementPointer);
     if (resourceElementPtrType && consumer->getOp() != kIROp_Load &&
         consumer->getOp() != kIROp_Store && consumer->getOp() != kIROp_SwizzledStore &&
-        !isAtomicConsumer && consumer->getOp() != kIROp_Call)
+        !isAtomicConsumer && consumer->getOp() != kIROp_Call && !hasSequentialChild)
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
             toSlice("raw RWStructuredBuffer numeric load or store consumer"));
+    }
+    if (hasStructuredBufferElementProducer &&
+        structuredBufferElementPointer.bufferType.access == NVVMBufferAccess::ReadOnly &&
+        consumer->getOp() != kIROp_Load && !hasSequentialChild)
+    {
+        return _diagnoseUnsupportedIR(
+            codeGenContext,
+            toSlice("read-only structured-buffer element access"));
     }
     if (fieldPtrType && !fieldAddress.isMutable &&
         (consumer->getOp() != kIROp_Load || requireWriteAccess))
@@ -8455,16 +8535,8 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_RWStructuredBufferGetElementPtr:
                 {
-                    IRInst* buffer = inst->getOperand(0);
-                    IRInst* elementIndex = inst->getOperand(1);
-                    NVVMRawBufferType bufferType;
-                    auto resultPointerType =
-                        asNVVMSupportedRWStructuredBufferElementPointerType(inst->getDataType());
-                    if (!buffer ||
-                        !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
-                        bufferType.kind != NVVMRawBufferKind::Structured ||
-                        bufferType.access != NVVMBufferAccess::ReadWrite || !resultPointerType ||
-                        !isNVVMRawBufferElementType(bufferType, resultPointerType->getValueType()))
+                    NVVMStructuredBufferElementPointer elementPointer;
+                    if (!_getNVVMStructuredBufferElementPointer(inst, elementPointer))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -8472,13 +8544,13 @@ SlangResult _validateNVVMFunction(
                     }
                     SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                         codeGenContext,
-                        buffer,
+                        elementPointer.buffer,
                         inst,
                         availableValues,
                         dominatorTree));
                     SLANG_RETURN_ON_FAIL(_validateInteger32Value(
                         codeGenContext,
-                        elementIndex,
+                        elementPointer.elementIndex,
                         inst,
                         availableValues,
                         dominatorTree));

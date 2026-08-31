@@ -1640,10 +1640,16 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
     auto ptrType = as<IRPtrTypeBase>(type);
     IRType* dataLayout = ptrType ? ptrType->getDataLayout() : nullptr;
     HashSet<IRInst*> activeTypes;
+    // Address-space specialization retains StorageBuffer on physical aggregate elements while
+    // ordinary scalar and vector elements keep Generic. Both are producer-side spellings for the
+    // same CUDA global-memory pointer returned by RWStructuredBufferGetElementPtr.
+    const bool hasResourceAddressSpace =
+        ptrType && (ptrType->getAddressSpace() == AddressSpace::Generic ||
+                    ptrType->getAddressSpace() == AddressSpace::StorageBuffer);
     if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
         !_isNVVMSupportedResourceElementType(ptrType->getValueType(), activeTypes) ||
         ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
-        ptrType->getAddressSpace() != AddressSpace::Generic || !dataLayout ||
+        !hasResourceAddressSpace || !dataLayout ||
         dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
     {
         return nullptr;
