@@ -16,7 +16,7 @@
 // its instruction with the value it was applied to still as its operand, which
 // is what makes a generic inline-asm fragment adapt to the types in scope.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage fragment
 
 [vk::binding(0)]
 Sampler2D gTex;

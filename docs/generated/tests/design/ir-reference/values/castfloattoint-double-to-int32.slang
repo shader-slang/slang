@@ -12,7 +12,7 @@
 // Top-of-float-ladder to standard int. The doc admits one opcode
 // regardless of how many precision bits are dropped.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double da;
 uniform RWStructuredBuffer<int> buf;

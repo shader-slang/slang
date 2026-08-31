@@ -13,7 +13,7 @@
 // global_param's IR type. A single `uniform uint64_t` exercises the
 // unsigned largest-edge boundary.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint64_t v;
 uniform RWStructuredBuffer<uint> buf;
