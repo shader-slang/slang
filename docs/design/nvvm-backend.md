@@ -6719,6 +6719,33 @@ All ten measured discovery gates assemble with CUDA 12.9 at direct O3 for SM70, 
 The new raw-buffer-result gate measures 243.5 ms and 732-byte PTX at direct O3 SM70 versus 357.8 ms
 and 8705 bytes through NVRTC O3; these remain uncontrolled exploratory measurements.
 
+### Slice 152: Canonical specialized-function identity
+
+Specialized function definitions now retain identities that describe their canonical producers.
+`lowerSpecializeExistentialsInFunc` keeps the externally linked source function but removes copied
+linkage from its context-specific clone. The clone remains readable through its name hint and is
+assigned an internal backend symbol. Separately, `getTypeNameHint` recursively spells
+`IRTypePack` arity and ordered element types, so `specializeLinkageDecoration` hashes different
+generic packs to different existing specialized linkage names.
+
+These are producer-side corrections, not NVVM name uniquing. Direct NVVM continues to reject two
+distinct externally linked definitions with one physical name, now reporting the exact duplicate
+symbol. The provider interface remains revision 30 and the LLVM implementation is unchanged.
+
+Five frozen-v1 workloads and two discovery workloads become correct at O0 and O3 and gain fourteen
+permanent direct lanes. Frozen corpus v1 remains exactly 452 workloads/427 healthy references and
+reaches 377/381/377 O0/O3/both-mode correctness with zero old-correct loss. Discovery remains
+82/72 and reaches 54/54/54 with zero old-correct loss. The function-identity cluster is eliminated
+from both corpora. One frozen workload advances to the independent provider-owned by-value
+aggregate field-pointer blocker and is not counted as supported.
+
+The selected NVVM unit prefix remains 427/427. All twelve measured discovery gates assemble with
+CUDA 12.9 at direct O3 for SM70, SM80, and SM90. The new existential-call-graph gate measures
+261.8 ms and 1007-byte PTX at direct O3 SM70 versus 370.6 ms and 8946 bytes through NVRTC O3; the
+variadic-pack gate measures 239.5 ms and 646 bytes versus 351.1 ms and 8585 bytes. These remain
+uncontrolled exploratory measurements, and the large direct-O0 PTX for both gates is recorded as
+an optimization-quality signal rather than a correctness failure.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

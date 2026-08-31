@@ -1,0 +1,46 @@
+{
+  "nvrtc-o3": {
+    "infrastructure-native-reference": 3
+  },
+  "nvvm-o0": {
+    "preflight-other": 9,
+    "runtime-bounds-zero-index": 1,
+    "runtime-sm90-mixed-width-atomic": 1,
+    "helper-abi-type-contract": 9,
+    "provider-unoptimized-half-operation": 5,
+    "aggregate-pointer-layout-transport": 7,
+    "residual-target-marker-or-undefined-value": 3,
+    "atomic-wave-operation": 3,
+    "generic-asm-atomic": 3,
+    "raw-buffer-view-access": 3,
+    "runtime-other": 1,
+    "generic-asm-ordinary-intrinsic": 1,
+    "generic-asm-texture": 1,
+    "generic-asm-wave-reconvergence": 6,
+    "runtime-constant-buffer-layout": 1,
+    "runtime-anyvalue-layout": 1,
+    "provider-aggregate-field-pointer": 3,
+    "runtime-descriptor-handle-layout": 3,
+    "generic-asm-device-clock": 1
+  },
+  "nvvm-o3": {
+    "preflight-other": 9,
+    "runtime-bounds-zero-index": 1,
+    "runtime-sm90-mixed-width-atomic": 1,
+    "helper-abi-type-contract": 9,
+    "aggregate-pointer-layout-transport": 7,
+    "residual-target-marker-or-undefined-value": 3,
+    "atomic-wave-operation": 3,
+    "generic-asm-atomic": 3,
+    "raw-buffer-view-access": 3,
+    "runtime-other": 1,
+    "generic-asm-ordinary-intrinsic": 1,
+    "generic-asm-texture": 1,
+    "generic-asm-wave-reconvergence": 6,
+    "runtime-constant-buffer-layout": 1,
+    "runtime-anyvalue-layout": 1,
+    "provider-aggregate-field-pointer": 3,
+    "runtime-descriptor-handle-layout": 3,
+    "generic-asm-device-clock": 1
+  }
+}

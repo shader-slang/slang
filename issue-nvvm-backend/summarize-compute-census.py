@@ -160,7 +160,7 @@ def _failure_ownership(row: dict[str, str]) -> tuple[str, str]:
             "raw-buffer-view-access",
             "raw-buffer legalization IR op -> direct-NVVM raw-buffer resolver",
         )
-    if shape == "function name":
+    if shape == "function name" or shape.startswith("duplicate function name: "):
         return (
             "function-identity",
             "post-specialization linked IRFunc -> _collectNVVMFunctionNames",

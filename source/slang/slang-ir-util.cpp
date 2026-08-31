@@ -890,6 +890,18 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         getTypeNameHint(sb, as<IRMatrixType>(type)->getColumnCount());
         sb << ">";
         break;
+    case kIROp_TypePack:
+        {
+            sb << "type_pack<";
+            for (UInt i = 0; i < type->getOperandCount(); ++i)
+            {
+                if (i)
+                    sb << ",";
+                getTypeNameHint(sb, type->getOperand(i));
+            }
+            sb << ">";
+        }
+        break;
     case kIROp_IntLit:
         sb << as<IRIntLit>(type)->getValue();
         break;

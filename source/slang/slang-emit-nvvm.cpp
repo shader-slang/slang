@@ -6647,7 +6647,11 @@ SlangResult _collectNVVMFunctionNames(
     {
         UnownedStringSlice name = _getNVVMFunctionName(function, entryPoint);
         if (name.getLength() && !names.add(String(name)))
-            return _diagnoseUnsupportedIR(codeGenContext, toSlice("function name"));
+        {
+            StringBuilder construct;
+            construct << "duplicate function name: " << name;
+            return _diagnoseUnsupportedIR(codeGenContext, construct.getUnownedSlice());
+        }
     }
     for (auto globalInst : module->getGlobalInsts())
     {

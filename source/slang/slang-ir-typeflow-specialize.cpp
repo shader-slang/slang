@@ -5388,6 +5388,20 @@ struct TypeFlowSpecializationContext
         builder.setInsertBefore(baseFunc);
         auto clonedFunc = cast<IRFunc>(cloneInst(&cloneEnv, &builder, baseFunc));
 
+        // The clone is an internal implementation for one existential call context, not another
+        // definition of the source function. Consider this example:
+        //
+        //     float process(ICompute value) { return value.compute(); }
+        //     process(interfaceValue);
+        //     process(ConcreteCompute());
+        //
+        // Typeflow keeps the tagged-union `process(ICompute)` function and clones a concrete
+        // `process(ConcreteCompute)` function for the second call. `cloneInst` copies the export
+        // decoration along with the body, which would give both live functions the same external
+        // symbol even though their signatures differ. Keep the source linkage on the base and let
+        // downstream emitters assign an internal name to the specialization.
+        removeLinkageDecorations(clonedFunc);
+
         // Transfer propagation info from the SpecializeExistentialsInFunc context
         // to the cloned function (using the cloned func as the new context).
         //

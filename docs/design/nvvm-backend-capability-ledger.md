@@ -2182,3 +2182,17 @@ row advances to an exact `IRLoad<Array<Texture2D, 2>>` conventional-global block
 reinterpret row advances to a `DescriptorHandle` field-address blocker; neither is counted as
 supported. The selected prefix passes 427/427, and ten measured discovery gates assemble with
 CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 152 repairs canonical specialized-function identity at two upstream producers. Typeflow
+existential clones are internal variants and no longer copy the base function's import/export
+linkage. Canonical `IRTypePack` name hints include ordered recursive elements, so the existing
+generic-specialization linkage digest distinguishes empty and non-empty packs. Direct NVVM keeps
+strict duplicate-symbol rejection and reports the exact colliding name; provider ABI revision 30
+is unchanged.
+
+Five frozen-v1 and two discovery workloads become correct at O0 and O3, with fourteen permanent
+direct lanes. Frozen v1 reaches 377/381/377 over its unchanged 427 healthy denominator; discovery
+reaches 54/54/54 over 72. Both have zero old-correct loss and no remaining function-identity
+cluster. `generic-interface-nested` advances to the provider-owned by-value aggregate field-pointer
+failure and remains unsupported. The selected unit prefix passes 427/427, and all twelve discovery
+measurement gates assemble at direct O3 with CUDA 12.9 for SM70, SM80, and SM90.

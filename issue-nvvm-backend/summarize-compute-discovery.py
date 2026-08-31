@@ -144,7 +144,7 @@ def _preflight_cluster(exact_shape: str) -> tuple[str, str]:
             "collectEntryPointUniforms and specialization -> linked IRFunc parameter; "
             "_validateNVVMFunction",
         )
-    if exact_shape == "function name":
+    if exact_shape == "function name" or exact_shape.startswith("duplicate function name: "):
         return (
             "function-identity",
             "linkage/specialization function decorations -> _getNVVMFunctionName; "
