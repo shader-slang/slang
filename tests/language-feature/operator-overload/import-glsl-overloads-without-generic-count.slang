@@ -1,4 +1,4 @@
-//TEST:SIMPLE: -no-codegen
+//TEST:SIMPLE: -std 2026 -warnings-as-errors 40021 -no-codegen
 //TEST:SIMPLE: -std 202c -no-codegen
 //TEST:SIMPLE(filecheck=CHECK): -std 202c -target spirv-asm -entry computeMain -stage compute
 

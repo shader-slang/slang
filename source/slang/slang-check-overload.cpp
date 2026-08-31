@@ -2163,8 +2163,8 @@ int SemanticsVisitor::compareOverloadCandidateSpecificity(
     // does not. Preserve that semantic relationship as an ordinary ranking rule; unlike comparing
     // two generics' parameter counts, it is not a compatibility heuristic and remains valid in
     // Slang 202c.
-    bool leftIsGenericInnerDecl = _getGenericParentOfInnerDeclRef(left.declRef) != nullptr;
-    bool rightIsGenericInnerDecl = _getGenericParentOfInnerDeclRef(right.declRef) != nullptr;
+    bool leftIsGenericInnerDecl = bool(_getGenericParentOfInnerDeclRef(left.declRef));
+    bool rightIsGenericInnerDecl = bool(_getGenericParentOfInnerDeclRef(right.declRef));
     if (leftIsGenericInnerDecl != rightIsGenericInnerDecl)
         return int(leftIsGenericInnerDecl) - int(rightIsGenericInnerDecl);
 
