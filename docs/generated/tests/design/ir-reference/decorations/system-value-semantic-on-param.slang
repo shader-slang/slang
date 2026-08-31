@@ -14,7 +14,7 @@
 // `SV_` family. The CHECK pins `("POSITION", -1 : Int)`, the same operand
 // pair the `SV_DispatchThreadID` sibling pins.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage vertex
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage vertex
 
 [shader("vertex")]
 float4 main(float3 pos : POSITION) : SV_Position

@@ -13,7 +13,7 @@
 // boundary probe takes the widest available widening step in the
 // documented type ladder: `half` (16-bit) to `double` (64-bit).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half ha;
 uniform RWStructuredBuffer<double> dbuf;

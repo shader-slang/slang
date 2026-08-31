@@ -15,7 +15,7 @@
 // `atomicAdd` as an ordinary value operand and is neither rejected nor
 // rewritten on the way down.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<Atomic<int>> abuf;
 uniform RWStructuredBuffer<int> rwbuf;

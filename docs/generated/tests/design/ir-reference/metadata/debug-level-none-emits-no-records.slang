@@ -17,8 +17,8 @@
 // than one section; the `MIN` run shows the same three records do appear one
 // level up, which is what keeps the negative from being vacuous.
 
-//TEST:SIMPLE(filecheck=NONE):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g0
-//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=NONE):-target spirv-asm -dump-ir -o - -entry main -stage compute -g0
+//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<int> buf;
 

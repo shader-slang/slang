@@ -16,7 +16,7 @@
 // named global_param carrying `ParameterBlock(%Stuff)`, which shows the
 // user struct's IR identity sits in the element-type slot.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 struct Stuff { float4 a; }
 
