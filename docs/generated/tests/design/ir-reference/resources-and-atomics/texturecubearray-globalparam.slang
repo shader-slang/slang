@@ -12,7 +12,7 @@
 // `TextureCubeArray` shares the cube shape token with `TextureCube`
 // but flips the array flag to `1`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform TextureCubeArray<float4> tex;
 uniform SamplerState samp;

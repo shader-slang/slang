@@ -11,7 +11,7 @@
 
 // Boundary: storage axis — `uint8_t` as struct field.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Byte { uint8_t b; }
 

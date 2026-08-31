@@ -14,7 +14,7 @@
 // typed `witness_table_t(%IFoo)` for the conformance, which the in-body
 // dispatch reads. The CHECKs pin both, plus the `lookupWitness` that consumes
 // the witness parameter.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 

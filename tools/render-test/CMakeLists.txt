@@ -38,6 +38,6 @@ if(SLANG_HAS_WEBGPU_SUPPORT AND CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin")
         render-test
         PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY
-                "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}"
+                "${slang_BINARY_DIR}/$<CONFIG>/${runtime_subdir}"
     )
 endif()

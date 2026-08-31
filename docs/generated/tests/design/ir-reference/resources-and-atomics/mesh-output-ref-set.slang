@@ -15,7 +15,7 @@
 // yields the write opcode. Both CHECKs are order-independent because
 // the two array writes are independent.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage mesh -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage mesh -entry main
 
 struct MeshVertex
 {

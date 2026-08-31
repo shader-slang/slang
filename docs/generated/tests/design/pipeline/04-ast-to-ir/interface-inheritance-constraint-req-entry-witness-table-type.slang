@@ -15,7 +15,7 @@
 // interface's entry list is typed witness_table_t of the base
 // interface (a conforming type must supply a witness table for IBase).
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IBase
 {

@@ -5,7 +5,7 @@
 glob_append(workgraph_shader_sources "*.slang")
 
 set(workgraph_output_dir
-    "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/experimental"
+    "${slang_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/experimental"
 )
 set(workgraph_module_file "${workgraph_output_dir}/${SLANG_WORKGRAPH_MODULE_FILE_NAME}")
 

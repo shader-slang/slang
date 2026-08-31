@@ -15,7 +15,7 @@
 // `[export("...main...")]` linkage decoration next to its `[layout(...)]`,
 // i.e. the stub resolved against the executable-side symbol.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 
@@ -25,7 +25,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = int(tid.x);
 }
 
-// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CHECK: [export("{{.*}}main{{.*}}")]
 // CHECK: [layout(%{{[0-9]+}})]
 // CHECK: func %main

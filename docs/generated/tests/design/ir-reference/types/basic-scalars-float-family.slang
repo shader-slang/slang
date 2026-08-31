@@ -13,7 +13,7 @@
 // struct-field types in the IR dump. A struct whose fields cover all
 // three floating-point widths surfaces each opcode in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Floats { half a; float b; double c; }
 
