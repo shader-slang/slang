@@ -1,6 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE: -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE: -vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-slang -shaderobj -mtl -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -shaderobj -output-using-type
 
 // Test that writing to swizzles of vector swizzles works correctly
