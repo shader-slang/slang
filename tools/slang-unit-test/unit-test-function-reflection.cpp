@@ -18,6 +18,75 @@ static String getTypeFullName(slang::TypeReflection* type)
     return String((const char*)blob->getBufferPointer());
 }
 
+static const char* kLanguageVersionOverloadSource = R"(
+    module reflectionVersion;
+
+    public struct BroadResult {}
+    public struct ShapedResult {}
+
+    public BroadResult choose<T : IFloat>(T value)
+    {
+        return BroadResult();
+    }
+
+    __generic<T : __BuiltinFloatingPointType, let N : int>
+    public ShapedResult choose(vector<T, N> value)
+    {
+        return ShapedResult();
+    }
+)";
+
+// Resolves the return type selected for `choose(float3)` in `layout`.
+static String resolveChooseReturnType(slang::ProgramLayout* layout)
+{
+    SLANG_CHECK_ABORT(layout != nullptr);
+    auto choose = layout->findFunctionByName("choose");
+    SLANG_CHECK_ABORT(choose != nullptr);
+    auto float3Type = layout->findTypeByName("float3");
+    SLANG_CHECK_ABORT(float3Type != nullptr);
+
+    slang::TypeReflection* argTypes[] = {float3Type};
+    auto resolved = choose->specializeWithArgTypes(1, argTypes);
+    return resolved ? getTypeFullName(resolved->getReturnType()) : String();
+}
+
+// Resolves the return type of `choose(float3)` through reflection in a fresh session configured
+// for `languageVersion`. A fresh session isolates the version policy under test from module and
+// reflection caches created by the other case.
+static String resolveChooseReturnTypeForLanguageVersion(SlangLanguageVersion languageVersion)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry languageVersionEntry = {};
+    languageVersionEntry.name = slang::CompilerOptionName::LanguageVersion;
+    languageVersionEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    languageVersionEntry.value.intValue0 = languageVersion;
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &languageVersionEntry;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "reflectionVersion",
+        "reflection-version.slang",
+        kLanguageVersionOverloadSource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    return resolveChooseReturnType(module->getLayout());
+}
+
 // Test that the reflection API provides correct info about entry point and ordinary functions.
 
 SLANG_UNIT_TEST(functionReflection)
@@ -223,70 +292,41 @@ SLANG_UNIT_TEST(functionReflection)
 // final fallback, while Slang 202c leaves the otherwise-tied candidates ambiguous.
 SLANG_UNIT_TEST(reflectionOverloadUsesSessionLanguageVersion)
 {
-    const char* source = R"(
-        module reflectionVersion;
+    SLANG_CHECK(
+        resolveChooseReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_2026) == "BroadResult");
+    SLANG_CHECK(
+        resolveChooseReturnTypeForLanguageVersion(SLANG_LANGUAGE_VERSION_202C).getLength() == 0);
+}
 
-        public struct BroadResult {}
-        public struct ShapedResult {}
+// Legacy compile requests can process command-line options after reflection has initialized its
+// ad hoc semantic context. Verify that changing `-std` replaces that context instead of retaining
+// overload rules from its originally cached language version.
+SLANG_UNIT_TEST(reflectionRefreshesChangedLanguageVersion)
+{
+    auto session = spCreateSession();
+    auto request = spCreateCompileRequest(session);
 
-        public BroadResult choose<T : IFloat>(T value)
-        {
-            return BroadResult();
-        }
+    spAddCodeGenTarget(request, SLANG_HLSL);
+    int translationUnitIndex =
+        spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "reflectionVersion");
+    spAddTranslationUnitSourceString(
+        request,
+        translationUnitIndex,
+        "reflection-version.slang",
+        kLanguageVersionOverloadSource);
+    SLANG_CHECK_ABORT(spCompile(request) == SLANG_OK);
 
-        __generic<T : __BuiltinFloatingPointType, let N : int>
-        public ShapedResult choose(vector<T, N> value)
-        {
-            return ShapedResult();
-        }
-    )";
+    auto layout = slang::ShaderReflection::get(request);
+    SLANG_CHECK(resolveChooseReturnType(layout) == "BroadResult");
 
-    auto resolveReturnType = [&](SlangLanguageVersion languageVersion) -> String
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    const char* slang202cArgs[] = {"-std", "202c"};
+    SLANG_CHECK_ABORT(
+        spProcessCommandLineArguments(request, slang202cArgs, SLANG_COUNT_OF(slang202cArgs)) ==
+        SLANG_OK);
+    SLANG_CHECK(resolveChooseReturnType(layout).getLength() == 0);
 
-        slang::CompilerOptionEntry languageVersionEntry = {};
-        languageVersionEntry.name = slang::CompilerOptionName::LanguageVersion;
-        languageVersionEntry.value.kind = slang::CompilerOptionValueKind::Int;
-        languageVersionEntry.value.intValue0 = languageVersion;
-
-        slang::TargetDesc targetDesc = {};
-        targetDesc.format = SLANG_HLSL;
-        targetDesc.profile = globalSession->findProfile("sm_5_0");
-
-        slang::SessionDesc sessionDesc = {};
-        sessionDesc.targetCount = 1;
-        sessionDesc.targets = &targetDesc;
-        sessionDesc.compilerOptionEntryCount = 1;
-        sessionDesc.compilerOptionEntries = &languageVersionEntry;
-        ComPtr<slang::ISession> session;
-        SLANG_CHECK_ABORT(
-            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
-
-        ComPtr<slang::IBlob> diagnostics;
-        auto module = session->loadModuleFromSourceString(
-            "reflectionVersion",
-            "reflection-version.slang",
-            source,
-            diagnostics.writeRef());
-        SLANG_CHECK_ABORT(module != nullptr);
-
-        auto layout = module->getLayout();
-        SLANG_CHECK_ABORT(layout != nullptr);
-        auto choose = layout->findFunctionByName("choose");
-        SLANG_CHECK_ABORT(choose != nullptr);
-        auto float3Type = layout->findTypeByName("float3");
-        SLANG_CHECK_ABORT(float3Type != nullptr);
-
-        slang::TypeReflection* argTypes[] = {float3Type};
-        auto resolved = choose->specializeWithArgTypes(1, argTypes);
-        return resolved ? getTypeFullName(resolved->getReturnType()) : String();
-    };
-
-    SLANG_CHECK(resolveReturnType(SLANG_LANGUAGE_VERSION_2026) == "BroadResult");
-    SLANG_CHECK(resolveReturnType(SLANG_LANGUAGE_VERSION_202C).getLength() == 0);
+    spDestroyCompileRequest(request);
+    spDestroySession(session);
 }
 
 // Regression test for shader-slang/slang#11277. `ModifiedType` wrappers

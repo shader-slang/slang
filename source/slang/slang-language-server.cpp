@@ -377,8 +377,12 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
             else if (initExpr)
             {
                 DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(version->linkage, module, &sink);
-                SemanticsVisitor semanticsVisitor(&semanticContext);
+                auto semanticContext = SharedSemanticsContext::createForOptionalModule(
+                    version->linkage,
+                    module,
+                    version->linkage->m_optionSet.getLanguageVersion(),
+                    &sink);
+                SemanticsVisitor semanticsVisitor(semanticContext);
                 if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
                         declRef.substitute(version->linkage->getASTBuilder(), initExpr),
                         SemanticsVisitor::ConstantFoldingKind::LinkTime,
@@ -704,13 +708,14 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
             if (auto funcDecl = as<FunctionDeclBase>(declRef.getDecl()))
             {
                 DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(
+                auto semanticContext = SharedSemanticsContext::createForOptionalModule(
                     version->linkage,
                     getModule(funcDecl),
+                    version->linkage->m_optionSet.getLanguageVersion(),
                     &sink);
-                SemanticsVisitor semanticsVisitor(&semanticContext);
+                SemanticsVisitor semanticsVisitor(semanticContext);
 
-                auto assocDecls = semanticContext.getAssociatedDeclsForDecl(funcDecl);
+                auto assocDecls = semanticContext->getAssociatedDeclsForDecl(funcDecl);
                 Decl* bwdDiff = nullptr;
                 Decl* fwdDiff = nullptr;
                 Decl* primalSubst = nullptr;

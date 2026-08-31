@@ -13,6 +13,14 @@ struct RankedResult
 {
 }
 
+struct FixedShapeResult
+{
+}
+
+struct VariableShapeResult
+{
+}
+
 BroadResult choose<T : IFloat>(T value)
 //SLANG202C:^^^^^^ candidate: func choose<vector<float,3>>(float3) -> BroadResult
 {
@@ -24,6 +32,19 @@ ShapedResult choose(vector<T, N> value)
 //SLANG202C: ^^^^^^ candidate: func choose<float, 3>(float3) -> ShapedResult
 {
     return ShapedResult();
+}
+
+FixedShapeResult chooseShape<T>(vector<T, 3> value)
+//SLANG202C:     ^^^^^^^^^^^ candidate: func chooseShape<float>(float3) -> FixedShapeResult
+{
+    return FixedShapeResult();
+}
+
+__generic<T, let N : int>
+VariableShapeResult chooseShape(vector<T, N> value)
+//SLANG202C:        ^^^^^^^^^^^ candidate: func chooseShape<float, 3>(float3) -> VariableShapeResult
+{
+    return VariableShapeResult();
 }
 
 BroadResult rankedChoose<T : IFloat>(T value)
@@ -47,6 +68,14 @@ void test()
 //LEGACY: deprecated generic-parameter-count overload tie-breaker
 //LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
 //SLANG202C: ambiguous call to 'choose' with arguments of type (vector<float,3>)
+
+    // The fixed-size overload accepts a strict subset of the variable-size overload's domain, but
+    // Slang does not yet implement that semantic specificity comparison. The legacy fallback
+    // happens to choose the fixed-size declaration; Slang 202c conservatively reports ambiguity.
+    FixedShapeResult shapeResult = chooseShape(float3(0.0));
+//LEGACY: deprecated generic-parameter-count overload tie-breaker
+//LEGACY: overload resolution selected an otherwise ambiguous candidate by preferring fewer required generic parameters; this tie-breaker is removed in Slang 202c
+//SLANG202C: ambiguous call to 'chooseShape' with arguments of type (vector<float,3>)
 
     // OverloadRank is an ordinary ranking criterion, so it resolves this call before the legacy
     // fallback is considered in both language versions.

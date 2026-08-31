@@ -2147,62 +2147,14 @@ int SemanticsVisitor::compareOverloadCandidateSpecificity(
     if (left.declRef.equals(right.declRef))
         return -1;
 
-    // There is a very general rule that we would like to enforce
-    // in principle:
+    // A principled specificity comparison would determine whether one candidate's accepted
+    // argument domain is a strict subset of the other's. Slang does not implement that comparison
+    // yet, so structural relationships such as `vector<T, 3>` versus `vector<T, N>` remain tied
+    // here. The pre-202c generic-parameter-count compatibility fallback runs only after every
+    // ordinary ranking rule has also left the candidates tied.
     //
-    // Given candidates A and B, if A being applicable to some
-    // arguments implies that B is also applicable, but not vice versa,
-    // then A is a more specific/specialized candidate than B.
-    //
-    // A number of conclusions follow from this general rule.
-    // For example, a non-generic declaration will always be
-    // more specific than a generic declaration that was specialized
-    // to matching types:
-    //
-    //      int doThing(int a);
-    //      T doThing<T>(T a);
-    //
-    // It is clear that if the non-generic `doThing` is applicable
-    // to an argument `x`, then `doThing<int>` is also applicable to
-    // `x`. However, knowing that the generic `doThing` was applicable
-    // to some `y` doesn't tell us that the non-generic `doThing` can
-    // be called on `y`, because `y` could have some type that can't
-    // convert to `int`.
-    //
-    // Similarly, a generic declaration with a subset of the parameters
-    // of another generic is always more specialized:
-    //
-    //      int doThing<T>(vector<T,3> value);
-    //      int doThing<T, let N : int>(vector<T,N> value);
-    //
-    // Here we know that both overloads can apply to `float3`, but only
-    // one can apply to `float4`, so the first overload is more
-    // specialized/specific.
-    //
-    // As a final example, a generic which places more constraints
-    // on its generic parameters is more specific, all other things
-    // being equal:
-    //
-    //      int doThing<T : IFoo>( T value );
-    //      int doThing<T>(T value);
-    //
-    // In this case we know that the first overload is applicable
-    // to a strict subset of the types that the second overload can
-    // apply to.
-    //
-    // The above rules represent the idealized principles we want
-    // to implement, but actually implementing that full check here
-    // could make overload resolution far more expensive.
-    //
-    // TODO: In the long run we should clearly replace this with
-    // the more general "does A being applicable imply B being applicable"
-    // test.
-    //
-    // TODO: The principle stated here doesn't take the actual
-    // arguments or their types into account, and it might be that
-    // in some cases disambiguation of which declaration should be
-    // preferred will depend on knowing the actual arguments.
-    //
+    // TODO: Replace this with an applicability-subset comparison that accounts for generic
+    // constraints and, where necessary, the actual argument types.
     return 0;
 }
 

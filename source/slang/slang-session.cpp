@@ -86,12 +86,16 @@ SharedSemanticsContext* Linkage::getSemanticsForReflection()
 {
     // Linkage options are populated after the `Linkage` constructor runs. Defer construction so
     // ad hoc reflection checking observes the language version configured on the session or
-    // compile request instead of unconditionally capturing the compiler default.
+    // compile request instead of unconditionally capturing the compiler default. A legacy compile
+    // request can also process a new `-std` option after reflection has started, so replace a
+    // cached context whose effective version no longer matches the linkage.
     std::lock_guard<std::recursive_mutex> lock(getComponentTypeOperationMutex());
-    if (!m_semanticsForReflection)
+    auto languageVersion = m_optionSet.getLanguageVersion();
+    if (!m_semanticsForReflection ||
+        m_semanticsForReflection->getLanguageVersion() != languageVersion)
     {
         m_semanticsForReflection =
-            new SharedSemanticsContext(this, m_optionSet.getLanguageVersion(), nullptr);
+            new SharedSemanticsContext(this, languageVersion, nullptr);
     }
     return m_semanticsForReflection.get();
 }

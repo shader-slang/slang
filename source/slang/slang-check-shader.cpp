@@ -1785,8 +1785,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         // Use the existing getTypeTags functionality to check for resource types
         // Create a temporary SemanticsVisitor to access getTypeTags
-        SharedSemanticsContext shared(linkage, module, sink);
-        SemanticsVisitor visitor(&shared);
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            module,
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
 
         auto typeTags = visitor.getTypeTags(returnType);
         bool hasResourceOrUnsizedTypes = (((int)typeTags & (int)TypeTag::Opaque) != 0) ||
@@ -1974,8 +1978,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // accessor it resolves to, so a need like `fragmentshaderbarycentric` on `SV_Barycentrics`
     // must be gathered here.
     {
-        SharedSemanticsContext shared(linkage, module, sink);
-        SemanticsVisitor visitor(&shared);
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            module,
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
 
         // Use the session's coreLanguageScope which contains the SemanticDecl definitions
         // The module's own scope may not include the core module (e.g., when loading from

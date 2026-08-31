@@ -933,6 +933,13 @@ public:
                m_isGLSLModuleImported;
     }
 
+private:
+    static SlangLanguageVersion _getModuleLanguageVersion(Module* module)
+    {
+        SLANG_RELEASE_ASSERT(module);
+        return module->getModuleDecl()->languageVersion;
+    }
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -942,14 +949,11 @@ public:
         TranslationUnitRequest* translationUnit = nullptr)
         : m_linkage(linkage)
         , m_module(module)
-        , m_languageVersion(
-              module ? module->getModuleDecl()->languageVersion : SLANG_LANGUAGE_VERSION_UNKNOWN)
+        , m_languageVersion(_getModuleLanguageVersion(module))
         , m_sink(sink)
         , m_environmentModules(environmentModules)
         , m_translationUnitRequest(translationUnit)
-    {
-        SLANG_RELEASE_ASSERT(module);
-    }
+    {}
 
     SharedSemanticsContext(
         Linkage* linkage,
@@ -958,6 +962,21 @@ public:
         : m_linkage(linkage), m_languageVersion(languageVersion), m_sink(sink)
     {
         SLANG_RELEASE_ASSERT(languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN);
+    }
+
+    /// Creates a context for a producer where the primary module is legitimately optional.
+    ///
+    /// A present module supplies the source language policy. Otherwise, the producer must provide
+    /// the language version that applies to its ad hoc checking operation.
+    static RefPtr<SharedSemanticsContext> createForOptionalModule(
+        Linkage* linkage,
+        Module* module,
+        SlangLanguageVersion fallbackLanguageVersion,
+        DiagnosticSink* sink)
+    {
+        if (module)
+            return new SharedSemanticsContext(linkage, module, sink);
+        return new SharedSemanticsContext(linkage, fallbackLanguageVersion, sink);
     }
 
     Session* getSession() { return m_linkage->getSessionImpl(); }
