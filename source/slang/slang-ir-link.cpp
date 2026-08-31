@@ -2434,10 +2434,11 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // definition.
     diagnoseUnresolvedSymbols(targetReq, codeGenContext->getSink(), state->irModule);
 
-    // Rewrite any GLSL atomic-uint types that reached the linked IR. SPIR-V cannot represent this
-    // GLSL type directly, so the legalization replaces it with a storage-buffer representation.
-    // `kIROp_GLSLAtomicUintType` is the source of truth for whether the rewrite is needed; scanning
-    // a module without that type is harmless.
+    // Rewrite any GLSL atomic-uint types that reached the linked IR. No target consumes this
+    // GLSL-only placeholder directly: SPIR-V cannot represent it, while targets such as HLSL need
+    // the equivalent storage-buffer representation. The opcode is therefore the cross-target
+    // source of truth for whether legalization is needed, and scanning a module without it is a
+    // no-op.
     GLSLReplaceAtomicUint(context, state->irModule);
 
     // TODO: *technically* we should consider the case where

@@ -87,7 +87,6 @@ SLANG_UNIT_TEST(sourceLanguageSessionOptionAppliesToModuleSourceString)
         unitTestContext->slangGlobalSession->createSession(sessionDesc, session.writeRef())));
 
     const char* source = R"(
-        #version 450
         layout(local_size_x = 1) in;
         buffer OutputBuffer
         {
