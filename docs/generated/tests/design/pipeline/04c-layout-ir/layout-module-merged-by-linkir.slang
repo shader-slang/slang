@@ -15,7 +15,7 @@
 // on the global_param. Since no pre-link pass attaches those, their
 // appearance is the observable evidence that link merged the layout module.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

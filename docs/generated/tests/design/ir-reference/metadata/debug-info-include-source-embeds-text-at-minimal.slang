@@ -16,7 +16,7 @@
 // same run must still not have gained the records that only Standard brings --
 // which is what shows the flag moved the text operand and not the level.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1 -debug-info-include-source
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1 -debug-info-include-source
 
 uniform RWStructuredBuffer<int> markerBuffer;
 

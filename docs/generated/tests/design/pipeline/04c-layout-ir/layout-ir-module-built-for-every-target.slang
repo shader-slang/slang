@@ -16,13 +16,13 @@
 // Only the structure is checked: the numeric operands inside `offset(...)`
 // differ per target, which is exactly why the module is per-target.
 
-//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=METAL):-target metal -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=WGSL):-target wgsl -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CUDA):-target cuda -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CPP):-target cpp -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

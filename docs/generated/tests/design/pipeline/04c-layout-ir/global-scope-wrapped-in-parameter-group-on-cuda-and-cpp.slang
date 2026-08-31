@@ -15,9 +15,9 @@
 // C++, where global uniforms are gathered into a generated parameter block.
 // The SPV prefix pins the unwrapped shape, CUDA/CPP the wrapped one.
 
-//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CUDA):-target cuda -dump-ir -o /dev/null -entry main -stage compute
-//TEST:SIMPLE(filecheck=CPP):-target cpp -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -dump-ir -o - -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

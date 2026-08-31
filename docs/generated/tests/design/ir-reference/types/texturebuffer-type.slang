@@ -17,7 +17,7 @@
 // struct, which pins the single-operand shape against the two-operand
 // ConstantBuffer covered by the sibling constant-buffer test.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 struct P { float4 a; }
 

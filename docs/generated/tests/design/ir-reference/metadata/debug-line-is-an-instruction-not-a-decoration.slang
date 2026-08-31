@@ -16,7 +16,7 @@
 // level 1 keeps the module's source record from embedding a copy of this file,
 // so the patterns cannot match their own text.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<int> buf;
 

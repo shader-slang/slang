@@ -13,7 +13,7 @@
 // widening. Verifies that lowering keeps both narrowing and widening under one
 // `floatCast` opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<double> buf;

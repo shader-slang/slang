@@ -15,7 +15,7 @@
 // named `gSamp` field key to its offset and to the size on its type layout
 // and require 7 in operand 0 of both.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 Texture2D<float4> gTex;
 SamplerState gSamp;

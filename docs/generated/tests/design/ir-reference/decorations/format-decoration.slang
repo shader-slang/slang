@@ -15,7 +15,7 @@
 // matches `[format(N : Int)]` with the tag wildcarded - the mapping from
 // format name to tag is not published, which is recorded as a doc gap.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 [format("rgba32f")]
 uniform RWTexture2D<float4> tex;

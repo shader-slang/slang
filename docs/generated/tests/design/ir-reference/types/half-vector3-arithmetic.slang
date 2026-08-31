@@ -15,7 +15,7 @@
 // Int)` value — arithmetic on the narrow-element vector preserves both
 // element type and width.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half3 a;
 uniform half3 b;

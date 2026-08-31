@@ -15,7 +15,7 @@
 // index as a separate integer operand, which is what lets a backend reason
 // about the index without parsing the string.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage fragment
 
 struct VOut
 {

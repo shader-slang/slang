@@ -32,7 +32,7 @@ target gate, the input-attachment-index space exemption, the bindless
 descriptor-heap placement, and the diagnostics that abort binding.
 
 **Layout-IR-shape tests** use
-`-target <T> -dump-ir -o /dev/null -entry main -stage compute`. The layout
+`-target <T> -dump-ir -o - -entry main -stage compute`. The layout
 module is never dumped under a header of its own; its effects appear once
 link merges it into the post-link IR, so these tests pin `CHECK-NOT`
 patterns to the pre-link `### LOWER-TO-IR:` block and positive `CHECK`

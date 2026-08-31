@@ -14,7 +14,7 @@
 // must lower to one `add` typed as the Mat IR type rather than a call
 // to an operator function.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float2x2 a;
 uniform float2x2 b;
