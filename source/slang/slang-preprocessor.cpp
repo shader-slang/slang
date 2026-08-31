@@ -4502,6 +4502,8 @@ static void HandleExtensionDirective(PreprocessorDirectiveContext* context)
 ///
 /// Preserving the first location lets the translation-unit layer combine independently
 /// preprocessed primary files while still reporting both sides of a conflict.
+/// `_applySourceLanguageDirective` diagnoses the same conflict across primary files, while
+/// `Linkage::findAndIncludeFile` handles directives discovered by a semantic `__include`.
 static void _handleSourceLanguageDirective(
     PreprocessorDirectiveContext* context,
     SourceLanguage language)

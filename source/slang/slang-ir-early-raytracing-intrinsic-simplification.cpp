@@ -43,7 +43,7 @@ struct CacheOfDataToReplaceOps
     /// the malformed operand and allow compilation to continue reporting errors.
     IRInst* getRayVariableFromLocation(IRInst* payloadVariable, Slang::IROp op)
     {
-        SLANG_ASSERT(isRayTracingLocationOperand(op));
+        SLANG_RELEASE_ASSERT(isRayTracingLocationOperand(op));
 
         IRBuilder builder(payloadVariable);
         IRInst** varLayoutPointsTo = nullptr;
@@ -62,7 +62,7 @@ struct CacheOfDataToReplaceOps
             }
             else
             {
-                SLANG_ASSERT(kIROp_SPIRVAsmOperandRayCallableFromLocation == op);
+                SLANG_RELEASE_ASSERT(kIROp_SPIRVAsmOperandRayCallableFromLocation == op);
                 varLayoutPointsTo = m_RayLocationToCallables.tryGetValue(intLitValue);
             }
         }

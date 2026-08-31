@@ -1080,7 +1080,10 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
 
     SlangLanguageVersion languageVersion = m_optionSet.getLanguageVersion();
-    SourceLanguageDirective sourceLanguageDirective;
+    // Term strings are always snippets of Slang syntax, rather than translation units that may
+    // select a parser mode. `preprocessSource` requires this output, so discard any directive it
+    // observes and preserve the term parser's Slang-language contract below.
+    SourceLanguageDirective ignoredSourceLanguageDirective;
 
     auto tokens = preprocessSource(
         srcFile,
@@ -1088,7 +1091,7 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         nullptr,
         Dictionary<String, String>(),
         this,
-        sourceLanguageDirective,
+        ignoredSourceLanguageDirective,
         languageVersion);
 
     return parseTermFromSourceFile(
@@ -2099,7 +2102,9 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
             // retained location lets the diagnostic identify both conflicting directives. If the
             // effective language came only from an API request or file extension, there is no
             // earlier directive to cite, so E00123 instead explains that the unit was already
-            // parsed under the other language.
+            // parsed under the other language. `_handleSourceLanguageDirective` emits E00121 for
+            // conflicts within one preprocessing unit, while `_applySourceLanguageDirective`
+            // emits it across primary source files.
             if (translationUnit->sourceLanguageImpliedBySourceContentsLoc.isValid())
             {
                 sink->diagnose(Diagnostics::ConflictingSourceLanguageDirectives{

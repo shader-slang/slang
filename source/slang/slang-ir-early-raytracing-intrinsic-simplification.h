@@ -10,7 +10,7 @@ struct IRModule;
 struct IRGlobalValueWithCode;
 class DiagnosticSink;
 
-/// Whether `op` is a SPIR-V assembly operand that names a ray object by integer location.
+/// Returns true if `op` is a SPIR-V assembly operand that names a ray object by integer location.
 ///
 /// This predicate is the complete opcode contract shared by the required-pass scan and the
 /// replacement pass. A new location-operand role must be added here so detecting and consuming it

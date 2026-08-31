@@ -255,6 +255,8 @@ static void _outputIncludes(
 /// so every primary source in the translation unit is parsed under one grammar. If a later primary
 /// source says `#language 2026`, this function diagnoses the conflict and retains the first GLSL
 /// selection; a translation unit cannot be reparsed under multiple language grammars.
+/// `_handleSourceLanguageDirective` diagnoses the same conflict within one preprocessing unit,
+/// while `Linkage::findAndIncludeFile` handles directives discovered by a semantic `__include`.
 static void _applySourceLanguageDirective(
     TranslationUnitRequest* translationUnit,
     SourceLanguageDirective const& directive,
