@@ -140,8 +140,11 @@ split the region:
 
 - An instruction that can abandon the invocation — `discard`, an abort,
   or a call to a function that transitively contains one, or that never
-  returns at all. The analysis is a memoized fixpoint over the call
-  graph.
+  returns at all. The analysis is a memoized depth-first walk of the
+  call graph, not an iterated fixpoint: a re-entered function is
+  reported as possibly not returning, which breaks cycles conservatively
+  without letting an optimistic answer escape into another function's
+  cached result.
 - A call whose target cannot be resolved statically, such as an
   interface method dispatched through a witness table. Coverage runs
   before specialization, so these are common; the pass assumes the

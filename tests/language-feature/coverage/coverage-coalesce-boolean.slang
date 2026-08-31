@@ -9,6 +9,7 @@
 // often chosen to avoid.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-coverage -trace-coverage-boolean
+//TEST:SIMPLE(filecheck=ONESTORE):-target cpp -stage compute -entry computeMain -trace-coverage -trace-coverage-boolean
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
@@ -31,3 +32,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // And no second slot: coalescing is still in effect.
 //CHECK-NOT: _slang_coverage_0)[int(1)]
+
+// Same property on the boolean path: one store for the region, not one per
+// statement sharing the slot. Checking only that slot 1 is absent would pass
+// even if every marker in the region emitted its own store into slot 0.
+//ONESTORE-COUNT-1: _slang_coverage_0)[int(0)]) = 1
+//ONESTORE-NOT: _slang_coverage_0)[int(0)]) = 1

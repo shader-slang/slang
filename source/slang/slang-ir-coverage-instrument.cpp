@@ -1020,6 +1020,19 @@ struct CoverageFunctionExitAnalysis
         // A body with no normal exit anywhere never returns to its
         // caller, which covers an unconditional exit and a
         // non-terminating loop.
+        //
+        // The scan above is unfiltered: any `IRReturn`/`IRGenericAsm` in
+        // any block sets `sawNormalExit`, with no reachability check. That
+        // is sound only because the front end does not leave an
+        // unreachable normal exit in a body that cannot return -- a
+        // function that never returns has no `IRReturn` to find, which is
+        // what makes `for (;;) {}` reach this branch at all. If that ever
+        // stopped holding, the failure would be in the dangerous
+        // direction: a dead `IRReturn` would set `sawNormalExit`, this
+        // split would be skipped, and callers would coalesce across a call
+        // that does not come back. Restricting the scan to exits reachable
+        // from the entry block would remove the dependence on that
+        // property, at the cost of a reachability walk per function.
         if (!sawNormalExit)
             result = true;
 

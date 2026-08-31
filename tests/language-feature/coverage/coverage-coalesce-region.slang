@@ -8,6 +8,7 @@
 // with the statements before or after them.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-coverage
+//TEST:SIMPLE(filecheck=ONEPROBE):-target cpp -stage compute -entry computeMain -trace-coverage
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
@@ -43,3 +44,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // ...and no fifth. If coalescing regresses to one counter per
 // statement, slot 4 appears and this fails.
 //CHECK-NOT: _slang_coverage{{.*int\(4\)}}
+
+// Slot count alone does not pin the point of this pass. `outCounterCount` is
+// computed from the slot assignment, independently of which marker emits a
+// probe, so a regression that shared slots correctly but left every marker
+// emitting would produce N redundant atomics into one slot while the counter
+// count, every entry's counterIndex and the LCOV output stayed byte-identical.
+// The region has to emit exactly ONE runtime probe, not just occupy one slot.
+//ONEPROBE-COUNT-1: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
+//ONEPROBE-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
