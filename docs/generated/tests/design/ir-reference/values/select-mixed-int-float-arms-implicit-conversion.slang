@@ -13,7 +13,7 @@
 // common type. When the two arms are int and float, the int arm
 // is promoted via `castIntToFloat` before `select`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform bool c;
 uniform int ia;

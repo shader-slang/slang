@@ -13,7 +13,7 @@
 // int-to-float-then-float-to-half pair; the doc places it under
 // one `castIntToFloat` opcode keyed by the result float type.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<half> buf;

@@ -14,7 +14,7 @@
 // type here is a vector, and the CHECK still pins the two-operand
 // `(buffer, index)` form under `func %main`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<float4> rwbuf;
 uniform RWStructuredBuffer<float> outbuf;
