@@ -724,6 +724,18 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 {
     switch (inst->getOp())
     {
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+        {
+            // Metal spells an array as `metal::array<T,N>`, a struct wrapping a `T[N]` member, so
+            // its initializer needs two brace levels — the struct and its member array — whereas
+            // the base emitter emits one and relies on brace-elision, which is ambiguous for nested
+            // arrays (same shape and handling as the C++ `FixedArray` target).
+            m_writer->emit("{ ");
+            defaultEmitInstExpr(inst, inOuterPrec);
+            m_writer->emit(" }");
+            return true;
+        }
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeVectorFromScalar:

@@ -635,10 +635,39 @@ match: ...`, `see declaration of ...`). Rules:
      **not** omit it when unannotated diagnostics remain — exhaustive mode
      then fails.
 
+8. **Pin only what the claim depends on.** Rules 1–7 ask whether a token
+   is _volatile_. This one asks whether it is _relevant_. A token can be
+   perfectly stable and still not belong in the CHECK, and pinning it
+   makes the test fail on unrelated compiler changes that leave the claim
+   true. Before pinning a token, ask: **if this token changed, would the
+   anchored claim be false?** If no, wildcard it or leave it out.
+
+   The recurring offenders are declaration specifiers and qualifiers
+   sitting next to the thing under test — `__device__`, `__global__`,
+   `__noinline__`, `inline`, `static`, `precise` — and decorations the
+   claim never mentions.
+
+   For a claim that `in` parameters are passed **by value**, the CUDA
+   signature line is about the parameter list, not the specifiers:
+
+   - ✅ `// CUDA: void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})`
+   - ❌ `// CUDA: __device__ void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})`
+
+   The second broke when `[noinline]` started emitting `__noinline__`
+   between `__device__` and `void`. Every parameter was still passed by
+   value, so the claim was untouched and only the scaffolding moved.
+
+   This is not licence to loosen the token that _carries_ the claim. In
+   that same test the `(int val_...)` shape — no `*`, no `&` — **is** the
+   assertion and must stay tight. Loosen the scaffolding, never the
+   subject. (Rule 6 forbids weakening a CHECK to force green; that is
+   about the subject. This rule is about everything around it.)
+
 **Bottom line:** keep patterns loose (`{{...}}`, `-DAG`, error codes,
-opcodes) and structural. Every time you are tempted to write an exact id,
-name, ordering, or full message string, ask "will codegen or the harness
-render this differently?" — if yes, loosen it.
+opcodes) and structural. Ask two questions of every token you are tempted
+to pin: "will codegen or the harness render this differently?" (rules 1–7)
+and "does the anchored claim actually depend on it?" (rule 8). Loosen it
+if the answer is yes to the first or no to the second.
 
 If a claim is genuinely unobservable through any `slang-test`
 directive even with full runner access (e.g., the claim is about a

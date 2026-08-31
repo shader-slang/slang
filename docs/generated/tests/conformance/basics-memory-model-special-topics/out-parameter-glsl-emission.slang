@@ -44,10 +44,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // MTL: void writeOut_{{[0-9]+}}(int thread* result_{{[0-9]+}},
 // MTL: *result_{{[0-9]+}} =
 
-// CUDA: __device__ void writeOut_{{[0-9]+}}(int {{.*}}result_{{[0-9]+}},
+// CUDA: void writeOut_{{[0-9]+}}(int {{.*}}result_{{[0-9]+}},
 // CUDA: *result_{{[0-9]+}} =
 
-// CPP: static void writeOut_{{[0-9]+}}(int32_t {{.*}}result_{{[0-9]+}},
+// CPP: void writeOut_{{[0-9]+}}(int32_t {{.*}}result_{{[0-9]+}},
 // CPP: *result_{{[0-9]+}} =
 
 // WGSL: fn writeOut_{{[0-9]+}}( result_{{[0-9]+}} : ptr<function, i32>

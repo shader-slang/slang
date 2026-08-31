@@ -70,6 +70,26 @@ static constexpr int kDefaultCoverageCounterByteWidth = 8;
 // an atomic add, so it records whether the entry executed (0 / non-zero)
 // rather than an exact count. This removes all atomic contention. Off by
 // default.
+// `bindlessIndex` is the value supplied by
+// `-trace-coverage-bindless-index`; pass `-1` for the ordinary
+// single-buffer form. When it is >= 0 the synthesized global becomes an
+// UNBOUNDED ARRAY of structured buffers rather than one buffer, and
+// every counter access indexes through it:
+// `__slang_coverage[bindlessIndex][slot]`. Many separately compiled
+// shaders sharing one pipeline then occupy a single descriptor binding
+// instead of one binding each — at the cost of requiring descriptor
+// indexing. A caller must therefore only pass `bindlessIndex >= 0` for a
+// Khronos target: the user-facing rejection belongs in `linkAndOptimizeIR`,
+// which validates it before this pass is gated on the module having any
+// coverage markers, so that a module with nothing instrumentable still
+// diagnoses. This pass asserts the invariant rather than re-reporting it.
+//
+// The index is a compile-time constant and therefore part of
+// the compiled artifact: a host that keys a shader cache on that
+// artifact must derive the index from a stable shader identity rather
+// than from load order, or an unchanged shader recompiles whenever the
+// order shifts. Supplying the index at pipeline creation instead would
+// avoid that entirely; see issue #12541.
 void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,
@@ -80,6 +100,7 @@ void instrumentCoverage(
     int reservedSpaceCount,
     int counterByteWidth,
     bool booleanMode,
+    int bindlessIndex,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);

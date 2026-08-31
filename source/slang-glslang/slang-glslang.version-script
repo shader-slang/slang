@@ -1,0 +1,25 @@
+# Export list for slang-glslang, a dlopen'd module that is never linked against. These are the names
+# GlslangDownstreamCompiler::init and GlslangModule::init look up; the definitions live in
+# slang-glslang.cpp.
+#
+# Listed individually rather than matched as `glslang_*` because glslang's own C API
+# (glslang_program_create, glslang_shader_delete, ...) shares that prefix: 41 such symbols exist in
+# libglslang.a, and a wildcard would export them too if anything ever pulled that member into the link.
+#
+# The version tag is left anonymous deliberately -- a named tag would add ELF version definitions and
+# change the ABI. `local: *` is what does the work here: it keeps everything not named above out of
+# the dynamic symbol table, including the libstdc++ template instantiations that #9146 reported.
+{
+    global:
+        glslang_compile;
+        glslang_compile_1_1;
+        glslang_compile_1_2;
+        glslang_compile_1_3;
+        glslang_disassembleSPIRV;
+        glslang_disassembleSPIRVWithResult;
+        glslang_freeDisassembly;
+        glslang_linkSPIRV;
+        glslang_validateSPIRV;
+    local:
+        *;
+};
