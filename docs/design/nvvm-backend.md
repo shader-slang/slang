@@ -7018,6 +7018,28 @@ reaches 391/395/391 O0/O3/both-mode correctness; discovery remains exactly 82/72
 64/64/64. Both have zero old-correct loss. The selected prefix passes 428/428, and all 21
 representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
 
+### Slice 163: Canonical wave-mask match
+
+Direct NVVM now lowers scalar `IRWaveMaskMatch` through one typed generic value operation. Active-
+mask synthesis emits this exact instruction before divergent switches as
+`UInt = waveMaskMatch(UInt mask, T value)`. Its result is the mask of active lanes whose b32 value
+matches the calling lane's value; the existing match-all predicate cannot reconstruct that
+partition mask.
+
+Forward-only provider ABI revision 31 appends `SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH` without adding
+a callback or changing any interface table. The semantic catalog admits exact signed-i32,
+unsigned-i32, and float32 rows. The LLVM 14 provider maps them to
+`llvm.nvvm.match.any.sync.i32`; float32 is bitcast to i32 before the intrinsic. Preflight uses the
+same catalog row consumed by emission, and adjacent widths, vectors, aggregates, and wave
+operations retain deterministic rejection.
+
+The two active-mask switch fixtures and the functional divergent-switch workload become correct at
+O0 and O3 and gain six permanent direct lanes. Frozen corpus v1 remains exactly 452 workloads/427
+healthy references and reaches 394/398/394 O0/O3/both-mode correctness; discovery remains exactly
+82/72 at 64/64/64. Both have zero old-correct loss. The selected prefix passes 432/432, generated
+PTX contains `match.any.sync.b32`, and all 24 representative direct-O3 gates assemble with CUDA
+12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

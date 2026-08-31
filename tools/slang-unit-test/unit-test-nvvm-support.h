@@ -7870,6 +7870,11 @@ static SlangResult _emitNVVMTestIntrinsic(
         operandTypes[0] = NVVMSemantics::kUnsignedI32;
         operandTypes[1] = valueType;
         break;
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH:
+        resultType = NVVMSemantics::kUnsignedI32;
+        operandTypes[0] = NVVMSemantics::kUnsignedI32;
+        operandTypes[1] = valueType;
+        break;
     default:
         return SLANG_E_INVALID_ARG;
     }
@@ -8505,6 +8510,7 @@ enum class WavePredicateValueKind
 {
     Boolean,
     Integer,
+    UnsignedInteger,
     Float,
 };
 
@@ -8532,16 +8538,18 @@ static SlangResult _populateWavePredicateIntrinsicKernel(
         SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
         globalIntegerPointerType));
 
+    const bool returnsMask = operation == SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH;
     SlangNVVMTypeHandle helperValueType = valueKind == WavePredicateValueKind::Boolean ? boolType
                                           : valueKind == WavePredicateValueKind::Float
                                               ? floatType
                                               : integerType;
+    SlangNVVMTypeHandle helperResultType = returnsMask ? integerType : boolType;
     SlangNVVMTypeHandle helperParameterTypes[] = {integerType, helperValueType};
     SlangNVVMTypeHandle helperType = nullptr;
     SlangNVVMValueHandle helper = nullptr;
     SLANG_RETURN_ON_FAIL(builder.getFunctionType(
         module,
-        boolType,
+        helperResultType,
         helperParameterTypes,
         SLANG_COUNT_OF(helperParameterTypes),
         helperType));
@@ -8586,18 +8594,19 @@ static SlangResult _populateWavePredicateIntrinsicKernel(
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, helperBlock));
     const SlangNVVMValueHandle intrinsicArguments[] = {helperMask, helperValue};
-    SlangNVVMValueHandle predicate = nullptr;
+    SlangNVVMValueHandle intrinsicResult = nullptr;
     SLANG_RETURN_ON_FAIL(_emitNVVMTestIntrinsic(
         builder,
         module,
         operation,
-        valueKind == WavePredicateValueKind::Float     ? NVVMSemantics::kFloat32
-        : valueKind == WavePredicateValueKind::Boolean ? NVVMSemantics::kBool
-                                                       : NVVMSemantics::kSignedI32,
+        valueKind == WavePredicateValueKind::Float             ? NVVMSemantics::kFloat32
+        : valueKind == WavePredicateValueKind::Boolean         ? NVVMSemantics::kBool
+        : valueKind == WavePredicateValueKind::UnsignedInteger ? NVVMSemantics::kUnsignedI32
+                                                               : NVVMSemantics::kSignedI32,
         intrinsicArguments,
         SLANG_COUNT_OF(intrinsicArguments),
-        predicate));
-    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, predicate));
+        intrinsicResult));
+    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, intrinsicResult));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, kernelBlock));
     SlangNVVMValueHandle value = nullptr;
@@ -8615,19 +8624,27 @@ static SlangResult _populateWavePredicateIntrinsicKernel(
         SLANG_RETURN_ON_FAIL(builder.getIntegerConstant(module, helperValueType, 1, value));
     }
     const SlangNVVMValueHandle callArguments[] = {mask, value};
-    predicate = nullptr;
+    intrinsicResult = nullptr;
     SLANG_RETURN_ON_FAIL(
-        builder.emitCall(module, helper, callArguments, SLANG_COUNT_OF(callArguments), predicate));
-    const SlangNVVMValueHandle ballotArguments[] = {mask, predicate};
-    SlangNVVMValueHandle ballot = nullptr;
-    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntrinsic(
-        builder,
-        module,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
-        ballotArguments,
-        SLANG_COUNT_OF(ballotArguments),
-        ballot));
-    SLANG_RETURN_ON_FAIL(builder.emitStore(module, ballot, destination, 4));
+        builder.emitCall(
+            module,
+            helper,
+            callArguments,
+            SLANG_COUNT_OF(callArguments),
+            intrinsicResult));
+    SlangNVVMValueHandle storedValue = intrinsicResult;
+    if (!returnsMask)
+    {
+        const SlangNVVMValueHandle ballotArguments[] = {mask, intrinsicResult};
+        SLANG_RETURN_ON_FAIL(_emitNVVMTestIntrinsic(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
+            ballotArguments,
+            SLANG_COUNT_OF(ballotArguments),
+            storedValue));
+    }
+    SLANG_RETURN_ON_FAIL(builder.emitStore(module, storedValue, destination, 4));
     SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
     SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, kernel));
     return SLANG_OK;
@@ -10531,6 +10548,24 @@ void computeMain(
 {
     uint laneIndex = WaveGetLaneIndex();
     destination[laneIndex] = WaveActiveAllEqual(source[laneIndex]) ? 1 : 0;
+}
+)";
+static const char kDirectNVVMWaveMaskMatchSwitchSource[] = R"(
+RWStructuredBuffer<uint> destination;
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    switch (dispatchThreadID.x)
+    {
+    case 0:
+    case 1:
+        destination[dispatchThreadID.x] = WaveGetActiveMask();
+        break;
+    default:
+        destination[dispatchThreadID.x] = WaveGetActiveMask();
+        break;
+    }
 }
 )";
 static const char kDirectNVVMUnmaskedWaveReadLaneAtUIntSource[] = R"(

@@ -4901,6 +4901,9 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation& outOperation)
     case kIROp_WaveMaskBallot:
         outOperation = SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT;
         return true;
+    case kIROp_WaveMaskMatch:
+        outOperation = SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH;
+        return true;
     default:
         return false;
     }
@@ -7650,10 +7653,17 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_WaveMaskBallot:
+            case kIROp_WaveMaskMatch:
                 {
                     NVVMResolvedValueOperation operation;
                     if (!_resolveNVVMValueOperation(inst, operation) || !operation.staticEntry)
-                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("wave-mask ballot"));
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            inst->getOp() == kIROp_WaveMaskBallot
+                                ? toSlice("wave-mask ballot")
+                                : toSlice("wave-mask match"));
+                    }
                     _requireValueOperation(
                         requirements.valueOperations,
                         operation.desc,
@@ -8285,6 +8295,22 @@ SlangResult _validateNVVMFunction(
                     availableValues,
                     dominatorTree));
                 SLANG_RETURN_ON_FAIL(_validateBooleanValue(
+                    codeGenContext,
+                    inst->getOperand(1),
+                    inst,
+                    availableValues,
+                    dominatorTree));
+                availableValues.add(inst);
+                break;
+
+            case kIROp_WaveMaskMatch:
+                SLANG_RETURN_ON_FAIL(_validateWaveMaskValue(
+                    codeGenContext,
+                    inst->getOperand(0),
+                    inst,
+                    availableValues,
+                    dominatorTree));
+                SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                     codeGenContext,
                     inst->getOperand(1),
                     inst,
@@ -12676,6 +12702,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_FloatCast:
                 case kIROp_Select:
                 case kIROp_WaveMaskBallot:
+                case kIROp_WaveMaskMatch:
                     {
                         NVVMResolvedIntegerTruthiness truthiness;
                         if (_resolveNVVMIntegerTruthiness(inst, truthiness))

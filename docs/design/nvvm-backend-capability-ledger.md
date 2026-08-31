@@ -2324,3 +2324,15 @@ Frozen `gh-5776` and discovery `parameter-block-load` become correct at O0 and O
 direct lanes. Frozen v1 reaches 391/395/391 over its unchanged 427 healthy denominator; discovery
 reaches 64/64/64 over 72. Both have zero old-correct loss. The selected prefix passes 428/428, and
 all 21 direct-O3 measurement gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 163 maps exact scalar `IRWaveMaskMatch(UInt mask, T value) -> UInt` to the native b32
+match-any operation. Forward-only provider ABI revision 31 appends one semantic operation ID to
+the existing generic value-operation interface; no callback or interface-table layout changes.
+The catalog supports signed i32, unsigned i32, and float32, with explicit float bit transport.
+Vectors, aggregates, wider scalars, and unrelated advanced wave operations remain unsupported.
+
+The two active-mask switch fixtures and the functional divergent-switch workload become correct at
+O0 and O3 and gain six direct lanes. Frozen v1 reaches 394/398/394 over its unchanged 427 healthy
+denominator; discovery remains 64/64/64 over 72. Both have zero old-correct loss. The selected
+prefix passes 432/432, generated PTX contains `match.any.sync.b32`, and all 24 direct-O3
+measurement gates assemble with CUDA 12.9 for SM70, SM80, and SM90.

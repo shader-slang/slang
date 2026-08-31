@@ -1727,7 +1727,7 @@ static SlangResult _emitIntrinsic(
     bool derivesFirstActiveLane = false;
     bool derivesFirstLanePredicate = false;
     bool extractsMatchAllPredicate = false;
-    bool bitcastsMatchAllFloatValue = false;
+    bool bitcastsMatchFloatValue = false;
     const bool hasFloatingValue =
         operation.operandCount > 1 &&
         operation.operandTypes[1].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
@@ -1780,7 +1780,14 @@ static SlangResult _emitIntrinsic(
         if (hasFloatingValue)
             expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
         extractsMatchAllPredicate = true;
-        bitcastsMatchAllFloatValue = hasFloatingValue;
+        bitcastsMatchFloatValue = hasFloatingValue;
+        break;
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH:
+        intrinsicID = llvm::Intrinsic::nvvm_match_any_sync_i32;
+        expectedArgumentCount = 2;
+        if (hasFloatingValue)
+            expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
+        bitcastsMatchFloatValue = hasFloatingValue;
         break;
     default:
         return SLANG_E_INVALID_ARG;
@@ -1800,7 +1807,7 @@ static SlangResult _emitIntrinsic(
         }
         llvmArguments.push_back(argument);
     }
-    if (bitcastsMatchAllFloatValue)
+    if (bitcastsMatchFloatValue)
         llvmArguments[1] = state->builder.CreateBitCast(llvmArguments[1], int32Type);
     if (derivesFirstLanePredicate)
     {
@@ -3404,6 +3411,7 @@ static SlangResult _emitCatalogOperation(
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE:
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE:
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL:
+    case SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH:
         return _emitIntrinsic(module, operation, operands, entry.operandCount, outValue);
     default:
         return SLANG_E_INVALID_ARG;

@@ -3248,7 +3248,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualUIntKernel)
         toSlice("wave-mask-all-equal-uint-module"),
         toSlice("waveActiveAllEqualUInt"),
         toSlice("waveMaskAllEqualUInt"),
-        WavePredicateValueKind::Integer);
+        WavePredicateValueKind::UnsignedInteger);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualFloatKernel)
@@ -3259,6 +3259,102 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualFloatKernel)
         toSlice("wave-mask-all-equal-float-module"),
         toSlice("waveActiveAllEqualFloat"),
         toSlice("waveMaskAllEqualFloat"),
+        WavePredicateValueKind::Float);
+}
+
+static void _checkNVVMIRBuilderBuildsWaveMaskMatchKernel(
+    UnitTestContext* unitTestContext,
+    const UnownedStringSlice& moduleName,
+    const UnownedStringSlice& kernelName,
+    const UnownedStringSlice& helperName,
+    WavePredicateValueKind valueKind)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    SLANG_CHECK_ABORT(builder.isInitialized());
+
+    const SlangNVVMValueTypeDesc unsupportedOperandTypes[] = {
+        NVVMSemantics::kUnsignedI32,
+        NVVMSemantics::kUnsignedI64,
+    };
+    const SlangNVVMValueOperationDesc unsupportedOperation = {
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH,
+        NVVMSemantics::kUnsignedI32,
+        unsupportedOperandTypes,
+        SLANG_COUNT_OF(unsupportedOperandTypes),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(unsupportedOperation));
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(moduleName, scope.module)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWavePredicateIntrinsicKernel(
+        builder,
+        scope.module,
+        kernelName,
+        helperName,
+        SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH,
+        valueKind)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        SLANG_CHECK_ABORT(assembly != nullptr);
+        const UnownedStringSlice text(
+            static_cast<const char*>(assembly->getBufferPointer()),
+            assembly->getBufferSize());
+        StringBuilder helperDefinition;
+        helperDefinition << "define i32 @" << helperName << "(i32";
+        StringBuilder helperCall;
+        helperCall << "call i32 @" << helperName;
+        SLANG_CHECK(text.indexOf(helperDefinition.getUnownedSlice()) >= 0);
+        SLANG_CHECK(
+            _countOccurrences(text, toSlice("call i32 @llvm.nvvm.match.any.sync.i32(i32")) == 1);
+        SLANG_CHECK(
+            _countOccurrences(text, toSlice("bitcast float")) ==
+            (valueKind == WavePredicateValueKind::Float ? 1 : 0));
+        SLANG_CHECK(_countOccurrences(text, toSlice("ret i32")) == 1);
+        SLANG_CHECK(_countOccurrences(text, helperCall.getUnownedSlice()) == 1);
+        SLANG_CHECK(_countOccurrences(text, toSlice("store i32")) == 1);
+        SLANG_CHECK(
+            _countOccurrences(
+                text,
+                toSlice("declare i32 @llvm.nvvm.match.any.sync.i32(i32, i32)")) == 1);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskMatchIntKernel)
+{
+    _checkNVVMIRBuilderBuildsWaveMaskMatchKernel(
+        unitTestContext,
+        toSlice("wave-mask-match-int-module"),
+        toSlice("waveMaskMatchIntKernel"),
+        toSlice("waveMaskMatchInt"),
+        WavePredicateValueKind::Integer);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskMatchUIntKernel)
+{
+    _checkNVVMIRBuilderBuildsWaveMaskMatchKernel(
+        unitTestContext,
+        toSlice("wave-mask-match-uint-module"),
+        toSlice("waveMaskMatchUIntKernel"),
+        toSlice("waveMaskMatchUInt"),
+        WavePredicateValueKind::UnsignedInteger);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskMatchFloatKernel)
+{
+    _checkNVVMIRBuilderBuildsWaveMaskMatchKernel(
+        unitTestContext,
+        toSlice("wave-mask-match-float-module"),
+        toSlice("waveMaskMatchFloatKernel"),
+        toSlice("waveMaskMatchFloat"),
         WavePredicateValueKind::Float);
 }
 
