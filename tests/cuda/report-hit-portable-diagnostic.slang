@@ -49,6 +49,7 @@ void badHalf()
     // `half` is 16 bits but has no bit-preserving read counterpart, so it is rejected too.
     ReportHit(1.0f, 1u, attributes);
     //CHECK-HALF: E55216
+    //CHECK-HALF: each scalar field must fit in one 32-bit register
 }
 
 struct PointerAttr
@@ -65,4 +66,5 @@ void badPtr()
     // dereference (which would change which value is reported).
     ReportHit(1.0f, 1u, p);
     //CHECK-PTR: E55216
+    //CHECK-PTR: each scalar field must fit in one 32-bit register
 }

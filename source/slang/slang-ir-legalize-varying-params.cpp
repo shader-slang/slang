@@ -1127,7 +1127,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     static const int kMaxPayloadRegisters = 32;
 
     // Maximum number of OptiX hit attribute registers (8 registers = 32 bytes). Shared by the read
-    // path (`getLegalizedVaryingVal`) and the `ReportHit` write path.
+    // path (`emitOptiXAttributeFetch`) and the `ReportHit` write path.
     static const int kMaxHitAttributeRegisters = 8;
 
     // Track payload write-back info for inout parameters
