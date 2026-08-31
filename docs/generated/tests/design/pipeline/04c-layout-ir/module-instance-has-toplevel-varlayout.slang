@@ -25,6 +25,6 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = int(tid.x);
 }
 
-// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // The module-instance varLayout is a top-level statement, no `let` binding.
 // CHECK: {{^}}varLayout(

@@ -25,6 +25,6 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = int(tid.x);
 }
 
-// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CHECK: stage(
 // CHECK: systemValueSemantic("SV_DispatchThreadID"

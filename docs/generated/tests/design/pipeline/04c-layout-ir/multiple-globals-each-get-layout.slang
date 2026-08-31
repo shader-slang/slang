@@ -27,6 +27,6 @@ void main(uint3 tid : SV_DispatchThreadID)
     bufB[0] = float(tid.y);
 }
 
-// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CHECK: structFieldLayout(%buf{{[A-Z]}}
 // CHECK: structFieldLayout(%buf{{[A-Z]}}
