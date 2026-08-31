@@ -50,7 +50,8 @@ void test()
 }
 
 // In 2026 mode the legacy fallback makes the float3-to-Converted conversion viable and selects
-// the second signature. In 202c both candidates are unmatched, so signature help retains the first
-// declaration. This expectation therefore fails if signature help ignores the document version.
+// that signature. In 202c both candidates are unmatched, so signature help retains signature-list
+// index zero, which lookup order fills with Unavailable. This expectation therefore fails if
+// signature help ignores the document version.
 // CHECK: activeSignature: 0
 // CHECK: (selected) func choose(Unavailable value) -> void

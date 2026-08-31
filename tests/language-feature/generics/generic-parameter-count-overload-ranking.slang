@@ -75,6 +75,14 @@ void equalGenericCount<T>(float3 first, T second)
 {
 }
 
+void failedInference<T>(float value)
+{
+}
+
+void failedInference<T, U>(float value)
+{
+}
+
 BroadResult rankedChoose<T : IFloat>(T value)
 {
     return BroadResult();
@@ -123,6 +131,21 @@ void test()
 //DISABLED: ambiguous call to 'equalGenericCount' with arguments of type (vector<float,3>, vector<float,3>)
 //DISABLED: candidate: func equalGenericCount<vector<float,3>>(float3, float3) -> void
 //DISABLED: candidate: func equalGenericCount<vector<float,3>>(float3, float3) -> void
+
+    // Both candidates fail generic inference, so the tied frontier is intentionally retained for
+    // the ordinary overload diagnostic. Unequal generic counts must not let the compatibility
+    // fallback promote either failed candidate or emit diagnostic 40021.
+    failedInference(0.0);
+//LEGACY: no overload for 'failedInference' applicable to arguments of type (float)
+//LEGACY: candidate: func failedInference<T> -> void
+//LEGACY: candidate: func failedInference<T, U> -> void
+//SLANG202C: no overload for 'failedInference' applicable to arguments of type (float)
+//SLANG202C: candidate: func failedInference<T> -> void
+//SLANG202C: candidate: func failedInference<T, U> -> void
+//ERROR: error[E39999]: no overload for 'failedInference' applicable to arguments of type (float)
+//DISABLED: no overload for 'failedInference' applicable to arguments of type (float)
+//DISABLED: candidate: func failedInference<T> -> void
+//DISABLED: candidate: func failedInference<T, U> -> void
 
     // An otherwise-equivalent non-generic declaration accepts a strict subset of the generic
     // overload's domain. This ordinary specificity rule is unchanged in Slang 202c and does not
