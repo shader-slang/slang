@@ -6642,6 +6642,28 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return innerType;
     }
 
+    // Returns true when `aggTypeDeclRef` names an aggregate whose concrete instance fields are
+    // materialized here in lowering, so its default value can be built as an IRMakeStruct over
+    // those fields. Only struct / class / GLSL-interface-block declarations own concrete `VarDecl`
+    // fields, and even one of those is opaque here when it has no body (`extern struct X;`,
+    // `!hasBody`) or is a link-time alias (`export struct Foo : IFoo = Bar;`, `aliasedType` set):
+    // both resolve to a concrete type only during linking, so — like the associated-type / `This` /
+    // global generic parameter kinds — they must defer to `emitDefaultConstruct` rather than build
+    // a MakeStruct from an as-yet-empty field list (shader-slang/slang#12708).
+    //
+    // `SynthesizedStructDecl` is deliberately excluded even though it also derives from
+    // `AggTypeDecl`: it carries an autodiff-context opcode plus operands (`visitAggTypeDecl` lowers
+    // it to a context type resolved later in `slang-ir-translate.cpp`), not concrete `VarDecl`
+    // fields, so it is opaque here too and must fall through to `emitDefaultConstruct`.
+    static bool isConcreteFieldOwningAggregate(DeclRef<AggTypeDecl> aggTypeDeclRef)
+    {
+        auto decl = aggTypeDeclRef.getDecl();
+        if (!decl->hasBody || decl->aliasedType)
+            return false;
+        return aggTypeDeclRef.as<StructDecl>() || aggTypeDeclRef.as<ClassDecl>() ||
+               aggTypeDeclRef.as<GLSLInterfaceBlockDecl>();
+    }
+
     LoweredValInfo getDefaultVal(Type* type)
     {
         type = getOriginalTypeFromModifiedType(type);
@@ -6707,23 +6729,15 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
             }
             else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>();
-                     aggTypeDeclRef && (aggTypeDeclRef.as<StructDecl>() ||
-                                        aggTypeDeclRef.as<SynthesizedStructDecl>() ||
-                                        aggTypeDeclRef.as<ClassDecl>() ||
-                                        aggTypeDeclRef.as<GLSLInterfaceBlockDecl>()))
+                     aggTypeDeclRef && isConcreteFieldOwningAggregate(aggTypeDeclRef))
             {
-                // Build the default value as an IRMakeStruct over instance members only for
-                // concrete, field-owning aggregates. Other AggTypeDecl subclasses are opaque
-                // until specialization (associated type, `This` type, global generic parameter;
-                // enum and interface are already handled by earlier branches) and own no
-                // concrete fields, so they fall through to emitDefaultConstruct below — building
-                // a MakeStruct from their empty member list yields a zero-operand IRMakeStruct
-                // that reads out of bounds once specialization resolves it to a non-empty struct
-                // (shader-slang/slang#12708). This list must stay exhaustive over field-owning
-                // kinds: one omitted here would silently fall through to a zero-filled default,
-                // dropping its members' default initializers. StructDecl covers its subclasses
-                // (e.g. LambdaDecl); SynthesizedStructDecl derives directly from AggTypeDecl, so
-                // it is listed alongside the other direct subclasses.
+                // Build the default value as an IRMakeStruct over instance members. Every other
+                // DeclRefType — the opaque AggTypeDecl kinds (associated type, `This`, global
+                // generic parameter, and bodyless/aliased structs; enum and interface are handled
+                // by earlier branches) — falls through to emitDefaultConstruct below. Building a
+                // MakeStruct from an opaque type's as-yet-empty field list would yield a
+                // zero-operand IRMakeStruct that reads out of bounds once specialization resolves
+                // the type to a non-empty struct (shader-slang/slang#12708).
                 List<IRInst*> args;
 
                 if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
