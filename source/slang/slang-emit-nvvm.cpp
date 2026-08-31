@@ -385,28 +385,54 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     return isNVVMSupportedAggregateStorageType(fieldType);
 }
 
-// Resolves the canonical pointer-like SSA value produced by loading one exact parameter-group
-// field. Consider this example:
+bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructField& outField);
+
+// Resolves one canonical parameter-group pointer value. Consider these examples:
 //
 //     struct Globals { ParameterBlock<Material> material; }
 //     Globals globals;
 //     Material value = globals.material;
 //
+//     struct Scene { ParameterBlock<Material> material; }
+//     Material nested = scene.material;
+//
+//     void kernel(uniform ParameterBlock<Material> material) { use(material); }
+//
 // Entry-point-uniform lowering first emits `fieldAddress(globals, material)`, then loads the
-// `ParameterBlock<Material>` pointer, and finally loads `Material` through that SSA value. The
-// middle value has parameter-group type rather than `Ptr<Material>`, so retain its exact field
-// producer here instead of admitting arbitrary load results as device pointers.
-bool _getNVVMLoadedParameterGroupPointer(IRInst* inst, IRType*& outElementType)
+// pointer. A first-class Scene uses `fieldExtract`, while a raw launch parameter uses its exact
+// `IRParam`. Each value has parameter-group type rather than `Ptr<Material>`. Preserve these three
+// producers instead of admitting arbitrary load results as device pointers.
+bool _getNVVMParameterGroupPointer(IRInst* inst, IRType*& outElementType)
 {
     outElementType = nullptr;
-    auto load = as<IRLoad>(inst);
     IRType* elementType = nullptr;
     auto parameterGroupType =
-        load ? asNVVMSupportedParameterGroupType(load->getDataType(), &elementType) : nullptr;
+        inst ? asNVVMSupportedParameterGroupType(inst->getDataType(), &elementType) : nullptr;
+    if (!parameterGroupType)
+        return false;
+
+    if (as<IRParam>(inst))
+    {
+        outElementType = elementType;
+        return true;
+    }
+
+    if (auto fieldExtract = as<IRFieldExtract>(inst))
+    {
+        NVVMStructField valueField;
+        if (!_getNVVMStructFieldValue(fieldExtract, valueField) ||
+            !isTypeEqual(valueField.field->getFieldType(), parameterGroupType))
+        {
+            return false;
+        }
+        outElementType = elementType;
+        return true;
+    }
+
+    auto load = as<IRLoad>(inst);
     auto fieldAddress = load ? as<IRFieldAddress>(load->getPtr()) : nullptr;
     NVVMStructField storageField;
-    if (!parameterGroupType || !fieldAddress ||
-        !_getNVVMStructFieldAddress(fieldAddress, storageField) ||
+    if (!fieldAddress || !_getNVVMStructFieldAddress(fieldAddress, storageField) ||
         !isTypeEqual(storageField.field->getFieldType(), parameterGroupType))
     {
         return false;
@@ -6231,7 +6257,7 @@ SlangResult _validatePointerValue(
     IRType* expectedPointeeType)
 {
     IRType* loadedParameterGroupElementType = nullptr;
-    if (_getNVVMLoadedParameterGroupPointer(value, loadedParameterGroupElementType))
+    if (_getNVVMParameterGroupPointer(value, loadedParameterGroupElementType))
     {
         if (!hasNVVMParameterGroupStorageValueRepresentation(loadedParameterGroupElementType))
         {
@@ -6986,6 +7012,19 @@ SlangResult _validateNVVMFunction(
                     codeGenContext,
                     toSlice("entry-point parameter layout"));
             }
+        }
+        IRType* parameterGroupElementType = nullptr;
+        if (isEntryPoint &&
+            asNVVMSupportedParameterGroupType(
+                param->getDataType(),
+                &parameterGroupElementType) &&
+            !_hasNVVMCompatibleAggregateStorageLayout(
+                codeGenContext,
+                parameterGroupElementType))
+        {
+            return _diagnoseUnsupportedIR(
+                codeGenContext,
+                toSlice("entry-point parameter-group layout"));
         }
         availableValues.add(param);
         ++actualParamCount;
@@ -11460,37 +11499,13 @@ SlangResult validateNVVMSupportedIR(
             outRequirements));
     }
 
-    // Scalar CUDA launch parameters and executable scalar operations are meaningful only for a
-    // CUDA kernel. Preserve Slice 6's conventional zero-parameter empty compute entry point, but
-    // do not invent a raw CUDA launch ABI for an ordinary shader entry point.
-    bool requiresCUDAKernel = functions.getCount() > 1 || entryPoint->getParamCount() != 0;
-    for (auto function : functions)
-    {
-        for (auto block : function->getBlocks())
-        {
-            requiresCUDAKernel = requiresCUDAKernel || block != function->getFirstBlock();
-            for (auto inst : block->getOrdinaryInsts())
-                requiresCUDAKernel = requiresCUDAKernel || inst->getOp() != kIROp_Return;
-        }
-    }
-    bool hasConventionalCUDAABI = false;
     NVVMConventionalGlobalParams conventionalGlobalParams;
     for (auto globalInst : linkedIR.module->getGlobalInsts())
     {
         NVVMConventionalGlobalParams globalParams;
-        SlangNVVMValueOperation executionOperation = 0;
         if (_getNVVMConventionalGlobalParams(globalInst, globalParams))
             conventionalGlobalParams = globalParams;
-        hasConventionalCUDAABI =
-            hasConventionalCUDAABI || globalParams.globalParam ||
-            _getNVVMCUDAExecutionGlobalOperation(globalInst, executionOperation);
     }
-    if (requiresCUDAKernel && !entryPoint->findDecoration<IRCudaKernelDecoration>() &&
-        !hasConventionalCUDAABI)
-    {
-        return _diagnoseUnsupportedIR(codeGenContext, toSlice("CUDA kernel decoration"));
-    }
-
     HashSet<IRInst*> selectedReachableStructTypes;
     if (conventionalGlobalParams.elementType)
     {
@@ -12195,7 +12210,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         auto load = cast<IRLoad>(inst);
                         IRType* loadedParameterGroupElementType = nullptr;
                         const bool isLoadedParameterGroupPointer =
-                            _getNVVMLoadedParameterGroupPointer(
+                            _getNVVMParameterGroupPointer(
                                 load->getPtr(),
                                 loadedParameterGroupElementType);
                         SLANG_RELEASE_ASSERT(

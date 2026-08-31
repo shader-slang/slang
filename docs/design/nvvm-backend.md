@@ -6959,6 +6959,42 @@ The new conventional aggregate/helper gate measures 258.1 ms and 797-byte PTX at
 versus 370.3 ms and 8770 bytes through NVRTC O3; direct O0 measures 255.1 ms and emits 22133-byte
 PTX. These remain exploratory measurements.
 
+### Slice 161: Parameter-group value transport
+
+Direct NVVM now treats a selected `ParameterBlock<T>` or `ConstantBuffer<T>` as one canonical
+pointer-valued resource leaf wherever that value is legitimately produced. A raw entry parameter
+is the global pointer directly. A field in a first-class helper aggregate is the same pointer in
+the aggregate's exact LLVM struct field. A conventional collected global still produces it by
+loading the exact keyed field address. The emitter recognizes only those `IRParam`,
+`IRFieldExtract`, and `IRLoad(IRFieldAddress)` producers; it does not admit arbitrary values merely
+because they have parameter-group type.
+
+Admission recursively proves that `T` has a finite parameter-group storage representation that is
+identical to its ordinary loaded value representation. The same active-type set covers nested
+parameter groups and resource structs, so recursive graphs fail deterministically. Entry
+parameters additionally require the existing exact CUDA/LLVM aggregate layout check for `T`.
+Immutable references, address-space casts, and storage/value conversions remain separate
+contracts.
+
+The slice also removes the old requirement that an executable raw-parameter entry carry an
+explicit `IRCudaKernelDecoration`. Ordinary `[numthreads]` compute functions have canonical
+`IREntryPointDecoration`; the CUDA source emitter already emits them as kernels, and direct NVVM
+already marks the selected entry function as a kernel. The explicit decoration represents only
+the source `[CUDAKernel]` spelling and was therefore an obsolete bring-up restriction rather than
+part of the launch ABI. Its negative tests are now positive ordinary-compute coverage.
+
+Discovery `nested-parameter-block-3` and `generic-shader-object-cbuffer2` become correct at O0 and
+O3 and gain four permanent direct lanes. Discovery remains exactly 82 workloads/72 healthy
+references and reaches 63/63/63 O0/O3/both-mode correctness (87.5%), with zero old-correct loss.
+Frozen v1 remains exactly 452/427 and 390/394/390 (91.3%/92.3%/91.3%), also with zero loss. The
+selected prefix passes 427/427, and provider ABI revision 30 is unchanged.
+
+All nineteen representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+The nested parameter-group method gate measures 242.5 ms and 1093-byte PTX at direct O3 SM70
+versus 361.6 ms and 9096 bytes through NVRTC O3; direct O0 emits 4513-byte PTX. The generic
+parameter-group entry gate measures 237.9 ms and 847-byte PTX versus 357.8 ms and 8897 bytes;
+direct O0 emits 4592-byte PTX. These remain exploratory measurements.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

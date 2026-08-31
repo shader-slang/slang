@@ -1085,6 +1085,9 @@ static bool _getNVVMSupportedRawBufferType(
     IRInst* type,
     NVVMRawBufferType& outType,
     HashSet<IRInst*>& activeTypes);
+static bool _hasNVVMParameterGroupStorageValueRepresentation(
+    IRInst* type,
+    HashSet<IRInst*>& activeTypes);
 
 // Returns the natural alignment of one canonical resource-capable value, or zero when the type is
 // outside the contract. The active set makes resource indirection cycle-safe. Consider this
@@ -1104,6 +1107,19 @@ static uint32_t _getNVVMResourceValueAlignment(IRInst* type, HashSet<IRInst*>& a
         return getNVVMCopyableValueAlignment(atomicValueType);
     if (isNVVMBoolType(type))
         return 1;
+
+    IRType* parameterGroupElementType = nullptr;
+    if (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType))
+    {
+        if (activeTypes.contains(type))
+            return 0;
+        activeTypes.add(type);
+        const bool hasValueRepresentation = _hasNVVMParameterGroupStorageValueRepresentation(
+            parameterGroupElementType,
+            activeTypes);
+        activeTypes.remove(type);
+        return hasValueRepresentation ? 8 : 0;
+    }
 
     IRType* descriptorResourceType = nullptr;
     if (asNVVMSupportedDescriptorHandleType(type, &descriptorResourceType))
@@ -1535,9 +1551,22 @@ static bool _hasNVVMParameterGroupStorageValueRepresentation(
         getNVVMSupportedSurfaceType(type, surfaceType) ||
         getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
         asNVVMSupportedDescriptorHandleType(type) ||
-        asNVVMSupportedSamplerValueType(type) || asNVVMSupportedParameterGroupType(type))
+        asNVVMSupportedSamplerValueType(type))
     {
         return true;
+    }
+
+    IRType* parameterGroupElementType = nullptr;
+    if (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType))
+    {
+        if (activeTypes.contains(type))
+            return false;
+        activeTypes.add(type);
+        const bool result = _hasNVVMParameterGroupStorageValueRepresentation(
+            parameterGroupElementType,
+            activeTypes);
+        activeTypes.remove(type);
+        return result;
     }
 
     // A UserPointer leaf is intentionally global in parameter-group storage and generic as an
@@ -1625,8 +1654,11 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
 bool isNVVMSupportedParameterType(IRInst* type)
 {
     NVVMRawBufferType rawBufferType;
+    IRType* parameterGroupElementType = nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedResourceStructType(type) ||
+           (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType) &&
+            hasNVVMParameterGroupStorageValueRepresentation(parameterGroupElementType)) ||
            asNVVMSupportedDeviceNumericPointerType(type) ||
            asNVVMSupportedDeviceArrayPointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType);
@@ -2080,7 +2112,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           localHelperPointer || isRawBuffer || isSampledTexture)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isInteger || isFloat32 || resourceStructType || deviceNumericPointer ||
-          deviceCopyablePointer || deviceArrayPointer || isRawBuffer)) ||
+          deviceCopyablePointer || deviceArrayPointer || isRawBuffer ||
+          (parameterGroup &&
+           hasNVVMParameterGroupStorageValueRepresentation(parameterGroupElementType)))) ||
         (use == NVVMTypeUse::HelperParameter &&
          (isHelperValue || resourceStructType || localResourceStructPointer ||
           localCopyablePointer || localHelperPointer || helperReferencePointer ||

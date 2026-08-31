@@ -11368,9 +11368,6 @@ void computeMain(uint tid : SV_DispatchThreadID)
         outputBuffer[0] = getStringHash("Hello World!");
 }
 )";
-static const char kDirectNVVMUnsupportedCallSource[] =
-    "[shader(\"compute\")] [numthreads(1, 1, 1)] void computeMain() { "
-    "GroupMemoryBarrierWithGroupSync(); }";
 static const char kDirectNVVMIntegerConstantSource[] = R"(
 [CUDAKernel]
 void computeMain(

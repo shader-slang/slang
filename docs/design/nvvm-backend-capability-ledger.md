@@ -2295,3 +2295,19 @@ discovery workload become correct at O0 and O3 and gain ten direct lanes. Frozen
 have zero old-correct loss. A parameter-block-valued entry parameter remains a distinct launch-ABI
 blocker. The selected prefix passes 427/427, and all seventeen direct-O3 measurement gates assemble
 with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 161 selects `ParameterBlock<T>` and `ConstantBuffer<T>` as one global-pointer resource leaf
+when `T` has recursively finite and identical parameter-group storage and ordinary value
+representations. The emitter recognizes the exact raw-entry `IRParam`, first-class aggregate
+`IRFieldExtract`, and conventional-global `IRLoad(IRFieldAddress)` producers. Immutable aggregate
+references and arbitrary pointer conversions remain rejected.
+
+The slice also removes the obsolete explicit `IRCudaKernelDecoration` gate. An ordinary compute
+entry's canonical `IREntryPointDecoration` is kernel identity; direct NVVM already marks that
+selected entry in the provider. The former negative lanes become positive ordinary-compute
+coverage. Provider ABI revision 30 is unchanged.
+
+Two discovery workloads become correct at O0 and O3 and gain four direct lanes. Discovery reaches
+63/63/63 over its unchanged 72 healthy references; frozen v1 remains 390/394/390 over 427. Both
+have zero old-correct loss. The selected prefix passes 427/427, and all nineteen direct-O3
+measurement gates assemble with CUDA 12.9 for SM70, SM80, and SM90.

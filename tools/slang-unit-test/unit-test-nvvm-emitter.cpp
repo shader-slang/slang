@@ -7162,7 +7162,7 @@ SLANG_UNIT_TEST(nvvmSlangRetainsOnlySelectedCUDAKernel)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-SLANG_UNIT_TEST(nvvmSlangRejectsConventionalRawKernelParameters)
+SLANG_UNIT_TEST(nvvmSlangOrdinaryComputeAcceptsRawKernelParameters)
 {
     _resetDirectNVVMFakes();
     {
@@ -7174,15 +7174,17 @@ SLANG_UNIT_TEST(nvvmSlangRejectsConventionalRawKernelParameters)
 
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
             globalSession,
             kDirectNVVMConventionalParameterizedComputeSource,
             code,
             diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52017") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+        SLANG_CHECK(gFakeNVVMBuilder.getFunctionParameterCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
@@ -8174,7 +8176,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         const char* expectedConstruct;
     };
     static const UnsupportedCase kCases[] = {
-        {kDirectNVVMUnsupportedCallSource, "'CUDA kernel decoration'"},
         {kDirectNVVMUnsupportedPointerHelperParameterSource, "'helper function parameter:"},
         {kDirectNVVMUnsupportedPointerHelperResultSource, "'helper function result type:"},
         {kDirectNVVMUnsupportedFloatArraySource, "'entry-point parameter'"},
