@@ -1595,7 +1595,7 @@ alias raygen_closesthit_miss = raygen | closesthit | miss;
 
 /// Stages that may trace a ray through the structural ray-tracing API.
 /// [Compound]
-alias structural_raytracing_trace = glsl_hlsl_spirv + raygen_closesthit_miss
+alias structural_raytracing_trace = cuda_glsl_hlsl_spirv + raygen_closesthit_miss
                                     | _raygen + metal
                                     | _closesthit + metal
                                     | _miss + metal;
