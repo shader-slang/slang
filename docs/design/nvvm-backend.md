@@ -7457,6 +7457,19 @@ out-parameter, and compound-wave families need richer typed payloads than one va
 and retain their bounded exact recognizers until their producers can carry those semantics. The
 provider ABI remains revision 34. Frozen corpus v1 stays 418/418/418 and discovery stays 72/72/72.
 
+### Slice 183: One cached type-role classification
+
+`NVVMTypeLoweringContext` now classifies each canonical linked-IR type once into `NVVMTypeInfo`.
+The record carries scalar widths, aggregate/resource forms, exact pointer pointees, and storage
+facts; its `supports` method is the sole nine-role admission matrix used by provider type lowering.
+Provider handles remain separately cached where value, helper, launch, parameter-group, and
+structured-buffer representations differ.
+
+A universal aggregate-memory ABI was rejected: first-class copyable aggregates, opaque resource
+handles, CUDA storage layouts, and LLVM 14 typed pointees prove that these are distinct canonical
+roles. No ABI or supported shape changes. Provider revision 34, frozen 418/418/418, and discovery
+72/72/72 remain unchanged.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

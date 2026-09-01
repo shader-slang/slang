@@ -365,6 +365,86 @@ enum class NVVMTypeUse
     StructuredBufferStorage,
 };
 
+/// Records every established direct-NVVM representation role for one canonical linked-IR type.
+///
+/// This is the classification boundary between canonical Slang types and provider type lowering.
+/// Consumers may select a role from this record, but must not independently rebuild the same
+/// predicate lattice.
+struct NVVMTypeInfo
+{
+    IRType* canonicalType = nullptr;
+    bool isVoid = false;
+    bool isInteger = false;
+    bool isFloatingPoint = false;
+    bool isFloat16 = false;
+    bool isFloat32 = false;
+    bool isBool = false;
+    bool isHelperValue = false;
+    bool isPointerBearingHelperValue = false;
+    bool isRawBuffer = false;
+    bool isSurface = false;
+    bool isSampledTexture = false;
+    bool isBufferDataPointer = false;
+    bool hasParameterGroupValueRepresentation = false;
+    bool isStructuredBufferStorage = false;
+    bool isParameterGroupElementStorage = false;
+    uint32_t integerBitWidth = 0;
+    uint32_t floatingPointBitWidth = 0;
+    uint32_t valueVectorElementCount = 0;
+    IRVectorType* valueVectorType = nullptr;
+    IRVectorType* numeric32VectorType = nullptr;
+    IRStructType* structType = nullptr;
+    IRStructType* scalarStructType = nullptr;
+    IRStructType* resourceStructType = nullptr;
+    IRStructType* physicalArrayStructType = nullptr;
+    IRStructType* localResourceStructValueType = nullptr;
+    IRPtrTypeBase* localResourceStructPointer = nullptr;
+    IRType* localCopyablePointerValueType = nullptr;
+    IRPtrTypeBase* localCopyablePointer = nullptr;
+    IRType* localHelperPointerValueType = nullptr;
+    IRPtrTypeBase* localHelperPointer = nullptr;
+    IRType* helperReferenceValueType = nullptr;
+    IRPtrTypeBase* helperReferencePointer = nullptr;
+    IRStructType* physicalStorageReferenceValueType = nullptr;
+    IRPtrTypeBase* physicalStorageReferencePointer = nullptr;
+    IRStructType* localPhysicalStorageValueType = nullptr;
+    IRPtrTypeBase* localPhysicalStoragePointer = nullptr;
+    IRType* sharedHelperPointerValueType = nullptr;
+    IRPtrTypeBase* sharedHelperPointer = nullptr;
+    IRType* deviceCopyablePointerValueType = nullptr;
+    IRPtrTypeBase* deviceCopyablePointer = nullptr;
+    IRType* deviceHelperPointerValueType = nullptr;
+    IRPtrTypeBase* deviceHelperPointer = nullptr;
+    IRStructType* devicePhysicalStorageValueType = nullptr;
+    IRPtrTypeBase* devicePhysicalStoragePointer = nullptr;
+    IRPtrTypeBase* deviceNumericPointer = nullptr;
+    IRArrayType* fixedCopyableArrayType = nullptr;
+    IRArrayType* fixedHelperArrayType = nullptr;
+    IRArrayType* fixedResourceArrayType = nullptr;
+    IRArrayType* aggregateStorageArrayType = nullptr;
+    IRVectorType* compactParameterGroupVectorType = nullptr;
+    IRArrayType* deviceArrayType = nullptr;
+    IRPtrTypeBase* deviceArrayPointer = nullptr;
+    NVVMRawBufferType rawBufferType;
+    NVVMSurfaceType surfaceType;
+    NVVMReadOnlyTextureType sampledTextureType;
+    NVVMBufferDataPointerType bufferDataPointerType;
+    IRType* parameterGroupElementType = nullptr;
+    IRParameterGroupType* parameterGroup = nullptr;
+    IRSamplerStateTypeBase* samplerStorage = nullptr;
+    IRSamplerStateTypeBase* samplerValue = nullptr;
+    IRType* descriptorResourceType = nullptr;
+    IRDescriptorHandleType* descriptorHandle = nullptr;
+    IRUnsizedArrayType* unsizedSamplerArrayStorage = nullptr;
+    IRPtrTypeBase* resourceElementPointer = nullptr;
+    IRPtrTypeBase* sharedElementPointer = nullptr;
+    IRType* atomicValueType = nullptr;
+    IRAtomicType* atomicType = nullptr;
+
+    /// Returns whether this type has an established representation for `use`.
+    bool supports(NVVMTypeUse use) const;
+};
+
 /// Maps canonical linked-IR types to module-owned provider handles and caches each representation.
 class NVVMTypeLoweringContext
 {
@@ -418,6 +498,7 @@ private:
         SlangNVVMTypeHandle& outType,
         NVVMTypeUse pointeeUse = NVVMTypeUse::Value,
         bool cacheCanonicalType = true);
+    NVVMTypeInfo _getTypeInfo(IRType* type);
     SlangResult _reportUnsupportedType(NVVMTypeUse use) const;
     SlangResult _requireBuilderOperation(const char* operation, SlangResult result) const;
 
@@ -430,6 +511,7 @@ private:
     Dictionary<IRType*, SlangNVVMTypeHandle> m_entryParameterRepresentationMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_helperABIRepresentationMap;
     Dictionary<PointerTypeKey, SlangNVVMTypeHandle> m_pointerRepresentationMap;
+    Dictionary<IRType*, NVVMTypeInfo> m_typeInfoMap;
 };
 
 } // namespace Slang

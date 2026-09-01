@@ -2579,3 +2579,14 @@ encoded in this value opcode because their canonical semantics require richer ty
 Provider ABI revision 34 is unchanged. Frozen corpus v1 remains 418/418/418 over 427 healthy
 references, discovery remains 72/72/72 over 72, the selected prefix passes 437/437, and the NVVM
 category passes 92/92.
+
+Slice 183 makes `NVVMTypeInfo` the single cached classification boundary for provider type
+lowering. It records every established scalar, aggregate, resource, pointer, and storage shape and
+owns admission for all nine `NVVMTypeUse` roles. Recursive provider type construction reuses that
+classification while retaining separate physical-handle caches for roles whose representations
+differ.
+
+The aggregate-memory prototype was not promoted because copyable values, resource handles,
+parameter-group/structured-buffer layouts, and typed pointees have distinct canonical contracts.
+No type or ABI was widened. Provider ABI revision 34 is unchanged; frozen corpus v1 remains
+418/418/418, discovery remains 72/72/72, and the regression gates remain 437/437 and 92/92.

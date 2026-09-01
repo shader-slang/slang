@@ -2243,6 +2243,132 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
     return SLANG_OK;
 }
 
+bool NVVMTypeInfo::supports(NVVMTypeUse use) const
+{
+    switch (use)
+    {
+    case NVVMTypeUse::EntryPointResult:
+        return isVoid;
+    case NVVMTypeUse::HelperResult:
+        return isVoid || isHelperValue || resourceStructType || localCopyablePointer ||
+               localHelperPointer || isRawBuffer || isSampledTexture;
+    case NVVMTypeUse::EntryPointParameter:
+        return isInteger || isFloat32 || resourceStructType || deviceNumericPointer ||
+               deviceCopyablePointer || devicePhysicalStoragePointer || deviceArrayPointer ||
+               isRawBuffer || (parameterGroup && hasParameterGroupValueRepresentation);
+    case NVVMTypeUse::HelperParameter:
+        return isHelperValue || resourceStructType || localResourceStructPointer ||
+               localCopyablePointer || localHelperPointer || helperReferencePointer ||
+               physicalStorageReferencePointer || localPhysicalStoragePointer ||
+               sharedHelperPointer || isRawBuffer || isSurface || isSampledTexture || samplerValue;
+    case NVVMTypeUse::HelperValue:
+        return isHelperValue;
+    case NVVMTypeUse::Value:
+        return isHelperValue || resourceStructType || fixedResourceArrayType ||
+               physicalArrayStructType || deviceNumericPointer || devicePhysicalStoragePointer ||
+               deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup ||
+               isSurface || isSampledTexture || samplerValue || resourceElementPointer ||
+               sharedElementPointer || sharedHelperPointer || atomicType;
+    case NVVMTypeUse::Storage:
+        return isInteger || isFloat32 || isFloat16 || numeric32VectorType ||
+               compactParameterGroupVectorType || structType || aggregateStorageArrayType ||
+               deviceCopyablePointer || devicePhysicalStoragePointer || isRawBuffer ||
+               parameterGroup || isSurface || isSampledTexture || samplerStorage ||
+               unsizedSamplerArrayStorage || atomicType || descriptorHandle;
+    case NVVMTypeUse::ParameterGroupStorage:
+        return isParameterGroupElementStorage;
+    case NVVMTypeUse::StructuredBufferStorage:
+        return isStructuredBufferStorage;
+    }
+    SLANG_UNEXPECTED("unknown NVVM type use");
+}
+
+NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
+{
+    if (const auto cachedInfo = m_typeInfoMap.tryGetValue(type))
+        return *cachedInfo;
+
+    NVVMTypeInfo info;
+    info.canonicalType = type;
+    info.isVoid = as<IRVoidType>(type) != nullptr;
+    info.isInteger = isNVVMSupportedIntegerScalarType(type, &info.integerBitWidth);
+    info.isFloatingPoint =
+        isNVVMSupportedFloatingPointScalarType(type, &info.floatingPointBitWidth);
+    info.isFloat16 = info.floatingPointBitWidth == 16;
+    info.isFloat32 = info.floatingPointBitWidth == 32;
+    info.isBool = isNVVMBoolType(type);
+    info.valueVectorType =
+        asNVVMSupportedValueVectorType(type, &info.valueVectorElementCount);
+    info.numeric32VectorType = asNVVMSupported32BitNumericVectorType(type);
+    info.structType = as<IRStructType>(type);
+    info.scalarStructType = asNVVMSupportedScalarStructType(type);
+    info.resourceStructType = asNVVMSupportedResourceStructType(type);
+    info.physicalArrayStructType = asNVVMSupportedPhysicalArrayStructType(type);
+    info.localResourceStructPointer = asNVVMSupportedLocalResourceStructPointerType(
+        type,
+        &info.localResourceStructValueType);
+    info.localCopyablePointer = asNVVMSupportedLocalCopyableValuePointerType(
+        type,
+        &info.localCopyablePointerValueType);
+    info.localHelperPointer = asNVVMSupportedLocalHelperValuePointerType(
+        type,
+        &info.localHelperPointerValueType);
+    info.helperReferencePointer =
+        asNVVMSupportedHelperReferencePointerType(type, &info.helperReferenceValueType);
+    info.physicalStorageReferencePointer = asNVVMSupportedPhysicalStorageReferencePointerType(
+        type,
+        &info.physicalStorageReferenceValueType);
+    info.localPhysicalStoragePointer = asNVVMSupportedLocalPhysicalStoragePointerType(
+        type,
+        &info.localPhysicalStorageValueType);
+    info.sharedHelperPointer =
+        asNVVMSupportedSharedHelperPointerType(type, &info.sharedHelperPointerValueType);
+    info.deviceCopyablePointer = asNVVMSupportedDeviceCopyableValuePointerType(
+        type,
+        &info.deviceCopyablePointerValueType);
+    info.deviceHelperPointer = asNVVMSupportedDeviceHelperValuePointerType(
+        type,
+        &info.deviceHelperPointerValueType);
+    info.devicePhysicalStoragePointer = asNVVMSupportedDevicePhysicalStoragePointerType(
+        type,
+        &info.devicePhysicalStorageValueType);
+    info.isHelperValue = isNVVMSupportedHelperValueType(type);
+    info.isPointerBearingHelperValue =
+        info.isHelperValue && !isNVVMSupportedCopyableValueType(type);
+    info.deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
+    info.fixedCopyableArrayType = asNVVMSupportedCopyableArrayType(type);
+    info.fixedHelperArrayType = asNVVMSupportedHelperArrayType(type);
+    info.fixedResourceArrayType = asNVVMSupportedResourceArrayType(type);
+    info.aggregateStorageArrayType = asNVVMSupportedAggregateStorageArrayType(type);
+    info.compactParameterGroupVectorType = asNVVMSupportedCompactParameterGroupVectorType(type);
+    info.deviceArrayPointer = asNVVMSupportedDeviceArrayPointerType(type, &info.deviceArrayType);
+    info.isRawBuffer = getNVVMSupportedRawBufferType(type, info.rawBufferType);
+    info.isSurface = getNVVMSupportedSurfaceType(type, info.surfaceType);
+    info.isSampledTexture =
+        getNVVMSupportedReadOnlyTextureType(type, info.sampledTextureType);
+    info.isBufferDataPointer =
+        getNVVMSupportedBufferDataPointerType(type, info.bufferDataPointerType);
+    info.parameterGroup =
+        asNVVMSupportedParameterGroupType(type, &info.parameterGroupElementType);
+    info.hasParameterGroupValueRepresentation =
+        info.parameterGroup &&
+        hasNVVMParameterGroupStorageValueRepresentation(info.parameterGroupElementType);
+    info.samplerStorage = asNVVMSupportedSamplerStorageType(type);
+    info.samplerValue = asNVVMSupportedSamplerValueType(type);
+    info.descriptorHandle =
+        asNVVMSupportedDescriptorHandleType(type, &info.descriptorResourceType);
+    info.unsizedSamplerArrayStorage = asNVVMSupportedUnsizedSamplerArrayStorageType(type);
+    info.resourceElementPointer = asNVVMSupportedRWStructuredBufferElementPointerType(type);
+    info.sharedElementPointer = asNVVMSupportedSharedElementPointerType(type);
+    info.atomicType = asNVVMSupportedAtomicType(type, &info.atomicValueType);
+    info.isStructuredBufferStorage = isNVVMSupportedStructuredBufferStorageType(type);
+    info.isParameterGroupElementStorage =
+        isNVVMSupportedParameterGroupElementStorageType(type);
+
+    m_typeInfoMap[type] = info;
+    return info;
+}
+
 SlangResult NVVMTypeLoweringContext::lowerType(
     IRType* type,
     NVVMTypeUse use,
@@ -2250,128 +2376,73 @@ SlangResult NVVMTypeLoweringContext::lowerType(
 {
     outType = nullptr;
 
-    const bool isVoid = as<IRVoidType>(type) != nullptr;
-    uint32_t integerBitWidth = 0;
-    const bool isInteger = isNVVMSupportedIntegerScalarType(type, &integerBitWidth);
-    uint32_t floatingPointBitWidth = 0;
-    const bool isFloatingPoint =
-        isNVVMSupportedFloatingPointScalarType(type, &floatingPointBitWidth);
-    const bool isFloat32 = floatingPointBitWidth == 32;
-    const bool isBool = isNVVMBoolType(type);
-    uint32_t valueVectorElementCount = 0;
-    IRVectorType* valueVectorType = asNVVMSupportedValueVectorType(type, &valueVectorElementCount);
-    IRStructType* structType = as<IRStructType>(type);
-    IRStructType* resourceStructType = asNVVMSupportedResourceStructType(type);
-    IRStructType* physicalArrayStructType = asNVVMSupportedPhysicalArrayStructType(type);
-    IRStructType* localResourceStructValueType = nullptr;
-    IRPtrTypeBase* localResourceStructPointer =
-        asNVVMSupportedLocalResourceStructPointerType(type, &localResourceStructValueType);
-    IRType* localCopyablePointerValueType = nullptr;
-    IRPtrTypeBase* localCopyablePointer =
-        asNVVMSupportedLocalCopyableValuePointerType(type, &localCopyablePointerValueType);
-    IRType* localHelperPointerValueType = nullptr;
-    IRPtrTypeBase* localHelperPointer =
-        asNVVMSupportedLocalHelperValuePointerType(type, &localHelperPointerValueType);
-    IRType* helperReferenceValueType = nullptr;
-    IRPtrTypeBase* helperReferencePointer =
-        asNVVMSupportedHelperReferencePointerType(type, &helperReferenceValueType);
-    IRStructType* physicalStorageReferenceValueType = nullptr;
-    IRPtrTypeBase* physicalStorageReferencePointer =
-        asNVVMSupportedPhysicalStorageReferencePointerType(
-            type,
-            &physicalStorageReferenceValueType);
-    IRStructType* localPhysicalStorageValueType = nullptr;
-    IRPtrTypeBase* localPhysicalStoragePointer =
-        asNVVMSupportedLocalPhysicalStoragePointerType(type, &localPhysicalStorageValueType);
-    IRType* sharedHelperPointerValueType = nullptr;
-    IRPtrTypeBase* sharedHelperPointer =
-        asNVVMSupportedSharedHelperPointerType(type, &sharedHelperPointerValueType);
-    IRType* deviceCopyablePointerValueType = nullptr;
-    IRPtrTypeBase* deviceCopyablePointer =
-        asNVVMSupportedDeviceCopyableValuePointerType(type, &deviceCopyablePointerValueType);
-    IRType* deviceHelperPointerValueType = nullptr;
-    IRPtrTypeBase* deviceHelperPointer =
-        asNVVMSupportedDeviceHelperValuePointerType(type, &deviceHelperPointerValueType);
-    IRStructType* devicePhysicalStorageValueType = nullptr;
-    IRPtrTypeBase* devicePhysicalStoragePointer =
-        asNVVMSupportedDevicePhysicalStoragePointerType(type, &devicePhysicalStorageValueType);
-    const bool isHelperValue = isNVVMSupportedHelperValueType(type);
-    const bool isPointerBearingHelperValue =
-        isHelperValue && !isNVVMSupportedCopyableValueType(type);
-    IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
-    IRArrayType* fixedCopyableArrayType = asNVVMSupportedCopyableArrayType(type);
-    IRArrayType* fixedHelperArrayType = asNVVMSupportedHelperArrayType(type);
-    IRArrayType* fixedResourceArrayType = asNVVMSupportedResourceArrayType(type);
-    IRArrayType* aggregateStorageArrayType = asNVVMSupportedAggregateStorageArrayType(type);
-    IRVectorType* compactParameterGroupVectorType =
-        asNVVMSupportedCompactParameterGroupVectorType(type);
-    IRArrayType* deviceArrayType = nullptr;
-    IRPtrTypeBase* deviceArrayPointer =
-        asNVVMSupportedDeviceArrayPointerType(type, &deviceArrayType);
-    NVVMRawBufferType rawBufferType;
-    const bool isRawBuffer = getNVVMSupportedRawBufferType(type, rawBufferType);
-    NVVMSurfaceType surfaceType;
-    const bool isSurface = getNVVMSupportedSurfaceType(type, surfaceType);
-    NVVMReadOnlyTextureType sampledTextureType;
-    const bool isSampledTexture = getNVVMSupportedReadOnlyTextureType(type, sampledTextureType);
-    NVVMBufferDataPointerType bufferDataPointerType;
-    const bool isBufferDataPointer =
-        getNVVMSupportedBufferDataPointerType(type, bufferDataPointerType);
-    IRType* parameterGroupElementType = nullptr;
-    IRParameterGroupType* parameterGroup =
-        asNVVMSupportedParameterGroupType(type, &parameterGroupElementType);
-    IRSamplerStateTypeBase* samplerStorage = asNVVMSupportedSamplerStorageType(type);
-    IRSamplerStateTypeBase* samplerValue = asNVVMSupportedSamplerValueType(type);
-    IRType* descriptorResourceType = nullptr;
-    IRDescriptorHandleType* descriptorHandle =
-        asNVVMSupportedDescriptorHandleType(type, &descriptorResourceType);
-    IRUnsizedArrayType* unsizedSamplerArrayStorage =
-        asNVVMSupportedUnsizedSamplerArrayStorageType(type);
-    IRPtrTypeBase* resourceElementPointer =
-        asNVVMSupportedRWStructuredBufferElementPointerType(type);
-    IRPtrTypeBase* sharedElementPointer = asNVVMSupportedSharedElementPointerType(type);
-    IRType* atomicValueType = nullptr;
-    IRAtomicType* atomicType = asNVVMSupportedAtomicType(type, &atomicValueType);
-    const bool isStructuredBufferStorage = isNVVMSupportedStructuredBufferStorageType(type);
-    const bool isParameterGroupElementStorage =
-        isNVVMSupportedParameterGroupElementStorageType(type);
+    const NVVMTypeInfo typeInfo = _getTypeInfo(type);
+    const bool isVoid = typeInfo.isVoid;
+    const uint32_t integerBitWidth = typeInfo.integerBitWidth;
+    const bool isInteger = typeInfo.isInteger;
+    const uint32_t floatingPointBitWidth = typeInfo.floatingPointBitWidth;
+    const bool isFloatingPoint = typeInfo.isFloatingPoint;
+    const bool isFloat16 = typeInfo.isFloat16;
+    const bool isFloat32 = typeInfo.isFloat32;
+    const bool isBool = typeInfo.isBool;
+    const uint32_t valueVectorElementCount = typeInfo.valueVectorElementCount;
+    IRVectorType* valueVectorType = typeInfo.valueVectorType;
+    IRStructType* structType = typeInfo.structType;
+    IRStructType* resourceStructType = typeInfo.resourceStructType;
+    IRStructType* physicalArrayStructType = typeInfo.physicalArrayStructType;
+    IRStructType* localResourceStructValueType = typeInfo.localResourceStructValueType;
+    IRPtrTypeBase* localResourceStructPointer = typeInfo.localResourceStructPointer;
+    IRType* localCopyablePointerValueType = typeInfo.localCopyablePointerValueType;
+    IRPtrTypeBase* localCopyablePointer = typeInfo.localCopyablePointer;
+    IRType* localHelperPointerValueType = typeInfo.localHelperPointerValueType;
+    IRPtrTypeBase* localHelperPointer = typeInfo.localHelperPointer;
+    IRType* helperReferenceValueType = typeInfo.helperReferenceValueType;
+    IRPtrTypeBase* helperReferencePointer = typeInfo.helperReferencePointer;
+    IRStructType* physicalStorageReferenceValueType =
+        typeInfo.physicalStorageReferenceValueType;
+    IRPtrTypeBase* physicalStorageReferencePointer = typeInfo.physicalStorageReferencePointer;
+    IRStructType* localPhysicalStorageValueType = typeInfo.localPhysicalStorageValueType;
+    IRPtrTypeBase* localPhysicalStoragePointer = typeInfo.localPhysicalStoragePointer;
+    IRType* sharedHelperPointerValueType = typeInfo.sharedHelperPointerValueType;
+    IRPtrTypeBase* sharedHelperPointer = typeInfo.sharedHelperPointer;
+    IRType* deviceCopyablePointerValueType = typeInfo.deviceCopyablePointerValueType;
+    IRPtrTypeBase* deviceCopyablePointer = typeInfo.deviceCopyablePointer;
+    IRType* deviceHelperPointerValueType = typeInfo.deviceHelperPointerValueType;
+    IRPtrTypeBase* deviceHelperPointer = typeInfo.deviceHelperPointer;
+    IRStructType* devicePhysicalStorageValueType = typeInfo.devicePhysicalStorageValueType;
+    IRPtrTypeBase* devicePhysicalStoragePointer = typeInfo.devicePhysicalStoragePointer;
+    const bool isPointerBearingHelperValue = typeInfo.isPointerBearingHelperValue;
+    IRPtrTypeBase* deviceNumericPointer = typeInfo.deviceNumericPointer;
+    IRArrayType* fixedCopyableArrayType = typeInfo.fixedCopyableArrayType;
+    IRArrayType* fixedHelperArrayType = typeInfo.fixedHelperArrayType;
+    IRArrayType* fixedResourceArrayType = typeInfo.fixedResourceArrayType;
+    IRArrayType* aggregateStorageArrayType = typeInfo.aggregateStorageArrayType;
+    IRVectorType* compactParameterGroupVectorType = typeInfo.compactParameterGroupVectorType;
+    IRArrayType* deviceArrayType = typeInfo.deviceArrayType;
+    IRPtrTypeBase* deviceArrayPointer = typeInfo.deviceArrayPointer;
+    const NVVMRawBufferType& rawBufferType = typeInfo.rawBufferType;
+    const bool isRawBuffer = typeInfo.isRawBuffer;
+    const bool isSurface = typeInfo.isSurface;
+    const bool isSampledTexture = typeInfo.isSampledTexture;
+    const NVVMBufferDataPointerType& bufferDataPointerType = typeInfo.bufferDataPointerType;
+    const bool isBufferDataPointer = typeInfo.isBufferDataPointer;
+    IRType* parameterGroupElementType = typeInfo.parameterGroupElementType;
+    IRParameterGroupType* parameterGroup = typeInfo.parameterGroup;
+    IRSamplerStateTypeBase* samplerStorage = typeInfo.samplerStorage;
+    IRType* descriptorResourceType = typeInfo.descriptorResourceType;
+    IRDescriptorHandleType* descriptorHandle = typeInfo.descriptorHandle;
+    IRUnsizedArrayType* unsizedSamplerArrayStorage = typeInfo.unsizedSamplerArrayStorage;
+    IRPtrTypeBase* resourceElementPointer = typeInfo.resourceElementPointer;
+    IRPtrTypeBase* sharedElementPointer = typeInfo.sharedElementPointer;
+    IRType* atomicValueType = typeInfo.atomicValueType;
+    IRAtomicType* atomicType = typeInfo.atomicType;
+    const bool isStructuredBufferStorage = typeInfo.isStructuredBufferStorage;
+    const bool isParameterGroupElementStorage = typeInfo.isParameterGroupElementStorage;
 
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
     // helper signature.
-    const bool isLegal =
-        (use == NVVMTypeUse::EntryPointResult && isVoid) ||
-        (use == NVVMTypeUse::HelperResult &&
-         (isVoid || isHelperValue || resourceStructType || localCopyablePointer ||
-          localHelperPointer || isRawBuffer || isSampledTexture)) ||
-        (use == NVVMTypeUse::EntryPointParameter &&
-         (isInteger || isFloat32 || resourceStructType || deviceNumericPointer ||
-          deviceCopyablePointer || devicePhysicalStoragePointer || deviceArrayPointer ||
-          isRawBuffer ||
-          (parameterGroup &&
-           hasNVVMParameterGroupStorageValueRepresentation(parameterGroupElementType)))) ||
-        (use == NVVMTypeUse::HelperParameter &&
-         (isHelperValue || resourceStructType || localResourceStructPointer ||
-          localCopyablePointer || localHelperPointer || helperReferencePointer ||
-          physicalStorageReferencePointer || localPhysicalStoragePointer || sharedHelperPointer ||
-          isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
-        (use == NVVMTypeUse::HelperValue && isHelperValue) ||
-        (use == NVVMTypeUse::Value &&
-         (isHelperValue || resourceStructType || fixedResourceArrayType ||
-          physicalArrayStructType || deviceNumericPointer || devicePhysicalStoragePointer ||
-          deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup || isSurface ||
-          isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer ||
-          sharedHelperPointer || atomicType)) ||
-        (use == NVVMTypeUse::Storage &&
-         (isInteger || isFloat32 || isNVVMFloat16Type(type) ||
-          asNVVMSupported32BitNumericVectorType(type) || compactParameterGroupVectorType ||
-          structType || aggregateStorageArrayType || deviceCopyablePointer ||
-          devicePhysicalStoragePointer || isRawBuffer || parameterGroup || isSurface ||
-          isSampledTexture || samplerStorage || unsizedSamplerArrayStorage || atomicType ||
-          descriptorHandle)) ||
-        (use == NVVMTypeUse::ParameterGroupStorage && isParameterGroupElementStorage) ||
-        (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage);
-    if (!isLegal)
+    if (!typeInfo.supports(use))
         return _reportUnsupportedType(use);
 
     // CUDA's canonical layout producer defines `DescriptorHandle<T>` to have exactly the layout
@@ -2490,7 +2561,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // helper parameter or result as i16. libNVVM's O3 NVPTX lowering can otherwise omit the caller
     // parameter store for a direct `half` argument, leaving the callee's value uninitialized.
     if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) &&
-        isNVVMFloat16Type(type))
+        isFloat16)
     {
         if (auto mappedType = m_helperABIRepresentationMap.tryGetValue(type))
         {
@@ -2611,9 +2682,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
 
     if (use == NVVMTypeUse::ParameterGroupStorage &&
-        (isInteger || isFloat32 || isNVVMFloat16Type(type) ||
-         (asNVVMSupported32BitNumericVectorType(type) && !compactParameterGroupVectorType) ||
-         asNVVMSupportedScalarStructType(type) || asNVVMSupportedPhysicalArrayStructType(type)))
+        (isInteger || isFloat32 || isFloat16 ||
+         (typeInfo.numeric32VectorType && !compactParameterGroupVectorType) ||
+         typeInfo.scalarStructType || physicalArrayStructType))
     {
         return lowerType(type, NVVMTypeUse::Value, outType);
     }
