@@ -2818,9 +2818,10 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
+            JSONResultResponse resultResponse;
             List<LanguageServerProtocol::CompletionItem> completionItems;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
+                resultResponse.result.getKind() == JSONValue::Kind::Null)
             {
                 actualOutputSB << "null\n";
             }
@@ -2857,9 +2858,10 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
+            JSONResultResponse resultResponse;
             LanguageServerProtocol::SignatureHelp sigInfo;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
+                resultResponse.result.getKind() == JSONValue::Kind::Null)
             {
                 actualOutputSB << "null\n";
             }
@@ -2904,9 +2906,10 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
+            JSONResultResponse resultResponse;
             LanguageServerProtocol::Hover hover;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
+                resultResponse.result.getKind() == JSONValue::Kind::Null)
             {
                 actualOutputSB << "null\n";
             }

@@ -123,7 +123,7 @@ SlangResult LanguageServer::parseNextMessage()
             }
             else if (call.method == ShutdownParams::methodName)
             {
-                m_connection->sendResult(NullResponse::get(), call.id);
+                m_connection->sendNullResult(call.id);
                 return SLANG_OK;
             }
             else if (call.method == InitializeParams::methodName)
@@ -624,7 +624,7 @@ SlangResult LanguageServer::hover(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1072,7 +1072,7 @@ SlangResult LanguageServer::gotoDefinition(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1252,7 +1252,7 @@ SlangResult LanguageServer::completion(
 {
     auto result = m_core.completion(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
     else if (result.result.items.getCount())
         m_connection->sendResult(&result.result.items, responseId);
     else
@@ -1416,7 +1416,7 @@ SlangResult LanguageServer::completionResolve(
     auto result = m_core.completionResolve(args, editItem);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1466,7 +1466,7 @@ SlangResult LanguageServer::semanticTokens(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1641,7 +1641,7 @@ SlangResult LanguageServer::signatureHelp(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2028,7 +2028,7 @@ SlangResult LanguageServer::documentSymbol(
     auto result = m_core.documentSymbol(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2069,7 +2069,7 @@ SlangResult LanguageServer::inlayHint(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2132,7 +2132,7 @@ SlangResult LanguageServer::formatting(
     auto result = m_core.formatting(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2167,7 +2167,7 @@ SlangResult LanguageServer::rangeFormatting(
     auto result = m_core.rangeFormatting(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2218,7 +2218,7 @@ SlangResult LanguageServer::onTypeFormatting(
     auto result = m_core.onTypeFormatting(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2939,7 +2939,7 @@ SlangResult LanguageServer::runCommand(Command& call)
     {
         // If we encountered an internal compiler error, don't crash the language server.
         // Instead we just return a null response.
-        return m_connection->sendResult(NullResponse::get(), call.id);
+        return m_connection->sendNullResult(call.id);
     }
 
     return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);

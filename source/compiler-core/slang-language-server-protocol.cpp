@@ -356,20 +356,6 @@ static const StructRttiInfo _makeInitializeParamsRtti()
 }
 const StructRttiInfo InitializeParams::g_rttiInfo = _makeInitializeParamsRtti();
 
-static const StructRttiInfo _makeNullResponseRtti()
-{
-    NullResponse obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::NullResponse", nullptr);
-    return builder.make();
-}
-const StructRttiInfo NullResponse::g_rttiInfo = _makeNullResponseRtti();
-
-NullResponse* NullResponse::get()
-{
-    static NullResponse result = {};
-    return &result;
-}
-
 static const StructRttiInfo _makeLocationRtti()
 {
     Location obj;
