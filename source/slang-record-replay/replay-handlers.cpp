@@ -124,7 +124,6 @@ static void registerAllHandlers()
     REPLAY_REGISTER(GlobalSessionProxy, compileBuiltinModule);
     REPLAY_REGISTER(GlobalSessionProxy, loadBuiltinModule);
     REPLAY_REGISTER(GlobalSessionProxy, saveBuiltinModule);
-    REPLAY_REGISTER(GlobalSessionProxy, getDownstreamCompilerVersion);
     REPLAY_REGISTER(GlobalSessionProxy, getDownstreamCompilerPath);
 
     // =========================================================================

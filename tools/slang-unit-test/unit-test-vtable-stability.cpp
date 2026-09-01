@@ -774,7 +774,7 @@ SLANG_UNIT_TEST(vtableISlangProfiler)
 }
 
 // ---------------------------------------------------------------------------
-// IGlobalSession : ISlangUnknown  (own slots 3-33)
+// IGlobalSession : ISlangUnknown  (own slots 3-32)
 // ---------------------------------------------------------------------------
 struct IGlobalSessionProbe : IGlobalSession
 {
@@ -950,16 +950,10 @@ struct IGlobalSessionProbe : IGlobalSession
         lastSlot = 31;
         return SLANG_OK;
     }
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    getDownstreamCompilerVersion(SlangPassThrough, int*, int*) SLANG_OVERRIDE
-    {
-        lastSlot = 32;
-        return SLANG_OK;
-    }
     SLANG_NO_THROW SlangResult SLANG_MCALL getDownstreamCompilerPath(SlangPassThrough, ISlangBlob**)
         SLANG_OVERRIDE
     {
-        lastSlot = 33;
+        lastSlot = 32;
         return SLANG_OK;
     }
 };
@@ -984,9 +978,7 @@ SLANG_UNIT_TEST(vtableIGlobalSession)
     callSlot(&p, 31);
     SLANG_CHECK(p.lastSlot == 31); // saveBuiltinModule
     callSlot(&p, 32);
-    SLANG_CHECK(p.lastSlot == 32); // getDownstreamCompilerVersion
-    callSlot(&p, 33);
-    SLANG_CHECK(p.lastSlot == 33); // getDownstreamCompilerPath
+    SLANG_CHECK(p.lastSlot == 32); // getDownstreamCompilerPath
 }
 
 // ---------------------------------------------------------------------------
