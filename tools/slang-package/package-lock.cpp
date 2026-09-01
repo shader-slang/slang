@@ -154,7 +154,7 @@ SlangResult getLockedPackageRoot(
     String& outRoot,
     String& outError)
 {
-    Index localIndex = findLocalPackageIndex(localPackages, package.name);
+    Index localIndex = findActiveLocalPackageIndex(localPackages, package.name);
     if (localIndex >= 0)
         return getLocalPackageRoot(projectRoot, localPackages[localIndex], outRoot, outError);
     if (isLocalOverrideLockedPackage(package))

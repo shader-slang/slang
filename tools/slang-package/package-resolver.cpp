@@ -149,7 +149,7 @@ public:
         List<TagCandidate>& outCandidates,
         String& outError) override
     {
-        Index localIndex = findLocalPackageIndex(*localPackages, packageName);
+        Index localIndex = findActiveLocalPackageIndex(*localPackages, packageName);
         if (localIndex < 0)
             return gitSource.listReleaseTags(packageName, git, outCandidates, outError);
 
@@ -193,7 +193,7 @@ public:
         TagCandidate& outCandidate,
         String& outError) override
     {
-        Index localIndex = findLocalPackageIndex(*localPackages, packageName);
+        Index localIndex = findActiveLocalPackageIndex(*localPackages, packageName);
         if (localIndex < 0)
             return gitSource.resolveReference(packageName, git, ref, outCandidate, outError);
 
@@ -238,7 +238,7 @@ public:
         if (!candidate.path.getLength())
             return gitSource.loadManifest(packageName, git, candidate, outManifest, outError);
 
-        Index localIndex = findLocalPackageIndex(*localPackages, packageName);
+        Index localIndex = findActiveLocalPackageIndex(*localPackages, packageName);
         if (localIndex < 0 || (*localPackages)[localIndex].path != candidate.path)
         {
             outError =
@@ -304,7 +304,12 @@ public:
         {
             if (!reachable[i])
                 continue;
-            SLANG_RELEASE_ASSERT(packages[i].selected);
+            if (!packages[i].selected)
+            {
+                outError = String("Internal resolver error: reachable package '") +
+                           packages[i].name + "' is unexpectedly unselected.";
+                return SLANG_FAIL;
+            }
             outLock.packages.add(packages[i].locked);
         }
         outLock.packages.sort([](const LockedPackage& left, const LockedPackage& right)

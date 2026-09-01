@@ -23,6 +23,12 @@ Index findLocalPackageIndex(const List<LocalPackage>& packages, const String& na
     return -1;
 }
 
+Index findActiveLocalPackageIndex(const List<LocalPackage>& packages, const String& name)
+{
+    Index index = findLocalPackageIndex(packages, name);
+    return index >= 0 && isActiveLocalPackage(packages[index]) ? index : -1;
+}
+
 SlangResult readProjectLocalPackages(
     const String& projectRoot,
     List<LocalPackage>& outPackages,

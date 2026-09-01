@@ -1236,8 +1236,19 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
             return SLANG_FAIL;
         }
     }
-    SLANG_RETURN_ON_FAIL(
-        _requireSchemaVersion(json.container, json.root, "slang-workspace.json", outError));
+    JSONValue schemaVersionValue = _find(json.container, json.root, "schema_version");
+    if (schemaVersionValue.getKind() != JSONValue::Kind::Integer)
+    {
+        outError = "Field 'schema_version' in slang-workspace.json must be an integer.";
+        return SLANG_FAIL;
+    }
+    Int workspaceSchemaVersion = Int(json.container->asInteger(schemaVersionValue));
+    if (workspaceSchemaVersion != 1 && workspaceSchemaVersion != kWorkspaceSchemaVersion)
+    {
+        outError = String("Unsupported slang-workspace.json schema version: ") +
+                   String(workspaceSchemaVersion);
+        return SLANG_FAIL;
+    }
     outPackages.clear();
     JSONValue edits = _find(json.container, json.root, "edits");
     if (edits.isValid() && edits.getKind() != JSONValue::Kind::Object)
@@ -1289,7 +1300,7 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
             for (auto field : json.container->getObject(pair.value))
             {
                 String key = json.container->getStringFromKey(field.key);
-                if (key != "path" && key != "as")
+                if (key != "path" && key != "as" && key != "enabled")
                 {
                     outError = String("Unknown field in override '") + package.name + "'.";
                     return SLANG_FAIL;
@@ -1299,6 +1310,13 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
                 _readRequiredString(json.container, pair.value, "path", package.path, outError));
             SLANG_RETURN_ON_FAIL(
                 _readOptionalString(json.container, pair.value, "as", package.as, outError));
+            SLANG_RETURN_ON_FAIL(_readOptionalBool(
+                json.container,
+                pair.value,
+                "enabled",
+                true,
+                package.enabled,
+                outError));
             if (package.as.getLength())
             {
                 SemanticVersion ignoredVersion;
@@ -1338,7 +1356,7 @@ SlangResult writeLocalPackages(
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
     _writeKey(writer, "schema_version");
-    writer.addIntegerValue(kSchemaVersion, SourceLoc());
+    writer.addIntegerValue(kWorkspaceSchemaVersion, SourceLoc());
     _writeKey(writer, "edits");
     writer.startObject(SourceLoc());
     for (const auto& package : packages)
@@ -1367,6 +1385,8 @@ SlangResult writeLocalPackages(
             _writeKey(writer, "as");
             writer.addStringValue(package.as.getUnownedSlice(), SourceLoc());
         }
+        _writeKey(writer, "enabled");
+        writer.addBoolValue(package.enabled, SourceLoc());
         writer.endObject(SourceLoc());
     }
     writer.endObject(SourceLoc());

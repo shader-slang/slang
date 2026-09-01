@@ -7,6 +7,8 @@
 #include "core/slang-process-util.h"
 #include "core/slang-string-util.h"
 
+#include <stdio.h>
+
 namespace Slang
 {
 namespace PackageTool
@@ -490,39 +492,67 @@ SlangResult materializeLockedRevision(
         outError);
 }
 
-SlangResult isWorkingTreeSafeToRemove(
+SlangResult getWorkingTreeStatus(
     const String& repositoryPath,
     const String& expectedCommit,
-    bool& outIsSafe,
+    GitWorkingTreeStatus& outStatus,
     String& outError)
 {
+    outStatus = GitWorkingTreeStatus();
     List<String> arguments;
     arguments.add("status");
     arguments.add("--porcelain");
     arguments.add("--untracked-files=normal");
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
-    if (result.standardOutput.trim().getLength() != 0)
-    {
-        outIsSafe = false;
-        return SLANG_OK;
-    }
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+        if (line.trim().getLength())
+            ++outStatus.changedFileCount;
 
     arguments.clear();
     arguments.add("rev-parse");
     arguments.add("HEAD");
     SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
-    if (String(result.standardOutput.trim()) != expectedCommit)
+    outStatus.headCommit = result.standardOutput.trim();
+
+    if (outStatus.headCommit != expectedCommit)
     {
-        outIsSafe = false;
-        return SLANG_OK;
+        arguments.clear();
+        arguments.add("rev-list");
+        arguments.add("--left-right");
+        arguments.add("--count");
+        arguments.add(expectedCommit + "...HEAD");
+        SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+        long long behind = 0;
+        long long ahead = 0;
+        if (sscanf(result.standardOutput.getBuffer(), "%lld %lld", &behind, &ahead) == 2)
+        {
+            outStatus.commitsBehind = Index(behind);
+            outStatus.commitsAhead = Index(ahead);
+        }
     }
 
     arguments.clear();
     arguments.add("stash");
     arguments.add("list");
     SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
-    outIsSafe = result.standardOutput.trim().getLength() == 0;
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+        if (line.trim().getLength())
+            ++outStatus.stashCount;
+    return SLANG_OK;
+}
+
+SlangResult isWorkingTreeSafeToRemove(
+    const String& repositoryPath,
+    const String& expectedCommit,
+    bool& outIsSafe,
+    String& outError)
+{
+    GitWorkingTreeStatus status;
+    SLANG_RETURN_ON_FAIL(getWorkingTreeStatus(repositoryPath, expectedCommit, status, outError));
+    outIsSafe = status.changedFileCount == 0 && status.commitsAhead == 0 &&
+                status.commitsBehind == 0 && status.stashCount == 0 &&
+                status.headCommit == expectedCommit;
     return SLANG_OK;
 }
 

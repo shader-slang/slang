@@ -37,8 +37,9 @@ docs/
 
 `src/` contains importable Slang modules. Host executables are workspace primaries whose filename
 stem matches a name in `host.executables`. For example, `src/video-preview.slang` is the source for
-the `video-preview` executable and must declare `module video_preview;`. `slang package run` uses
-`host.default`, or the only listed executable when `default` is omitted.
+the `video-preview` executable and must declare `module video_preview;`.
+`slang package --experimental run` uses `host.default`, or the only listed executable when
+`default` is omitted.
 
 `tests/` and `docs/` are reserved for package tests and documentation. The initial package tool
 creates these directories.
@@ -116,7 +117,8 @@ The optional root `host` object requests native host executables. `executables` 
 filenames without directory separators; the package tool adds the platform executable suffix and
 writes each result at the root of `workspace.build`. Each name must match an exported workspace
 primary whose source filename is `<name>.slang`. When more than one executable is listed,
-`default` names the artifact `slang package run` executes if you do not pass an executable name.
+`default` names the artifact `slang package --experimental run` executes if you do not pass an
+executable name.
 With a single executable, `default` may be omitted and that name is used. Dependency manifests may
 declare this field, but only the workspace package controls executable generation.
 
@@ -183,8 +185,9 @@ package name: every incoming constraint must match that version. Both `version` 
 release tag's `v` prefix. `ref` is normally a branch or tag; the lock, rather than the
 manifest, records the exact commit.
 
-A dependency `path` must be relative to the manifest that declares it. The target directory must
-contain its own `slang-package.json`, and its package name must match the dependency key.
+A dependency `path` must be relative to the manifest that declares it and must be paired with an
+exact `as` version. The target directory must contain its own `slang-package.json`, and its package
+name must match the dependency key.
 
 For example, a package can check in another package under `vendor/noise`:
 
@@ -225,13 +228,14 @@ always an error.
 `slang package update` resolves all manifests reachable from the workspace package, materializes
 the resulting dependency set, and writes one `slang-package-lock.json` in the workspace root. The
 lockfile is the definitive dependency graph and records both Git and path packages. It starts with
-`"schema_version": 1`, the same file-format version as `slang-package.json` and
-`slang-workspace.json`. Nested
-packages' lockfiles are not used for that solve. `slang package fetch` requires the workspace
-lockfile, checks that it still satisfies every recorded manifest, and checks out every direct and
-transitive Git dependency under `workspace.deps` (`deps/` by default). Path dependencies remain at their locked
-relative locations. Fetch never changes dependency resolution, so it is the appropriate command
-for normal builds and CI.
+`"schema_version": 1`, the same file-format version as `slang-package.json`.
+`slang-workspace.json` currently uses schema version 2. Nested packages' lockfiles are not used for
+that solve. When a lock exists, `slang package fetch` checks that it still satisfies every recorded
+manifest and checks out every direct and transitive Git dependency under `workspace.deps` (`deps/`
+by default). Path dependencies remain at their locked relative locations. When dependencies exist
+but a fresh checkout has no lock, fetch performs the initial solve, shows the same selection report
+as update, confirms it, and writes the first lock. Later fetches reproduce that lock without
+reselecting versions, so fetch remains the appropriate command for normal builds and CI.
 
 Every lock row has an exact `version`. A Git row also records the selected `ref` and `commit`; a
 range-selected release uses its `vMAJOR.MINOR.PATCH` tag as the ref. A path row records its
@@ -246,9 +250,10 @@ Run `slang package update` deliberately when manifest constraints or upstream re
 `slang package update --dry-run` and `slang package update --from-local --dry-run` print the
 selected graph (what moved, what stayed, and why) without writing the lock or replacing
 checkouts. `--minimal` keeps one-line package changes and the summary count. Resolver Git clones
-under `.slang/cache/` may still be populated so the tool can inspect available tags. Normal CI and
-developer builds use `slang package fetch`; a missing or inconsistent lock is an
-error.
+under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
+prints that report and asks before applying the exact graph it just resolved. Pass `--yes` for a
+non-interactive invocation. Normal CI and developer builds use `slang package fetch`; an
+inconsistent existing lock is an error.
 
 The tool invokes the `git` executable from the system path. Existing Git credential and SSH
 configuration therefore applies without separate package-tool authentication. Git locations
@@ -256,9 +261,10 @@ cannot begin with `-`, use Git's command-executing `ext::` transport, or contain
 control characters.
 
 After fetching, `{workspace.build}/search-paths` (by default `build/search-paths`) lists the source
-roots to pass to `slangc` with `-I`. It is a derived file and may be deleted with the rest of the
-build directory; fetch or update regenerates it. Paths in this file are relative to the workspace
-root and are not added to compiler sessions automatically.
+roots, one per line. A caller must translate each line into a separate `slangc -I <path>` argument;
+`slangc` does not read this file directly. It is a derived file and may be deleted with the rest of
+the build directory; fetch or update regenerates it. Paths in this file are relative to the
+workspace root and are not added to compiler sessions automatically.
 
 ## Validating packages
 
@@ -287,12 +293,21 @@ the lock against declared dependencies and materialized manifests, but it skips 
 first-declaration placement, and import uniqueness. The command prints a warning. Do not use it
 in CI; `slang package validate` has no skip flag.
 
-`slang package status` checks the root manifest against the lock, verifies registered edits and
-overrides, validates the materialized manifests, and checks that tool-owned Git checkouts remain at
-their locked commits without changed files or stashes. It prints the registered local package
-state and reports the corrective `fetch`, `update`, `update --from-local`, `edit`, or `--clean`
-command when the workspace is inconsistent. The command does not modify package state or contact
-remotes.
+`slang package status` inventories the root manifest and lock, registered edits and overrides,
+materialized manifests, origins, changed and untracked file counts, commit divergence, and stashes
+for every tool-owned checkout. It reports all discovered problems and the corrective `fetch`,
+`update`, `edit`, or `--clean` command instead of stopping at the first one. Enabled overrides and
+edits make status return nonzero because the workspace is not portable; disabled overrides remain
+listed without making an otherwise published graph dirty. Status does not inspect `build/`, modify
+package state, or contact remotes.
+
+Use `slang package dependency add` and `dependency remove` to edit direct manifest edges, and
+`dependency list` to inspect them. Add accepts exactly one source shape:
+`--git URL --version RANGE`, `--git URL --ref REF --as VERSION`, or
+`--path PATH --as VERSION`. These commands change only `slang-package.json`; inspect `status` and
+run `update` afterward. `slang package tree` prints the selected lock graph, while
+`slang package why NAME` prints every current root-to-package path and incoming requirement. Why
+explains the graph that is locked now, not candidates rejected during an earlier solve.
 
 Each `.slang` file that is not below a module's companion directory is a primary module file. Its
 first declaration must be `module NAME;`, where `NAME` matches the filename stem with hyphens
@@ -323,14 +338,15 @@ For example, the generated local-state file may contain:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "edits": {
     "noise": {}
   },
   "overrides": {
     "shared": {
       "path": "../shared",
-      "as": "2.3.0"
+      "as": "2.3.0",
+      "enabled": true
     }
   }
 }
@@ -338,24 +354,25 @@ For example, the generated local-state file may contain:
 
 Use the package commands to change this file; its schema is tool-owned and may evolve.
 
-`slang package override NAME PATH [AS]` uses an existing local package directory instead. `AS` is
-an exact semantic version for solver compatibility. When it is omitted, the command uses the
-version in the package's current lock row. Both commands register local state in
-`slang-workspace.json`, which must remain uncommitted. An override does not copy or modify the
-supplied directory. `slang package unoverride NAME` removes an override registration.
-`unoverride` refuses while the lock has a local-path entry for the package; run normal
-`slang package update` first to restore a published pin.
+`slang package override add NAME PATH [AS]` uses an existing local package directory instead. `AS`
+is an exact semantic version for solver compatibility. When it is omitted, the command uses the
+version in the package's current lock row. `override enable`, `override disable`, `override remove`,
+and `override list` retain or inspect the same registration. A disabled override keeps its path and
+version but plain update selects published Git. The older `override NAME PATH [AS]` and
+`unoverride NAME` spellings remain compatibility aliases. An override does not copy or modify the
+supplied directory.
 
 A registered local manifest must agree with the lock. An in-place edit keeps the published Git pin
 in the lock, so changing its exports or dependencies requires publishing a new release tag and
 running normal `slang package update`. Use an override when local manifest changes must participate
-in resolution before publication. `slang package update --from-local` resolves override manifests
-and their transitive requirements into the definitive lock. An override records both its original
+in resolution before publication. Enabled overrides automatically participate in plain
+`slang package update`; `--from-local` remains a deprecated compatibility spelling for the old
+full-local-graph mode. An override records both its original
 Git location and its effective path and requires the matching registration in
 `slang-workspace.json`; it therefore fails explicitly on another machine or in CI. The override's
 effective version must satisfy every incoming constraint, and all of its transitive dependencies
-are resolved. Run normal `slang package update` before removing an override registration or
-committing a portable published resolution.
+are resolved. Disable enabled overrides and run `slang package update` before removing their
+registrations or committing a portable published resolution.
 
 Fetched package trees contain source only. Compilation output must be written outside these trees
 because the same source commit can be compiled against different resolved dependency graphs.
@@ -382,8 +399,9 @@ consumer's search path and distribute it without the materialized `deps/` source
 from one generated module to another resolve at the same import-relative paths used by source. The
 `build/bundle/source` tree is the corresponding source-form search path.
 
-When `host.executables` is present, build also compiles each matching workspace primary with the
-host executable target and writes `build/<executable-name>` (plus `.exe` on Windows). The `main`
+When `host.executables` is present, `slang package --experimental build` also compiles each matching
+workspace primary with the host executable target and writes `build/<executable-name>` (plus
+`.exe` on Windows). The `main`
 function in that file must use the native ABI, such as `export __extern_cpp int main()`, and a
 supported downstream C++ compiler must be available. Build copies the matching `slang-rt` shared
 library beside the executables so the artifacts can locate their runtime support. Configuring a
@@ -396,10 +414,12 @@ copied. Build also writes `build/docs/index.md`: the workspace dependency tree, 
 alphabetized list of copied Markdown files per package. Every package in the graph is listed;
 only packages that contributed Markdown link from the tree into that file list.
 
-`slang package run` executes an existing native artifact from `host.executables` and forwards
+`slang package --experimental run` executes an existing native artifact from `host.executables` and forwards
 trailing arguments. With no executable name, it runs `host.default`. It does not build first. Run
 fails with instructions when the manifest does not configure a host executable or when
-`slang package build` has not produced that artifact.
+`slang package --experimental build` has not produced that artifact. The global
+`--experimental` option must appear immediately after `slang package`; normal help hides `run` and
+host build behavior.
 
 `slang package test` is reserved and currently reports that it is not implemented. It does not
 invoke `slang-test`. Package testing will get a dedicated model; `slang-test` remains an internal
@@ -407,7 +427,8 @@ compiler harness and is not part of the package command surface.
 
 `slang package docs` prints the path of the generated `build/docs/` directory so you can open
 `index.md` and the copied package files. It does not copy or regenerate documentation; run
-`slang package build` for that.
+`slang package build` for that, or `slang package --experimental build` when the manifest configures
+host executables.
 
 ## Possible future enhancements
 

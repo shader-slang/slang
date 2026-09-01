@@ -11,6 +11,7 @@ namespace PackageTool
 {
 
 Index findLocalPackageIndex(const List<LocalPackage>& packages, const String& name);
+Index findActiveLocalPackageIndex(const List<LocalPackage>& packages, const String& name);
 
 /// Read `slang-workspace.json`, treating an absent file as no edits or overrides.
 SlangResult readProjectLocalPackages(

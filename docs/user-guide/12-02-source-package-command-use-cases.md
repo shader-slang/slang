@@ -6,10 +6,11 @@ permalink: /user-guide/source-package-command-use-cases
 Growing an Application with Source Packages
 ============================================
 
-This chapter follows a person from an empty directory to an application made from several
-packages. It says what you do by hand, what `slang package` does for you, and where the current
-tool stops helping. Later sections follow the same application when an upstream package changes
-its graph, and when you extract part of your own application into a package.
+This chapter presents user-centered use cases as journeys. It follows a person from an empty
+directory to an application made from several packages, saying what you do by hand, what
+`slang package` does for you, and where the current tool stops helping. Later journeys follow the
+same application when an upstream package changes its graph and when you extract part of your own
+application into a package.
 
 This is also a behavioral contract for the package tool. The maintainer appendix turns the
 journeys into must/must-not checks for future command changes.
@@ -26,8 +27,9 @@ view:
 - `slang-package.json` is intent written by a package author. It declares the package's exported
   source, dependencies, licenses, and toolchain requirements. You edit and commit it.
 - `slang-package-lock.json` is the exact graph selected for the workspace in which you ran
-  `update`. The tool writes it; you review and commit it. A dependency's nested lock is not used
-  when your workspace resolves that dependency.
+  `update`. The tool writes it; reviewing and committing a root application's lock is recommended
+  for reproducibility but not enforced. A dependency's nested lock is not used when your workspace
+  resolves that dependency.
 - `slang-workspace.json` is machine-local state for `edit` and `override`. The tool writes it and
   `init` adds it to `.gitignore`. Do not commit it.
 
@@ -99,8 +101,8 @@ Run the package-quality gate, build, and then run the artifact:
 
 ```sh
 slang package validate
-slang package build
-slang package run
+slang package --experimental build
+slang package --experimental run
 ```
 
 Finally, initialize source control if needed and commit:
@@ -119,16 +121,17 @@ or `slang-workspace.json`.
 - `init` creates the manifest, conventional directories, license placeholder, and ignore rules.
 - `validate` checks the closed manifest schema, license, export directories, module declarations,
   and installed toolchain. A package with no dependencies does not need a lock.
-- `build` repeats full validation, emits source and module bundles under `build/bundle/`, compiles
-  configured host executables, and collects Markdown under `build/docs/`.
-- `run` executes the existing configured binary. It forwards trailing arguments but does not
-  rebuild.
+- `build` repeats full validation, emits source and module bundles under `build/bundle/`, and
+  collects Markdown under `build/docs/`. With the global experimental opt-in, it also compiles
+  configured host executables.
+- Experimental `run` executes the existing configured binary. It forwards trailing arguments but
+  does not rebuild.
 
 ### Current gaps and pitfalls
 
-- `init` does not ask whether you want an application or library, does not write a first source
-  file, and leaves a license placeholder that makes the default `validate`, `update`, and `build`
-  paths fail. Missing `init --app` and `init --lib` templates are the first onboarding gap.
+- `init` is intentionally scoped to the manifest, directories, ignore rules, and license reminder.
+  It does not write a first source file, and its placeholder license makes the default `validate`,
+  `update`, and `build` paths fail until you choose a real license.
 - There is no package-level build script. Host executables need a supported C++ compiler and the
   sibling Slang tools available at runtime.
 - `slang package test` is reserved but not implemented. The generated `tests/` directory is only a
@@ -145,8 +148,8 @@ At this point a new clone can reproduce the package without dependency resolutio
 git clone <image-viewer-url>
 cd image-viewer
 slang package validate
-slang package build
-slang package run
+slang package --experimental build
+slang package --experimental run
 ```
 
 There is no lock yet because the package has no dependencies. Once dependencies are added, the
@@ -164,7 +167,16 @@ for another machine to reproduce it.
 
 ### Human does
 
-There is no `slang package add` command. Edit `slang-package.json` by hand:
+Add the direct dependency:
+
+```sh
+slang package dependency add color-encoding \
+  --git https://example.com/color-encoding.git \
+  --version ">=1.0.0 <2.0.0"
+```
+
+This atomically changes only `slang-package.json`; it does not resolve or materialize anything.
+The resulting manifest edge is:
 
 ```json
 "dependencies": {
@@ -196,7 +208,7 @@ Apply the solve, then validate and build:
 slang package update
 slang package validate
 slang package status
-slang package build
+slang package --experimental build
 ```
 
 Review and commit both files:
@@ -214,17 +226,20 @@ version, dependencies, and exports selected for this workspace.
 
 - `update` clones resolver metadata under `.slang/cache/`, examines compatible Git tags, resolves
   the complete transitive graph, and selects one version per package name.
+- A real update prints that exact selection and asks before applying it. `--yes` is required when
+  no interactive terminal is available.
 - A real update materializes Git source under `deps/NAME`, validates the selected graph, writes
   `slang-package-lock.json`, and regenerates `build/search-paths`.
 - `status` checks that the root manifest, lock, local registrations, materialized manifests, and
-  tool-owned Git checkouts agree. It diagnoses workspace state; it is not a replacement for
-  source and license validation.
+  every tool-owned Git checkout agree. It aggregates wrong origins, changed/untracked counts,
+  commit divergence, and stashes without inspecting `build/` or contacting remotes. Active edits
+  and overrides make status nonzero because the graph is not portable.
 - `fetch` subsequently reproduces that lock without consulting newer tags, publisher retractions,
   or version selection:
 
   ```sh
   slang package fetch
-  slang package build
+  slang package --experimental build
   ```
 
   This is the normal clean-clone and CI path. CI should not run `update`.
@@ -235,14 +250,13 @@ From this point forward, the clean-clone flow has a lock and starts with fetch:
 git clone <image-viewer-url>
 cd image-viewer
 slang package fetch
-slang package build
-slang package run
+slang package --experimental build
+slang package --experimental run
 ```
 
 ### Current gaps and pitfalls
 
-- Dependency declaration, removal, and pinning are manual JSON edits. There is no `add`, `remove`,
-  or package search command.
+- Dependency add/remove and pin/ref forms are available, but there is no package registry search.
 - Update always solves the entire graph. There is no package-scoped update.
 - `--dry-run` can inspect remote manifests but does not materialize remote source. A preview can
   succeed and the real update can later fail source or module-layout validation.
@@ -366,15 +380,14 @@ To trial an unpublished manifest or another repository, point the existing packa
 directory:
 
 ```sh
-slang package override color-encoding ../color-encoding 1.1.0
-slang package update --from-local --dry-run
-slang package update --from-local
+slang package override add color-encoding ../color-encoding 1.1.0
+slang package update --dry-run
+slang package update
 ```
 
-`--from-local` is not “update one local package.” It re-solves the **entire graph** using every
-registered override as the only candidate for its package name; packages without overrides still
-come from Git. Registered edits remain published Git candidates, so their changed manifests do not
-enter the solve.
+Enabled overrides automatically participate in the **entire graph** solve as the only candidate
+for their package names; packages without enabled overrides still come from Git. Registered edits
+remain published Git candidates, so their changed manifests do not enter the solve.
 
 If the local `color-encoding` manifest adds `color-math`, the full-graph local solve adds
 `color-math` and its transitive requirements to the root lock. Every incoming constraint must
@@ -387,12 +400,14 @@ the root or another resolved local manifest.
 Restore a portable graph before sharing it:
 
 ```sh
+slang package override disable color-encoding
 slang package update
-slang package unoverride color-encoding
+slang package override remove color-encoding
 ```
 
-A normal update restores published Git selections. `unoverride` refuses while the lock still
-contains the local path row.
+Disabling retains the local path and version while update restores published Git selections.
+Removal refuses while the lock still contains the local path row. Re-enable later to return to the
+same local tree without re-entering its configuration.
 
 ### Tool does
 
@@ -401,22 +416,23 @@ contains the local path row.
   edited manifest's dependencies or exports does **not** adopt that graph.
 - For an override, records the name, path, and exact effective version in
   `slang-workspace.json`. It does not copy or modify the supplied directory.
-- `edit`, `unedit`, `override`, and `unoverride` immediately regenerate `build/search-paths` to
-  reflect the active registration. An override's locked export paths therefore become compiler
-  inputs immediately, mapped to the local directory. If its manifest declares different exports,
-  run `update --from-local` to adopt them.
-- With `update --from-local`, records the original Git identity and local path in the definitive
-  lock and resolves all current override manifests together.
+- Local registration changes regenerate `build/search-paths` when the current lock can represent
+  the newly active source. An override's locked export paths therefore become compiler inputs
+  immediately, mapped to the local directory. If its manifest declares different exports, run
+  `update` to adopt them. Disabling a lock-adopted override needs update before published paths are
+  regenerated.
+- A plain update records each enabled override's original Git identity and local path in the
+  definitive lock and resolves all enabled override manifests together.
 - A local-path lock fails on another machine without the matching registration. This is
   intentional: a local graph must not silently masquerade as the portable published graph.
 
 ### Current gaps and pitfalls
 
-- `--from-local` is easy to misread as a package-scoped update. It is a mode of the full-graph
-  solver.
+- `--from-local` remains as a deprecated compatibility spelling. It never meant a package-scoped
+  update; current workflows use enabled overrides with plain update.
 - An edit is not a way to trial manifest changes. Use an override, or publish a new tag and run
   normal `update`.
-- If an edit is registered while you run `update --from-local`, its checkout HEAD must match a
+- If an edit is registered while you run the local-override solve, its checkout HEAD must match a
   published release tag. An unpublished edit commit makes the local solve fail; use an override
   when the version or manifest identity differs.
 - Overrides are path-only; there is no user-global Git-to-Git remapping policy.
@@ -492,8 +508,10 @@ lock gains an exact row for it.
 
 ### Current gaps and pitfalls
 
-- There is no `tree` or `why color-math` command after the update. The update report is currently
-  the only explanation of why the name entered the lock.
+- `slang package tree` shows the selected graph, and `slang package why color-math` prints every
+  root-to-package path and incoming requirement. These commands explain current graph presence,
+  not the historical candidates rejected during the solve; keep the update report when that
+  history matters.
 - There is no package-scoped update. Previewing or taking the new `color-encoding` release may
   move other compatible packages in the same solve.
 - `--minimal` preserves the added/changed/unchanged list but intentionally drops the incoming
@@ -569,10 +587,10 @@ identity to the local `color-encoding` manifest, even if that remote has no usab
 register both local trees:
 
 ```sh
-slang package override color-encoding ../color-encoding 2.0.0
-slang package override color-transfer ../color-transfer 1.0.0
-slang package update --from-local --dry-run
-slang package update --from-local
+slang package override add color-encoding ../color-encoding 2.0.0
+slang package override add color-transfer ../color-transfer 1.0.0
+slang package update --dry-run
+slang package update
 ```
 
 The solve is still whole-graph. The first override's local manifest introduces the second package;
@@ -582,9 +600,11 @@ multi-package upstream change before publication.
 After publishing both tags, restore the portable graph:
 
 ```sh
+slang package override disable color-encoding
+slang package override disable color-transfer
 slang package update
-slang package unoverride color-encoding
-slang package unoverride color-transfer
+slang package override remove color-encoding
+slang package override remove color-transfer
 ```
 
 ### Tool does
@@ -600,8 +620,8 @@ slang package unoverride color-transfer
 ### Current gaps and pitfalls
 
 - There is no migration or package-split command and no API compatibility check.
-- There is no durable dependency-tree view after resolution. The user has to inspect the update
-  report or lock to understand the new graph.
+- `tree` and `why` expose the durable selected graph, but rejected-candidate rationale exists only
+  in the update report.
 - Dry-run reads candidate manifests but cannot validate the unmaterialized packages' source trees.
 - If real update materializes the split and then source validation fails, the previous lock stays
   unchanged but some dependency directories may already have moved.
@@ -693,7 +713,7 @@ Then return to the root workspace:
 ```sh
 slang package update --dry-run
 slang package update
-slang package build
+slang package --experimental build
 ```
 
 The path package stays under `packages/color-math`; it is not copied to `deps/`. Commit the child
@@ -720,9 +740,9 @@ dependency to the root manifest:
 Register the sibling directory with an explicit version:
 
 ```sh
-slang package override color-math ../color-math 1.0.0
-slang package update --from-local --dry-run
-slang package update --from-local
+slang package override add color-math ../color-math 1.0.0
+slang package update --dry-run
+slang package update
 ```
 
 The override lets the solver use the local manifest without a release tag. The resulting lock is
@@ -734,8 +754,9 @@ After publishing `v1.0.0`, run a normal update to replace the local row with the
 remove the registration:
 
 ```sh
+slang package override disable color-math
 slang package update
-slang package unoverride color-math
+slang package override remove color-math
 git add slang-package.json slang-package-lock.json
 git commit
 ```
@@ -789,18 +810,20 @@ It edits dependency intent with
 [workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html) give committed members one
 root lock and shared configuration.
 
-That suggests three concrete Slang improvements:
+That suggests three workflow checks for Slang:
 
-- `init --app` and `init --lib` should leave a valid, useful starting package.
-- `add` should edit the manifest and show the selected pin instead of requiring JSON editing. The
-  Slang form would take a Git URL and version range, not assume a package registry.
+- `init` should leave manifest structure useful without pretending to choose application source,
+  library source, or a license for the user.
+- `dependency add` should edit manifest intent without assuming a package registry; update remains
+  the separate operation that selects a pin.
 - A future committed member list should model packages that are always developed and checked in
   together, with one root solve.
 
 Cargo also separates graph inspection from updating:
 [`cargo tree`](https://doc.rust-lang.org/cargo/commands/cargo-tree.html), especially its inverted
-`-i` view, can inspect who depends on a package after the update. Slang currently explains a
-dependency only while printing the update report.
+`-i` view, can inspect who depends on a package after the update. Slang's `tree` and `why NAME`
+provide the corresponding selected-graph inspection; the update report additionally records why
+candidates were rejected.
 
 ### Go: keep local composition separate from published intent
 
@@ -821,8 +844,8 @@ couple the Git/package name to export-relative Slang module names.
 Go also provides
 [`go mod why`](https://go.dev/ref/mod#go-mod-why). The consumed-package-growth journeys need the
 same durable question: “why is `color-math` in my graph?” Go answers from imported packages;
-Slang would answer from manifest and lock edges. A full dependency path is more useful after the
-fact than a lock row alone.
+`slang package why color-math` answers from manifest and lock edges and prints every dependency
+path.
 
 ### npm: initialize and connect a child in one workflow
 
@@ -873,10 +896,10 @@ without performing another update.
 ### What not to copy
 
 Slang does not need npm-style hoisting, Gradle's opt-in locking model, or a registry-first
-publishing workflow to fix the journeys above. The immediate improvements are scaffolding,
-manifest editing, committed multi-package composition, graph explanation, package-content preview,
-testing, and transactional updates. Unlike Cargo's introductory loop, `slang package run` should
-not be read as build-and-run; it deliberately executes only an existing artifact.
+publishing workflow to fix the journeys above. Remaining improvements include committed
+multi-package composition, package-content preview, testing, and transactional updates. Unlike
+Cargo's introductory loop, experimental `slang package --experimental run` should not be read as
+build-and-run; it deliberately executes only an existing artifact.
 
 ## How flags change the journeys
 
@@ -910,20 +933,29 @@ unchanged package lines remain, followed by summary counts.
 **It does not change:** resolution, validation, materialization, or lock output. It is valid on
 both dry-run and real update.
 
-### `update --from-local`
+### `update --yes`
 
-**Use it when:** one or more registered overrides have unpublished manifest changes that should
-participate in a trial solve.
+**Use it when:** a non-interactive caller has already decided to apply the report.
 
-**It changes:** the full-graph resolver uses every registered override as the candidate for that
-package name. Non-overridden packages still resolve from Git. The resulting lock records local
-paths and requires the same `slang-workspace.json`.
+Without this flag, a real update resolves once, prints the exact selected graph, and defaults to
+“no” at its confirmation prompt. It then materializes that same in-memory lock without refreshing
+remote selection a second time. `--dry-run` remains an advisory preview across invocations; a later
+update may see newer remote state.
 
-**It does not mean:** “update only this package,” “use every nearby repository,” or “adopt the
+### Enabled overrides and deprecated `update --from-local`
+
+**Use them when:** one or more registered overrides have unpublished manifest changes that should
+participate in a trial solve. Enabled overrides participate in plain update automatically.
+
+**They change:** the full-graph resolver uses every enabled override as the candidate for that
+package name. Non-overridden and disabled packages still resolve from Git. The resulting lock
+records local paths and requires the same `slang-workspace.json`.
+
+**They do not mean:** “update only this package,” “use every nearby repository,” or “adopt the
 changed manifest from an in-place edit.” Edits retain published Git candidates.
 
-**Precondition:** at least one local package registration must exist. In normal use, register an
-override first. Combine with `--dry-run` before writing a local lock.
+Use `override enable` and `override disable` to switch without deleting configuration.
+`--from-local` remains a deprecated compatibility alias and still means a whole-graph solve.
 
 ### `fetch --clean` and `update --clean`
 
@@ -937,7 +969,8 @@ dependency selection.
 Local package registrations remain protected by their own workflow.
 
 **Combination:** `update --dry-run --clean` is rejected. Fetch may combine `--clean` with
-`--skip-validate`.
+`--skip-validate`. When fetch would actually discard local checkout state, it lists every affected
+package and asks once. Pass `--yes` only when that destruction was pre-approved.
 
 ### `fetch --skip-validate`, `update --skip-validate`, and `build --skip-validate`
 
@@ -955,24 +988,28 @@ command's normal side effects. It always prints a warning.
 cannot inspect remote source that dry-run did not materialize. `validate` intentionally has no
 skip flag.
 
-### `override NAME PATH [AS]`
+### `override add NAME PATH [AS]`
 
 `AS` is a positional exact version, not a global flag. Omit it only when `NAME` already has a lock
 row whose version the local tree represents. Supply it for a newly introduced name or when the
 local tree represents another version. The value must satisfy every incoming constraint when you
-run `update --from-local`.
+run `update`.
 
-### `run [NAME] [ARGS...]`
+### `--experimental build` and `--experimental run [NAME] [ARGS...]`
 
-The optional leading name selects a configured host executable; otherwise `host.default` (or the
-only configured executable) is used. Remaining values are forwarded to the existing artifact.
-This selection does not trigger build or package resolution.
+The global flag must appear before the subcommand:
+`slang package --experimental build` or `slang package --experimental run`. A manifest with
+`host.executables` makes ordinary build fail with that instruction rather than silently skipping
+host output. Run's optional leading name selects a configured executable; otherwise
+`host.default` (or the only configured executable) is used. Remaining values are forwarded to the
+existing artifact. This selection does not trigger build or package resolution.
 
 ### Help spellings and commands without flags
 
-`slang package help`, `-help`, and `--help` print package help. `init`, `validate`, `status`,
-`edit`, `unedit`, `unoverride`, and `docs` otherwise accept only their documented positional
-arguments. `test` is present but returns a not-implemented error.
+`slang package help`, `-help`, and `--help` print stable package help. Experimental run and host
+build behavior appear in `slang package --experimental help`. `init`, `validate`, `status`,
+`tree`, `edit`, `unedit`, and `docs` otherwise accept only their documented arguments. `test` is
+present but returns a not-implemented error.
 
 ## Gaps, tensions, and intentional asymmetries
 
@@ -1018,15 +1055,15 @@ can leave partial checkouts and no lock. This is a correctness and recovery gap.
 ### Edit and override solve different problems
 
 `edit` protects the current checkout but ignores its changed manifest during resolution.
-`override` redirects a package identity, and `update --from-local` adopts all override manifests.
-This is a principled distinction, but the current terminology and two-step override workflow are
-hard to discover.
+An enabled `override` redirects a package identity and plain update adopts all enabled override
+manifests. This is a principled distinction; enable/disable keeps local configuration while making
+the active source explicit.
 
 ### Local solve writes a definitive but non-portable lock
 
-`update --from-local` writes the normal root lock even though that lock requires gitignored local
-registrations. Other machines fail rather than silently using another graph, which is safe, but
-the user must remember to run normal `update` before sharing. A future tool could distinguish or
+An enabled-override update writes the normal root lock even though that lock requires gitignored
+local registrations. Other machines fail rather than silently using another graph, which is safe,
+but the user must disable overrides and update before sharing. A future tool could distinguish or
 label a local trial lock more visibly.
 
 ### A nested lock does not protect a package's consumers
@@ -1069,12 +1106,11 @@ belongs in the package tool.
 
 ### Onboarding and ordinary dependency work
 
-1. Add `init --app` and `init --lib` scaffolds with a first source file and clear license step.
-2. Add `add`, `remove`, and pin/ref forms that edit manifest intent and preview the resulting
-   selection.
-3. Add `tree` and `why NAME` so update explanations remain available after the update.
-4. Implement a package testing contract for the generated `tests/` directory.
-5. Add a package-content preview analogous to pack/publish dry-run.
+1. Decide whether optional source scaffolding belongs in `init` without conflating manifest
+   initialization with application/library policy.
+2. Add package registry search if Slang later gains a registry.
+3. Implement a package testing contract for the generated `tests/` directory.
+4. Add a package-content preview analogous to pack/publish dry-run.
 
 ### Multi-package development
 
@@ -1102,13 +1138,16 @@ them or update this chapter and its regression tests in the same change.
 - `init` creates the manifest, conventional directories, placeholder license, and ignore entries.
 - Default `validate`, `update`, and `build` reject the license placeholder.
 - A dependency-free valid package can validate and build without a lock.
-- `run` executes an existing artifact and never silently builds it.
+- Host executable build and run require global `--experimental`; run executes an existing artifact
+  and never silently builds it.
 
 ### Resolve and reproduce contract
 
 - `update` is the only normal command that reselects versions and writes a graph lock.
 - `update --dry-run` writes neither lock nor dependency checkouts.
-- `fetch` requires a lock, selects nothing, and does not rewrite that lock.
+- A real update reports one selected in-memory graph, confirms it, and applies that exact graph.
+- Fetch with an existing lock selects nothing and does not rewrite that lock. Fetch with
+  dependencies and no lock performs the confirmed initial solve and writes the first lock.
 - A real update writes the lock only after the candidate graph validates.
 - Every reachable dependency has one exact lock row; Git rows include ref and commit.
 - Path packages remain in place; Git packages materialize under the configured deps directory.
@@ -1131,12 +1170,14 @@ them or update this chapter and its regression tests in the same change.
 - `edit` keeps the published Git identity and prevents replacement of `deps/NAME`.
 - An edited manifest does not enter the solve.
 - `override` records a machine-local path and exact effective version.
-- `update --from-local` resolves the complete graph using all overrides, not one package.
-- A registered edit used during `update --from-local` must have HEAD at a published release tag.
+- Enabled overrides participate in plain whole-graph update; disabled overrides retain
+  configuration while published resolution is active.
+- `update --from-local` remains a deprecated compatibility alias, not a package-scoped update.
+- A registered edit used during a local-override solve must have HEAD at a published release tag.
 - A local-path lock fails on another machine without matching `slang-workspace.json`.
-- Normal `update` restores published selections before `unoverride`.
-- `edit`, `unedit`, `override`, and `unoverride` regenerate `build/search-paths` immediately to
-  reflect the active local registrations.
+- Disable an override and update to restore published selection before removing it.
+- Local-registration changes regenerate `build/search-paths` when the current lock can represent
+  the newly active source. Disabling a lock-adopted override requires update first.
 - Dirty, unregistered Git checkouts are not replaced without `--clean`; registered edits remain
   protected.
 
@@ -1147,12 +1188,16 @@ them or update this chapter and its regression tests in the same change.
 - `--skip-validate` exists only on fetch, update, and build; it warns and keeps lock, manifest,
   closure, toolchain, export, and dirty-checkout checks.
 - `status` diagnoses lock, registration, and checkout state without mutation or remote access. It
-  is not the package-quality gate.
+  inventories all discovered problems, never inspects `build/`, and is not the package-quality
+  gate. Active edits and overrides produce a nonzero result.
 
 ### Output and side-effect contract
 
 - Detailed update output explains what moved, what stayed, and the incoming constraints.
 - `--minimal` retains one-line changes, unchanged packages, and summary counts.
+- Dependency add/remove changes only the manifest; tree and why read only the current graph.
+- Materialization prints per-package source/checkout progress. A failure explains that the prior
+  lock remains authoritative and how to recover potentially partial derived state.
 - `docs` prints the generated documentation location but does not regenerate it.
 - `test` reports that package testing is not implemented.
 - A command failure must not claim that an update, fetch, or build succeeded.
@@ -1162,18 +1207,22 @@ them or update this chapter and its regression tests in the same change.
 Start with these unit tests when changing a journey:
 
 - Bootstrap and license: `PackageToolInit`, `PackageValidateStructureAndLicense`.
-- Fetch and required lock: `PackageToolFetchRequiresLock`.
-- Update preview and report: `PackageToolUpdateDryRun`, `PackageResolveReportFormat`.
+- Fetch and initial lock: `PackageToolFetchRequiresLock`,
+  `PackageToolDependencyCommandsAndInitialFetch`.
+- Update preview, confirmation, and report: `PackageToolUpdateDryRun`,
+  `PackageToolUpdateRequiresConfirmation`, `PackageResolveReportFormat`.
 - Module layout and uniqueness: `PackageCommandsValidateDependencyModuleLayout`,
   `PackageToolUpdateRejectsBundleCaseConflict`, `PackageValidateRejectsFlattenedModuleAlias`.
-- Local overrides: `PackageToolLocalOverrideUpdatesDefinitiveLock`.
+- Local overrides and enable state: `PackageToolLocalOverrideUpdatesDefinitiveLock`,
+  `PackageLocalRegistryJSON`.
 - Path dependencies: `PackageToolPathDependencies`,
   `PackageToolFetchRejectsPathLockForGitDependency`, `PackageToolRejectsPathIntoSlangState`,
   `PackageResolverPathShadowsSelectedGit`, `PackageResolverPathPackageGitTransitive`.
 - Exclusions and retractions: `PackageResolverAppliesWorkspaceExclusions`,
   `PackageToolFetchRejectsWorkspaceExclusion`, `PackageResolverUsesLatestReleaseRetractions`.
 - Toolchain selection: `PackageToolSlangToolchain`, `PackageResolverSlangToolchain`.
-- Build and run: `PackageToolBuild`, `PackageToolRun`,
+- Dependency editing and graph inspection: `PackageToolDependencyCommandsAndInitialFetch`.
+- Build and experimental run: `PackageToolBuild`, `PackageToolRun`,
   `PackageToolExecutableRequiresWorkspaceSource`.
 
 The upstream-add and upstream-split journeys do not yet have end-to-end command tests named after

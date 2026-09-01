@@ -71,6 +71,13 @@ SlangResult isWorkingTreeSafeToRemove(
     bool& outIsSafe,
     String& outError);
 
+/// Inspect every kind of local Git state that makes a tool-owned checkout non-reproducible.
+SlangResult getWorkingTreeStatus(
+    const String& repositoryPath,
+    const String& expectedCommit,
+    GitWorkingTreeStatus& outStatus,
+    String& outError);
+
 } // namespace PackageTool
 } // namespace Slang
 

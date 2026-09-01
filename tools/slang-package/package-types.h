@@ -12,9 +12,10 @@ namespace Slang
 namespace PackageTool
 {
 
-/// Schema version written in `slang-package.json`, `slang-package-lock.json`, and
-/// `slang-workspace.json`. The prototype currently accepts only `1`.
+/// Schema version accepted by `slang-package.json` and `slang-package-lock.json`.
 inline constexpr Int kSchemaVersion = 1;
+/// Schema version written by the machine-local `slang-workspace.json`.
+inline constexpr Int kWorkspaceSchemaVersion = 2;
 
 struct Dependency
 {
@@ -208,11 +209,28 @@ struct LocalPackage
     /// from the lock row being replaced.
     String as;
     LocalPackageKind kind = LocalPackageKind::Override;
+    /// Disabled overrides retain their configuration but do not participate in resolution.
+    bool enabled = true;
+};
+
+/// Detailed Git state used by `status` and destructive-operation confirmation.
+struct GitWorkingTreeStatus
+{
+    Index changedFileCount = 0;
+    Index commitsAhead = 0;
+    Index commitsBehind = 0;
+    Index stashCount = 0;
+    String headCommit;
 };
 
 inline bool isEditedLocalPackage(const LocalPackage& package)
 {
     return package.kind == LocalPackageKind::Edit;
+}
+
+inline bool isActiveLocalPackage(const LocalPackage& package)
+{
+    return isEditedLocalPackage(package) || package.enabled;
 }
 
 enum class VersionComparison

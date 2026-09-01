@@ -96,7 +96,9 @@ rewrites the lock.
 Use fetch for ordinary development and for CI. Pass `--clean` only when you intend to replace a
 dirty or unowned checkout.
 
-If the lock is missing, fetch fails and asks you to run `update` once to create it.
+If dependencies exist but the lock is missing, fetch performs the initial solve, prints the
+selection report, and asks before writing the first lock. Pass `--yes` in a non-interactive
+checkout. Once a lock exists, fetch reproduces it and never reselects versions.
 
 ## Check workspace consistency
 
@@ -104,10 +106,11 @@ If the lock is missing, fetch fails and asks you to run `update` once to create 
 slang package status
 ```
 
-After a successful fetch, status should report that the lock is current, that there is no local
-edit or override state, and that tool-owned Git checkouts are clean. Status does not fetch, does
-not update, and does not contact remotes. When something is wrong, it names the command that
-fixes it: `fetch`, `update`, `update --from-local`, `edit`, or `--clean`.
+After a successful fetch, status should report that the lock is current, that there is no active
+local edit or override state, and that tool-owned Git checkouts are clean. It inventories all
+manifest/lock mismatches, missing materialization, wrong origins, changed or untracked files,
+commit divergence, and stashes. Status does not inspect `build/`, fetch, update, or contact
+remotes. When something is wrong, it names the corrective command.
 
 If you run status before fetch, it fails because the locked packages are not materialized yet.
 
@@ -133,7 +136,9 @@ git -C deps/color-convert describe --tags --exact-match
 git -C deps/color-encoding describe --tags --exact-match
 ```
 
-All three should now print `v1.1.0`. Convert's tighter encoding range (`>=1.1.0`) and the
+Update prints the report again and asks whether to apply that exact in-memory selection. Use
+`slang package update --yes` for automation. All three should now print `v1.1.0`. Convert's tighter
+encoding range (`>=1.1.0`) and the
 publisher retraction of `1.0.0` agree: the shared leaf is `color-encoding@v1.1.0`, once, in the
 lock.
 
@@ -154,7 +159,7 @@ package-specific update mode yet.
 ## Build, run, and collect docs
 
 ```sh
-slang package build
+slang package --experimental build
 ```
 
 Build validates the materialized graph, then:
@@ -173,7 +178,7 @@ The `build/bundle/modules` tree is enough for a consumer that should not receive
 put that directory on the search path. The matching source layout is `build/bundle/source/`.
 
 ```sh
-slang package run
+slang package --experimental run
 ```
 
 Run executes the existing `host.default` artifact (`video-preview`) and does not compile. If the
@@ -197,19 +202,22 @@ Two local mechanisms, both recorded in gitignored `slang-workspace.json`:
 Changing its exports or dependencies still requires a new published tag and a normal `update`.
 `unedit` refuses while the tree has extra commits, dirty files, or stashes.
 
-`slang package override NAME PATH [AS]` points the package at another directory you already have.
+`slang package override add NAME PATH [AS]` points the package at another directory you already have.
 Its effective version must satisfy every incoming dependency constraint. Omit `AS` to retain the
 version from the current lock, or provide it when the local tree represents a different version.
-Its current manifest participates in resolution only when you run:
+An enabled override's current manifest participates in every plain update:
 
 ```sh
-slang package update --from-local
+slang package update
 ```
 
-`--from-local --dry-run` prints the lock diff without writing it. The resulting lock records the
+Use `override disable NAME` to retain its path and version while selecting the published graph,
+then `override enable NAME` to switch back. `override list` shows both states.
+`--from-local` remains a deprecated compatibility spelling. A dry run prints the lock diff without
+writing it. The resulting lock records the
 local path plus the original Git identity, so another machine or CI fails unless it has the same
-`slang-workspace.json`. Restore a portable Git pin with a normal `update` before you `unoverride`
-or commit.
+`slang-workspace.json`. Disable the override and run `update` to restore a portable Git pin before
+you remove the registration or commit.
 
 Do not commit `slang-workspace.json`. Path dependencies in `slang-package.json` are the published
 way to vendor a tree; overrides are the laptop way to redirect one.
@@ -243,7 +251,7 @@ Git-to-Git remapping is not available yet. Overrides replace a dependency with a
 ```sh
 slang package fetch
 slang package status
-slang package build
+slang package --experimental build
 ```
 
 CI should not run `update`. Update is a deliberate choice to take newer tags and rewrite the

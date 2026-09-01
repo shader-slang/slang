@@ -505,7 +505,7 @@ static SlangResult _readMaterializedManifest(
     Manifest& outManifest,
     String& outError)
 {
-    Index localIndex = findLocalPackageIndex(localPackages, package.name);
+    Index localIndex = findActiveLocalPackageIndex(localPackages, package.name);
     if (localIndex >= 0)
     {
         if (package.path.getLength() && package.path != localPackages[localIndex].path)
