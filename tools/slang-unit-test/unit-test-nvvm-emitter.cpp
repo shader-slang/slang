@@ -3761,6 +3761,52 @@ SLANG_UNIT_TEST(nvvmSlangRecursiveCopyableValuesCrossHelperBoundaries)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangTexture2DGathersUseOneTypedOperationFamily)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMTexture2DGatherSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+        SLANG_CHECK(gFakeNVVMBuilder.textureOperations.getCount() == 4);
+        bool sawComponents[4] = {};
+        for (const auto& operation : gFakeNVVMBuilder.textureOperations)
+        {
+            SLANG_CHECK(operation.operation == SLANG_NVVM_TEXTURE_OP_GATHER);
+            SLANG_CHECK(operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D);
+            SLANG_CHECK(operation.isArray == 0);
+            SLANG_CHECK(operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
+            SLANG_CHECK(operation.elementType.bitWidth == 32);
+            SLANG_CHECK(operation.elementType.laneCount == 4);
+            SLANG_CHECK_ABORT(operation.component < SLANG_COUNT_OF(sawComponents));
+            sawComponents[operation.component] = true;
+        }
+        for (bool sawComponent : sawComponents)
+            SLANG_CHECK(sawComponent);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangResourceStructsCrossLocalAndHelperBoundaries)
 {
     _resetDirectNVVMFakes();

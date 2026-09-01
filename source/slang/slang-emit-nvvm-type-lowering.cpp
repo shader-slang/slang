@@ -1466,6 +1466,9 @@ bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerTy
     return true;
 }
 
+// Describes one selected 32-bit numeric resource element without imposing an operation's result
+// shape. Consider `Texture2D<float3>`: its opaque resource type must retain three logical lanes so
+// GatherGreen can return `float4`, while sample/fetch capability checks may still reject float3.
 static bool _getNVVMSelected32BitNumericElementType(IRType* type, SlangNVVMValueTypeDesc& outType)
 {
     outType = {};
@@ -1474,7 +1477,7 @@ static bool _getNVVMSelected32BitNumericElementType(IRType* type, SlangNVVMValue
     uint32_t vectorLaneCount = 0;
     if (auto vectorType = asNVVMSupported32BitNumericVectorType(type, &vectorLaneCount))
     {
-        if (vectorLaneCount != 2 && vectorLaneCount != 4)
+        if (vectorLaneCount < 2 || vectorLaneCount > 4)
             return false;
         scalarType = vectorType->getElementType();
         laneCount = vectorLaneCount;

@@ -221,11 +221,12 @@ SlangResult NVVMIRBuilder::emitTextureOperation(
     if (!isInitialized())
         return SLANG_E_UNINITIALIZED;
     const size_t expectedOperandCount =
-        operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
+        operation.operation == SLANG_NVVM_TEXTURE_OP_GATHER ? 2
+        : operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
                 operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL
             ? 3
             : 1;
-    if (operation.operation > SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL ||
+    if (operation.operation > SLANG_NVVM_TEXTURE_OP_GATHER ||
         operandCount != expectedOperandCount || !operands)
     {
         return SLANG_E_INVALID_ARG;

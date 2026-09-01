@@ -7392,6 +7392,33 @@ The 65-result truthiness gate produces accepted native NVRTC, direct O0 SM70, an
 SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 PTX is 30,174 bytes versus
 38,917 bytes native, while direct O0 PTX is 32,829 bytes. Timings remain exploratory.
 
+### Slice 179: Canonical ordinary Texture2D gather
+
+The CUDA prelude generates every ordinary non-array `Texture2D` gather from one extension. Its
+result is always `vector<T.Element,4>`, even when the declared texture element has one, two, or
+three lanes. `Gather` and `GatherRed` select component zero; green, blue, and alpha select one,
+two, and three. The single-offset overload emits the same CUDA intrinsic because CUDA
+`tex2Dgather` has no offset form.
+
+Direct preflight recognizes only those exact finalized helpers. It proves the non-shadow
+Texture2D, ordinary sampler, Float32 `float2` coordinate, four-lane Float32/Int32/UInt32 result,
+and optional signed `int2` offset. The provider operation receives only the texture and coordinate
+runtime values plus typed result/component metadata. Revision 34 emits the corresponding
+`tld4.{r|g|b|a}.2d.v4.{f32|s32|u32}.f32` inline PTX and reconstructs the four-lane result. Array,
+cube, comparison, status, multi-offset, and non-32-bit gathers remain deterministic rejections.
+
+The compile-only element-type fixture proves scalar, two-lane, and three-lane texture declarations,
+all three result kinds, multiple components, and the offset topology. The runtime fixture becomes
+correct at O0 and O3 and gains two permanent direct lanes. Frozen corpus v1 remains exactly
+452/427 and advances from 416/416/416 to 417/417/417, with one gain and no old-correct regression.
+Discovery remains exactly 82/72 at 72/72/72 with no changed row. The selected prefix passes
+437/437 and the permanent NVVM category passes 90/90.
+
+CUDA 12.9 assembles the gather gate's native reference, direct O0 SM70, and direct O3
+SM70/SM80/SM90 PTX. The one-repetition reference emitted SM75 PTX in 710.0 ms and 8,945 bytes;
+direct SM70 measured 428.0 ms and 6,519 bytes at O0, and 409.9 ms and 1,091 bytes at O3. These
+timings remain exploratory.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

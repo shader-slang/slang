@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 33u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 34u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -264,6 +264,7 @@ extern "C"
 #define SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT ((SlangNVVMTextureOperation)2u)
 #define SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH ((SlangNVVMTextureOperation)3u)
 #define SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL ((SlangNVVMTextureOperation)4u)
+#define SLANG_NVVM_TEXTURE_OP_GATHER ((SlangNVVMTextureOperation)5u)
 
     /** Describes one complete typed sampled-texture operation. */
     typedef struct SlangNVVMTextureOperationDesc
@@ -272,6 +273,8 @@ extern "C"
         SlangNVVMTextureShape shape;
         uint32_t isArray;
         SlangNVVMValueTypeDesc elementType;
+        /** Selects the gathered component for GATHER; must be zero for every other operation. */
+        uint32_t component;
     } SlangNVVMTextureOperationDesc;
 
     /** Owns module lifetime and verified serialization. */

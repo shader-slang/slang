@@ -2550,3 +2550,19 @@ v1 advances from 415/415/415 to 416/416/416 over its unchanged 427 healthy denom
 gain and no old-correct loss. Discovery stays 72/72/72 over 72 with no changed row. The selected
 prefix passes 435/435, the permanent NVVM category passes 86/86, and the measurement gate produces
 accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.
+
+Slice 179 maps the generated ordinary CUDA `Texture2D` gather family to one typed texture
+operation. Its descriptor carries the four-lane Float32/Int32/UInt32 result and component selector;
+the runtime operands are the opaque texture handle and Float32 coordinate. The compiler proves the
+sampler and the optional signed `int2` offset before intentionally omitting them, matching the CUDA
+prelude contract that the texture object owns sampling state and `tex2Dgather` has no offset form.
+Revision 34 adds this concrete resource operation.
+
+Read-only texture description now admits legal three-lane 32-bit element declarations, while each
+texture operation continues to enforce its own exact lane set. Frozen
+`hlsl-intrinsic/texture-2d-gather` gains two permanent direct lanes. Frozen v1 advances from
+416/416/416 to 417/417/417 over its unchanged 427 healthy denominator, with one gain and no
+old-correct loss. Discovery stays 72/72/72 over 72 with no changed row. The selected prefix passes
+437/437, the permanent NVVM category passes 90/90, and the gather measurement gate produces
+accepted PTX/cubins for the native reference, direct O0 SM70, and direct O3 SM70/SM80/SM90
+configurations.

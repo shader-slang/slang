@@ -2439,7 +2439,8 @@ static bool _isFakeNVVMBuilderVectorValue(
                 : expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Float &&
                       operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
         return (operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
-                operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL) &&
+                operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL ||
+                operation.operation == SLANG_NVVM_TEXTURE_OP_GATHER) &&
                isExpectedKind && operation.elementType.bitWidth == 32 &&
                operation.elementType.laneCount == expectedElementCount;
     }
@@ -6151,6 +6152,8 @@ static SlangNVVMBuilderSurfaceOperationsAPI _makeFakeNVVMBuilderSurfaceOperation
 
 static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperationDesc& operation)
 {
+    if (operation.operation != SLANG_NVVM_TEXTURE_OP_GATHER && operation.component != 0)
+        return false;
     if (operation.isArray > 1)
     {
         return false;
@@ -6185,6 +6188,7 @@ static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperation
         operation.elementType.bitWidth == 32 &&
         (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
          operation.elementType.laneCount == 4);
+    const bool isGatherElement = isFetchElement && operation.elementType.laneCount == 4;
     switch (operation.operation)
     {
     case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
@@ -6199,6 +6203,9 @@ static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperation
         return isFetchElement &&
                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
                 (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && !operation.isArray));
+    case SLANG_NVVM_TEXTURE_OP_GATHER:
+        return isGatherElement && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D &&
+               !operation.isArray && operation.component < 4;
     default:
         return false;
     }
@@ -6225,9 +6232,11 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitTextureOperation(
 {
     if (outValue)
         *outValue = nullptr;
+    const bool isGather = operation && operation->operation == SLANG_NVVM_TEXTURE_OP_GATHER;
     const size_t expectedOperandCount =
-        operation && (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
-                      operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
+        isGather ? 2
+        : operation && (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
+                        operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
             ? 3
             : 1;
     if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
@@ -6241,11 +6250,11 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitTextureOperation(
     }
 
     if (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
-        operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
+        operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL || isGather)
     {
         const bool isFetchLevel = operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL;
-        if (isFetchLevel ? !_isFakeNVVMBuilderIntegerValue(operands[2])
-                         : !_isFakeNVVMBuilderFloatingPointValue(operands[2], 32))
+        if (!isGather && (isFetchLevel ? !_isFakeNVVMBuilderIntegerValue(operands[2])
+                                       : !_isFakeNVVMBuilderFloatingPointValue(operands[2], 32)))
             return SLANG_E_INVALID_ARG;
 
         uint32_t coordinateLaneCount = 0;
@@ -12692,6 +12701,21 @@ void computeMain()
 {
     preserveDestination(destination)[0] =
         preserveTexture(texture).SampleLevel(sampler, float2(0.0), 0.0).x;
+}
+)";
+static const char kDirectNVVMTexture2DGatherSource[] = R"(
+Texture2D<float4> texture;
+SamplerState sampler;
+RWStructuredBuffer<float4> destination;
+
+[CUDAKernel]
+void computeMain()
+{
+    float2 coordinate = float2(0.5, 0.5);
+    destination[0] = texture.GatherRed(sampler, coordinate);
+    destination[1] = texture.GatherGreen(sampler, coordinate);
+    destination[2] = texture.GatherBlue(sampler, coordinate);
+    destination[3] = texture.GatherAlpha(sampler, coordinate, int2(1, 1));
 }
 )";
 static const char kDirectNVVMUnsignedFixedArrayIndexSource[] = R"(

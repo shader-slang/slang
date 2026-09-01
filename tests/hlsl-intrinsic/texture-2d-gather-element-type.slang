@@ -3,6 +3,8 @@
 // tex2Dgather result assigned into the vector<T,4> the signature returns.
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute
+//TEST(nvvm):SIMPLE(filecheck=PTX): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O0 -o -
+//TEST(nvvm):SIMPLE(filecheck=PTX): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -O3 -o -
 
 Texture2D<float> texF1;
 Texture2D<float2> texF2;
@@ -43,4 +45,12 @@ void computeMain()
     // CUDA: tex2Dgather<float4
     // PTX: tld4.r.2d.v4.f32
     outF[3] = texF1.Gather(samp, float2(0.5, 0.5), int2(1, 1));
+
+    // CUDA: tex2Dgather<float4
+    // PTX: tld4.b.2d.v4.f32
+    outF[4] = texF3.GatherBlue(samp, float2(0.5, 0.5));
+
+    // CUDA: tex2Dgather<float4
+    // PTX: tld4.a.2d.v4.f32
+    outF[5] = texF3.GatherAlpha(samp, float2(0.5, 0.5));
 }

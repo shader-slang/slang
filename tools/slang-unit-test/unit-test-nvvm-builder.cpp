@@ -187,6 +187,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
     SLANG_CHECK(builder.supportsTextureOperation(unsupported));
     unsupported.elementType.laneCount = 3;
     SLANG_CHECK(!builder.supportsTextureOperation(unsupported));
+    unsupported = {
+        SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL,
+        SLANG_NVVM_TEXTURE_SHAPE_2D,
+        0,
+        floatType,
+        1,
+    };
+    SLANG_CHECK(!builder.supportsTextureOperation(unsupported));
 
     for (const auto shape : shapes)
     {
@@ -256,6 +264,43 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
     unsupportedFetch.elementType.laneCount = 1;
     unsupportedFetch.elementType.bitWidth = 16;
     SLANG_CHECK(!builder.supportsTextureOperation(unsupportedFetch));
+
+    const SlangNVVMValueTypeKind gatherKinds[] = {
+        SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+        SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+        SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+    };
+    for (const auto kind : gatherKinds)
+    {
+        for (uint32_t component = 0; component < 4; ++component)
+        {
+            const SlangNVVMTextureOperationDesc gather = {
+                SLANG_NVVM_TEXTURE_OP_GATHER,
+                SLANG_NVVM_TEXTURE_SHAPE_2D,
+                0,
+                {kind, 32, 4},
+                component,
+            };
+            SLANG_CHECK(builder.supportsTextureOperation(gather));
+        }
+    }
+    SlangNVVMTextureOperationDesc unsupportedGather = {
+        SLANG_NVVM_TEXTURE_OP_GATHER,
+        SLANG_NVVM_TEXTURE_SHAPE_2D,
+        0,
+        {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 4},
+        4,
+    };
+    SLANG_CHECK(!builder.supportsTextureOperation(unsupportedGather));
+    unsupportedGather.component = 0;
+    unsupportedGather.isArray = 1;
+    SLANG_CHECK(!builder.supportsTextureOperation(unsupportedGather));
+    unsupportedGather.isArray = 0;
+    unsupportedGather.shape = SLANG_NVVM_TEXTURE_SHAPE_CUBE;
+    SLANG_CHECK(!builder.supportsTextureOperation(unsupportedGather));
+    unsupportedGather.shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
+    unsupportedGather.elementType.laneCount = 3;
+    SLANG_CHECK(!builder.supportsTextureOperation(unsupportedGather));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderEmitsVectorTextureSamples)
@@ -337,6 +382,110 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsVectorTextureSamples)
         const String assembly = _getBlobText(assemblyBlob);
         SLANG_CHECK(assembly.indexOf("@llvm.nvvm.tex.unified.2d.level.v4f32.f32") >= 0);
         SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("insertelement")) == 4);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderEmitsTexture2DGathers)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+
+    ScopedNVVMBuilderModule module;
+    module.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("texture2d-gathers"), module.module)));
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle int64Type = nullptr;
+    SlangNVVMTypeHandle floatType = nullptr;
+    SlangNVVMTypeHandle float2Type = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 64, int64Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, 32, floatType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getVectorType(module.module, floatType, 2, float2Type)));
+
+    const SlangNVVMTypeHandle parameterTypes[] = {int64Type, float2Type};
+    SlangNVVMTypeHandle functionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        module.module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType)));
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("gather2D"),
+        function)));
+    SlangNVVMValueHandle operands[2] = {};
+    for (size_t parameterIndex = 0; parameterIndex < SLANG_COUNT_OF(operands); ++parameterIndex)
+    {
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionParameter(
+            module.module,
+            function,
+            parameterIndex,
+            operands[parameterIndex])));
+    }
+    SlangNVVMBlockHandle entryBlock = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
+
+    const SlangNVVMValueTypeKind kinds[] = {
+        SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+        SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+        SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+    };
+    for (const auto kind : kinds)
+    {
+        for (uint32_t component = 0; component < 4; ++component)
+        {
+            const SlangNVVMTextureOperationDesc operation = {
+                SLANG_NVVM_TEXTURE_OP_GATHER,
+                SLANG_NVVM_TEXTURE_SHAPE_2D,
+                0,
+                {kind, 32, 4},
+                component,
+            };
+            SlangNVVMValueHandle result = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitTextureOperation(
+                module.module,
+                operation,
+                operands,
+                SLANG_COUNT_OF(operands),
+                result)));
+            SLANG_CHECK_ABORT(result != nullptr);
+        }
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    const char* componentNames[] = {"r", "g", "b", "a"};
+    const char* dataTypeNames[] = {"f32", "s32", "u32"};
+    for (const auto format : formats)
+    {
+        ComPtr<ISlangBlob> assemblyBlob;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assemblyBlob)));
+        const String assembly = _getBlobText(assemblyBlob);
+        for (const char* componentName : componentNames)
+        {
+            for (const char* dataTypeName : dataTypeNames)
+            {
+                StringBuilder instruction;
+                instruction << "tld4." << componentName << ".2d.v4." << dataTypeName << ".f32";
+                SLANG_CHECK(
+                    _countOccurrences(assembly.getUnownedSlice(), instruction.getUnownedSlice()) ==
+                    1);
+            }
+        }
     }
 }
 

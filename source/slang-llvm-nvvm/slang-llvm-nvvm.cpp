@@ -4398,6 +4398,8 @@ static uint32_t _getTextureCoordinateLaneCount(const SlangNVVMTextureOperationDe
 
 static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& operation)
 {
+    if (operation.operation != SLANG_NVVM_TEXTURE_OP_GATHER && operation.component != 0)
+        return false;
     const bool isSupportedShape = operation.shape == SLANG_NVVM_TEXTURE_SHAPE_1D ||
                                   operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
                                   operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D ||
@@ -4420,6 +4422,7 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
         operation.elementType.bitWidth == 32 &&
         (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
          operation.elementType.laneCount == 4);
+    const bool isGatherElement = isFetchElement && operation.elementType.laneCount == 4;
     switch (operation.operation)
     {
     case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
@@ -4434,6 +4437,9 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
         return isFetchElement &&
                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
                 (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && !operation.isArray));
+    case SLANG_NVVM_TEXTURE_OP_GATHER:
+        return isGatherElement && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D &&
+               !operation.isArray && operation.component < 4;
     default:
         return false;
     }
@@ -4505,9 +4511,11 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
         *outValue = nullptr;
     ModuleState* state = _getModule(module);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    const bool isGather = operation && operation->operation == SLANG_NVVM_TEXTURE_OP_GATHER;
     const size_t expectedOperandCount =
-        operation && (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
-                      operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
+        isGather ? 2
+        : operation && (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
+                        operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
             ? 3
             : 1;
     if (!state || !insertionBlock || !operation || !operands ||
@@ -4520,9 +4528,9 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
     llvm::Value* texture = _getValue(operands[0]);
     const bool isSampleLevel = operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL;
     const bool isFetchLevel = operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL;
-    const bool hasCoordinate = isSampleLevel || isFetchLevel;
+    const bool hasCoordinate = isSampleLevel || isFetchLevel || isGather;
     llvm::Value* coordinate = hasCoordinate ? _getValue(operands[1]) : nullptr;
-    llvm::Value* level = hasCoordinate ? _getValue(operands[2]) : nullptr;
+    llvm::Value* level = isSampleLevel || isFetchLevel ? _getValue(operands[2]) : nullptr;
     llvm::Type* floatType = llvm::Type::getFloatTy(state->context);
     llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
     const uint32_t coordinateLaneCount = _getTextureCoordinateLaneCount(*operation);
@@ -4535,10 +4543,11 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
         isFetchLevel ? llvm::Intrinsic::not_intrinsic : _getTextureIntrinsicID(*operation);
     if (!texture || !texture->getType()->isIntegerTy(64) ||
         (hasCoordinate && (!coordinate || coordinate->getType() != expectedCoordinateType ||
-                           !level || level->getType() != (isFetchLevel ? int32Type : floatType) ||
-                           !_isValueUsableAtInsertionPoint(state, insertionBlock, coordinate) ||
-                           !_isValueUsableAtInsertionPoint(state, insertionBlock, level))) ||
-        (!isFetchLevel && intrinsicID == llvm::Intrinsic::not_intrinsic) ||
+                           ((isSampleLevel || isFetchLevel) &&
+                            (!level || level->getType() != (isFetchLevel ? int32Type : floatType) ||
+                             !_isValueUsableAtInsertionPoint(state, insertionBlock, level))) ||
+                           !_isValueUsableAtInsertionPoint(state, insertionBlock, coordinate))) ||
+        (!isFetchLevel && !isGather && intrinsicID == llvm::Intrinsic::not_intrinsic) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, texture))
     {
         return SLANG_E_INVALID_ARG;
@@ -4552,6 +4561,46 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
             llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
         *outValue =
             reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(intrinsic, arguments));
+        return SLANG_OK;
+    }
+
+    if (isGather)
+    {
+        const bool isFloat = operation->elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+        const char* componentNames[] = {"r", "g", "b", "a"};
+        const char* dataType = isFloat ? "f32"
+                               : operation->elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                                   ? "s32"
+                                   : "u32";
+        const std::string assembly = std::string("tld4.") + componentNames[operation->component] +
+                                     ".2d.v4." + dataType +
+                                     ".f32 {$0, $1, $2, $3}, [$4, {$5, $6}];";
+        const std::string constraints = isFloat ? "=f,=f,=f,=f,l,f,f" : "=r,=r,=r,=r,l,f,f";
+        arguments.push_back(state->builder.CreateExtractElement(coordinate, uint64_t(0)));
+        arguments.push_back(state->builder.CreateExtractElement(coordinate, uint64_t(1)));
+
+        llvm::Type* physicalScalarType = isFloat ? floatType : int32Type;
+        llvm::SmallVector<llvm::Type*, 3> argumentTypes;
+        for (llvm::Value* argument : arguments)
+            argumentTypes.push_back(argument->getType());
+        llvm::StructType* physicalResultType = llvm::StructType::get(
+            state->context,
+            {physicalScalarType, physicalScalarType, physicalScalarType, physicalScalarType});
+        llvm::FunctionType* functionType =
+            llvm::FunctionType::get(physicalResultType, argumentTypes, false);
+        llvm::InlineAsm* inlineAsm =
+            llvm::InlineAsm::get(functionType, assembly, constraints, false);
+        llvm::CallInst* call = state->builder.CreateCall(inlineAsm, arguments);
+        llvm::Type* resultType = llvm::FixedVectorType::get(physicalScalarType, 4);
+        llvm::Value* result = llvm::UndefValue::get(resultType);
+        for (uint32_t lane = 0; lane < 4; ++lane)
+        {
+            result = state->builder.CreateInsertElement(
+                result,
+                state->builder.CreateExtractValue(call, {lane}),
+                lane);
+        }
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
         return SLANG_OK;
     }
 

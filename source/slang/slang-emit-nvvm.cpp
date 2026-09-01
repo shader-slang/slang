@@ -3193,6 +3193,93 @@ bool _resolveNVVMTextureFetchGenericAsm(
     return true;
 }
 
+// Maps one complete ordinary CUDA-prelude Texture2D Gather helper to a typed four-lane gather.
+// Consider `Texture2D<float3>.GatherGreen(s, uv)`: the producer emits a float4-result helper with
+// component one even though the texture declares three lanes. CUDA has no offset form, so the
+// generated offset overload deliberately shares the same assembly; this resolver still proves its
+// otherwise-ignored signed int2 parameter.
+bool _resolveNVVMTextureGatherGenericAsm(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMResolvedTextureOperation& outOperation)
+{
+    outOperation = {};
+    if (!genericAsm || !function || genericAsm->getOperandCount() != 1 ||
+        (function->getParamCount() != 3 && function->getParamCount() != 4))
+    {
+        return false;
+    }
+
+    uint32_t component = 0;
+    const UnownedStringSlice assembly = genericAsm->getAsm();
+    if (assembly == toSlice("tex2Dgather<$TR>($0, ($2).x, ($2).y, 0)"))
+        component = 0;
+    else if (assembly == toSlice("tex2Dgather<$TR>($0, ($2).x, ($2).y, 1)"))
+        component = 1;
+    else if (assembly == toSlice("tex2Dgather<$TR>($0, ($2).x, ($2).y, 2)"))
+        component = 2;
+    else if (assembly == toSlice("tex2Dgather<$TR>($0, ($2).x, ($2).y, 3)"))
+        component = 3;
+    else
+        return false;
+
+    IRParam* texture = function->getFirstParam();
+    IRParam* sampler = texture->getNextParam();
+    IRParam* coordinate = sampler->getNextParam();
+    NVVMReadOnlyTextureType textureType;
+    auto resultType = as<IRVectorType>(function->getResultType());
+    auto resultLaneCount = resultType ? as<IRIntLit>(resultType->getElementCount()) : nullptr;
+    auto coordinateType = as<IRVectorType>(coordinate->getDataType());
+    auto coordinateLaneCount =
+        coordinateType ? as<IRIntLit>(coordinateType->getElementCount()) : nullptr;
+    IRType* textureScalarType = nullptr;
+    if (getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType))
+    {
+        textureScalarType = textureType.textureType->getElementType();
+        if (auto textureVectorType = as<IRVectorType>(textureScalarType))
+            textureScalarType = textureVectorType->getElementType();
+    }
+    if (!textureScalarType || textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D ||
+        textureType.isArray || !resultType || !resultLaneCount ||
+        resultLaneCount->getValue() != 4 ||
+        !isTypeEqual(resultType->getElementType(), textureScalarType) ||
+        !asNVVMSupportedSamplerValueType(sampler->getDataType()) || !coordinateType ||
+        !coordinateLaneCount || coordinateLaneCount->getValue() != 2 ||
+        !isNVVMFloat32Type(coordinateType->getElementType()))
+    {
+        return false;
+    }
+
+    if (IRParam* offset = coordinate->getNextParam())
+    {
+        bool offsetIsSigned = false;
+        uint32_t offsetLaneCount = 0;
+        if (offset->getNextParam() ||
+            !asNVVMSupportedI32VectorType(
+                offset->getDataType(),
+                &offsetIsSigned,
+                &offsetLaneCount) ||
+            !offsetIsSigned || offsetLaneCount != 2)
+        {
+            return false;
+        }
+    }
+
+    SlangNVVMValueTypeDesc resultElementType = textureType.elementType;
+    resultElementType.laneCount = 4;
+    outOperation.operations[0] = {
+        SLANG_NVVM_TEXTURE_OP_GATHER,
+        SLANG_NVVM_TEXTURE_SHAPE_2D,
+        0,
+        resultElementType,
+        component,
+    };
+    outOperation.operationCount = 1;
+    outOperation.texture = texture;
+    outOperation.coordinate = coordinate;
+    return true;
+}
+
 // Resolves the finalized CUDA texture dimension helpers. Array helpers deliberately write zero to
 // their final element-count output because that is the behavior encoded by the CUDA prelude.
 bool _resolveNVVMTextureDimensionsGenericAsm(
@@ -3325,6 +3412,7 @@ void _requireTextureOperations(
             SLANG_RELEASE_ASSERT(
                 existing.operation == operation.operation && existing.shape == operation.shape &&
                 existing.isArray == operation.isArray &&
+                existing.component == operation.component &&
                 NVVMSemantics::areSameType(existing.elementType, operation.elementType));
         }
         return;
@@ -8554,6 +8642,11 @@ SlangResult _validateNVVMFunction(
                                  function,
                                  textureOperation))
                         textureDiagnosticName = "integer-coordinate texture fetch level";
+                    else if (_resolveNVVMTextureGatherGenericAsm(
+                                 genericAsm,
+                                 function,
+                                 textureOperation))
+                        textureDiagnosticName = "ordinary Texture2D gather";
                     else if (_resolveNVVMTextureDimensionsGenericAsm(
                                  genericAsm,
                                  function,
@@ -15405,6 +15498,43 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     moduleScope.module,
                                     function,
                                     "texture fetch value return",
+                                    loweredValue));
+                                break;
+                            }
+
+                            if (textureRequirement->operations[0].operation ==
+                                SLANG_NVVM_TEXTURE_OP_GATHER)
+                            {
+                                IRParam* coordinate = texture->getNextParam()->getNextParam();
+                                SlangNVVMValueHandle loweredCoordinate = nullptr;
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    coordinate,
+                                    valueMap,
+                                    typeContext,
+                                    loweredCoordinate));
+                                SlangNVVMValueHandle loweredOperands[] = {
+                                    loweredTexture,
+                                    loweredCoordinate,
+                                };
+                                SlangNVVMValueHandle loweredValue = nullptr;
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    textureRequirement->diagnosticName,
+                                    builder.emitTextureOperation(
+                                        moduleScope.module,
+                                        textureRequirement->operations[0],
+                                        loweredOperands,
+                                        SLANG_COUNT_OF(loweredOperands),
+                                        loweredValue)));
+                                SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    function,
+                                    "texture gather value return",
                                     loweredValue));
                                 break;
                             }
