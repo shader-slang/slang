@@ -523,4 +523,3 @@ jobs:
                   `no current iteration on field ${SPRINT_FIELD}; leaving Sprint unset`);
               }
             }
-
