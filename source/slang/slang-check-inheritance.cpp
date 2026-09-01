@@ -1116,21 +1116,17 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     //         associatedtype Second : IConsumer<Context>;
                     //     }
                     //
-                    // `parseAssocType` stores the three bounds as sibling constraint requirements
-                    // of `ILayout`. While checking `First : IConsumer<Context>`, validating
-                    // `IConsumer`'s generic argument asks for the inheritance of `Context`. This
-                    // loop consequently sees all three siblings. Fully checking the unrelated
-                    // `Second` constraint at that point would validate the same generic argument
-                    // and re-enter the still-in-progress inheritance query for `Context`, before
-                    // its `Context : IContext` facet has been published.
+                    // This loop sees all three constraints while computing the bases of
+                    // `T.Context`. If we call `ensureDecl` on the unrelated `Second` constraint,
+                    // checking `IConsumer<T.Context>` asks for the bases of `T.Context` again.
+                    // The first calculation is not finished yet, so this recursion causes a false
+                    // conformance error.
                     //
-                    // Re-express the constraint through `conformingWitness` so that the
-                    // interface's `This` refers to the concrete lookup source. We can then reject
-                    // the constraint before `ensureDecl` resolves a potentially recursive
-                    // super-type. A directed constraint is relevant only when its subject matches
-                    // `selfType`; an equality constraint is relevant when either endpoint matches.
-                    // In the example, this keeps `Context : IContext` and rejects
-                    // `Second : IConsumer<Context>` while computing `Context`.
+                    // We must therefore find and skip unrelated constraints before `ensureDecl`.
+
+                    // Step 1: Express the constraint in terms of the concrete lookup source.
+                    // For example, change `This.Second` to `T.Second` so that it can be compared
+                    // with `selfType`.
                     DeclRef<GenericTypeConstraintDecl> lookedUpConstraint = constraintDeclRef;
                     if (!SubstitutionSet(lookedUpConstraint).findLookupDeclRef())
                     {
@@ -1141,6 +1137,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                             return;
                     }
 
+                    // Step 2: Compare the constraint's endpoints with `selfType`. A directed
+                    // constraint `A : B` applies only to `A`. An equality `A == B` applies to
+                    // either endpoint.
                     Type* selfCanonical = selfType->getCanonicalType();
                     auto doesEndpointMatchSelfType = [&](Type* endpointType) -> bool
                     {
@@ -1150,10 +1149,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         return endpointType->getCanonicalType()->equals(selfCanonical);
                     };
 
-                    // `tryResolveConstraintTypes` returned true, so the directed constraint's
-                    // subject is available without resolving its super-type. For an equality it
-                    // also made the second endpoint available, because either endpoint can make
-                    // the equality relevant to `selfType`.
+                    // The subject is now resolved. For an equality, both endpoints are resolved.
+                    // A directed constraint's super-type remains unresolved until after this
+                    // relevance check.
                     Type* lookedUpSub = getSub(astBuilder, lookedUpConstraint);
                     SLANG_RELEASE_ASSERT(lookedUpSub);
 
@@ -1164,39 +1162,40 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         SLANG_RELEASE_ASSERT(lookedUpSup);
                     }
 
-                    bool matchOnSub = doesEndpointMatchSelfType(lookedUpSub);
-                    bool matchOnSup = constraintDecl->isEqualityConstraint &&
-                                      doesEndpointMatchSelfType(lookedUpSup);
-                    if (!matchOnSub && !matchOnSup)
+                    bool constraintAppliesToSelf = doesEndpointMatchSelfType(lookedUpSub) ||
+                                                   (constraintDecl->isEqualityConstraint &&
+                                                    doesEndpointMatchSelfType(lookedUpSup));
+
+                    // Step 3: Skip the constraint unless it applies to `selfType`. Only relevant
+                    // constraints are fully checked by `ensureDecl`.
+                    if (!constraintAppliesToSelf)
                         return;
 
                     ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
-                    // Full checking can canonicalize an equality's endpoint order. Read the final
-                    // endpoints and repeat the authoritative match before selecting the base.
-                    lookedUpSub = getSub(astBuilder, lookedUpConstraint);
-                    SLANG_RELEASE_ASSERT(lookedUpSub);
-                    lookedUpSup = getSup(astBuilder, lookedUpConstraint);
+                    Type* baseType = nullptr;
+                    if (constraintDecl->isEqualityConstraint)
+                    {
+                        // Checking an equality may swap its endpoints. Re-read them and use the
+                        // endpoint opposite `selfType` as the base.
+                        lookedUpSub = getSub(astBuilder, lookedUpConstraint);
+                        SLANG_RELEASE_ASSERT(lookedUpSub);
+                        lookedUpSup = getSup(astBuilder, lookedUpConstraint);
 
-                    // A constraint applies to `selfType` when one of its endpoints,
-                    // after substitution, *is* `selfType`. Compare canonical types so
-                    // an endpoint resolved through a concrete witness (e.g. a
-                    // `typealias` binding `FloatElement.DataType -> FloatData`) still
-                    // matches the access. For a subtype constraint `sub : sup` only
-                    // the sub endpoint is meaningful; for an equality constraint
-                    // either endpoint may match (the checker may canonicalize it in
-                    // either order), and the *other* endpoint becomes a base of
-                    // `selfType`. This identity match relies on conformance witnesses
-                    // being canonical -- including that defaulted generic arguments
-                    // have had their witnesses re-rooted; see
-                    // `TryCheckOverloadCandidateConstraints`.
-                    matchOnSub = doesEndpointMatchSelfType(lookedUpSub);
-                    matchOnSup = constraintDecl->isEqualityConstraint &&
-                                 doesEndpointMatchSelfType(lookedUpSup);
-                    if (!matchOnSub && !matchOnSup)
-                        return;
+                        bool selfIsSub = doesEndpointMatchSelfType(lookedUpSub);
+                        bool selfIsSup = doesEndpointMatchSelfType(lookedUpSup);
+                        if (!selfIsSub && !selfIsSup)
+                            return;
 
-                    Type* baseType = matchOnSub ? lookedUpSup : lookedUpSub;
+                        baseType = selfIsSub ? lookedUpSup : lookedUpSub;
+                    }
+                    else
+                    {
+                        // A directed constraint cannot swap its endpoints. Its subject already
+                        // matched `selfType`, so its checked super-type is the base.
+                        baseType = getSup(astBuilder, lookedUpConstraint);
+                    }
+
                     if (!baseType)
                         return;
 
