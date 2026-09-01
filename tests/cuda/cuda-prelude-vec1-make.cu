@@ -10,9 +10,10 @@
 //      ignored on tiers without it.
 //   3. Fast-math transcendental redirects (#12619) — this fixture defines
 //      SLANG_CUDA_ENABLE_FAST_MATH, so testFastMathWrappers only compiles if the
-//      gated `__*f` intrinsic names/arities are correct. slang-test cannot catch a
-//      bad name/arity: the CUDA prelude is emitted as an `#include`, so the `#ifdef`
-//      bodies never appear in slangc's textual output and compile nowhere else.
+//      gated `__*f` intrinsic names/arities are correct. This is dedicated
+//      offline-nvcc coverage of the gated bodies that runs regardless of whether
+//      slang-test has an NVRTC tier available (the cuda-fp-mode-fast.slang PTX lanes
+//      also exercise the redirect through NVRTC, but auto-skip where NVRTC is absent).
 // __half is included to pin the known-good sibling pattern.
 
 #define SLANG_CUDA_ENABLE_HALF 1

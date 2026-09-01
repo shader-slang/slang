@@ -20,7 +20,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     outBuf[0] = cos(x) + sin(x) + exp(x) + pow(x, 2.0f) + log2(x);
 }
 
-// The define must precede the prelude include so the prelude's #ifdef sees it.
+// The define must precede the prelude include so the prelude's `#if` gate sees it.
 //FAST: #define SLANG_CUDA_ENABLE_FAST_MATH
 //FAST: slang-cuda-prelude.h
 

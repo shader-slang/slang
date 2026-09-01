@@ -2054,8 +2054,8 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_round(float f)
 {
     return ::roundf(f);
 }
-// SLANG_CUDA_ENABLE_FAST_MATH is emitted into the CUDA output by Slang's CUDA
-// back-end under `-fp-mode fast`. When defined, the transcendental wrappers that
+// SLANG_CUDA_ENABLE_FAST_MATH is emitted (as `1`) into the CUDA output by Slang's
+// CUDA back-end under `-fp-mode fast`. When nonzero, the transcendental wrappers that
 // have an approximate `__*f` CUDA intrinsic redirect to it, trading accuracy for a
 // much smaller instruction count; otherwise they use the precise `::` form. Only
 // the wrappers with such an intrinsic are gated (sin/cos/sincos/tan/log/log2/log10/
