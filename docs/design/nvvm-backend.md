@@ -7431,6 +7431,19 @@ This removed 471 lines from the builder facade and 43 more from the emitter with
 provider ABI revision 34. Frozen corpus v1 remains exactly 452/427 at 417/417/417 O0/O3/both;
 discovery remains 82/72 at 72/72/72.
 
+### Slice 181: Explicit NVVM-ready IR
+
+The direct route now has a named `legalizeIRForNVVM` boundary after common linking and late bitcast
+normalization. It folds CUDA layout queries, removes the canonical read-none `unmodified` source
+check, discharges CUDA's compile-time `RequireComputeDerivative` marker, runs DCE, and verifies that
+none of those representation-only operations survives to preflight. Layout-query recognition and
+dead aggregate-initializer cleanup moved out of the emitter.
+
+`RequirePrelude` deliberately remains unsupported because its text can define macros used by a
+following CUDA GenericAsm; deleting it would lose live semantics. Frozen corpus v1 advances to
+418/418/418 through `matrix-double`, while discovery remains 72/72/72. Provider ABI revision 34 is
+unchanged.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

@@ -98,6 +98,7 @@
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
 #include "slang-ir-missing-return.h"
+#include "slang-ir-nvvm-legalize.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-redundancy-removal.h"
@@ -3649,7 +3650,7 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    SLANG_RETURN_ON_FAIL(foldNVVMCompileTimeLayoutQueries(this, linkedIR));
+    SLANG_RETURN_ON_FAIL(legalizeIRForNVVM(this, linkedIR));
     NVVMOperationRequirements requirements;
     SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requirements));
 
