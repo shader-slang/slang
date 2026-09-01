@@ -1080,6 +1080,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     [&](DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
                 {
                     auto constraintDecl = constraintDeclRef.getDecl();
+                    bool isEqualityConstraint = constraintDecl->isEqualityConstraint;
 
                     // Skip a constraint that is currently being checked: resolving
                     // a multi-level subject (e.g. `This.TA.TB`) requires the
@@ -1149,22 +1150,24 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         return endpointType->getCanonicalType()->equals(selfCanonical);
                     };
 
-                    // The subject is now resolved. For an equality, both endpoints are resolved.
-                    // A directed constraint's super-type remains unresolved until after this
-                    // relevance check.
+                    // `tryResolveConstraintTypes` has resolved the subject. That is enough to
+                    // filter a directed constraint because only its subject can match `selfType`.
+                    // Its super-type is intentionally left for `ensureDecl`: resolving an
+                    // unrelated super-type here can re-enter the inheritance query described
+                    // above.
                     Type* lookedUpSub = getSub(astBuilder, lookedUpConstraint);
                     SLANG_RELEASE_ASSERT(lookedUpSub);
 
-                    Type* lookedUpSup = nullptr;
-                    if (constraintDecl->isEqualityConstraint)
+                    bool constraintAppliesToSelf = doesEndpointMatchSelfType(lookedUpSub);
+                    if (!constraintAppliesToSelf && isEqualityConstraint)
                     {
-                        lookedUpSup = getSup(astBuilder, lookedUpConstraint);
+                        // If the left-hand side of an equality is not `selfType`, check the
+                        // right-hand side as well. `tryResolveConstraintTypes` has resolved both
+                        // sides.
+                        Type* lookedUpSup = getSup(astBuilder, lookedUpConstraint);
                         SLANG_RELEASE_ASSERT(lookedUpSup);
+                        constraintAppliesToSelf = doesEndpointMatchSelfType(lookedUpSup);
                     }
-
-                    bool constraintAppliesToSelf = doesEndpointMatchSelfType(lookedUpSub) ||
-                                                   (constraintDecl->isEqualityConstraint &&
-                                                    doesEndpointMatchSelfType(lookedUpSup));
 
                     // Step 3: Skip the constraint unless it applies to `selfType`. Only relevant
                     // constraints are fully checked by `ensureDecl`.
@@ -1174,20 +1177,20 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
                     Type* baseType = nullptr;
-                    if (constraintDecl->isEqualityConstraint)
+                    if (isEqualityConstraint)
                     {
                         // Checking an equality may swap its endpoints. Re-read them and use the
                         // endpoint opposite `selfType` as the base.
-                        lookedUpSub = getSub(astBuilder, lookedUpConstraint);
-                        SLANG_RELEASE_ASSERT(lookedUpSub);
-                        lookedUpSup = getSup(astBuilder, lookedUpConstraint);
+                        Type* checkedSub = getSub(astBuilder, lookedUpConstraint);
+                        Type* checkedSup = getSup(astBuilder, lookedUpConstraint);
+                        SLANG_RELEASE_ASSERT(checkedSub);
 
-                        bool selfIsSub = doesEndpointMatchSelfType(lookedUpSub);
-                        bool selfIsSup = doesEndpointMatchSelfType(lookedUpSup);
+                        bool selfIsSub = doesEndpointMatchSelfType(checkedSub);
+                        bool selfIsSup = doesEndpointMatchSelfType(checkedSup);
                         if (!selfIsSub && !selfIsSup)
                             return;
 
-                        baseType = selfIsSub ? lookedUpSup : lookedUpSub;
+                        baseType = selfIsSub ? checkedSup : checkedSub;
                     }
                     else
                     {
