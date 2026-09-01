@@ -123,8 +123,17 @@ reasons (e.g., a security fix or feature addition touching many lines).
 Formatting:
 
 - Use four-space indentation for C, C++, headers, and Slang files.
-- Run `./extras/formatting.sh` before committing to apply rules from `.clang-format`
-  and `.editorconfig`.
+- Run `./extras/formatting.sh --modified --no-version-check` and then
+  `./extras/formatting.sh --modified --md --no-version-check` before committing to apply rules
+  from `.clang-format` and `.editorconfig`. `--no-version-check` is included because the version
+  ranges are narrow — a distro clang-format 18.1.3 is rejected as "too new" and the script then
+  formats nothing; drop it if you want the exact versions CI uses. Both are needed
+  because a type flag such as `--md` narrows the run to that type rather than adding to it, and
+  markdown is the one formatter a flagless run does not enable. Two cases neither command covers,
+  each exiting 0 having formatted nothing: untracked files are invisible to `--modified` (it is
+  `git diff HEAD`), so name a new file (`./extras/formatting.sh --no-version-check -- path/to/new-file`); and
+  `.slang` files have no formatter configured, so naming one selects nothing. Run with no
+  arguments, the script prints its help text and exits 0 without formatting anything.
 - Follow Allman braces, a 100-column limit, left-aligned pointers, and final newlines.
 
 Conventions:
