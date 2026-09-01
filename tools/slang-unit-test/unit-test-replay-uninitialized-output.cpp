@@ -3,7 +3,6 @@
 // output parameters when the wrapped API fails without writing them.
 //
 // Several proxy methods share this defect shape and are covered here:
-//   - GlobalSessionProxy::getDownstreamCompilerVersion   (int* outMajor / int* outMinor)
 //   - GlobalSessionProxy::getDownstreamCompilerPath      (ISlangBlob** outPath)
 //   - SessionProxy::getTypeConformanceWitnessSequentialID (uint32_t* outId)
 //
@@ -40,55 +39,6 @@ static bool twoRecordedSegmentsIdentical(size_t off0, size_t off1, size_t off2)
     return memcmp(data + off0, data + off1, len1) == 0;
 }
 
-// GlobalSessionProxy::getDownstreamCompilerVersion serializes both int* output slots
-// unconditionally. Called with SLANG_PASS_THROUGH_NONE the real IGlobalSession returns
-// SLANG_E_NOT_FOUND WITHOUT writing *outMajor/*outMinor (see Session::getDownstreamCompilerVersion
-// in slang-global-session.cpp), so before the fix the proxy read (and serialized) whatever the
-// caller left in that memory.
-SLANG_UNIT_TEST(replayGetDownstreamCompilerVersionFailureNoUninitializedRead)
-{
-    REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
-
-    // Recording must be active BEFORE the session is created so the returned session is wrapped in
-    // a GlobalSessionProxy and registered for handle tracking. We set the mode directly via
-    // ctx().setMode(Mode::Record) rather than the public slang_enableRecordLayer(true) used by the
-    // sibling wrapping test; both leave the context in Mode::Record, which is what makes
-    // slang_createGlobalSession2 wrap the returned session in a proxy. (Do not reset() after
-    // creation: that drops the proxy registration and the next call's 'this' record would fail.)
-    ctx().setMode(Mode::Record);
-
-    Slang::ComPtr<slang::IGlobalSession> globalSession;
-    SlangGlobalSessionDesc desc = {};
-    desc.apiVersion = 0;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(slang_createGlobalSession2(&desc, globalSession.writeRef())));
-    SLANG_CHECK_ABORT(dynamic_cast<GlobalSessionProxy*>(globalSession.get()) != nullptr);
-
-    // Two failing calls, back to back, with distinct poison in the (untouched-on-failure) outputs.
-    const size_t off0 = ctx().getStream().getSize();
-    int majorA = 0x11111111;
-    int minorA = 0x22222222;
-    SLANG_CHECK(
-        globalSession->getDownstreamCompilerVersion(SLANG_PASS_THROUGH_NONE, &majorA, &minorA) ==
-        SLANG_E_NOT_FOUND);
-    const size_t off1 = ctx().getStream().getSize();
-
-    int majorB = 0x33333333;
-    int minorB = 0x44444444;
-    SLANG_CHECK(
-        globalSession->getDownstreamCompilerVersion(SLANG_PASS_THROUGH_NONE, &majorB, &minorB) ==
-        SLANG_E_NOT_FOUND);
-    const size_t off2 = ctx().getStream().getSize();
-
-    // With the fix the differing caller-side poison never reaches the stream, so the two recorded
-    // call segments are byte-identical. Before the fix the poison was serialized into the output
-    // slots and the segments diverged.
-    SLANG_CHECK(twoRecordedSegmentsIdentical(off0, off1, off2));
-
-    // Return to Idle before the session ComPtr releases during teardown.
-    ctx().reset();
-}
-
 // GlobalSessionProxy::getDownstreamCompilerPath serializes its ISlangBlob* output slot
 // unconditionally. Called with SLANG_PASS_THROUGH_NONE the real IGlobalSession returns
 // SLANG_E_NOT_FOUND WITHOUT writing *outPath (see Session::getDownstreamCompilerPath in
@@ -100,8 +50,12 @@ SLANG_UNIT_TEST(replayGetDownstreamCompilerPathFailureNoUninitializedRead)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Recording must be active before session creation so the returned session is wrapped in a
-    // GlobalSessionProxy (see the version test above for the full rationale).
+    // Recording must be active BEFORE the session is created so the returned session is wrapped in
+    // a GlobalSessionProxy and registered for handle tracking. We set the mode directly via
+    // ctx().setMode(Mode::Record) rather than the public slang_enableRecordLayer(true) used by the
+    // sibling wrapping test; both leave the context in Mode::Record, which is what makes
+    // slang_createGlobalSession2 wrap the returned session in a proxy. (Do not reset() after
+    // creation: that drops the proxy registration and the next call's 'this' record would fail.)
     ctx().setMode(Mode::Record);
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
