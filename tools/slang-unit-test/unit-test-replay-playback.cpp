@@ -778,13 +778,21 @@ SLANG_UNIT_TEST(replayContextOrphanSweepKeepsEntryPointRetention)
 // A minimal user-supplied ISlangFileSystem, used to drive createSession down the
 // custom-file-system arms of GlobalSessionProxy::createSession that the default
 // tests never reach. loadFile is stubbed because these tests create a session but
-// compile nothing; castAs returns null to report that this double implements no
-// extended or mutable file-system interface -- the wrapper probes for those via
-// castAs while wrapping, and a null result means it is treated as a plain
-// read-only file system. s_liveCount lets a test observe that every reference the
-// createSession record/playback paths take on a user file system is also released:
-// a residual reference leaves the count above zero after teardown, which a leak
-// sanitizer would flag but a Debug run would otherwise miss.
+// compile nothing.
+//
+// The double deliberately denies the extended file-system interfaces
+// (ISlangFileSystemExt / ISlangMutableFileSystem) on *both* probe paths that the
+// wrap machinery consults, and the two must agree: tryWrap() selects the proxy
+// overload by queryInterface (proxy-base.cpp), and the chosen
+// MutableFileSystemProxy(ISlangFileSystem*) constructor then re-probes via castAs
+// (proxy-mutable-file-system.h) to decide whether it may forward extended
+// operations. Denying on only one path would be internally inconsistent, so both
+// queryInterface and castAs report a plain read-only ISlangFileSystem here.
+//
+// s_liveCount lets a test observe that every reference the createSession
+// record/playback paths take on a user file system is also released: a residual
+// reference leaves the count above zero after teardown, which a leak sanitizer
+// would flag but a Debug run would otherwise miss.
 class TestFileSystem : public ISlangFileSystem
 {
 public:
@@ -795,9 +803,9 @@ public:
     queryInterface(SlangUUID const& uuid, void** outObject) override
     {
         // Single-inheritance chain (ISlangFileSystem : ISlangCastable : ISlangUnknown),
-        // so `this` is the canonical identity for all three; anything else (e.g. the
-        // Ext / Mutable file-system interfaces) is genuinely unsupported, so createSession
-        // wraps us as a plain read-only ISlangFileSystem.
+        // so `this` is the canonical identity for all three; the extended file-system
+        // interfaces are denied here -- this is the first of the two probe paths the
+        // wrapper consults (see the class comment on why both must agree).
         if (uuid == ISlangFileSystem::getTypeGuid() || uuid == ISlangCastable::getTypeGuid() ||
             uuid == ISlangUnknown::getTypeGuid())
         {
@@ -820,9 +828,10 @@ public:
 
     SLANG_NO_THROW void* SLANG_MCALL castAs(SlangUUID const& uuid) override
     {
-        // Returning null reports that this double implements no extended or mutable
-        // file-system interface; the createSession wrapper probes for those via
-        // castAs while wrapping and treats null as a plain read-only file system.
+        // The second probe path (see the class comment): returning null keeps castAs
+        // consistent with queryInterface's denial of the extended/mutable file-system
+        // interfaces, so the MutableFileSystemProxy wrapper treats this double as a
+        // plain read-only file system.
         SLANG_UNUSED(uuid);
         return nullptr;
     }
@@ -850,16 +859,21 @@ std::atomic<int> TestFileSystem::s_liveCount{0};
 // kCustomFileSystemHandle branch that wraps a fresh per-call ReplayNullFileSystem
 // as the stand-in file system and takes the guarded owning-reference release() in
 // GlobalSessionProxy::createSession -- an arm no default-file-system test reaches.
-// The final s_liveCount == 0 check tracks the user-supplied TestFileSystem (the
-// write side): it confirms the write kCustomFileSystemHandle arm balances the
-// reference it takes on that object. The playback stand-in (ReplayNullFileSystem)
-// is a separate object not counted by s_liveCount -- its per-instance refcount
-// frees it when the wrapper proxy dies, which the leak sanitizer covers.
-// replayContextCustomFileSystemRegisteredSessionPlayback below is the regression
-// check for the registered-reuse leak. The
-// orphan-count check pins that the recreated session was noted as an orphaned
-// playback proxy, so a regression that stopped the dispatcher noting orphans fails
-// here rather than only surfacing as a sanitizer leak.
+//
+// The test pins three things independently:
+//   * TestFileSystem::s_liveCount back to 0 at teardown tracks the user-supplied
+//     file system (the write side): the write kCustomFileSystemHandle arm balances
+//     the reference it takes on that object.
+//   * ReplayNullFileSystem's live count (testsOnlyReplayNullFileSystemLiveCount)
+//     tracks the playback stand-in: it is created during executeAll and self-deleted
+//     when its wrapper proxy dies. This gives the #12865 stand-in leak fix a
+//     deterministic guard in every build, not only under the leak sanitizer.
+//   * The orphan-count check confirms the recreated session was noted as an orphaned
+//     playback proxy, so a regression that stopped the dispatcher noting orphans
+//     fails here rather than only surfacing as a sanitizer leak.
+//
+// replayContextCustomFileSystemRegisteredSessionPlayback below is the dedicated
+// regression check for the registered-reuse leak (#12470).
 SLANG_UNIT_TEST(replayContextCustomFileSystemSessionPlayback)
 {
     REPLAY_TEST;
@@ -907,6 +921,13 @@ SLANG_UNIT_TEST(replayContextCustomFileSystemSessionPlayback)
     ctx().executeAll();
     ctx().disable();
 
+    // Playback took the reading kCustomFileSystemHandle arm, so a stand-in
+    // ReplayNullFileSystem was created and is still held by the recreated session's
+    // file-system proxy. This assertion directly guards the #12865 fix: reverting
+    // the arm to the old, untracked new NULLFileSystem() would leave this counter at
+    // 0 and fail here.
+    SLANG_CHECK(SlangRecord::testsOnlyReplayNullFileSystemLiveCount() >= 1);
+
     // The session was recreated by playback and noted as an orphaned proxy.
     ISlangUnknown* playedBackSessionUnk = ctx().getProxy(recordedSessionHandle);
     SLANG_CHECK(playedBackSessionUnk != nullptr);
@@ -920,6 +941,11 @@ SLANG_UNIT_TEST(replayContextCustomFileSystemSessionPlayback)
     recordedSession.setNull();
     recordedGlobalSession.setNull();
     ctx().reset();
+    // Draining the context destroyed the recreated session's file-system proxy,
+    // which released the stand-in to a zero refcount and freed it. A non-zero count
+    // here means a ReplayNullFileSystem was created but never destroyed -- i.e. the
+    // stand-in leaked.
+    SLANG_CHECK(SlangRecord::testsOnlyReplayNullFileSystemLiveCount() == 0);
     SLANG_CHECK(TestFileSystem::s_liveCount == 1); // only fileSystemPtr remains
     fileSystemPtr.setNull();
     SLANG_CHECK(TestFileSystem::s_liveCount == 0);

@@ -14,6 +14,16 @@ namespace SlangRecord
 {
 using namespace Slang;
 
+/// Live-instance count of `ReplayNullFileSystem`, for the unit test's deterministic
+/// #12865 leak guard. Exported (`SLANG_API`, default visibility) on purpose: the
+/// build uses `-fvisibility=hidden`, and the stand-in is constructed/destroyed inside
+/// libslang (from `createSession`'s playback arm) while the test observes the count
+/// from the separately-linked `slang-unit-test-tool` module. A plain (hidden) class
+/// static would resolve to a *different* copy in each module and always read zero
+/// from the test; a single exported symbol makes both modules share one counter (the
+/// same reason `wrapObject`/`ReplayContext::get` are `SLANG_API`).
+SLANG_API std::atomic<int>& testsOnlyReplayNullFileSystemLiveCount();
+
 /// A properly reference-counted no-op file system used as the replay stand-in
 /// for a recorded custom file system on the reading `kCustomFileSystemHandle`
 /// arm of `createSession` (see below).
@@ -27,9 +37,20 @@ using namespace Slang;
 /// final release, so a fresh instance can be created for each replayed custom-FS
 /// session -- giving each a distinct proxy registration, which preserves the
 /// record/playback handle sequence -- without leaking.
+///
+/// Only `addRef`/`release` are overridden; `queryInterface` (from the
+/// `SLANG_IUNKNOWN_QUERY_INTERFACE` macro) and `castAs` are inherited from
+/// `NULLFileSystem` unchanged. That is deliberate and load-bearing: the inherited
+/// `queryInterface` calls `addRef()` *virtually*, so the reference the wrapper takes
+/// while wrapping lands on this override's `m_refCount` rather than the base's no-op
+/// counter. Inheriting the rest is therefore safe -- the only behaviour that must
+/// differ from the singleton base is the reference counting, and it does.
 class ReplayNullFileSystem : public NULLFileSystem
 {
 public:
+    ReplayNullFileSystem() { ++testsOnlyReplayNullFileSystemLiveCount(); }
+    ~ReplayNullFileSystem() SLANG_OVERRIDE { --testsOnlyReplayNullFileSystemLiveCount(); }
+
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return ++m_refCount; }
     SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
     {
@@ -123,12 +144,12 @@ public:
                 }
                 else
                 {
-                    // wrapObject() -> tryWrap() takes ownership of one reference on
-                    // the file system (it calls desc.fileSystem->release()), so
-                    // pre-add one here for it to consume; otherwise it would consume
-                    // the caller's own reference. The already-registered branch above
-                    // needs no such addRef: wrapObject() there returns the existing
-                    // proxy and never releases the file system.
+                    // First wrap of this file system: wrapObject() -> tryWrap() takes
+                    // ownership of one reference on it (it calls
+                    // desc.fileSystem->release()), so pre-add one here for it to
+                    // consume; otherwise it would consume the caller's own reference.
+                    // (The already-registered branch above owes no such addRef -- see
+                    // its comment.)
                     desc.fileSystem->addRef();
                     desc2.fileSystem = wrapObject(desc.fileSystem);
                     handle = kCustomFileSystemHandle;
