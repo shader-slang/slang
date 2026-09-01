@@ -42,7 +42,7 @@ Note: If pip install fails with externally-managed-environment error, use `--bre
 Homebrew's default `clang-format` and `gersemi` formulas track upstream latest, which is usually newer than the pinned versions above. Install the pinned versions explicitly:
 
 ```bash
-brew install llvm@17 prettier shfmt
+brew install llvm@17 python3 prettier shfmt
 export PATH="$(brew --prefix llvm@17)/bin:$PATH"
 python3 -m pip install gersemi==0.21.0
 ```
