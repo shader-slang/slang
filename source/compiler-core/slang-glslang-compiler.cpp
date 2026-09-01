@@ -533,8 +533,9 @@ SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersio
 
 SlangResult GlslangDownstreamCompiler::getPath(slang::IBlob** outPath)
 {
-    // Recover the path from whichever compile entry point was resolved, matching the fallback
-    // order getVersionString uses to pick a symbol in this library.
+    // All four m_compile_1_x symbols live in the same shared library, so any resolved one yields
+    // the same path; this fallback only needs to pick a non-null symbol -- the order is immaterial
+    // for path recovery (unlike in _invoke, where it selects the best compile ABI).
     void* symbol = nullptr;
     if (m_compile_1_3)
         symbol = (void*)m_compile_1_3;

@@ -956,8 +956,8 @@ struct IGlobalSessionProbe : IGlobalSession
         lastSlot = 32;
         return SLANG_OK;
     }
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    getDownstreamCompilerPath(SlangPassThrough, ISlangBlob**) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL getDownstreamCompilerPath(SlangPassThrough, ISlangBlob**)
+        SLANG_OVERRIDE
     {
         lastSlot = 33;
         return SLANG_OK;

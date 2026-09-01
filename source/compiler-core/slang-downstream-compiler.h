@@ -400,9 +400,11 @@ public:
         0x4f8c,
         {0xa6, 0x68, 0x10, 0x6f, 0xfd, 0xd5, 0x65, 0xc5})
 
-    /// Get the on-disk path of the loaded compiler library as a blob. Returns
-    /// SLANG_E_NOT_AVAILABLE when the path cannot be recovered (e.g. WASM, which has no
-    /// shared-library introspection).
+    /// Get the on-disk path of the loaded compiler library as a blob. `outPath` must be non-null
+    /// and, on SLANG_OK, receives the path; it is left untouched on any failure return. Returns
+    /// SLANG_E_NOT_AVAILABLE when this compiler has no recoverable shared-library path -- either
+    /// because it is not backed by a shared library at all (executable-based command-line
+    /// compilers, Metal) or because the platform has no shared-library introspection (e.g. WASM).
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) = 0;
 };
 
@@ -417,10 +419,11 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // IDownstreamCompilerPathProvider. Default: no recoverable path (executable-based command-line
-    // compilers, Metal). Shared-library compilers override this.
+    // compilers, Metal). Shared-library compilers override this. Leaves *outPath untouched on this
+    // failure return, matching the contract getPathFromSymbol and the public API document.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) SLANG_OVERRIDE
     {
-        *outPath = nullptr;
+        SLANG_UNUSED(outPath);
         return SLANG_E_NOT_AVAILABLE;
     }
 

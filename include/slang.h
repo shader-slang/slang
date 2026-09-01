@@ -4388,11 +4388,14 @@ struct IGlobalSession : public ISlangUnknown
     no such path and returns SLANG_E_NOT_AVAILABLE, which the client must keep distinct from
     SLANG_E_NOT_FOUND (the compiler was not located at all).
     @param passThrough The downstream compiler to query (e.g. SLANG_PASS_THROUGH_NVRTC).
-    @param outPath Receives the resolved library path as a blob. Set only on SLANG_OK.
+    @param outPath Must be non-null. On SLANG_OK receives the resolved library path as a blob; left
+    untouched on any failure return.
     @return SLANG_OK if the compiler was located, loaded, and its path recovered.
     SLANG_E_NOT_FOUND if the compiler could not be located or loaded (and likewise for
     SLANG_PASS_THROUGH_NONE or an out-of-range value). SLANG_E_NOT_AVAILABLE if the compiler was
-    loaded but exposes no recoverable on-disk path. */
+    loaded but has no recoverable on-disk path -- it is not backed by a shared library (an
+    executable-based command-line compiler such as Clang/GCC/VS, or Metal) or the platform has no
+    shared-library introspection (e.g. WASM). */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getDownstreamCompilerPath(SlangPassThrough passThrough, ISlangBlob** outPath) = 0;
 };

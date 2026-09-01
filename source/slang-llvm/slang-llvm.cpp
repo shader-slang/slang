@@ -547,6 +547,10 @@ SlangResult LLVMDownstreamCompiler::getPath(slang::IBlob** outPath)
     // Recover the slang-llvm shared library's own path from an exported symbol, the same module
     // getVersionString identifies for its timestamp. This is the library a client would load to
     // reach the LLVM-backed downstream compiler.
+    //
+    // This mirrors DownstreamCompilerBase::getPathFromSymbol, but cannot reuse it: this compiler is
+    // built into the separate prebuilt slang-llvm module and deliberately does not derive
+    // DownstreamCompilerBase, so the helper is not reachable across the module boundary.
     String path =
         SharedLibraryUtils::getSharedLibraryFileName((void*)createLLVMDownstreamCompiler_V4);
     if (path.getLength() == 0)

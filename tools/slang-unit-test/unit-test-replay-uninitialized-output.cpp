@@ -2,8 +2,9 @@
 // Regression tests for issue #11865: the record layer must not read uninitialized caller memory for
 // output parameters when the wrapped API fails without writing them.
 //
-// Two proxy methods had this defect and are both covered here:
+// Several proxy methods share this defect shape and are covered here:
 //   - GlobalSessionProxy::getDownstreamCompilerVersion   (int* outMajor / int* outMinor)
+//   - GlobalSessionProxy::getDownstreamCompilerPath      (ISlangBlob** outPath)
 //   - SessionProxy::getTypeConformanceWitnessSequentialID (uint32_t* outId)
 //
 // Each proxy serializes its output slot(s) unconditionally, because the record stream has a fixed
@@ -82,6 +83,52 @@ SLANG_UNIT_TEST(replayGetDownstreamCompilerVersionFailureNoUninitializedRead)
     // With the fix the differing caller-side poison never reaches the stream, so the two recorded
     // call segments are byte-identical. Before the fix the poison was serialized into the output
     // slots and the segments diverged.
+    SLANG_CHECK(twoRecordedSegmentsIdentical(off0, off1, off2));
+
+    // Return to Idle before the session ComPtr releases during teardown.
+    ctx().reset();
+}
+
+// GlobalSessionProxy::getDownstreamCompilerPath serializes its ISlangBlob* output slot
+// unconditionally. Called with SLANG_PASS_THROUGH_NONE the real IGlobalSession returns
+// SLANG_E_NOT_FOUND WITHOUT writing *outPath (see Session::getDownstreamCompilerPath in
+// slang-global-session.cpp), so the same uninitialized-read defect applies. Here the output is a
+// COM pointer, so a regression would serialize an uninitialized ISlangBlob* rather than a stray
+// int; recording twice with distinct poison pointers and byte-comparing confirms the redirect.
+SLANG_UNIT_TEST(replayGetDownstreamCompilerPathFailureNoUninitializedRead)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    // Recording must be active before session creation so the returned session is wrapped in a
+    // GlobalSessionProxy (see the version test above for the full rationale).
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc desc = {};
+    desc.apiVersion = 0;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(slang_createGlobalSession2(&desc, globalSession.writeRef())));
+    SLANG_CHECK_ABORT(dynamic_cast<GlobalSessionProxy*>(globalSession.get()) != nullptr);
+
+    // Two failing calls, back to back, with distinct poison in the (untouched-on-failure) outPath.
+    // outPath is a raw ISlangBlob* out-param, so we poison it directly rather than via a ComPtr.
+    const size_t off0 = ctx().getStream().getSize();
+    ISlangBlob* pathA =
+        reinterpret_cast<ISlangBlob*>(static_cast<uintptr_t>(0x1111111111111111ull));
+    SLANG_CHECK(
+        globalSession->getDownstreamCompilerPath(SLANG_PASS_THROUGH_NONE, &pathA) ==
+        SLANG_E_NOT_FOUND);
+    const size_t off1 = ctx().getStream().getSize();
+
+    ISlangBlob* pathB =
+        reinterpret_cast<ISlangBlob*>(static_cast<uintptr_t>(0x2222222222222222ull));
+    SLANG_CHECK(
+        globalSession->getDownstreamCompilerPath(SLANG_PASS_THROUGH_NONE, &pathB) ==
+        SLANG_E_NOT_FOUND);
+    const size_t off2 = ctx().getStream().getSize();
+
+    // With the fix the differing poison pointers never reach the stream, so the two recorded call
+    // segments are byte-identical. Before the fix the proxy serialized the caller's poison pointer.
     SLANG_CHECK(twoRecordedSegmentsIdentical(off0, off1, off2));
 
     // Return to Idle before the session ComPtr releases during teardown.

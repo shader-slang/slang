@@ -308,9 +308,14 @@ SlangResult Session::getDownstreamCompilerVersion(
 
 SlangResult Session::getDownstreamCompilerPath(SlangPassThrough inPassThrough, ISlangBlob** outPath)
 {
+    // getPath dereferences outPath unconditionally to write the result, so a null argument is a
+    // hard programming error rather than a runtime not-found condition (unlike the optional
+    // out-params of getDownstreamCompilerVersion). Fail loudly on out-of-contract input.
+    SLANG_ASSERT(outPath);
+
     // Validate at the public boundary exactly as getDownstreamCompilerVersion does: only a real
-    // (non-None), in-range pass-through can name a loadable compiler, and getOrLoadDownstreamCompiler
-    // indexes per-type arrays by the enum value.
+    // (non-None), in-range pass-through can name a loadable compiler, and
+    // getOrLoadDownstreamCompiler indexes per-type arrays by the enum value.
     if (inPassThrough <= SLANG_PASS_THROUGH_NONE || inPassThrough >= SLANG_PASS_THROUGH_COUNT_OF)
         return SLANG_E_NOT_FOUND;
 
