@@ -74,7 +74,7 @@ IRStructType* asNVVMSupportedScalarStructType(IRInst* type);
 /// Returns a canonical physical struct containing exactly one selected fixed numeric array.
 IRStructType* asNVVMSupportedPhysicalArrayStructType(IRInst* type);
 
-/// Returns an exact compact three-lane 32-bit numeric parameter-group storage vector.
+/// Returns a selected numeric vector whose CUDA aggregate storage differs from its LLVM value.
 IRVectorType* asNVVMSupportedCompactParameterGroupVectorType(IRInst* type);
 
 /// Returns a fixed aggregate-storage array with the exact provider representation.

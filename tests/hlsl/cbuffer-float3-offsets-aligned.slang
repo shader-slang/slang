@@ -2,6 +2,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -dx12 -profile cs_6_2 -Xdxc -fvk-use-dx-layout -Xdxc -enable-16bit-types -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -vk -profile cs_6_2 -emit-spirv-directly -Xslang... -fvk-use-dx-layout -X. -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -output-using-type
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry computeMain -target spirv -profile cs_6_2 -no-codegen -line-directive-mode none -fvk-use-dx-layout
 
 //TEST_INPUT:ubuffer(stride=4, count=17):out,name=outputBuffer

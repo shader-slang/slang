@@ -7198,6 +7198,33 @@ exactly one gain and no loss. Frozen v1 remains exactly 452/427 and 407/407/407 
 The selected prefix passes 433/433, the permanent NVVM category passes 62/62, and the promoted gate
 assembles with CUDA 12.9 for SM70, SM80, and SM90.
 
+### Slice 171: Canonical parameter-group vector storage
+
+Parameter-group storage now recursively distinguishes a semantic numeric vector from its exact
+CUDA physical representation. Three-lane 32-bit vectors use a scalar array, giving `float3` size
+12 and alignment four. CUDA's `half3` and `half4` both use size eight and alignment four, so the
+provider represents them as two `half2` chunks. Ordinary LLVM vectors remain the SSA value form;
+an immutable field or fixed-array-element load extracts the storage lanes and reconstructs that
+semantic vector through existing generic builder operations.
+
+Fixed numeric arrays no longer bypass parameter-group storage lowering. Their element type recurses
+through the same physical algebra, so `float3 values[2]` has provider stride 12 rather than LLVM
+value-vector stride 16. The CUDA layout query on the canonical lowered type proves every complete
+size, alignment, field offset, and array stride before emission. Whole-value parameter-group loads
+whose storage and value representations differ remain rejected; no downstream byte-offset patch or
+host-layout reinterpretation is used. Provider ABI revision 32 is unchanged.
+
+Frozen `cbuffer-float3-offsets-aligned` and `cbuffer-float3-offsets-unaligned` become correct at O0
+and O3 and gain four permanent direct lanes. Frozen corpus v1 remains exactly 452 workloads/427
+healthy references and advances from 407/407/407 to 409/409/409, with exactly two gains and no
+old-correct regression. Discovery remains exactly 82/72 at 69/69/69 with no changed row. The
+selected prefix passes 433/433 and the permanent NVVM category passes 66/66.
+
+Both representative gates produce accepted native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 emits 1,619-byte PTX for the
+aligned vector-array workload versus 12,548 bytes from NVRTC, and 4,596-byte PTX for the unaligned
+Half-vector workload versus 17,466 bytes from NVRTC. Timings remain exploratory.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

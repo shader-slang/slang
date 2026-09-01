@@ -985,9 +985,9 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     return true;
 }
 
-// Returns the exact immutable pointer producers whose three-lane semantic vector is represented by
-// a compact scalar array in parameter-group storage. Direct fields and elements of an explicit
-// 12-byte-stride physical array are the only canonical producers of this representation.
+// Returns the exact immutable pointer producers whose semantic vector has a distinct compact
+// parameter-group representation. Direct fields and fixed-array elements are canonical producers;
+// aggregate type lowering recursively selects the same storage representation for both.
 IRVectorType* _getNVVMCompactParameterGroupVectorPointer(IRInst* value)
 {
     auto pointerType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
@@ -1008,7 +1008,6 @@ IRVectorType* _getNVVMCompactParameterGroupVectorPointer(IRInst* value)
 
     NVVMSequentialElementPointer elementPointer;
     if (!_getNVVMSequentialElementPointer(value, elementPointer) || !elementPointer.isImmutable ||
-        asNVVMSupportedNumericArrayType(elementPointer.aggregateType) ||
         !asNVVMSupportedAggregateStorageArrayType(elementPointer.aggregateType))
     {
         return nullptr;
@@ -1350,11 +1349,11 @@ IRVarLayout* _findNVVMCanonicalFieldLayout(IRStructTypeLayout* structLayout, IRS
     return nullptr;
 }
 
-// Computes the provider layout selected for one aggregate-storage type. Three-lane 32-bit vectors
-// are scalar arrays, raw-buffer views are pointer/count pairs, and every other leaf keeps its
-// ordinary LLVM representation. When target layout has already produced canonical metadata, the
-// recursive walk proves provider offsets and strides against that metadata instead of trying to
-// reconstruct the layout of opaque resource fields.
+// Computes the provider layout selected for one aggregate-storage type. Compact vectors use their
+// exact CUDA size and alignment, raw-buffer views are pointer/count pairs, and every other leaf
+// keeps its ordinary LLVM representation. When target layout has already produced canonical
+// metadata, the recursive walk proves provider offsets and strides against that metadata instead
+// of trying to reconstruct the layout of opaque resource fields.
 bool _getNVVMAggregateStorageLayout(
     CodeGenContext* codeGenContext,
     IRType* type,
@@ -1367,8 +1366,21 @@ bool _getNVVMAggregateStorageLayout(
 
     if (asNVVMSupportedCompactParameterGroupVectorType(type))
     {
-        outLayout.size = 12;
-        outLayout.alignment = 4;
+        if (SLANG_FAILED(getSizeAndAlignment(
+                codeGenContext->getTargetReq(),
+                IRTypeLayoutRules::getCUDA(),
+                type,
+                &outLayout)))
+        {
+            return false;
+        }
+        if (canonicalTypeLayout)
+        {
+            IRSizeAndAlignment canonicalLayout;
+            return _getNVVMCanonicalByteLayout(canonicalTypeLayout, canonicalLayout) &&
+                   canonicalLayout.size == outLayout.size &&
+                   canonicalLayout.alignment == outLayout.alignment;
+        }
         return true;
     }
 
@@ -1388,9 +1400,18 @@ bool _getNVVMAggregateStorageLayout(
             return false;
         if (asNVVMSupportedCompactParameterGroupVectorType(arrayType->getElementType()))
         {
+            IRSizeAndAlignment elementLayout;
+            if (!_getNVVMAggregateStorageLayout(
+                    codeGenContext,
+                    arrayType->getElementType(),
+                    elementLayout,
+                    canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr))
+            {
+                return false;
+            }
             auto elementCount = cast<IRIntLit>(arrayType->getElementCount())->getValue();
-            outLayout.size = elementCount * 12;
-            outLayout.alignment = 4;
+            outLayout.size = elementCount * elementLayout.size;
+            outLayout.alignment = elementLayout.alignment;
             IRSizeAndAlignment canonicalLayout;
             return !canonicalArrayLayout ||
                    (_getNVVMCanonicalByteLayout(canonicalArrayLayout, canonicalLayout) &&
@@ -1399,7 +1420,7 @@ bool _getNVVMAggregateStorageLayout(
                     canonicalArrayLayout->getElementStrideInBytes().isFinite() &&
                     canonicalArrayLayout->getElementStrideInBytes()
                             .getFiniteValue()
-                            .getValidValue() == 12);
+                            .getValidValue() == uint64_t(elementLayout.size));
         }
 
         IRSizeAndAlignment elementLayout;
@@ -1515,8 +1536,8 @@ bool _getNVVMAggregateStorageLayout(
         return true;
     }
 
-    if (!isNVVMSupportedIntegerScalarType(type) && !isNVVMFloat32Type(type) &&
-        !asNVVMSupported32BitNumericVectorType(type))
+    if (!isNVVMSupportedIntegerScalarType(type) && !isNVVMFloat16Type(type) &&
+        !isNVVMFloat32Type(type) && !asNVVMSupported32BitNumericVectorType(type))
     {
         return false;
     }
@@ -12986,22 +13007,53 @@ SlangResult emitNVVMIRFromLinkedIR(
                         if (compactStorageVector)
                         {
                             uint32_t elementCount = 0;
-                            SLANG_RELEASE_ASSERT(asNVVMSupported32BitNumericVectorType(
+                            SLANG_RELEASE_ASSERT(asNVVMSupportedNumericVectorType(
                                 compactStorageVector,
                                 &elementCount));
-                            SLANG_RELEASE_ASSERT(elementCount == 3);
                             SlangNVVMValueHandle loweredElements[4] = {};
-                            for (uint32_t elementIndex = 0; elementIndex < elementCount;
-                                 ++elementIndex)
+                            if (isNVVMFloat16Type(compactStorageVector->getElementType()))
                             {
-                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                    codeGenContext,
-                                    "compact parameter-group vector element extraction",
-                                    builder.emitAggregateElementExtract(
-                                        moduleScope.module,
-                                        loweredValue,
-                                        elementIndex,
-                                        loweredElements[elementIndex])));
+                                for (uint32_t chunkIndex = 0; chunkIndex < 2; ++chunkIndex)
+                                {
+                                    SlangNVVMValueHandle chunk = nullptr;
+                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                        codeGenContext,
+                                        "compact parameter-group half-vector chunk extraction",
+                                        builder.emitAggregateElementExtract(
+                                            moduleScope.module,
+                                            loweredValue,
+                                            chunkIndex,
+                                            chunk)));
+                                    for (uint32_t laneIndex = 0; laneIndex < 2; ++laneIndex)
+                                    {
+                                        const uint32_t elementIndex = chunkIndex * 2 + laneIndex;
+                                        if (elementIndex >= elementCount)
+                                            break;
+                                        SLANG_RETURN_ON_FAIL(_emitNVVMSequentialElementExtract(
+                                            codeGenContext,
+                                            builder,
+                                            moduleScope.module,
+                                            chunk,
+                                            laneIndex,
+                                            loweredElements[elementIndex]));
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                SLANG_RELEASE_ASSERT(elementCount == 3);
+                                for (uint32_t elementIndex = 0; elementIndex < elementCount;
+                                     ++elementIndex)
+                                {
+                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                        codeGenContext,
+                                        "compact parameter-group vector element extraction",
+                                        builder.emitAggregateElementExtract(
+                                            moduleScope.module,
+                                            loweredValue,
+                                            elementIndex,
+                                            loweredElements[elementIndex])));
+                                }
                             }
                             SlangNVVMTypeHandle loweredVectorType = nullptr;
                             SLANG_RETURN_ON_FAIL(typeContext.lowerType(

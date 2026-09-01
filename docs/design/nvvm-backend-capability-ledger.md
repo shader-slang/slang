@@ -2440,3 +2440,18 @@ Discovery `buffer-type-splitting` gains two permanent direct lanes and advances 
 427 with no changed row. The selected prefix passes 433/433, the permanent NVVM category passes
 62/62, and the promoted measurement gate produces accepted PTX/cubins for native NVRTC, direct O0
 SM70, and direct O3 SM70/SM80/SM90 configurations.
+
+Slice 171 gives parameter-group vectors one canonical split between semantic values and CUDA
+storage. Three-lane 32-bit vectors use scalar arrays; `half3` and `half4` use two `half2` chunks,
+matching CUDA's eight-byte size and four-byte alignment. Fixed arrays recurse through this storage
+algebra instead of delegating to ordinary LLVM value lowering, and immutable field/element loads
+reconstruct the semantic vector with generic extraction and construction operations. Whole-value
+loads with a distinct storage representation remain unsupported. Provider ABI revision 32 is
+unchanged.
+
+Frozen `cbuffer-float3-offsets-aligned` and `cbuffer-float3-offsets-unaligned` gain four permanent
+direct lanes. Frozen v1 advances from 407/407/407 to 409/409/409 over its unchanged 427 healthy
+denominator, with exactly two gains and no old-correct loss. Discovery remains 69/69/69 over 72
+with no changed row. The selected prefix passes 433/433, the permanent NVVM category passes 66/66,
+and both measurement gates produce accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct
+O3 SM70/SM80/SM90 configurations.

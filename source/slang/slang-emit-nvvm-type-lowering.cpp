@@ -281,8 +281,21 @@ IRStructType* asNVVMSupportedPhysicalArrayStructType(IRInst* type)
 IRVectorType* asNVVMSupportedCompactParameterGroupVectorType(IRInst* type)
 {
     uint32_t elementCount = 0;
-    auto vectorType = asNVVMSupported32BitNumericVectorType(type, &elementCount);
-    return elementCount == 3 ? vectorType : nullptr;
+    auto vectorType = asNVVMSupportedNumericVectorType(type, &elementCount);
+    if (!vectorType)
+        return nullptr;
+
+    // CUDA's native three-lane 32-bit vectors have scalar alignment and no tail padding, whereas
+    // LLVM gives the corresponding value vector four-lane storage. Slang's CUDA prelude spells
+    // half3 and half4 as 8-byte, 4-byte-aligned structs, which also differs from LLVM's value
+    // vectors. These are the exact selected vector families that need a distinct storage type.
+    if (elementCount == 3 && (isNVVMInteger32Type(vectorType->getElementType()) ||
+                              isNVVMFloat32Type(vectorType->getElementType())))
+    {
+        return vectorType;
+    }
+    return isNVVMFloat16Type(vectorType->getElementType()) && elementCount >= 3 ? vectorType
+                                                                                : nullptr;
 }
 
 static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>& activeTypes);
@@ -306,9 +319,12 @@ static IRArrayType* _asNVVMSupportedAggregateStorageArrayType(
         return nullptr;
     }
 
-    if (asNVVMSupportedCompactParameterGroupVectorType(arrayType->getElementType()))
+    if (auto compactVector =
+            asNVVMSupportedCompactParameterGroupVectorType(arrayType->getElementType()))
     {
-        if (!stride || stride->getValue() != 12)
+        const IRIntegerValue compactStride =
+            isNVVMFloat16Type(compactVector->getElementType()) ? 8 : 12;
+        if (!stride || stride->getValue() != compactStride)
             return nullptr;
     }
     else
@@ -339,8 +355,9 @@ IRArrayType* asNVVMSupportedAggregateStorageArrayType(IRInst* type, uint32_t* ou
 
 static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
-    if (isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-        asNVVMSupported32BitNumericVectorType(type))
+    if (isNVVMSupportedIntegerScalarType(type) || isNVVMFloat16Type(type) ||
+        isNVVMFloat32Type(type) || asNVVMSupported32BitNumericVectorType(type) ||
+        asNVVMSupportedCompactParameterGroupVectorType(type))
     {
         return true;
     }
@@ -1575,16 +1592,20 @@ static bool _hasNVVMParameterGroupStorageValueRepresentation(
     IRInst* type,
     HashSet<IRInst*>& activeTypes)
 {
-    if (isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type))
+    if (isNVVMSupportedIntegerScalarType(type) || isNVVMFloat16Type(type) ||
+        isNVVMFloat32Type(type))
         return true;
 
     if (asNVVMSupported32BitNumericVectorType(type))
         return !asNVVMSupportedCompactParameterGroupVectorType(type);
 
-    // Fixed numeric arrays and physical matrix wrappers deliberately delegate parameter-group
-    // storage lowering to ordinary value lowering. Keep those producer-owned identities explicit
-    // instead of trying to infer provider type equality from their children.
-    if (asNVVMSupportedNumericArrayType(type) || asNVVMSupportedPhysicalArrayStructType(type))
+    if (asNVVMSupportedCompactParameterGroupVectorType(type))
+        return false;
+
+    // Physical matrix wrappers deliberately delegate parameter-group storage lowering to ordinary
+    // value lowering. Keep that producer-owned identity explicit instead of trying to infer
+    // provider type equality from its children.
+    if (asNVVMSupportedPhysicalArrayStructType(type))
         return true;
 
     NVVMRawBufferType rawBufferType;
@@ -2122,7 +2143,6 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     const bool isPointerBearingHelperValue =
         isHelperValue && !isNVVMSupportedCopyableValueType(type);
     IRPtrTypeBase* deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
-    IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
     IRArrayType* fixedCopyableArrayType = asNVVMSupportedCopyableArrayType(type);
     IRArrayType* fixedHelperArrayType = asNVVMSupportedHelperArrayType(type);
     IRArrayType* fixedResourceArrayType = asNVVMSupportedResourceArrayType(type);
@@ -2182,10 +2202,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           isBufferDataPointer || parameterGroup || isSurface || isSampledTexture || samplerValue ||
           resourceElementPointer || sharedElementPointer || sharedHelperPointer || atomicType)) ||
         (use == NVVMTypeUse::Storage &&
-         (isInteger || isFloat32 || asNVVMSupported32BitNumericVectorType(type) || structType ||
-          aggregateStorageArrayType || deviceCopyablePointer || isRawBuffer || parameterGroup ||
-          isSurface || isSampledTexture || samplerStorage || unsizedSamplerArrayStorage ||
-          atomicType || descriptorHandle)) ||
+         (isInteger || isFloat32 || isNVVMFloat16Type(type) ||
+          asNVVMSupported32BitNumericVectorType(type) || compactParameterGroupVectorType ||
+          structType || aggregateStorageArrayType || deviceCopyablePointer || isRawBuffer ||
+          parameterGroup || isSurface || isSampledTexture || samplerStorage ||
+          unsizedSamplerArrayStorage || atomicType || descriptorHandle)) ||
         (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type)) ||
         (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage);
     if (!isLegal)
@@ -2392,10 +2413,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
 
     if (use == NVVMTypeUse::ParameterGroupStorage &&
-        (isInteger || isFloat32 ||
+        (isInteger || isFloat32 || isNVVMFloat16Type(type) ||
          (asNVVMSupported32BitNumericVectorType(type) && !compactParameterGroupVectorType) ||
-         fixedNumericArrayType || asNVVMSupportedScalarStructType(type) ||
-         asNVVMSupportedPhysicalArrayStructType(type)))
+         asNVVMSupportedScalarStructType(type) || asNVVMSupportedPhysicalArrayStructType(type)))
     {
         return lowerType(type, NVVMTypeUse::Value, outType);
     }
@@ -2448,13 +2468,26 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             elementType));
         const bool useStructuredBufferArray =
             use == NVVMTypeUse::StructuredBufferStorage && valueVectorElementCount == 3;
+        const bool useCompactHalfChunks =
+            compactParameterGroupVectorType &&
+            isNVVMFloat16Type(compactParameterGroupVectorType->getElementType()) &&
+            (use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage);
+        SlangNVVMTypeHandle compactHalfChunkType = nullptr;
+        if (useCompactHalfChunks)
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                "compact half-vector storage chunk type",
+                m_builder.getVectorType(m_module, elementType, 2, compactHalfChunkType)));
+        }
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             useStructuredBufferArray ? "structured-buffer vector storage type"
             : compactParameterGroupVectorType &&
                     (use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage)
                 ? "compact aggregate vector storage type"
                 : "selected value vector type",
-            useStructuredBufferArray
+            useCompactHalfChunks
+                ? m_builder.getArrayType(m_module, compactHalfChunkType, 2, outType)
+            : useStructuredBufferArray
                 ? m_builder.getArrayType(m_module, elementType, valueVectorElementCount, outType)
             : compactParameterGroupVectorType &&
                     (use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage)

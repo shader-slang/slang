@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "aligned-cbuffer-vector-array-layout",
+      "source": "tests/hlsl/cbuffer-float3-offsets-aligned.slang",
+      "census_id": "hlsl/cbuffer-float3-offsets-aligned.slang#cuda-1"
+    },
+    {
+      "name": "unaligned-cbuffer-half-vector-layout",
+      "source": "tests/hlsl/cbuffer-float3-offsets-unaligned.slang",
+      "census_id": "hlsl/cbuffer-float3-offsets-unaligned.slang#cuda-1"
+    }
+  ]
+}
