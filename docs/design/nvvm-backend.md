@@ -7326,6 +7326,29 @@ gain and no loss. The selected prefix passes 433/433, the permanent NVVM categor
 and the gate assembles through CUDA 12.9 for native NVRTC, direct O0 SM70, and direct O3
 SM70/SM80/SM90.
 
+### Slice 176: CUDA floating-point remainder semantics
+
+Canonical Float32/64 `kIROp_FRem` now preserves CUDA `fmod` behavior instead of delegating to
+LLVM `frem`. The compiler proves the established component-wise scalar/vector family, including
+scalar broadcast, then applies the existing scalar libdevice FMOD descriptor lane by lane and
+reconstructs the exact selected vector. Integer remainder and the provider's generic floating
+remainder operation retain their existing meanings.
+
+Capability collection records both the scalar FMOD descriptor and its module-level libdevice
+dependency. This is required even when `%` is the only device-library operation in a module;
+otherwise libNVVM can emit PTX with an unresolved `__nv_fmodf` declaration. The recipe uses only
+existing extraction, construction, and generic value-operation callbacks, so provider ABI
+revision 32 is unchanged.
+
+Frozen `hlsl-intrinsic/matrix-float` becomes correct at O0 and O3 and gains two permanent direct
+lanes. Frozen v1 remains exactly 452/427 and advances from 413/413/413 to 414/414/414, with one
+gain and no old-correct loss. Discovery remains exactly 82/72 at 72/72/72 with no changed row. The
+selected prefix passes 433/433 and the permanent NVVM category passes 82/82.
+
+The representative matrix gate produces accepted native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 PTX is 104,640 bytes versus
+109,591 bytes native, while direct O0 PTX is 321,704 bytes. Timings remain exploratory.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

@@ -5204,7 +5204,6 @@ bool _getNVVMValueOperation(IROp op, SlangNVVMValueOperation& outOperation)
         outOperation = SLANG_NVVM_VALUE_OP_DIVIDE;
         return true;
     case kIROp_IRem:
-    case kIROp_FRem:
         outOperation = SLANG_NVVM_VALUE_OP_REMAINDER;
         return true;
     case kIROp_Lsh:
@@ -5291,6 +5290,19 @@ struct NVVMResolvedValueOperation
     const NVVMSemantics::CatalogEntry* staticEntry = nullptr;
     NVVMSemantics::ValueOperationFamilyResolution family;
     const char* diagnosticName = nullptr;
+};
+
+// Describes the CUDA floating-remainder recipe selected for one canonical `kIROp_FRem`.
+// LLVM `frem` is not a semantic substitute for CUDA `fmod` near an exactly representable
+// multiple, so selected vectors are explicitly decomposed into scalar libdevice operations.
+struct NVVMFloatingRemainderOperation
+{
+    IRInst* operands[2] = {};
+    bool operandIsVector[2] = {};
+    IRType* resultType = nullptr;
+    IRType* scalarType = nullptr;
+    uint32_t laneCount = 0;
+    NVVMValueRecipeStep scalarStep;
 };
 
 struct NVVMPointerBitCast
@@ -6323,6 +6335,76 @@ void _requireNVVMRawBufferDescriptorBitCastOperations(
         const auto& step = bitCast.steps[i];
         _requireValueOperation(requirements, step.getDesc(), step.diagnosticName);
     }
+}
+
+bool _resolveNVVMFloatingRemainderOperation(
+    IRInst* inst,
+    NVVMFloatingRemainderOperation& outOperation)
+{
+    outOperation = {};
+    if (!inst || inst->getOp() != kIROp_FRem || inst->getOperandCount() != 2)
+        return false;
+
+    IRType* resultType = inst->getDataType();
+    SlangNVVMValueTypeDesc resultSemantic = {};
+    SlangNVVMValueTypeDesc operandSemantics[2] = {};
+    if (!_getNVVMSemanticType(resultType, resultSemantic) ||
+        !_getNVVMSemanticType(inst->getOperand(0)->getDataType(), operandSemantics[0]) ||
+        !_getNVVMSemanticType(inst->getOperand(1)->getDataType(), operandSemantics[1]))
+    {
+        return false;
+    }
+
+    const SlangNVVMValueOperationDesc componentwiseDesc = {
+        SLANG_NVVM_VALUE_OP_REMAINDER,
+        resultSemantic,
+        operandSemantics,
+        SLANG_COUNT_OF(operandSemantics),
+    };
+    NVVMSemantics::ValueOperationFamilyResolution componentwiseFamily;
+    if (!NVVMSemantics::resolveValueOperationFamily(componentwiseDesc, componentwiseFamily) ||
+        componentwiseFamily.family != NVVMSemantics::ValueOperationFamily::FloatBinary)
+    {
+        return false;
+    }
+
+    IRType* scalarType = resultType;
+    uint32_t laneCount = 1;
+    if (auto vectorType = asNVVMSupportedValueVectorType(resultType, &laneCount))
+        scalarType = vectorType->getElementType();
+
+    uint32_t bitWidth = 0;
+    if (!isNVVMSupportedFloatingPointScalarType(scalarType, &bitWidth) ||
+        (bitWidth != 32 && bitWidth != 64))
+    {
+        return false;
+    }
+
+    SlangNVVMValueTypeDesc scalarSemantic = {};
+    SLANG_RELEASE_ASSERT(_getNVVMSemanticType(scalarType, scalarSemantic));
+    const SlangNVVMValueTypeDesc operandTypes[] = {scalarSemantic, scalarSemantic};
+    _setNVVMValueRecipeStep(
+        outOperation.scalarStep,
+        SLANG_NVVM_VALUE_OP_FMOD,
+        scalarSemantic,
+        operandTypes,
+        SLANG_COUNT_OF(operandTypes),
+        "CUDA scalar floating-point remainder");
+
+    NVVMSemantics::ValueOperationFamilyResolution family;
+    if (!NVVMSemantics::resolveValueOperationFamily(outOperation.scalarStep.getDesc(), family))
+        return false;
+    SLANG_RELEASE_ASSERT(family.requiresCUDADeviceLibrary);
+
+    outOperation.operands[0] = inst->getOperand(0);
+    outOperation.operands[1] = inst->getOperand(1);
+    outOperation.operandIsVector[0] = operandSemantics[0].laneCount > 1;
+    outOperation.operandIsVector[1] = operandSemantics[1].laneCount > 1;
+    outOperation.resultType = resultType;
+    outOperation.scalarType = scalarType;
+    outOperation.laneCount = laneCount;
+    outOperation.scalarStep.diagnosticName = family.diagnosticName;
+    return true;
 }
 
 // Resolves canonical Slang value operations to either a fixed exact row or one bounded family.
@@ -7996,7 +8078,6 @@ SlangResult _validateNVVMFunction(
             case kIROp_Mul:
             case kIROp_Div:
             case kIROp_IRem:
-            case kIROp_FRem:
             case kIROp_Lsh:
             case kIROp_Rsh:
             case kIROp_BitAnd:
@@ -8036,6 +8117,25 @@ SlangResult _validateNVVMFunction(
                         requirements.valueOperations,
                         operation.desc,
                         operation.diagnosticName);
+                }
+                break;
+
+            case kIROp_FRem:
+                {
+                    NVVMFloatingRemainderOperation operation;
+                    if (!_resolveNVVMFloatingRemainderOperation(inst, operation))
+                    {
+                        return _diagnoseUnsupportedIRTypeRelation(
+                            codeGenContext,
+                            getIROpInfo(inst->getOp()).name,
+                            inst->getOperand(0)->getDataType(),
+                            inst->getOperand(1)->getDataType());
+                    }
+                    _requireValueOperation(
+                        requirements.valueOperations,
+                        operation.scalarStep.getDesc(),
+                        operation.scalarStep.diagnosticName);
+                    requirements.requiresCUDADeviceLibrary = true;
                 }
                 break;
 
@@ -8698,11 +8798,20 @@ SlangResult _validateNVVMFunction(
             case kIROp_FloatCast:
             case kIROp_Select:
                 {
-                    NVVMResolvedIntegerTruthiness truthiness;
-                    if (!_resolveNVVMIntegerTruthiness(inst, truthiness))
+                    if (inst->getOp() == kIROp_FRem)
                     {
-                        NVVMResolvedValueOperation operation;
-                        SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                        NVVMFloatingRemainderOperation operation;
+                        SLANG_RELEASE_ASSERT(
+                            _resolveNVVMFloatingRemainderOperation(inst, operation));
+                    }
+                    else
+                    {
+                        NVVMResolvedIntegerTruthiness truthiness;
+                        if (!_resolveNVVMIntegerTruthiness(inst, truthiness))
+                        {
+                            NVVMResolvedValueOperation operation;
+                            SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                        }
                     }
                     for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
                          ++operandIndex)
@@ -10036,6 +10145,96 @@ SlangResult _emitNVVMSequentialElementExtract(
         codeGenContext,
         "structured-buffer vector lane extraction",
         builder.emitSequentialElementExtract(module, aggregate, indexValue, outElement));
+}
+
+// Emits CUDA floating remainder for the exact scalar/vector shape proven by preflight. Keeping
+// the scalar libdevice call in the existing generic operation interface makes the target-specific
+// semantic choice explicit without teaching the LLVM provider about Slang matrix legalization.
+SlangResult _emitNVVMFloatingRemainderOperation(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMFloatingRemainderOperation& operation,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMValueHandle operands[2] = {};
+    for (uint32_t i = 0; i < SLANG_COUNT_OF(operands); ++i)
+    {
+        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+            codeGenContext,
+            builder,
+            module,
+            operation.operands[i],
+            valueMap,
+            typeContext,
+            operands[i]));
+    }
+
+    const SlangNVVMValueOperationDesc scalarDesc = operation.scalarStep.getDesc();
+    if (isTypeEqual(operation.resultType, operation.scalarType))
+    {
+        return _requireBuilderOperation(
+            codeGenContext,
+            operation.scalarStep.diagnosticName,
+            builder.emitValueOperation(
+                module,
+                scalarDesc,
+                operands,
+                SLANG_COUNT_OF(operands),
+                outValue));
+    }
+
+    SLANG_RELEASE_ASSERT(
+        asNVVMSupportedValueVectorType(operation.resultType) && operation.laneCount > 0);
+    List<SlangNVVMValueHandle> results;
+    for (uint32_t lane = 0; lane < operation.laneCount; ++lane)
+    {
+        SlangNVVMValueHandle laneOperands[2] = {};
+        for (uint32_t operandIndex = 0; operandIndex < SLANG_COUNT_OF(operands); ++operandIndex)
+        {
+            if (operation.operandIsVector[operandIndex])
+            {
+                SLANG_RETURN_ON_FAIL(_emitNVVMSequentialElementExtract(
+                    codeGenContext,
+                    builder,
+                    module,
+                    operands[operandIndex],
+                    lane,
+                    laneOperands[operandIndex]));
+            }
+            else
+            {
+                laneOperands[operandIndex] = operands[operandIndex];
+            }
+        }
+
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            operation.scalarStep.diagnosticName,
+            builder.emitValueOperation(
+                module,
+                scalarDesc,
+                laneOperands,
+                SLANG_COUNT_OF(laneOperands),
+                result)));
+        results.add(result);
+    }
+
+    SlangNVVMTypeHandle resultType = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        typeContext.lowerType(operation.resultType, NVVMTypeUse::Value, resultType));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "CUDA floating-point remainder vector construction",
+        builder.emitVectorConstruct(
+            module,
+            resultType,
+            results.getBuffer(),
+            size_t(results.getCount()),
+            outValue));
 }
 
 // Crosses one selected external structured-buffer boundary without changing the canonical IR
@@ -13866,7 +14065,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Mul:
                 case kIROp_Div:
                 case kIROp_IRem:
-                case kIROp_FRem:
                 case kIROp_Lsh:
                 case kIROp_Rsh:
                 case kIROp_BitAnd:
@@ -13932,6 +14130,24 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 inst->getOperandCount() ? loweredOperands : nullptr,
                                 inst->getOperandCount(),
                                 loweredValue)));
+                        valueMap[inst] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_FRem:
+                    {
+                        NVVMFloatingRemainderOperation operation;
+                        SLANG_RELEASE_ASSERT(
+                            _resolveNVVMFloatingRemainderOperation(inst, operation));
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_emitNVVMFloatingRemainderOperation(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            operation,
+                            valueMap,
+                            typeContext,
+                            loweredValue));
                         valueMap[inst] = loweredValue;
                     }
                     break;

@@ -2513,3 +2513,16 @@ from 71/71/71 to 72/72/72 over its unchanged 72 healthy references, with exactly
 loss. The selected prefix passes 433/433, the permanent NVVM category passes 80/80, and the
 measurement gate produces accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3
 SM70/SM80/SM90 configurations.
+
+Slice 176 maps canonical component-wise Float32/64 `kIROp_FRem` to scalar CUDA/libdevice FMOD
+semantics. Selected vectors are decomposed and reconstructed with existing generic builder
+operations, and scalar operands are reused for canonical broadcast shapes. Capability discovery
+records the FMOD descriptor and the module-level libdevice dependency together. Integer remainder
+and the provider's generic LLVM floating remainder remain unchanged; provider ABI revision 32 is
+unchanged.
+
+Frozen `hlsl-intrinsic/matrix-float` gains two permanent direct lanes. Frozen v1 advances from
+413/413/413 to 414/414/414 over its unchanged 427 healthy denominator, with exactly one gain and
+no old-correct loss. Discovery stays 72/72/72 over 72 with no changed row. The selected prefix
+passes 433/433, the permanent NVVM category passes 82/82, and the measurement gate produces
+accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.

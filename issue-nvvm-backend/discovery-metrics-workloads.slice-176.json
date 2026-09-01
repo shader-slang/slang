@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "matrix-floating-remainder",
+      "source": "tests/hlsl-intrinsic/matrix-float.slang",
+      "census_id": "hlsl-intrinsic/matrix-float.slang#cuda-1"
+    }
+  ]
+}

@@ -6,6 +6,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -shaderobj -render-feature hardware-device
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 // Not supported in WGSL: Integer matrices, Double and other unsupported scalar types
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu

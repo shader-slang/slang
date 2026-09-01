@@ -2,6 +2,27 @@
 
 #include "unit-test-nvvm-support.h"
 
+// Gives fake-emitter tests that intentionally request a libdevice operation the same coherent
+// toolkit shape required by production preflight. The fake bytes are never parsed by the fake
+// compiler; their presence proves the module dependency is carried through discovery.
+static SlangResult _configureFakeDirectNVVMLibdevice(
+    slang::IGlobalSession* globalSession,
+    TempDirectory& toolkit)
+{
+    static const uint8_t kLibdevice[] = {0x42, 0x43, 0xc0, 0xde, 0x7e, 0x12};
+    SLANG_RETURN_ON_FAIL(_createTempDirectory(toolkit));
+    String candidatePath;
+    String libdevicePath;
+    SLANG_RETURN_ON_FAIL(_createFakeNVVMToolkit(
+        toolkit.path,
+        kLibdevice,
+        sizeof(kLibdevice),
+        candidatePath,
+        libdevicePath));
+    globalSession->setDownstreamCompilerPath(SLANG_PASS_THROUGH_NVVM, toolkit.path.getBuffer());
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(nvvmSlangRoutesGenericScalarFamilies)
 {
     enum class Family
@@ -1036,13 +1057,20 @@ SLANG_UNIT_TEST(nvvmSlangDynamicLocalVectorStoreUsesSequentialPointerContract)
 
 SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
 {
+#if !(SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY)
+    SLANG_IGNORE_TEST;
+    return;
+#endif
     _resetDirectNVVMFakes();
+    TempDirectory toolkit;
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
             slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
         globalSession->setSharedLibraryLoader(loader);
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(globalSession, toolkit)));
 
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
@@ -1085,7 +1113,7 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
         bool sawSignedI8x2Remainder = false;
         bool sawSignedI8x2LessThan = false;
         bool sawFloat32x3Add = false;
-        bool sawFloat32x3Remainder = false;
+        int float32ScalarFmodCount = 0;
         bool sawFloat32x3VectorScalarAdd = false;
         bool sawFloat32x3LessThan = false;
         bool sawBooleanVectorNot = false;
@@ -1131,10 +1159,13 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
                 sawFloat32x3Add || (operation.key.operation == SLANG_NVVM_VALUE_OP_ADD &&
                                     type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
                                     type.bitWidth == 32 && type.laneCount == 3);
-            sawFloat32x3Remainder = sawFloat32x3Remainder ||
-                                    (operation.key.operation == SLANG_NVVM_VALUE_OP_REMAINDER &&
-                                     type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                                     type.bitWidth == 32 && type.laneCount == 3);
+            if (operation.key.operation == SLANG_NVVM_VALUE_OP_FMOD &&
+                type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.bitWidth == 32 &&
+                type.laneCount == 1 && operation.operandTypes[0].laneCount == 1 &&
+                operation.operandTypes[1].laneCount == 1)
+            {
+                ++float32ScalarFmodCount;
+            }
             sawFloat32x3VectorScalarAdd =
                 sawFloat32x3VectorScalarAdd ||
                 (operation.key.operation == SLANG_NVVM_VALUE_OP_ADD &&
@@ -1179,7 +1210,7 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
         SLANG_CHECK(sawSignedI8x2Remainder);
         SLANG_CHECK(sawSignedI8x2LessThan);
         SLANG_CHECK(sawFloat32x3Add);
-        SLANG_CHECK(sawFloat32x3Remainder);
+        SLANG_CHECK(float32ScalarFmodCount == 3);
         SLANG_CHECK(sawFloat32x3VectorScalarAdd);
         SLANG_CHECK(sawFloat32x3LessThan);
         SLANG_CHECK(sawBooleanVectorNot);
@@ -1206,6 +1237,7 @@ SLANG_UNIT_TEST(nvvmSlangVectorOperationFamiliesUseTypedDescriptors)
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 10);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
@@ -1937,13 +1969,20 @@ SLANG_UNIT_TEST(nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresent
 
 SLANG_UNIT_TEST(nvvmSlangFloat64ValueFamilyUsesGenericTypedOperations)
 {
+#if !(SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY)
+    SLANG_IGNORE_TEST;
+    return;
+#endif
     _resetDirectNVVMFakes();
+    TempDirectory toolkit;
     {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
             slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
         globalSession->setSharedLibraryLoader(loader);
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(globalSession, toolkit)));
 
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
@@ -2046,6 +2085,7 @@ SLANG_UNIT_TEST(nvvmSlangFloat64ValueFamilyUsesGenericTypedOperations)
         SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount >= 1);
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount >= 1);
         SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
