@@ -247,6 +247,96 @@ SLANG_UNIT_TEST(PackageGitDirtyPredicateIncludesCommitsAndStashes)
     SLANG_CHECK(stashedStatus.stashCount == 1);
 }
 
+// Status must name an absent checkout as unmaterialized rather than reporting it indirectly
+// through a failed dependency-manifest read and a raw Git "cannot change to" complaint, and it
+// must still inspect the checkouts that are present.
+SLANG_UNIT_TEST(PackageToolStatusReportsUnmaterializedCheckouts)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    // Two independent dependencies, so one can be removed while the other stays present.
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    Manifest root;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    const char* packageNames[] = {"noise", "color"};
+    for (const char* packageName : packageNames)
+    {
+        String repository = Path::combine(temp.path, String("upstream-") + packageName);
+        SLANG_CHECK_ABORT(Path::createDirectoryRecursive(repository));
+        Manifest dependencyManifest;
+        dependencyManifest.name = packageName;
+        dependencyManifest.exports.add("src");
+        dependencyManifest.licenseFiles.add("LICENSE");
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(
+            Path::combine(repository, "slang-package.json"),
+            dependencyManifest,
+            error)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            _writeFile(Path::combine(repository, "LICENSE"), String(packageName) + " license\n")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+            Path::combine(repository, String("src/") + packageName + ".slang"),
+            String("module ") + packageName + ";\n")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+
+        Dependency dependency;
+        dependency.name = packageName;
+        dependency.git = repository;
+        dependency.version = "1.0.0";
+        root.dependencies.add(dependency);
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+
+    const char* statusArguments[] = {"slang-package", "status"};
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+
+    Path::removeNonEmpty(Path::combine(temp.path, "deps/noise"));
+    error = String();
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("are not materialized under 'deps/'")) >=
+        0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("noise")) >= 0);
+    // The absent checkout is reported once: neither the dependency-manifest read nor Git's own
+    // missing-directory text should restate it, and the present sibling must not be implicated.
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("dependency manifest")) < 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("cannot change to")) < 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("color")) < 0);
+
+    const char* fetchArguments[] = {"slang-package", "fetch"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+
+    // A checkout that is present but dirty is still inspected while a sibling is absent.
+    Path::removeNonEmpty(Path::combine(temp.path, "deps/noise"));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(Path::combine(temp.path, "deps/color/stray.txt"), "stray\n")));
+    error = String();
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("are not materialized under 'deps/'")) >=
+        0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(
+            UnownedStringSlice("Package checkout 'color' is not clean")) >= 0);
+}
+
 SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
 {
     TemporaryDirectory temp;

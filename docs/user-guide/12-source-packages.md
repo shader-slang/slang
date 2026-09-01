@@ -251,7 +251,8 @@ changed files, extra commits, or stashes. Pass `--clean` explicitly to permit re
 Run `slang package update` deliberately when manifest constraints or upstream releases change.
 `slang package update --dry-run` and `slang package update --from-local --dry-run` print the
 selected graph (what moved, what stayed, and why) without writing the lock or replacing
-checkouts. `--minimal` keeps one-line package changes and the summary count. Resolver Git clones
+checkouts. `--minimal` keeps one-line package changes and the summary count. The installed Slang
+toolchain is omitted unless its constraint fails. Resolver Git clones
 under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
 prints that report and asks before applying the exact graph it just resolved. Pass `--yes` for a
 non-interactive invocation. Normal CI and developer builds use `slang package fetch`; an

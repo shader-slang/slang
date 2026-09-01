@@ -2663,6 +2663,11 @@ SLANG_UNIT_TEST(PackageResolveReportFormat)
     report.rootPackageName = "video-preview";
     report.packages.add(convert);
     report.packages.add(encoding);
+    ToolchainConstraint toolchainConstraint;
+    toolchainConstraint.packageName = "video-preview";
+    toolchainConstraint.constraint = ">=2026.14.1";
+    report.toolchainConstraints.add(toolchainConstraint);
+    report.installedToolchain = "2026.14.1";
 
     String detailed = formatResolveReport(root, &previous, next, report, false, false);
     SLANG_CHECK(
@@ -2674,9 +2679,26 @@ SLANG_UNIT_TEST(PackageResolveReportFormat)
         detailed.getUnownedSlice().indexOf(UnownedStringSlice("skipped 1.0.0: retracted")) >= 0);
     SLANG_CHECK(
         detailed.getUnownedSlice().indexOf(UnownedStringSlice("added color-convert 1.1.0")) >= 0);
+    SLANG_CHECK(detailed.getUnownedSlice().indexOf(UnownedStringSlice("slang-toolchain")) < 0);
     SLANG_CHECK(
         detailed.getUnownedSlice().indexOf(
             UnownedStringSlice("Updated 2 packages: 1 upgraded, 1 added; 0 unchanged.")) >= 0);
+
+    String detailedDryRun = formatResolveReport(root, &previous, next, report, true, false);
+    SLANG_CHECK(
+        detailedDryRun.getUnownedSlice().indexOf(
+            UnownedStringSlice("would upgrade color-encoding 1.0.0 => 1.1.0")) >= 0);
+    SLANG_CHECK(
+        detailedDryRun.getUnownedSlice().indexOf(
+            UnownedStringSlice("would add color-convert 1.1.0")) >= 0);
+    Index firstAdd = detailedDryRun.indexOf("would add color-convert 1.1.0");
+    SLANG_CHECK_ABORT(firstAdd >= 0);
+    SLANG_CHECK(detailedDryRun.indexOf("would add color-convert 1.1.0", firstAdd + 1) < 0);
+    SLANG_CHECK(detailedDryRun.getUnownedSlice().indexOf(UnownedStringSlice("Would add")) < 0);
+    SLANG_CHECK(
+        detailedDryRun.getUnownedSlice().indexOf(
+            UnownedStringSlice("Would update 2 packages: 1 upgraded, 1 added; 0 unchanged.")) >= 0);
+    SLANG_CHECK(detailedDryRun.getUnownedSlice().indexOf(UnownedStringSlice("would update")) < 0);
 
     String minimal = formatResolveReport(root, &previous, next, report, false, true);
     SLANG_CHECK(

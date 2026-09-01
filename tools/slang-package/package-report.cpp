@@ -16,7 +16,6 @@ struct ResolveChange
     String previousVersion;
     String nextVersion;
     String nextPath;
-    bool isToolchain = false;
     const ResolvePackageExplanation* explanation = nullptr;
 };
 
@@ -63,15 +62,15 @@ static const char* _changeVerb(ResolveChangeKind kind, bool dryRun)
     switch (kind)
     {
     case ResolveChangeKind::Added:
-        return dryRun ? "Would add" : "added";
+        return dryRun ? "would add" : "added";
     case ResolveChangeKind::Removed:
-        return dryRun ? "Would remove" : "removed";
+        return dryRun ? "would remove" : "removed";
     case ResolveChangeKind::Upgraded:
-        return dryRun ? "Would upgrade" : "upgraded";
+        return dryRun ? "would upgrade" : "upgraded";
     case ResolveChangeKind::Downgraded:
-        return dryRun ? "Would downgrade" : "downgraded";
+        return dryRun ? "would downgrade" : "downgraded";
     case ResolveChangeKind::Replaced:
-        return dryRun ? "Would replace" : "replaced";
+        return dryRun ? "would replace" : "replaced";
     case ResolveChangeKind::Unchanged:
         return "unchanged";
     }
@@ -282,8 +281,6 @@ static void _appendDetails(
     const LockFile* previous,
     const ResolveChange& change)
 {
-    if (change.isToolchain)
-        return;
     if (change.kind == ResolveChangeKind::Removed)
     {
         builder << "    no longer reachable from the workspace root\n";
@@ -304,17 +301,6 @@ static void _appendDetails(
         return;
     }
     _appendSelectionReason(builder, change);
-}
-
-static void _appendToolchainDetails(StringBuilder& builder, const ResolveReport& report)
-{
-    if (report.toolchainConstraints.getCount() == 0)
-        return;
-    for (const auto& constraint : report.toolchainConstraints)
-    {
-        builder << "    satisfies " << constraint.packageName << ": " << constraint.constraint
-                << "\n";
-    }
 }
 
 static void _collectChanges(
@@ -369,16 +355,6 @@ static void _collectChanges(
                 return leftOrder < rightOrder;
             return left.name < right.name;
         });
-
-    if (report.toolchainConstraints.getCount() && report.installedToolchain.getLength())
-    {
-        ResolveChange toolchain;
-        toolchain.kind = ResolveChangeKind::Unchanged;
-        toolchain.name = kSlangToolchainName;
-        toolchain.nextVersion = report.installedToolchain;
-        toolchain.isToolchain = true;
-        outChanges.add(toolchain);
-    }
 }
 
 static String _countLine(const List<ResolveChange>& changes, bool dryRun)
@@ -420,6 +396,9 @@ static String _countLine(const List<ResolveChange>& changes, bool dryRun)
         }
     }
 
+    // The summary is a standalone sentence, so it is capitalized for both the dry-run and the
+    // applied spelling. Per-package lines are list entries and stay lowercase for every verb, so
+    // capitalization tracks the role of the line rather than which verb the line happens to use.
     StringBuilder builder;
     if (moved == 0)
     {
@@ -472,34 +451,20 @@ String formatResolveReport(
                 << (goStyle ? _goHeadlineRest(change) : _headlineRest(change)) << "\n";
     };
 
-    if (!minimal)
+    if (minimal)
+    {
+        for (const auto& change : changes)
+            appendHeadline(change, true);
+        builder << "\n";
+    }
+    else
     {
         for (const auto& change : changes)
         {
             appendHeadline(change, false);
-            if (change.isToolchain)
-                _appendToolchainDetails(builder, report);
-            else
-                _appendDetails(builder, rootManifest, previous, change);
+            _appendDetails(builder, rootManifest, previous, change);
             builder << "\n";
         }
-    }
-
-    bool anyMoved = false;
-    for (const auto& change : changes)
-    {
-        if (change.kind != ResolveChangeKind::Unchanged)
-            anyMoved = true;
-        if (!minimal && change.kind == ResolveChangeKind::Unchanged)
-            continue;
-        appendHeadline(change, true);
-    }
-    if (anyMoved || minimal)
-        builder << "\n";
-    else if (!minimal)
-    {
-        // Default no-op already listed unchanged packages above; keep a blank line before the
-        // count.
     }
 
     builder << _countLine(changes, dryRun);

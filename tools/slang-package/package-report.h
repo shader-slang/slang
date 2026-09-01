@@ -70,9 +70,9 @@ struct ResolveReport
 
 /// Format a resolve report for `slang package update`.
 ///
-/// Default output is a Gradle-style rationale for each package, then Go-style one-liners for
-/// packages that moved, then a count. `--minimal` keeps the one-liners, including unchanged
-/// packages, and the count.
+/// Default output is a rationale for each selected package, then a count. `--minimal` keeps
+/// one-liners for every selected package, including unchanged ones, and the count. The installed
+/// Slang toolchain is not listed unless resolution fails its constraint.
 String formatResolveReport(
     const Manifest& rootManifest,
     const LockFile* previous,

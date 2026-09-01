@@ -41,15 +41,8 @@ SlangResult requireAllLockPackagesTrusted(
     const List<bool>& trusted,
     String& outError);
 
-/// Return a short identity string for a lock row, including Git, path, and version.
-String describeLockedPackage(const LockedPackage& package);
-
 /// True when two lock rows record the same identity, exports, and declared dependencies.
 bool lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right);
-
-/// Append human-readable lines describing how `next` differs from `previous`.
-/// Pass a null `previous` when no lock exists yet.
-void describeLockDiff(const LockFile* previous, const LockFile& next, List<String>& outLines);
 
 } // namespace PackageTool
 } // namespace Slang

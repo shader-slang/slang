@@ -1009,7 +1009,8 @@ there is no checkout replacement to authorize.
 rationale.
 
 **It changes:** report formatting only. Added, removed, upgraded, downgraded, replaced, and
-unchanged package lines remain, followed by summary counts.
+unchanged package lines remain, followed by summary counts. A detailed report already includes
+that information plus rationale, so it does not repeat the one-line list.
 
 **It does not change:** resolution, validation, materialization, or lock output. It is valid on
 both dry-run and real update.
@@ -1275,7 +1276,8 @@ them or update this chapter and its regression tests in the same change.
 ### Output and side-effect contract
 
 - Detailed update output explains what moved, what stayed, and the incoming constraints.
-- `--minimal` retains one-line changes, unchanged packages, and summary counts.
+- `--minimal` retains one-line changes, unchanged packages, and summary counts. Detailed reports
+  include rationale only, then the summary. The installed toolchain is not listed on success.
 - Dependency add/remove changes only the manifest; tree and why read only the current graph.
 - Materialization prints per-package source/checkout progress. A failure explains that the prior
   lock remains authoritative and how to recover potentially partial derived state.

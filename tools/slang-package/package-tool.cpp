@@ -629,8 +629,8 @@ static SlangResult _validateMaterializedManifests(
         if (SLANG_FAILED(
                 readManifest(Path::combine(packageRoot, kManifestName), manifest, outError)))
         {
-            outError =
-                String("Cannot read locked package manifest '") + package.name + "'. " + outError;
+            outError = String("Cannot read the dependency manifest of locked package '") +
+                       package.name + "'. " + outError;
             return SLANG_FAIL;
         }
         if (!(allowLocalManifestChanges && localIndex >= 0))
@@ -1230,31 +1230,69 @@ static SlangResult _status(const String& projectRoot, String& outError)
     if (SLANG_FAILED(_validateLocalPackages(projectRoot, lock, localPackages, issue)))
         addIssue(issue);
 
-    List<String> warnings;
-    issue = String();
-    if (SLANG_FAILED(_validateMaterializedManifests(
-            projectRoot,
-            manifest,
-            lock,
-            localPackages,
-            issue,
-            false,
-            &warnings)))
-    {
-        appendErrorAdvice(
-            issue,
-            "Run 'slang package fetch' if packages are missing, or 'slang package update' "
-            "if a path-package manifest changed.");
-        addIssue(issue);
-    }
-    for (const auto& warning : warnings)
-        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
-
-    Index cleanCheckoutCount = 0;
+    // Find the tool-owned checkouts that are absent before inspecting anything inside them.
+    // Reading a dependency's own `slang-package.json` and asking Git about its checkout both fail
+    // for an absent directory, and those failures would only restate the absence -- one as a
+    // missing JSON file, the other as Git refusing to run in a directory that does not exist.
+    List<String> toolOwnedNames;
+    List<String> unmaterializedNames;
     for (const auto& package : lock.packages)
     {
-        Index localIndex = findActiveLocalPackageIndex(localPackages, package.name);
-        if (localIndex >= 0 || package.path.getLength())
+        if (findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
+            package.path.getLength())
+            continue;
+        toolOwnedNames.add(package.name);
+        String packageRoot =
+            Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest), package.name);
+        SlangPathType pathType;
+        if (SLANG_FAILED(Path::getPathType(packageRoot, &pathType)) ||
+            pathType != SLANG_PATH_TYPE_DIRECTORY)
+            unmaterializedNames.add(package.name);
+    }
+
+    Index cleanCheckoutCount = 0;
+    if (unmaterializedNames.getCount())
+    {
+        StringBuilder detail;
+        detail << unmaterializedNames.getCount()
+               << " locked package(s) are not materialized under '"
+               << getWorkspaceDepsDirectory(manifest) << "/': ";
+        for (Index i = 0; i < unmaterializedNames.getCount(); ++i)
+            detail << (i ? ", " : "") << unmaterializedNames[i];
+        detail << ". Run 'slang package fetch' to materialize them.";
+        addIssue(detail);
+    }
+    else
+    {
+        // Validating the manifest closure requires walking every reachable dependency manifest, so
+        // it can only run once all of them are present.
+        List<String> warnings;
+        issue = String();
+        if (SLANG_FAILED(_validateMaterializedManifests(
+                projectRoot,
+                manifest,
+                lock,
+                localPackages,
+                issue,
+                false,
+                &warnings)))
+        {
+            appendErrorAdvice(
+                issue,
+                "Run 'slang package update' if a path or override package manifest changed.");
+            addIssue(issue);
+        }
+        for (const auto& warning : warnings)
+            fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
+    }
+
+    // Inspect each checkout that is present, even when a sibling is absent. A present checkout can
+    // still carry the wrong origin or uncommitted work, which is separate information rather than a
+    // restatement of the absence reported above.
+    for (const auto& package : lock.packages)
+    {
+        if (findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
+            package.path.getLength() || unmaterializedNames.indexOf(package.name) >= 0)
             continue;
         String packageRoot =
             Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest), package.name);
@@ -1262,8 +1300,10 @@ static SlangResult _status(const String& projectRoot, String& outError)
         issue = String();
         if (SLANG_FAILED(getRepositoryOrigin(packageRoot, origin, issue)))
         {
-            appendErrorAdvice(issue, "Run 'slang package fetch' to restore this checkout.");
-            addIssue(issue);
+            addIssue(
+                String("Package checkout '") + package.name +
+                "' is not a Git repository with an 'origin' remote. Run 'slang package fetch "
+                "--clean' to replace it.");
             continue;
         }
         if (origin != package.git)
@@ -1372,7 +1412,14 @@ static SlangResult _status(const String& projectRoot, String& outError)
             }
         }
     }
-    fprintf(stdout, "%lld tool-owned Git checkout(s) are clean.\n", (long long)cleanCheckoutCount);
+    if (toolOwnedNames.getCount())
+    {
+        fprintf(
+            stdout,
+            "%lld of %lld tool-owned Git checkout(s) are clean.\n",
+            (long long)cleanCheckoutCount,
+            (long long)toolOwnedNames.getCount());
+    }
     if (issueCount)
     {
         outError = String("Workspace is not clean or portable:\n") + issues;
