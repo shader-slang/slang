@@ -16,7 +16,7 @@
 // query inst at all; the CHECK-NOT lines are scoped to the entry point body so
 // unrelated core-module code cannot satisfy them.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<uint> outputBuffer;
 

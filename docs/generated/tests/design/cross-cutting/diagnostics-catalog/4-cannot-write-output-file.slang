@@ -16,7 +16,7 @@
 // write fail after codegen succeeds, so the CHECK pins the write-side code
 // rather than any front-end error.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -o /nonexistent-dir-xyz/out.hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -o nonexistent-dir-xyz/out.hlsl
 [numthreads(1,1,1)]
 void main() {}
 

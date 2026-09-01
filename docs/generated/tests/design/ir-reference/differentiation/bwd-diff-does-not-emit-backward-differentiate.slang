@@ -19,7 +19,7 @@
 // by the `LegacyBackwardDifferentiate` and `TrivialBackwardDifferentiate`
 // spellings, which contain the shorter name as a substring.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

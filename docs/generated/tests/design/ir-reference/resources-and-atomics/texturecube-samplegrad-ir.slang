@@ -15,7 +15,7 @@
 // so the CHECK pins the cube shape tag together with the texture,
 // sampler, and both gradient arguments.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform TextureCube<float4> tex;
 uniform SamplerState samp;
