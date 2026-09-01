@@ -2697,13 +2697,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-// Returns true if the current JSON-RPC response's `result` is JSON `null`.
-//
-// Inspects the raw result kind instead of deserializing with getMessage(): getMessage() into a
-// zero-field struct succeeds on `{}` and fails on real `null`, so it cannot tell the two apart —
-// and distinguishing them is exactly what the null-result LANG_SERVER tests assert (see #12869,
-// where an empty hover must serialize as `null`, not `{}`). Folding this back to a typed
-// getMessage() check would silently reinstate that bug.
+// Inspect the raw result kind: deserializing into a zero-field struct via getMessage() accepts `{}`
+// but rejects JSON `null`, so it cannot detect a null result.
 static bool receivedNullResult(JSONRPCConnection* connection)
 {
     JSONResultResponse resultResponse;
