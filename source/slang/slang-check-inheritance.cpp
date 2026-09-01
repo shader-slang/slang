@@ -1177,6 +1177,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
                     ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
+                    // The endpoint reads before `ensureDecl` were only for relevance filtering.
+                    // Read the fully checked constraint below to select its base.
                     Type* baseType = nullptr;
                     if (isEqualityConstraint)
                     {
@@ -1190,6 +1192,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
                         bool selfIsSub = doesEndpointMatchSelfType(checkedSub);
                         bool selfIsSup = doesEndpointMatchSelfType(checkedSup);
+
+                        // Equality checking only reorders the endpoints; it does not replace
+                        // them. The prefilter matched at least one endpoint, so at least one of
+                        // the checked endpoints must still match.
                         SLANG_RELEASE_ASSERT(selfIsSub || selfIsSup);
 
                         baseType = selfIsSub ? checkedSup : checkedSub;
