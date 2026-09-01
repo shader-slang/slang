@@ -8,7 +8,7 @@ Writing Module Files, Import, and Include
 
 This chapter is for authors of Slang modules and source packages. It states how to name files, how to write `import` and `__include`, and how those constructs are resolved. The compiler rules are the same whether or not you use `slang package`; the package layout is the conventional way to keep those rules from colliding across dependencies.
 
-The language model for modules, `__include` versus `#include`, and `public` / `internal` / `private` is in [Modules and Access Control](modules). Fetching and validating packages is in [Slang Source Packages](source-packages). A command walkthrough is in [Using Source Packages](source-package-workflow). Command success and failure contracts are in [Source Package Command Use Cases](source-package-command-use-cases).
+The language model for modules, `__include` versus `#include`, and `public` / `internal` / `private` is in [Modules and Access Control](modules). Fetching and validating packages is in [Slang Source Packages](source-packages). A command walkthrough is in [Using Source Packages](source-package-workflow). Human package-growth journeys and command contracts are in [Growing an Application with Source Packages](source-package-command-use-cases).
 
 ## A running example
 
@@ -83,15 +83,15 @@ void computeMain(uint2 tid: SV_DispatchThreadID)
 }
 ```
 
-Compile that shader with the export root on the search path, for example `slangc app/tonemap.slang -I src ...`. After `slang package fetch`, pass each path listed in `.slang/search-paths` the same way.
+Compile that shader with the export root on the search path, for example `slangc app/tonemap.slang -I src ...`. After `slang package fetch`, pass each path listed in `build/search-paths` the same way.
 
 ## Primary files and import paths
 
 Every module has exactly one primary file. In a package, every `.slang` file that is not under another module's companion directory is a primary.
 
-| Role | Example | First declaration | How others refer to it |
-| --- | --- | --- | --- |
-| Primary | `src/acme/noise.slang` | `module noise;` | `import acme.noise;` |
+| Role      | Example                     | First declaration     | How others refer to it                                                              |
+| --------- | --------------------------- | --------------------- | ----------------------------------------------------------------------------------- |
+| Primary   | `src/acme/noise.slang`      | `module noise;`       | `import acme.noise;`                                                                |
 | Companion | `src/acme/noise/hash.slang` | `implementing noise;` | `__include "noise/hash";` from the primary (or another file already in this module) |
 
 The filename of the primary (without extension) must match `NAME` in `module NAME;`. `slang package validate` enforces that, and also requires that the same import path is not exported by two packages in the lockfile.

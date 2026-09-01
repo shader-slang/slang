@@ -12,7 +12,7 @@ its build command emits `.slang-module` files for the resolved graph and optiona
 executables. A command-order walkthrough using the public `video-preview` demo is in
 [Using Source Packages](source-package-workflow). Expected success and failure for each command,
 used when changing the tool, is in
-[Source Package Command Use Cases](source-package-command-use-cases).
+[Growing an Application with Source Packages](source-package-command-use-cases).
 
 A **package** is a directory with `slang-package.json`. Its name, exports, license files, and
 dependencies apply wherever that package appears in a graph, including as a Git pin or a path
