@@ -1945,17 +1945,22 @@ public:
     // the name of a non-proper type, and then have the compiler fill
     // in the default values for its type arguments (e.g., a variable
     // given type `Texture2D` will actually have type `Texture2D<float4>`).
+    // `allowTypeConjunction` is set for a pure type-naming position -- a `typealias` RHS, or an
+    // operand of `&` (`A & B & C` nests as `(A & B) & C`) -- where a conjunction is a legal name
+    // for later use as a constraint/inheritance clause. In every other (value-type) position a
+    // conjunction is rejected here with `E30133`.
     bool CoerceToProperTypeImpl(
         TypeExp const& typeExp,
         Type** outProperType,
-        DiagnosticSink* diagSink);
+        DiagnosticSink* diagSink,
+        bool allowTypeConjunction = false);
 
-    TypeExp CoerceToProperType(TypeExp const& typeExp);
+    TypeExp CoerceToProperType(TypeExp const& typeExp, bool allowTypeConjunction = false);
 
     TypeExp tryCoerceToProperType(TypeExp const& typeExp);
 
     // Check a type, and coerce it to be proper
-    TypeExp CheckProperType(TypeExp typeExp);
+    TypeExp CheckProperType(TypeExp typeExp, bool allowTypeConjunction = false);
 
     // For our purposes, a "usable" type is one that can be
     // used to declare a function parameter, variable, etc.

@@ -7455,6 +7455,13 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
         arg = CheckTerm(arg);
     }
 
+    // If the target failed to resolve to a proper type (e.g. a conjunction, rejected by
+    // `CoerceToProperType`), stop here rather than processing the cast as a construction call
+    // below -- that would re-diagnose the same invalid target type. Arguments are checked first
+    // (above) so their own diagnostics are not suppressed.
+    if (as<ErrorType>(typeExp.type))
+        return expr;
+
     if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang202cOrLater(this))
     {
         // SLANG <=2026 LEGACY FEATURE:
@@ -9253,10 +9260,12 @@ Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
 
 Expr* SemanticsExprVisitor::visitAndTypeExpr(AndTypeExpr* expr)
 {
-    // The left and right sides of an `&` for types must both be types.
-    //
-    expr->left = CheckProperType(expr->left);
-    expr->right = CheckProperType(expr->right);
+    // The left and right sides of an `&` for types must both be types, and either side may itself
+    // be a conjunction (`A & B & C` parses as `(A & B) & C`), so a conjunction operand is permitted
+    // here -- the whole conjunction is flattened by its constraint/inheritance consumer. (A
+    // conjunction used as the type of a *value* is still rejected at that value position.)
+    expr->left = CheckProperType(expr->left, /*allowTypeConjunction:*/ true);
+    expr->right = CheckProperType(expr->right, /*allowTypeConjunction:*/ true);
 
     // TODO: We should enforce some rules here about what is allowed
     // for the `left` and `right` types.

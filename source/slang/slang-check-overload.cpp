@@ -3393,6 +3393,21 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         arg = maybeOpenExistential(arg);
     }
 
+    // An invoke whose callee names a conjunction (`(A & B)(x)`) would construct a value of the
+    // conjunction, so constructor overload resolution below queries its members and reaches member
+    // lookup with an un-flattened `AndType` (which asserts). A type-callee's members are looked up
+    // before it is ever coerced as a value type, so -- unlike every other value-type position,
+    // which the `CoerceToProperType` bottleneck rejects -- this one is rejected here.
+    if (auto calleeTypeType = as<TypeType>(funcExpr->type))
+    {
+        if (auto conjunction = as<AndType>(calleeTypeType->getType()))
+        {
+            getSink()->diagnose(
+                Diagnostics::ConjunctionTypeAsValueType{.type = conjunction, .expr = funcExpr});
+            return CreateErrorExpr(expr);
+        }
+    }
+
     context.originalExpr = expr;
     context.funcLoc = funcExpr->loc;
     context.argCount = expr->arguments.getCount();

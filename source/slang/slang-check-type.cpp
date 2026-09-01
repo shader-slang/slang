@@ -271,7 +271,8 @@ bool isManagedType(Type* type)
 bool SemanticsVisitor::CoerceToProperTypeImpl(
     TypeExp const& typeExp,
     Type** outProperType,
-    DiagnosticSink* diagSink)
+    DiagnosticSink* diagSink,
+    bool allowTypeConjunction)
 {
     Type* result = nullptr;
     Type* type = typeExp.type;
@@ -446,6 +447,21 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         result = type;
     }
 
+    // A type conjunction (`A & B`) has no representation as a value, so it is not a proper type.
+    // This is the single bottleneck for "a conjunction written as the type of a value". Generic
+    // constraints and inheritance clauses resolve via `TranslateTypeNode` + flattening and never
+    // reach here. Pure type-naming positions that *may* name a conjunction -- a `typealias` RHS and
+    // an operand of `&` -- do reach here but set `allowTypeConjunction` to permit the name.
+    if (!allowTypeConjunction && as<AndType>(result))
+    {
+        if (diagSink)
+            diagSink->diagnose(
+                Diagnostics::ConjunctionTypeAsValueType{.type = result, .expr = typeExp.exp});
+        if (outProperType)
+            *outProperType = m_astBuilder->getErrorType();
+        return false;
+    }
+
     // Check for invalid types.
     // We don't allow pointers to managed types.
     if (auto ptrType = as<PtrType>(result))
@@ -461,10 +477,10 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
     return true;
 }
 
-TypeExp SemanticsVisitor::CoerceToProperType(TypeExp const& typeExp)
+TypeExp SemanticsVisitor::CoerceToProperType(TypeExp const& typeExp, bool allowTypeConjunction)
 {
     TypeExp result = typeExp;
-    CoerceToProperTypeImpl(typeExp, &result.type, getSink());
+    CoerceToProperTypeImpl(typeExp, &result.type, getSink(), allowTypeConjunction);
     return result;
 }
 
@@ -476,9 +492,9 @@ TypeExp SemanticsVisitor::tryCoerceToProperType(TypeExp const& typeExp)
     return result;
 }
 
-TypeExp SemanticsVisitor::CheckProperType(TypeExp typeExp)
+TypeExp SemanticsVisitor::CheckProperType(TypeExp typeExp, bool allowTypeConjunction)
 {
-    return CoerceToProperType(TranslateTypeNode(typeExp));
+    return CoerceToProperType(TranslateTypeNode(typeExp), allowTypeConjunction);
 }
 
 TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
