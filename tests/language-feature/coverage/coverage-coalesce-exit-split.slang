@@ -10,6 +10,7 @@
 // path, and the split still happens at its call site in `fragMain`.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage fragment -entry fragMain -trace-coverage
+//TEST:SIMPLE(filecheck=BOOLEAN):-target spirv-asm -stage fragment -entry fragMain -trace-coverage -trace-coverage-boolean
 
 void maybeKill(float v)
 {
@@ -41,3 +42,12 @@ float4 fragMain(float2 uv : TEXCOORD) : SV_Target
 // And no fifth region: the split is at the call, not at every
 // statement.
 //CHECK-NOT: %__slang_coverage {{.*}} %int_4
+
+// Boolean recording changes what a probe writes, not where regions break, so
+// the split has to survive it. The boolean test elsewhere only shows that a
+// straight-line region still coalesces under this mode; nothing showed the
+// exit analysis still fires, so a regression that split only under counting
+// mode would pass every other test.
+//BOOLEAN-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_2
+//BOOLEAN-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_3
+//BOOLEAN-NOT: OpAtomicIAdd
