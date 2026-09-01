@@ -10,6 +10,7 @@ namespace Slang
 // Returns true if `inst` is the `MatrixLayoutMode.Unknown` literal, i.e. a layout the source
 // left unspecified. `MatrixLayoutMode` is an enum rather than an `int` so that this stays
 // recognizable as a generic argument, where an `int` would look like a row or column count.
+// `inst` may be any operand (e.g. a `specialize` argument), so a non-layout is simply `false`.
 static bool isUnknownMatrixLayout(IRInst* inst, IRType* matrixLayoutModeType)
 {
     auto lit = as<IRIntLit>(inst);
@@ -26,23 +27,27 @@ struct UnresolvedMatrixLayoutCollector
     List<IRMatrixType*> matrixTypes;
     List<IRSpecialize*> specializeInsts;
 
-    void visit(IRInst* parent)
+    void visitMatrixTypes(IRInst* parent)
     {
         for (auto child : parent->getChildren())
         {
             if (auto matrixType = as<IRMatrixType>(child))
             {
-                // Any matrix type identifies `MatrixLayoutMode` for us.
+                // Any matrix type identifies `MatrixLayoutMode` for us. Types are deduplicated,
+                // so every layout operand must share it; a mismatch would be silently skipped.
+                auto layout = matrixType->getLayout();
                 if (!matrixLayoutModeType)
-                    matrixLayoutModeType = matrixType->getLayout()->getFullType();
+                    matrixLayoutModeType = layout->getFullType();
+                SLANG_ASSERT(layout->getFullType() == matrixLayoutModeType);
 
-                if (isUnknownMatrixLayout(matrixType->getLayout(), matrixLayoutModeType))
+                if (isUnknownMatrixLayout(layout, matrixLayoutModeType))
                     matrixTypes.add(matrixType);
             }
-            visit(child);
+            visitMatrixTypes(child);
         }
     }
 
+    // Requires `matrixLayoutModeType`, i.e. call after `visitMatrixTypes`.
     void visitSpecializeInsts(IRInst* parent)
     {
         for (auto child : parent->getChildren())
@@ -66,7 +71,7 @@ struct UnresolvedMatrixLayoutCollector
 void specializeMatrixLayout(IRModule* module, TargetProgram* target)
 {
     UnresolvedMatrixLayoutCollector collector;
-    collector.visit(module->getModuleInst());
+    collector.visitMatrixTypes(module->getModuleInst());
     if (!collector.matrixLayoutModeType)
         return;
     collector.visitSpecializeInsts(module->getModuleInst());
