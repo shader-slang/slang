@@ -926,6 +926,78 @@ static IRFunc* getStaticallyResolvedCallee(IRInst* callee)
 // future abandoning intrinsic modeled the same way. Slang's IR has no
 // `[noreturn]` concept to key off instead. Marking them in the
 // core module is the principled fix and is tracked separately.
+// Returns true when every block reachable from `func`'s entry can still
+// reach a normal exit — an `IRReturn`, or an `IRGenericAsm`, which is how
+// `__intrinsic_asm` lowers and which ends the function the same way.
+//
+// Asking whether a normal exit is *present* is not enough, and the
+// difference is a real under-reporting bug rather than imprecision.
+// Consider:
+//
+//     void h(bool c) { if (c) { for (;;) { } } }
+//
+// The else path lowers to a reachable `return_val`, so a presence check
+// concludes `h` returns and a caller coalesces across the call to it. When
+// `c` is true `h` diverges instead, so a probe placed after the call never
+// fires and the statements before it — which did execute — report zero
+// hits. Reachability catches it: the `for (;;)` block is reachable from
+// entry and can reach no exit at all.
+//
+// The same walk covers the case where lowering leaves a dead `IRReturn` in
+// a body that cannot return, since an unreachable block is never
+// considered.
+static bool everyReachablePathCanExit(IRFunc* func)
+{
+    auto entry = func->getFirstBlock();
+    if (!entry)
+        return true;
+
+    // Blocks that can reach a normal exit, found by walking predecessors
+    // back from every block that terminates in one.
+    HashSet<IRBlock*> canExit;
+    List<IRBlock*> workList;
+    for (auto block : func->getBlocks())
+    {
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
+        if (terminator->getOp() == kIROp_Return || terminator->getOp() == kIROp_GenericAsm)
+        {
+            if (canExit.add(block))
+                workList.add(block);
+        }
+    }
+    while (workList.getCount())
+    {
+        auto block = workList.getLast();
+        workList.removeLast();
+        for (auto pred : block->getPredecessors())
+        {
+            if (canExit.add(pred))
+                workList.add(pred);
+        }
+    }
+
+    // Walk forward from the entry; any block reached that cannot itself
+    // reach an exit means some execution never returns.
+    HashSet<IRBlock*> visited;
+    visited.add(entry);
+    workList.add(entry);
+    while (workList.getCount())
+    {
+        auto block = workList.getLast();
+        workList.removeLast();
+        if (!canExit.contains(block))
+            return false;
+        for (auto succ : block->getSuccessors())
+        {
+            if (visited.add(succ))
+                workList.add(succ);
+        }
+    }
+    return true;
+}
+
 struct CoverageFunctionExitAnalysis
 {
     // `true` when the function may abandon the invocation instead of
@@ -1000,40 +1072,17 @@ struct CoverageFunctionExitAnalysis
             return true;
 
         bool result = false;
-        bool sawNormalExit = false;
         for (auto block : func->getBlocks())
         {
             for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
             {
-                // `IRGenericAsm` is how `__intrinsic_asm` lowers, and it
-                // carries return semantics: it ends the function and
-                // hands the value back, exactly like `IRReturn`. Most
-                // core-module math (`dot`, `lerp`, ...) exits this way,
-                // so counting it as a normal exit is what keeps a call
-                // to an ordinary intrinsic from splitting every run.
-                if (inst->getOp() == kIROp_Return || inst->getOp() == kIROp_GenericAsm)
-                    sawNormalExit = true;
                 if (!result && mayNotFallThrough(inst))
                     result = true;
             }
         }
-        // A body with no normal exit anywhere never returns to its
-        // caller, which covers an unconditional exit and a
-        // non-terminating loop.
-        //
-        // The scan above is unfiltered: any `IRReturn`/`IRGenericAsm` in
-        // any block sets `sawNormalExit`, with no reachability check. That
-        // is sound only because the front end does not leave an
-        // unreachable normal exit in a body that cannot return -- a
-        // function that never returns has no `IRReturn` to find, which is
-        // what makes `for (;;) {}` reach this branch at all. If that ever
-        // stopped holding, the failure would be in the dangerous
-        // direction: a dead `IRReturn` would set `sawNormalExit`, this
-        // split would be skipped, and callers would coalesce across a call
-        // that does not come back. Restricting the scan to exits reachable
-        // from the entry block would remove the dependence on that
-        // property, at the cost of a reachability walk per function.
-        if (!sawNormalExit)
+        // A path that cannot reach a normal exit means the function may
+        // not return, even when other paths do.
+        if (!everyReachablePathCanExit(func))
             result = true;
 
         inProgress.remove(func);
