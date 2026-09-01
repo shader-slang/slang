@@ -222,11 +222,7 @@ void IRInstListBase::Iterator::operator++()
 {
     if (inst)
     {
-        // `peek` rather than `getNextInst`: `first`/`last` only ever come from an
-        // already-materialized parent (getFirstChild/getLastChild and everything built
-        // on them), and materialization is one-way, so re-checking the parent's flag on
-        // every step re-derives a fact this list already established once.
-        inst = inst->peekNextInst();
+        inst = inst->getNextInst();
     }
 }
 
@@ -236,7 +232,7 @@ IRInstListBase::Iterator IRInstListBase::begin()
 }
 IRInstListBase::Iterator IRInstListBase::end()
 {
-    return Iterator(last ? last->peekNextInst() : nullptr);
+    return Iterator(last ? last->getNextInst() : nullptr);
 }
 
 //

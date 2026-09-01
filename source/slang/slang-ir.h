@@ -1248,36 +1248,33 @@ IRFilteredInstList<T>::IRFilteredInstList(IRInst* fst, IRInst* lst)
     first = fst;
     last = lst;
 
-    // `peek` throughout: `fst`/`lst` are children of a common parent that whoever built
-    // this list already materialized (getFirstChild/getLastChild and everything built on
-    // them), and materialization is one-way, so there is nothing left to re-check here.
-    auto lastIter = last ? last->peekNextInst() : nullptr;
+    auto lastIter = last ? last->getNextInst() : nullptr;
     while (first != lastIter && !as<T>(first))
-        first = first->peekNextInst();
+        first = first->getNextInst();
     while (last && last != first && !as<T>(last))
-        last = last->peekPrevInst();
+        last = last->getPrevInst();
 }
 
 template<typename T>
 void IRFilteredInstList<T>::Iterator::operator++()
 {
-    inst = inst->peekNextInst();
+    inst = inst->getNextInst();
     while (inst != exclusiveLast && !as<T>(inst))
     {
-        inst = inst->peekNextInst();
+        inst = inst->getNextInst();
     }
 }
 template<typename T>
 typename IRFilteredInstList<T>::Iterator IRFilteredInstList<T>::begin()
 {
-    auto lastIter = last ? last->peekNextInst() : nullptr;
+    auto lastIter = last ? last->getNextInst() : nullptr;
     return IRFilteredInstList<T>::Iterator(first, lastIter);
 }
 
 template<typename T>
 typename IRFilteredInstList<T>::Iterator IRFilteredInstList<T>::end()
 {
-    auto lastIter = last ? last->peekNextInst() : nullptr;
+    auto lastIter = last ? last->getNextInst() : nullptr;
     return IRFilteredInstList<T>::Iterator(lastIter, lastIter);
 }
 
