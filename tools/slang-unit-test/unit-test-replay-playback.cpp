@@ -770,3 +770,220 @@ SLANG_UNIT_TEST(replayContextOrphanSweepKeepsEntryPointRetention)
     entryPoint->release();
     SLANG_CHECK(TestOwningProxy::s_owningProxyDestroyed == 1);
 }
+
+// =============================================================================
+// Custom-file-system createSession playback tests
+// =============================================================================
+
+// A minimal user-supplied ISlangFileSystem, used to drive createSession down the
+// custom-file-system arms of GlobalSessionProxy::createSession that the default
+// tests never reach. It only needs COM identity plus a loadFile that never gets
+// called (these tests create a session but compile nothing), so loadFile and
+// castAs are stubbed out. s_liveCount lets a test observe that every reference the
+// createSession record/playback paths take on a user file system is also released:
+// a residual reference leaves the count above zero after teardown, which a leak
+// sanitizer would flag but a Debug run would otherwise miss.
+class TestFileSystem : public ISlangFileSystem
+{
+public:
+    TestFileSystem() { ++s_liveCount; }
+    virtual ~TestFileSystem() { --s_liveCount; }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) override
+    {
+        // Single-inheritance chain (ISlangFileSystem : ISlangCastable : ISlangUnknown),
+        // so `this` is the canonical identity for all three; anything else (e.g. the
+        // Ext / Mutable file-system interfaces) is genuinely unsupported, so createSession
+        // wraps us as a plain read-only ISlangFileSystem.
+        if (uuid == ISlangFileSystem::getTypeGuid() || uuid == ISlangCastable::getTypeGuid() ||
+            uuid == ISlangUnknown::getTypeGuid())
+        {
+            *outObject = static_cast<ISlangFileSystem*>(this);
+            addRef();
+            return SLANG_OK;
+        }
+        *outObject = nullptr;
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return ++m_refCount; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override
+    {
+        uint32_t count = --m_refCount;
+        if (count == 0)
+            delete this;
+        return count;
+    }
+
+    SLANG_NO_THROW void* SLANG_MCALL castAs(SlangUUID const& uuid) override
+    {
+        SLANG_UNUSED(uuid);
+        return nullptr;
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) override
+    {
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(outBlob);
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    /// Number of live instances, so a test can assert the createSession paths leak
+    /// no reference onto a user-supplied file system.
+    static std::atomic<int> s_liveCount;
+
+private:
+    std::atomic<uint32_t> m_refCount{1};
+};
+
+std::atomic<int> TestFileSystem::s_liveCount{0};
+
+// Record and play back a single createSession that supplies a custom
+// ISlangFileSystem on SessionDesc::fileSystem. This is the arm the default tests
+// never hit: on writing it records kCustomFileSystemHandle and wraps the user file
+// system, and on playback it takes the kCustomFileSystemHandle branch that does
+// `new NULLFileSystem(); addRef(); wrapObject(nfs)` and the guarded owning-reference
+// release() in GlobalSessionProxy::createSession. The final s_liveCount check pins
+// that no reference is leaked onto the user file system, and the orphan-count check
+// pins that the recreated session was noted as an orphaned playback proxy, so a
+// regression that stopped the dispatcher noting orphans fails here rather than only
+// surfacing as a sanitizer leak.
+SLANG_UNIT_TEST(replayContextCustomFileSystemSessionPlayback)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    TestFileSystem::s_liveCount = 0;
+
+    // The constructor starts the refcount at 1; adopt that reference rather than
+    // adding a second one the test never releases.
+    TestFileSystem* fileSystem = new TestFileSystem();
+    Slang::ComPtr<ISlangFileSystem> fileSystemPtr(Slang::INIT_ATTACH, fileSystem);
+    SLANG_CHECK(TestFileSystem::s_liveCount == 1);
+
+    ctx().enable();
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> recordedGlobalSession;
+    Slang::ComPtr<slang::ISession> recordedSession;
+    {
+        SlangGlobalSessionDesc globalDesc = {};
+        globalDesc.apiVersion = 0;
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
+        slang::SessionDesc sessionDesc = {};
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV;
+        targetDesc.profile = recordedGlobalSession->findProfile("spirv_1_5");
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.targetCount = 1;
+        // The custom file system routes createSession down the kCustomFileSystemHandle
+        // path instead of the default-file-system path every other test exercises.
+        sessionDesc.fileSystem = fileSystemPtr.get();
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            recordedGlobalSession->createSession(sessionDesc, recordedSession.writeRef())));
+    }
+
+    uint64_t recordedSessionHandle = ctx().getProxyHandle(recordedSession.get());
+    SLANG_CHECK(recordedSessionHandle >= kFirstValidHandle);
+
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isPlayback());
+    ctx().executeAll();
+    ctx().disable();
+
+    // The session was recreated by playback and noted as an orphaned proxy.
+    ISlangUnknown* playedBackSessionUnk = ctx().getProxy(recordedSessionHandle);
+    SLANG_CHECK(playedBackSessionUnk != nullptr);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(playedBackSessionUnk) > 0);
+
+    // Drop everything that could hold a reference on the user file system -- the
+    // recorded session (whose real session holds the file-system proxy that in turn
+    // holds our object) and the registries/orphan set that reset() drains -- then
+    // release our own reference. If the createSession paths balanced their
+    // references, the object is gone; a residual reference is a leak.
+    recordedSession.setNull();
+    recordedGlobalSession.setNull();
+    ctx().reset();
+    SLANG_CHECK(TestFileSystem::s_liveCount == 1); // only fileSystemPtr remains
+    fileSystemPtr.setNull();
+    SLANG_CHECK(TestFileSystem::s_liveCount == 0);
+}
+
+// Record and play back two createSession calls that supply the *same* custom
+// ISlangFileSystem object. The first call sees an unregistered file system and
+// records kCustomFileSystemHandle (as above); the second sees it already registered
+// (isInterfaceRegistered / getProxyHandle) and records the file-system proxy handle,
+// so on playback the second call takes the `default:` branch --
+// `toSlangInterface(getProxy(handle))`, a *borrowed* pointer for which
+// ownsFileSystemWrapper stays false and no release() runs. That arm's failure mode
+// is a double-release / use-after-free rather than a leak, which the leak
+// suppression net structurally cannot catch, so covering it needs a test that
+// executes it. The s_liveCount check additionally catches a residual reference on
+// the registered-file-system write arm.
+SLANG_UNIT_TEST(replayContextCustomFileSystemRegisteredSessionPlayback)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    TestFileSystem::s_liveCount = 0;
+
+    TestFileSystem* fileSystem = new TestFileSystem();
+    Slang::ComPtr<ISlangFileSystem> fileSystemPtr(Slang::INIT_ATTACH, fileSystem);
+    SLANG_CHECK(TestFileSystem::s_liveCount == 1);
+
+    ctx().enable();
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> recordedGlobalSession;
+    Slang::ComPtr<slang::ISession> recordedSession1;
+    Slang::ComPtr<slang::ISession> recordedSession2;
+    {
+        SlangGlobalSessionDesc globalDesc = {};
+        globalDesc.apiVersion = 0;
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
+        slang::SessionDesc sessionDesc = {};
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV;
+        targetDesc.profile = recordedGlobalSession->findProfile("spirv_1_5");
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.targetCount = 1;
+        sessionDesc.fileSystem = fileSystemPtr.get();
+
+        // First call: file system not yet registered -> kCustomFileSystemHandle.
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            recordedGlobalSession->createSession(sessionDesc, recordedSession1.writeRef())));
+        // Second call, same file-system object: now registered -> records its proxy
+        // handle, so playback takes the `default:` branch.
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            recordedGlobalSession->createSession(sessionDesc, recordedSession2.writeRef())));
+    }
+
+    uint64_t sessionHandle1 = ctx().getProxyHandle(recordedSession1.get());
+    uint64_t sessionHandle2 = ctx().getProxyHandle(recordedSession2.get());
+    SLANG_CHECK(sessionHandle1 >= kFirstValidHandle);
+    SLANG_CHECK(sessionHandle2 >= kFirstValidHandle);
+    SLANG_CHECK(sessionHandle1 != sessionHandle2);
+
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isPlayback());
+    ctx().executeAll();
+    ctx().disable();
+
+    // Both sessions were recreated: the first via the kCustomFileSystemHandle branch,
+    // the second via the borrowed `default:` branch.
+    SLANG_CHECK(ctx().getProxy(sessionHandle1) != nullptr);
+    SLANG_CHECK(ctx().getProxy(sessionHandle2) != nullptr);
+
+    recordedSession1.setNull();
+    recordedSession2.setNull();
+    recordedGlobalSession.setNull();
+    ctx().reset();
+    SLANG_CHECK(TestFileSystem::s_liveCount == 1); // only fileSystemPtr remains
+    fileSystemPtr.setNull();
+    SLANG_CHECK(TestFileSystem::s_liveCount == 0);
+}

@@ -80,14 +80,23 @@ public:
             uint64_t handle = 0;
             if (desc.fileSystem)
             {
-                desc.fileSystem->addRef();
                 if (_ctx.isInterfaceRegistered(desc.fileSystem))
                 {
+                    // Already wrapped once: wrapObject() returns the existing proxy
+                    // and only adds a reference to that proxy, leaving the user's
+                    // file system untouched, so no reference is owed on it here.
                     desc2.fileSystem = wrapObject(desc.fileSystem);
                     handle = _ctx.getProxyHandle(desc2.fileSystem);
                 }
                 else
                 {
+                    // wrapObject() -> tryWrap() takes ownership of one reference on
+                    // the file system (it calls desc.fileSystem->release()), so
+                    // pre-add one here for it to consume; otherwise it would consume
+                    // the caller's own reference. The already-registered branch above
+                    // needs no such addRef: wrapObject() there returns the existing
+                    // proxy and never releases the file system.
+                    desc.fileSystem->addRef();
                     desc2.fileSystem = wrapObject(desc.fileSystem);
                     handle = kCustomFileSystemHandle;
                 }
