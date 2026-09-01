@@ -298,12 +298,16 @@ IRVectorType* asNVVMSupportedCompactParameterGroupVectorType(IRInst* type)
                                                                                 : nullptr;
 }
 
-static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>& activeTypes);
+static bool _isNVVMSupportedAggregateStorageType(
+    IRInst* type,
+    HashSet<IRInst*>& activeTypes,
+    bool allowZeroStateStructs);
 
 static IRArrayType* _asNVVMSupportedAggregateStorageArrayType(
     IRInst* type,
     uint32_t* outElementCount,
-    HashSet<IRInst*>& activeTypes)
+    HashSet<IRInst*>& activeTypes,
+    bool allowZeroStateStructs)
 {
     if (outElementCount)
         *outElementCount = 0;
@@ -334,7 +338,10 @@ static IRArrayType* _asNVVMSupportedAggregateStorageArrayType(
         if (arrayType->getOperandCount() != 2 || activeTypes.contains(arrayType))
             return nullptr;
         activeTypes.add(arrayType);
-        if (!_isNVVMSupportedAggregateStorageType(arrayType->getElementType(), activeTypes))
+        if (!_isNVVMSupportedAggregateStorageType(
+                arrayType->getElementType(),
+                activeTypes,
+                allowZeroStateStructs))
         {
             activeTypes.remove(arrayType);
             return nullptr;
@@ -350,10 +357,13 @@ static IRArrayType* _asNVVMSupportedAggregateStorageArrayType(
 IRArrayType* asNVVMSupportedAggregateStorageArrayType(IRInst* type, uint32_t* outElementCount)
 {
     HashSet<IRInst*> activeTypes;
-    return _asNVVMSupportedAggregateStorageArrayType(type, outElementCount, activeTypes);
+    return _asNVVMSupportedAggregateStorageArrayType(type, outElementCount, activeTypes, false);
 }
 
-static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>& activeTypes)
+static bool _isNVVMSupportedAggregateStorageType(
+    IRInst* type,
+    HashSet<IRInst*>& activeTypes,
+    bool allowZeroStateStructs)
 {
     if (isNVVMSupportedIntegerScalarType(type) || isNVVMBoolType(type) || isNVVMFloat16Type(type) ||
         isNVVMFloat32Type(type) || asNVVMSupported32BitNumericVectorType(type) ||
@@ -396,8 +406,10 @@ static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>&
             return false;
         }
         activeTypes.add(type);
-        const bool isSupported =
-            _isNVVMSupportedAggregateStorageType(parameterGroupType->getElementType(), activeTypes);
+        const bool isSupported = _isNVVMSupportedAggregateStorageType(
+            parameterGroupType->getElementType(),
+            activeTypes,
+            true);
         activeTypes.remove(type);
         return isSupported;
     }
@@ -405,8 +417,11 @@ static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>&
     if (auto arrayType = as<IRArrayType>(type))
     {
         uint32_t elementCount = 0;
-        auto supportedArray =
-            _asNVVMSupportedAggregateStorageArrayType(arrayType, &elementCount, activeTypes);
+        auto supportedArray = _asNVVMSupportedAggregateStorageArrayType(
+            arrayType,
+            &elementCount,
+            activeTypes,
+            allowZeroStateStructs);
         return supportedArray && elementCount;
     }
 
@@ -418,7 +433,10 @@ static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>&
     bool hasField = false;
     for (auto field : structType->getFields())
     {
-        if (!_isNVVMSupportedAggregateStorageType(field->getFieldType(), activeTypes))
+        if (!_isNVVMSupportedAggregateStorageType(
+                field->getFieldType(),
+                activeTypes,
+                allowZeroStateStructs))
         {
             activeTypes.remove(type);
             return false;
@@ -426,13 +444,29 @@ static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>&
         hasField = true;
     }
     activeTypes.remove(type);
-    return hasField;
+    return hasField || allowZeroStateStructs;
 }
 
 bool isNVVMSupportedAggregateStorageType(IRInst* type)
 {
     HashSet<IRInst*> activeTypes;
-    return _isNVVMSupportedAggregateStorageType(type, activeTypes);
+    return _isNVVMSupportedAggregateStorageType(type, activeTypes, false);
+}
+
+bool isNVVMSupportedParameterGroupElementStorageType(IRInst* type)
+{
+    // Consider this example:
+    //
+    //     struct Empty {}
+    //     struct Parameters { Empty empty; }
+    //     ParameterBlock<Parameters> parameters;
+    //
+    // CUDA global-parameter collection retains a pointer to `Parameters`, so its pointee needs an
+    // exact provider type even though the nested `Empty` field contributes no bytes. Start the
+    // recursive storage proof with the parameter-group-only zero-state permission; the ordinary
+    // aggregate entry point above deliberately starts the same proof without that permission.
+    HashSet<IRInst*> activeTypes;
+    return _isNVVMSupportedAggregateStorageType(type, activeTypes, true);
 }
 
 IRStructType* asNVVMSupportedAggregateStorageStructType(IRInst* type)
@@ -1686,8 +1720,8 @@ IRParameterGroupType* asNVVMSupportedParameterGroupType(IRInst* type, IRType** o
     }
 
     IRType* elementType = parameterGroupType->getElementType();
-    if (!asNVVMSupportedAggregateStorageStructType(elementType) &&
-        !asNVVMSupportedAggregateStorageArrayType(elementType))
+    if ((!as<IRStructType>(elementType) && !as<IRArrayType>(elementType)) ||
+        !isNVVMSupportedParameterGroupElementStorageType(elementType))
         return nullptr;
 
     if (outElementType)
@@ -1749,7 +1783,7 @@ static bool _hasNVVMParameterGroupStorageValueRepresentation(
 
     if (auto arrayType = as<IRArrayType>(type))
     {
-        if (!asNVVMSupportedAggregateStorageArrayType(arrayType))
+        if (!isNVVMSupportedParameterGroupElementStorageType(arrayType))
             return false;
         activeTypes.add(type);
         const bool result = _hasNVVMParameterGroupStorageValueRepresentation(
@@ -1759,12 +1793,11 @@ static bool _hasNVVMParameterGroupStorageValueRepresentation(
         return result;
     }
 
-    auto structType = asNVVMSupportedAggregateStorageStructType(type);
-    if (!structType)
+    auto structType = as<IRStructType>(type);
+    if (!structType || !isNVVMSupportedParameterGroupElementStorageType(type))
         return false;
 
     activeTypes.add(type);
-    bool hasField = false;
     for (auto field : structType->getFields())
     {
         if (!_hasNVVMParameterGroupStorageValueRepresentation(field->getFieldType(), activeTypes))
@@ -1772,15 +1805,14 @@ static bool _hasNVVMParameterGroupStorageValueRepresentation(
             activeTypes.remove(type);
             return false;
         }
-        hasField = true;
     }
     activeTypes.remove(type);
-    return hasField;
+    return true;
 }
 
 bool hasNVVMParameterGroupStorageValueRepresentation(IRInst* type)
 {
-    if (!isNVVMSupportedAggregateStorageType(type))
+    if (!isNVVMSupportedParameterGroupElementStorageType(type))
         return false;
     HashSet<IRInst*> activeTypes;
     return _hasNVVMParameterGroupStorageValueRepresentation(type, activeTypes);
@@ -2298,6 +2330,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRType* atomicValueType = nullptr;
     IRAtomicType* atomicType = asNVVMSupportedAtomicType(type, &atomicValueType);
     const bool isStructuredBufferStorage = isNVVMSupportedStructuredBufferStorageType(type);
+    const bool isParameterGroupElementStorage =
+        isNVVMSupportedParameterGroupElementStorageType(type);
 
     // Preflight admits types by their producer/consumer role. Check that role before looking in the
     // cache so a handle created for a valid value cannot make the same type valid in a forbidden
@@ -2332,7 +2366,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           devicePhysicalStoragePointer || isRawBuffer || parameterGroup || isSurface ||
           isSampledTexture || samplerStorage || unsizedSamplerArrayStorage || atomicType ||
           descriptorHandle)) ||
-        (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type)) ||
+        (use == NVVMTypeUse::ParameterGroupStorage && isParameterGroupElementStorage) ||
         (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage);
     if (!isLegal)
         return _reportUnsupportedType(use);
@@ -2659,6 +2693,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (
         fixedCopyableArrayType || fixedHelperArrayType || fixedResourceArrayType ||
         (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage &&
+         as<IRArrayType>(type)) ||
+        (use == NVVMTypeUse::ParameterGroupStorage && isParameterGroupElementStorage &&
          as<IRArrayType>(type)) ||
         ((use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage) &&
          aggregateStorageArrayType))

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "zero-state-parameter-group-element",
+      "source": "tests/bugs/type-legalize-bug-1.slang",
+      "census_id": "bugs/type-legalize-bug-1.slang#discovery-1",
+      "compiler_args": [
+        "-conformance",
+        "A:IFoo=0",
+        "-conformance",
+        "B:IFoo=1"
+      ]
+    }
+  ]
+}

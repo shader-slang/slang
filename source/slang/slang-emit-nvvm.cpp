@@ -1403,7 +1403,8 @@ bool _getNVVMAggregateStorageLayout(
     CodeGenContext* codeGenContext,
     IRType* type,
     IRSizeAndAlignment& outLayout,
-    IRTypeLayout* canonicalTypeLayout = nullptr)
+    IRTypeLayout* canonicalTypeLayout = nullptr,
+    bool allowZeroStateStructs = false)
 {
     outLayout = {};
     if (!codeGenContext || !type)
@@ -1438,7 +1439,11 @@ bool _getNVVMAggregateStorageLayout(
         return true;
     }
 
-    if (auto arrayType = asNVVMSupportedAggregateStorageArrayType(type))
+    IRArrayType* arrayType =
+        allowZeroStateStructs && isNVVMSupportedParameterGroupElementStorageType(type)
+            ? as<IRArrayType>(type)
+            : asNVVMSupportedAggregateStorageArrayType(type);
+    if (arrayType)
     {
         auto canonicalArrayLayout = as<IRArrayTypeLayout>(canonicalTypeLayout);
         if (canonicalTypeLayout && !canonicalArrayLayout)
@@ -1450,7 +1455,8 @@ bool _getNVVMAggregateStorageLayout(
                     codeGenContext,
                     arrayType->getElementType(),
                     elementLayout,
-                    canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr))
+                    canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr,
+                    allowZeroStateStructs))
             {
                 return false;
             }
@@ -1473,8 +1479,10 @@ bool _getNVVMAggregateStorageLayout(
                 codeGenContext,
                 arrayType->getElementType(),
                 elementLayout,
-                canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr) ||
-            elementLayout.size <= 0 || elementLayout.alignment <= 0)
+                canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr,
+                allowZeroStateStructs) ||
+            (elementLayout.size <= 0 && !(allowZeroStateStructs && elementLayout.size == 0)) ||
+            elementLayout.alignment <= 0)
         {
             return false;
         }
@@ -1499,7 +1507,11 @@ bool _getNVVMAggregateStorageLayout(
         return true;
     }
 
-    if (auto structType = asNVVMSupportedAggregateStorageStructType(type))
+    IRStructType* structType =
+        allowZeroStateStructs && isNVVMSupportedParameterGroupElementStorageType(type)
+            ? as<IRStructType>(type)
+            : asNVVMSupportedAggregateStorageStructType(type);
+    if (structType)
     {
         auto canonicalStructLayout = as<IRStructTypeLayout>(canonicalTypeLayout);
         if (canonicalTypeLayout && !canonicalStructLayout)
@@ -1520,8 +1532,10 @@ bool _getNVVMAggregateStorageLayout(
                     codeGenContext,
                     field->getFieldType(),
                     fieldLayout,
-                    canonicalFieldLayout ? canonicalFieldLayout->getTypeLayout() : nullptr) ||
-                fieldLayout.size <= 0 || fieldLayout.alignment <= 0)
+                    canonicalFieldLayout ? canonicalFieldLayout->getTypeLayout() : nullptr,
+                    allowZeroStateStructs) ||
+                (fieldLayout.size <= 0 && !(allowZeroStateStructs && fieldLayout.size == 0)) ||
+                fieldLayout.alignment <= 0)
             {
                 return false;
             }
@@ -1598,7 +1612,8 @@ bool _getNVVMAggregateStorageLayout(
 bool _hasNVVMCompatibleAggregateStorageLayout(
     CodeGenContext* codeGenContext,
     IRType* type,
-    IRTypeLayout* canonicalTypeLayout = nullptr)
+    IRTypeLayout* canonicalTypeLayout = nullptr,
+    bool allowZeroStateStructs = false)
 {
     IRSizeAndAlignment providerLayout;
     if (canonicalTypeLayout)
@@ -1606,10 +1621,16 @@ bool _hasNVVMCompatibleAggregateStorageLayout(
             codeGenContext,
             type,
             providerLayout,
-            canonicalTypeLayout);
+            canonicalTypeLayout,
+            allowZeroStateStructs);
 
     IRSizeAndAlignment cudaLayout;
-    return _getNVVMAggregateStorageLayout(codeGenContext, type, providerLayout) &&
+    return _getNVVMAggregateStorageLayout(
+               codeGenContext,
+               type,
+               providerLayout,
+               nullptr,
+               allowZeroStateStructs) &&
            SLANG_SUCCEEDED(getSizeAndAlignment(
                codeGenContext->getTargetReq(),
                IRTypeLayoutRules::getCUDA(),
@@ -1633,23 +1654,33 @@ uint32_t _getNVVMPhysicalAggregateStorageAlignment(CodeGenContext* codeGenContex
     return uint32_t(layout.alignment);
 }
 
-// Retains the canonical declaration closure of a selected struct. Nested aggregate fields and
-// fixed-array elements are semantic type dependencies of their parent even when no independent
-// local or signature mentions them, so validation must accept the complete tree that type
-// lowering will visit.
-void _addNVVMReachableStructTypes(IRType* type, HashSet<IRInst*>& reachableTypes)
+// Retains the canonical declaration closure of a selected struct. Consider a
+// `ParameterBlock<Parameters>` where `Parameters` contains a zero-field `Empty` struct. Global-
+// parameter collection retains a typed pointer to `Parameters`, and type lowering therefore
+// visits both declarations even when optimized code never loads the handle. The explicit
+// parameter-group role carries permission for that finite zero-state child through the closure;
+// ordinary signatures, locals, and storage roots continue using their nonempty classifiers.
+void _addNVVMReachableStructTypes(
+    IRType* type,
+    HashSet<IRInst*>& reachableTypes,
+    bool allowZeroStateStructs = false)
 {
     IRType* pointerValueType = nullptr;
     if (asNVVMSupportedDeviceCopyableValuePointerType(type, &pointerValueType))
         type = pointerValueType;
     IRType* parameterGroupElementType = nullptr;
     if (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType))
+    {
         type = parameterGroupElementType;
+        allowZeroStateStructs = true;
+    }
     while (auto arrayType = as<IRArrayType>(type))
     {
         if (!asNVVMSupportedHelperArrayType(arrayType) &&
             !asNVVMSupportedResourceArrayType(arrayType) &&
             !asNVVMSupportedAggregateStorageArrayType(arrayType) &&
+            !(allowZeroStateStructs &&
+              isNVVMSupportedParameterGroupElementStorageType(arrayType)) &&
             !isNVVMSupportedStructuredBufferStorageType(arrayType))
             return;
         type = arrayType->getElementType();
@@ -1659,13 +1690,14 @@ void _addNVVMReachableStructTypes(IRType* type, HashSet<IRInst*>& reachableTypes
         (!asNVVMSupportedHelperStructType(structType) &&
          !asNVVMSupportedResourceStructType(structType) &&
          !asNVVMSupportedAggregateStorageStructType(structType) &&
+         !(allowZeroStateStructs && isNVVMSupportedParameterGroupElementStorageType(structType)) &&
          !isNVVMSupportedStructuredBufferStorageType(structType)) ||
         reachableTypes.contains(structType))
         return;
     reachableTypes.add(structType);
     for (auto field : structType->getFields())
     {
-        _addNVVMReachableStructTypes(field->getFieldType(), reachableTypes);
+        _addNVVMReachableStructTypes(field->getFieldType(), reachableTypes, allowZeroStateStructs);
     }
 }
 
@@ -7717,12 +7749,12 @@ SlangResult _validateNVVMFunction(
         }
         IRType* parameterGroupElementType = nullptr;
         if (isEntryPoint &&
-            asNVVMSupportedParameterGroupType(
-                param->getDataType(),
-                &parameterGroupElementType) &&
+            asNVVMSupportedParameterGroupType(param->getDataType(), &parameterGroupElementType) &&
             !_hasNVVMCompatibleAggregateStorageLayout(
                 codeGenContext,
-                parameterGroupElementType))
+                parameterGroupElementType,
+                nullptr,
+                true))
         {
             return _diagnoseUnsupportedIR(
                 codeGenContext,
@@ -12713,7 +12745,9 @@ SlangResult validateNVVMSupportedIR(
             if (asNVVMSupportedParameterGroupType(fieldType, &parameterGroupElementType) &&
                 !_hasNVVMCompatibleAggregateStorageLayout(
                     codeGenContext,
-                    parameterGroupElementType))
+                    parameterGroupElementType,
+                    nullptr,
+                    true))
             {
                 return _diagnoseUnsupportedIR(
                     codeGenContext,
@@ -12721,7 +12755,10 @@ SlangResult validateNVVMSupportedIR(
             }
             if (auto parameterGroupStruct = as<IRStructType>(parameterGroupElementType))
             {
-                _addNVVMReachableStructTypes(parameterGroupStruct, selectedReachableStructTypes);
+                _addNVVMReachableStructTypes(
+                    parameterGroupStruct,
+                    selectedReachableStructTypes,
+                    true);
             }
             IRStructType* elementStruct = _getNVVMRawBufferAggregateElementType(fieldType);
             if (auto resourceStruct = asNVVMSupportedResourceStructType(fieldType))

@@ -1,4 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute, nvvm):COMPARE_COMPUTE: -cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE: -cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 
 //TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out,name outputBuffer

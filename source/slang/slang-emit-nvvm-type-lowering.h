@@ -88,6 +88,9 @@ IRStructType* asNVVMSupportedAggregateStorageStructType(IRInst* type);
 /// Returns whether a type is in the recursive aggregate-storage algebra.
 bool isNVVMSupportedAggregateStorageType(IRInst* type);
 
+/// Returns whether a type is finite parameter-group element storage, including zero-state structs.
+bool isNVVMSupportedParameterGroupElementStorageType(IRInst* type);
+
 /// Returns a physical struct accepted by the parameter-group storage algebra.
 IRStructType* asNVVMSupportedPhysicalAggregateStorageStructType(IRInst* type);
 

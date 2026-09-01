@@ -7304,6 +7304,28 @@ Discovery remains exactly 82/72 and advances from 70/70/70 to 71/71/71, with one
 The selected prefix passes 433/433, the permanent NVVM category passes 78/78, and the gate
 assembles through CUDA 12.9 for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90.
 
+### Slice 175: Zero-state parameter-group elements
+
+CUDA global-parameter collection retains a pointer-sized handle for a `ParameterBlock<T>` even
+when optimization removes every load from that handle. The pointee `T` is still part of the typed
+launch ABI. Direct NVVM now gives parameter-group element storage its own finite recursive
+classifier, which permits a zero-field struct or a struct whose state recursively totals zero.
+The ordinary aggregate, copyable-value, and helper-value classifiers remain nonempty.
+
+Parameter-group type lowering constructs the exact nested provider structs, including zero-field
+LLVM structs, and retains the typed global pointer. Layout validation carries the same explicit
+role while comparing provider size/alignment with CUDA layout. The selected-declaration closure
+also preserves that role after the parameter-group wrapper has been removed, so the module audit
+retains every exact pointee declaration. Active-type detection continues to reject cycles, and no
+opaque byte pointee or provider callback is introduced. Provider ABI revision 32 is unchanged.
+
+Discovery `bugs/type-legalize-bug-1` becomes correct at O0 and O3 and gains two permanent direct
+lanes. Frozen v1 remains exactly 452/427 at 413/413/413 with no changed row. Discovery remains
+exactly 82/72 and advances from 71/71/71 to 72/72/72, reaching every healthy reference with one
+gain and no loss. The selected prefix passes 433/433, the permanent NVVM category passes 80/80,
+and the gate assembles through CUDA 12.9 for native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

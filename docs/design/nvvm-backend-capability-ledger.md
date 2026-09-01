@@ -2499,3 +2499,17 @@ from 70/70/70 to 71/71/71 over its unchanged 72 healthy references, with exactly
 loss. The selected prefix passes 433/433, the permanent NVVM category passes 78/78, and the
 measurement gate produces accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3
 SM70/SM80/SM90 configurations.
+
+Slice 175 gives parameter-group element storage a finite recursive zero-state rule. Empty structs
+are accepted only after a canonical `ParameterBlock` or `ConstantBuffer` establishes that role;
+ordinary storage and helper values keep their nonempty invariants. Type lowering, CUDA/provider
+layout proof, and selected-struct declaration retention carry the same role and preserve exact
+nested zero-field LLVM structs behind the typed pointer-sized handle. Cycles remain rejected, and
+provider ABI revision 32 is unchanged.
+
+Discovery `bugs/type-legalize-bug-1` gains two permanent direct lanes. Frozen v1 stays
+413/413/413 over its unchanged 427 healthy denominator with no changed row. Discovery advances
+from 71/71/71 to 72/72/72 over its unchanged 72 healthy references, with exactly one gain and no
+loss. The selected prefix passes 433/433, the permanent NVVM category passes 80/80, and the
+measurement gate produces accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90 configurations.
