@@ -3432,7 +3432,24 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         if (const auto typeType = as<TypeType>(funcExpr->type))
         {
             auto targetType = typeType->getType();
-            if (isDeclRefTypeOf<AggTypeDeclBase>(targetType) ||
+            // Keep this coercion fast-path off single-argument calls on a
+            // `class` unless the call is a genuine same-type identity cast.
+            // Three cases for a class target `C`:
+            //   `new C(x)`               -> construction; must reach overload
+            //                               resolution so `CompleteOverloadCandidate`
+            //                               completes the constructor call from the
+            //                               original `NewExpr` (the fast-path would
+            //                               build a cast instead and lose it).
+            //   `C(4)` (differing type)  -> not valid construction; must reach
+            //                               overload resolution so it is reported as
+            //                               `ClassCanOnlyBeInitializedWithNew` (E30066)
+            //                               rather than silently coerced.
+            //   `C(c)` where `c` is `C`  -> identity coercion; the fast-path's
+            //                               equal-types no-op is correct, so keep it.
+            bool skipCoercionFastPath =
+                isDeclRefTypeOf<ClassDecl>(targetType) &&
+                (as<NewExpr>(expr) || !targetType->equals(expr->arguments[0]->type));
+            if ((isDeclRefTypeOf<AggTypeDeclBase>(targetType) && !skipCoercionFastPath) ||
                 isDeclRefTypeOf<EnumDecl>(targetType))
             {
                 Expr* resultExpr = nullptr;
