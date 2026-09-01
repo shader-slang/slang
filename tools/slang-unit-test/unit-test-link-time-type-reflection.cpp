@@ -1373,16 +1373,14 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerProgramCache)
     SLANG_CHECK(fieldsB == 2);
 }
 
-// Test for issue #10749 (per-target cache correctness): the same linked program is
+// Test for issue #10749 (per-target cache memoization): the same linked program is
 // reflected via `programLayout->getTypeLayout` against two different targets in the
-// same session. `TargetProgram::getProgramScopedTypeLayouts` is a member of
-// `TargetProgram`, which is scoped per `(program, target)` -- a distinct `TargetProgram`
-// instance backs each target's `ProgramLayout`, even though both `ProgramLayout`s
-// reflect the same underlying `Type*` for `Scene`. This pins the remaining scoping
-// dimension the per-program test above does not exercise: a regression that folded the
-// per-target `TargetProgram` instances back onto a single shared cache would alias
-// target A's cached `TypeLayout*` for target B's identical `{type, rules}` query, and
-// this test would catch it by observing the same pointer come back for both targets.
+// same session, and each target's `TypeLayout` query is memoized to a stable pointer on
+// repeat calls. Each target has its own `TargetRequest`/`TargetProgram` pair, so this
+// does not discriminate the per-program cache-scoping fix itself (that scoping is pinned
+// by `linkTimeTypeReflectionStructMemberPerProgramCache` above, which keeps the target
+// fixed and varies the program instead); it exists to confirm memoization still works
+// correctly when a session has more than one target.
 SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerTargetCache)
 {
     const char* sourceBody = R"(
@@ -1455,13 +1453,14 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerTargetCache)
     auto sceneLayoutTarget1 = programLayoutTarget1->getTypeLayout(sceneTypeTarget1);
     SLANG_CHECK_ABORT(sceneLayoutTarget1 != nullptr);
 
-    // If the per-program cache were keyed only by {type, rules} and accidentally shared
-    // across `TargetProgram` instances for the same program, the second target's query
-    // would alias the first target's cache entry and return the same `TypeLayout*`.
-    SLANG_CHECK(sceneLayoutTarget0 != sceneLayoutTarget1);
-
     // Each target's own cache is still memoized: a repeated query on the same target
-    // returns the same pointer.
+    // returns the same pointer. (This test does not add discriminating coverage beyond
+    // memoization: each target has its own `TargetRequest`/`TargetProgram` pair, so the
+    // two queries land in separate caches regardless of whether the cache is keyed
+    // per-`TargetProgram` (this PR's fix) or per-`TargetRequest` (the pre-fix design) --
+    // the per-program scoping fix itself is pinned by
+    // `linkTimeTypeReflectionStructMemberPerProgramCache`, which keeps the target fixed
+    // and varies the program.)
     SLANG_CHECK(programLayoutTarget0->getTypeLayout(sceneTypeTarget0) == sceneLayoutTarget0);
     SLANG_CHECK(programLayoutTarget1->getTypeLayout(sceneTypeTarget1) == sceneLayoutTarget1);
 }

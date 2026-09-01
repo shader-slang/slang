@@ -248,15 +248,21 @@ TypeLayout* TargetRequest::getTypeLayout(
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
-    // The per-program cache below is selected via `programLayout->getTargetProgram()`,
-    // so its correctness depends on that `TargetProgram` belonging to `this`
-    // `TargetRequest` -- otherwise a layout computed with this target's rules would be
-    // cached against, and later returned for, a different target's program. This holds
-    // by construction for the sole caller: `spReflection_GetTypeLayout` calls
-    // `context->getTargetReq()->getTypeLayout(type, rules, context)`, so `programLayout`
-    // (== `context`) and `this` always come from the same `ProgramLayout`. A debug-only
-    // `SLANG_ASSERT` is therefore enough to catch a future caller that breaks this
-    // by construction guarantee, rather than a release-mode guard against untrusted input.
+    // When non-null, `programLayout` must belong to `this` `TargetRequest`. This is a
+    // precondition on the layout context below, not just a cache-correctness concern: a
+    // mismatched `programLayout` would build the layout against a foreign program's
+    // `extern`/global-generic resolution, and the per-program cache selected via
+    // `programLayout->getTargetProgram()` would additionally cache that wrong result
+    // against, and later return it for, a different target's program.
+    //
+    // This holds by construction for the sole *program-supplying* caller:
+    // `spReflection_GetTypeLayout` calls `context->getTargetReq()->getTypeLayout(type,
+    // rules, context)`, so `programLayout` (== `context`) and `this` always come from
+    // the same `ProgramLayout`. (The other caller, `Linkage::getTypeLayout`, passes no
+    // `programLayout` at all, so it trivially satisfies the assert via the `!programLayout`
+    // short-circuit rather than by supplying a matching one.) A debug-only `SLANG_ASSERT`
+    // is therefore enough to catch a future caller that breaks this by-construction
+    // guarantee, rather than a release-mode guard against untrusted input.
     SLANG_ASSERT(!programLayout || programLayout->getTargetReq() == this);
 
     // When a `ProgramLayout` is supplied, the layout context can resolve
