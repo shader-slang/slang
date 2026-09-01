@@ -308,9 +308,9 @@ SlangResult Session::getDownstreamCompilerVersion(
 
 SlangResult Session::getDownstreamCompilerPath(SlangPassThrough inPassThrough, ISlangBlob** outPath)
 {
-    // getPath dereferences outPath unconditionally to write the result, so a null argument is a
-    // hard programming error rather than a runtime not-found condition (unlike the optional
-    // out-params of getDownstreamCompilerVersion). Fail loudly on out-of-contract input.
+    // getPath writes the result through outPath on success, so it must be a valid non-null pointer;
+    // a null argument is a programming error, not a runtime not-found condition (unlike the
+    // optional out-params of getDownstreamCompilerVersion). Fail loudly on out-of-contract input.
     SLANG_ASSERT(outPath);
 
     // Validate at the public boundary exactly as getDownstreamCompilerVersion does: only a real

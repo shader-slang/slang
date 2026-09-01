@@ -45,7 +45,7 @@ SLANG_UNIT_TEST(getDownstreamCompilerPath)
     {
         // NVRTC is a shared library, so its path is recoverable from a held symbol.
         SLANG_CHECK(result == SLANG_OK);
-        SLANG_CHECK(nvrtcPath != nullptr);
+        SLANG_CHECK_ABORT(nvrtcPath != nullptr); // abort rather than deref null below on regression
         SLANG_CHECK(nvrtcPath->getBufferSize() > 0);
 
         // The central contract is that this is the exact loadable library Slang uses, not merely a
@@ -91,7 +91,7 @@ SLANG_UNIT_TEST(getDownstreamCompilerPath)
     // device. When loadable, its path must be recoverable (SLANG_OK + non-empty), exercising the
     // shared-library recovery path for a compiler that reports no numeric version. This also gives
     // the "reload the path and verify an entry point" check runtime coverage on a GPU-free host,
-    // which the NVRTC block above cannot: reload the returned path and confirm the glslang_compile
+    // which the NVRTC block above cannot: reload the returned path and confirm a glslang compile
     // entry point resolves from it, proving it is the real loadable library and not just a string.
     if (SLANG_SUCCEEDED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_GLSLANG)))
     {
@@ -100,7 +100,8 @@ SLANG_UNIT_TEST(getDownstreamCompilerPath)
             globalSession->getDownstreamCompilerPath(
                 SLANG_PASS_THROUGH_GLSLANG,
                 glslangPath.writeRef()) == SLANG_OK);
-        SLANG_CHECK(glslangPath != nullptr);
+        SLANG_CHECK_ABORT(
+            glslangPath != nullptr); // abort rather than deref null below on regression
         SLANG_CHECK(glslangPath->getBufferSize() > 0);
 
         const char* glslangPathStr = static_cast<const char*>(glslangPath->getBufferPointer());
@@ -108,32 +109,45 @@ SLANG_UNIT_TEST(getDownstreamCompilerPath)
         SLANG_CHECK(SLANG_SUCCEEDED(SharedLibrary::loadWithPlatformPath(glslangPathStr, handle)));
         if (handle)
         {
-            // glslang_compile is the base compile entry point the glslang downstream always
-            // resolves (slang-glslang-compiler.cpp), so it must be present in the returned library.
-            SLANG_CHECK(
-                SharedLibrary::findSymbolAddressByName(handle, "glslang_compile") != nullptr);
+            // The glslang downstream binds to whichever compile entry point the library exposes,
+            // trying glslang_compile then the versioned glslang_compile_1_1/_1_2/_1_3
+            // (slang-glslang-compiler.cpp init). At least one must resolve from the returned
+            // library; requiring the unversioned name alone would wrongly reject a versioned-only
+            // build, so accept any of them.
+            const bool anyCompileSymbol =
+                SharedLibrary::findSymbolAddressByName(handle, "glslang_compile") != nullptr ||
+                SharedLibrary::findSymbolAddressByName(handle, "glslang_compile_1_1") != nullptr ||
+                SharedLibrary::findSymbolAddressByName(handle, "glslang_compile_1_2") != nullptr ||
+                SharedLibrary::findSymbolAddressByName(handle, "glslang_compile_1_3") != nullptr;
+            SLANG_CHECK(anyCompileSymbol);
             SharedLibrary::unload(handle);
         }
     }
 
     // Exercise the third return code, SLANG_E_NOT_AVAILABLE -- the "loaded but no recoverable path"
-    // case the client must keep distinct from SLANG_E_NOT_FOUND. GCC is backed by an executable on
-    // PATH: GCCDownstreamCompiler derives CommandLineDownstreamCompiler -> DownstreamCompilerBase
+    // case the client must keep distinct from SLANG_E_NOT_FOUND. GCC/Clang/Visual Studio are backed
+    // by executables on PATH: each derives CommandLineDownstreamCompiler -> DownstreamCompilerBase
     // and does not override getPath, so once located it hits the base default and reports no
-    // recoverable path. This is reachable GPU-free on any host with a g++ toolchain and is gated on
-    // availability exactly like the NVRTC/glslang cases above. (We use GCC/CLANG rather than the
-    // GENERIC_C_CPP alias, whose default C/C++ compiler can resolve to the shared-library-backed
-    // slang-llvm, which *does* have a recoverable path and would return SLANG_OK.)
-    for (auto cppPassThrough : {SLANG_PASS_THROUGH_GCC, SLANG_PASS_THROUGH_CLANG})
+    // recoverable path. This is reachable GPU-free wherever a host C/C++ toolchain exists
+    // (g++/clang on POSIX, cl on Windows), and is gated on availability like the NVRTC/glslang
+    // cases above. (We use the concrete executable pass-throughs rather than the GENERIC_C_CPP
+    // alias, whose default C/C++ compiler can resolve to the shared-library-backed slang-llvm,
+    // which *does* have a recoverable path and would return SLANG_OK.)
+    for (auto cppPassThrough :
+         {SLANG_PASS_THROUGH_GCC, SLANG_PASS_THROUGH_CLANG, SLANG_PASS_THROUGH_VISUAL_STUDIO})
     {
         if (SLANG_SUCCEEDED(globalSession->checkPassThroughSupport(cppPassThrough)))
         {
-            ComPtr<ISlangBlob> cppPath;
+            // Seed a non-null sentinel and require it to survive the call: this proves the failure
+            // return leaves *outPath untouched. A null starting value could not distinguish an
+            // untouched pointer from one set to null. The sentinel is never dereferenced.
+            ISlangBlob* const sentinel =
+                reinterpret_cast<ISlangBlob*>(static_cast<uintptr_t>(0xF00DF00DF00DF00Dull));
+            ISlangBlob* cppPath = sentinel;
             SLANG_CHECK(
-                globalSession->getDownstreamCompilerPath(cppPassThrough, cppPath.writeRef()) ==
+                globalSession->getDownstreamCompilerPath(cppPassThrough, &cppPath) ==
                 SLANG_E_NOT_AVAILABLE);
-            // The failure return must leave the caller's out-parameter untouched (still null here).
-            SLANG_CHECK(cppPath == nullptr);
+            SLANG_CHECK(cppPath == sentinel);
         }
     }
 }

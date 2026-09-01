@@ -127,8 +127,10 @@ SLANG_UNIT_TEST(replayGetDownstreamCompilerPathFailureNoUninitializedRead)
         SLANG_E_NOT_FOUND);
     const size_t off2 = ctx().getStream().getSize();
 
-    // With the fix the differing poison pointers never reach the stream, so the two recorded call
-    // segments are byte-identical. Before the fix the proxy serialized the caller's poison pointer.
+    // On failure the proxy redirects outPath to a zero-initialized temporary before recording, so
+    // the caller's poison pointer never reaches the stream: both calls serialize the same defined
+    // null and the two recorded segments are byte-identical. A proxy that recorded *outPath
+    // directly would serialize the two distinct poison pointers and the segments would diverge.
     SLANG_CHECK(twoRecordedSegmentsIdentical(off0, off1, off2));
 
     // Return to Idle before the session ComPtr releases during teardown.
