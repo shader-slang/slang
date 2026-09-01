@@ -4,7 +4,7 @@
 // Note: Slang allows mixing xyzw and rgba sets (unlike GLSL), so we test
 // actually invalid patterns: stpq (not supported) and non-member names.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 [shader("compute")]
 [numthreads(1,1,1)]

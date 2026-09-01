@@ -1,6 +1,8 @@
 // struct-inheritance-invalid.slang
 
 // Test that a struct cannot inherit from multiple base structs.
+// This diagnostic emits identical summary and span text as one match, so pin its code and severity
+// instead of adding a second message annotation that cannot bind.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
