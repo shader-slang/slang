@@ -2425,3 +2425,18 @@ Five frozen workloads gain ten permanent direct lanes. Frozen v1 advances from 4
 68/68/68 over 72. The selected prefix passes 433/433, the permanent NVVM category passes 60/60,
 and three representative gates produce accepted PTX/cubins for native NVRTC, direct O0 SM70, and
 direct O3 SM70/SM80/SM90 configurations.
+
+Slice 170 validates resource-bearing conventional-global aggregates against the canonical
+`IRTypeLayout` retained by target layout and global-parameter collection. Struct fields are matched
+by semantic key, arrays propagate their element layouts, and the existing provider representation
+must reproduce every offset, stride, complete size, and alignment. Context-free layout queries
+remain the strict fallback only where no retained layout is available. Provider ABI revision 32 is
+unchanged.
+
+Collected-global producer recognition is separate from field support, so an unsupported sibling
+is diagnosed by its exact field type instead of erasing provenance from supported field addresses.
+Discovery `buffer-type-splitting` gains two permanent direct lanes and advances discovery from
+68/68/68 to 69/69/69 over its unchanged 72 healthy denominator. Frozen v1 remains 407/407/407 over
+427 with no changed row. The selected prefix passes 433/433, the permanent NVVM category passes
+62/62, and the promoted measurement gate produces accepted PTX/cubins for native NVRTC, direct O0
+SM70, and direct O3 SM70/SM80/SM90 configurations.

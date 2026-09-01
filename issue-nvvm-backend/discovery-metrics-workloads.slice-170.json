@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "resource-aggregate-array",
+      "source": "tests/compute/buffer-type-splitting.slang",
+      "census_id": "compute/buffer-type-splitting.slang#discovery-1"
+    }
+  ]
+}

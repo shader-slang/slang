@@ -121,6 +121,12 @@ def _preflight_cluster(exact_shape: str) -> tuple[str, str]:
             "entry-point/buffer type lowering -> conventional global aggregate; "
             "_hasNVVMCompatibleAggregateStorageLayout",
         )
+    if exact_shape.startswith("conventional global field:"):
+        return (
+            "conventional-global-field-representation",
+            "collectGlobalUniformParameters -> synthesized GlobalParams field; "
+            "isNVVMSupportedConventionalGlobalFieldType",
+        )
     if exact_shape == "array element pointer relation":
         return (
             "aggregate-array-element-pointer",

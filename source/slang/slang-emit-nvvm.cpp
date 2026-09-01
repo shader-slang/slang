@@ -97,8 +97,9 @@ struct NVVMConventionalGlobalParams
     IRStructType* elementType = nullptr;
 };
 
-// Recognizes the canonical collected CUDA parameter block. Executable resource fields and opaque
-// sampler storage share this block, but sampler values remain unavailable to ordinary IR emission.
+// Recognizes the canonical collected CUDA parameter block by its producer-owned shape. Field
+// support is validated separately: an unsupported sibling must not make an otherwise canonical
+// field address lose its provenance before module validation can name that sibling's exact type.
 bool _getNVVMConventionalGlobalParams(IRInst* inst, NVVMConventionalGlobalParams& outParams)
 {
     outParams = {};
@@ -116,8 +117,7 @@ bool _getNVVMConventionalGlobalParams(IRInst* inst, NVVMConventionalGlobalParams
     bool hasField = false;
     for (auto field : elementType->getFields())
     {
-        if (!isNVVMSupportedConventionalGlobalFieldType(field))
-            return false;
+        SLANG_UNUSED(field);
         hasField = true;
     }
     if (!hasField)
@@ -1318,14 +1318,48 @@ uint32_t _getNVVMStructuredBufferMemoryAlignment(CodeGenContext* codeGenContext,
     return uint32_t(cudaLayout.alignment);
 }
 
+// Reads the finite byte layout retained on a canonical IR type layout. Collected conventional
+// globals carry this metadata after target layout and global-parameter collection, including for
+// opaque resource fields that the context-free CUDA layout query cannot inspect.
+bool _getNVVMCanonicalByteLayout(IRTypeLayout* typeLayout, IRSizeAndAlignment& outLayout)
+{
+    outLayout = {};
+    if (!typeLayout)
+        return false;
+
+    auto size = typeLayout->getSizeInBytes();
+    auto alignment = typeLayout->getAlignmentInBytes();
+    if (!size.isFinite() || alignment <= 0 || alignment > INT_MAX)
+        return false;
+    outLayout.size = IRIntegerValue(size.getFiniteValue().getValidValue());
+    outLayout.alignment = int(alignment);
+    return true;
+}
+
+// Looks up one field by its semantic key. Struct-layout entries are key/value metadata, so their
+// order is not assumed to match the declaration even though current producers usually preserve it.
+IRVarLayout* _findNVVMCanonicalFieldLayout(IRStructTypeLayout* structLayout, IRStructKey* fieldKey)
+{
+    if (!structLayout || !fieldKey)
+        return nullptr;
+    for (auto fieldLayoutAttr : structLayout->getFieldLayoutAttrs())
+    {
+        if (fieldLayoutAttr->getFieldKey() == fieldKey)
+            return fieldLayoutAttr->getLayout();
+    }
+    return nullptr;
+}
+
 // Computes the provider layout selected for one aggregate-storage type. Three-lane 32-bit vectors
 // are scalar arrays, raw-buffer views are pointer/count pairs, and every other leaf keeps its
-// ordinary LLVM representation. Struct offsets are checked against CUDA while walking the
-// canonical direct-field declaration.
+// ordinary LLVM representation. When target layout has already produced canonical metadata, the
+// recursive walk proves provider offsets and strides against that metadata instead of trying to
+// reconstruct the layout of opaque resource fields.
 bool _getNVVMAggregateStorageLayout(
     CodeGenContext* codeGenContext,
     IRType* type,
-    IRSizeAndAlignment& outLayout)
+    IRSizeAndAlignment& outLayout,
+    IRTypeLayout* canonicalTypeLayout = nullptr)
 {
     outLayout = {};
     if (!codeGenContext || !type)
@@ -1349,52 +1383,98 @@ bool _getNVVMAggregateStorageLayout(
 
     if (auto arrayType = asNVVMSupportedAggregateStorageArrayType(type))
     {
+        auto canonicalArrayLayout = as<IRArrayTypeLayout>(canonicalTypeLayout);
+        if (canonicalTypeLayout && !canonicalArrayLayout)
+            return false;
         if (asNVVMSupportedCompactParameterGroupVectorType(arrayType->getElementType()))
         {
             auto elementCount = cast<IRIntLit>(arrayType->getElementCount())->getValue();
             outLayout.size = elementCount * 12;
             outLayout.alignment = 4;
-            return true;
+            IRSizeAndAlignment canonicalLayout;
+            return !canonicalArrayLayout ||
+                   (_getNVVMCanonicalByteLayout(canonicalArrayLayout, canonicalLayout) &&
+                    canonicalLayout.size == outLayout.size &&
+                    canonicalLayout.alignment == outLayout.alignment &&
+                    canonicalArrayLayout->getElementStrideInBytes().isFinite() &&
+                    canonicalArrayLayout->getElementStrideInBytes()
+                            .getFiniteValue()
+                            .getValidValue() == 12);
         }
 
         IRSizeAndAlignment elementLayout;
         if (!_getNVVMAggregateStorageLayout(
                 codeGenContext,
                 arrayType->getElementType(),
-                elementLayout) ||
+                elementLayout,
+                canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr) ||
             elementLayout.size <= 0 || elementLayout.alignment <= 0)
         {
             return false;
         }
         const auto elementCount = cast<IRIntLit>(arrayType->getElementCount())->getValue();
-        outLayout.size =
-            elementCount * _alignNVVMStorageSize(elementLayout.size, elementLayout.alignment);
+        const auto elementStride =
+            _alignNVVMStorageSize(elementLayout.size, elementLayout.alignment);
+        outLayout.size = elementCount * elementStride;
         outLayout.alignment = elementLayout.alignment;
+        if (canonicalArrayLayout)
+        {
+            IRSizeAndAlignment canonicalLayout;
+            auto canonicalStride = canonicalArrayLayout->getElementStrideInBytes();
+            if (!_getNVVMCanonicalByteLayout(canonicalArrayLayout, canonicalLayout) ||
+                !canonicalStride.isFinite() ||
+                IRIntegerValue(canonicalStride.getFiniteValue().getValidValue()) != elementStride ||
+                canonicalLayout.size != outLayout.size ||
+                canonicalLayout.alignment != outLayout.alignment)
+            {
+                return false;
+            }
+        }
         return true;
     }
 
     if (auto structType = asNVVMSupportedAggregateStorageStructType(type))
     {
+        auto canonicalStructLayout = as<IRStructTypeLayout>(canonicalTypeLayout);
+        if (canonicalTypeLayout && !canonicalStructLayout)
+            return false;
         IRIntegerValue size = 0;
         int alignment = 1;
         for (auto field : structType->getFields())
         {
+            IRVarLayout* canonicalFieldLayout =
+                canonicalStructLayout
+                    ? _findNVVMCanonicalFieldLayout(canonicalStructLayout, field->getKey())
+                    : nullptr;
+            if (canonicalStructLayout && !canonicalFieldLayout)
+                return false;
             IRSizeAndAlignment fieldLayout;
             IRIntegerValue cudaOffset = 0;
             if (!_getNVVMAggregateStorageLayout(
                     codeGenContext,
                     field->getFieldType(),
-                    fieldLayout) ||
-                fieldLayout.size <= 0 || fieldLayout.alignment <= 0 ||
-                SLANG_FAILED(getOffset(
-                    codeGenContext->getTargetReq(),
-                    IRTypeLayoutRules::getCUDA(),
-                    field,
-                    &cudaOffset)))
+                    fieldLayout,
+                    canonicalFieldLayout ? canonicalFieldLayout->getTypeLayout() : nullptr) ||
+                fieldLayout.size <= 0 || fieldLayout.alignment <= 0)
             {
                 return false;
             }
             size = _alignNVVMStorageSize(size, fieldLayout.alignment);
+            if (canonicalFieldLayout)
+            {
+                auto offsetAttr = canonicalFieldLayout->findOffsetAttr(LayoutResourceKind::Uniform);
+                if (!offsetAttr)
+                    return false;
+                cudaOffset = IRIntegerValue(offsetAttr->getOffset());
+            }
+            else if (SLANG_FAILED(getOffset(
+                         codeGenContext->getTargetReq(),
+                         IRTypeLayoutRules::getCUDA(),
+                         field,
+                         &cudaOffset)))
+            {
+                return false;
+            }
             if (cudaOffset != size)
                 return false;
             size += fieldLayout.size;
@@ -1402,6 +1482,16 @@ bool _getNVVMAggregateStorageLayout(
         }
         outLayout.size = _alignNVVMStorageSize(size, alignment);
         outLayout.alignment = alignment;
+        if (canonicalStructLayout)
+        {
+            IRSizeAndAlignment canonicalLayout;
+            if (!_getNVVMCanonicalByteLayout(canonicalStructLayout, canonicalLayout) ||
+                canonicalLayout.size != outLayout.size ||
+                canonicalLayout.alignment != outLayout.alignment)
+            {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -1437,9 +1527,19 @@ bool _getNVVMAggregateStorageLayout(
         &outLayout));
 }
 
-bool _hasNVVMCompatibleAggregateStorageLayout(CodeGenContext* codeGenContext, IRType* type)
+bool _hasNVVMCompatibleAggregateStorageLayout(
+    CodeGenContext* codeGenContext,
+    IRType* type,
+    IRTypeLayout* canonicalTypeLayout = nullptr)
 {
     IRSizeAndAlignment providerLayout;
+    if (canonicalTypeLayout)
+        return _getNVVMAggregateStorageLayout(
+            codeGenContext,
+            type,
+            providerLayout,
+            canonicalTypeLayout);
+
     IRSizeAndAlignment cudaLayout;
     return _getNVVMAggregateStorageLayout(codeGenContext, type, providerLayout) &&
            SLANG_SUCCEEDED(getSizeAndAlignment(
@@ -12089,9 +12189,20 @@ SlangResult validateNVVMSupportedIR(
         for (auto field : conventionalGlobalParams.elementType->getFields())
         {
             IRType* fieldType = field->getFieldType();
+            if (!isNVVMSupportedConventionalGlobalFieldType(field))
+            {
+                return _diagnoseUnsupportedIRType(
+                    codeGenContext,
+                    "conventional global field",
+                    fieldType);
+            }
             if (auto storageArray = asNVVMSupportedAggregateStorageArrayType(fieldType))
             {
-                if (!_hasNVVMCompatibleAggregateStorageLayout(codeGenContext, storageArray))
+                auto fieldVarLayout = findVarLayout(field->getKey());
+                if (!_hasNVVMCompatibleAggregateStorageLayout(
+                        codeGenContext,
+                        storageArray,
+                        fieldVarLayout ? fieldVarLayout->getTypeLayout() : nullptr))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,

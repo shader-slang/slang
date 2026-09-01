@@ -7173,6 +7173,31 @@ and advances from 402/402/402 to 407/407/407 O0/O3/both with no old-correct regr
 remains exactly 82/72 at 68/68/68. The selected prefix passes 433/433, the permanent NVVM category
 passes 60/60, and all three representative gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
 
+### Slice 170: Resource-bearing aggregate storage layout
+
+Collected conventional globals retain the exact target layout chosen for every field. Direct NVVM
+now uses that `IRTypeLayout` graph when validating resource-bearing aggregate arrays instead of
+asking the context-free CUDA layout rules to reconstruct offsets for opaque resource fields.
+Struct entries are matched by semantic key; arrays propagate their element layout; and provider
+field offsets, element strides, complete sizes, and alignments must match the retained metadata.
+
+The established provider representation is unchanged. A raw buffer view remains the 16-byte,
+eight-aligned `{data, count}` value, so `struct S { RWByteAddressBuffer a; RWByteAddressBuffer b; }`
+has offsets zero/16 and size 32, and `S[2]` has stride 32 and size 64. Missing, non-finite, or
+inconsistent layout metadata retains deterministic rejection. Provider ABI revision 32 is
+unchanged.
+
+Canonical collected-global recognition is now independent from field support. Module validation
+names the exact first unsupported sibling field instead of causing supported field addresses to
+lose their global provenance. This advances two adjacent parameter-group probes without admitting
+their unsupported representations.
+
+Discovery `buffer-type-splitting` becomes correct at O0 and O3 and gains two permanent direct
+lanes. Discovery advances from 68/68/68 to 69/69/69 over its unchanged 72 healthy references, with
+exactly one gain and no loss. Frozen v1 remains exactly 452/427 and 407/407/407 with no changed row.
+The selected prefix passes 433/433, the permanent NVVM category passes 62/62, and the promoted gate
+assembles with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
