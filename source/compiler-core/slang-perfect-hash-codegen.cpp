@@ -1,6 +1,6 @@
 #include "slang-perfect-hash-codegen.h"
 
-#include "../core/slang-io.h"
+#include "core/slang-io.h"
 
 namespace Slang
 {

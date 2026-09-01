@@ -1148,12 +1148,12 @@ FIDDLE()
 class ConcreteVariadicPackCountWitness : public Witness
 {
     FIDDLE(...)
-    ConcreteVariadicPackCountWitness(Val* pack, IntVal* expectedCount)
+    ConcreteVariadicPackCountWitness(IntVal* actualCount, IntVal* expectedCount)
     {
-        setOperands(pack, expectedCount);
+        setOperands(actualCount, expectedCount);
     }
 
-    Val* getPack() const { return getOperand(0); }
+    IntVal* getActualCount() const { return as<IntVal>(getOperand(0)); }
     IntVal* getExpectedCount() const { return as<IntVal>(getOperand(1)); }
 
     void _toTextOverride(StringBuilder& out);

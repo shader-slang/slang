@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
-//META: doc_ref=docs/generated/design/ast-reference/expressions.md#memberexpr-staticmemberexpr-derefmemberexpr
-//META: doc_section_digest=a8293cbfbfbb580f987e71889bbd1c8f5697b1440fa8a8bc081a878f12d3aabf
-//META: purpose=A StaticMemberExpr `T.m` (or `T::m`) accesses a static member of a type; the value of the static field is returned.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/expressions.md#memberexpr--staticmemberexpr--derefmemberexpr
+//META: doc_section_digest=2e4c0cf09ff9c6fb2f3bd8e1c643d300367d45168a8b35d087ed154695482428
+//META: purpose=Member access with `.` on a type-valued base (`Limits.kMax`) is reinterpreted during checking to reach the static member without an instance.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says StaticMemberExpr represents `T::m` (or `T.m` on a
-// type expression). Reading a `static const int` member through the
-// type produces the stored value without an instance.
+// Verifies that a `.` member access whose base names a type (not a
+// value) still reaches the type's static member: the parser starts it
+// as a plain member access, and checking reinterprets it once the base
+// resolves to a type. CHECK asserts the static constant's value read
+// through `Limits.kMax` without an instance.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

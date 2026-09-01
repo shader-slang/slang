@@ -17,6 +17,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
 
 [[SpecializationConstant]]
 const int TILE_SIZE = 8;
@@ -36,3 +37,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<int> output
 // WGSL maps [SpecializationConstant] to an override declaration with @id.
 // WGSL: @id(
 // WGSL-DAG: override TILE_SIZE_
+// GLSL emits the Specialization-constant address space as a `layout(constant_id = N) const`.
+// GLSL: layout(constant_id = {{[0-9]+}})
+// GLSL-NEXT: const int TILE_SIZE_

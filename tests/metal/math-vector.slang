@@ -186,7 +186,7 @@ bool Test_Vector()
         // METAL-NOT: min3(
         && zero == min3<T>(zero, zero, zero)
 
-        // METAL-COUNT-2: fmod(
+        // METAL: fmod(
         // METAL-NOT: fmod(
         && zero == fmod<T>(zero, one)
 

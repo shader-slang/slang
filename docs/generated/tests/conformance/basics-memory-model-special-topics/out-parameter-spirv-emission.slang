@@ -15,6 +15,10 @@
 // and `OpStore %result`, confirming the pointer-passing mechanism for `out` parameters.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> output;
 
@@ -38,3 +42,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK: %writeOut = OpFunction %void DontInline
 // CHECK: %result = OpFunctionParameter %_ptr_Function_int
 // CHECK: OpStore %result
+
+// GLSL: void writeOut_{{[0-9]+}}(out int result_{{[0-9]+}},
+// GLSL: result_{{[0-9]+}} =
+
+// HLSL: void writeOut_{{[0-9]+}}(out int result_{{[0-9]+}},
+// HLSL: result_{{[0-9]+}} =
+
+// MTL: void writeOut_{{[0-9]+}}(int thread* result_{{[0-9]+}},
+// MTL: *result_{{[0-9]+}} =
+
+// WGSL: fn writeOut_{{[0-9]+}}( result_{{[0-9]+}} : ptr<function, i32>
+// WGSL: (*result_{{[0-9]+}}) =

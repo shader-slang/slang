@@ -1,7 +1,7 @@
 // metal-command-buffer.h
 #pragma once
 
-#include "../simple-transient-resource-heap.h"
+#include "gfx/simple-transient-resource-heap.h"
 #include "metal-base.h"
 #include "metal-command-encoder.h"
 #include "metal-shader-object.h"

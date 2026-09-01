@@ -1,0 +1,46 @@
+schema_version: 1
+id: ir-types-unorm-snorm-struct-field-sigsegv
+bundle: design/ir-reference/types
+suspected_kind: sigsegv
+title: "`unorm`/`snorm` float struct field SIGSEGVs slangc on every target"
+observed_at: "2026-08-04T00:00:00+00:00"
+scope: ir
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang -target hlsl -stage compute -entry main -dump-ir -o /dev/null"
+  source_slang: docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang
+  exit_code: 139
+  observed_summary: |
+    A struct with a `unorm float` (or `snorm float`) field, used as a
+    module-scope `uniform`, crashes slangc with a segmentation fault
+    (exit 139) after the IR has been built. With `-dump-ir` the dump gets
+    as far as printing the struct — `struct %Norms { field(%u,
+    Attributed(Float, %2)) field(%s, Attributed(Float, %1)) }` — and the
+    process then dies partway through the dump.
+
+    The crash reproduces with `-target hlsl`, `glsl`, `spirv-asm`, `metal`
+    and `cpp`, with and without `-dump-ir`, and with either modifier alone
+    (a struct with only `unorm float a;` is enough). Under slang-test's
+    in-process test server it manifests as repeated "JSON RPC failure:
+    waitForResult()/hasMessage()" because the server process dies.
+
+    A bare `uniform unorm float a;` (no struct) compiles fine, so the
+    struct-field position is what triggers it.
+  stderr_tail: "Segmentation fault (exit 139); no diagnostic emitted"
+expected:
+  claim: |
+    types.md's "Vectors, matrices, and composite" table lists `Attributed`
+    with AST origin "`unorm` / `snorm` / `Aligned` and other type
+    modifiers", so a `unorm`-qualified struct field is a documented surface
+    for the opcode. It should either lower and emit cleanly or produce a
+    graceful unsupported diagnostic, never a segmentation fault.
+  citation_kind: sibling-test
+  citation: tests/language-feature/types/modifiers/unorm-modifier.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/ir-reference/types.md#vectors-matrices-and-composite
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Malformed test input: ruled out — `unorm float` is a documented type modifier and `tests/language-feature/types/modifiers/unorm-modifier.slang` uses the modifier successfully in buffer-element position."
+    - "Duplicate of metadata-unorm-structured-buffer-element-sigsegv: possible shared root cause (both crash on an `Attributed(Float, ...)` type), but the surface differs — that finding is `RWStructuredBuffer<unorm float>` element type, this one is a plain struct field with no buffer involved. Left separate for triage to merge."

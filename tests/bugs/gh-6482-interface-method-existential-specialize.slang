@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -O3
 
 // This is a test that checks that we can apply partial specialization to a function
 // that takes existential parameters.
@@ -33,7 +33,7 @@ struct Scene : IScene {
 };
 
 public interface IIntegrator {
-    
+
     // This function takes two existential parameters, `scene` and `rng`.
     // if we call this function with `rng` being dynamic, and `scene` being static,
     // we should still be able to specialize the `sample` function with the statically known

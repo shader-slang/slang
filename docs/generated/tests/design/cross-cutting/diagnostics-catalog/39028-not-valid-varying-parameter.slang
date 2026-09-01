@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=20673cb4358c7ef2dc6197cbe8ab1af517130201709c40bc3eba85147e09d1b1
 //META: purpose=Fires diagnostic E39028 (not-valid-varying-parameter) - not a valid varying parameter
 //META: intent=negative
 //META: pipeline_stage=check
@@ -24,4 +24,4 @@ float4 main(IFoo foo : A) : SV_Position
     return float4(0);
 }
 
-// CHECK: E39028
+//CHECK: E39028

@@ -26,8 +26,12 @@ line 2754).
     to a SPIR-V instruction; do not over-claim.
   - **SPIR-V inline asm operands** — `SPIRVAsmOperand` family and
     related opcodes used by the inline `__intrinsic_asm` mechanism.
-- The `AST origin` column for these opcodes is usually
-  `(synthesized)` — they are introduced by IR passes
+- Most of these opcodes are introduced by IR passes rather than by AST
+  lowering, so the `AST origin` column must **name the producing pass**
+  — the retired catch-all `(synthesized)` is not acceptable, and an
+  opcode nothing in `source/` constructs is marked **no producer at
+  HEAD** (see the column contract in [_common.md](_common.md)). The
+  usual producers are
   (`slang-ir-insert-debug-value-store.cpp` for debug ops,
   `slang-ir-layout-impl.cpp` for layout, the SPIR-V emitter for
   asm operands). For `Layout` opcodes that originate from

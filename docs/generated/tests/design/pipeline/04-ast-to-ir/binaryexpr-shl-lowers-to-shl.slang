@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T18:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
-//META: purpose=A BinaryExpr `a << n` lowers to an `shl` IR opcode — a pure-value inst representing left-shift in the doc's arithmetic-Expr row.
+//META: doc_section_digest=1195a752790819415908e083ce9656a353d4764f2fab38cc5aa27d92f184c486
+//META: purpose=A builtin `a << n` (a checker fast-path BuiltinOperatorExpr) lowers to an `shl` IR opcode — a pure-value inst representing left-shift in the doc's BuiltinOperatorExpr row.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
@@ -13,7 +13,7 @@
 // covers any arithmetic Expr; the left-shift `<<` lowers to `shl`
 // with the shift amount as the second operand.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

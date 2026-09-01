@@ -9,9 +9,14 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that $for emits as fully-unrolled code in HLSL (no loop structure remains).
-// The body assigns to arr[i]; HLSL output should have explicit index assignments.
+// Verifies that $for emits as fully-unrolled code on every shader text target
+// (no loop structure remains). The body assigns to arr[i]; each target's output
+// should have three explicit constant-index assignments and no loop construct.
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -32,3 +37,34 @@ void computeMain()
 // CHECK: 0
 // CHECK: 10
 // CHECK: 20
+
+// GLSL emits three constant-index stores between the function open and the
+// buffer writes, with no `for`/`while` construct in between.
+// GLSL: void main()
+// GLSL-NOT: for(
+// GLSL-NOT: while(
+// GLSL: arr_{{[0-9]+}}[0] = 0;
+// GLSL: arr_{{[0-9]+}}[1] = 10;
+// GLSL: arr_{{[0-9]+}}[2] = 20;
+
+// METAL: {{\[\[}}kernel{{\]\]}} void computeMain
+// METAL-NOT: for(
+// METAL-NOT: while(
+// METAL: arr_{{[0-9]+}}[int(0)] = int(0);
+// METAL: arr_{{[0-9]+}}[int(1)] = int(10);
+// METAL: arr_{{[0-9]+}}[int(2)] = int(20);
+
+// WGSL: fn computeMain
+// WGSL-NOT: for(
+// WGSL-NOT: loop
+// WGSL: arr_{{[0-9]+}}[i32(0)] = i32(0);
+// WGSL: arr_{{[0-9]+}}[i32(1)] = i32(10);
+// WGSL: arr_{{[0-9]+}}[i32(2)] = i32(20);
+
+// In SPIR-V the unrolled form is three OpStore of the literal constants inside
+// a single basic block; a loop would have produced an OpLoopMerge.
+// SPIRV: %computeMain = OpFunction
+// SPIRV-NOT: OpLoopMerge
+// SPIRV: OpStore %{{[0-9]+}} %int_0
+// SPIRV: OpStore %{{[0-9]+}} %int_10
+// SPIRV: OpStore %{{[0-9]+}} %int_20

@@ -1,16 +1,19 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
-//META: doc_ref=docs/language-reference/generics.md#description
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=A generic function can take an IFunc-typed parameter; the concrete implementing struct is passed and called through the interface.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/language-reference/generics.md#generic-function-with-type-parameter
+//META: doc_section_digest=c59debbe3e17a3a2ab8b9d098c19641c5ad3b7ac102c0670d8911cb4973db4ca
+//META: purpose=A generic function taking an `IFunc<T,T,T>` parameter can be called with a concrete struct implementing IFunc.
 //META: intent=functional
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// From the doc Examples section (Generic function with type parameter).
-// `performOp` takes an `IFunc<T, T, T>` parameter and a `Adder` struct implements it.
+// Verifies the doc's "Generic function with type parameter" example: a struct
+// `Adder` conforms to `IFunc<int,int,int>` and is passed to
+// `performOp<T>(IFunc<T,T,T> op, T a, T b)`. The kernel evaluates
+// performOp(adder, 234, 456); CHECK asserts 234+456+bias(5)=695, proving the
+// interface-typed parameter dispatched to Adder's operator().
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
@@ -37,10 +40,9 @@ struct Adder : IFunc<int, int, int>
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 id : SV_DispatchThreadID)
+void computeMain()
 {
-    Adder addTwoWithBias;
-    addTwoWithBias.bias = 5;
-    outputBuffer[0] = performOp(addTwoWithBias, 234, 456);
+    Adder addWithBias = { 5 };
+    outputBuffer[0] = performOp(addWithBias, 234, 456);
 }
 // CHECK: 695

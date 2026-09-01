@@ -715,11 +715,17 @@ int main(int argc, char** argv)
         // `--batch-size=N`: split the ray grid into batches of N rays,
         // each dispatched as a separate GPU submission. Keeps individual
         // submissions short to avoid OS watchdog resets (Windows TDR /
-        // VK_ERROR_DEVICE_LOST) under coverage instrumentation. Default
-        // is 0 (all rays in a single dispatch). A value of 262144
-        // (512×512) is a safe starting point on any GPU; reduce if you
-        // observe TDR, increase for fewer submissions on fast hardware.
-        uint32_t batchSize = 0; // 0 = single dispatch
+        // VK_ERROR_DEVICE_LOST) under coverage instrumentation. Full mode
+        // defaults to 262144 rays (512×512) per batch — a safe value on
+        // any GPU — because its denser mesh makes a single 16M-ray
+        // coverage-instrumented dispatch long enough to trip the watchdog.
+        // Smoke mode is quick and defaults to a single dispatch. Pass an
+        // explicit value to tune (smaller if you still observe TDR, larger
+        // for fewer submissions on fast hardware), or `--batch-size=0` to
+        // force a single dispatch in full mode.
+        constexpr uint32_t kBatchSizeUnset = UINT32_MAX;
+        constexpr uint32_t kFullModeBatchSize = 262144;
+        uint32_t batchSize = kBatchSizeUnset; // resolved per mode after parsing
         constexpr std::string_view kOutputDirFlag = "--output-dir=";
         constexpr std::string_view kDemoDirFlag = "--demo-dir=";
         constexpr std::string_view kBatchSizeFlag = "--batch-size=";
@@ -754,6 +760,12 @@ int main(int argc, char** argv)
                 return 1;
             }
         }
+
+        // Resolve the batch-size default per mode (see the flag comment
+        // above): full mode batches by default, smoke mode does not. An
+        // explicit `--batch-size=` always wins, including `=0`.
+        if (batchSize == kBatchSizeUnset)
+            batchSize = (mode == "full") ? kFullModeBatchSize : 0;
 
         // Publish the `--demo-dir` override to file-scope storage so
         // `getDemoDirectory()` (called from `compileShader` and from
@@ -909,12 +921,12 @@ int main(int argc, char** argv)
         // Both patterns are the same WAR for GPU watchdog timeouts on
         // coverage-instrumented kernels.
         //
-        // `--batch-size=N` sets the rays-per-batch; omitting the flag submits
-        // all rays in a single dispatch (fast, no TDR protection). A value of
-        // 262144 (512×512) is a safe starting point on any GPU.
+        // `--batch-size=N` sets the rays-per-batch; full mode defaults to
+        // 262144 (512×512), smoke mode and `--batch-size=0` submit all rays
+        // in a single dispatch (fast, no TDR protection).
         const uint32_t totalRays = (uint32_t)rays.size();
-        // Resolve 0 (the "no flag" sentinel) to the full ray count so the loop
-        // always runs exactly one iteration by default.
+        // Resolve 0 (single dispatch) to the full ray count so the loop
+        // always runs exactly one iteration in that case.
         const uint32_t effectiveBatchSize = (batchSize == 0) ? totalRays : batchSize;
         uint32_t batchCount = 0;
         std::cout << "dispatching " << totalRays << " rays";
@@ -994,6 +1006,16 @@ int main(int argc, char** argv)
         ctx.destroyPipeline(pipe);
         std::cout << "done\n";
         return 0;
+    }
+    catch (const vkdemo::VulkanError& e)
+    {
+        std::cerr << "fatal: " << e.what() << "\n";
+        if (e.result == VK_ERROR_DEVICE_LOST)
+            std::cerr << "The GPU was likely reset by the OS watchdog (TDR) during a long "
+                         "coverage-instrumented dispatch. Rerun with a smaller --batch-size "
+                         "(e.g. --batch-size=65536), or use --coverage-mode=boolean, which "
+                         "removes the atomic-counter cost.\n";
+        return 1;
     }
     catch (const std::exception& e)
     {

@@ -21,7 +21,6 @@ struct A : IFoo
 
     // Normal differentiable implementation
     [Differentiable]
-    [NoDiffThis]
     float calc(float x) { return a * x * x; } // df/dx = 2*a*x
 }
 

@@ -224,6 +224,20 @@ else
     # runs once a day; data quality > runner-minute savings.
     AGENTIC_TEST_ARGS+=("-server-count" "1")
 
+    # Scope the agentic pass to docs/generated/tests only: exclude the
+    # built-in unit tests. slang-test always appends the
+    # `slang-unit-test-tool/*` unit tests even when `-test-dir` is
+    # given, and some of them (e.g. the record-replay `replayContext*`
+    # cases) throw C++ exceptions that are contained under the
+    # subprocess test-server but become an uncaught `terminate`/SIGABRT
+    # when this pass runs them in-process (`-server-count 1`). That
+    # abort kills slang-test before it flushes its .profraw, losing the
+    # coverage for the whole agentic pass. The unit tests are not part
+    # of the doc-anchored suite and their coverage is already collected
+    # by the main pass above (plus the focused `slang-unit-test-tool/
+    # RecordReplayApi` run), so skipping them here is non-lossy.
+    AGENTIC_TEST_ARGS+=("-exclude-prefix" "slang-unit-test-tool")
+
     # Read coverage-only exclude list from
     # docs/generated/tests/_meta/agentic-coverage-excludes.txt and add
     # one -exclude-prefix flag per entry. These are tests that crash

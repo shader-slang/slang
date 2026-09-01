@@ -1,9 +1,9 @@
 // unit-test-persistent-cache.cpp
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-persistent-cache.h"
-#include "../../source/core/slang-process.h"
-#include "../../source/core/slang-random-generator.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-persistent-cache.h"
+#include "core/slang-process.h"
+#include "core/slang-random-generator.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <atomic>

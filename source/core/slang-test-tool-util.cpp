@@ -225,4 +225,76 @@ static SlangResult _getCanonicalOrExecutablePath(const char* exePath, String& ou
     return SLANG_OK;
 }
 
+
+/// Largest subtest index `getSubtestIndex` will report. Anything above this is
+/// rejected rather than wrapped, so the accumulation below stays in range.
+static const int kMaxSubtestIndex = 0x7fffffff;
+
+/* static */ int TestToolUtil::getSubtestIndex(const String& entry, const String& filePath)
+{
+    if (entry.getLength() <= filePath.getLength() || !entry.startsWith(filePath))
+        return -1;
+
+    auto suffix = entry.getUnownedSlice().tail(filePath.getLength());
+    if (suffix.getLength() < 2 || suffix[0] != '.')
+        return -1;
+
+    // Check all remaining chars are digits, accumulating the index as we go.
+    //
+    // The bound check is not defensive padding: `index * 10 + digit` is signed
+    // arithmetic, so a suffix of enough digits would overflow `int` and be
+    // undefined behaviour rather than merely producing a large number. An entry
+    // that names a subtest beyond `INT_MAX` cannot correspond to a real subtest
+    // anyway, so it is rejected the same way a non-numeric suffix is: the caller
+    // then treats the entry as a plain path prefix, which is the reading that
+    // cannot silently select the wrong test.
+    int index = 0;
+    for (Index i = 1; i < suffix.getLength(); i++)
+    {
+        char c = suffix[i];
+        if (c < '0' || c > '9')
+            return -1;
+        const int digit = c - '0';
+        if (index > (kMaxSubtestIndex - digit) / 10)
+            return -1;
+        index = index * 10 + digit;
+    }
+
+    return index;
+}
+
+/* static */ bool TestToolUtil::entryMatchesSubtest(
+    const String& entry,
+    const String& filePath,
+    const String& outputStem,
+    Index subTestIndex)
+{
+    const int entrySubtest = getSubtestIndex(entry, filePath);
+    if (entrySubtest >= 0)
+    {
+        if (entrySubtest == 0 && subTestIndex == 0)
+            return true;
+        return outputStem == entry;
+    }
+    return filePath.startsWith(entry);
+}
+
+/* static */ bool TestToolUtil::isSubtestExcluded(
+    const List<String>& excludePrefixes,
+    const List<String>& skipList,
+    const String& filePath,
+    const String& outputStem,
+    Index subTestIndex)
+{
+    for (const auto* entries : {&excludePrefixes, &skipList})
+    {
+        for (const auto& entry : *entries)
+        {
+            if (entryMatchesSubtest(entry, filePath, outputStem, subTestIndex))
+                return true;
+        }
+    }
+    return false;
+}
+
 } // namespace Slang

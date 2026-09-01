@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#aggregate-constructors
-//META: doc_section_digest=3e412bb1b8df51b023821b69be767e4f040104ad482e9063949a7dd98d9eda38
+//META: doc_section_digest=136fa0f20043e0a8db805b7f018d292446250e6117047722c77e7aa7efca0675
 //META: purpose=A `makeTuple(...)` call lowers to the `makeTuple` IR opcode producing a `tuple_type(...)` value.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // "`MakeTupleExpr`". Using the `makeTuple(...)` builtin with two
 // uniform operands produces a value of `tuple_type(Int, Float)`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform float fa;

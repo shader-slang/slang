@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#conversions
-//META: doc_section_digest=e98041c33a94ddbbb2f967b2078765fb561c2b5e826bdd9ca046a44763e172fe
+//META: doc_section_digest=e048ee63e8d3331531d544e35ff8c335c38d075b516814b79f5d10d0602ac72a
 //META: purpose=Expansion: signed widening `int32 -> int64_t` selects the sign-extend variant of `intCast`; lowers to `intCast(%a)` with `Int64` result.
 //META: intent=expansion
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // test flipped signedness. Complement to the uint to int64
 // counterpart in the existing tests.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int64_t> buf;

@@ -1,0 +1,36 @@
+schema_version: 1
+id: slangi-if-let-optional-parameter-binds-none
+bundle: design/syntax-reference/grammar
+suspected_kind: wrong-codegen
+scope: ir
+observed_at: 2026-08-04T00:00:00+00:00
+title: slangi binds the empty-Optional parameter arm of `if (let v = o)`
+evidence:
+  command: build/RelWithDebInfo/bin/slangi docs/generated/tests/design/syntax-reference/grammar/stmt-if-let.slang
+  source_slang: docs/generated/tests/design/syntax-reference/grammar/stmt-if-let.slang
+  observed_summary: >-
+    Under slangi, `if (let v = o)` takes the bound branch when `o` is an
+    `Optional<int>` function parameter holding `none`, binding v to 0; the same
+    shader passes on `-cpu`, and the same `if (let ...)` on a local `none`
+    variable (the form shipped in this test) evaluates correctly.
+expected:
+  claim: >-
+    `if (let v = o)` must take the else branch when the Optional operand is
+    empty, regardless of whether the operand is a local or a by-value parameter.
+  citation_kind: sibling-test
+  citation: tests/language-feature/nested-optional.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/syntax-reference/grammar.md#statements
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - >-
+      A test bug in how the empty Optional was constructed - ruled out because
+      reading `nothing.hasValue` in the same slangi run prints 0, and the
+      identical shader passes under `-cpu`.
+    - >-
+      A general slangi Optional limitation - ruled out because the local-variable
+      form of the same `if (let ...)` statement evaluates both arms correctly on
+      slangi.

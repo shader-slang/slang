@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#deferstmt
-//META: doc_section_digest=8d7ee5a379aeb4b393aeb766e8179650d332b2a7a6bcc65b16e7e5c13a614827
+//META: doc_section_digest=9d7a17de2e7a4cacf7a44eefe78eaa8bea0a9a617b555cc1e20d4e784f62d6bf
 //META: purpose=A DeferStmt placed at function entry has the entire function body as its surrounding scope; the deferred inner statement runs after every other statement in the function but before the caller resumes.
 //META: intent=boundary
 //META: pipeline_stage=check

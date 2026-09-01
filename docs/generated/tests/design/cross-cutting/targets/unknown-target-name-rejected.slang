@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#targets
-//META: doc_section_digest=e324a10260c794d77c45954ccddaf61cf66af2794e97a8289f9655330ee625d4
+//META: doc_section_digest=09ecdf153c06b46e85b5bfd65a0136d6c1516c1e42e5e33b4b02ee440f2f963c
 //META: purpose=A `-target` value that does not appear in the documented target table is rejected with `E00013: unknown code generation target`; target parsing is closed-set against `SlangCompileTarget`.
 //META: intent=negative
 //META: pipeline_stage=check

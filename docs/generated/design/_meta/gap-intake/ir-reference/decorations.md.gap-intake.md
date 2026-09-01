@@ -1,0 +1,72 @@
+---
+gap_intake_report: true
+intake_model: claude-opus-5[1m]
+intake_at: 2026-08-12T06:38:42Z
+target_doc: ir-reference/decorations.md
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
+gap_count: 11
+actions:
+  fixed: 8
+  rejected_bogus: 2
+  rejected_out_of_scope: 1
+  deferred: 0
+  escalated_to_finding: 0
+---
+
+# Gap-intake report for ir-reference/decorations.md
+
+## Summary
+
+This is a re-run of the intake for this page, revisiting the single gap
+the first pass deferred; the ten other verdicts and their Evidence are
+carried forward unchanged. `901ca639c751` was deferred on the premise
+that only a `-dump-ir` run could settle it and that this host could not
+run the compiler. That premise was wrong: a native macOS-arm64 `slangc`
+built from the same compiler source as `HEAD` is present, and it shows
+the decoration plainly, so the gap moves from `deferred` to `fixed` and
+the deferred count drops to zero. The action breakdown is now eight
+fixed, two rejected as bogus, one rejected as out of scope, none
+deferred, and none escalated.
+
+The dump contradicted the gap's own report as well as the deferral. The
+gap said neither an entry-point `uniform` nor a global `uniform`
+produced the decoration in any snapshot; both do, on every text target
+tried. What the earlier observation most likely hit is the
+`LOWER-TO-IR` snapshot, which cannot contain the struct because both
+producing passes run during target lowering — that timing is now stated
+in the page so the next reader does not repeat the search.
+
+Two `Suggested addition` hypotheses from the first pass were wrong in a
+way that mattered and were not written as proposed; those verdicts are
+unchanged. `320bf7714a3d` proposed a stage-to-tag table; the tag is a
+`Profile::RawVal` whose low 16 bits happen to be the stage, so a
+stage-only table would have been a documented half-truth.
+`bd7183d2d708` asserted `BuiltinDecoration` sits on "nearly every
+core-module declaration"; the sole producer attaches it only to
+`interface` declarations carrying `[builtin]`, of which there are 18
+across the two `.meta.slang` files.
+
+The first pass also flagged `source/slang/slang-profile.h`,
+`source/slang/slang-ir-glsl-legalize.cpp`,
+`source/slang/slang-ir-entry-point-uniforms.cpp` and
+`source/slang/slang-ir-collect-global-uniforms.cpp` as cited but
+unwatched. All four are in `watched_paths` at `HEAD`
+(`regenerate.py show ir-reference/decorations.md`), so that follow-up is
+closed and the new `901ca639c751` text cites a watched path.
+
+## Actions
+
+| Gap ID | Action | Evidence | Fix summary |
+| --- | --- | --- | --- |
+| a13d8a468a77 | rejected-out-of-scope | `docs/generated/design/_meta/prompts/ir-reference-decorations.md` lines 75-81, `## Forbidden content`: "Backend-specific consumption of decorations — see [../pipeline/06-emit.md]". A per-target table of what `[unroll]` / `[branch]` become in hlsl / glsl / spirv / metal / wgsl is exactly that material, and the callout already links `06-emit.md`. | — |
+| 33fbeb8b7617 | fixed | `source/slang/slang-lower-to-ir.cpp:16509-16521`, inside `TargetProgram::createIRModuleForLayout` (line 16381): the decoration is built from `asFuncDecl->inferredCapabilityRequirements`, filtered to `_spirv_1_0..latestSpirvAtom` and `metallib_2_3..latestMetalAtom`. No `[require(...)]` path adds it. Builder at `source/slang/slang-ir-insts.h:5014-5019`. | replaced the false `require(...)` AST origin with the layout-IR producer and the inferred-capability-set route, and noted that only SPIR-V-version and Metal-library atoms are recorded |
+| 320bf7714a3d | fixed | `source/slang/slang-ir-insts.h:355` — `getProfile()` returns `Profile(Profile::RawVal(getIntVal(getProfileInst())))`; `source/slang/slang-ir-insts.h:5228-5238` stores `profile.raw`; `source/slang/slang-lower-to-ir.cpp:15274-15278` passes `entryPoint->getProfile()`. Encoding at `source/slang/slang-profile.h:75-77,96-101`. Value `1` for `-stage vertex` verified by `entry-point-vertex-profile.slang`. | extended the `entryPoint` callout to say the tag is a `Profile::RawVal` (`ProfileVersion` high 16 bits, `Stage` low 16), not a bare stage code |
+| dbe97ebb7283 | fixed | `source/slang/core.meta.slang:4749-4750` and `4756-4757` — `attribute_syntax [format(format : String)]` / `[vk_image_format(format : String)] : FormatAttribute`; `source/slang/slang-ir-insts.h:5299-5302` — `addFormatDecoration(IRInst*, ImageFormat)` stores `getIntValue(getIntType(), IRIntegerValue(format))`. | showed the quoted argument in the `format` row and said the operand is the integer `ImageFormat` value the string resolves to |
+| e19c29a6b653 | fixed | `source/slang/slang-ir-insts.h:153-164` — `enum class IRInterpolationMode { Linear, NoPerspective, NoInterpolation, Centroid, Sample, PerVertex }`; modifier mapping at `source/slang/slang-lower-to-ir.cpp:3125-3149`; source spellings at `source/slang/slang-parser.cpp:10792-10796` and `source/slang/core.meta.slang:42`. Values 0/2/4 pinned by `interpolation-mode-{linear,nointerpolation,sample}.slang`. | added an `interpolationMode` callout with the full six-value mapping (the gap's list omitted `PerVertex` 5) and pointed the table row at it |
+| 7bb8913f2a18 | rejected-bogus | `source/slang/core.meta.slang:4418-4419` declares `attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute`, so `vk_location` is the attribute's real name and is writable; `source/slang/slang-parser.cpp:963-978` (`parseAttributeName`) rewrites each `::` in a scoped attribute name to `_`, which is how `[vk::location(7)]` in `glsl-location-decoration.slang` reaches the same attribute. The gap's premise — that `[vk_location(...)]` is unwritable — is false. The row was still reworded to lead with the spelling users write. | — |
+| 863b0c0f87dc | fixed | `source/slang/core.meta.slang:4469-4471` — `__attributeTarget(LoopStmt)` + `attribute_syntax [ForceUnroll(count: int = 0)]`; `source/slang/slang-lower-to-ir.cpp:8409-8411` reads the modifier off the loop *statement*; `source/slang/slang-ir-insts.h:4867-4870` — `addLoopForceUnrollDecoration` appends `getIntValue(getIntType(), iters)` even though the Lua entry (`source/slang/slang-ir-insts.lua:2199-2202`) declares none. Operand form pinned by `force-unroll-on-loop.slang`, E31002 by `force-unroll-on-function-error.slang`. | corrected the `ForceUnroll` row to the builder-appended `count: IRIntLit` idiom the `vulkanRayPayload` rows already use, and recorded the `LoopStmt`-only attribute target and the `0` default |
+| 69f3396b03eb | rejected-bogus | These are two distinct opcodes, not two spellings of one. `source/slang/slang-ir-insts.lua:2081-2084` declares the decoration `streamOutputTypeDecoration`; `source/slang/slang-ir-insts.lua:2888` declares `streamOutputTypeLayout` under `TypeLayout`, wrapped by `IRStreamOutputTypeLayout : IRTypeLayout` at `source/slang/slang-ir-insts.h:1406-1424`. What `stream-output-type-decoration.slang` matched is the type-layout inst. The decoration itself is produced only by `source/slang/slang-ir-glsl-legalize.cpp:4076`, so an `-target hlsl` dump cannot contain it. | — |
+| bd7183d2d708 | fixed | `source/slang/slang-ir-insts.h:5341` is the only definition of `addBuiltinDecoration` and `source/slang/slang-lower-to-ir.cpp:12322-12325` its only caller, inside `visitInterfaceDecl` (line 12073) under `decl->findModifier<BuiltinAttribute>()`. `[builtin]` is declared at `source/slang/core.meta.slang:4874-4875`; all 12 uses in `core.meta.slang` and all 6 in `hlsl.meta.slang` are on `interface` declarations, including `IBufferDataLayout` at `source/slang/hlsl.meta.slang:22-24`, which is the default layout constraint of `RWStructuredBuffer` (`hlsl.meta.slang:74`). | narrowed the row from "Core-module lowering" / "an inst" to the `[builtin]` attribute on an `interface`, and named `IBufferDataLayout` as the case ordinary code links in |
+| 93335aeba9c7 | fixed | `source/slang/slang-ir-insts.h:895-901` — `IRConstructorDecoration::getSynthesizedStatus()` reads `cast<IRBoolLit>(getOperand(0))`; `source/slang/slang-ir-insts.h:4884-4887` — `addConstructorDecoration(IRInst*, bool synthesizedConstructor)`; sole caller `source/slang/slang-lower-to-ir.cpp:14302-14305` passes `constructorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault)`. | replaced the retired `(variadic, min=1)` cell with `(1 unnamed: an `IRBoolLit`, read by `getSynthesizedStatus()`)` and said `true` marks the compiler-synthesized default rather than a user-written `__init` |
+| 901ca639c751 | fixed | Re-run: settled by running the compiler, which the first pass wrongly believed impossible. `build-arm64/Debug/bin/slangc` (`-version` `2026.14.1-80-g6122d03def`; `git diff --stat 6122d03def HEAD -- source/ include/` is empty, so its compiler source is `HEAD`'s). With `SLANG_ASSERT=release-assert-only`, `slangc -dump-ir -target hlsl -entry computeMain -o out.hlsl x.slang` on a `[shader("compute")] [numthreads(1,1,1)] void computeMain(uniform float scale, uint3 tid : SV_DispatchThreadID)` writing `outBuf[tid.x] = scale` prints `[synthesizedParameterGroup]` on `struct %EntryPointParams` in the `AFTER collectEntryPointUniformParams` snapshot and in all later ones; moving `scale` to a file-scope `uniform float scale` prints it on `struct %GlobalParams` from `AFTER collectGlobalUniformParameters` onward. Both agree with the watched producers `source/slang/slang-ir-entry-point-uniforms.cpp:550` (`ensureCollectedParamAndTypeHaveBeenCreated`) and `source/slang/slang-ir-collect-global-uniforms.cpp:157`. Neither appears in the `LOWER-TO-IR` snapshot, because `slang-emit.cpp:1231` and `1275` run both passes during target lowering. The ordinary-data precondition is `source/slang/slang-ir-collect-global-uniforms.cpp:120-122`, confirmed by a control program whose only globals are `RWStructuredBuffer` and `Texture2D`: zero matches in the whole dump. Same counts on glsl, spirv, metal and wgsl. | added a second paragraph to the `synthesizedParameterGroup` callout giving the reachable entry-point and global spellings with their target and options, the ordinary-data precondition on global collection, and the note that both structs are absent from the `LOWER-TO-IR` snapshot |

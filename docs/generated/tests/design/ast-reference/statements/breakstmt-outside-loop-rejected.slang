@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
-//META: doc_ref=docs/generated/design/ast-reference/statements.md#nodes
-//META: doc_section_digest=9f32f2463c3b3150d88ac333b9a732766e6f477e8e541627f6f4db0faa939a24
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/statements.md#labelstmt-breakstmt-continuestmt-and-discardstmt
+//META: doc_section_digest=7c61fa1b4009ab648f41bc90151176c2c3ef804455b39f0ca18a8fb8d9a62d07
 //META: purpose=A BreakStmt is a ChildStmt whose target must be an enclosing BreakableStmt (loop or switch); used outside any such enclosing statement it is rejected.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// BreakStmt is documented as a JumpStmt that derives from ChildStmt;
-// the family-hierarchy section says BreakableStmt holds the uniqueID
-// that ChildStmt references via `targetOuterStmtID`. Outside any loop
-// or switch there is no matching BreakableStmt, so the checker must
-// reject the statement.
+// Verifies `break` requires an enclosing loop or switch to jump out of.
+// With no such enclosing statement, checking has nothing to match the
+// jump against; the CHECK pins the E30003 diagnostic on the `break`
+// token itself.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 

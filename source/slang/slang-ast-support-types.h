@@ -1,16 +1,15 @@
 #pragma once
 
-#include "../compiler-core/slang-doc-extractor.h"
-#include "../compiler-core/slang-lexer.h"
-#include "../compiler-core/slang-name.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-semantic-version.h"
+#include "compiler-core/slang-doc-extractor.h"
+#include "compiler-core/slang-lexer.h"
+#include "compiler-core/slang-name.h"
+#include "core/slang-basic.h"
+#include "core/slang-semantic-version.h"
 #include "slang-ast-forward-declarations.h"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
 #include "slang.h"
 
-#include <assert.h>
 #include <type_traits>
 
 //
@@ -43,6 +42,7 @@ FIDDLE() namespace Slang
     class Val;
 
     class DeclRefBase;
+    struct SubstitutionCache;
     class NodeBase;
     class LookupDeclRef;
     class GenericAppDeclRef;
@@ -243,6 +243,32 @@ FIDDLE() namespace Slang
 
     /// Convert string name to KnownBuiltinDeclName enum
     KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);
+
+    /// Returns true if `name` identifies one of the differentiable builtin
+    /// interfaces (`IDifferentiable`, `IDifferentiablePtr`, and the
+    /// function-translation interfaces `IForwardDifferentiable`,
+    /// `IBackwardDifferentiable`, `IBwdCallable`).
+    ///
+    /// This is the authoritative definition of the "differentiable interface
+    /// family": the IR linker defers the witness-table entries of conformances
+    /// to these interfaces when linking a program that does not use auto-diff
+    /// (see `shouldDeepCloneWitnessTable` in slang-ir-link.cpp). A newly added
+    /// differentiable interface must be added here, or its witness tables will
+    /// be deep-cloned into every program regardless of auto-diff use.
+    inline bool isDifferentiableInterfaceBuiltin(KnownBuiltinDeclName name)
+    {
+        switch (name)
+        {
+        case KnownBuiltinDeclName::IDifferentiable:
+        case KnownBuiltinDeclName::IDifferentiablePtr:
+        case KnownBuiltinDeclName::IForwardDifferentiable:
+        case KnownBuiltinDeclName::IBackwardDifferentiable:
+        case KnownBuiltinDeclName::IBwdCallable:
+            return true;
+        default:
+            return false;
+        }
+    }
 
     // TODO(tfoley): We should ditch this enumeration
     // and just use the IR opcodes that represent these
@@ -754,6 +780,9 @@ FIDDLE() namespace Slang
     struct SubstitutionSet
     {
         DeclRefBase* declRef = nullptr;
+
+        // An operation-local cache shared by recursive copies of this substitution set.
+        SubstitutionCache* substitutionCache = nullptr;
 
         // The element index if the substitution is happening inside a pack expansion.
         // For example, if we are substituting the pattern type of `expand each T`, where

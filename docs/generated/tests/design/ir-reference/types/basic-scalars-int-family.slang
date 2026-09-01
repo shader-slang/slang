@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#basic-scalar-types
-//META: doc_section_digest=63ee1ec4667453d54a2bcd56e4fb65f66647e427edd024e6dec258599bc428c6
+//META: doc_section_digest=b3e088ac3dc9706ad8749cb8f9a4f8033e0bd510147eb7d3d1d0a3563b2dd6ca
 //META: purpose=The signed-integer scalar opcodes Int8, Int16, Int, Int64 appear as struct-field types in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Basic scalar types" table lists `Int8`, `Int16`, `Int`,
-// `Int64` (under their respective C++ wrapper types) as separate IR
-// type opcodes. A struct whose fields cover each of these scalar
-// widths surfaces all four opcodes in one IR dump.
+// The signed-integer scalar opcodes Int8, Int16, Int, Int64 appear as
+// struct-field types in the IR dump. A struct whose fields cover each
+// of these scalar widths surfaces all four opcodes in one IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Ints { int8_t a; int16_t b; int c; int64_t d; }
 

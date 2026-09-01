@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0 -g
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -g
 
 //CHECK: OpEntryPoint
 

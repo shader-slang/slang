@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#per-keyword-semantics
-//META: doc_section_digest=ce44867411acd029099bae586609553fe57570c9431906d8d42a8d17c424b6bc
+//META: doc_section_digest=7d96ab9817d6f6251e2148b7d4d9959fb9ec73041354e919db537f46458d416e
 //META: purpose=A `private` member is visible from another method of the same aggregate; access through `this` succeeds.
 //META: intent=functional
 //META: pipeline_stage=check

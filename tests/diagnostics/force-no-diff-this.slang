@@ -41,4 +41,3 @@ void computeMain(uint id : SV_DispatchThreadID)
 
     output[0] = x.d;
 }
-

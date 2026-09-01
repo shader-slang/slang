@@ -81,7 +81,7 @@ namespace toc
 
             try
             {
-                Builder.Run(args[0]);
+                Console.WriteLine(Builder.Run(args[0]));
                 return 0;
             }
             catch (Exception ex)

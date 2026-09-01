@@ -1,34 +1,32 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T22:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#declreftype
-//META: doc_section_digest=354aa5e4ad824810f192137554fb86892215b9326ffe9fad3435b95088dbb52d
-//META: purpose=A DeclRefType carries the generic substitutions that apply to its declaration; two specializations of a generic struct hold values typed as the substituted parameter.
+//META: doc_section_digest=14c270eeceb6fd55e692293c2e8e4945e22f3b34e19b33e287da175a7b35f56b
+//META: purpose=A type defined by reference to a declaration also carries whatever generic substitutions the decl-ref encodes, so two instantiations of one generic struct behave as distinct types with substituted field types.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `DeclRefType` note states: "A `DeclRefType` carries a
-// decl-ref to a type declaration ... together with whatever generic
-// substitutions apply." A `Pair<int>` and a `Pair<float>` are
-// distinct `DeclRefType` instances of the same `StructDecl`; the
-// fields carry the substituted scalar type.
+// Verifies that the decl-ref carries generic arguments alongside the
+// declaration: Box<int> and Box<float> name the same struct but
+// substitute different field types. Each stores and reads back a value
+// at its own substituted type; CHECK asserts both, so a shared
+// (unsubstituted) field type would be visible as a wrong readback.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
-struct Pair<T> { T first; T second; }
+struct Box<T> { T value; }
 
 void main()
 {
-    Pair<int> pi;
-    pi.first = 100;
-    pi.second = 200;
-    Pair<float> pf;
-    pf.first = 1.5f;
-    pf.second = 2.5f;
-    // CHECK: pi=100,200
-    printf("pi=%d,%d\n", pi.first, pi.second);
-    // CHECK: pf=1,2
-    printf("pf=%d,%d\n", int(pf.first), int(pf.second));
+    Box<int> bi;
+    bi.value = 7;
+    Box<float> bf;
+    bf.value = 2.5f;
+    // CHECK: bi=7
+    printf("bi=%d\n", bi.value);
+    // CHECK: bf=2
+    printf("bf=%d\n", int(bf.value));
 }

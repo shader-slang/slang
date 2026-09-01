@@ -10,7 +10,7 @@
 
 #include "slang-crypto.h"
 
-#include "../core/slang-char-util.h"
+#include "core/slang-char-util.h"
 
 namespace Slang
 {

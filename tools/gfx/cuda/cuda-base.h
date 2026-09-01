@@ -3,15 +3,15 @@
 #pragma once
 
 #ifdef GFX_ENABLE_CUDA
-#include "../command-encoder-com-forward.h"
-#include "../command-writer.h"
-#include "../mutable-shader-object.h"
-#include "../renderer-shared.h"
-#include "../simple-transient-resource-heap.h"
-#include "../slang-context.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "core/slang-std-writers.h"
+#include "gfx/command-encoder-com-forward.h"
+#include "gfx/command-writer.h"
+#include "gfx/mutable-shader-object.h"
+#include "gfx/renderer-shared.h"
+#include "gfx/simple-transient-resource-heap.h"
+#include "gfx/slang-context.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"

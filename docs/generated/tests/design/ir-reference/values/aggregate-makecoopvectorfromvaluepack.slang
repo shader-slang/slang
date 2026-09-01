@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#aggregate-constructors
-//META: doc_section_digest=3e412bb1b8df51b023821b69be767e4f040104ad482e9063949a7dd98d9eda38
+//META: doc_section_digest=136fa0f20043e0a8db805b7f018d292446250e6117047722c77e7aa7efca0675
 //META: purpose=The synthesized `__makeCoopVec<T, N>(expand each U)` variadic-pack core-module builtin (invoked by `CoopVec<T, N>(args...)` constructors) lowers to a `makeCoopVectorFromValuePack(...)` IR opcode in the generic-unspecialized form of `CoopVec.$init`.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -19,7 +19,7 @@
 // `-dump-ir` output; the specialized form collapses it to plain
 // `makeCoopVector` after pack expansion, which is the sibling test.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int ia;
 uniform int ib;

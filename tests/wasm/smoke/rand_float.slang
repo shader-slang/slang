@@ -6,6 +6,11 @@
 uniform float seed;
 RWStructuredBuffer<float> outputBuffer;
 
+public struct WasmDefaultValueSmoke
+{
+    public static const int Answer = 0x12345678;
+}
+
 uint seedPerThread(uint idx)
 {
     return ((uint)idx + (uint)(seed * 1000000)) * 1099087573UL;

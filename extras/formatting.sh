@@ -23,7 +23,7 @@ show_help() {
   cat <<EOF
 $me: Format or check formatting of files in this repo
 
-Usage: $me [--check-only] [--no-version-check] [--modified] [--source <path>] [--cpp] [--yaml] [--md] [--sh] [--cmake] [--since <rev>] [-- file1 file2 ...]
+Usage: $me [--check-only] [--no-version-check] [--modified] [--source <path>] [--cpp] [--yaml] [--md] [--sh] [--cmake] [--ascii] [--since <rev>] [-- file1 file2 ...]
 
 Options:
     --check-only       Check formatting without modifying files
@@ -35,6 +35,7 @@ Options:
     --md              Format only markdown files
     --sh              Format only shell script files
     --cmake           Format only CMake files
+    --ascii           Check only that shipped headers/preludes are pure ASCII
     --since <rev>     Only format files since Git revision <rev>
     -- file1 file2    Format only the specified files (auto-detects file types)
 
@@ -56,6 +57,7 @@ run_yaml=0
 run_markdown=0
 run_sh=0
 run_cmake=0
+run_ascii=0
 run_all=1
 explicit_files=()
 
@@ -88,6 +90,10 @@ while [[ "$#" -gt 0 ]]; do
     run_cmake=1
     run_all=0
     ;;
+  --ascii)
+    run_ascii=1
+    run_all=0
+    ;;
   --source)
     source_dir="$2"
     shift
@@ -98,7 +104,9 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --)
     shift
-    explicit_files=("$@")
+    # Strip a leading ./ from each path so the anchored path-prefix patterns
+    # below (include/*, prelude/*) match however the caller spelled the path.
+    explicit_files=("${@#./}")
     break
     ;;
   *)
@@ -224,6 +232,11 @@ if [ ${#explicit_files[@]} -gt 0 ]; then
     *.md) run_markdown=1 ;;
     *.sh) run_sh=1 ;;
     *.cmake | CMakeLists.txt) run_cmake=1 ;;
+    esac
+    # Separate case: shipped files also get the ASCII check, on top of
+    # whatever type-based formatter matched above (bash case is first-match).
+    case "$file" in
+    include/* | prelude/*) run_ascii=1 ;;
     esac
   done
 fi
@@ -385,6 +398,27 @@ markdown_formatting() {
   prettier_formatting
 }
 
+# Shipped files - the public headers in include/ and the preludes in
+# prelude/ - must be pure ASCII: a non-ASCII byte makes MSVC emit C4819
+# (a /WX hard error) for consumers building with a non-UTF-8 source
+# charset.
+ascii_check() {
+  echo "Checking shipped headers and preludes are pure ASCII..." >&2
+
+  read_lines < <(list_files 'include/*' 'prelude/*')
+  [ ${#files[@]} -gt 0 ] || return 0
+
+  local matches
+  for file in "${files[@]}"; do
+    # LC_ALL=C makes grep match raw bytes rather than decoded characters.
+    if matches=$(LC_ALL=C $GREP_BIN -nP '[^\x00-\x7F]' "$file"); then
+      echo "error: non-ASCII bytes in shipped file $file (breaks MSVC consumers using a non-UTF-8 source charset):" >&2
+      echo "$matches" >&2
+      exit_code=1
+    fi
+  done
+}
+
 sh_formatting() {
   echo "Formatting sh files..." >&2
 
@@ -403,6 +437,7 @@ sh_formatting() {
   fi
 }
 
+((run_all || run_ascii)) && ascii_check
 ((run_all || run_sh)) && sh_formatting
 ((run_all || run_cmake)) && cmake_formatting
 ((run_all || run_yaml)) && yaml_json_formatting

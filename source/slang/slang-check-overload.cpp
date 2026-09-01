@@ -1370,8 +1370,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
             // `TryCheckOverloadCandidateConstraints` runs after ordinary
             // overload checks have selected a generic candidate. Rebuild the
             // constraint decl-ref with the candidate's current argument list so
-            // the shared proof helper sees the same substituted `(pack, count)`
-            // pair that lowering will later receive as a hidden witness arg.
+            // the shared proof helper sees the same substituted
+            // `(actualCount, expectedCount)` pair that lowering will later
+            // receive as a hidden witness arg.
             DeclRef<GenericVariadicPackCountConstraintDecl> constraintDeclRef =
                 m_astBuilder
                     ->getGenericAppDeclRef(
@@ -1380,33 +1381,13 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                         packCountConstraintDecl)
                     .as<GenericVariadicPackCountConstraintDecl>();
 
-            DeclRef<Decl> constrainedPackDeclRef;
-            if (auto declRefExpr = getPackCountConstraintPackExpr(m_astBuilder, constraintDeclRef)
-                                       .as<DeclRefExpr>())
-            {
-                constrainedPackDeclRef = getDeclRef(m_astBuilder, declRefExpr);
-            }
-
-            Val* constrainedArg = nullptr;
-            if (auto typePackDeclRef = constrainedPackDeclRef.as<GenericTypePackParamDecl>())
-            {
-                auto typePackDecl = typePackDeclRef.getDecl();
-                if (typePackDecl->parameterIndex < newArgs.getCount())
-                    constrainedArg = newArgs[typePackDecl->parameterIndex];
-            }
-            else if (auto valuePackDeclRef = constrainedPackDeclRef.as<GenericValuePackParamDecl>())
-            {
-                auto valuePackDecl = valuePackDeclRef.getDecl();
-                if (valuePackDecl->parameterIndex < newArgs.getCount())
-                    constrainedArg = newArgs[valuePackDecl->parameterIndex];
-            }
-
+            auto actualCount = getPackCountConstraintActualCount(m_astBuilder, constraintDeclRef);
             auto expectedCount =
                 getPackCountConstraintExpectedCount(m_astBuilder, constraintDeclRef);
             auto packCountWitness = findVariadicPackCountWitnessForConstraint(
                 m_astBuilder,
                 this,
-                constrainedArg,
+                actualCount,
                 expectedCount,
                 &context,
                 context.mode != OverloadResolveContext::Mode::JustTrying);
@@ -3450,7 +3431,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     {
         if (const auto typeType = as<TypeType>(funcExpr->type))
         {
-            if (isDeclRefTypeOf<AggTypeDeclBase>(typeType->getType()))
+            auto targetType = typeType->getType();
+            if (isDeclRefTypeOf<AggTypeDeclBase>(targetType) ||
+                isDeclRefTypeOf<EnumDecl>(targetType))
             {
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
@@ -3458,7 +3441,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
-                                            typeType->getType(),
+                                            targetType,
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],

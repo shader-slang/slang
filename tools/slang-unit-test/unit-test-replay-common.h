@@ -4,11 +4,11 @@
 #pragma once
 
 // Include cpp files directly to access internal symbols not exported from slang DLL
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/slang-record-replay/proxy/proxy-base.h"
-#include "../../source/slang-record-replay/proxy/proxy-global-session.h"
-#include "../../source/slang-record-replay/replay-context.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "slang-record-replay/proxy/proxy-base.h"
+#include "slang-record-replay/proxy/proxy-global-session.h"
+#include "slang-record-replay/replay-context.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <cstring>

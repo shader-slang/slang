@@ -12,13 +12,13 @@
 #include "replay-context.h"
 
 // Include all proxy headers
-#include "../slang/slang-internal.h"
 #include "proxy/proxy-compile-request.h"
 #include "proxy/proxy-component-type.h"
 #include "proxy/proxy-global-session.h"
 #include "proxy/proxy-mutable-file-system.h"
 #include "proxy/proxy-session.h"
 #include "proxy/proxy-shared-library.h"
+#include "slang/slang-internal.h"
 
 #include <slang.h>
 

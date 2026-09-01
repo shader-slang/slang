@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -emit-spirv-directly -entry main -stage compute
-//TEST:SIMPLE(filecheck=DEBUG):-target spirv-asm -emit-spirv-directly -entry main -stage compute -g2 -O0
+//TEST:SIMPLE(filecheck=DEBUG):-target spirv-asm -emit-spirv-directly -entry main -stage compute -g2
 
 // Check that void* in PhysicalStorageBuffer is emitted as uint* with
 // ArrayStride 4 (required by OpPtrAccessChain), and that debug info still

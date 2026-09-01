@@ -2,8 +2,8 @@
 
 #include "slang-language-server-completion.h"
 
-#include "../core/slang-char-util.h"
-#include "../core/slang-file-system.h"
+#include "core/slang-char-util.h"
+#include "core/slang-file-system.h"
 #include "slang-ast-all.h"
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"

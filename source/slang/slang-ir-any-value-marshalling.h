@@ -1,7 +1,7 @@
 // slang-ir-any-value-marshalling.h
 #pragma once
 
-#include "../core/slang-common.h"
+#include "core/slang-common.h"
 
 namespace Slang
 {

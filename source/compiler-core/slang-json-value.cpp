@@ -1,8 +1,8 @@
 // slang-json-value.cpp
 #include "slang-json-value.h"
 
-#include "../core/slang-string-escape-util.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
 
 namespace Slang
 {

@@ -1,10 +1,10 @@
 // slang-ir-obfuscate-loc.cpp
 #include "slang-ir-obfuscate-loc.h"
 
-#include "../core/slang-castable.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-random-generator.h"
-#include "../core/slang-stable-hash.h"
+#include "core/slang-castable.h"
+#include "core/slang-char-util.h"
+#include "core/slang-random-generator.h"
+#include "core/slang-stable-hash.h"
 #include "slang.h"
 
 namespace Slang

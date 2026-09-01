@@ -21,6 +21,7 @@ void main()
 case 1:
 /*CHECK:
 ^^^^ E39999
+^^^^ 'case' is only allowed in a 'switch' body
 */
     x = 1;
 }

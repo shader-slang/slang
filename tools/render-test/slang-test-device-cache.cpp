@@ -82,17 +82,28 @@ void DeviceCache::evictOldestDeviceIfNeeded()
     }
 }
 
-SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice** outDevice)
+SlangResult DeviceCache::acquireDevice(
+    const rhi::DeviceDesc& desc,
+    rhi::IDevice** outDevice,
+    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge>* outBridge)
 {
-    if (!outDevice)
+    if (!outDevice || !outBridge)
         return SLANG_E_INVALID_ARG;
 
     *outDevice = nullptr;
+    *outBridge = nullptr;
 
-    // Skip caching for CUDA devices due to crashes
+    // CUDA is not cached (crashes); each call gets a fresh device wired to a fresh bridge.
     if (desc.deviceType == rhi::DeviceType::CUDA)
     {
-        return rhi::getRHI()->createDevice(desc, outDevice);
+        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge =
+            renderer_test::createRetainedCoreToRHIDebugBridge();
+        rhi::DeviceDesc localDesc = desc;
+        localDesc.debugCallback = bridge.Ptr();
+        SlangResult result = rhi::getRHI()->createDevice(localDesc, outDevice);
+        if (SLANG_SUCCEEDED(result))
+            *outBridge = bridge;
+        return result;
     }
 
     std::lock_guard<std::mutex> lock(getMutex());
@@ -115,28 +126,34 @@ SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice
 
     // Check if we have a cached device
     auto it = deviceCache.find(key);
-    if (it != deviceCache.end())
+    if (it != deviceCache.end() && it->second.device)
     {
-        // Return the cached device - COM reference counting handles the references
+        // Hit: return the cached device and the bridge it was created with (stored together).
+        SLANG_ASSERT(it->second.bridge);
         *outDevice = it->second.device.get();
-        if (*outDevice)
-        {
-            (*outDevice)->addRef();
-            return SLANG_OK;
-        }
+        (*outDevice)->addRef();
+        *outBridge = it->second.bridge;
+        return SLANG_OK;
     }
 
-    // Create new device
+    // Miss: create the device wired to a fresh retained bridge, and cache them together so a later
+    // hit returns the same bridge.
+    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge =
+        renderer_test::createRetainedCoreToRHIDebugBridge();
+    rhi::DeviceDesc localDesc = desc;
+    localDesc.debugCallback = bridge.Ptr();
+
     Slang::ComPtr<rhi::IDevice> device;
-    auto result = rhi::getRHI()->createDevice(desc, device.writeRef());
+    SlangResult result = rhi::getRHI()->createDevice(localDesc, device.writeRef());
     if (SLANG_FAILED(result))
     {
         return result;
     }
 
-    // Cache the device
+    // Cache the device together with the bridge it was created with.
     CachedDevice& cached = deviceCache[key];
     cached.device = device;
+    cached.bridge = bridge;
     cached.creationOrder = nextCreationOrder++;
 
     // Return the device with proper reference counting
@@ -145,6 +162,7 @@ SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice
     {
         (*outDevice)->addRef();
     }
+    *outBridge = bridge;
 
     return SLANG_OK;
 }
@@ -153,6 +171,7 @@ SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice
 void DeviceCache::cleanCache()
 {
     std::lock_guard<std::mutex> lock(getMutex());
-    auto& deviceCache = getDeviceCache();
-    deviceCache.clear();
+    // Bridges stay alive via the process-global retained list, so a late message from a released
+    // device still hits a live (cleared) bridge, not freed storage.
+    getDeviceCache().clear();
 }

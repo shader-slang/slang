@@ -1,19 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#wrapcbufferelementsformetal
-//META: doc_section_digest=2a4fe67f3530d551446e5a52ff530daaceb47c541972fbd77fc4832e5e0aa6a6
-//META: purpose=wrapCBufferElementsForMetal wraps a float4x4 cbuffer element in a _MatrixStorage_..._natural_<N> struct so the emitted MSL is valid.
+//META: doc_section_digest=794e6b917e6a05e1bb5a790707b746f03faed4ff03cdce751a3d870c7ccc928f
+//META: purpose=`wrapCBufferElementsForMetal` rewrites a `float4x4` cbuffer element into a `_MatrixStorage_..._natural_<N>` struct inside a `SLANG_ParameterGroup_<name>` wrapper.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Metal cannot reference a bare `float4x4` element of a constant
-// buffer; `wrapCBufferElementsForMetal` rewrites the element as a
-// `_MatrixStorage_…natural_<N>` struct holding the matrix as an
-// `array<float4, int(4)>`. The cbuffer struct wrapper is
-// `SLANG_ParameterGroup_<name>_natural_<M>`.
+// Verifies the pass that makes constant-buffer elements expressible in
+// MSL: Metal restricts what may appear as a `constant T*` element type, so
+// the matrix is re-expressed as a struct holding an array of row vectors
+// and the cbuffer itself is wrapped in a parameter-group struct. The
+// kernel multiplies through the matrix so the field is live; CHECK asserts
+// both wrapper struct names appear, with wildcards for the mangled
+// suffixes.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

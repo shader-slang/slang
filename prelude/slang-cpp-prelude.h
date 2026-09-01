@@ -322,7 +322,7 @@ public:                                                                         
 #include "slang-cpp-types.h"
 
 // Atomic helpers for the CPU target. Needed so kIROp_AtomicAdd and
-// friends can lower to native atomic operations on the host — matching
+// friends can lower to native atomic operations on the host - matching
 // the semantics of HLSL `InterlockedAdd`, SPIR-V `OpAtomicIAdd`, etc.
 // Uses compiler builtins so no <atomic> header is required.
 //

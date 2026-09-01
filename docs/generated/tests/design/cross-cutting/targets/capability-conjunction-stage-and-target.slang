@@ -1,21 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
-//META: doc_ref=docs/generated/design/cross-cutting/targets.md#vocabulary
-//META: doc_section_digest=e6ee8d6a0ad9b6be0dfa1e2bef7fa142d6866067cb581476b3dadc1f13bb47e4
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/cross-cutting/targets.md#definition-forms
+//META: doc_section_digest=d6d360ed810fe20f1543f761a89b7a194383364a9db523edf2e823b33ddfb19e
 //META: purpose=A stage atom (`compute`) populates the `stage` keyhole; a target atom (`hlsl`, `glsl`, `spirv`, ...) populates the `target` keyhole. Because they populate different keyholes a `compute` entry point is compatible with every text-emit target.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Vocabulary section establishes that atoms populate
-// keyholes and that two atoms populating different keyholes are
-// compatible (the `vertex + glsl` example). `compute` (stage) and
-// `hlsl`/`glsl`/`spirv`/`metal`/`wgsl`/`cuda`/`cpp` (target) are
-// in distinct keyholes, so a single `[shader("compute")]` entry
-// point validates against every text-emit target. This test is a
-// positive proof: the same shader compiles under each backend.
+// Verifies that an unpopulated keyhole stays compatible with any key
+// atom of that keyhole: a `compute` entry point populates only the
+// `stage` keyhole, leaving `target` free, so the same shader is
+// admissible under every target atom. Each per-target CHECK asserts
+// the literal 42 reaches that backend's emitted text, which happens
+// only if the stage/target conjunction was accepted for that target.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute

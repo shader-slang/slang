@@ -2,13 +2,13 @@
 #ifndef SLANG_REPRO_H_INCLUDED
 #define SLANG_REPRO_H_INCLUDED
 
-#include "../core/slang-riff.h"
-#include "../core/slang-stable-hash.h"
-#include "../core/slang-string.h"
+#include "core/slang-riff.h"
+#include "core/slang-stable-hash.h"
+#include "core/slang-string.h"
 
 // For TranslationUnitRequest
-#include "../core/slang-file-system.h"
-#include "../core/slang-offset-container.h"
+#include "core/slang-file-system.h"
+#include "core/slang-offset-container.h"
 #include "slang-compiler.h"
 
 namespace Slang

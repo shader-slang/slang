@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T20:31:07+00:00
-//META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#eliminatephis-with-default-options
-//META: doc_section_digest=df36b14c0d0c1c8ecb065a968a44debf9939033194e920e3e5fa7c762e530478
+//META: doc_section_digest=42a32e37078a93fd367fe57a5b75554853e304db2f22ab2e994a85f0cc5a56ef
 //META: purpose=Stress: five-deep nested if/else still phi-eliminates to a single named local assigned in each leaf.
 //META: intent=stress
 //META: pipeline_stage=ir-pass

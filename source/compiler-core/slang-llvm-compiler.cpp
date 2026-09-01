@@ -1,7 +1,7 @@
 // slang-llvm-compiler.cpp
 #include "slang-llvm-compiler.h"
 
-#include "../core/slang-common.h"
+#include "core/slang-common.h"
 
 namespace Slang
 {

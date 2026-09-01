@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -O0
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-via-glsl -entry main -stage compute -O0
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-via-glsl -entry main -stage compute
 
 RWStructuredBuffer<float> output;
 

@@ -1,7 +1,7 @@
 // slang-ir-ssa-simplification.cpp
 #include "slang-ir-ssa-simplification.h"
 
-#include "../core/slang-performance-profiler.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-deduplicate-generic-children.h"
 #include "slang-ir-peephole.h"
@@ -56,6 +56,15 @@ void simplifyIR(
     DiagnosticSink* sink)
 {
     SLANG_PROFILE;
+
+    // Callee-side-effect memo shared by every DCE invocation in this pass
+    // (see IRDeadCodeEliminationOptions::calleeSideEffectCache). Cleared each
+    // outer iteration so DCE sees the purity facts propagateFuncProperties
+    // proves that iteration.
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!options.deadCodeElimOptions.calleeSideEffectCache)
+        options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
+
     bool changed = true;
     const int kMaxIterations = 8;
     const int kMaxFuncIterations = 16;
@@ -67,6 +76,7 @@ void simplifyIR(
             break;
 
         changed = false;
+        options.deadCodeElimOptions.calleeSideEffectCache->clear();
 
         changed |= deduplicateGenericChildren(module);
         changed |= propagateFuncProperties(module);
@@ -116,6 +126,10 @@ void simplifyNonSSAIR(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!options.deadCodeElimOptions.calleeSideEffectCache)
+        options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
+
     bool changed = true;
     const int kMaxIterations = 8;
     int iterationCounter = 0;
@@ -146,6 +160,10 @@ void simplifyFunc(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!options.deadCodeElimOptions.calleeSideEffectCache)
+        options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
+
     bool changed = true;
     const int kMaxIterations = 8;
     int iterationCounter = 0;

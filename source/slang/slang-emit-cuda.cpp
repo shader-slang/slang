@@ -1,11 +1,10 @@
 // slang-emit-cuda.cpp
 #include "slang-emit-cuda.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 namespace Slang
 {
@@ -451,6 +450,14 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     else
     {
         m_writer->emit("__device__ ");
+
+        // `__noinline__` is a declaration specifier, so it belongs in this specifier
+        // sequence. Kernels are call-graph roots with no caller to be inlined into, so the
+        // request is honoured for ordinary device functions only.
+        if (inst->findDecoration<IRNoInlineDecoration>())
+        {
+            m_writer->emit("__noinline__ ");
+        }
     }
 }
 
@@ -1312,8 +1319,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             IRType* elementType = arrayType->getElementType();
 
             // Emit braces for the FixedArray struct.
-
+            m_writer->emit("{ ");
             _emitInitializerList(elementType, inst->getOperands(), Index(inst->getOperandCount()));
+            m_writer->emit(" }");
 
             return true;
         }

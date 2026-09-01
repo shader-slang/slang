@@ -1,21 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#unqualified-lookup
-//META: doc_section_digest=3b394bf839041f0d86487cb14f22d3c9442c777b87a2bbf98421edb81222a98a
-//META: purpose=Step 4 of unqualified-lookup detects AggTypeDeclBase and rewrites the request to member lookup with a This breadcrumb; this rewrite still applies when the use site is several block scopes deep inside the method body.
-//META: intent=functional
+//META: doc_section_digest=32b5d6cdc50501bef4e7ef2a5cc9d61e93145ad0a37a1049859831fc766c24f1
+//META: purpose=When the scope walk reaches an enclosing aggregate type it rewrites the request into member lookup with an implicit This breadcrumb, and that rewrite still fires from several block scopes deep inside a method body.
+//META: intent=boundary
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Step 4: "If the `containerDecl` is an `AggTypeDeclBase` ... the
-// request is rewritten to perform member lookup against the
-// corresponding `Type*`, with a `Breadcrumb::Kind::This` breadcrumb
-// that records the implicit `this`/`This` of the enclosing decl."
-// Verify the rewrite still fires when the reference is buried in
-// nested blocks — the parent-chain walk traverses both blocks
-// before reaching the struct.
+// Verifies the container-kind dispatch of the scope walk on its
+// deepest documented shape: the reference to the field `x` sits two
+// nested blocks inside the method, so the walk crosses both block
+// scopes before it recognizes the struct container and rewrites the
+// request into a member lookup carrying the implicit `this`. CHECK
+// asserts 50 + 3, which only comes out if `x` bound to the receiver's
+// field rather than failing to resolve.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
@@ -26,7 +26,7 @@ struct P
     {
         {
             {
-                return x + n;  // this.x via the AggType rewrite
+                return x + n;
             }
         }
     }

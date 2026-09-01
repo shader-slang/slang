@@ -1,24 +1,23 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#generic-parameters
-//META: doc_section_digest=d1f4a2e54c58257bd988b1303a72ffcd341afb497149e825b71ca8dc1d343750
-//META: purpose=A generic parameter T shadows a same-named decl in an enclosing scope because the GenericDecl scope is the closer parent during the unqualified-lookup walk.
+//META: doc_section_digest=e6a604ecd95d745398ce230ff444eb5e4ef8a7eb569f1a45fd57675c245e1700
+//META: purpose=A generic parameter is a direct member of the generic's own scope, which the inner decl's parent chain passes through first, so it shadows a same-named decl in the enclosing scope.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A reference to `T` from inside the generic's inner
-// decl resolves through the inner scope's parent (the GenericDecl
-// scope), shadowing any same-named decl in the enclosing scope."
-// Here, a file-scope `typedef float T` is shadowed by the generic
-// parameter `T` of `handle`; the call with `int` selects int (would
-// fail to compile if T were resolving to `float`).
+// Verifies that the generic scope sits between the inner decl and the
+// file scope. A file-scope `typedef float T` competes with the generic
+// parameter `T`; only the parameter admits the IInteger constraint and
+// the int instantiation. CHECK asserts 7 round-tripping through
+// asInt(), which requires `T` inside the function to be the parameter.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
-typedef float T;       // file-scope T = float
+typedef float T;
 
 interface IInteger { int asInt(); }
 extension int : IInteger { int asInt() { return this; } }

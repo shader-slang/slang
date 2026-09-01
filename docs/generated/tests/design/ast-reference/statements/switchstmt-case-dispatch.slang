@@ -1,21 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#switchstmt-casestmt-defaultstmt
-//META: doc_section_digest=a1ec0803b8c128d1fa4912560d537bd7689c45ee4daaefd344406cf6fe5b8219
-//META: purpose=A SwitchStmt dispatches to the matching CaseStmt; the case labels slice the body into per-case blocks, and a `BreakStmt` returns control to the statement after the switch.
+//META: doc_section_digest=c17fa898c930ec5bd9c17383b899c278d84a084e1966bd606af453fb02db5a07
+//META: purpose=A SwitchStmt dispatches on its condition value to the matching case section, and a `BreakStmt` inside it returns control to the statement after the switch.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says "each CaseStmt/DefaultStmt is just a marker that the
-// IR lowering uses to slice the body into per-case blocks" and
-// "BreakStmt inside a SwitchStmt is matched via
-// BreakableStmt::uniqueID". The interpreter cannot evaluate switch
-// directly, so we use the C++ emit path to observe both the surviving
-// `switch` construct and that the runtime value is dispatched
-// correctly.
+// Verifies a `switch` dispatches on its condition value and that
+// `break` returns control past the switch. The interpreter does not
+// execute `switch`, so the C++ emit is the observation point; the
+// CHECK asserts a `switch` construct survives with its case sections.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
 

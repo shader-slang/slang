@@ -104,7 +104,63 @@ async function runSmokeTest() {
         }
         console.log('SPIRV binary generated successfully');
         console.log('Generated binary length:', spirvBinary.length);
-        
+
+        const layout = linkedProgram.getLayout(0);
+        if (!layout) {
+            throw new Error('Could not get program layout');
+        }
+        const defaultValueType = layout.findTypeByName('WasmDefaultValueSmoke');
+        if (!defaultValueType) {
+            throw new Error('Could not find default-value smoke type');
+        }
+        const answerVar = layout.findVarByNameInType(defaultValueType, 'Answer');
+        if (!answerVar) {
+            throw new Error('Could not find default-value smoke variable');
+        }
+        if (!answerVar.hasDefaultValue()) {
+            throw new Error('Default-value smoke variable did not report a default value');
+        }
+        const defaultValueBlob = answerVar.getDefaultValueBlob();
+        if (!(defaultValueBlob instanceof Uint8Array)) {
+            throw new Error('Default-value blob was not returned as a Uint8Array');
+        }
+        if (defaultValueBlob.length !== 4) {
+            throw new Error(`Unexpected default-value blob size: ${defaultValueBlob.length}`);
+        }
+        const answer = new DataView(
+            defaultValueBlob.buffer,
+            defaultValueBlob.byteOffset,
+            defaultValueBlob.byteLength).getInt32(0, true);
+        if (answer !== 0x12345678) {
+            throw new Error(`Unexpected default-value blob contents: 0x${answer.toString(16)}`);
+        }
+        console.log('Default-value blob reflection smoke test passed');
+
+        const coreSource = globalSession.getBuiltinModuleSource('core');
+        for (const marker of ['public module core;', 'struct RayDesc', 'struct NullDifferential']) {
+            if (!coreSource.includes(marker)) {
+                throw new Error(`Core builtin module source is missing: ${marker}`);
+            }
+        }
+        const glslSource = globalSession.getBuiltinModuleSource('glsl');
+        if (!glslSource.includes('#define highp')) {
+            throw new Error('GLSL builtin module source is missing: #define highp');
+        }
+        // Prefix-matching contract: names beginning with core/glsl select that module.
+        if (globalSession.getBuiltinModuleSource('core-extra') !== coreSource) {
+            throw new Error('Prefix-matched "core-extra" should return the same source as "core"');
+        }
+        if (globalSession.getBuiltinModuleSource('glsl-450') !== glslSource) {
+            throw new Error('Prefix-matched "glsl-450" should return the same source as "glsl"');
+        }
+        if (globalSession.getBuiltinModuleSource('nonexistent') !== '') {
+            throw new Error('Unknown builtin module name should return an empty string');
+        }
+        if (globalSession.getBuiltinModuleSource('') !== '') {
+            throw new Error('Empty builtin module name should return an empty string');
+        }
+        console.log('Builtin module source smoke test passed');
+
         // Clean up
         linkedProgram.delete();
         program.delete();
@@ -120,4 +176,4 @@ async function runSmokeTest() {
     }
 }
 
-runSmokeTest(); 
+runSmokeTest();

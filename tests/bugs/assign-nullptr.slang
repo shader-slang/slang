@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
 
 //CHECK: %[[NULLPTR_VAL:[a-zA-Z0-9_]+]] = OpConvertUToPtr %_ptr_PhysicalStorageBuffer_int %{{.*}}
 //CHECK: OpStore %ptr %[[NULLPTR_VAL]]

@@ -17,6 +17,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 struct SmallData {
     float x;
@@ -37,3 +39,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // METAL: constant* pc_
 // WGSL has no push-constant concept; [[push_constant]] lowers to var<uniform>.
 // WGSL: var<uniform> pc_
+// GLSL emits the Push-constant address space as a `layout(push_constant)` uniform block.
+// GLSL: layout(push_constant)
+// GLSL: }pc_
+// HLSL has no push-constant construct; it lowers to a cbuffer on a `b` register.
+// HLSL: cbuffer pc_{{.*}} : register(b

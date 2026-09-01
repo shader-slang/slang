@@ -1,24 +1,37 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:14:52Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T14:25:00Z
 target_doc: name-resolution/visibility.md
 review_report: ../../reviews/name-resolution/visibility.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-actions: { fixed: 3, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+actions:
+  fixed: 5
+  rejected_bogus: 0
+  rejected_out_of_scope: 1
+  deferred: 0
+  escalated: 0
 ---
 
 # Remediation report for name-resolution/visibility.md
 
 ## Summary
-
-All three review findings were verified against the source at `eb9403ef595a99c2ff6def1d538dbd7a792d9371` and fixed. F-001 corrected the API surface for the `minLanguageVersion` default field; F-002 added the prompt-required `using`/re-export edge case, naming the actual source-backed rejection path; F-003 corrected the diagnostic attribution for duplicated visibility modifiers. No findings were rejected, deferred, or escalated.
+Five of the six findings were verified against the source at the recorded
+commit and fixed with local wording corrections: the `languageVersion`
+lifecycle, the `GenericTypeConstraintDecl` fall-through, the
+`_getTypeVisibility` recursion shape, the parent-visibility cap, and the
+`using` target kind. The digest finding is reserved for the operator.
+Breakdown: 5 fixed, 0 rejected-bogus, 1 rejected-out-of-scope, 0 deferred, 0
+escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed: `include/slang.h:5574` declares `minLanguageVersion = SLANG_LANGUAGE_VERSION_2025` inside `struct SlangGlobalSessionDesc` (line 5565); `struct SessionDesc` (line 4244) has no such field. | Renamed the cited field to `SlangGlobalSessionDesc::minLanguageVersion` in the `SlangLanguageVersion` concept bullet. |
-| F-002 | fixed | Prompt line 93 requires this edge case and the doc omitted it. Verified `visitUsingDecl` (slang-check-decl.cpp:16419) only accepts a namespace argument (`ExpectedANamespace` otherwise) and does not re-export individual members; the actual less-visible-alias rejection is `validatePublicCallableOperandVisibility`'s `FuncAliasDecl` branch (slang-check-decl.cpp:9012-9037) emitting `public-custom-derivative-uses-non-exported-import` (slang-diagnostics.lua:2652, code 31162). | Added a "Re-exporting a non-exported decl through an alias" edge-case bullet stating the absence of a `using`-specific path and citing the `FuncAliasDecl` rejection path and diagnostic. |
-| F-003 | fixed | Confirmed: `InvalidVisibilityModifierOnTypeOfDecl` fires for `private`/`internal` on a `NamespaceDeclBase` (slang-check-modifier.cpp:1998,2018), not for `public public`. Duplicate visibility modifiers are caught by the `VisibilityModifier` conflict group (slang-check-modifier.cpp:1500) and emit `DuplicateModifier` (slang-check-modifier.cpp:2306, `duplicate-modifier` code 31202). | Replaced the `public public ...` example with the namespace `private`/`internal` case and noted that repeated modifiers emit `duplicate-modifier` from the conflict-group check. |
+| F-001 | rejected-out-of-scope | `docs/generated/design/_meta/prompts/_remediate.md:97-100` reserves `watched_paths_digest` for the operator's `mark-fresh` run and forbids the remediator from editing it. | — |
+| F-002 | fixed | Confirmed: `source/slang/slang-compile-request.cpp:324-325` reads `optionSet.getLanguageVersion()` and `:339` assigns it to `translationUnitSyntax->languageVersion`; `source/slang/slang-parser.cpp:1221-1227` defines `maybeUpgradeLanguageVersionFromLegacy` (legacy to 2025), called at `:1260`, `:1365`, `:1404`. No version is parsed from the `module` declaration. Follow-up for the operator: adding these two files to `watched_paths` is a manifest change outside this stage. | `## Concepts`, `languageVersion` bullet: "set from the `module` declaration's version (or the linkage default)" replaced with the option-set initialization plus the parser's legacy-to-2025 upgrade, flagged as living outside the watched paths. |
+| F-003 | fixed | Confirmed: `source/slang/slang-check-decl.cpp:21260-21262` returns `DeclVisibility::Default` when `as<GenericDecl>(decl->parentDecl)` fails. | `### Per-keyword semantics`, generic-parameter fall-through bullet: qualified to parents that are a `GenericDecl` and added the `Default` fall-back for other parents. |
+| F-004 | fixed | Confirmed: `source/slang/slang-check-expr.cpp:1117` guards the recursion with `as<DeclRefType>(arg)`, so non-`DeclRefType` generic arguments are skipped. | `### Container-level cap`, first paragraph: "any generic type arguments" replaced with "its declaration-reference generic arguments" plus a clause naming the `DeclRefType` guard. |
+| F-005 | fixed | Confirmed: `source/slang/slang-check-modifier.cpp:2376-2381` initializes `parentDecl = decl` and breaks at the first `AggTypeDeclBase`, so an aggregate is compared with itself at `:2385`. | `### Container-level cap`, `checkVisibility` paragraph: parent cap restated as the nearest enclosing `AggTypeDeclBase` with a sentence noting the self-comparison for aggregates. |
+| F-006 | fixed | Confirmed: `source/slang/slang-check-decl.cpp:17332-17333` says "a namespace (or a module, since modules are namespace-like)" and `:17362`/`:17373` test `NamespaceDeclBase`. | `## Edge cases and failure modes`, `using` bullet: "only brings a *namespace* into scope" replaced with "only brings a *namespace-like* container into scope — a namespace or a module". |

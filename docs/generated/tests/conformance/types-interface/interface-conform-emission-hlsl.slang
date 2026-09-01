@@ -14,6 +14,7 @@
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CPUCHECK):-cpu -output-using-type
 //TEST:SIMPLE(filecheck=EMITHLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITGLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=EMITSPV):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=EMITMETAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=EMITWGSL):-target wgsl -entry computeMain -stage compute
@@ -50,6 +51,10 @@ void computeMain()
 // EMITHLSL: struct Square
 // EMITHLSL: Square_area
 // EMITHLSL: numthreads
+// EMITGLSL: struct Square
+// EMITGLSL: Square_area
+// EMITGLSL: local_size_x
+// EMITGLSL: = 2.0;
 // EMITSPV: LocalSize
 // EMITSPV: OpFMul
 // EMITMETAL: Square_area

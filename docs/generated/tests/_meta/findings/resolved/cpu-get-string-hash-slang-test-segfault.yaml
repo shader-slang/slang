@@ -1,0 +1,49 @@
+schema_version: 1
+id: cpu-get-string-hash-slang-test-segfault
+bundle: design/ir-reference/misc
+suspected_kind: sigsegv
+title: "[cpu] COMPARE_COMPUTE kernel calling getStringHash segfaults slang-test"
+observed_at: "2026-07-08T00:00:00+00:00"
+scope: cpp
+evidence:
+  command: ./build/Release/bin/slang-test docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-cpu.slang
+  source_slang: docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-cpu.slang
+  observed_summary: |
+    Running a `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu
+    -output-using-type` kernel that calls `getStringHash` crashes the
+    slang-test process itself with SIGSEGV (exit code 139) after the
+    backend-support checks print; no test result is reported. Minimal
+    repro kernel:
+      RWStructuredBuffer<int> outputBuffer;
+      [numthreads(1, 1, 1)]
+      void computeMain()
+      {
+          outputBuffer[0] = (getStringHash("stable-key-123") != 0) ? 1 : 0;
+      }
+    The compile side is healthy: `slangc -target cpp -entry computeMain
+    -stage compute` emits correct C++ in which both call sites of the
+    same literal fold to the identical constant uint32_t(3275690514).
+    The crash is therefore in slang-test's CPU host-callable execution
+    path (suspected handling of the module's hashed-string-literal
+    global when preparing/running the compiled kernel), not in codegen.
+  exit_code: 139
+  stderr_tail: "(process killed by SIGSEGV; no diagnostic output)"
+expected:
+  claim: |
+    misc.md#getstringhash states `getStringHash` produces a
+    compile-time-stable hash of the literal's bytes that emitters fold
+    to a constant. A CPU compute kernel comparing the hashes of two
+    identical literals must run and store the equal result, not crash
+    the test harness.
+  citation_kind: doc
+  citation: docs/generated/design/ir-reference/misc.md
+provenance:
+  agent_model: claude-fable-5
+  source_commit: 1740cd3b034871640d8426adc4437d2dfe7bf02a
+  doc_anchor: docs/generated/design/ir-reference/misc.md#getstringhash
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — reduced to a single getStringHash call in an otherwise standard COMPARE_COMPUTE cpu kernel that matches passing sibling tests; still segfaults."
+    - "Codegen bug: ruled out for the C++ text path — emitted C++ is correct and constant-folded; the process dies during slang-test's CPU execution of the kernel."
+    - "Distinct from the slangi VM finding for the same doc claim: that one is an explicit InternalError in bytecode gen; this is a hard SIGSEGV in the CPU host-callable run path."

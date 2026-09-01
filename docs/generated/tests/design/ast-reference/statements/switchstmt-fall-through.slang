@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#switchstmt-casestmt-defaultstmt
-//META: doc_section_digest=a1ec0803b8c128d1fa4912560d537bd7689c45ee4daaefd344406cf6fe5b8219
-//META: purpose=A CaseStmt is "just a marker" that slices the switch body into per-case blocks; an empty case body followed by another case is a fall-through, observable in the emitted text as the two case labels share the next statement block.
+//META: doc_section_digest=c17fa898c930ec5bd9c17383b899c278d84a084e1966bd606af453fb02db5a07
+//META: purpose=Case labels are markers in the statement sequence rather than parents of the statements under them, so two adjacent case labels with nothing between them share the statements that follow.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says "each CaseStmt/DefaultStmt is just a marker that the
-// IR lowering uses to slice the body into per-case blocks. The case
-// labels are not the parents of the statements that fall under them".
-// The observable form is fall-through: two empty case markers
-// followed by one body. Compiling to C++ shows both case labels
-// preserved as ordinary `case` markers.
+// Verifies case labels are markers rather than parents of the
+// statements beneath them: two adjacent labels with nothing between
+// them therefore share the following statements. The CHECKs assert both
+// labels appear in the emitted C++ ahead of one shared body.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
 

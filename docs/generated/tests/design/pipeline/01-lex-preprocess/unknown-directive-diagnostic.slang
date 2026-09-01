@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#failure-modes
-//META: doc_section_digest=7b0494434454c9476d516b02e8b2bb91395544db9dcff77b2783b0b8868b34dc
+//META: doc_section_digest=f6d63bedcd6d31bb43fb73300201d5b6af73fbcaf7464a55660a5559a1828ae0
 //META: purpose=An unknown preprocessor directive emits a diagnostic through the DiagnosticSink.
 //META: intent=negative
 //META: pipeline_stage=preprocess

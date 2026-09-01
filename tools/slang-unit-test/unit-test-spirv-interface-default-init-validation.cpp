@@ -8,7 +8,7 @@
 // NOTE: This test is written as a *regression test* (it expects success). It will fail until the
 // underlying bug is fixed.
 
-#include "../../source/core/slang-process.h"
+#include "core/slang-process.h"
 #include "scoped-env-var.h"
 #include "slang-com-ptr.h"
 #include "slang.h"

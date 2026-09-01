@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T12:04:49+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:07:46+00:00
 target_doc: pipeline/04b-pre-link-passes.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: 5d8f0673fff709ba944e2d5a817256dd08a0b0e59062363746d7886db6baead6
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 0a827687878ad7390b1acdda49546f652c2eaf5da2d820809834f1faa2ed69cb
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: pass
+  factual_accuracy: partial
   cross_references: pass
   completeness: pass
   style_consistency: pass
-  source_alignment: pass
-  front_matter_validity: pass
-finding_count: 0
+  source_alignment: partial
+  front_matter_validity: partial
+finding_count: 3
 severity_breakdown:
   critical: 0
-  major: 0
-  minor: 0
+  major: 1
+  minor: 2
   nit: 0
 ---
 
@@ -25,23 +25,28 @@ severity_breakdown:
 
 ## Summary
 
-The pre-link mandatory-pass page is aligned with `generateIRForTranslationUnit` at the recorded source commit. I found no ordered-pass, gate, loop, or link issues.
+The document substantially matches the recorded source and satisfies the required four-phase contract. Three issues remain: it names a nonexistent `Module::compile` caller, overstates the contents of the layout IR module, and records a watched-path digest that does not match the watched files at its own `source_commit`. The fabricated caller is the most important finding because it directs readers to an API that is not present in the source tree.
 
 ## Items checked
 
-- Ran `regenerate.py show pipeline/04b-pre-link-passes.md` and read the target page, `_common.md`, `pipeline-04b-pre-link-passes.md`, and dependencies `pipeline/03-semantic-check.md`, `pipeline/04-ast-to-ir.md`, `pipeline/05-ir-passes.md`, and `ir-reference/index.md`.
-- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
-- Checked every line-number citation in the body against `source/slang/slang-lower-to-ir.cpp` and sampled linked pass implementation headers/files.
-- Verified the ordered Phase A-D tables against `generateIRForTranslationUnit`, including `prelinkIR`, `lowerErrorHandling`, `lowerDefer`, `synthesizeBitFieldAccessors`, `lowerExpandType`, debug-value insertion, SSA/SCCP/CFG/peephole/DCE, loop inversion, early inlining, non-essential validation, stripping, obfuscation, validation, and mangled-name-map construction.
-- Confirmed the pass-level loop description matches the `for (;;)` body and that the page does not mislabel pre-link calls as `SLANG_PASS` calls.
-- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
+- Read the target document, `_common.md`, the per-doc prompt, and all four dependency documents.
+- Resolved all five watched files with `regenerate.py show` and verified source against commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
+- Spot-checked more than 30 factual claims covering all four phases, pass ordering and gates, the early-inlining loop, prelink cloning, stripping, obfuscation, linker caches, and adjacent module constructors.
+- Verified every line-number citation across 65 citation-bearing lines; the cited definitions and ranges match the recorded commit.
+- Resolved all 49 distinct linked source, generated-document, and directory paths at the recorded commit; the two local heading anchors also exist.
+- Checked the mandatory sections, tables, diagrams, gate groups, notable-pass callouts, three adjacent constructs, size cap, front-matter keys, and review style rules.
 
 ## Findings
 
-(no findings)
+| ID | Severity | Location | Description | Evidence | Recommendation |
+| --- | --- | --- | --- | --- | --- |
+| F-001 | major | `## Source`, lines 31-35 | The document says `generateIRForTranslationUnit` is invoked from `Module::compile`, but no `Module::compile` symbol exists. The normal translation-unit driver is `FrontEndCompileRequest::generateIR`; imported modules use a separate linkage loading path. | `source/slang/slang-compile-request.cpp:526-570` defines `FrontEndCompileRequest::generateIR`, calls `generateIRForTranslationUnit` at line 552, and caches the result at line 570. `source/slang/slang-session.cpp:1123-1131` shows the imported-module call path. | Replace “from `Module::compile` and friends” with the two real callers: `FrontEndCompileRequest::generateIR` for request translation units and the imported-module generation path in `slang-session.cpp`. |
+| F-002 | minor | `### TargetProgram::createIRModuleForLayout`, lines 627-635 | The claim that the layout module's “only contents are `IRLayoutDecoration`s on stub globals and entry points” is too strong. The constructor also attaches a layout decoration to the module instruction, emits layout/type instructions, adds import linkage to entry-point stubs, and forwards SPIR-V/Metal capability decorations. | `source/slang/slang-lower-to-ir.cpp:16412-16450` builds variable and module-level layouts; lines 16470-16498 add import, capability, and layout decorations to entry-point stubs. | Say that the separate module carries target layout metadata on import stubs and the module instruction, with capability decorations on applicable entry points; retain that it contains no executable bodies and does not run the mandatory pass sequence. |
+| F-003 | minor | YAML front-matter, lines 1-7 | `watched_paths_digest` is valid hexadecimal but does not match the digest of the five resolved watched files at the recorded `source_commit`. The document records `0a827687...ed69cb`; recomputation from that commit yields `6b4337c0...1603b1`. | `docs/generated/design/_meta/regenerate.py:441-457` defines the digest over path, size, and contents. Running `regenerate.py digest pipeline/04b-pre-link-passes.md` at HEAD, which equals the recorded source commit, and independently hashing the five commit blobs both yield `6b4337c01022716f64c1f958ec59f2ab400c9c07e4d2646c5bea3a771e1603b1`. | Refresh the generated document's `watched_paths_digest` through the regeneration/remediation workflow so it records `6b4337c01022716f64c1f958ec59f2ab400c9c07e4d2646c5bea3a771e1603b1`; do not hand-edit the ledger. |
 
 ## No-issues notes
 
-- The source line numbers reflect the current shifted locations around `generateIRForTranslationUnit`.
-- The mandatory-early-inlining loop description correctly notes the overwritten `changed` value after `peepholeOptimizeGlobalScope`.
-- The adjacent constructs section stays within the required three constructs.
+- The direct pre-link calls and all conditional gates match `generateIRForTranslationUnit`.
+- The loop section accurately captures the subtle overwrite of `changed` by `peepholeOptimizeGlobalScope`.
+- The revised `obfuscateModuleLocs` text correctly states that locations remain unchanged when obfuscation is enabled without a source map.
+- The `prelinkIR` cloning, auto-diff pruning, and stable-input linking-cache descriptions align with `slang-ir-link.cpp`.

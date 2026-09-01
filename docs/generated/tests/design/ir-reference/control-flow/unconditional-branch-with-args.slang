@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-unconditional-branches
-//META: doc_section_digest=14af4d2a3a4636636d6099f23a462c390fb80ef7faa8966bf7a220163783dc45
+//META: doc_section_digest=a0f708a11d81970e17fbe525500eba453951d03287c41957fe027cbfb06d85f6
 //META: purpose=unconditionalBranch carries argument operands beyond the target block; these become the values bound to the target's block params, the Slang-IR SSA phi handoff.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // post-switch merge block carries the per-arm value as an argument
 // operand; the merge block receives it as a block-level param.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int sel;
 uniform RWStructuredBuffer<int> buf;

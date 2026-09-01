@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#container-level-cap
-//META: doc_section_digest=f97c340f9ed0d70698a682137262abf68c7dac2e0bc8a5cd8f0a2f7897f3b3f8
+//META: doc_section_digest=17336538ec29e57920f3b7003dd39a6ad2e2af3018c615ad8a7112f747ce1b92
 //META: purpose=A `public` field of a less-visible (internal) struct type inside a `public` aggregate is rejected with `use-of-less-visible-type`.
 //META: intent=negative
 //META: pipeline_stage=check

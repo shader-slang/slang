@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00+00:00
-//META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-d-cuda-emit-and-downstream-tools
-//META: doc_section_digest=db1bbab6f46f461cd7603b49543603decc6e6d9598a8009d4e83aac70becf0c4
+//META: doc_section_digest=6125db2deed527f9850790324fd3a09c7d0cd76e0bbeee263f331f56a3527a81
 //META: purpose=Verifies a struct-typed groupshared declaration is lowered to __device__ __shared__ with field accesses preserved on CUDA emit.
 //META: intent=boundary
 //META: pipeline_stage=emit

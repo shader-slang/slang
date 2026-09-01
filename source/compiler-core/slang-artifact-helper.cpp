@@ -1,11 +1,11 @@
 // slang-artifact-helper.cpp
 #include "slang-artifact-helper.h"
 
-#include "../compiler-core/slang-slice-allocator.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-file-system.h"
-#include "../core/slang-io.h"
-#include "../core/slang-shared-library.h"
+#include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-castable.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-shared-library.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-impl.h"
 #include "slang-artifact-representation-impl.h"

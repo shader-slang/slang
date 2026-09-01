@@ -1,9 +1,9 @@
 #ifndef SLANG_DIAGNOSTIC_SINK_H
 #define SLANG_DIAGNOSTIC_SINK_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-writer.h"
 #include "slang-source-loc.h"
 #include "slang-token.h"
 #include "slang.h"
@@ -19,6 +19,32 @@ enum class Severity
     Fatal,
     Internal
 };
+
+// The "level" (group) a warning belongs to, modeled on clang/gcc's -Wall/-Wextra/-Wpedantic
+// groups. Groups are enabled independently (not nested): a warning is emitted only if its group
+// is `Default` (always emitted) or its group has been explicitly enabled on the sink. Most
+// diagnostics use `Default`; only warnings that should be opt-in are tagged with another group.
+enum class WarningLevel
+{
+    Default = 0,
+    All = 1,
+    Extra = 2,
+    Pedantic = 3,
+};
+
+// Keep the internal enum in sync with the public slang.h constants.
+static_assert(
+    SLANG_WARNING_LEVEL_DEFAULT == int(WarningLevel::Default),
+    "mismatched WarningLevel enum values");
+static_assert(
+    SLANG_WARNING_LEVEL_ALL == int(WarningLevel::All),
+    "mismatched WarningLevel enum values");
+static_assert(
+    SLANG_WARNING_LEVEL_EXTRA == int(WarningLevel::Extra),
+    "mismatched WarningLevel enum values");
+static_assert(
+    SLANG_WARNING_LEVEL_PEDANTIC == int(WarningLevel::Pedantic),
+    "mismatched WarningLevel enum values");
 
 // Make sure that the slang.h severity constants match those defined here
 static_assert(SLANG_SEVERITY_DISABLED == int(Severity::Disable), "mismatched Severity enum values");
@@ -60,6 +86,15 @@ struct DiagnosticInfo
     Severity severity;
     char const* name; ///< Unique name
     char const* messageFormat;
+
+    /// The warning group this diagnostic belongs to. Only meaningful for warnings; the default of
+    /// `WarningLevel::Default` means "always emitted". Tagging a warning with another group gates
+    /// it on whether that group is currently enabled (see the enabled-groups bitmask below):
+    /// `Extra` is on by default, `All`/`Pedantic` are off by default, and each is toggled by the
+    /// corresponding -Wall/-Wextra/-Wpedantic flag (or the WarningLevel API option). Has a default
+    /// so the many aggregate initializers that predate this field (and the `DIAGNOSTIC(...)` macro
+    /// catalogs) keep compiling unchanged.
+    WarningLevel level = WarningLevel::Default;
 };
 
 class Diagnostic
@@ -272,6 +307,44 @@ public:
         Severity overrideSeverity,
         const DiagnosticInfo* info = nullptr);
 
+    /// Enable the given warning group (one of the -Wall/-Wextra/-Wpedantic groups). Warnings
+    /// tagged with that group will then be emitted. Enabling is additive; `WarningLevel::Default`
+    /// warnings are always emitted and need not be enabled.
+    ///
+    /// The bit index is bounds-checked before shifting so that an out-of-range value (which can
+    /// only arrive from a bogus int cast through the public `CompilerOptionName::WarningLevel`
+    /// option) cannot produce an out-of-range shift, which is undefined behavior. Such values are
+    /// ignored here; `applySettingsToDiagnosticSink` also filters them at the API boundary.
+    void enableWarningLevel(WarningLevel level)
+    {
+        const auto bit = uint32_t(level);
+        if (bit < 32)
+            m_enabledWarningLevels |= (uint32_t(1) << bit);
+    }
+
+    /// Test whether a warning belonging to `level` should currently be emitted: true for the
+    /// always-on `Default` group, and for any group that has been enabled via enableWarningLevel.
+    bool isWarningLevelEnabled(WarningLevel level) const
+    {
+        if (level == WarningLevel::Default)
+            return true;
+        const auto bit = uint32_t(level);
+        return bit < 32 && (m_enabledWarningLevels & (uint32_t(1) << bit)) != 0;
+    }
+
+    /// Get/set the raw enabled-warning-group bitmask. Used to copy this settings-shaped state
+    /// between sinks (e.g. from a parent sink), mirroring getFlags/setFlags.
+    uint32_t getEnabledWarningLevels() const { return m_enabledWarningLevels; }
+    void setEnabledWarningLevels(uint32_t levels) { m_enabledWarningLevels = levels; }
+
+    /// Get/set the per-diagnostic severity overrides (the map populated by -W<name>/-Wno-<name>
+    /// through overrideDiagnosticSeverity).
+    const Dictionary<int, Severity>& getSeverityOverrides() const { return m_severityOverrides; }
+    void setSeverityOverrides(const Dictionary<int, Severity>& overrides)
+    {
+        m_severityOverrides = overrides;
+    }
+
     /// Get the (optional) diagnostic sink lexer. This is used to
     /// improve quality of highlighting a locations token. If not set, will just have a single
     /// character caret at location
@@ -345,6 +418,7 @@ public:
     {
         init(sourceManager, sourceLocationLexer);
     }
+
     /// Ctor that also copies display/settings state from an optional parent sink.
     DiagnosticSink(
         SourceManager* sourceManager,
@@ -357,8 +431,11 @@ public:
             setFlags(parentSink->getFlags());
             setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
             setEnableUnicode(parentSink->getEnableUnicode());
+            setEnabledWarningLevels(parentSink->getEnabledWarningLevels());
+            setSeverityOverrides(parentSink->getSeverityOverrides());
         }
     }
+
     /// Default Ctor
     DiagnosticSink()
         : m_sourceManager(nullptr), m_sourceLocationLexer(nullptr)
@@ -422,6 +499,17 @@ protected:
     // will share the same override. TODO: Consider keying by DiagnosticInfo* instead for
     // more precise per-diagnostic control.
     Dictionary<int, Severity> m_severityOverrides;
+
+    // Bitmask of enabled warning groups, indexed by `WarningLevel`. The `Default` group is always
+    // on and is not represented here; other groups are opt-in (see enableWarningLevel).
+    //
+    // The groups are independent (not nested): a warning is gated on exactly the one group it is
+    // tagged with. By default the `Extra` group is on and the `Pedantic` group is off, so a
+    // `pedantic` warning is an advisory hint that fires only under `-Wpedantic`. A warning that
+    // should stay silent unless the user opts in belongs in `pedantic` (e.g.
+    // `vertex-shader-missing-sv-position`, which is a false positive whenever the vertex shader
+    // feeds a geometry/tessellation/mesh stage rather than the rasterizer).
+    uint32_t m_enabledWarningLevels = (uint32_t(1) << uint32_t(WarningLevel::Extra));
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
 

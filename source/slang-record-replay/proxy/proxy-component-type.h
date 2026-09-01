@@ -1,12 +1,12 @@
 #ifndef SLANG_PROXY_COMPONENT_TYPE_H
 #define SLANG_PROXY_COMPONENT_TYPE_H
 
-#include "../slang/slang-ast-type.h"
-#include "../slang/slang-compiler-api.h"
 #include "proxy-base.h"
 #include "proxy-macros.h"
 #include "slang-com-helper.h"
 #include "slang.h"
+#include "slang/slang-ast-type.h"
+#include "slang/slang-compiler-api.h"
 
 namespace SlangRecord
 {

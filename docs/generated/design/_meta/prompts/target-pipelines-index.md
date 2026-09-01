@@ -16,7 +16,7 @@ the pages share the same four-phase shape.
 ## Sources
 
 - [slang-emit.cpp](../../../../source/slang/slang-emit.cpp)
-  `linkAndOptimizeIR` (line ~892) — the shared orchestrator that
+  `linkAndOptimizeIR` (re-derive the line number) — the shared orchestrator that
   every per-target page describes a filtered view of.
 - The five peer pages:
   [spirv.md](spirv.md), [hlsl.md](hlsl.md), [metal.md](metal.md),
@@ -43,11 +43,12 @@ Follow the **Target-pipeline index contract** in
 5. `## Cross-target comparison` — a single table with columns
    **Target**, **CodeGenTarget enum values**, **Phase C entry**,
    **Phase D emitter**, **Downstream tools**, **Loops**.
-   Use these exact entry/emitter names:
+   The names below are a starting point, not a transcript — verify each
+   against the fresh child page and the source before publishing it.
 
    | Target | Enum values | Phase C entry | Phase D emitter | Downstream | Loops |
    | --- | --- | --- | --- | --- | --- |
-   | SPIR-V | `SPIRV`, `SPIRVAssembly` | `legalizeIRForSPIRV` | `emitSPIRVForEntryPointsDirectly` | spirv-link, spirv-val, spirv-opt | `simplifyIRForSpirvLegalization` (outer 8 x inner 16); forward-declared-pointer fixup |
+   | SPIR-V | `SPIRV`, `SPIRVAssembly` | none in Phase C — `legalizeIRForSPIRV` is deferred into the emit step, so it belongs to **Phase D** | `emitSPIRVForEntryPointsDirectly` (defined in `slang-emit.cpp`, not `slang-emit-spirv.cpp`; the function in the latter is `emitSPIRVFromIR`) | spirv-link, spirv-val, spirv-opt | `simplifyIRForSpirvLegalization` runs to convergence — its `kMaxIterations`/`kMaxFuncIterations` counters are never incremented, so do **not** describe it as "8 x 16"; plus the forward-declared-pointer fixup |
    | HLSL | `HLSL` (plus downstream `DXIL`, `DXBytecode`) | (no single entry; per-pass HLSL arms) | `HLSLSourceEmitter` | DXC, fxc | none in `linkAndOptimizeIR` |
    | Metal | `Metal`, `MetalLib`, `MetalLibAssembly` | `legalizeIRForMetal` | `MetalSourceEmitter` | Apple `metal` compiler (for `MetalLib*`) | none in `linkAndOptimizeIR` |
    | WGSL | `WGSL`, `WGSLSPIRV`, `WGSLSPIRVAssembly` | `legalizeIRForWGSL` | `WGSLSourceEmitter` | Tint (for `WGSLSPIRV*`) | none in `linkAndOptimizeIR` |

@@ -1,6 +1,6 @@
 #ifdef _WIN32
 
-#include "../window.h"
+#include "platform/window.h"
 
 #include <windows.h>
 #include <windowsx.h>

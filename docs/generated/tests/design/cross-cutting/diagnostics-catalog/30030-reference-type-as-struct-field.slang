@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T11:10:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=d7caae452a61c310382c555cefddbf2b170195ba7546beedf735d5f02266c950
 //META: purpose=Fires diagnostic E30030 (reference-type-as-struct-field) - reference type cannot be used as struct field
 //META: intent=negative
 //META: pipeline_stage=check
@@ -22,4 +22,4 @@ struct S
 
 void main() {}
 
-// CHECK: 30030
+//CHECK: 30030

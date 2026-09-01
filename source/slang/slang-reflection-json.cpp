@@ -1,7 +1,7 @@
 
 #include "slang-reflection-json.h"
 
-#include "../core/slang-blob.h"
+#include "core/slang-blob.h"
 #include "slang-ast-support-types.h"
 #include "slang.h"
 
@@ -66,6 +66,47 @@ static void emitReflectionSize(PrettyWriter& writer, size_t size)
                                  : writer << (uint64_t)size;
 }
 
+// Single source of truth for the JSON spelling of a layout unit, so binding/offset and size
+// printing name a given unit identically.
+static UnownedStringSlice getReflectionParameterCategoryName(SlangParameterCategory category)
+{
+    switch (category)
+    {
+#define CASE(NAME, KIND)                  \
+    case SLANG_PARAMETER_CATEGORY_##NAME: \
+        return toSlice(#KIND)
+        CASE(UNIFORM, uniform);
+        CASE(CONSTANT_BUFFER, constantBuffer);
+        CASE(SHADER_RESOURCE, shaderResource);
+        CASE(UNORDERED_ACCESS, unorderedAccess);
+        CASE(VARYING_INPUT, varyingInput);
+        CASE(VARYING_OUTPUT, varyingOutput);
+        CASE(SAMPLER_STATE, samplerState);
+        CASE(PUSH_CONSTANT_BUFFER, pushConstantBuffer);
+        CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
+        CASE(SPECIALIZATION_CONSTANT, specializationConstant);
+        CASE(MIXED, mixed);
+        CASE(REGISTER_SPACE, registerSpace);
+        CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
+        CASE(GENERIC, generic);
+        CASE(RAY_PAYLOAD, rayPayload);
+        CASE(HIT_ATTRIBUTES, hitAttributes);
+        CASE(CALLABLE_PAYLOAD, callablePayload);
+        CASE(SHADER_RECORD, shaderRecord);
+        CASE(EXISTENTIAL_TYPE_PARAM, existentialTypeParam);
+        CASE(EXISTENTIAL_OBJECT_PARAM, existentialObjectParam);
+        CASE(SUBPASS, inputAttachmentIndex);
+        CASE(METAL_ARGUMENT_BUFFER_ELEMENT, metalArgumentBufferElement);
+        CASE(METAL_ATTRIBUTE, metalAttribute);
+        CASE(METAL_PAYLOAD, metalPayload);
+#undef CASE
+
+    default:
+        SLANG_ASSERT(!"unhandled case");
+        return toSlice("unknown");
+    }
+}
+
 static void emitReflectionVarBindingInfoJSON(
     PrettyWriter& writer,
     SlangParameterCategory category,
@@ -76,8 +117,9 @@ static void emitReflectionVarBindingInfoJSON(
 {
     if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
     {
-        writer << "\"kind\": \"uniform\"";
-        writer << ", ";
+        writer << "\"kind\": \"";
+        writer.write(getReflectionParameterCategoryName(category));
+        writer << "\", ";
         writer << "\"offset\": ";
         emitReflectionSize(writer, index);
         writer << ", ";
@@ -90,43 +132,7 @@ static void emitReflectionVarBindingInfoJSON(
     else
     {
         writer << "\"kind\": \"";
-        switch (category)
-        {
-#define CASE(NAME, KIND)                  \
-    case SLANG_PARAMETER_CATEGORY_##NAME: \
-        writer.write(toSlice(#KIND));     \
-        break
-            CASE(CONSTANT_BUFFER, constantBuffer);
-            CASE(SHADER_RESOURCE, shaderResource);
-            CASE(UNORDERED_ACCESS, unorderedAccess);
-            CASE(VARYING_INPUT, varyingInput);
-            CASE(VARYING_OUTPUT, varyingOutput);
-            CASE(SAMPLER_STATE, samplerState);
-            CASE(UNIFORM, uniform);
-            CASE(PUSH_CONSTANT_BUFFER, pushConstantBuffer);
-            CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
-            CASE(SPECIALIZATION_CONSTANT, specializationConstant);
-            CASE(MIXED, mixed);
-            CASE(REGISTER_SPACE, registerSpace);
-            CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
-            CASE(GENERIC, generic);
-            CASE(RAY_PAYLOAD, rayPayload);
-            CASE(HIT_ATTRIBUTES, hitAttributes);
-            CASE(CALLABLE_PAYLOAD, callablePayload);
-            CASE(SHADER_RECORD, shaderRecord);
-            CASE(EXISTENTIAL_TYPE_PARAM, existentialTypeParam);
-            CASE(EXISTENTIAL_OBJECT_PARAM, existentialObjectParam);
-            CASE(SUBPASS, inputAttachmentIndex);
-            CASE(METAL_ARGUMENT_BUFFER_ELEMENT, metalArgumentBufferElement);
-            CASE(METAL_ATTRIBUTE, metalAttribute);
-            CASE(METAL_PAYLOAD, metalPayload);
-#undef CASE
-
-        default:
-            writer << "unknown";
-            SLANG_ASSERT(!"unhandled case");
-            break;
-        }
+        writer.write(getReflectionParameterCategoryName(category));
         writer << "\"";
         if (space && category != SLANG_PARAMETER_CATEGORY_REGISTER_SPACE)
         {
@@ -182,6 +188,9 @@ static void emitReflectionVarBindingInfoJSON(
             break;
         case SLANG_STAGE_AMPLIFICATION:
             stageName = "amplification";
+            break;
+        case SLANG_STAGE_NODE:
+            stageName = "node";
             break;
 
         default:
@@ -593,6 +602,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
                 break;
 
             case SLANG_STRUCTURED_BUFFER:
+            case SLANG_TEXTURE_BUFFER:
             case SLANG_TEXTURE_1D:
             case SLANG_TEXTURE_2D:
             case SLANG_TEXTURE_3D:
@@ -766,6 +776,9 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     slang::TypeLayoutReflection* typeLayout,
     const char* kind)
 {
+    // Go through the comma tracker so a key appended after this object (e.g. `sizes`) is
+    // correctly separated.
+    writer.maybeComma();
     writer << "\"kind\": \"";
     writer.write(kind);
     writer << "\"";
@@ -829,7 +842,7 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     emitReflectionVarLayoutJSON(writer, typeLayout->getElementVarLayout());
 }
 
-static void emitReflectionTypeLayoutInfoJSON(
+static void emitReflectionTypeLayoutKindInfoJSON(
     PrettyWriter& writer,
     slang::TypeLayoutReflection* typeLayout)
 {
@@ -1009,6 +1022,54 @@ static void emitReflectionTypeLayoutInfoJSON(
     }
 }
 
+static void emitReflectionTypeLayoutSizeInfoJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* typeLayout)
+{
+    writer.maybeComma();
+    writer << "\"sizes\": [\n";
+    writer.indent();
+
+    bool first = true;
+    auto categoryCount = typeLayout->getCategoryCount();
+    for (uint32_t cc = 0; cc < categoryCount; ++cc)
+    {
+        auto category = SlangParameterCategory(typeLayout->getCategoryByIndex(cc));
+        auto size = typeLayout->getSize(category);
+        if (size == 0)
+            continue;
+
+        if (!first)
+            writer << ",\n";
+        first = false;
+
+        writer << "{";
+        writer << "\"kind\": \"";
+        writer.write(getReflectionParameterCategoryName(category));
+        writer << "\", ";
+        writer << "\"value\": ";
+        emitReflectionSize(writer, size);
+        if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
+        {
+            writer << ", ";
+            writer << "\"alignment\": ";
+            emitReflectionSize(writer, typeLayout->getAlignment(category));
+        }
+        writer << "}";
+    }
+
+    writer.dedent();
+    writer << "\n]";
+}
+
+static void emitReflectionTypeLayoutInfoJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* typeLayout)
+{
+    emitReflectionTypeLayoutKindInfoJSON(writer, typeLayout);
+    emitReflectionTypeLayoutSizeInfoJSON(writer, typeLayout);
+}
+
 static void emitReflectionTypeLayoutJSON(
     PrettyWriter& writer,
     slang::TypeLayoutReflection* typeLayout)
@@ -1068,6 +1129,78 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
     writer.maybeComma();
     writer << "\"type\": ";
     emitReflectionTypeLayoutJSON(writer, param->getTypeLayout());
+
+    writer.dedent();
+    writer << "\n}";
+}
+
+// Emit a scope's `"parameters"` array from the fields of `structTypeLayout`, which holds the
+// scope's contents: one field per parameter declared in that scope. A scope's contents are always
+// modeled as a `struct`, so this is required to be a `Struct` layout — possibly with zero fields,
+// which correctly yields `"parameters": []`.
+static void emitReflectionScopeParametersJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* structTypeLayout)
+{
+    SLANG_ASSERT(structTypeLayout->getKind() == slang::TypeReflection::Kind::Struct);
+
+    writer.maybeComma();
+    writer << "\"parameters\": [\n";
+    writer.indent();
+    auto paramCount = structTypeLayout->getFieldCount();
+    for (auto pp : makeRange(paramCount))
+    {
+        if (pp != 0)
+            writer << ",\n";
+        emitReflectionParamJSON(writer, structTypeLayout->getFieldByIndex(pp));
+    }
+    writer.dedent();
+    writer << "\n]";
+}
+
+// Describe a program scope (the global scope, or an entry point's scope) as a JSON object,
+// following the same kind-based traversal as `printScope` in `examples/reflection-api/main.cpp`.
+// The key detail the flat `parameters` list cannot express is the binding of the constant buffer
+// that a scope's parameters are automatically gathered into: that container occupies a register /
+// descriptor slot / space of its own, reported here as the scope's `binding`.
+//
+// A scope layout is one of exactly two shapes, so both are handled explicitly and anything else
+// asserts. `ScopeLayoutBuilder::endLayout` (`slang-parameter-binding.cpp`) builds the scope as a
+// `StructTypeLayout` of its parameters, then passes it to `createConstantBufferTypeLayoutIfNeeded`,
+// which either returns that struct unchanged (an unwrapped scope, `kind: "none"`) or wraps it in a
+// parameter-group layout whose element var-layout is that same struct (`kind: "constantBuffer"`).
+static void emitReflectionScopeJSON(
+    PrettyWriter& writer,
+    slang::VariableLayoutReflection* scopeVarLayout)
+{
+    writer << "{\n";
+    writer.indent();
+    CommaTrackerRAII commaTracker(writer);
+
+    auto scopeTypeLayout = scopeVarLayout->getTypeLayout();
+    switch (scopeTypeLayout->getKind())
+    {
+    case slang::TypeReflection::Kind::Struct:
+        writer.maybeComma();
+        writer << "\"kind\": \"none\"";
+        emitReflectionScopeParametersJSON(writer, scopeTypeLayout);
+        break;
+
+    case slang::TypeReflection::Kind::ConstantBuffer:
+        writer.maybeComma();
+        writer << "\"kind\": \"constantBuffer\"";
+
+        emitReflectionVarBindingInfoJSON(writer, scopeTypeLayout->getContainerVarLayout());
+
+        emitReflectionScopeParametersJSON(
+            writer,
+            scopeTypeLayout->getElementVarLayout()->getTypeLayout());
+        break;
+
+    default:
+        SLANG_ASSERT(!"unexpected type layout kind for a program scope");
+        break;
+    }
 
     writer.dedent();
     writer << "\n}";
@@ -1164,9 +1297,15 @@ static void emitReflectionEntryPointJSON(
     case SLANG_STAGE_AMPLIFICATION:
         writer << ",\n\"stage\": \"amplification\"";
         break;
+    case SLANG_STAGE_NODE:
+        writer << ",\n\"stage\": \"node\"";
+        break;
     default:
         break;
     }
+
+    writer << ",\n\"scope\": ";
+    emitReflectionScopeJSON(writer, entryPoint->getVarLayout());
 
     auto entryPointParameterCount = entryPoint->getParameterCount();
     if (entryPointParameterCount)
@@ -1244,6 +1383,10 @@ static void emitReflectionJSON(
 {
     writer << "{\n";
     writer.indent();
+
+    // Absence of this field is implicitly version "1.0" (before the scope objects existed).
+    writer << "\"version\": \"1.1\",\n";
+
     writer << "\"parameters\": [\n";
     writer.indent();
 
@@ -1259,6 +1402,9 @@ static void emitReflectionJSON(
 
     writer.dedent();
     writer << "\n]";
+
+    writer << ",\n\"globalScope\": ";
+    emitReflectionScopeJSON(writer, programReflection->getGlobalParamsVarLayout());
 
     auto entryPointCount = programReflection->getEntryPointCount();
     if (entryPointCount)

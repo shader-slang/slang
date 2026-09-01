@@ -1,0 +1,37 @@
+schema_version: 1
+id: specialize-interface-defaults-init-spirv-emit-ice
+bundle: coverage/specialize
+suspected_kind: sigsegv
+title: "Interface defaults-init + dynamic dispatch aborts in spirv-emit (E99997)"
+observed_at: "2026-06-11T14:00:00+00:00"
+scope: spirv
+evidence:
+  command: "./build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/specialize/_repro/interface-defaults-init-dynamic-dispatch.slang -target spirv -entry computeMain -stage compute -o out.spv"
+  source_slang: docs/generated/tests/coverage/specialize/_repro/interface-defaults-init-dynamic-dispatch.slang
+  observed_summary: |
+    An interface-typed local initialized with defaults (`IFoo f = {};`) is only
+    flagged with the deprecation warning E30521, so the input is accepted. When
+    that value is then passed to a function that dynamically dispatches on it
+    (`useDyn(f)` where `useDyn(IFoo)`), compilation aborts with an internal
+    error E99997: "unimplemented: Unhandled local inst in spirv-emit: let %1 :
+    _ = Func(%2, %3)". A crash is never an acceptable response to accepted input.
+  exit_code: 255
+  stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unimplemented: Unhandled local inst in spirv-emit:\nlet  %1\t: _\t= Func(%2, %3)"
+expected:
+  claim: |
+    Compiling an interface-typed local that is defaults-initialized and then used
+    in a dynamic-dispatch call must either complete successfully or report a clean
+    source-level diagnostic; it must not abort with an internal compiler error
+    during SPIR-V emit. The deprecation warning E30521 already indicates the
+    construct is accepted (not rejected), so the downstream emit must handle it.
+  citation_kind: doc
+  citation: docs/generated/design/ir-reference/generics-and-existentials.md
+provenance:
+  agent_model: claude-opus-4-8[1m]
+  source_commit: ef1068b5485e09b3a7afadba2e25f9541e29af42
+  doc_anchor: docs/generated/design/ir-reference/generics-and-existentials.md#dispatchers-and-existential-specialization
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug / malformed input: the compiler only warns (E30521), it does not reject the construct, so the input is accepted and the crash is a real emit-stage failure."
+    - "Same root cause as the no-type-conformances E50100 path: ruled out — that path emits a diagnostic, this path emits no specialization diagnostic and reaches spirv-emit with an unlowered Func inst."

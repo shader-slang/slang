@@ -161,7 +161,7 @@ public:
     /// Rewind (and effectively deallocate) all allocations *after* the cursor
     void rewindToCursor(const void* cursor);
 
-    /// Add a block such that it will be freed when everything else is freed.
+    /// Adds a block allocated by StandardAllocator that the arena owns and deallocates.
     void addExternalBlock(void* data, size_t size);
 
     // Swap this with rhs
@@ -247,7 +247,7 @@ private:
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE bool MemoryArena::isValid(const void* data, size_t size) const
 {
-    assert(size);
+    SLANG_ASSERT(size);
     uint8_t* ptr = (uint8_t*)data;
     return (ptr >= m_start && ptr + size <= m_current) || _findNonCurrent(data, size) != nullptr;
 }
@@ -255,7 +255,7 @@ SLANG_FORCE_INLINE bool MemoryArena::isValid(const void* data, size_t size) cons
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t sizeInBytes)
 {
-    assert(sizeInBytes > 0);
+    SLANG_ASSERT(sizeInBytes > 0);
 
     if (!m_current)
     {
@@ -301,7 +301,7 @@ SLANG_FORCE_INLINE void* MemoryArena::allocateCurrentUnaligned(size_t sizeInByte
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t sizeInBytes)
 {
-    assert(sizeInBytes > 0);
+    SLANG_ASSERT(sizeInBytes > 0);
 
     if (!m_current)
     {
@@ -326,7 +326,7 @@ SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t sizeInBytes)
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocateAndZero(size_t sizeInBytes)
 {
-    assert(sizeInBytes > 0);
+    SLANG_ASSERT(sizeInBytes > 0);
 
     if (!m_current)
     {
@@ -354,9 +354,9 @@ SLANG_FORCE_INLINE void* MemoryArena::allocateAndZero(size_t sizeInBytes)
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocateAligned(size_t sizeInBytes, size_t alignment)
 {
-    assert(sizeInBytes > 0);
+    SLANG_ASSERT(sizeInBytes > 0);
     // Alignment must be a power of 2
-    assert(((alignment - 1) & alignment) == 0);
+    SLANG_ASSERT(((alignment - 1) & alignment) == 0);
 
     if (!m_current)
     {
@@ -472,7 +472,7 @@ inline void MemoryArena::adjustToBlockAlignment()
         // Set the position
         m_current = ptr;
     }
-    assert(size_t(m_current) & alignMask);
+    SLANG_ASSERT(size_t(m_current) & alignMask);
 }
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void MemoryArena::rewindToCursor(const void* cursor)

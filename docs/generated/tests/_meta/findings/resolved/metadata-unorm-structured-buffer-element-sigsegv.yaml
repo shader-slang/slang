@@ -1,0 +1,26 @@
+schema_version: 1
+id: metadata-unorm-structured-buffer-element-sigsegv
+bundle: design/ir-reference/metadata
+suspected_kind: sigsegv
+scope: ir
+title: "slangc segfaults on RWStructuredBuffer<unorm float> / <snorm float>"
+observed_at: 2026-08-04T00:00:00+00:00
+evidence:
+  command: build/RelWithDebInfo/bin/slangc -target hlsl -dump-ir -o /dev/null -entry main -stage compute docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffer-element.slang
+  source_slang: docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffer-element.slang
+  observed_summary: slangc terminates with SIGSEGV on a module declaring RWStructuredBuffer<unorm float>; the same happens for snorm and on -target spirv-asm, while RWTexture2D<unorm float4> compiles normally.
+  exit_code: 139
+expected:
+  claim: A structured-buffer element type carrying the unorm or snorm modifier must compile, producing the unorm / snorm attribute inside an Attributed type wrapper, just as the same modifier on a texture element type does.
+  citation_kind: sibling-test
+  citation: tests/language-feature/types/modifiers/unorm-modifier.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/ir-reference/metadata.md#attr-family
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Malformed test: ruled out because the identical modifier on RWTexture2D<unorm float4> compiles and emits the attribute, and the crash reproduces on both -target hlsl and -target spirv-asm with and without -dump-ir."
+    - "Unsupported surface that should diagnose: ruled out because the compiler crashes rather than emitting a diagnostic, and the previous revision of this bundle carried a passing test using this exact surface."
+    - "Duplicate of ir-types-unorm-snorm-struct-field-sigsegv: likely shared root cause (both crash on an Attributed(Float, ...) type reached from a module-scope uniform), but the surface differs - that one is a plain struct field with no buffer involved. Left separate for triage to merge."

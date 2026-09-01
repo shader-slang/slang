@@ -4,7 +4,6 @@
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
-#include <assert.h>
 #include <typeinfo>
 
 namespace Slang
@@ -1077,6 +1076,18 @@ std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
     }
 }
 
+bool doesTypeHaveNoDiffModifier(Type* type)
+{
+    if (auto modifiedType = as<ModifiedType>(type))
+    {
+        if (modifiedType->findModifier<NoDiffModifierVal>())
+            return true;
+        return doesTypeHaveNoDiffModifier(modifiedType->getBase());
+    }
+
+    return false;
+}
+
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
 {
     List<Type*> paramTypes;
@@ -1095,17 +1106,29 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         }
 
         auto paramDecl = paramDeclRef.getDecl();
+        if (paramDecl->findModifier<NoDiffModifier>() &&
+            !doesTypeHaveNoDiffModifier(paramValueType))
+        {
+            paramValueType =
+                astBuilder->getModifiedType(paramValueType, astBuilder->getNoDiffModifierVal());
+        }
         auto paramMode = getParamPassingMode(paramDecl);
         auto paramType = getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
 
         paramTypes.add(paramType);
     };
     auto parent = declRef.getParent();
-    if (as<SubscriptDecl>(parent) || as<PropertyDecl>(parent))
+    // An accessor includes parameters from a callable storage parent before its own parameters.
+    // For example, a subscript setter receives the subscript index before the value being set.
+    // A property is not callable, so it contributes no parameters here.
+    if (declRef.as<AccessorDecl>())
     {
-        for (auto paramDeclRef : getParameters(astBuilder, parent.as<CallableDecl>()))
+        if (auto callableParent = parent.as<CallableDecl>())
         {
-            visitParamDecl(paramDeclRef);
+            for (auto paramDeclRef : getParameters(astBuilder, callableParent))
+            {
+                visitParamDecl(paramDeclRef);
+            }
         }
     }
     for (auto paramDeclRef : getParameters(astBuilder, declRef))
@@ -1113,8 +1136,8 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         visitParamDecl(paramDeclRef);
     }
 
-    FuncType* funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
-    return funcType;
+    auto funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
+    return as<FuncType>(funcType->substitute(astBuilder, SubstitutionSet(declRef))->resolve());
 }
 
 GenericDeclRefType* getGenericDeclRefType(

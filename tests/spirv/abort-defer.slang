@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -O3
 
 // Verify that defer lowering inserts cleanup before abort(), even though Abort is
 // represented as a normal intrinsic until SPIR-V legalization turns it into a

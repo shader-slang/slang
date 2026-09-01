@@ -3,7 +3,6 @@
 
 #include "slang-com-helper.h"
 
-#include <assert.h>
 #include <cstddef>
 
 namespace Slang

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#ssa-construction-and-basic-cleanup
-//META: doc_section_digest=bf314e51995b5a2b76e1104cf5f719db98f30e41b3a1ec2cddb5792a8ffcdf27
+//META: doc_section_digest=1784b8e9f30332a4995be817424580937cb7178f3cb7ce01ea908f8b8807e9fa
 //META: purpose=Boundary: a completely dead two-function call chain (`deadOuter` calls `deadInner`, neither reachable) is fully removed by DCE — neither name appears in emit.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

@@ -1,7 +1,7 @@
 #include "slang-file-system.h"
 
-#include "../core/slang-io.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-io.h"
+#include "core/slang-string-util.h"
 #include "slang-com-ptr.h"
 
 namespace Slang

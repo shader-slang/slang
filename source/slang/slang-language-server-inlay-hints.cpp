@@ -1,6 +1,6 @@
 #include "slang-language-server-inlay-hints.h"
 
-#include "../core/slang-char-util.h"
+#include "core/slang-char-util.h"
 #include "slang-ast-iterator.h"
 #include "slang-ast-support-types.h"
 #include "slang-language-server.h"

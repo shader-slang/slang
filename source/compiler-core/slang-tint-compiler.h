@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../core/slang-platform.h"
+#include "core/slang-platform.h"
 #include "slang-downstream-compiler-util.h"
 
 namespace Slang

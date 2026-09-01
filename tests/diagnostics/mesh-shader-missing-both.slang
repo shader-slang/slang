@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -O0
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv
 
 // Test for #9444: mesh shader with neither [outputtopology] nor outputs.
 // Both E38047 and E38048 should fire.

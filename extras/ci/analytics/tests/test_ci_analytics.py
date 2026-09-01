@@ -6,7 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 
@@ -134,6 +134,36 @@ class TestRunnerTypeCoverage(unittest.TestCase):
                     msg=f"misclassified for labels={lbls} runner_name={name!r}",
                 )
                 self.assertTrue(self_hosted)
+
+    def test_shipped_config_classifies_june_2026_runner_labels(self):
+        """The shipped runner_config.json must classify the runner labels
+        introduced by the June 2026 CI refactors, or `classify_group` falls
+        back to ("Other", self_hosted=False) and silently mis-buckets the
+        jobs (under-reporting self-hosted load and corrupting the
+        build-vs-test wait split).
+
+        - `["Windows", "self-hosted", "build"]`: the dedicated Windows build
+          pool that the Falcor/regression/MDL/compile builds were split onto
+          (shader-slang/slang#11562, #11605, #11635, #11640). Must classify
+          as the same group as the `win-build-` runner-name prefix.
+        - `windows-2025` / `windows-2025-vs2026`: GitHub-hosted images used
+          after the windows-latest pin and the VS2026 matrix (#11579).
+        - `ubuntu-24.04`: GitHub-hosted image used by the RHI/test jobs in
+          ci.yml.
+        """
+        config = ci_visualization.load_config()
+
+        cases = [
+            (["Windows", "self-hosted", "build"], "Windows Build (GCP)", True),
+            (["windows-2025"], "Windows (GH)", False),
+            (["windows-2025-vs2026"], "Windows (GH)", False),
+            (["ubuntu-24.04"], "Linux (GH)", False),
+        ]
+        for labels, expected_group, expected_self_hosted in cases:
+            with self.subTest(labels=labels):
+                group, self_hosted = ci_visualization.classify_group(labels, config)
+                self.assertEqual(group, expected_group)
+                self.assertEqual(self_hosted, expected_self_hosted)
 
     def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
@@ -561,6 +591,252 @@ class TestHealthPartialRendering(unittest.TestCase):
                 html = f.read()
 
         self.assertIn("Queue sample is partial", html)
+
+
+class TestPendingApprovals(unittest.TestCase):
+    """The Falcor bridge gate pauses runs until someone approves them, and a
+    stalled approval is invisible everywhere else: nothing has failed and
+    nothing is running, so it looks like a quiet afternoon."""
+
+    def _render(self, pending, partial=False, errors=None):
+        return ci_health.render_pending_approvals(
+            {"pending": pending, "partial": partial, "errors": errors or []}
+        )
+
+    def _row(self, **kw):
+        row = {
+            "run_id": 1,
+            "url": "https://github.com/o/r/actions/runs/1",
+            "actor": "someone",
+            "event": "pull_request",
+            "branch": "topic",
+            "title": "Some PR",
+            "waited_min": 5,
+            "pr_number": None,
+        }
+        row.update(kw)
+        return row
+
+    def test_nothing_waiting_is_ok(self):
+        html = self._render([])
+        self.assertIn(">OK<", html)
+        self.assertIn("Nothing waiting for approval", html)
+
+    def test_recent_wait_is_only_a_warning(self):
+        # A couple of minutes means the approval bot is about to pick it up.
+        html = self._render([self._row(waited_min=3)])
+        self.assertIn(">WAITING<", html)
+        self.assertNotIn(">STALLED<", html)
+
+    def test_long_wait_is_stalled(self):
+        # Half an hour means nobody is coming, and the job will time out and
+        # report as a test failure rather than as an unapproved gate.
+        html = self._render([self._row(waited_min=45)])
+        self.assertIn(">STALLED<", html)
+
+    def test_partial_does_not_render_false_healthy_empty_state(self):
+        html = self._render([], partial=True, errors=["HTTP 502"])
+        self.assertIn(">PARTIAL<", html)
+        self.assertNotIn(">OK<", html)
+        self.assertIn("HTTP 502", html)
+
+    def test_oldest_first(self):
+        # render_pending_approvals displays rows in the order it receives them;
+        # sorting is done by fetch_pending_approvals. Pass already-sorted rows
+        # and scope to the table body to avoid the banner ("oldest 40 min").
+        html = self._render([self._row(waited_min=40), self._row(waited_min=5)])
+        table = html[html.index("<table>"):]
+        self.assertLess(table.index("40 min"), table.index("5 min"))
+
+    def test_merge_queue_runs_are_highlighted(self):
+        # A merge_group run holds up the whole queue, not just its own PR.
+        html = self._render([self._row(event="merge_group")])
+        self.assertIn("<strong>merge_group</strong>", html)
+
+    def test_pr_number_renders_as_link(self):
+        html = self._render([self._row(pr_number=12345)])
+        self.assertIn("/pull/12345", html)
+        self.assertIn("#12345", html)
+
+    def test_pr_link_points_to_changes_tab(self):
+        # Reviewers approving a run want to see the code, not the PR
+        # overview tab, so the link must land on the Files-changed view.
+        html = self._render([self._row(pr_number=12345)])
+        self.assertIn("/pull/12345/changes", html)
+
+    def test_no_pr_number_renders_empty_cell(self):
+        html = self._render([self._row(pr_number=None)])
+        # Empty PR cell — no pull URL in the table
+        self.assertNotIn("/pull/", html)
+
+    def test_titles_are_escaped_exactly_once(self):
+        # _link already escapes, so escaping the title before passing it in
+        # double-escapes: "A & B" renders as the literal text "A &amp; B".
+        # Asserting only that "<script>" is absent does not catch that, since
+        # double-escaping also hides it.
+        html = self._render([self._row(title="fix <script> & co")])
+        self.assertNotIn("<script>", html)
+        self.assertIn("fix &lt;script&gt; &amp; co", html)
+        self.assertNotIn("&amp;amp;", html)
+
+
+    def test_query_asks_for_waiting_runs(self):
+        # status=waiting has to be a request parameter: the default listing
+        # excludes waiting runs, so filtering client-side finds nothing.
+        calls = []
+
+        def fake_list(endpoint, key):
+            calls.append((endpoint, key))
+            return [], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual(calls[0][1], "workflow_runs")
+        self.assertIn("status=waiting", calls[0][0])
+
+    def test_collection_error_is_partial_not_empty(self):
+        # An API failure must not look like "nothing is waiting".
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([], "HTTP 502")):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertTrue(data["partial"])
+        self.assertEqual(data["pending"], [])
+        self.assertIn("HTTP 502", data["errors"])
+
+    def test_records_are_sorted_oldest_first(self):
+        now = datetime.now(timezone.utc)
+
+        def fake_list(endpoint, key):
+            return [
+                {
+                    "id": 1,
+                    "created_at": (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "actor": {"login": "recent"},
+                },
+                {
+                    "id": 2,
+                    "created_at": (now - timedelta(minutes=90)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "actor": {"login": "oldest"},
+                },
+            ], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual([p["actor"] for p in data["pending"]], ["oldest", "recent"])
+        self.assertGreaterEqual(data["pending"][0]["waited_min"], 89)
+
+    def test_unparseable_timestamp_does_not_raise(self):
+        with mock.patch.object(
+            gh_api, "gh_api_list", side_effect=lambda e, k: ([{"id": 1, "created_at": "not-a-date"}], None)
+        ):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual(data["pending"][0]["waited_min"], 0)
+
+    def test_pr_number_extracted_from_pull_requests(self):
+        run = {"id": 1, "created_at": "2026-08-11T00:00:00Z", "pull_requests": [{"number": 999}]}
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+        self.assertEqual(data["pending"][0]["pr_number"], 999)
+
+    def test_pr_number_is_none_when_no_pull_requests(self):
+        run = {"id": 1, "created_at": "2026-08-11T00:00:00Z", "pull_requests": []}
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+        self.assertIsNone(data["pending"][0]["pr_number"])
+
+    def test_pr_number_falls_back_to_head_lookup_for_fork_runs(self):
+        # A run triggered from a fork branch has an empty `pull_requests`
+        # field (GitHub only populates it for same-repo branches), so the PR
+        # number has to be found via a head owner/branch lookup instead.
+        run = {
+            "id": 1,
+            "created_at": "2026-08-11T00:00:00Z",
+            "event": "pull_request",
+            "pull_requests": [],
+            "head_branch": "fix-assoc-default-init-and-matrix-layout",
+            "head_repository": {"owner": {"login": "fknfilewalker"}},
+        }
+        calls = []
+
+        def fake_gh_api(endpoint):
+            calls.append(endpoint)
+            return [{"number": 12435}], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)), \
+                mock.patch.object(gh_api, "gh_api", side_effect=fake_gh_api):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual(data["pending"][0]["pr_number"], 12435)
+        self.assertIn(
+            "head=fknfilewalker%3Afix-assoc-default-init-and-matrix-layout", calls[0]
+        )
+
+    def test_pr_number_head_lookup_skipped_for_non_pull_request_events(self):
+        # Only pull_request runs have a head branch worth resolving; a
+        # merge_group run's PR number comes from parse_merge_queue_pr_number
+        # elsewhere, not from this fallback.
+        run = {
+            "id": 1,
+            "created_at": "2026-08-11T00:00:00Z",
+            "event": "merge_group",
+            "pull_requests": [],
+            "head_branch": "gh-readonly-queue/master/pr-1-abcdef",
+            "head_repository": {"owner": {"login": "shader-slang"}},
+        }
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)), \
+                mock.patch.object(gh_api, "gh_api", side_effect=AssertionError("should not be called")):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertIsNone(data["pending"][0]["pr_number"])
+
+    def test_pr_number_head_lookup_returns_none_when_no_match(self):
+        run = {
+            "id": 1,
+            "created_at": "2026-08-11T00:00:00Z",
+            "event": "pull_request",
+            "pull_requests": [],
+            "head_branch": "some-branch",
+            "head_repository": {"owner": {"login": "someone"}},
+        }
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)), \
+                mock.patch.object(gh_api, "gh_api", side_effect=lambda e: ([], None)):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertIsNone(data["pending"][0]["pr_number"])
+
+
+class TestFindPrNumberByHead(unittest.TestCase):
+    def test_returns_number_from_matching_pr(self):
+        with mock.patch.object(gh_api, "gh_api", side_effect=lambda e: ([{"number": 42}], None)):
+            self.assertEqual(
+                gh_api.find_pr_number_by_head("o/r", "someone", "topic"), 42
+            )
+
+    def test_returns_none_when_no_owner_or_branch(self):
+        self.assertIsNone(gh_api.find_pr_number_by_head("o/r", "", "topic"))
+        self.assertIsNone(gh_api.find_pr_number_by_head("o/r", "someone", ""))
+
+    def test_returns_none_on_api_error(self):
+        with mock.patch.object(gh_api, "gh_api", side_effect=lambda e: (None, "HTTP 502")):
+            self.assertIsNone(gh_api.find_pr_number_by_head("o/r", "someone", "topic"))
+
+    def test_branch_name_with_ampersand_is_url_encoded(self):
+        # An unencoded "&" in the branch name would split "head=owner:branch"
+        # into separate query parameters instead of one head value.
+        calls = []
+
+        def fake_gh_api(endpoint):
+            calls.append(endpoint)
+            return [{"number": 1}], None
+
+        with mock.patch.object(gh_api, "gh_api", side_effect=fake_gh_api):
+            gh_api.find_pr_number_by_head("o/r", "someone", "fix&hack")
+
+        self.assertIn("head=someone%3Afix%26hack", calls[0])
+        self.assertNotIn("head=someone:fix&hack", calls[0])
 
 
 class TestHealthApiBounds(unittest.TestCase):
@@ -1668,6 +1944,155 @@ class TestHostedRunnerUsage(unittest.TestCase):
         self.assertEqual(snap["queued"]["by_workflow"], [{"name": "CMake Options", "count": 2}])
 
 
+class TestHostedRunnerCapResolution(unittest.TestCase):
+    """The hosted-runner cap is derived from the org's live GitHub plan
+    tier so a plan change (e.g. Free -> Team, 20 -> 60) is picked up
+    without a code edit. These tests cover the plan lookup, the tier
+    mapping, and the fallback path when the plan can't be queried.
+    """
+
+    def test_org_from_repo(self):
+        self.assertEqual(
+            ci_hosted_runner_usage.org_from_repo("shader-slang/slang"), "shader-slang"
+        )
+        # A bare org (no slash) is returned unchanged.
+        self.assertEqual(
+            ci_hosted_runner_usage.org_from_repo("shader-slang"), "shader-slang"
+        )
+
+    def test_fetch_org_plan_cap_maps_team_tier(self):
+        def fake_gh_api(endpoint):
+            self.assertEqual(endpoint, "orgs/shader-slang")
+            return {"login": "shader-slang", "plan": {"name": "team", "seats": 40}}, None
+
+        with mock.patch.object(ci_hosted_runner_usage, "gh_api", side_effect=fake_gh_api):
+            self.assertEqual(
+                ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"), 60
+            )
+
+    def test_fetch_org_plan_cap_maps_free_and_enterprise(self):
+        for tier, expected in (("free", 20), ("enterprise", 180), ("TEAM", 60)):
+            with mock.patch.object(
+                ci_hosted_runner_usage,
+                "gh_api",
+                side_effect=lambda ep, t=tier: ({"plan": {"name": t}}, None),
+            ):
+                self.assertEqual(
+                    ci_hosted_runner_usage.fetch_org_plan_cap("org"), expected
+                )
+
+    def test_fetch_org_plan_cap_returns_none_without_plan_field(self):
+        """An external/fork token sees no `plan` field. That must yield
+        None (caller falls back), not a crash.
+        """
+        with mock.patch.object(
+            ci_hosted_runner_usage,
+            "gh_api",
+            side_effect=lambda ep: ({"login": "shader-slang"}, None),
+        ):
+            self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
+
+    def test_fetch_org_plan_cap_returns_none_on_api_error(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage,
+            "gh_api",
+            side_effect=lambda ep: (None, "HTTP 403"),
+        ):
+            self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
+
+    def test_fetch_org_plan_cap_returns_none_on_unknown_tier(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage,
+            "gh_api",
+            side_effect=lambda ep: ({"plan": {"name": "galaxy-brain"}}, None),
+        ):
+            self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
+
+    def test_resolve_hosted_runner_cap_none_when_plan_unqueryable(self):
+        """No plan -> None (not a guessed fallback), so consumers can
+        report "cap unknown" instead of a wrong denominator.
+        """
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_org_plan_cap", side_effect=lambda org: None
+        ):
+            self.assertIsNone(
+                ci_hosted_runner_usage.resolve_hosted_runner_cap("shader-slang/slang")
+            )
+
+    def test_resolve_hosted_runner_cap_prefers_live_plan(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_org_plan_cap", side_effect=lambda org: 60
+        ):
+            self.assertEqual(
+                ci_hosted_runner_usage.resolve_hosted_runner_cap("shader-slang/slang"), 60
+            )
+
+    def test_sample_auto_detects_cap_when_none(self):
+        """With cap=None the sampler resolves the cap from the org plan."""
+
+        def fake_in_progress(repo):
+            return [], None
+
+        def fake_queued(repo):
+            return [], None
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "resolve_hosted_runner_cap", side_effect=lambda repo: 60
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage("shader-slang/slang")
+
+        self.assertEqual(snap["cap"], 60)
+
+    def test_sample_cap_is_none_when_undetectable(self):
+        """When the plan can't be queried and no --cap is given, the
+        snapshot carries cap=None so consumers know it's unknown.
+        """
+
+        def fake_in_progress(repo):
+            return [], None
+
+        def fake_queued(repo):
+            return [], None
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "resolve_hosted_runner_cap", side_effect=lambda repo: None
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage("shader-slang/slang")
+
+        self.assertIsNone(snap["cap"])
+
+    def test_plan_tier_map_values(self):
+        """The tier->cap map is the single source of truth for caps."""
+        self.assertEqual(
+            ci_hosted_runner_usage.PLAN_TIER_HOSTED_RUNNER_CAP,
+            {"free": 20, "team": 60, "enterprise": 180},
+        )
+
+    def test_format_summary_omits_cap_line_when_unknown(self):
+        """With cap=None the CLI summary drops the denominator/percentage
+        and warns, instead of printing a bogus `N / None`.
+        """
+        snapshot = {
+            "cap": None,
+            "in_progress": {"total": 7, "by_workflow": [], "by_label": []},
+            "queued": {"total": 0, "by_workflow": [], "by_label": []},
+        }
+        out = ci_hosted_runner_usage.format_summary(snapshot)
+        self.assertIn("Hosted runners in use: 7", out)
+        self.assertNotIn("/ None", out)
+        self.assertNotIn("%", out)
+        self.assertIn("WARNING", out)
+        self.assertIn("cap could not be detected", out)
+
+
 class TestHostedLabelPalette(unittest.TestCase):
     """Regression: variants must yield valid 6-digit `#RRGGBB` colors.
 
@@ -1778,6 +2203,40 @@ class TestHostedRunnerRender(unittest.TestCase):
         self.assertIn("PARTIAL", html)
         self.assertNotIn("OK", html)
         self.assertIn("partial", html.lower())
+
+    def test_render_banner_unknown_cap_omits_denominator(self):
+        """A None cap (org plan not queryable) renders UNKNOWN CAP with
+        raw usage and no `/ cap` or percentage — a wrong denominator is
+        worse than none.
+        """
+        html = ci_health.render_hosted_runner_usage(self._snapshot(in_use=12, cap=None))
+        self.assertIn("UNKNOWN CAP", html)
+        self.assertIn("12 hosted runners in use", html)
+        self.assertNotIn("/ None", html)
+        self.assertNotIn("%)", html)
+        self.assertNotIn("AT CAP", html)
+        self.assertIn("could not be detected", html)
+
+    def test_build_hosted_runner_chart_none_cap_when_undetectable(self):
+        """If no snapshot carries a cap, the chart's cap is None so the
+        JS omits the reference line rather than drawing a guessed one.
+        """
+        snapshots = [
+            {
+                "timestamp": "2026-07-02T10:00:00Z",
+                "hosted_runner_usage": {
+                    "cap": None,
+                    "in_progress": {
+                        "total": 2,
+                        "by_label": [{"label": "ubuntu-latest", "count": 2}],
+                    },
+                    "queued": {"total": 0},
+                },
+            }
+        ]
+        chart = ci_health._build_hosted_runner_chart(snapshots)
+        self.assertIsNotNone(chart)
+        self.assertIsNone(chart["cap"])
 
     def test_build_hosted_runner_chart_none_when_no_data(self):
         snapshots = [{"timestamp": "2026-05-13T10:00:00Z"}]
@@ -1943,6 +2402,86 @@ class TestHostedRunnerRender(unittest.TestCase):
             with open(os.path.join(tmp, ci_health.SNAPSHOTS_FILE), encoding="utf-8") as f:
                 snapshot = json.loads(f.readline())
         self.assertEqual(snapshot["hosted_runner_usage"], usage)
+
+
+class TestPendingApprovalsLive(unittest.TestCase):
+    """The pending approvals section is now rendered by client-side JS that
+    fetches the GitHub API on page load, so the generated HTML contains a
+    placeholder div and a script tag rather than static content."""
+
+    def _health_html(self, repo="shader-slang/slang"):
+        queue_data = {
+            "summary": {
+                "jobs_queued": 0, "jobs_running": 0,
+                "runs_queued": 0, "runs_in_progress": 0,
+            },
+            "partial": False,
+            "list_errors": [],
+            "self_hosted_runners": [],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, [], tmp, repo=repo)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                return f.read()
+
+    def test_pending_approvals_section_uses_js_placeholder(self):
+        html = self._health_html()
+        self.assertIn('id="pending-approvals-section"', html)
+        self.assertIn("fetch(url)", html)
+
+    def test_pending_approvals_placeholder_embeds_repo(self):
+        html = self._health_html(repo="shader-slang/slang")
+        self.assertIn('data-repo="shader-slang/slang"', html)
+
+    def test_pending_approvals_js_pr_link_points_to_changes_tab(self):
+        # Mirrors test_pr_link_points_to_changes_tab for the server-rendered
+        # table: the client-side widget builds the same link.
+        self.assertIn("/pull/' + p.pr_number + '/changes", ci_health.PENDING_APPROVALS_JS)
+
+    def test_pending_approvals_js_bounds_fork_pr_lookups(self):
+        # A burst of unresolved fork-branch runs must not fire one
+        # unauthenticated fetch per run — that can exceed GitHub's 60
+        # requests/hour anonymous rate limit. The client widget caps and
+        # deduplicates lookups by owner/branch before firing requests.
+        js = ci_health.PENDING_APPROVALS_JS
+        self.assertIn("MAX_HEAD_LOOKUPS", js)
+        self.assertIn("seenKeys", js)
+
+    def test_pending_approvals_section_shows_loading_placeholder(self):
+        # The placeholder div shows a loading message before JS runs.
+        # Server-side rendering is gone; all content arrives via fetch().
+        html = self._health_html()
+        self.assertIn("Loading", html)
+        # No server-rendered approval rows exist as real HTML elements —
+        # the Python render_pending_approvals function is no longer called.
+        # The fetch_pending_approvals call was removed from main(), so the
+        # pending_approvals kwarg is never passed to generate_health_html.
+        self.assertNotIn("render_pending_approvals", html)
+
+    def test_pending_approvals_js_esc_is_reachable_from_catch_handler(self):
+        # esc() must be declared in the IIFE's outer scope, not inside the
+        # .then() callback that builds the table. If it is only declared
+        # inside that .then(), a promise rejection before that point (e.g.
+        # the first fetch() failing because an unauthenticated client hit
+        # GitHub's rate limit) reaches the trailing .catch(), which itself
+        # calls esc() -- throwing a ReferenceError there means innerHTML is
+        # never set and the panel is stuck showing "Loading..." forever.
+        js = ci_health.PENDING_APPROVALS_JS
+        iife_start = js.index("(function () {")
+        first_fetch = js.index("fetch(url)")
+        esc_decl = js.index("function esc(s)")
+        self.assertGreater(esc_decl, iife_start)
+        self.assertLess(
+            esc_decl, first_fetch,
+            "esc() must be declared before the first fetch() call so the "
+            "trailing .catch() handler can reach it if that fetch fails",
+        )
+        self.assertEqual(
+            js.count("function esc(s)"), 1,
+            "esc() should be defined once, not duplicated inside a nested .then()",
+        )
 
 
 if __name__ == "__main__":

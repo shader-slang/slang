@@ -32,7 +32,7 @@ int PipelineCommandEncoder::getBindPointIndex(VkPipelineBindPoint bindPoint)
     case VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR:
         return 2;
     default:
-        assert(!"unknown pipeline type.");
+        SLANG_ASSERT_FAILURE("unknown pipeline type.");
         return -1;
     }
 }
@@ -752,7 +752,7 @@ void ResourceCommandEncoder::clearResourceView(
                 break;
             case ResourceViewImpl::ViewType::PlainBuffer:
                 {
-                    assert(
+                    SLANG_ASSERT(
                         clearValue->color.uintValues[1] == clearValue->color.uintValues[0] &&
                         clearValue->color.uintValues[2] == clearValue->color.uintValues[0] &&
                         clearValue->color.uintValues[3] == clearValue->color.uintValues[0]);
@@ -771,7 +771,7 @@ void ResourceCommandEncoder::clearResourceView(
                 break;
             case ResourceViewImpl::ViewType::TexelBuffer:
                 {
-                    assert(
+                    SLANG_ASSERT(
                         clearValue->color.uintValues[1] == clearValue->color.uintValues[0] &&
                         clearValue->color.uintValues[2] == clearValue->color.uintValues[0] &&
                         clearValue->color.uintValues[3] == clearValue->color.uintValues[0]);
@@ -874,7 +874,7 @@ void ResourceCommandEncoder::copyTextureToBuffer(
     ITextureResource::Offset3D srcOffset,
     ITextureResource::Extents extent)
 {
-    assert(srcSubresource.mipLevelCount <= 1);
+    SLANG_ASSERT(srcSubresource.mipLevelCount <= 1);
 
     auto image = static_cast<TextureResourceImpl*>(src);
     auto desc = image->getDesc();
@@ -1016,7 +1016,7 @@ Result RenderCommandEncoder::bindPipelineWithRootObject(
 void RenderCommandEncoder::setViewports(GfxCount count, const Viewport* viewports)
 {
     static const int kMaxViewports = 8; // TODO: base on device caps
-    assert(count <= kMaxViewports);
+    SLANG_ASSERT(count <= kMaxViewports);
 
     m_viewports.setCount(count);
     for (GfxIndex ii = 0; ii < count; ++ii)
@@ -1039,7 +1039,7 @@ void RenderCommandEncoder::setViewports(GfxCount count, const Viewport* viewport
 void RenderCommandEncoder::setScissorRects(GfxCount count, const ScissorRect* rects)
 {
     static const int kMaxScissorRects = 8; // TODO: base on device caps
-    assert(count <= kMaxScissorRects);
+    SLANG_ASSERT(count <= kMaxScissorRects);
 
     m_scissorRects.setCount(count);
     for (GfxIndex ii = 0; ii < count; ++ii)
@@ -1075,8 +1075,8 @@ void RenderCommandEncoder::setPrimitiveTopology(PrimitiveTopology topology)
         default:
             // We are using a non-list topology, but we don't have dynmaic state
             // extension, error out.
-            assert(!"Non-list topology requires VK_EXT_extended_dynamic_states, which "
-                    "is not present.");
+            SLANG_ASSERT_FAILURE("Non-list topology requires VK_EXT_extended_dynamic_states, which "
+                                 "is not present.");
             break;
         }
     }
@@ -1122,7 +1122,7 @@ void RenderCommandEncoder::setIndexBuffer(
         indexType = VK_INDEX_TYPE_UINT32;
         break;
     default:
-        assert(!"unsupported index format");
+        SLANG_ASSERT_FAILURE("unsupported index format");
     }
 
     BufferResourceImpl* bufferImpl = static_cast<BufferResourceImpl*>(buffer);

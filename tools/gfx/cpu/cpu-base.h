@@ -2,11 +2,11 @@
 // Shared header file for CPU implementation
 #pragma once
 
-#include "../immediate-renderer-base.h"
-#include "../mutable-shader-object.h"
-#include "../slang-context.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
+#include "gfx/immediate-renderer-base.h"
+#include "gfx/mutable-shader-object.h"
+#include "gfx/slang-context.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"

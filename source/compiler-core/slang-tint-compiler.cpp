@@ -1,7 +1,7 @@
 #include "slang-tint-compiler.h"
 
-#include "../../external/slang-tint-headers/slang-tint.h"
 #include "slang-artifact-associated-impl.h"
+#include "slang-tint-headers/slang-tint.h"
 
 namespace Slang
 {

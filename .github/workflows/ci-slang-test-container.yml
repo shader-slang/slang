@@ -75,8 +75,20 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          submodules: "recursive"
+          submodules: "false"
           fetch-depth: "1"
+
+      - name: Clean inherited checkout state
+        run: |
+          # Remove stale files and stale submodule worktrees inherited by self-hosted runners.
+          git submodule deinit --all --force
+          git clean -ffdx
+          git reset --hard HEAD
+
+      - name: Checkout OptiX headers
+        run: |
+          git submodule sync -- external/optix-dev
+          git submodule update --init --depth=1 external/optix-dev
 
       - name: Setup Vulkan ICD
         uses: ./.github/actions/setup-vulkan-icd
@@ -168,6 +180,16 @@ jobs:
 
           "$bin_dir/slang-test" "${test_roots[@]}" "${slang_test_args[@]}"
 
+      - name: Check slang-test worktree cleanliness
+        if: always()
+        run: |
+          status="$(git status --short --untracked-files=all -- . ':(exclude)artifacts/**')"
+          if [[ -n "$status" ]]; then
+            echo "::error::slang-test left generated or modified files in the worktree"
+            printf '%s\n' "$status"
+            exit 1
+          fi
+
       - name: Run slangc tests
         if: inputs.gpu-tier == 't4'
         run: |
@@ -190,6 +212,16 @@ jobs:
             -expected-failure-list tests/expected-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
+
+      - name: Check via-glsl slang-test worktree cleanliness
+        if: always() && inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
+        run: |
+          status="$(git status --short --untracked-files=all -- . ':(exclude)artifacts/**')"
+          if [[ -n "$status" ]]; then
+            echo "::error::slang-test left generated or modified files in the worktree"
+            printf '%s\n' "$status"
+            exit 1
+          fi
 
       # Extract gdb backtraces from any cores written to /var/cores during
       # the test steps above. /var/cores lives on the host (bind-mounted in

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "slang-support.h"
+
 #include <mutex>
 #include <slang-rhi.h>
 #include <string>
@@ -36,6 +38,11 @@ public:
     struct CachedDevice
     {
         Slang::ComPtr<rhi::IDevice> device;
+
+        // The bridge this device was created with (as desc.debugCallback); a cached device cannot
+        // be re-pointed, so acquireDevice returns this exact bridge on reuse (see #11856).
+        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge;
+
         uint64_t creationOrder;
 
         CachedDevice();
@@ -52,7 +59,14 @@ private:
     static void evictOldestDeviceIfNeeded();
 
 public:
-    static SlangResult acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice** outDevice);
+    // Acquires or reuses a device for `desc` and returns the bridge it is wired to via `outBridge`
+    // (both out-params required). A reused device returns its original bridge, so the caller can
+    // bind to the bridge the device actually uses (see #11856).
+    static SlangResult acquireDevice(
+        const rhi::DeviceDesc& desc,
+        rhi::IDevice** outDevice,
+        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge>* outBridge);
+
     static void cleanCache();
 };
 

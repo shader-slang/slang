@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#edge-cases-and-failure-modes
-//META: doc_section_digest=984d93f961836cc85daa4d28cbdc53dade2964991d8474fd53b87f15b712e265
+//META: doc_section_digest=b57e81781278bd6752bd817f50c238aae4f56d4fda646e22befd826b34d6cab4
 //META: purpose=The block-local `hiddenFromLookup` rule does not apply at file scope; a function may refer to another function declared later in the same file.
 //META: intent=functional
 //META: pipeline_stage=check

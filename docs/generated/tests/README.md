@@ -184,8 +184,14 @@ four canonical sections, in this order:
    (`link-stage-only`, `out-of-bundle`, `deprecated`, …).
 4. `## Doc gaps observed` — `Anchor | Kind | Gap | Suggested
 addition` table. The feedback channel into doc regeneration. Rows
-   are aggregated by `regenerate.py doc-gaps` and consumed by the
-   doc-regen workflow.
+   are aggregated by `regenerate.py doc-gaps`, which groups them by
+   the document the `Anchor` cell points at and gives each a stable
+   `gap_id`; the doc side records what it decided about each id in
+   `docs/generated/design/_meta/doc-gap-state.json` and reports the
+   remaining queue with that tree's `regenerate.py gap-status`.
+   The `Anchor` cell must carry a link to the document, not a bare
+   `#fragment` — a row that names no document cannot be routed to
+   one, and lint rejects it.
 
 Empty sections are filled with `NA` rather than omitted. Bundle-
 specific sections (e.g., `## Sibling-bundle overlap`,

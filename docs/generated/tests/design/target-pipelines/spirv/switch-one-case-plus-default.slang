@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
-//META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools
-//META: doc_section_digest=701541a00a1b084515168e6adaa766b069355955c8c77e0f8307c0318b34f251
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/target-pipelines/spirv.md#opswitch-case-literals-follow-the-selector-width
+//META: doc_section_digest=261553d1527d9ea1e4d05d9bd40bce371d25c59c042c492c960808b79eb5b1ee
 //META: purpose=A switch with exactly one case plus default still emits OpSwitch (lower edge of case count) with one labeled target and one default target.
 //META: intent=boundary
 //META: pipeline_stage=emit

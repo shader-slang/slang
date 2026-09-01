@@ -2,12 +2,12 @@
 
 #include "options.h"
 
-#include "../../source/compiler-core/slang-command-line-args.h"
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-render-api-util.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-type-text-util.h"
-#include "../../source/core/slang-writer.h"
+#include "compiler-core/slang-command-line-args.h"
+#include "core/slang-list.h"
+#include "core/slang-render-api-util.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
+#include "core/slang-writer.h"
 #include "diagnostics.h"
 
 #include <stdio.h>
@@ -93,6 +93,14 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     sink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
 
     outOptions = Options();
+
+    // Accept every `-X<compiler>` name that slangc accepts (dxc, fxc, glslang, nvrtc, ...),
+    // not just `-Xslang`. The default Options() ctor registers only "slang", so `-Xdxc ...`
+    // would be rejected as an unknown downstream name. Constructing DownstreamArgs with the
+    // command-line context auto-registers all pass-through names (as slangc does in
+    // slang-options.cpp); "slang" is not a pass-through enum value, so re-add it explicitly.
+    outOptions.downstreamArgs = DownstreamArgs(cmdLineContext);
+    outOptions.downstreamArgs.addName("slang");
 
     CommandLineArgs args(cmdLineContext);
 

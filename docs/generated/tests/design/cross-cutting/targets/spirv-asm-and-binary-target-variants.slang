@@ -1,20 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#targets
-//META: doc_section_digest=e324a10260c794d77c45954ccddaf61cf66af2794e97a8289f9655330ee625d4
-//META: purpose=The Targets table lists `SLANG_SPIRV` and `SLANG_SPIRV_ASM` as variants of the same emit backend; both `-target spirv-asm` produces SPIR-V text (the assembly-text-form observable in the no-GPU runner).
+//META: doc_section_digest=09ecdf153c06b46e85b5bfd65a0136d6c1516c1e42e5e33b4b02ee440f2f963c
+//META: purpose=`SLANG_SPIRV` and `SLANG_SPIRV_ASM` are binary and assembly variants of one emit backend, and the assembly variant `-target spirv-asm` produces SPIR-V module text.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Targets table groups `SLANG_SPIRV` (binary) and
-// `SLANG_SPIRV_ASM` (assembly text) under the SPIR-V direct emit
-// backend. The assembly form is what the no-GPU runner can FileCheck.
-// We exercise the same source on `-target spirv-asm` and assert
-// SPIR-V-shape header markers — `OpCapability Shader`,
-// `OpMemoryModel`, and `OpEntryPoint GLCompute` — appear.
+// Verifies that the binary and assembly SPIR-V targets are two
+// renderings of one emit backend by exercising the rendering a text
+// runner can read. The CHECKs pin the structural header a SPIR-V
+// module always carries — capability, memory model, entry point and
+// execution mode — so a pass shows the direct SPIR-V backend ran and
+// emitted a well-formed module rather than some other text.
 
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 

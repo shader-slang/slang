@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T22:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#declreftype
-//META: doc_section_digest=354aa5e4ad824810f192137554fb86892215b9326ffe9fad3435b95088dbb52d
-//META: purpose=A struct name is a DeclRefType referencing the StructDecl; a variable declared with that type stores the struct's fields and member access reads them.
+//META: doc_section_digest=14c270eeceb6fd55e692293c2e8e4945e22f3b34e19b33e287da175a7b35f56b
+//META: purpose=A struct name is a type defined by reference to its declaration; a variable declared with that name stores the struct's fields and member access resolves through the declaration.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `DeclRefType` notable-node section says "almost every
-// user-declared type the front end sees is a DeclRefType ... carries
-// a decl-ref to a type declaration". The user-spelled struct name
-// `Vec3i` resolves through a DeclRefType to its StructDecl; field
-// access then dispatches via the decl-ref.
+// Verifies that a user-declared struct name is usable directly as a
+// value type and that member lookup follows the referenced declaration.
+// Three fields are written then summed; CHECK asserts the sum, which is
+// only reachable if each `.x`/`.y`/`.z` resolved through the decl-ref to
+// its own member.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

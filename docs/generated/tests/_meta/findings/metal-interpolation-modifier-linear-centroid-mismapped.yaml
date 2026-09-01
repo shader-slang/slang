@@ -1,0 +1,54 @@
+schema_version: 1
+id: metal-interpolation-modifier-linear-centroid-mismapped
+bundle: coverage/emit
+suspected_kind: wrong-codegen
+title: "Metal mis-maps `linear` and `centroid` interpolation modifiers"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: metal
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/emit/glsl-interpolation-modifiers.slang -target metal -entry fragMain -stage fragment"
+  source_slang: docs/generated/tests/coverage/emit/glsl-interpolation-modifiers.slang
+  observed_summary: |
+    A fragment input struct carrying one field per HLSL interpolation modifier emits these
+    Metal attributes:
+
+      nointerpolation float3 flatColor -> [[flat]]                   (correct)
+      noperspective   float2 npUV      -> [[center_no_perspective]]  (correct)
+      centroid        float2 cUV       -> [[center_perspective]]     (wrong)
+      sample          float2 sUV       -> [[sample_perspective]]     (correct)
+      linear          float  lin       -> [[sample_no_perspective]]  (wrong)
+
+    The mapping table is `_getInterpolationModifierText` in
+    source/slang/slang-emit-metal.cpp:1726; `IRInterpolationMode::Centroid` returns
+    "[[center_perspective]]" and `IRInterpolationMode::Linear` returns
+    "[[sample_no_perspective]]".
+
+    Both mismatches change the sampling behaviour of the shader rather than just its
+    spelling: `centroid` loses centroid sampling and silently becomes centre sampling
+    (which can sample outside the primitive at partially covered pixels), and `linear`
+    -- which in HLSL is the *default*, perspective-correct, pixel-centre mode -- becomes
+    both per-sample and non-perspective-correct.
+
+    The GLSL, SPIR-V and HLSL back ends all handle the same five inputs correctly
+    (`flat`/`noperspective`/`centroid`/`sample`/`smooth`, and the matching SPIR-V
+    `Flat`/`NoPerspective`/`Centroid`/`Sample` decorations), so the shader itself is
+    well-formed; the committed test pins those three targets and deliberately omits Metal.
+expected:
+  claim: |
+    HLSL `linear` is perspective-correct interpolation at the pixel centre, whose Metal
+    spelling is `[[center_perspective]]`; HLSL `centroid` is perspective-correct
+    interpolation at a covered centroid, whose Metal spelling is
+    `[[centroid_perspective]]`. Metal provides both attributes, so neither modifier needs
+    to be approximated.
+  citation_kind: sibling-test
+  citation: tests/pipeline/rasterization/get-attribute-at-vertex-struct.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/06-emit.md
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Deliberate approximation because Metal lacks the attribute: ruled out — Metal defines [[centroid_perspective]] and [[center_perspective]], and the emitter already uses the latter (for Centroid), so both spellings are available."
+    - "Test bug: ruled out — the same source struct produces the correct qualifier on GLSL, SPIR-V and HLSL, and the mismap is visible directly in the switch in slang-emit-metal.cpp."
+    - "Pinned by an existing test as intended behaviour: ruled out — no test under tests/ mentions center_perspective, centroid_perspective or sample_no_perspective."

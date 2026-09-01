@@ -1,23 +1,25 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
-//META: doc_ref=docs/language-reference/generics.md#description
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=A generic constructor `__init<T : IInteger>` can be parameterized over a type and used to initialize a struct from values of type T.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/language-reference/generics.md#generic-constructor
+//META: doc_section_digest=84110c19cd479ac78a3cab0412932226933d86185349aa66c82743765c7dec1c
+//META: purpose=A generic constructor `__init<T : IInteger>` initializes a struct from two values of type T.
 //META: intent=functional
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// From the doc Examples section (Generic constructor).
-// `__init<T : IInteger>` combines two values into a single int by adding them.
+// Verifies the doc's "Generic constructor" example: `TestStruct` has a generic
+// `__init<T : IInteger>(T, T)` that sums its arguments via the IInteger
+// requirements and stores the result. The aggregate `{ 123, 345 }` invokes the
+// constructor with T inferred as int; CHECK asserts val == 468, proving the
+// generic constructor's body ran and used the IInteger constraint.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 struct TestStruct
 {
     int val;
-
     __init<T : IInteger>(T initval1, T initval2)
     {
         T tmp = initval1 + initval2;
@@ -26,12 +28,12 @@ struct TestStruct
 }
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
-RWStructuredBuffer<float> outputBuffer;
+RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 id : SV_DispatchThreadID)
+void computeMain()
 {
     TestStruct obj = { 123, 345 };
-    outputBuffer[0] = (float)obj.val;
+    outputBuffer[0] = obj.val;
 }
 // CHECK: 468

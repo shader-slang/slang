@@ -133,6 +133,24 @@ enum
     kEOF = -1
 };
 
+static const int kMaxLexErrorCount = 100;
+
+template<typename P, typename... Args>
+static void diagnose(
+    DiagnosticSink* sink,
+    const P& loc,
+    const DiagnosticInfo& info,
+    const Args&... args)
+{
+    if (!sink)
+        return;
+
+    // Cap max errors to avoid flooding the sink memory.
+    if (sink->getErrorCount() > kMaxLexErrorCount)
+        return;
+    sink->diagnose(loc, info, args...);
+}
+
 // Get the next input byte, without any handling of
 // escaped newlines, non-ASCII code points, source locations, etc.
 static int _peekRaw(Lexer* lexer)
@@ -155,6 +173,29 @@ static int _advanceRaw(Lexer* lexer)
         return kEOF;
 
     return *lexer->m_cursor++;
+}
+
+static SourceLoc _getSourceLoc(const Lexer& lexer, const char* it)
+{
+    return lexer.m_startLoc + (it - lexer.m_begin);
+}
+
+static SourceLoc _getSourceLoc(const Lexer* lexer)
+{
+    return _getSourceLoc(*lexer, lexer->m_cursor);
+}
+
+static String _inputToByteSeq(const char* b, const char* e)
+{
+    StringBuilder byteSeqBuilder;
+    for (const char* i = b; i != e; ++i)
+    {
+        StringUtil::appendFormat(
+            byteSeqBuilder,
+            (i == b) ? "0x%02X" : " 0x%02X",
+            unsigned{static_cast<unsigned char>(*i)});
+    }
+    return byteSeqBuilder.toString();
 }
 
 // When the cursor is already at the first byte of an end-of-line sequence,
@@ -227,13 +268,32 @@ static int _peek(Lexer* lexer, int offset = 0)
         {
             // Consume all unicode characters.
             pos--;
+            bool first{true};
+            bool invalid{};
             c = getUnicodePointFromUTF8(
-                [&]()
+                [&]() -> unsigned char
                 {
                     if (lexer->m_cursor + pos >= lexer->m_end)
-                        return (char)0;
-                    return lexer->m_cursor[pos++];
-                });
+                        return 0U;
+
+                    if (first || isUtf8ContinuationByte(lexer->m_cursor[pos]))
+                    {
+                        first = false;
+                        return static_cast<unsigned char>(lexer->m_cursor[pos++]);
+                    }
+
+                    // Current byte is not a continuation byte, so we don't
+                    // consume it. Instead, we'll just return a poison byte to
+                    // ensure that the current sequence is interpreted as
+                    // invalid.
+                    return 0xFFU; // always invalid UTF-8
+                },
+                &invalid);
+
+            // If the UTF-8 sequence is invalid, we'll return space,
+            // instead. This will be diagnosed in _advance().
+            if (invalid)
+                c = ' ';
         }
         // Default case is to just hand along the byte we read as an ASCII code point.
     } while (offset--);
@@ -290,16 +350,39 @@ static int _advance(Lexer* lexer)
         if (isUtf8LeadingByte((Byte)c))
         {
             lexer->m_cursor--;
+            const char* seqStart = lexer->m_cursor;
+            bool invalid{};
             c = getUnicodePointFromUTF8(
-                [&]()
+                [&]() -> unsigned char
                 {
                     if (lexer->m_cursor >= lexer->m_end)
                     {
                         isInvalidStream = true;
-                        return (char)0;
+                        return 0U;
                     }
-                    return *lexer->m_cursor++;
-                });
+
+                    if ((lexer->m_cursor == seqStart) || isUtf8ContinuationByte(*lexer->m_cursor))
+                        return static_cast<unsigned char>(*lexer->m_cursor++);
+
+                    // Current byte is not a continuation byte, so we don't
+                    // consume it. Instead, we'll just return a poison byte to
+                    // ensure that the current sequence is interpreted as
+                    // invalid.
+                    return 0xFFU; // always invalid UTF-8
+                },
+                &invalid);
+
+            // If the UTF-8 sequence is invalid, we'll interpret it as a space
+            // and diagnose.
+            if (invalid)
+            {
+                diagnose(
+                    lexer->m_sink,
+                    _getSourceLoc(*lexer, seqStart),
+                    LexerDiagnostics::invalidUtf8ByteSequence,
+                    _inputToByteSeq(seqStart, lexer->m_cursor).getBuffer());
+                c = ' ';
+            }
         }
 
         // If we encounter a \0, return kEOF, and move stream cursor to the end.
@@ -311,24 +394,6 @@ static int _advance(Lexer* lexer)
         // Default case is to return the raw byte we saw.
         return c;
     }
-}
-
-static const int kMaxLexErrorCount = 100;
-
-template<typename P, typename... Args>
-static void diagnose(
-    DiagnosticSink* sink,
-    const P& loc,
-    const DiagnosticInfo& info,
-    const Args&... args)
-{
-    if (!sink)
-        return;
-
-    // Cap max errors to avoid flooding the sink memory.
-    if (sink->getErrorCount() > kMaxLexErrorCount)
-        return;
-    sink->diagnose(loc, info, args...);
 }
 
 static void _handleNewLine(Lexer* lexer)
@@ -424,16 +489,6 @@ static void _lexIdentifier(Lexer* lexer)
         }
         return;
     }
-}
-
-static SourceLoc _getSourceLoc(const Lexer& lexer, const char* it)
-{
-    return lexer.m_startLoc + (it - lexer.m_begin);
-}
-
-static SourceLoc _getSourceLoc(const Lexer* lexer)
-{
-    return _getSourceLoc(*lexer, lexer->m_cursor);
 }
 
 static void _lexDigits(Lexer* lexer, int base)
@@ -782,6 +837,114 @@ IntegerLiteralValue getIntegerLiteralValue(
     return value;
 }
 
+// Rounds a non-negative double to the precision and range of a narrower float
+// type, returning the result still held in a double.
+//
+// This function assumes that 'value' is non-negative.
+//
+// Parameters:
+//
+//   value           - Value to round. When a regular number, must be >= 0. May also be 0,
+//                     +infinity, NaN.
+//   minNormalExp    - Minimum normal exponent before subnormal
+//   maxExp          - Maximum exponent. Anything above that is +INFINITY
+//   precisionBits   - Precision in number of bits
+//   roundToNearest  - Rounding mode: true = round to nearest, ties to even. False = truncate
+//                     (round towards zero)
+//
+// Note:
+// - float:  -126, +127, 24
+// - half:   -14,  +15,  11
+static double _truncateDouble(
+    double value,
+    int minNormalExp,
+    int maxExp,
+    unsigned precisionBits,
+    bool roundToNearest)
+{
+    // NaNs and INFs are passed as is
+    if (!std::isfinite(value))
+        return value;
+
+    SLANG_ASSERT(value >= 0.0);
+
+    // first check for overflow
+    if (roundToNearest)
+    {
+        // anything at or above the tie point that rounds up to maxExp+1 overflows
+        const double limit =
+            std::ldexp(2.0, maxExp) - std::ldexp(1.0, maxExp - static_cast<int>(precisionBits));
+        if (value >= limit)
+            return std::numeric_limits<double>::infinity();
+    }
+    else
+    {
+        const double limit = std::ldexp(2.0, maxExp);
+        if (value >= limit)
+            return std::numeric_limits<double>::infinity();
+    }
+
+    // Note: there is a seeming off-by-one with exponents. This is because
+    // frexp() returns a fraction between [0.5, 1). That is, a number such as
+    // 3.5 is decomposed as 0.875 * 2^2, instead of 1.75 * 2^1.
+    int exp{};
+    double fraction = std::frexp(value, &exp);
+
+    // Additional precision reduction for subnormals - note the exponent
+    // off-by-one comment above.
+    int precisionLoss = std::max(minNormalExp - (exp - 1), 0);
+
+    int exponentShift = static_cast<int>(precisionBits) - precisionLoss;
+
+    // scale the fraction so that the retained bits become the integer part
+    fraction = std::ldexp(fraction, exponentShift);
+
+    if (roundToNearest)
+    {
+        // To make the rounding precise, we need to divide the number into integer and fractional
+        // parts
+        double integerPart{};
+
+        // yyyyyyy.xxxxxxxx
+        // integer.roundoff
+
+        double roundOffPart = std::modf(fraction, &integerPart);
+        if (roundOffPart != 0.5)
+        {
+            fraction = std::round(fraction);
+        }
+        else
+        {
+            // Tied. The tie breaker is the least significant retained
+            // bit. Round up or down to make it 0.
+
+            // integerPart / 2:
+            //
+            // intege.r00000
+            //        |
+            //        \- The least significant retained bit. Note: Round-off part
+            //           is 0.5 since we're in this branch.
+
+            [[maybe_unused]] double unused{};
+            double lsb = std::modf(integerPart / 2.0, &unused);
+            if (lsb >= 0.5)
+                fraction = std::round(fraction); // round up to make integerPart even
+            else
+                fraction = std::trunc(fraction); // round down to keep integerPart even
+        }
+    }
+    else
+    {
+        // simple truncation
+        fraction = std::trunc(fraction);
+    }
+
+    fraction = std::ldexp(fraction, -exponentShift);
+
+    // return rounded double
+    return std::ldexp(fraction, exp);
+}
+
 // Converts a literal in hexadecimal format to double. The return value is truncated
 // in case the significand in the literal cannot be fit.
 //
@@ -973,19 +1136,20 @@ static double _hexFloatLiteralToDouble(
 
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
-    UnownedStringSlice* outSuffix,
-    bool* outIsOutOfRange,
-    bool* outPrecisionLost)
+    FloatingPointLiteralType& outLiteralType,
+    bool& outIsOutOfRange,
+    bool& outPrecisionLost,
+    UnownedStringSlice& outErrorContent)
 {
-    FloatingPointLiteralValue value{};
-    bool isOutOfRange{}; // underflow/overflow detection
-    bool precisionLost{};
-
     const UnownedStringSlice content = token.getContent();
+    const char* cursor = content.begin();
+    const char* end = content.end();
 
-    char const* cursor = content.begin();
-    char const* end = content.end();
+    bool hexFloat{};
+    const char* numberStart{};
+    UnownedStringSlice errorContent{};
 
+    // start by consuming the hex prefix if any
     if (UnownedStringSlice(cursor, end).startsWith("0x") ||
         UnownedStringSlice(cursor, end).startsWith("0X"))
     {
@@ -995,17 +1159,205 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         // is reasonably straightforward.
 
         cursor += 2U;
-        value = _hexFloatLiteralToDouble(cursor, end, cursor, isOutOfRange, precisionLost);
+        hexFloat = true;
+    }
+
+    // the number starts here
+    numberStart = cursor;
+
+    // scan through the number
+    if (hexFloat)
+    {
+        // Hex float: find exponent marker (p/P)
+        while (cursor != end)
+        {
+            char c = *cursor;
+            if (c == '#')
+                break;
+            ++cursor;
+            if (c == 'p' || c == 'P')
+                break;
+        }
+
+        // then scan through the exponent number
+        while (cursor != end)
+        {
+            bool expChar{};
+            switch (*cursor)
+            {
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            case '+':
+            case '-':
+                expChar = true;
+                break;
+
+            default:
+                expChar = false;
+                break;
+            }
+
+            if (!expChar)
+                break;
+
+            ++cursor;
+        }
+
+        // rest is suffix.
     }
     else
     {
-        // We'll use fast_float to handle decimal float formats. This should
-        // give us bit-exact input regardless of the toolchain used to compile
-        // slang.
+        // regular float: the number chars (incl. exponent) are distinct from
+        // suffix chars
+        while (cursor != end)
+        {
+            bool numberChar{};
+            switch (*cursor)
+            {
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            case 'e':
+            case 'E':
+            case '+':
+            case '-':
+            case '.':
+                numberChar = true;
+                break;
 
+            default:
+                numberChar = false;
+                break;
+            }
+
+            if (!numberChar)
+                break;
+
+            ++cursor;
+        }
+
+        // rest is suffix.
+    }
+
+    UnownedStringSlice number{numberStart, cursor};
+    FloatingPointLiteralValue value{};
+    bool isInfinity{};
+
+    // Check for infinity marker
+    if (UnownedStringSlice(cursor, end).startsWith("#INF"))
+    {
+        isInfinity = true;
+        cursor += 4U;
+        value = std::numeric_limits<double>::infinity();
+    }
+
+    UnownedStringSlice suffix{cursor, end};
+
+    // start from the suffix, since we need the literal type for rounding
+    FloatingPointLiteralType literalType;
+    if ((suffix == "") || (suffix == "f") || (suffix == "F"))
+        literalType = FloatingPointLiteralType::Float;
+    else if (
+        (suffix == "h") || (suffix == "H") || (suffix == "hf") || (suffix == "HF") ||
+        (suffix == "fh") || (suffix == "FH"))
+        literalType = FloatingPointLiteralType::Half;
+    else if (
+        (suffix == "l") || (suffix == "L") || (suffix == "lf") || (suffix == "LF") ||
+        (suffix == "fl") || (suffix == "FL"))
+        literalType = FloatingPointLiteralType::Double;
+    else
+    {
+        literalType = FloatingPointLiteralType::BadSuffix;
+        errorContent = suffix;
+    }
+
+    // then the floating-point number
+    bool isOutOfRange{};
+    bool precisionLost{};
+
+    // Cursor is updated to be at the end of parsed number
+    if (isInfinity)
+    {
+        cursor = number.end();
+    }
+    else if (hexFloat)
+    {
+        value = _hexFloatLiteralToDouble(
+            number.begin(),
+            number.end(),
+            cursor,
+            isOutOfRange,
+            precisionLost);
+
+        double oldValue = value;
+
+        if (literalType == FloatingPointLiteralType::Half)
+            value = _truncateDouble(value, -14, +15, 11, false);
+        else if (literalType == FloatingPointLiteralType::Float)
+            value = _truncateDouble(value, -126, +127, 24, false);
+
+        // value became 0 in truncation?
+        if (oldValue != 0.0 && value == 0.0)
+            isOutOfRange = true;
+
+        // value changed in truncation?
+        if (value != oldValue)
+            precisionLost = true;
+    }
+    else
+    {
         value = 0.0; // default in case of errors. fast_float sets the value
                      // appropriately in case of result_out_of_range
-        auto result = fast_float::from_chars(cursor, end, value);
+
+        fast_float::from_chars_result_t<char> result{};
+
+        if (literalType == FloatingPointLiteralType::Float)
+        {
+            float f{};
+            result = fast_float::from_chars(number.begin(), number.end(), f);
+            value = f;
+        }
+        else if (literalType == FloatingPointLiteralType::Half)
+        {
+            // We do not currently have std::float16_t support in all our
+            // compiler toolchains, so parse to double and then round to
+            // half. This effectively performs double rounding (decimal ->
+            // double -> half), and therefore in rare cases, the result may
+            // differ from a single correctly-rounded decimal -> half.
+            result = fast_float::from_chars(number.begin(), number.end(), value);
+
+            if (result.ec == std::errc{})
+            {
+                double oldValue = value;
+                value = _truncateDouble(value, -14, +15, 11, true);
+
+                if (!std::isfinite(value))
+                    isOutOfRange = true;
+                else if (oldValue != 0.0 && value == 0.0)
+                    isOutOfRange = true;
+            }
+        }
+        else
+        {
+            // in all other cases, parse as double
+            result = fast_float::from_chars(number.begin(), number.end(), value);
+        }
+
         cursor = result.ptr;
 
         if (result.ec == std::errc::result_out_of_range)
@@ -1015,35 +1367,25 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         }
         else if (result.ec != std::errc{})
         {
-            // We can still fail to parse literals here, since our accepted
-            // floating point format is narrower than the tokenizer general
-            // literal format. This should trigger an invalid suffix error later
-            // on.
+            // nonspecific error
+            literalType = FloatingPointLiteralType::BadSignificand;
+            errorContent = UnownedStringSlice(content.begin(), number.end());
             value = 0.0;
         }
     }
 
     // check for special exponent for infinity
-    if ((cursor != end) && (*cursor == '#'))
+    if (cursor != number.end())
     {
-        const auto inf = toSlice("#INF");
-
-        if (UnownedStringSlice(cursor, end).startsWith(inf))
-        {
-            value = INFINITY;
-            isOutOfRange = false;
-            cursor += inf.getLength();
-        }
+        literalType = FloatingPointLiteralType::BadSignificand;
+        errorContent = UnownedStringSlice(content.begin(), number.end());
     }
 
-    if (outSuffix)
-        *outSuffix = UnownedStringSlice(cursor, end);
-
-    if (outIsOutOfRange)
-        *outIsOutOfRange = isOutOfRange;
-
-    if (outPrecisionLost)
-        *outPrecisionLost = precisionLost;
+    // report results
+    outLiteralType = literalType;
+    outIsOutOfRange = isOutOfRange;
+    outPrecisionLost = precisionLost && !isOutOfRange;
+    outErrorContent = errorContent;
 
     return value;
 }
@@ -1057,6 +1399,7 @@ static uint32_t _parseHexNumber(
     const char*& cursor,
     const char* const e,
     size_t maxDigits,
+    size_t& outNumDigits,
     bool& outOverflow)
 {
     uint32_t value{};
@@ -1084,10 +1427,12 @@ static uint32_t _parseHexNumber(
     }
 
     outOverflow = overflow;
+    outNumDigits = numDigits;
     return value;
 }
 
-// Decodes string escape sequence, returns -1 on failure
+// Decodes string escape sequence, returns -1 on failure. Failures will be
+// diagnosed.
 //
 // Preconditions:
 // - cursor != e      -- there must be at least 1 character
@@ -1095,8 +1440,11 @@ static uint32_t _parseHexNumber(
 static IntegerLiteralValue _decodeStringEscape(
     const char*& cursor,
     const char* const e,
+    DiagnosticSink* sink,
+    const SourceLoc& loc,
     bool& outUnicode)
 {
+    const char* const b = cursor;
     bool unicode{};
     int64_t value{};
 
@@ -1108,7 +1456,10 @@ static IntegerLiteralValue _decodeStringEscape(
 
     // check that there is an escape sequence after '\'
     if (cursor == e)
+    {
+        diagnose(sink, loc, LexerDiagnostics::invalidStringEscape, String(b, cursor));
         value = -1;
+    }
     else
     {
         uint8_t byte = *cursor++;
@@ -1182,25 +1533,34 @@ static IntegerLiteralValue _decodeStringEscape(
         case 'x':
             {
                 bool overflow{};
+                size_t numDigits{};
 
                 if ((cursor != e) && (*cursor == '{'))
                 {
                     // \x{...}
 
                     ++cursor;
-                    value = _parseHexNumber(cursor, e, 255U, overflow);
+                    value = _parseHexNumber(cursor, e, 255U, numDigits, overflow);
 
                     if ((cursor != e) && (*cursor == '}'))
                         ++cursor;
+                    else
+                    {
+                        // no enclosing '}'
+                        value = -1;
+                    }
                 }
                 else
                 {
                     // \x...
-                    value = _parseHexNumber(cursor, e, 255U, overflow);
+                    value = _parseHexNumber(cursor, e, 255U, numDigits, overflow);
                 }
 
-                if (overflow)
+                if ((numDigits == 0U) || overflow)
                     value = -1;
+
+                if (value == -1)
+                    diagnose(sink, loc, LexerDiagnostics::invalidStringEscape, String(b, cursor));
 
                 break;
             }
@@ -1208,29 +1568,53 @@ static IntegerLiteralValue _decodeStringEscape(
         case 'u':
             {
                 bool overflow{};
+                size_t numDigits{};
 
                 if ((cursor != e) && (*cursor == '{'))
                 {
                     // \u{...}
 
                     ++cursor;
-                    value = _parseHexNumber(cursor, e, 255U, overflow);
+                    value = _parseHexNumber(cursor, e, 255U, numDigits, overflow);
 
                     if ((cursor != e) && (*cursor == '}'))
+                    {
                         ++cursor;
+
+                        if (numDigits == 0U)
+                            value = -1;
+                    }
+                    else
+                    {
+                        // no enclosing '}'
+                        value = -1;
+                    }
 
                     if (overflow)
                         value = -1;
+
+                    if (value == -1)
+                        diagnose(
+                            sink,
+                            loc,
+                            LexerDiagnostics::invalidStringEscape,
+                            String(b, cursor));
                 }
                 else
                 {
                     // \u...
-                    value = _parseHexNumber(cursor, e, 4U, overflow);
+                    value = _parseHexNumber(cursor, e, 4U, numDigits, overflow);
 
                     // note: value cannot overflow here (4 hex digits max), so we'll
                     // guard this with assert instead of check to avoid unreachable
                     // branches
                     SLANG_ASSERT(!overflow);
+
+                    if (numDigits != 4U)
+                    {
+                        diagnose(sink, loc, LexerDiagnostics::invalidUnicodeStringEscape, "u", 4U);
+                        value = -1;
+                    }
                 }
 
                 unicode = true;
@@ -1240,12 +1624,20 @@ static IntegerLiteralValue _decodeStringEscape(
         case 'U':
             {
                 bool overflow{};
-                value = _parseHexNumber(cursor, e, 8U, overflow);
+                size_t numDigits{};
+
+                value = _parseHexNumber(cursor, e, 8U, numDigits, overflow);
 
                 // note: value cannot overflow here (8 hex digits max), so we'll
                 // guard this with assert instead of check to avoid unreachable
                 // branches
                 SLANG_ASSERT(!overflow);
+
+                if (numDigits != 8U)
+                {
+                    diagnose(sink, loc, LexerDiagnostics::invalidUnicodeStringEscape, "U", 8U);
+                    value = -1;
+                }
 
                 unicode = true;
 
@@ -1253,31 +1645,16 @@ static IntegerLiteralValue _decodeStringEscape(
             }
 
         default:
-            value = -1;
+            {
+                diagnose(sink, loc, LexerDiagnostics::invalidStringEscape, String(b, cursor));
+                value = -1;
+                break;
+            }
         }
     }
 
     outUnicode = unicode;
     return value;
-}
-
-static String _inputToByteSeq(const char* b, const char* e)
-{
-    StringBuilder byteSeqBuilder;
-    for (const char* i = b; i != e; ++i)
-    {
-        if (i == b)
-            StringUtil::appendFormat(
-                byteSeqBuilder,
-                "0x%02X",
-                unsigned{static_cast<unsigned char>(*i)});
-        else
-            StringUtil::appendFormat(
-                byteSeqBuilder,
-                " 0x%02X",
-                unsigned{static_cast<unsigned char>(*i)});
-    }
-    return byteSeqBuilder.toString();
 }
 
 IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink)
@@ -1303,18 +1680,10 @@ IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink
     {
         // handle escape
         bool unicode{};
-        const char* literalStart = cursor;
-        ret = _decodeStringEscape(cursor, e, unicode);
+        ret = _decodeStringEscape(cursor, e, sink, token.getLoc(), unicode);
 
         // note: unicode matters only with string literals
         static_cast<void>(unicode);
-
-        if (ret == -1)
-        {
-            StringBuilder sb;
-            sb.append(literalStart, cursor - literalStart);
-            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
-        }
     }
     else
     {
@@ -1345,36 +1714,29 @@ IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink
         }
     }
 
+    // did we consume everything? (and we haven't diagnosed yet)
+    if ((cursor != e) && (ret != -1))
+    {
+        diagnose(sink, token.getLoc(), LexerDiagnostics::illegalCharacterLiteral);
+        ret = -1;
+    }
+
     return ret;
 }
 
-static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
+// We use string literals in places where we don't do string escaping other than
+// the bare minimum (\"). Therefore, this function pushes almost all
+// escape-related checking and error handling to getStringLiteralTokenValue()
+// and getCharLiteralValue().
+static void _lexStringLiteralBody(Lexer* lexer, char quote)
 {
-    int len = 0;
     for (;;)
     {
         int c = _peek(lexer);
         if (c == quote)
         {
-            if (singleChar && len == 0)
-            { // Empty char literal - size must be exactly 1.
-                if (auto sink = lexer->getDiagnosticSink())
-                {
-                    diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
-                }
-            }
             _advance(lexer);
             return;
-        }
-
-        len++;
-
-        if (singleChar && len == 2)
-        { // Char literal about to have more than 1 char.
-            if (auto sink = lexer->getDiagnosticSink())
-            {
-                diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
-            }
         }
 
         switch (c)
@@ -1395,143 +1757,18 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
             return;
 
         case '\\':
-            // Need to handle various escape sequence cases
+            // We'll do only the bare minimum escape processing to detect
+            // correctly the end of the literal. The escape diagnostics is done
+            // in _decodeStringEscape() invoked by getStringLiteralTokenValue()
+            // and getCharLiteralValue().
             _advance(lexer);
             switch (_peek(lexer))
             {
             case '\'':
             case '\"':
             case '\\':
-            case '?':
-            case 'a':
-            case 'b':
-            case 'f':
-            case 'n':
-            case 'r':
-            case 't':
-            case 'v':
                 _advance(lexer);
                 break;
-
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-                // octal escape: up to 3 characters
-                _advance(lexer);
-                for (int ii = 0; ii < 3; ++ii)
-                {
-                    int d = _peek(lexer);
-                    if (('0' <= d) && (d <= '7'))
-                    {
-                        _advance(lexer);
-                        continue;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                break;
-
-            case 'U':
-            case 'u':
-            case 'x':
-                {
-                    // Hexadecimal 'x' escape has any number of digits.
-                    //
-                    // Unicode 'u' escape has either 4 hex digits or '\u{xxx}' form with
-                    // arbitrary number of digits.
-                    //
-                    // Unicode 'U' escape has either 8 hex digits
-                    StringBuilder sb;
-                    const char escapeChar = static_cast<char>(_peek(lexer));
-
-                    sb.append('\\');
-                    sb.append(escapeChar);
-                    _advance(lexer);
-
-                    bool curlyBraces{};
-                    if ((escapeChar != 'U') && (_peek(lexer) == '{'))
-                    {
-                        curlyBraces = true;
-                        _advance(lexer);
-                        sb.append('{');
-                    }
-
-                    size_t numDigits{};
-
-                    for (;;)
-                    {
-                        int d = _peek(lexer);
-                        if (('0' <= d) && (d <= '9') || ('a' <= d) && (d <= 'f') ||
-                            ('A' <= d) && (d <= 'F'))
-                        {
-                            sb.append(static_cast<char>(d));
-                            _advance(lexer);
-                            ++numDigits;
-                            continue;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-
-                    if (curlyBraces)
-                    {
-                        if (_peek(lexer) == '}')
-                        {
-                            sb.append('}');
-                            _advance(lexer);
-
-                            // check that there's at least one digit
-                            if (numDigits == 0U)
-                                diagnose(
-                                    lexer->getDiagnosticSink(),
-                                    _getSourceLoc(lexer),
-                                    LexerDiagnostics::invalidStringEscape,
-                                    sb.getBuffer());
-                        }
-                        else
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidStringEscape,
-                                sb.getBuffer());
-                    }
-                    else
-                    {
-                        if ((escapeChar == 'x') && (numDigits == 0U))
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidStringEscape,
-                                sb.getBuffer());
-
-                        if ((escapeChar == 'u') && (numDigits != 4U))
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidUnicodeStringEscape,
-                                "u",
-                                4U);
-
-                        if ((escapeChar == 'U') && (numDigits != 8U))
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidUnicodeStringEscape,
-                                "U",
-                                8U);
-                    }
-
-                    break;
-                }
             }
             break;
 
@@ -1656,8 +1893,8 @@ String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
 
         // decode escape sequence
         bool unicode{};
-        const char* literalStart = cursor;
-        IntegerLiteralValue charValue = _decodeStringEscape(cursor, end, unicode);
+        IntegerLiteralValue charValue =
+            _decodeStringEscape(cursor, end, sink, token.getLoc(), unicode);
 
         if (charValue >= 0)
         {
@@ -1702,13 +1939,6 @@ String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
                         hexSB.getBuffer());
                 }
             }
-        }
-        else
-        {
-            StringBuilder sb;
-            sb.append(literalStart, cursor - literalStart);
-
-            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
         }
     }
 
@@ -1939,12 +2169,12 @@ static TokenType _lexTokenImpl(Lexer* lexer)
 
     case '\"':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\"', false);
+        _lexStringLiteralBody(lexer, '\"');
         return TokenType::StringLiteral;
 
     case '\'':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\'', true);
+        _lexStringLiteralBody(lexer, '\'');
         return TokenType::CharLiteral;
 
 

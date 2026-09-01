@@ -1,0 +1,39 @@
+schema_version: 1
+id: countof-on-array-returns-element-size
+bundle: design/ast-reference/expressions
+suspected_kind: wrong-codegen
+title: "[expressions] countof(array) folds to the element size, not the element count"
+observed_at: "2026-08-04T00:00:00+00:00"
+scope: core-module
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/ast-reference/expressions/countof-static-array.slang -target hlsl -entry computeMain -stage compute"
+  source_slang: docs/generated/tests/design/ast-reference/expressions/countof-static-array.slang
+  observed_summary: |
+    `countof(e)` applied to a static array is accepted by the checker but folds to the
+    size in bytes of the array's *element type* instead of the array's element count.
+    Observed with `-target hlsl` on a buffer-store shader:
+      int a[9];      -> countof(a) emits int(4)
+      float b[6];    -> countof(b) emits int(4)
+      double a[9];   -> countof(a) emits int(8)
+      countof(int[3])    -> int(4)
+      countof(double[9]) -> int(8)
+    The same values are produced under `slangi`. `countof` on a generic type pack folds
+    correctly (a 4-element pack yields 4), so only the array operand is affected. The
+    checker explicitly admits array operands, so the input is not rejected — the wrong
+    value is produced silently.
+expected:
+  claim: |
+    `countof(e)` yields the number of elements of an array or pack, so `countof(a)` for
+    `int a[9]` must be 9 and `countof(b)` for `float b[6]` must be 6, independent of the
+    element type's size.
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/expressions.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/ast-reference/expressions.md#nodes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — the result tracks the element type's byte size (4 for int/float, 8 for double) rather than either array length, so it is not a mis-written length."
+    - "countof is pack-only and arrays should be rejected: possible, but then the expected behaviour is a diagnostic, not a silently wrong constant; the language reference only documents countof for packs, so triage may prefer to fix the doc claim and add a rejection instead."

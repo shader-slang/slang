@@ -11,9 +11,9 @@ SLANG_UNIT_TEST(specialScalarReflection)
     const char* userSourceBody = R"(
         struct TestStruct
         {
-            BFloat16 bf;
-            FloatE4M3 e4;
-            FloatE5M2 e5;
+            BFloat16 bf = BFloat16(1.0);
+            FloatE4M3 e4 = FloatE4M3(1.0);
+            FloatE5M2 e5 = FloatE5M2(1.0);
             intptr_t ip;
             uintptr_t up;
             vector<BFloat16, 2> vbf;
@@ -141,4 +141,19 @@ SLANG_UNIT_TEST(specialScalarReflection)
     SLANG_CHECK(ve5ElementType->getScalarType() == slang::TypeReflection::ScalarType::FloatE5M2);
     SLANG_CHECK(vipElementType->getScalarType() == slang::TypeReflection::ScalarType::IntPtr);
     SLANG_CHECK(vupElementType->getScalarType() == slang::TypeReflection::ScalarType::UIntPtr);
+
+    ComPtr<slang::IBlob> bfDefault;
+    SLANG_CHECK(SLANG_SUCCEEDED(bfField->getDefaultValueBlob(bfDefault.writeRef())));
+    SLANG_CHECK(bfDefault->getBufferSize() == sizeof(uint16_t));
+    SLANG_CHECK(((const uint16_t*)bfDefault->getBufferPointer())[0] == 0x3f80);
+
+    ComPtr<slang::IBlob> e4Default;
+    SLANG_CHECK(SLANG_SUCCEEDED(e4Field->getDefaultValueBlob(e4Default.writeRef())));
+    SLANG_CHECK(e4Default->getBufferSize() == sizeof(uint8_t));
+    SLANG_CHECK(((const uint8_t*)e4Default->getBufferPointer())[0] == 0x38);
+
+    ComPtr<slang::IBlob> e5Default;
+    SLANG_CHECK(SLANG_SUCCEEDED(e5Field->getDefaultValueBlob(e5Default.writeRef())));
+    SLANG_CHECK(e5Default->getBufferSize() == sizeof(uint8_t));
+    SLANG_CHECK(((const uint8_t*)e5Default->getBufferPointer())[0] == 0x3c);
 }

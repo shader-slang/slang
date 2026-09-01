@@ -15,6 +15,13 @@
 // entry point; CHECK asserts both type names appear in the HLSL output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=EMITGLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=EMITMETAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=EMITSPV):-target spirv-asm -entry main -stage compute
+// WGSL is absent on purpose: `ConcreteInt16` stores an `int16_t`, and the WGSL
+// back-end rejects 16-bit integers outright (E56103), so the claim cannot be
+// emitted there. Recorded in the README `## Untested claims` table with reason
+// `unsupported-on-target` rather than weakened to a passing directive.
 
 interface IBase
 {
@@ -72,3 +79,17 @@ void main(RWStructuredBuffer<int> outputBuffer, uint3 id : SV_DispatchThreadID)
 // CHECK: ConcreteInt32
 // CHECK: ConcreteInt16
 // CHECK: numthreads
+// EMITGLSL: struct ConcreteInt32
+// EMITGLSL: ConcreteInt32_getA
+// EMITGLSL: struct ConcreteInt16
+// EMITGLSL: ConcreteInt16_getA
+// EMITGLSL: local_size_x
+// EMITMETAL: struct ConcreteInt32
+// EMITMETAL: ConcreteInt32_getA
+// EMITMETAL: struct ConcreteInt16
+// EMITMETAL: ConcreteInt16_getA
+// EMITMETAL: kernel
+// EMITSPV: OpCapability Int16
+// EMITSPV: LocalSize 1 1 1
+// EMITSPV: OpTypeInt 16 1
+// EMITSPV: OpIMul

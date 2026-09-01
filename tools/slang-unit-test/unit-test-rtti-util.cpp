@@ -33,9 +33,9 @@
 // produces equal values; hasDtor(int) == false → skipping dtor
 // leaks nothing).
 
-#include "../../source/core/slang-rtti-info.h"
-#include "../../source/core/slang-rtti-util.h"
-#include "../../source/core/slang-string.h"
+#include "core/slang-rtti-info.h"
+#include "core/slang-rtti-util.h"
+#include "core/slang-string.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <string.h>

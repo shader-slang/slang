@@ -16,6 +16,9 @@
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 static groupshared float sharedArr[8];
 
@@ -34,3 +37,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // METAL: threadgroup {{.*}} sharedArr{{.*}}
 // WGSL maps groupshared to var<workgroup>.
 // WGSL: var<workgroup> sharedArr{{.*}}
+// GLSL maps the same Group-shared array to the `shared` storage qualifier.
+// GLSL: shared float{{.*}} sharedArr_
+// HLSL maps it back to `groupshared`.
+// HLSL: static groupshared float{{.*}} sharedArr_
+// SPIRV maps it to the Workgroup storage class.
+// SPIRV: %sharedArr = OpVariable {{.*}} Workgroup

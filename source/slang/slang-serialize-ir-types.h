@@ -2,11 +2,11 @@
 #ifndef SLANG_SERIALIZE_IR_TYPES_H_INCLUDED
 #define SLANG_SERIALIZE_IR_TYPES_H_INCLUDED
 
-#include "../compiler-core/slang-name.h"
-#include "../compiler-core/slang-source-loc.h"
-#include "../core/slang-array-view.h"
-#include "../core/slang-riff.h"
-#include "../core/slang-string-slice-pool.h"
+#include "compiler-core/slang-name.h"
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-array-view.h"
+#include "core/slang-riff.h"
+#include "core/slang-string-slice-pool.h"
 #include "slang-ir.h"
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize-types.h"

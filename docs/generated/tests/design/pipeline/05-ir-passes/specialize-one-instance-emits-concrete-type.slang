@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#specialization-and-generics
-//META: doc_section_digest=80bc5973053356e62dbd6f6ded27b7e93976729f33655c137440d5c954689e89
+//META: doc_section_digest=2f10610b6a8497f9b2cec62d411162a4585b32e9698a95e5288845967ffba16d
 //META: purpose=Boundary: a generic with exactly one call-site instantiation produces exactly one concrete specialization — the `### AFTER specializeModule` dump shows a `Func(Float, Float, Float)` signature.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
@@ -13,7 +13,7 @@
 // specializeModule pass the function carries a single concrete
 // `Func(Float, Float, Float)` signature.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after specializeModule -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after specializeModule -o - -stage compute -entry main
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

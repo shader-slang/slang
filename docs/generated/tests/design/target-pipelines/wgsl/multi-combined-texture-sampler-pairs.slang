@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00Z
-//META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=940b62a9312b41f261f039cda6fd50e2e307dcb924128aa8ff8c28474a8c6945
+//META: doc_section_digest=03a91c30e9eaf1766fcdfbae6c7316ecb8108a2f9e0a27218a3bbcea152c7a7f
 //META: purpose=Two Sampler2D globals each split into their own <name>_texture_* / <name>_sampler_* pair with distinct bindings
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

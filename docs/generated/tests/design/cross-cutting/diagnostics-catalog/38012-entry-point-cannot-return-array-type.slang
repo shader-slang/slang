@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=f64689ff5b6cb29926b1f0602498333f390b94257df1ba47701e18e6251e16ad
 //META: purpose=Fires diagnostic E38012 (entry-point-cannot-return-array-type) - entry point cannot return array type
 //META: intent=negative
 //META: pipeline_stage=check
@@ -23,4 +23,4 @@ ArrType main() : COLOR
     return a;
 }
 
-// CHECK: E38012
+//CHECK: E38012

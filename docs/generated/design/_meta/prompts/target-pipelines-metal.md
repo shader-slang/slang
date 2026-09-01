@@ -111,7 +111,12 @@ Cover at least:
   `metal` compiler benefits from the same parameter shape.
 - `legalizeEmptyTypes` — Metal-only branch (the SPIR-V path has a
   separate `legalizeEmptyTypes` invocation later).
-- `eliminatePhis` with default options — contrast with SPIR-V.
+- `eliminatePhis` with default options. Do **not** write that this
+  contrasts with SPIR-V: the defaults in
+  [slang-ir-eliminate-phis.h](../../../../source/slang/slang-ir-eliminate-phis.h)
+  (lines 13-14) are `eliminateCompositeTypedPhiOnly = false` and
+  `useRegisterAllocation = true`, and the direct-SPIR-V branch assigns
+  those same two values, so there is no difference to contrast.
 - The downstream Apple `metal` compiler — invoked only for
   `MetalLib` / `MetalLibAssembly`.
 

@@ -251,6 +251,10 @@ jobs:
           # - Web search for external references
           # Security: git permissions restrict checkout/fetch to prevent loading untrusted fork code.
           # Claude reads PR diffs via gh CLI and GitHub MCP tools.
+          # gh pr is enumerated (no `gh pr review` / `gh pr merge`) and gh api is scoped so the
+          # assistant cannot approve or merge PRs. Glob patterns cannot block method-override
+          # flags on gh api, so the "Dismiss unauthorized bot approvals" step below is the
+          # mechanical guarantee that no bot review affects merge eligibility.
           allowed-tools: |
             View,Edit,GlobTool,GrepTool,BatchTool,Write,
             Bash(cmake*),Bash(cmake.exe*),
@@ -264,10 +268,13 @@ jobs:
             Bash(cat *),Bash(head *),Bash(tail *),
             Bash(ls *),Bash(find *),Bash(wc *),
             Bash(mkdir *),Bash(cp *),Bash(mv *),
-            Bash(gh pr *),
+            Bash(gh pr view*),Bash(gh pr diff*),Bash(gh pr list*),Bash(gh pr checks*),
+            Bash(gh pr comment*),Bash(gh pr create*),Bash(gh pr edit*),Bash(gh pr ready*),
             Bash(gh issue *),
             Bash(gh run *),
-            Bash(gh api repos/*/*),
+            Bash(gh api repos/*/pulls*),Bash(gh api repos/*/issues*),
+            Bash(gh api repos/*/commits*),Bash(gh api repos/*/actions/*),
+            Bash(gh api repos/*/contents/*),
             Bash(./extras/formatting.sh*),
             Bash(python*extras/split-ir-dump.py*),
             Bash(python*extras/insttrace.py*),
@@ -290,3 +297,56 @@ jobs:
             mcp__github_ci__get_workflow_run_details,
             mcp__github_ci__download_job_log,
             mcp__deepwiki__ask_question
+
+      # Safety net: dismiss any APPROVE or REQUEST_CHANGES reviews from bot accounts.
+      # The allowlist above excludes gh pr review, but prompt/allowlist constraints are
+      # not mechanical guarantees. This step ensures no bot review affects merge
+      # eligibility, and fails the job loudly if a dismissal attempt fails.
+      - name: Dismiss unauthorized bot approvals
+        if: always()
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            // issue_comment on a PR carries issue.pull_request; direct PR events carry pull_request
+            const prNumber = context.payload.pull_request?.number
+              || (context.payload.issue?.pull_request ? context.payload.issue.number : 0);
+            if (!prNumber) { core.info('Not a PR context; nothing to check'); return; }
+
+            const BOT_LOGINS = ['claude', 'claude[bot]', 'github-actions', 'github-actions[bot]'];
+            const FORBIDDEN_STATES = ['APPROVED', 'CHANGES_REQUESTED'];
+
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100,
+            });
+
+            let dismissed = 0, failed = 0;
+            for (const review of reviews) {
+              const login = review.user?.login || '';
+              if (BOT_LOGINS.includes(login) && FORBIDDEN_STATES.includes(review.state)) {
+                try {
+                  await github.rest.pulls.dismissReview({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: prNumber,
+                    review_id: review.id,
+                    message: 'Automated review dismissed: bot reviews must use COMMENT only, not APPROVE or REQUEST_CHANGES.',
+                  });
+                  dismissed++;
+                  core.warning(`Dismissed ${review.state} review ${review.id} from ${login}`);
+                } catch (e) {
+                  failed++;
+                  core.error(`Failed to dismiss review ${review.id} from ${login}: ${e.message}`);
+                }
+              }
+            }
+
+            if (failed > 0) {
+              core.setFailed(`Safety net: ${failed} unauthorized bot review(s) could NOT be dismissed — manual dismissal required`);
+            } else if (dismissed > 0) {
+              core.warning(`Safety net: dismissed ${dismissed} unauthorized bot review(s)`);
+            } else {
+              core.info('No unauthorized bot approvals found');
+            }

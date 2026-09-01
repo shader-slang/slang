@@ -2,6 +2,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util-hlsl.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -131,6 +132,13 @@ struct LValueCastLoweringContext
         {
         case SourceLanguage::HLSL:
             {
+                // HLSL work-graph Barrier flag diagnostics can leave enum/integer value casts
+                // wrapped in the l-value cast ops. Those are not pointer l-value casts, so this
+                // pass leaves only this known pattern for HLSL expression emission, where the
+                // wrappers are stripped.
+                if (isBarrierFlagValueCast(castInst, fromType, toType))
+                    return;
+
                 // If the conversion can just be ignored for HLSL, just remove it
                 if (_canRemoveCastForHLSL(fromType, toType))
                 {

@@ -1,4 +1,4 @@
-#include "../core/slang-string-util.h"
+#include "core/slang-string-util.h"
 #include "slang-compiler.h"
 #include "slang-ir.h"
 

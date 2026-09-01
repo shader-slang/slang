@@ -182,7 +182,19 @@ void main()
 }
 ```
 
-`internal` is the default visibility if no other access modifiers are specified. An exception is `interface` members, where the default visibility is the visibility of the interface.
+`internal` is the default visibility if no other access modifiers are specified. There are two exceptions. First, `interface` members default to the visibility of the interface. Second, starting with language version 2026, a member of an aggregate (`struct`/`class`) with no explicit access modifier defaults to the visibility of its enclosing aggregate, so an unmodified member of a `public` struct is `public`:
+
+```csharp
+// declared in a module compiled with `#language slang 2026`
+public struct FrameInfo
+{
+    float3   cameraPosition; // public, because `FrameInfo` is public.
+    float4x4 viewMatrix;     // public.
+    private int frameId;     // still private; an explicit modifier always wins.
+}
+```
+
+A member of an `internal` or `private` nested type likewise inherits that lower visibility. Before language version 2026 this inheritance does not apply: a member with no explicit specifier takes the module's default visibility (`internal` for a normal module) regardless of the enclosing type's visibility.
 
 ### Additional Validation Rules
 

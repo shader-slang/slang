@@ -1,0 +1,55 @@
+schema_version: 1
+id: optional-interface-shader-param-emit-ice
+bundle: coverage/type-layout
+suspected_kind: wrong-codegen
+title: "Optional<IFoo> shader parameter aborts backends at emit (isNullExistential)"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: ir
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/type-layout/optional-interface-shader-param.slang -target spirv-asm -entry main -stage compute"
+  source_slang: docs/generated/tests/coverage/type-layout/optional-interface-shader-param.slang
+  observed_summary: |
+    A struct field of type `Optional<IFoo>` (an optional *interface* type) inside a
+    `ConstantBuffer` type-checks and lays out, but every backend aborts at code emit on the
+    `isNullExistential` instruction produced by reading `.hasValue`:
+      spirv-asm:
+        error[E99997]: Slang compilation aborted due to an exception of
+        N5Slang13InternalErrorE unimplemented: Unhandled local inst in spirv-emit:
+        let  %1 : %2 = isNullExistential(%3)
+      hlsl / metal / cpp:
+        internal error[E99999]: unimplemented feature in Slang compiler:
+        unexpected IR opcode during code emit
+    Full shader:
+      interface IFoo { float get(); }
+      struct S { Optional<IFoo> maybe; float tail; }
+      ConstantBuffer<S> cb;
+      RWStructuredBuffer<float> outp;
+      [numthreads(1,1,1)]
+      void main() { outp[0] = cb.maybe.hasValue ? 1.0 : cb.tail; }
+    The equivalent shader with `Optional<float>` (a non-nullable value type, laid out as a
+    (value, bool) tuple) and with `Optional<Ptr<float>>` (a nullable type, laid out as the
+    bare pointer) both compile and emit cleanly on the same targets; only the interface /
+    existential value type reaches the unhandled `isNullExistential`. Layout itself succeeds
+    for all three: `_createTypeLayout`'s `OptionalType` arm classifies an interface type as
+    having a spare bit pattern and returns the value type's own layout, so the failure is
+    strictly downstream of layout.
+  exit_code: 0
+  stderr_tail: "unimplemented: Unhandled local inst in spirv-emit: let  %1\t: %2\t= isNullExistential(%3)"
+expected:
+  claim: |
+    An `Optional<T>` whose `T` is an interface type is accepted by the front end and given a
+    layout, so reading its `.hasValue` should either emit working code on every text target
+    or be rejected at check time with a real diagnostic. Aborting the compiler with an
+    internal error at code emit is neither.
+  citation_kind: sibling-test
+  citation: tests/bugs/optional-generic.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/04c-layout-ir.md#global-scope-type-layout
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — replacing only the `Optional`'s type argument (float, Ptr<float>) with the rest of the shader unchanged compiles and emits cleanly, so the failure is attributable to the interface value type."
+    - "Existential values are simply not allowed in uniform storage: possible, but then the rejection belongs at check time; today the shader type-checks and lays out, and only emit fails."
+    - "Same root cause as other 'unhandled local inst in spirv-emit' findings in this campaign (marker-style insts surviving to emit): plausible shared shape, recorded only as an observation."

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../core/slang-exception.h"
-#include "../core/slang-io.h"
-#include "../core/slang-list.h"
-#include "../core/slang-stream.h"
-#include "../core/slang-string.h"
+#include "core/slang-exception.h"
+#include "core/slang-io.h"
+#include "core/slang-list.h"
+#include "core/slang-stream.h"
+#include "core/slang-string.h"
 
 #include <cstddef>
 #include <cstdint>

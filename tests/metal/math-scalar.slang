@@ -178,8 +178,8 @@ bool Test_Scalar()
         // METAL: min3(
         && zero == min3<T>(zero, zero, zero)
 
-        // METAL-COUNT-2: fmod(
-        // METALLIB-COUNT-2: fmod.f32
+        // METAL: fmod(
+        // METALLIB: fmod.f32
         && zero == fmod<T>(zero, one)
 
         // METAL: fract(

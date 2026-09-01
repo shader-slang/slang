@@ -116,6 +116,19 @@ Functions that are only needed within that one source file can be marked `static
 
 ### Includes
 
+Cross-directory project-internal includes should name a header from an include root and should not
+use `../` to traverse directories. The `source/` directory is an include root, so cross-module
+includes should use paths such as:
+
+```c++
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-string.h"
+```
+
+Targets that consume headers under another project directory, such as `tools/` or `examples/`,
+should expose that directory through their CMake include directories and use paths relative to that
+root. Prefer a private include directory unless it is part of the target's public interface.
+
 In general, includes should be grouped as follows:
 
 * First, the correspodning feature/module header, if we are in a source file
@@ -190,6 +203,14 @@ void maybeAppendExtraNames(std::vector<Name>& ioNames);
 ```
 
 Public C APIs will prefix all symbol names while following the casing convention (e.g. `SlangModule`, `slangLoadModule`, etc.).
+
+### Internal `spirv_asm` result registers
+
+Result registers named inside a `spirv_asm` block in the core module (the `*.meta.slang` files) must be given a `__` prefix, e.g. `%__result` rather than `%result`.
+The SPIR-V emitter emits an `OpName` for every named `spirv_asm` register, so an un-prefixed internal name such as `%result` surfaces in the generated module's debug names where it can be mistaken for a user symbol.
+The `__` prefix marks these names as compiler-internal, matching the convention above for other not-for-normal-use core-module identifiers.
+This is enforced at parse time: the parser asserts that every named `spirv_asm` register in core-module code begins with `__`.
+User-authored `spirv_asm` blocks are unaffected — they may name registers however they like.
 
 ### Enums
 

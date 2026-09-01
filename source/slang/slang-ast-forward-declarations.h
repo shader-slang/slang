@@ -1,7 +1,7 @@
 // slang-ast-forward-declarations.h
 #pragma once
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 
 namespace Slang
 {

@@ -1,17 +1,18 @@
 // slang-api.cpp
 
-#include "../compiler-core/slang-artifact-associated-impl.h"
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-rtti-info.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-signal.h"
-#include "../slang-record-replay/proxy/proxy-base.h"
-#include "../slang-record-replay/proxy/proxy-macros.h"
-#include "../slang-record-replay/replay-context.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "core/slang-builtin-module-cache.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-platform.h"
+#include "core/slang-rtti-info.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-signal.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
+#include "slang-record-replay/proxy/proxy-base.h"
+#include "slang-record-replay/proxy/proxy-macros.h"
+#include "slang-record-replay/replay-context.h"
 #include "slang-repro.h"
 #include "slang-tag-version.h"
 
@@ -53,18 +54,16 @@ SlangResult tryLoadBuiltinModuleFromCache(
         return SLANG_FAIL;
     }
     Slang::ScopedAllocation cacheData;
-    SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(cacheFileName, cacheData));
-
-    // The first 8 bytes stores the timestamp of the slang dll that created this core module cache.
-    if (cacheData.getSizeInBytes() < sizeof(uint64_t))
-        return SLANG_FAIL;
-    auto cacheTimestamp = *(uint64_t*)(cacheData.getData());
-    if (cacheTimestamp != currentLibTimestamp)
-        return SLANG_FAIL;
-    SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
-        builtinModuleName,
-        (uint8_t*)cacheData.getData() + sizeof(uint64_t),
-        cacheData.getSizeInBytes() - sizeof(uint64_t)));
+    const void* moduleData = nullptr;
+    size_t moduleSize = 0;
+    SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::read(
+        cacheFileName,
+        currentLibTimestamp,
+        cacheData,
+        moduleData,
+        moduleSize));
+    SLANG_RETURN_ON_FAIL(
+        globalSession->loadBuiltinModule(builtinModuleName, moduleData, moduleSize));
     return SLANG_OK;
 }
 
@@ -144,13 +143,11 @@ SlangResult trySaveBuiltinModuleToCache(
             SLANG_ARCHIVE_TYPE_RIFF_LZ4,
             coreModuleBlobPtr.writeRef()));
 
-        Slang::FileStream fileStream;
-        SLANG_RETURN_ON_FAIL(fileStream.init(cacheFilename, Slang::FileMode::Create));
-
-        SLANG_RETURN_ON_FAIL(fileStream.write(&dllTimestamp, sizeof(dllTimestamp)));
-        SLANG_RETURN_ON_FAIL(fileStream.write(
+        SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::write(
+            cacheFilename,
+            dllTimestamp,
             coreModuleBlobPtr->getBufferPointer(),
-            coreModuleBlobPtr->getBufferSize()))
+            coreModuleBlobPtr->getBufferSize()));
     }
 
     return SLANG_OK;
@@ -382,7 +379,9 @@ SLANG_API void spAddBuiltins(
     char const* sourcePath,
     char const* sourceString)
 {
+    SLANG_ALLOW_DEPRECATED_BEGIN
     session->addBuiltins(sourcePath, sourceString);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_API void spSessionSetSharedLibraryLoader(
@@ -1251,6 +1250,12 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
                 out << ",\n    \"space\": " << (int64_t)resourceInfo.space;
             if (resourceInfo.binding >= 0)
                 out << ",\n    \"binding\": " << (int64_t)resourceInfo.binding;
+            // Present only in the bindless form, where the buffer is one
+            // element of an unbounded descriptor array. Emitted on the same
+            // >= 0 convention as space/binding so a single-buffer manifest
+            // is byte-identical to before.
+            if (resourceInfo.bindlessIndex >= 0)
+                out << ",\n    \"bindless_index\": " << (int64_t)resourceInfo.bindlessIndex;
             if (resourceInfo.uniformOffset >= 0)
                 out << ",\n    \"uniform_offset\": " << (int64_t)resourceInfo.uniformOffset;
             if (resourceInfo.uniformStride > 0)

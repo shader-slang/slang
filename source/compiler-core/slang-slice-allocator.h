@@ -3,7 +3,7 @@
 #define SLANG_SLICE_ALLOCATOR_H
 
 // Has definition of CharSlice
-#include "../core/slang-memory-arena.h"
+#include "core/slang-memory-arena.h"
 #include "slang-artifact.h"
 #include "slang-com-ptr.h"
 

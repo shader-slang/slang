@@ -9,18 +9,20 @@ using namespace Slang;
 namespace debug
 {
 
-class DebugShaderProgram : public DebugObject<IShaderProgram>
+class DebugShaderProgram : public DebugObject<IShaderProgram>, public IShaderProgramD3D12
 {
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL;
 
 public:
-    IShaderProgram* getInterface(const Slang::Guid& guid);
+    void* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Result SLANG_MCALL getRootSignature(void** outRootSignature) override;
     virtual SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL
     findTypeByName(const char* name) override;
 
 public:
     Slang::ComPtr<slang::IComponentType> m_slangProgram;
+    Slang::ComPtr<IShaderProgramD3D12> m_baseD3D12Program;
 };
 
 } // namespace debug

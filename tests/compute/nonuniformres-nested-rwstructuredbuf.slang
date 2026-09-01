@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK0):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK1):-target hlsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute -emit-spirv-via-glsl -O3
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry main -stage compute -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK4):-target cuda -entry main -stage compute -emit-spirv-directly
 
@@ -30,7 +30,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     // CHECK3-DAG: OpDecorate %[[IDX2]] NonUniform
     // CHECK3-DAG: OpDecorate %[[AC2]] NonUniform
     // CHECK3-DAG: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[AC2]]
-    
+
     // CHECK4: Array<RWStructuredBuffer<int>>  [[BUFFER:buffer[_0-9]*]];
     // CHECK4: [[GLOBALPARAMS:globalParams[_0-9]*]]->[[BUFFER]][_S{{[0-9]+}}]
     // CHECK4: [[GLOBALPARAMS]]->[[BUFFER]][int(_S{{[0-9]+}})]

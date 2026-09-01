@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T09:40:00+00:00
-//META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#shader-io
-//META: doc_section_digest=21e167102f1daeca19e02f308c112de6dba84ede8a917f058d59ae80138afd50
+//META: doc_section_digest=212a9e3fd4ca324be91b034872f2b7a9afdb1fe8ac5acfc9f068664d69c3e326
 //META: purpose=A module-scope `RWTexture3D<T>` parameter surfaces as a `global_param` whose result type is `TextureType(..., TextureShape3DType, 0, 0, 0, 1, ...)`, combining 3D shape with the RW-access flag.
 //META: intent=expansion
 //META: pipeline_stage=lower
@@ -11,7 +11,7 @@
 
 // `RWTexture3D<T>` combines 3D shape with the RW flag.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWTexture3D<float4> rwtex;
 uniform RWStructuredBuffer<int> outbuf;

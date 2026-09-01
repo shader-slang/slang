@@ -109,8 +109,8 @@ bool TEST_sampler<T>(
     float bias = 0.0;
     float grad = 0.0;
     float level = 0.0;
-    constexpr const float ddx = 0.0f;
-    constexpr const float ddy = 0.0f;
+    const float ddx = 0.0f;
+    const float ddy = 0.0f;
 
     uint status;
 
@@ -159,7 +159,7 @@ bool TEST_sparse<T>(
      where T : ITexelElement, IArithmetic
  {
      typealias TN = T;
-     constexpr const int2 offset = int2(0, 0);
+     const int2 offset = int2(0, 0);
      uint status;
 
      int sampleIndex = 0;

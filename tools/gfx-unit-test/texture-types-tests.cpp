@@ -94,7 +94,7 @@ struct BaseTextureViewTest
             shape = "Cube";
             break;
         default:
-            assert(!"Invalid texture shape");
+            SLANG_ASSERT_FAILURE("Invalid texture shape");
             SLANG_CHECK_ABORT(false);
         }
 
@@ -113,7 +113,7 @@ struct BaseTextureViewTest
             view = "Unordered";
             break;
         default:
-            assert(!"Invalid resource view");
+            SLANG_ASSERT_FAILURE("Invalid resource view");
             SLANG_CHECK_ABORT(false);
         }
 

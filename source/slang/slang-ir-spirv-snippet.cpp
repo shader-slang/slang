@@ -2,8 +2,8 @@
 
 #include "slang-ir-spirv-snippet.h"
 
-#include "../compiler-core/slang-spirv-core-grammar.h"
-#include "../core/slang-token-reader.h"
+#include "compiler-core/slang-spirv-core-grammar.h"
+#include "core/slang-token-reader.h"
 #include "slang-lookup-spirv.h"
 
 namespace Slang

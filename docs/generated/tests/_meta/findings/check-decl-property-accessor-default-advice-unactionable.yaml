@@ -1,0 +1,47 @@
+schema_version: 1
+id: check-decl-property-accessor-default-advice-unactionable
+bundle: coverage/check-decl
+suspected_kind: wrong-diagnostic
+title: "E30318 advises defining all property accessors, but that is rejected too"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/check-decl/partial-property-accessor-default.slang -target hlsl"
+  source_slang: docs/generated/tests/coverage/check-decl/partial-property-accessor-default.slang
+  exit_code: 255
+  observed_summary: |
+    An interface property with a body on one accessor and not the other is
+    rejected with E30318:
+
+      property int p { get; set { } }
+        ^^^ interface accessor default implementation is incomplete;
+            define all accessors or none.
+
+    Following that advice — giving *every* accessor a body — is rejected too,
+    with a different diagnostic, one per accessor:
+
+      property int q { get { return 0; } set { } }
+        ^^^ error[E30317]: non-method interface requirement cannot have a body.
+
+    So for a property inside an interface, only "none" is achievable; the "define
+    all accessors" half of the advice never produces an accepted declaration. The
+    advice is accurate for `__subscript`, where the parser builds an
+    `InterfaceDefaultImplDecl` and an all-accessor default is supported (see the
+    cited sibling test), but properties have no such representation.
+expected:
+  claim: |
+    E30318's remedy text should describe a reachable fix for the declaration it
+    is reported against — either properties should accept an all-accessor default
+    the way subscripts do, or the property-specific message should say that
+    accessor bodies are not supported on an interface property at all.
+  citation_kind: sibling-test
+  citation: tests/diagnostics/interfaces/partial-default-subscript-accessor.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/03-semantic-check.md#failure-modes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "The message is fine and 'or none' is the intended reading: possible, but the sentence offers two remedies and only one of them works for the declaration form it is reported on."
+    - "Test bug: ruled out — the `q` property is a plain, well-formed interface property whose only distinguishing feature is that both accessors have bodies."

@@ -148,6 +148,14 @@ struct CollectGlobalUniformParametersContext
             UnownedTerminatedStringSlice("GlobalParams"));
         builder->addBinaryInterfaceTypeDecoration(wrapperStructType);
 
+        // This struct is synthesized by the compiler to gather the global-scope shader
+        // parameters into an implicit `ConstantBuffer<GlobalParams>`; the user wrote a set
+        // of separate globals, not a parameter group. Mark it so that type legalization
+        // does not warn (E31106/E31107) when a resource "leaks" out of that constant
+        // buffer — the regrouping is inherent to this lowering, not something the user can
+        // restructure.
+        builder->addSynthesizedParameterGroupDecoration(wrapperStructType);
+
         // If the computed layout used a bare `struct` type, then we will use
         // our `GlobalParams` struct as-is, but if the layout involved an
         // implicitly defined `ConstantBuffer<...>`, this is where we construct

@@ -11,7 +11,7 @@ glob_append(neural_unittest_sources "unit-test/*.slang")
 # Files go under a "slang/" subdirectory so that `import slang.neural;` resolves
 # to <standard-module-dir>/slang/neural.slang-module at runtime.
 set(neural_output_dir
-    "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang"
+    "${slang_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang"
 )
 set(neural_module_file "${neural_output_dir}/${SLANG_NEURAL_MODULE_FILE_NAME}")
 
@@ -50,7 +50,7 @@ else()
     set(SLANG_COMPILER slang-bootstrap)
     set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
 endif()
-set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive})
+set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive_without_timestamp})
 set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
 # Determine compiler flags based on build type

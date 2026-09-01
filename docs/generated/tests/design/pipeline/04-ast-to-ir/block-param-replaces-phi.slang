@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
+//META: doc_section_digest=1195a752790819415908e083ce9656a353d4764f2fab38cc5aa27d92f184c486
 //META: purpose=Phi-style joining is encoded as block parameters (IRParam at the start of a block); branches to a block carry the parameter values as arguments — not via an explicit `phi` opcode.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // iteration's values as branch arguments. We CHECK for the absence
 // of any `phi` opcode and the presence of `param` inside the loop.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

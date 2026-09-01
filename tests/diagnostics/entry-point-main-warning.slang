@@ -5,7 +5,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry main -target cpp
 [shader("compute")]
 [numthreads(1,1,1)]
-void main(RWBuffer<float> output)
+void main(RWStructuredBuffer<float> output)
 {
     output[0] = 1.0f;
 }

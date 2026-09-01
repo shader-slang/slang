@@ -3,7 +3,7 @@
 #ifndef SLANGI_TOOL_H_INCLUDED
 #define SLANGI_TOOL_H_INCLUDED
 
-#include "../../source/core/slang-std-writers.h"
+#include "core/slang-std-writers.h"
 
 /* The slangi 'tool' interface, such that slangc like functionality is available directly without
 invoking slangc command line tool, or need for a dll/shared library. */

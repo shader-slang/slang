@@ -1,9 +1,9 @@
 // slang-include-system.cpp
 #include "slang-include-system.h"
 
-#include "../core/slang-file-system.h"
-#include "../core/slang-io.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-string-util.h"
 #include "slang-artifact-impl.h"
 #include "slang-artifact-representation-impl.h"
 #include "slang-slice-allocator.h"

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -g2 -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -g2
 // Zero-length array variables are legalized to void types and removed.
 // Check we do not generate debug info for the removed variables.
 

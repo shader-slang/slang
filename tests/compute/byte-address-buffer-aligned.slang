@@ -112,10 +112,15 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK3-DAG: OpStore %[[V33]] %[[V28]]
     // CHECK3-DAG: %[[V34:[a-zA-Z0-9_]+]] = OpAccessChain %[[SBf]] %[[BUF00]]
     // CHECK3-DAG: OpStore %[[V34]] %[[V30]]
-    buffer0.StoreAligned(32, buffer0.LoadAligned<float4>(32));
-    buffer0.StoreAligned(32, buffer0.LoadAligned<float4>(8));
-    buffer0.StoreAligned(8, buffer0.LoadAligned<float4>(32));
-    buffer0.StoreAligned(8, buffer0.LoadAligned<float4>(8));
+    // Per issue #11545 the alignment must be a power of two and a constant location must be a
+    // multiple of it, so the wide-vs-scalarized choice is requested through an explicit alignment
+    // rather than a (now self-contradictory) misaligned single-argument call. A `float4` whose
+    // natural alignment (16) is satisfied loads/stores wide; an explicit alignment of 4 forces the
+    // per-component path.
+    buffer0.StoreAligned(32, buffer0.LoadAligned<float4>(32));      // wide load + wide store
+    buffer0.StoreAligned(32, buffer0.LoadAligned<float4>(8, 4));    // scalarized load + wide store
+    buffer0.Store<float4>(8, buffer0.LoadAligned<float4>(32), 4);   // wide load + scalarized store
+    buffer0.Store<float4>(8, buffer0.LoadAligned<float4>(8, 4), 4); // scalarized load + store
 }
 
 // CHECK_CUDA: ).Load<float4{{.*}}>(32U);

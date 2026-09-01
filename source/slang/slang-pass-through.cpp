@@ -1,8 +1,8 @@
 // slang-pass-through.cpp
 #include "slang-pass-through.h"
 
-#include "../core/slang-type-text-util.h"
 #include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 
 namespace Slang

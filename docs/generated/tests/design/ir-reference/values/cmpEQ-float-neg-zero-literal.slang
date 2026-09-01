@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#comparison
-//META: doc_section_digest=03e312fcc9f534bb1522ca14baac23dce5576764a035ba6d311c03be3b39ed14
+//META: doc_section_digest=a41eec816a55db301ccafcfa867bab048ae6ed92cc99c5f791c2e8474302d15d
 //META: purpose=Boundary: `==` against the negative-zero literal `-0.0` lowers to `cmpEQ(%fa, -0 : Float)`, with the sign-distinct payload preserved on the operand.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // formatter (matches the IEEE-754 distinct bit pattern), even
 // though `+0.0 == -0.0` is true at the value level.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<int> buf;

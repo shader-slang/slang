@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -fvk-invert-y
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -fvk-invert-y -O3
 //TEST:SIMPLE(filecheck=POINT): -target spirv -stage mesh -entry pointMain
 
 // CHECK-DAG: OpExecutionMode %main OutputLinesEXT

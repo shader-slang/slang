@@ -1,6 +1,5 @@
 module adam;
 
-import mlp;
 import common;
 
 public struct AdamState

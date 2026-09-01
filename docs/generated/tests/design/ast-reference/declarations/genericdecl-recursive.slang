@@ -1,16 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#genericdecl
-//META: doc_section_digest=821d70752ab2fb0ab927aca034dc6d1ab1bf2642184d0e87594d63c182097322
-//META: purpose=Two GenericDecls can compose: a generic struct field of a generic struct specializes when the outer specializes.
+//META: doc_section_digest=985b5affb3dd0e12342a333d794d470a82a87f6624d475545de5bdf3de72fbf2
+//META: purpose=Generic declarations compose: a generic struct used as a field of another generic struct specializes when the outer one does.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that nested generic decls compose: the outer GenericDecl
-// specializes its inner field type, which itself is a generic.
+// Verifies that specializing an outer generic propagates the type argument to
+// a generic field type. Both fields of the outer struct are inner generic
+// values; the CHECK asserts a sum computed from both, which requires the inner
+// generic to have been specialized at the outer's argument.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -160,9 +160,8 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
 #endif
 }
 
-uint64_t SharedLibraryUtils::getSharedLibraryTimestamp(void* symbolInLib)
+uint64_t SharedLibraryUtils::getFileTimestamp(const String& fileName)
 {
-    auto fileName = getSharedLibraryFileName(symbolInLib);
     if (fileName.getLength() == 0)
         return 0;
     struct stat result;
@@ -172,6 +171,11 @@ uint64_t SharedLibraryUtils::getSharedLibraryTimestamp(void* symbolInLib)
         return (uint64_t)mod_time;
     }
     return 0;
+}
+
+uint64_t SharedLibraryUtils::getSharedLibraryTimestamp(void* symbolInLib)
+{
+    return getFileTimestamp(getSharedLibraryFileName(symbolInLib));
 }
 
 } // namespace Slang

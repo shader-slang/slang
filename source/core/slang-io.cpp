@@ -750,7 +750,13 @@ String Path::getRelativePath(String base, String path)
     std::filesystem::path p2(path.getBuffer());
     std::error_code ec;
     auto result = std::filesystem::relative(p2, p1, ec);
-    if (ec)
+    // `std::filesystem::relative` yields an empty path when no relative path exists between the
+    // two inputs -- most notably when they have different root names, e.g. distinct Windows drive
+    // letters (`C:\...` vs `D:\...`). An empty string is never a usable relative path, so fall
+    // back to the original (absolute) `path`, matching the `ec` failure case. This keeps callers
+    // that store or re-resolve the result (such as serialized module dependency paths) from
+    // recording an empty, unresolvable path across volumes.
+    if (ec || result.empty())
         return path;
     return String(reinterpret_cast<const char*>(result.generic_u8string().c_str()));
 }

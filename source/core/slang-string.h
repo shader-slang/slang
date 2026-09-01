@@ -173,7 +173,7 @@ public:
 
     const char& operator[](Index i) const
     {
-        assert(i >= 0 && i < Index(m_end - m_begin));
+        SLANG_ASSERT(i >= 0 && i < Index(m_end - m_begin));
         return m_begin[i];
     }
 

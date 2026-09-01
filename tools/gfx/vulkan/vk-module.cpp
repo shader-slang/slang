@@ -1,7 +1,6 @@
 // module.cpp
 #include "vk-module.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -11,7 +10,7 @@
 #include <dlfcn.h>
 #endif
 
-#include "../renderer-shared.h"
+#include "gfx/renderer-shared.h"
 
 namespace gfx
 {
@@ -55,7 +54,7 @@ Slang::Result VulkanModule::init(bool useSoftwareImpl)
 
 PFN_vkVoidFunction VulkanModule::getFunction(const char* name) const
 {
-    assert(m_module);
+    SLANG_ASSERT(m_module);
     if (!m_module)
     {
         return nullptr;

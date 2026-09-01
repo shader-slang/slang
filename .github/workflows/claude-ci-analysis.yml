@@ -52,7 +52,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
-            // Security: Use context.payload.inputs instead of ${{ github.event.inputs }}
+            // Security: Use context.payload.inputs instead of github.event.inputs
             // to avoid JavaScript injection from user-provided workflow_dispatch inputs.
             const runId = parseInt(context.payload.inputs.run_id);
 

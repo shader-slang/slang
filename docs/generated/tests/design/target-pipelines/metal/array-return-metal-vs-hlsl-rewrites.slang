@@ -1,17 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=de6a2b24718ef9344624fa3cfc660b5e13c913b28787d2b06b2db1085587ae5e
-//META: purpose=Cross-target negative observation: Metal keeps an array-return function as `array<T, N> foo(...)` (legalizeArrayReturnType skipped), while HLSL rewrites the function to `void` with an `out T[N]` parameter.
+//META: doc_section_digest=2a4c97aeaacd2a9728a83c1944ef99c7efe30fe3fe60ef075d8d47044f03eefc
+//META: purpose=`legalizeArrayReturnType` is filtered out for Metal (`!isMetalTarget && !isSPIRV`), so an array-returning function survives as `array<T, N> f(...)` on Metal while HLSL rewrites it to `void` with an `out` parameter.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Demonstrates the "Metal-does-X, HLSL-does-Y" split for
-// `legalizeArrayReturnType`. Same source, two targets, distinct
-// CHECK prefixes.
+// Verifies the filtered-out-pass claim by compiling one source to two
+// targets: the pass that rewrites an array return into an `out` parameter
+// runs for HLSL but is excluded for Metal, so the same function must have
+// two different signatures. The `CHECK` prefix asserts Metal keeps the
+// `array<int, int(4)>` return type; the `HLSL` prefix asserts the HLSL
+// emit turned the function into a `void` one with an `out` parameter.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl  -entry main -stage compute

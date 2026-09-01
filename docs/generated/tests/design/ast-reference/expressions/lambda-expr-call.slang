@@ -1,17 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#lambdaexpr-and-lambdadecl
-//META: doc_section_digest=521b006586b3c2d016313bdd2e59350f44b59690f83752ed2aacfb0e0f8e9d5c
+//META: doc_section_digest=488c8698e5c5c5edba49863bb42e29a1d761c4be06fab55035626918cc32cbb8
 //META: purpose=A LambdaExpr `(params) => { body }` forms a callable that returns the body's value when invoked.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says a LambdaExpr parses into a synthesized LambdaDecl and
-// a body Stmt. We define a lambda, store it in a `var`, and call it;
-// the returned value must match the body's expression.
+// Verifies that `(params) => body` forms a callable value that returns the
+// body's result when invoked. The lambda is bound to a local and then called
+// with a concrete argument; the CHECK asserts the body's arithmetic ran.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

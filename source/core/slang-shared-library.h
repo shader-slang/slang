@@ -1,11 +1,11 @@
 #ifndef SLANG_CORE_SHARED_LIBRARY_H
 #define SLANG_CORE_SHARED_LIBRARY_H
 
-#include "../core/slang-com-object.h"
-#include "../core/slang-common.h"
-#include "../core/slang-dictionary.h"
-#include "../core/slang-io.h"
-#include "../core/slang-platform.h"
+#include "core/slang-com-object.h"
+#include "core/slang-common.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-io.h"
+#include "core/slang-platform.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -106,6 +106,12 @@ class SharedLibraryUtils
 {
 public:
     static String getSharedLibraryFileName(void* symbolInLib);
+    /// Returns an opaque modification stamp for fileName, or zero when the path is empty, its
+    /// timestamp is unavailable, or its modification time is exactly the epoch. Zero deliberately
+    /// disables cache use, so the rare epoch case falls back to recompilation.
+    /// Non-zero stamps are meaningful only for equality comparisons between results from this
+    /// function on the same host; their units and resolution are platform-defined.
+    static uint64_t getFileTimestamp(const String& fileName);
     static uint64_t getSharedLibraryTimestamp(void* symbolInLib);
 };
 

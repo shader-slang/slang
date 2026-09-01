@@ -1,20 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/base.md#val-nodebase
-//META: doc_section_digest=da2cf169dd5b15686dcd86869a63242dc8a98cf55184ac9bd91ffc7b49b41e55
-//META: purpose=Vals (including Types) are deduplicated by the ASTBuilder; two textually identical type expressions denote the same Val, so an overload set keyed on the type resolves identically at each use.
+//META: doc_section_digest=17754b4ad55bb3bbeb3b934dd617e4a3120a865a281a81848bf3fc5ab03948d7
+//META: purpose=Vals are deduplicated by the ASTBuilder, so two textually separate spellings of the same type denote one value and select the same overload at every use.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that Type is a hash-consed Val. The two written uses of
-// `vector<int,3>` must denote the same Type Val and select the same
-// overload at each site. If the types were distinct values, overload
-// resolution at the second call could pick a different overload or
-// fail to find one — the test fails to print the expected `kind=3`
-// twice.
+// Verifies that types are hash-consed values rather than per-site
+// objects. Two separately-written `vector<int,3>` declarations are
+// passed to an overload set that distinguishes `int`,
+// `vector<int,3>` and `vector<float,3>`. CHECK asserts both calls land
+// on the same overload; distinct-but-equal type values would let the
+// second call diverge or fail to match.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -1,7 +1,7 @@
 // slang-language-server-completion.h
 #pragma once
 
-#include "../compiler-core/slang-language-server-protocol.h"
+#include "compiler-core/slang-language-server-protocol.h"
 #include "slang-language-server-ast-lookup.h"
 #include "slang-workspace-version.h"
 

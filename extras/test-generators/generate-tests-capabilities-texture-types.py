@@ -266,8 +266,8 @@ def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
         "Texture1DArray<float4>"   : TestInfo("130", 2),
         "Texture2D<float4>"        : TestInfo("110", 2),
         "Texture2DArray<float4>"   : TestInfo("130", 3),
-        "Texture2DMS<float4>"      : TestInfo(None,  13), # accessible only via combined texture+sampler
-        "Texture2DMSArray<float4>" : TestInfo(None,  14), # accessible only via combined texture+sampler
+        "Texture2DMS<float4>"      : TestInfo("150", 13).disableComputeTest(8786), # bare Load supported since GLSL 1.50 (#11874)
+        "Texture2DMSArray<float4>" : TestInfo("150", 14).disableComputeTest(8786), # bare Load supported since GLSL 1.50 (#11874)
         "Texture3D<float4>"        : TestInfo("110", 3),
         "TextureCube<float4>"      : TestInfo("110", 3),
         "TextureCubeArray<float4>" : TestInfo("400", 4).disableNegativeTest(8912),
@@ -276,8 +276,8 @@ def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
         "DepthTexture1DArray"      : TestInfo("130", 42).bug(8802),
         "DepthTexture2D"           : TestInfo("110", 42).bug(8802),
         "DepthTexture2DArray"      : TestInfo("130", 43).bug(8802),
-        "DepthTexture2DMS"         : TestInfo(None,  15),
-        "DepthTexture2DMSArray"    : TestInfo(None,  16),
+        "DepthTexture2DMS"         : TestInfo("150", 15).disableComputeTest(8786), # bare Load supported since GLSL 1.50 (#11874)
+        "DepthTexture2DMSArray"    : TestInfo("150", 16).disableComputeTest(8786), # bare Load supported since GLSL 1.50 (#11874)
         "DepthTexture3D"           : TestInfo(None,  43),
         "DepthTextureCube"         : TestInfo("110", 43).bug(8802),
         "DepthTextureCubeArray"    : TestInfo("400", 44).bug(8802),

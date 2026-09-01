@@ -1,0 +1,44 @@
+schema_version: 1
+id: declarations-attribute-syntax-unknown-class-ice
+bundle: design/ast-reference/declarations
+suspected_kind: wrong-diagnostic
+title: "[parser] attribute_syntax naming an unknown attribute class emits ICE E99999"
+observed_at: "2026-08-04T00:00:00+00:00"
+scope: parser
+evidence:
+  command: "./build/RelWithDebInfo/bin/slangi /tmp/decl/n5.slang"
+  source_slang: docs/generated/tests/design/ast-reference/declarations/attributedecl-attribute-syntax.slang
+  observed_summary: |
+    An `attribute_syntax` declaration whose right-hand side names an attribute class that does
+    not exist produces "internal error[E99999]: unexpected condition encountered in Slang
+    compiler: attribute declaration does not reference an attribute class" instead of an ordinary
+    user-facing diagnostic naming the unknown class. The error is reported at the attribute name
+    on the `attribute_syntax` line and then aborts compilation.
+
+    Minimal repro (as a whole file):
+      attribute_syntax [Doubling(n: int)] : DoublingAttribute;
+      [Doubling(3)] int helper() { return 4; }
+      void main() { printf("%d\n", helper()); }
+
+    No test was shipped for this: expressing the observation as a DIAGNOSTIC_TEST would have to
+    pin the internal-error text, which would codify the bug. The bundle README records the
+    surrounding doc gap instead.
+  exit_code: 1
+  stderr_tail: "internal error[E99999]: unexpected condition encountered in Slang compiler: attribute declaration does not reference an attribute class"
+expected:
+  claim: |
+    `attribute_syntax` is a user-reachable declaration form (it is registered in the parser's
+    syntax table, not restricted to core-module source), so naming an attribute class that does
+    not exist is ordinary bad user input and must produce a normal diagnostic identifying the
+    unknown class, not an internal compiler error.
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/declarations.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/ast-reference/declarations.md#nodes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — the same file with a real attribute class name (UnrollAttribute) parses without the internal error, so the ICE is specific to the unresolved class name."
+    - "Intentional core-module-only restriction: possible, but then the expected outcome is still a diagnostic saying so, not E99999."

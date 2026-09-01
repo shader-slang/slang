@@ -1,19 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=f394bf1461f5876676bdb5fa5c51feaa920cf5ef0986df9fe1bbf0db976d5a30
+//META: doc_section_digest=e0b71e7cc30a0e069a5833b7fdc7038f02b6ab982bbba6656983e3a65dcba7ce
 //META: purpose=`Atomic<T>::load()` and `::store(v)` lower to the dedicated `atomicLoad(%ptr, %order)` and `atomicStore(%ptr, %val, %order)` opcodes (separate from the RMW ops).
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's atomic-operations table lists `atomicLoad` and
-// `atomicStore` as the two non-RMW members of the atomic family.
-// Both surface from the corresponding `Atomic<T>` methods.
+// Verifies that the two non-read-modify-write atomics have their own
+// opcodes with their own operand counts. The CHECKs allow one operand
+// after the pointer for the load and one after the value for the store,
+// which is how the memory-order operand's position differs between
+// them.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<Atomic<int>> abuf;
 uniform RWStructuredBuffer<int> rwbuf;
@@ -28,5 +30,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // IR-LABEL: func %main
-// IR: atomicLoad(%{{[^,]+}}, {{.*}})
-// IR: atomicStore(%{{[^,]+}}, 42 : Int, {{.*}})
+// IR: atomicLoad(%{{[^,]+}}, {{[^,)]+}})
+// IR: atomicStore(%{{[^,]+}}, 42 : Int, {{[^,)]+}})

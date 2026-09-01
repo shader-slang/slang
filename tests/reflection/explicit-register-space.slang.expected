@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "tx",
@@ -17,14 +18,47 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "tx",
+                "binding": {"kind": "shaderResource", "space": 2, "index": 1},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
@@ -35,7 +69,10 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
+                    },
+                    "sizes": [
+                        {"kind": "varyingOutput", "value": 1}
+                    ]
                 }
             }
         }

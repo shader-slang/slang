@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00Z
-//META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-d-wgsl-emit-and-downstream-tools
-//META: doc_section_digest=287321dc153823860396c030325e4ad4c0f6064005fa37b19c8ba53087dcd3e6
+//META: doc_section_digest=7d3641e4955ae039b13fce50516f0ed39854eeed3ca279f81a665ace48b92daa
 //META: purpose=[numthreads(0,1,1)] is rejected with diagnostic E31102 ('invalid numthreads value') because the @workgroup_size axis cannot be zero
 //META: intent=negative
 //META: pipeline_stage=check

@@ -1,6 +1,6 @@
 // slang-ir-restructure-scoping.h
 #pragma once
-#include "../core/slang-func-ptr.h"
+#include "core/slang-func-ptr.h"
 
 namespace Slang
 {

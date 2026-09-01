@@ -1,13 +1,12 @@
 // slang-type-layout.cpp
 #include "slang-type-layout.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-check-impl.h"
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
 #include "slang-syntax.h"
 
-#include <assert.h>
 
 namespace Slang
 {
@@ -3232,9 +3231,9 @@ static bool isOpenGLTarget(TargetRequest*)
     return false;
 }
 
-bool isD3DTarget(TargetRequest* targetReq)
+bool isD3DTarget(CodeGenTarget target)
 {
-    switch (targetReq->getTarget())
+    switch (target)
     {
     case CodeGenTarget::HLSL:
     case CodeGenTarget::DXBytecode:
@@ -3248,9 +3247,14 @@ bool isD3DTarget(TargetRequest* targetReq)
     }
 }
 
-bool isMetalTarget(TargetRequest* targetReq)
+bool isD3DTarget(TargetRequest* targetReq)
 {
-    switch (targetReq->getTarget())
+    return isD3DTarget(targetReq->getTarget());
+}
+
+bool isMetalTarget(CodeGenTarget target)
+{
+    switch (target)
     {
     default:
         return false;
@@ -3260,6 +3264,11 @@ bool isMetalTarget(TargetRequest* targetReq)
     case CodeGenTarget::MetalLibAssembly:
         return true;
     }
+}
+
+bool isMetalTarget(TargetRequest* targetReq)
+{
+    return isMetalTarget(targetReq->getTarget());
 }
 
 bool isKhronosTarget(CodeGenTarget target)
@@ -3355,6 +3364,16 @@ bool isWGPUTarget(CodeGenTarget target)
 bool isWGPUTarget(TargetRequest* targetReq)
 {
     return isWGPUTarget(targetReq->getTarget());
+}
+
+bool doesTargetSupportVkBindingOnEntryPointParameters(CodeGenTarget target)
+{
+    return isKhronosTarget(target) || isWGPUTarget(target);
+}
+
+bool doesTargetSupportVkBindingOnEntryPointParameters(TargetRequest* targetReq)
+{
+    return doesTargetSupportVkBindingOnEntryPointParameters(targetReq->getTarget());
 }
 
 bool isKernelTarget(CodeGenTarget codeGenTarget)
@@ -5724,6 +5743,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         auto tupleType = context.astBuilder->getTupleType(types.getView());
         return _createTypeLayout(context, tupleType);
     }
+    else if (auto modifiedType = as<ModifiedType>(type))
+    {
+        // Every modifier a `ModifiedType` can carry (`noDiff`, `unorm`, `snorm`)
+        // is layout-transparent: `unorm`/`snorm` only select a texture image
+        // format at emit and never change storage size or alignment. So the type
+        // lays out exactly as its base.
+        return _createTypeLayout(context, modifiedType->getBase());
+    }
     else if (auto tupleType = as<TupleType>(type))
     {
         // A `Tuple` type is laid out exactly the same way as a `struct` type,
@@ -6419,6 +6446,9 @@ RefPtr<TypeLayout> createTypeLayoutWith(
     LayoutRulesImpl* rules,
     Type* type)
 {
+    // `createTypeLayout` dereferences `rules` unconditionally, so a null here is
+    // a caller bug that would otherwise surface as a silent access violation.
+    SLANG_RELEASE_ASSERT(rules);
     auto c = context.with(rules);
     return createTypeLayout(c, type);
 }

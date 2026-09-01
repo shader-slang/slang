@@ -28,7 +28,7 @@
 //     in the smaller format, and saturate / lose precision in the
 //     documented way otherwise.
 
-#include "../../source/core/slang-math.h"
+#include "core/slang-math.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <limits>

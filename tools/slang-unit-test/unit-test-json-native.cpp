@@ -1,8 +1,8 @@
 // unit-test-json-native.cpp
 
-#include "../../source/compiler-core/slang-json-native.h"
-#include "../../source/compiler-core/slang-json-parser.h"
-#include "../../source/core/slang-rtti-info.h"
+#include "compiler-core/slang-json-native.h"
+#include "compiler-core/slang-json-parser.h"
+#include "core/slang-rtti-info.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

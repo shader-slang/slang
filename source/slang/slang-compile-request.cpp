@@ -1,9 +1,9 @@
 // slang-compile-request.cpp
 #include "slang-compile-request.h"
 
-#include "../core/slang-performance-profiler.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-util.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ast-dump.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"

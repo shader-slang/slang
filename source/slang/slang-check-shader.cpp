@@ -6,8 +6,8 @@
 // enumerating specialization parameters, and validating
 // attempts to specialize shader code.
 
-#include "../core/slang-char-util.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-char-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"
@@ -17,12 +17,22 @@
 namespace Slang
 {
 
+static constexpr char const* kNodeLaunchModeBroadcasting = "broadcasting";
+static constexpr char const* kNodeLaunchModeThread = "thread";
+
 // Direction of a semantic value (input from previous stage, or output to next stage)
 enum class SemanticDirection
 {
     Input,
     Output,
 };
+
+// Maximum nesting depth when recursively walking a declaration's type for system-value
+// semantics. Shared by validateSystemValueSemantic and collectDepthOutputSemantics so the two
+// walks provably use the same bound: collectDepthOutputSemantics can return silently at the
+// limit precisely because validateSystemValueSemantic runs first with this same bound and has
+// already reported MaximumTypeNestingLevelExceeded for anything deeper.
+static constexpr UInt kMaxSystemValueSemanticRecursionDepth = 128;
 
 static bool isValidThreadDispatchIDType(Type* type)
 {
@@ -71,24 +81,60 @@ static Type* unwrapConditionalType(Type* type)
     return type;
 }
 
+// Extract the scalar element type and element count from a type.
+// For a scalar BasicExpressionType, returns the type itself with count 1.
+// For a VectorExpressionType, returns the element type and count.
+// Returns nullptr if the type is neither scalar nor vector.
+static BasicExpressionType* getScalarElementType(Type* type, IntegerLiteralValue& outCount)
+{
+    if (auto basicType = as<BasicExpressionType>(type))
+    {
+        outCount = 1;
+        return basicType;
+    }
+    if (auto vecType = as<VectorExpressionType>(type))
+    {
+        if (auto countVal = as<ConstantIntVal>(vecType->getElementCount()))
+        {
+            outCount = countVal->getValue();
+            return as<BasicExpressionType>(vecType->getElementType());
+        }
+    }
+    return nullptr;
+}
+
 // Check if two types are compatible for system value semantics.
-// This is stricter than canCoerce alone, as it requires that both types have
-// the same "shape" (both scalars or both vectors) to prevent scalar-to-vector
-// promotions like uint -> float4.
-static bool isSemanticTypeCompatible(SemanticsVisitor* visitor, Type* expectedType, Type* type)
+// Two types are compatible when they have the same shape (both scalar, or both
+// vectors of the same element count) and their scalar element types belong to
+// the same type category (integer, floating-point, or bool). This allows sign
+// coercions like int3 for a uint3 semantic while rejecting cross-category
+// coercions like float for a uint semantic.
+static bool isSemanticTypeCompatible(Type* expectedType, Type* type)
 {
     // Unwrap Conditional<T, hasValue> to T
     type = unwrapConditionalType(type);
 
-    // Must be coercible
-    if (!visitor->canCoerce(expectedType, type, nullptr))
+    IntegerLiteralValue expectedCount = 0, typeCount = 0;
+    auto expectedElem = getScalarElementType(expectedType, expectedCount);
+    auto typeElem = getScalarElementType(type, typeCount);
+
+    // Both types must be scalar or vector (no matrices, arrays, structs, etc.)
+    if (!expectedElem || !typeElem)
         return false;
 
-    // Both must have the same shape (both scalar or both vector)
-    bool expectedIsVector = as<VectorExpressionType>(expectedType) != nullptr;
-    bool typeIsVector = as<VectorExpressionType>(type) != nullptr;
+    // Shapes must match: same element count (1 for scalar, N for vectorN)
+    if (expectedCount != typeCount)
+        return false;
 
-    return expectedIsVector == typeIsVector;
+    // Scalar element types must be in the same category.
+    // BaseTypeInfo tracks FloatingPoint and Integer flags; bool has neither.
+    // Comparing the masked flags ensures int/uint match each other, float/half/double
+    // match each other, and bool only matches bool.
+    using Flag = BaseTypeInfo::Flag;
+    constexpr BaseTypeInfo::Flags categoryMask = Flag::FloatingPoint | Flag::Integer;
+    const auto& expectedInfo = BaseTypeInfo::getInfo(expectedElem->getBaseType());
+    const auto& typeInfo = BaseTypeInfo::getInfo(typeElem->getBaseType());
+    return (expectedInfo.flags & categoryMask) == (typeInfo.flags & categoryMask);
 }
 
 // Look up a SemanticDecl by name in the given scope.
@@ -112,6 +158,46 @@ static SemanticDecl* lookUpSemanticDecl(
     return as<SemanticDecl>(lookupResult.item.declRef.getDecl());
 }
 
+// True when `stageProjectedCaps` (an accessor requirement already projected onto `stage`) is
+// equivalent to the bare stage and so adds nothing to enforce. Tested by implication in *both*
+// directions: one-way `{stage} implies req` also holds when `req` is strictly stronger than the
+// stage (e.g. adds a target restriction), so requiring `req implies {stage}` too keeps genuinely
+// stage-only requirements out while letting stronger ones through.
+static bool isStageOnlyRequirement(const CapabilitySet& stageProjectedCaps, Stage stage)
+{
+    if (stageProjectedCaps.isEmpty() || stageProjectedCaps.isInvalid())
+        return true;
+    CapabilityAtom stageAtom = getAtomFromStage(stage);
+    if (stageAtom == CapabilityAtom::Invalid)
+        return false;
+    CapabilitySet stageCaps((CapabilityName)stageAtom);
+    return stageCaps.implies(stageProjectedCaps) && stageProjectedCaps.implies(stageCaps);
+}
+
+// Fold a matched semantic accessor's `[require]` into the entry point's `*outCaps`, so the profile
+// check enforces a capability the semantic carries but general inference misses (it does not look
+// through a semantic to its accessor). Project the requirement onto the entry point's stage first
+// and join only what is strictly stronger than that stage context: a multi-stage requirement's
+// off-stage alternatives must not leak in (a fragment use of a getter declared for
+// `[require(fragment)] [require(geometry)]` must not pull in `geometry`), and a requirement equal
+// to the stage is already implied by the profile. Example: `SV_Barycentrics`, whose getter is
+// `[require(fragment, fragmentshaderbarycentric)]`, contributes `fragmentshaderbarycentric`.
+static void collectSemanticAccessorRequirement(Decl* member, Stage stage, CapabilitySet* outCaps)
+{
+    SLANG_ASSERT(outCaps);
+    auto requireAttr = member->findModifier<RequireCapabilityAttribute>();
+    if (!requireAttr || !requireAttr->capabilitySet)
+        return;
+    CapabilityAtom stageAtom = getAtomFromStage(stage);
+    if (stageAtom == CapabilityAtom::Invalid)
+        return;
+    CapabilitySet stageProjectedCaps{requireAttr->capabilitySet};
+    stageProjectedCaps.join(CapabilitySet((CapabilityName)stageAtom));
+    if (isStageOnlyRequirement(stageProjectedCaps, stage))
+        return;
+    outCaps->nonDestructiveJoin(stageProjectedCaps);
+}
+
 // Validate that type being used for a system value semantic is compatible with the semantic.
 static void validateSystemValueSemanticForType(
     SemanticsVisitor* visitor,
@@ -121,7 +207,8 @@ static void validateSystemValueSemanticForType(
     HLSLSimpleSemantic* semantic,
     Stage stage,
     SemanticDirection direction,
-    Scope* scope)
+    Scope* scope,
+    CapabilitySet* outInferredCaps)
 {
     if (!semantic || !type)
         return;
@@ -221,9 +308,10 @@ static void validateSystemValueSemanticForType(
             continue;
         }
 
-        if (isSemanticTypeCompatible(visitor, accessorType, type))
+        if (isSemanticTypeCompatible(accessorType, type))
         {
             foundMatchingAccessor = true;
+            collectSemanticAccessorRequirement(member, stage, outInferredCaps);
             break;
         }
 
@@ -236,11 +324,11 @@ static void validateSystemValueSemanticForType(
                 if (accessorArrayType->isUnsized())
                 {
                     if (isSemanticTypeCompatible(
-                            visitor,
                             accessorArrayType->getElementType(),
                             typeArrayType->getElementType()))
                     {
                         foundMatchingAccessor = true;
+                        collectSemanticAccessorRequirement(member, stage, outInferredCaps);
                         break;
                     }
                 }
@@ -347,8 +435,12 @@ static void validateNoPerPrimitiveSemanticsInType(
 }
 
 
-// Validate system value semantics on a declaration recursively.
-// and validates any SV_ semantic against the SemanticDecl definitions in core module.
+// Validate `decl`'s SV_ semantics against the SemanticDecl definitions in the core module,
+// recursing through struct fields. Also folds each matched accessor's capability requirement into
+// `outInferredCaps` (non-destructive join), so the entry point enforces a requirement the semantic
+// carries but the general capability inference misses — e.g. `fragmentshaderbarycentric` for
+// `SV_Barycentrics`. `outInferredCaps` is the entry point's accumulating requirement set and is
+// always non-null.
 static void validateSystemValueSemantic(
     SemanticsVisitor* visitor,
     DiagnosticSink* sink,
@@ -356,9 +448,9 @@ static void validateSystemValueSemantic(
     Stage stage,
     SemanticDirection direction,
     Scope* scope,
+    CapabilitySet* outInferredCaps,
     UInt recursionDepth = 0)
 {
-    static constexpr UInt kMaxSystemValueSemanticRecursionDepth = 128;
     if (!decl)
         return;
 
@@ -445,6 +537,7 @@ static void validateSystemValueSemantic(
                     stage,
                     direction,
                     scope,
+                    outInferredCaps,
                     recursionDepth + 1);
             }
         }
@@ -463,7 +556,80 @@ static void validateSystemValueSemantic(
         semantic,
         stage,
         direction,
-        scope);
+        scope,
+        outInferredCaps);
+}
+
+// Return true if `semanticName` is one of the fragment depth-output system values
+// (SV_Depth / SV_DepthGreaterEqual / SV_DepthLessEqual). A trailing numeric index is
+// stripped first, matching validateSystemValueSemanticForType above, because Slang treats
+// an indexed spelling like "SV_Depth0" as the same depth output (it lowers to gl_FragDepth /
+// DepthReplacing just as "SV_Depth" does), so it must be classified identically here.
+static bool isDepthOutputSemantic(UnownedStringSlice semanticName)
+{
+    UnownedStringSlice baseName;
+    UnownedStringSlice indexSlice;
+    splitNameAndIndex(semanticName, baseName, indexSlice);
+    return baseName.caseInsensitiveEquals(toSlice("sv_depth")) ||
+           baseName.caseInsensitiveEquals(toSlice("sv_depthgreaterequal")) ||
+           baseName.caseInsensitiveEquals(toSlice("sv_depthlessequal"));
+}
+
+// Append to `ioDepthSemantics` every depth-output system-value semantic that `decl` contributes
+// as a fragment output. `decl` is an `out`/`inout` parameter or the entry-point function itself
+// (whose return type is examined). A fragment output can only be a scalar, a struct, or an array
+// of those — never a mesh/stream output wrapper, which belong to non-fragment stages — so
+// unwrapping Conditional and array wrappers and recursing into struct fields reaches every place
+// a depth semantic can appear. Each depth semantic is recorded independently (a decl may
+// contribute both its own semantic and those of its fields), so a collected count greater than
+// one means the fragment entry point genuinely declares more than one depth output.
+static void collectDepthOutputSemantics(
+    ASTBuilder* astBuilder,
+    Decl* decl,
+    List<HLSLSimpleSemantic*>& ioDepthSemantics,
+    UInt recursionDepth = 0)
+{
+    if (!decl || recursionDepth >= kMaxSystemValueSemanticRecursionDepth)
+        return;
+
+    // Get the type from the declaration (parameter type or function return type).
+    Type* type = nullptr;
+    if (auto varDecl = as<VarDeclBase>(decl))
+        type = varDecl->getType();
+    else if (auto funcDecl = as<FuncDecl>(decl))
+        type = funcDecl->returnType.type;
+
+    if (type)
+    {
+        // Unwrap Conditional<T> and any array wrappers, matching the sibling aggregate walk
+        // validateNoPerPrimitiveSemanticsInType, so a depth semantic on a field of an
+        // array-of-struct output (e.g. `out DepthOut a[1]`) is still reached.
+        type = unwrapConditionalType(type);
+        while (auto arrayType = as<ArrayExpressionType>(type))
+            type = unwrapConditionalType(arrayType->getElementType());
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
+            {
+                for (auto fieldDeclRef :
+                     getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+                {
+                    collectDepthOutputSemantics(
+                        astBuilder,
+                        fieldDeclRef.getDecl(),
+                        ioDepthSemantics,
+                        recursionDepth + 1);
+                }
+            }
+        }
+    }
+
+    // Record a depth semantic declared directly on this decl.
+    if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
+    {
+        if (isDepthOutputSemantic(semantic->name.getContent()))
+            ioDepthSemantics.add(semantic);
+    }
 }
 
 /// Recursively walk `paramDeclRef` and add any existential/interface specialization parameters to
@@ -764,6 +930,94 @@ bool isUniformParameterType(Type* type)
     return false;
 }
 
+// Return whether `type`, used as an entry-point parameter, can actually have its
+// binding placed by a `[[vk::binding(...)]]` annotation, i.e. it consumes a
+// descriptor-shaped resource. This gates the "attribute ignored" diagnostic: the
+// warning is suppressed only for parameters we can honor, and still fires for
+// parameter kinds (e.g. plain varying scalars) where the annotation has no effect.
+// Arrays and modified types defer to their element/base type.
+//
+// A `struct` is compatible iff at least one of its fields — transitively, and
+// including fields inherited from a base struct — is compatible. This mirrors the
+// binder, which decomposes an aggregate through its computed type layout: a struct
+// whose fields include a texture/sampler accumulates a `DescriptorTableSlot` and so
+// the binder positions those fields. Consider `struct Resources { Texture2D tex;
+// SamplerState samp; }` used as `[[vk::binding(2,1)]] uniform Resources r`: the
+// binder places `r.tex` at (binding 2, set 1) and `r.samp` at (binding 3, set 1),
+// so the annotation is honored and the E38010 "ignored" warning must not fire.
+// Field types are substituted through the struct's `DeclRef` (so a generic field
+// such as `T tex` with `T = Texture2D` is recognized), and a nested struct field is
+// handled by the recursive call.
+//
+// The recursion needs no explicit cycle/depth guard: it only ever descends a finite,
+// acyclic type structure. A by-value struct cycle (`struct S { S next; }`) has
+// unbounded size and is rejected earlier by the front-end nesting limit
+// (`E39997`, `kMaxTypeNestingDepth`), and a cyclic inheritance graph is rejected by
+// `E39999` — both fire before `validateEntryPoint` runs this predicate. So every
+// field/base reached here resolves to a finite, non-recursive type.
+//
+// This list must stay in sync with the binder's contract: an explicit
+// `[[vk::binding(...)]]` can only position a parameter that consumes a
+// `DescriptorTableSlot` or `SubElementRegisterSpace` (see
+// `isVkBindingEntryPointParameterResourceKind` in slang-parameter-binding.cpp).
+// Unlike the near-identical `isUniformParameterType` above, do NOT list `PtrType`
+// here: a raw pointer is a buffer-device-address value in push-constant/uniform
+// storage with no descriptor slot to position, so the binder never honors a
+// binding on it. Listing it would silently suppress the E38010 diagnostic
+// (regression #11857). The struct case relies on that same subset property: it
+// returns `true` only when a genuine descriptor-consuming leaf is found, so a
+// struct of only pointers or plain data still (correctly) warns.
+static bool isVkBindingCompatibleEntryPointParameterType(ASTBuilder* astBuilder, Type* type)
+{
+    if (as<ResourceType>(type))
+        return true;
+    if (as<SubpassInputType>(type))
+        return true;
+    if (as<HLSLStructuredBufferTypeBase>(type))
+        return true;
+    if (as<UntypedBufferResourceType>(type))
+        return true;
+    if (as<UniformParameterGroupType>(type))
+        return true;
+    if (as<GLSLShaderStorageBufferType>(type))
+        return true;
+    if (as<SamplerStateType>(type))
+        return true;
+    if (as<DynamicResourceType>(type))
+        return true;
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return isVkBindingCompatibleEntryPointParameterType(
+            astBuilder,
+            arrayType->getElementType());
+    if (auto modType = as<ModifiedType>(type))
+        return isVkBindingCompatibleEntryPointParameterType(astBuilder, modType->getBase());
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
+        {
+            // `MemberFilterStyle::Instance` selects instance (non-`static`) members, not
+            // own-vs-inherited: `getFields` returns only fields declared directly in this
+            // struct, which is why inheritance needs the separate `findBaseStructType`
+            // branch below rather than being folded in here. `static` members are excluded
+            // deliberately — a static resource is a global, not part of this parameter
+            // value's descriptor layout, so it must not make the struct look bindable.
+            for (auto fieldDeclRef :
+                 getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+            {
+                if (isVkBindingCompatibleEntryPointParameterType(
+                        astBuilder,
+                        getType(astBuilder, fieldDeclRef)))
+                    return true;
+            }
+            // Inherited fields also participate in the layout, so a base struct that
+            // consumes a descriptor makes the derived type compatible too.
+            if (auto baseStructType = findBaseStructType(astBuilder, structDeclRef))
+                return isVkBindingCompatibleEntryPointParameterType(astBuilder, baseStructType);
+        }
+    }
+    return false;
+}
+
 bool isBuiltinParameterType(Type* type)
 {
     if (!as<BuiltinType>(type))
@@ -784,6 +1038,11 @@ bool isBuiltinParameterType(Type* type)
 // which have no dedicated AST type class but carry an `IntrinsicTypeModifier`.
 static bool isIntrinsicTypeWithOp(Type* type, IROp op)
 {
+    SLANG_ASSERT(type);
+    type = as<Type>(type->resolve());
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
         return false;
@@ -1368,6 +1627,16 @@ static bool _outputDeclHasSemantic(
     return _typeHasSemanticImpl(astBuilder, type, baseName, seenTypes);
 }
 
+static bool _allTargetsSupportVkBindingOnEntryPointParameters(Linkage* linkage)
+{
+    for (auto targetReq : linkage->targets)
+    {
+        if (!doesTargetSupportVkBindingOnEntryPointParameters(targetReq))
+            return false;
+    }
+    return true;
+}
+
 
 // A user-defined generic struct found in an entry-point signature type, paired
 // with the source location of its use.
@@ -1691,7 +1960,19 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // Validate system value semantics against SemanticDecl definitions in core module
+    // The entry point's effective requirements, seeded from the decl's inferred set and augmented
+    // at this boundary with two contributions the per-decl capability walk does not record: the
+    // SV_ semantic-accessor requirements (walk just below) and the signature's generic-struct
+    // requirements (`signatureStructUses` loop further below). Both are gathered into this local
+    // set — matching the existing generic-struct handling — because the accessor match is resolved
+    // here using the entry-point stage, and the decl's own `inferredCapabilityRequirements` was
+    // already frozen in the earlier CapabilityChecked phase.
+    CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
+
+    // Validate system value semantics, and collect the capabilities their accessors require:
+    // general capability inference does not look through a semantic to the `[require]` on the
+    // accessor it resolves to, so a need like `fragmentshaderbarycentric` on `SV_Barycentrics`
+    // must be gathered here.
     {
         SharedSemanticsContext shared(linkage, module, sink);
         SemanticsVisitor visitor(&shared);
@@ -1712,14 +1993,16 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Input,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                     validateSystemValueSemantic(
                         &visitor,
                         sink,
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
                 else if (param->hasModifier<OutModifier>())
                 {
@@ -1729,7 +2012,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
                 else
                 {
@@ -1739,7 +2023,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Input,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
             }
 
@@ -1750,7 +2035,44 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 entryPointFuncDecl,
                 stage,
                 SemanticDirection::Output,
-                scope);
+                scope,
+                &entryPointInferredCaps);
+        }
+    }
+
+    // HLSL allows a fragment shader to write at most one depth output. Slang previously
+    // accepted multiple depth output semantics (e.g. both SV_Depth and SV_DepthGreaterEqual)
+    // and silently produced a semantically wrong shader: the GLSL emitter assumes a single
+    // directional depth qualifier on gl_FragDepth, and the SPIR-V emitter collapses the
+    // conflicting per-variable depth execution modes to DepthReplacing (dropping the
+    // directional hint). The per-parameter validation above checks each semantic in isolation
+    // and never aggregates, so detect the conflict here across all of the entry point's
+    // outputs and reject it uniformly on every target.
+    if (stage == Stage::Fragment)
+    {
+        auto astBuilder = getCurrentASTBuilder();
+        List<HLSLSimpleSemantic*> depthOutputSemantics;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            // Depth semantics are output-only (setter-only in the core module; any input use
+            // is already rejected), so only `out`/`inout` parameters can carry one.
+            // InOutModifier derives from OutModifier, so this catches both.
+            if (param->hasModifier<OutModifier>())
+                collectDepthOutputSemantics(astBuilder, param, depthOutputSemantics);
+        }
+        // The return value is also an output of the entry point.
+        collectDepthOutputSemantics(astBuilder, entryPointFuncDecl, depthOutputSemantics);
+
+        if (depthOutputSemantics.getCount() > 1)
+        {
+            // Report at the second collected depth output — the one that makes the count
+            // exceed one — and name it as conflicting with the first. Collection order is
+            // parameters (in declaration order) then the return value, so the "second" is the
+            // later contributor, not necessarily the lexically-later one.
+            sink->diagnose(Diagnostics::MultipleDepthOutputSemantics{
+                .conflictingSemantic = String(depthOutputSemantics[1]->name.getContent()),
+                .earlierSemantic = String(depthOutputSemantics[0]->name.getContent()),
+                .location = depthOutputSemantics[1]->loc});
         }
     }
 
@@ -1760,7 +2082,44 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // itself. GLSL allows each axis to be specified in a separate declaration,
     // so we merge all GLSLLayoutLocalSizeAttribute values into a single
     // NumThreadsAttribute.
-    if ((stage == Stage::Compute || stage == Stage::Mesh || stage == Stage::Amplification) &&
+    // Node shaders in thread-launch mode do not require [numthreads].
+    bool isThreadLaunchNode = false;
+    bool hasUncheckedNodeLaunchAttr = false;
+    if (stage == Stage::Node)
+    {
+        auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+        for (auto modifier = entryPointFuncDecl->modifiers.first; modifier;
+             modifier = modifier->next)
+        {
+            auto uncheckedAttr = as<UncheckedAttribute>(modifier);
+            if (!uncheckedAttr || !uncheckedAttr->keywordName)
+                continue;
+
+            if (uncheckedAttr->keywordName->text.getUnownedSlice() == toSlice("NodeLaunch"))
+            {
+                hasUncheckedNodeLaunchAttr = true;
+                break;
+            }
+        }
+        if (!launchAttr && !hasUncheckedNodeLaunchAttr)
+        {
+            sink->diagnose(Diagnostics::NodeLaunchAttributeRequired{.decl = entryPointFuncDecl});
+        }
+        isThreadLaunchNode = launchAttr && launchAttr->mode == kNodeLaunchModeThread;
+    }
+
+    if (isThreadLaunchNode)
+    {
+        if (auto numThreadsAttr = entryPointFuncDecl->findModifier<NumThreadsAttribute>())
+        {
+            sink->diagnose(
+                Diagnostics::NumThreadsDisallowedOnThreadLaunchNode{.attr = numThreadsAttr});
+        }
+    }
+
+    bool needsNumThreads = stage == Stage::Compute || stage == Stage::Mesh ||
+                           stage == Stage::Amplification || stage == Stage::Node;
+    if (needsNumThreads && !isThreadLaunchNode && !hasUncheckedNodeLaunchAttr &&
         !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
     {
         auto parentDecl = entryPointFuncDecl->parentDecl;
@@ -1781,6 +2140,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         numThreads->extents[i] = glslAttr->extents[i];
                         numThreads->specConstExtents[i] = glslAttr->specConstExtents[i];
                     }
+                    // We attribute the location of the new NumThreadsAttribute
+                    // to the location of the first GLSLLayoutLocalSizeAttribute,
+                    // just to have something there (even if multiple
+                    // attributes get merged to this NumThreadsAttribute).
+                    numThreads->loc = glslAttr->loc;
                 }
                 else
                 {
@@ -1811,6 +2175,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             if (numThreads)
                 addModifier(entryPointFuncDecl, numThreads);
         }
+        if (stage == Stage::Node && !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
+        {
+            sink->diagnose(
+                Diagnostics::NodeNumThreadsAttributeRequired{.decl = entryPointFuncDecl});
+        }
     }
 
     bool canHaveVaryingInput = false;
@@ -1832,12 +2201,42 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     case Stage::Dispatch:
         shouldWarnOnNonUniformParam = false;
         break;
+    case Stage::Node:
+        {
+            canHaveVaryingInput = true;
+            auto hasMaxGrid = entryPointFuncDecl->findModifier<NodeMaxDispatchGridAttribute>();
+            auto hasFixedGrid = entryPointFuncDecl->findModifier<NodeDispatchGridAttribute>();
+            auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+            // Fixed and maximum dispatch-grid attributes are valid only on broadcasting nodes,
+            // e.g. `[NodeLaunch("broadcasting")] [NodeDispatchGrid(1, 1, 1)]`.
+            if ((hasMaxGrid || hasFixedGrid) && launchAttr &&
+                launchAttr->mode != kNodeLaunchModeBroadcasting)
+            {
+                sink->diagnose(
+                    Diagnostics::NodeGridAttributeRequiresBroadcasting{.decl = entryPointFuncDecl});
+            }
+            break;
+        }
     default:
         break;
     }
 
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
+        if (auto allowSparseNodesAttr = param->findModifier<AllowSparseNodesAttribute>())
+        {
+            // `[AllowSparseNodes]` is valid on node output arrays, e.g.
+            // `[AllowSparseNodes] NodeOutputArray<MyRecord> outputs` or
+            // `[AllowSparseNodes] EmptyNodeOutputArray outputs`.
+            auto paramType = param->getType();
+            if (!isIntrinsicTypeWithOp(paramType, kIROp_NodeOutputArrayType) &&
+                !isIntrinsicTypeWithOp(paramType, kIROp_EmptyNodeOutputArrayType))
+            {
+                sink->diagnose(Diagnostics::AllowSparseNodesRequiresNodeOutputArray{
+                    .attr = allowSparseNodesAttr});
+            }
+        }
+
         if (isUniformParameterType(param->getType()))
         {
             // Automatically add `uniform` modifier to entry point parameters.
@@ -1987,17 +2386,24 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // Attribute and keyword diagnostics. Check for the [[vk::binding]] and [[vk::push_constants]]
-    // attributes, and the register() and packoffset() keywords on entry point parameters. Slang
-    // currently ignores these, which can lead to user confusion whenever the output does not
-    // correspond to what was requested. Conversely, Slang silently generating output that just
-    // happens to align with what's requested can also lead to user confusion, with the user
-    // mistakenly believing that the modifiers are working as intended.
+    // Attribute and keyword diagnostics. Check for ignored [[vk::binding]] and
+    // [[vk::push_constant]] attributes, and the register() and packoffset() keywords on entry
+    // point parameters. Slang currently ignores these in the cases diagnosed below, which can lead
+    // to user confusion whenever the output does not correspond to what was requested. Conversely,
+    // Slang silently generating output that just happens to align with what's requested can also
+    // lead to user confusion, with the user mistakenly believing that the modifiers are working as
+    // intended.
     //
     // Note that this only checks when they're used on entry point parameters.
+    bool supportsVkBindingOnEntryPointParameters =
+        _allTargetsSupportVkBindingOnEntryPointParameters(linkage);
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
-        if (param->findModifier<GLSLBindingAttribute>())
+        auto astBuilder = linkage->getASTBuilder();
+        bool supportsVkBindingOnParameter =
+            supportsVkBindingOnEntryPointParameters &&
+            isVkBindingCompatibleEntryPointParameterType(astBuilder, param->getType());
+        if (!supportsVkBindingOnParameter && param->findModifier<GLSLBindingAttribute>())
         {
             sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
                 .modifier = "attribute '[[vk::binding(...)]]'",
@@ -2037,7 +2443,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // for both spellings. `signatureStructUses` keeps each contributing struct and
     // its use location so we can point the diagnostic at the exact use site (the
     // non-generic case is reported by `diagnoseMissingCapabilityProvenance`).
-    CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
     List<GenericStructTypeUse> signatureStructUses;
     {
         auto astBuilder = linkage->getASTBuilder();
@@ -2078,6 +2483,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // collector), so this join is unconditional.
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
+
+    // The entry point's stage-specific requirements belong to the `EntryPoint`, not the
+    // stage-agnostic `FuncDecl`; store the finalized set there as the source of truth for
+    // downstream entry-point consumers.
+    entryPoint->setInferredCapabilityRequirements(
+        entryPointInferredCaps.freeze(linkage->getASTBuilder()));
 
     for (auto target : linkage->targets)
     {
@@ -3088,7 +3499,39 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     auto args = inArgs;
     auto argCount = inArgCount;
 
-    SharedSemanticsContext sharedSemanticsContext(getLinkage(), nullptr, sink);
+    // Validating a specialization argument means checking that the argument
+    // type conforms to the entry point's generic constraints, and that check
+    // needs to see every `extension` that could supply a conformance witness.
+    //
+    // Scope the checking session to the entry point's own module rather than
+    // leaving it module-less. A module-less (`m_module == nullptr`) context
+    // resolves extensions from the linkage's `loadedModulesList`, which never
+    // contains the primary command-line translation unit -- so a conformance
+    // provided by an `extension` in that primary source (e.g. specializing a
+    // `T : IFoo` entry point to a type whose `T : IFoo` witness comes from an
+    // `extension T : IFoo` in the same file) was invisible and failed with
+    // E38029, even though the identical call resolves fine in the module body.
+    //
+    // With `m_module` set, `getCandidateExtensionsForTypeDecl` instead consults
+    // `importedModulesList`, so we seed it from the entry point's module
+    // dependency closure. `getModuleDependencies()` self-includes the owning
+    // module (see `Module::Module`'s `addModuleDependency(this)`), so the
+    // primary module's own extensions come along -- this is the same
+    // point-of-view an in-body generic call has.
+    //
+    // When the entry point has no owning module (`getModule()` is null) we pass
+    // `nullptr` and fall back to the prior module-less behavior.
+    auto entryPointModule = getModule();
+    SharedSemanticsContext sharedSemanticsContext(getLinkage(), entryPointModule, sink);
+    if (entryPointModule)
+    {
+        for (auto module : getModuleDependencies())
+        {
+            auto moduleDecl = module->getModuleDecl();
+            if (sharedSemanticsContext.importedModulesSet.add(moduleDecl))
+                sharedSemanticsContext.importedModulesList.add(moduleDecl);
+        }
+    }
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     // The last N arguments will be for the implicit existential arguments
@@ -3301,12 +3744,20 @@ Scope* ComponentType::_getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder)
         for (auto srcScope = module->getModuleDecl()->ownedScope; srcScope;
              srcScope = srcScope->nextSibling)
         {
-            if (srcScope->containerDecl != module->getModuleDecl() &&
-                srcScope->containerDecl->parentDecl != module->getModuleDecl())
-                continue; // Skip scopes that is not part of current module.
+            // Re-export only the module's own scope and its own `__include`d files
+            // into the legacy name-based lookup scope (which backs `getTypeFromString`,
+            // string-specified entry points / type-conformance, and
+            // specialization-argument parsing); drop `using`-spliced namespaces and any
+            // foreign module's files a transitive `import` put on the chain, so `using`
+            // can't leak into reflection/API name lookup. Mirrors
+            // `importModuleIntoScope` (see `isOwnModuleOrIncludedFileScope` /
+            // shader-slang/slang#11443).
+            auto containerDecl = srcScope->containerDecl;
+            if (!isOwnModuleOrIncludedFileScope(containerDecl, module->getModuleDecl()))
+                continue; // Skip scopes that are not part of the current module.
 
             Scope* moduleScope = astBuilder->create<Scope>();
-            moduleScope->containerDecl = srcScope->containerDecl;
+            moduleScope->containerDecl = containerDecl;
 
             moduleScope->nextSibling = scope->nextSibling;
             scope->nextSibling = moduleScope;

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment -g3 -O0 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment -g3 -emit-spirv-directly
 
 // Structure for shader parameters
 struct ShaderParameters

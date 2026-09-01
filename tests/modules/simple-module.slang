@@ -7,6 +7,7 @@ module simple_module;
 __include "simple-module-impl";
 
 // TestFunctionB is defined directly in this file
+[noinline]
 public int TestFunctionB(int x)
 {
     return x + 200;

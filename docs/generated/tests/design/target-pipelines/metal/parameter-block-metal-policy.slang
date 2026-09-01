@@ -1,19 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
-//META: doc_ref=docs/generated/design/target-pipelines/metal.md#metal-specific-lowerbufferelementtypetostoragetype
-//META: doc_section_digest=402fbd082c2a298b616bbcc98ca821e8dc84d270680f801b050b215045c8be2f
-//META: purpose=ParameterBlock<T> uses the MetalParameterBlock lowering policy: resource-typed fields become descriptor handles (raw `T device*` pointer fields) and the block binds as one `constant*` parameter.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/target-pipelines/metal.md#metals-three-lowerbufferelementtypetostoragetype-invocations
+//META: doc_section_digest=41531393ced08c0803ee8c63b01f36a7cafa65309b49df24964c1309a93f4b8e
+//META: purpose=The Phase-B `MetalParameterBlock` policy turns resource-typed fields inside a `ParameterBlock` into raw `T device*` descriptor-handle fields, and the block binds as one `constant*` argument.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Metal models parameter blocks as bindless: the
-// `MetalParameterBlock`-policy `lowerBufferElementTypeToStorageType`
-// rewrites the resource-typed fields inside Resources into raw
-// `int device*` pointer fields, and the whole block is passed as
-// a single `Resources constant*` argument.
+// Verifies the bindless half of Metal's "bindful for constant buffers,
+// bindless for parameter blocks" model. This invocation runs before the
+// general resource legalization precisely so the resource fields are
+// already descriptor handles by the time that pass walks the struct.
+// CHECK asserts the block struct's two buffer fields are plain
+// `int device*` pointers and that the whole block arrives as a single
+// `constant*` kernel argument with a buffer slot.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

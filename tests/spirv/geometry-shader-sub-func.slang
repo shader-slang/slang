@@ -1,6 +1,6 @@
 // geometry-shader-sub-func.slang
 
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv -emit-spirv-directly -O0
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -emit-spirv-directly
 
 struct CoarseVertex
 {

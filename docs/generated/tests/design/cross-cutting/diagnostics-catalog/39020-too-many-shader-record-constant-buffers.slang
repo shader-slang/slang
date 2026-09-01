@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=585639ca71660c2af61e0642d91c54c3088c5a4152aa87e34e0f76e055122b45
 //META: purpose=Fires diagnostic E39020 (too-many-shader-record-constant-buffers) - too many shader record constant buffers
 //META: intent=negative
 //META: pipeline_stage=check
@@ -30,4 +30,4 @@ void main(inout Payload p, in BuiltInTriangleIntersectionAttributes attrs)
     p.c = float4(0);
 }
 
-// CHECK: E39020
+//CHECK: E39020

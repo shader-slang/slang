@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2
 // Tests generation of DebugLocalVariable and DebugDeclare for enum variables
 
 //CHECK: [[E_STR:%[0-9]+]] = OpString "e"

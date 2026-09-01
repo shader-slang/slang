@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-06-24T09:20:31Z
-//META: source_commit=b25e06aeb8862d207541c3d812c57cb9e381b802
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#aggregate-constructors
-//META: doc_section_digest=3e412bb1b8df51b023821b69be767e4f040104ad482e9063949a7dd98d9eda38
+//META: doc_section_digest=136fa0f20043e0a8db805b7f018d292446250e6117047722c77e7aa7efca0675
 //META: purpose=A specialized `CoopVec<T, N>(args...)` constructor call collapses, after value-pack expansion, to a `makeCoopVector(...)` IR opcode with one operand per element.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -21,7 +21,7 @@
 // `cooperative_vector` capability; the IR opcode is visible at
 // LOWER-TO-IR regardless.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int ia;
 uniform int ib;

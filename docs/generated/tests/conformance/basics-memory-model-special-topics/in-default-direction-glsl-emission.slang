@@ -19,6 +19,8 @@
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 RWStructuredBuffer<int> output;
 
@@ -51,12 +53,23 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // MTL: void readExplicit_{{[0-9]+}}(int val_{{[0-9]+}}
 // MTL-NOT: int thread*
 
-// CUDA: __device__ void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})
-// CUDA: __device__ void readExplicit_{{[0-9]+}}(int val_{{[0-9]+}})
+// CUDA: void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})
+// CUDA: void readExplicit_{{[0-9]+}}(int val_{{[0-9]+}})
 
-// CPP: static void readImplicit_{{[0-9]+}}(int32_t val_{{[0-9]+}}
-// CPP: static void readExplicit_{{[0-9]+}}(int32_t val_{{[0-9]+}}
+// CPP: void readImplicit_{{[0-9]+}}(int32_t val_{{[0-9]+}}
+// CPP: void readExplicit_{{[0-9]+}}(int32_t val_{{[0-9]+}}
 
 // WGSL: fn readImplicit_{{[0-9]+}}( val_{{[0-9]+}} : i32)
 // WGSL: fn readExplicit_{{[0-9]+}}( val_{{[0-9]+}} : i32)
 // WGSL-NOT: ptr<function
+
+// HLSL: void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})
+// HLSL: void readExplicit_{{[0-9]+}}(int val_{{[0-9]+}})
+// HLSL-NOT: inout int
+// HLSL-NOT: out int
+
+// SPIRV-NOT: OpTypePointer Function
+// SPIRV: %readImplicit = OpFunction %void DontInline
+// SPIRV: %val = OpFunctionParameter %int
+// SPIRV: %readExplicit = OpFunction %void DontInline
+// SPIRV: %val_{{[0-9]+}} = OpFunctionParameter %int

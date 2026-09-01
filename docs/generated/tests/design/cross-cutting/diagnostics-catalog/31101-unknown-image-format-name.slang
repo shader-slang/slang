@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=b7f362a156d5667189e07898b68e1621030f7de6635b4ad056d730039cf90716
+//META: doc_section_digest=5fa8c32d1f84cd9cb7e96980a93eea5b978b02a744f82c419e67563ba30dbdc2
 //META: purpose=Fires diagnostic E31101 (unknown-image-format-name) -- unknown image format
 //META: intent=negative
 //META: pipeline_stage=check
@@ -19,4 +19,4 @@ RWTexture2D<float4> tex;
 void main() {}
 
 
-// CHECK: E31101
+//CHECK: E31101

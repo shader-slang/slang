@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#wrapcbufferelementsformetal
-//META: doc_section_digest=2a4fe67f3530d551446e5a52ff530daaceb47c541972fbd77fc4832e5e0aa6a6
-//META: purpose=ConstantBuffer<T> emits as a wrapper-struct pointer in Metal's `constant` address space with a positional [[buffer(N)]] attribute.
+//META: doc_section_digest=794e6b917e6a05e1bb5a790707b746f03faed4ff03cdce751a3d870c7ccc928f
+//META: purpose=A `ConstantBuffer<T>` emits as a `T constant*` pointer parameter with a positional `[[buffer(N)]]` slot.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `ConstantBuffer<Params>` lowers to a wrapped struct passed as
-// `Params_0 constant*` (Metal's constant address space) with a
-// positional `[[buffer(N)]]` slot. The cbuffer element wrapping
-// is `wrapCBufferElementsForMetal`'s job.
+// Verifies the bindful half of Metal's parameter model: unlike a
+// `ParameterBlock`, a constant buffer keeps a real binding slot and lands
+// in the `constant` address space. The kernel reads two fields of the
+// buffer so it stays live; CHECK matches the kernel signature and then, on
+// the same emitted line, the `constant*` parameter and its `buffer(` slot
+// marker.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

@@ -1,7 +1,7 @@
 // closesthit.slang
 
 //TEST:SIMPLE(filecheck=GL_SPIRV): -stage anyhit -entry main -target spirv-assembly -emit-spirv-via-glsl
-//TEST:SIMPLE(filecheck=SPIRV): -stage anyhit -entry main -target spirv
+//TEST:SIMPLE(filecheck=SPIRV): -stage anyhit -entry main -target spirv -O3
 
 struct SphereHitAttributes
 {

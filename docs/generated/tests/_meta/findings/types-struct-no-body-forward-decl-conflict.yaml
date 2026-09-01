@@ -1,0 +1,45 @@
+schema_version: 1
+id: types-struct-no-body-forward-decl-conflict
+bundle: conformance/types-struct
+suspected_kind: wrong-diagnostic
+title: "no-body struct decl + later definition rejected as conflicting (E30200)"
+observed_at: "2026-06-11T10:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "./build/RelWithDebInfo/bin/slangc docs/generated/tests/conformance/types-struct/struct-no-body-decl.slang -target hlsl -entry main -stage compute"
+  source_slang: docs/generated/tests/conformance/types-struct/struct-no-body-decl.slang
+  exit_code: 255
+  observed_summary: |
+    A no-body struct declaration (`struct ForwardDeclared;`) followed by a
+    with-members definition (`struct ForwardDeclared { int x; }`) is rejected:
+
+    error[E30200]: conflicting declaration
+      22 | struct ForwardDeclared
+         |        ^^^^^^^^^^^^^^^ declaration of 'ForwardDeclared' conflicts with existing declaration
+    note: see previous declaration of 'ForwardDeclared'
+      19 | struct ForwardDeclared;
+    error[E39999]: ambiguous reference to 'ForwardDeclared'
+      32 | ForwardDeclared fd;
+         | ^^^^^^^^^^^^^^^ ambiguous reference to 'ForwardDeclared'
+
+    The order does not matter: a with-members declaration followed by a
+    no-body declaration of the same name produces the same conflict. A no-body
+    declaration on its own (with no later definition) compiles cleanly on all
+    targets. The failure reproduces on hlsl, glsl, spirv-asm, metal, and wgsl
+    (it is a front-end diagnostic, not a back-end issue).
+expected:
+  claim: |
+    A no-body struct declaration specifies the existence of a struct type and
+    enables its use in type expressions; a subsequent with-members definition of
+    the same name should complete that type, not collide with the forward
+    declaration. The compiler should accept the pair, not emit E30200/E39999.
+  citation_kind: doc
+  citation: docs/language-reference/types-struct.md
+provenance:
+  agent_model: claude-opus-4-8[1m]
+  source_commit: 4a91b58b87e4619ffd76f313e7ae2164d1bd288a
+  doc_anchor: docs/language-reference/types-struct.md#description
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Spec intends no-body declarations only for link-time extern types (the `extern struct` form), so a same-module no-body + definition pair may be out of contract; but the Description section presents the plain no-body form as a general forward-declaration mechanism with no such restriction, so the diagnostic still contradicts the doc as written."

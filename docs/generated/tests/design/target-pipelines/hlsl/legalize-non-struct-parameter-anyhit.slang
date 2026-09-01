@@ -1,20 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizenonstructparametertostructforhlsl
-//META: doc_section_digest=22ad05f0b82be681c3aaa0f7d4e69c88ae0c09144722950713aebddf79498241
+//META: doc_section_digest=73eddbf92f9a1dd3768bc3f8d75a4776ee86e6cd3d0c38eeda0ae88faa4bf883
 //META: purpose=legalizeNonStructParameterToStructForHLSL wraps non-struct DXR-stage parameters in single-field struct types so DXC accepts them; the HLSL emission of an anyhit entry point taking a non-struct payload still produces a struct-typed payload parameter.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `### legalizeNonStructParameterToStructForHLSL` section:
-// DXC requires DXR shader-stage parameters (anyhit, closesthit, etc.)
-// to be struct types. A non-struct `inout float4` payload is wrapped
-// in a single-field struct and unwrapped inside the entry point. The
-// HLSL emit therefore contains a struct declaration that wraps the
-// float4 plus an `anyhit` `void main(...)` entry-point function.
+// Verifies that a DXR entry point whose payload parameter is not a struct
+// gets that parameter wrapped in a generated single-field struct, because DXC
+// only accepts struct-typed DXR-stage parameters. The test declares an
+// `anyhit` entry point over a payload carrying a bare `float4`; CHECK asserts
+// the emit contains a struct declaration holding the float4 and an
+// entry-point signature that takes it, i.e. the wrapped-and-unwrapped shape
+// the legalization produces.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile lib_6_6 -stage anyhit -entry main
 

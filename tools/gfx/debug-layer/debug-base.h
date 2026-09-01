@@ -1,9 +1,9 @@
 // debug-base.h
 #pragma once
 
-#include "../command-encoder-com-forward.h"
-#include "../renderer-shared.h"
 #include "core/slang-com-object.h"
+#include "gfx/command-encoder-com-forward.h"
+#include "gfx/renderer-shared.h"
 #include "slang-com-ptr.h"
 #include "slang-gfx.h"
 

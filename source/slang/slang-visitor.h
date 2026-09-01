@@ -349,6 +349,13 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         e->typeExpr = dispatchIfNotNull(e->typeExpr);
         return e;
     }
+    Expr* visitCastOptionalExpr(CastOptionalExpr* e)
+    {
+        e->valueArg = dispatchIfNotNull(e->valueArg);
+        // innerVarDecl is synthetic — do not dispatch
+        e->innerCoercedExpr = dispatchIfNotNull(e->innerCoercedExpr);
+        return e;
+    }
 
     // --- Existential ---
     // Note: ExtractExistentialValueExpr has originalExpr for language server only (not traversed)

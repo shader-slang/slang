@@ -197,14 +197,9 @@ Of course there's a lot more to it in once you get into the details and the diff
 For now, looking at `source/slang/slang-serialize.h` is probably the best way to learn more about the approach.
 
 One key goal of this serialization system is that it allows the serialized format to be swapped in and out without affecting the per-type `serialize` functions.
-Currently there are only a small number of implementations.
+Currently Fossil is the only implementation.
 
-RIFF Serialization
-------------------
-
-The files `slang-serialize-riff.{h,cpp}` provide an implementation of the general-purpose serialization framework that reads/writes RIFF files with a particular kind of structure, based on what had previously been hard-coded for use in serializing the AST to RIFF.
-
-In practice this representation is kind of like an encoding of JSON as RIFF chunks, with leaf/data chunks for what would be leaf values in JSON, and container chunks for arrays and dictionaries (plus other aggregates that would translate into arrays or dictionaries in JSON).
+(Historical note: a second backend once existed in `slang-serialize-riff.{h,cpp}`, encoding values directly as RIFF chunks — in practice something like an encoding of JSON as RIFF. It was written to compare backends while Fossil serialization was being brought up, lost that comparison, and was later removed as dead code; recover it from git history if it is ever needed again.)
 
 Fossil Serialization
 --------------------

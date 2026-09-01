@@ -1,0 +1,44 @@
+name: PR Checks Complete Sync
+
+# Relays a gating GitHub Actions workflow's completion to the board, so a PR is
+# moved to Snagged when its checks fail (and recovered when they pass) in real
+# time rather than waiting for the nightly sweep. Copy to
+# `.github/workflows/pr-checks-complete.yml`.
+#
+# Why this is needed: GitHub deliberately does NOT deliver check_suite/check_run
+# events for suites created by GitHub Actions (recursion prevention), so a
+# check_suite trigger never fires for Actions-based CI. workflow_run IS delivered
+# for Actions runs, so it is the event that carries "a gating workflow finished".
+#
+# IMPORTANT -- customize the `workflows:` list below for THIS repo. workflow_run
+# can only reference workflows in the same repo, by their `name:`. List your
+# repo's gating workflows: at least the heavyweight CI workflow (usually the last
+# to finish, so the whole check rollup has settled when it completes), plus any
+# lighter required checks you want reflected the moment they finish rather than
+# when CI does. The reusable workflow always recomputes from the WHOLE check
+# rollup, so listing a workflow only changes WHEN the recompute runs, not which
+# checks it reads.
+#
+# Do NOT list the board-sync's own callers ("PR Maintenance", "PR Review Fork
+# Bridge", "PR Review Fork Apply", "PR Commit Status Sync", and this one) -- a
+# workflow_run keyed on them would trigger this caller in a loop.
+#
+# No conclusion guard: react to every completion (failure -> Snagged, success ->
+# recovery); the recompute is idempotent. (workflow_run only fires for workflow
+# files on the default branch.)
+
+on:
+  workflow_run:
+    workflows:
+      # Replace with THIS repo's gating workflow name(s) (the `name:` field of
+      # each workflow, not its filename), e.g.:
+      - "CI"
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  board-sync:
+    uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
+    secrets:
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

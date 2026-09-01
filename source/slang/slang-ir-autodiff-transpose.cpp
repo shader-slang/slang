@@ -2364,52 +2364,11 @@ struct DiffTransposePass
         }
     }
 
-    void safeSetInsertAfterInst(IRBuilder* builder, IRInst* inst)
-    {
-        // If the inst is in the first or second block of the parent function, then
-        // insert into the third block, otherwise simply call
-        // setInsertAfterOrdinaryInst. The second block is the block that the first
-        // block branches into unconditionaly.
-        //
-        bool shouldGoIntoNextBlock = false;
-        if (auto block = as<IRBlock>(inst->getParent()))
-        {
-            // Primal parameters block.
-            auto firstBlock = cast<IRFunc>(block->getParent())->getFirstBlock();
-            if (block == firstBlock)
-                shouldGoIntoNextBlock = true;
-
-            // Check if block is bwd-prop parameters block.
-            if (block->getPredecessors().getCount() == 1)
-            {
-                auto predBlock = getUniquePredecessor(block);
-                if (isDifferentialOrRecomputeBlock(block) &&
-                    !isDifferentialOrRecomputeBlock(predBlock))
-                    shouldGoIntoNextBlock = true;
-            }
-
-            if (shouldGoIntoNextBlock)
-            {
-                auto nextBlock =
-                    as<IRUnconditionalBranch>(block->getTerminator())->getTargetBlock();
-                if (auto ordInst = nextBlock->getFirstOrdinaryInst())
-                    builder->setInsertAfter(ordInst);
-                else
-                    builder->setInsertBefore(nextBlock->getTerminator());
-                return;
-            }
-        }
-
-        setInsertAfterOrdinaryInst(builder, inst);
-    }
-
-    IRInst* promoteOperandsToTargetType(IRBuilder* builder, IRInst* fwdInst)
+    List<IRInst*> promoteOperandsToTargetType(IRBuilder* builder, IRInst* fwdInst)
     {
         auto oldLoc = builder->getInsertLoc();
         // If operands are not of the same type, cast them to the target type.
         IRType* targetType = fwdInst->getDataType();
-
-        bool needNewInst = false;
 
         List<IRInst*> newOperands;
         for (UIndex ii = 0; ii < fwdInst->getOperandCount(); ii++)
@@ -2418,21 +2377,30 @@ struct DiffTransposePass
             auto operandType = unwrapAttributedType(operand->getDataType());
             if (operandType != targetType)
             {
-                // Insert new operand just after the old operand, so we have the old
-                // operands available.
-                //
-                safeSetInsertAfterInst(builder, operand);
-
-                IRInst* newOperand = promoteToType(builder, targetType, operand);
-
+                IRInst* newOperand = nullptr;
                 if (isDifferentialInst(operand))
+                {
+                    // A differential promotion must stay in the forward block so that it is
+                    // transposed in turn.
+                    builder->setInsertBefore(fwdInst);
+                    newOperand = promoteToType(builder, targetType, operand);
                     builder->markInstAsDifferential(
                         newOperand,
                         tryGetPrimalTypeFromDiffInst(fwdInst));
+                }
+                else
+                {
+                    // A primal promotion is consumed by the reverse instruction emitted below,
+                    // so place it at that use directly in the reverse-mode block. Consider a
+                    // vector/scalar division after a loop where the scalar is a loop parameter.
+                    // Inserting the broadcast after that parameter puts it inside the primal loop,
+                    // while the reverse division runs before the reverse loop and cannot use it
+                    // there.
+                    builder->setInsertLoc(oldLoc);
+                    newOperand = promoteToType(builder, targetType, operand);
+                }
 
                 newOperands.add(newOperand);
-
-                needNewInst = true;
             }
             else
             {
@@ -2440,27 +2408,8 @@ struct DiffTransposePass
             }
         }
 
-        if (needNewInst)
-        {
-            builder->setInsertAfter(fwdInst);
-            IRInst* newInst = builder->emitIntrinsicInst(
-                fwdInst->getDataType(),
-                fwdInst->getOp(),
-                newOperands.getCount(),
-                newOperands.getBuffer());
-
-            builder->setInsertLoc(oldLoc);
-
-            if (isDifferentialInst(fwdInst))
-                builder->markInstAsDifferential(newInst, tryGetPrimalTypeFromDiffInst(fwdInst));
-
-            return newInst;
-        }
-        else
-        {
-            builder->setInsertLoc(oldLoc);
-            return fwdInst;
-        }
+        builder->setInsertLoc(oldLoc);
+        return newOperands;
     }
 
 
@@ -2494,17 +2443,17 @@ struct DiffTransposePass
     TranspositionResult transposeArithmetic(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
 
-        // Only handle arithmetic on uniform types. If the types aren't uniform, we need
-        // some promotion/demotion logic. Note that this can create a new inst in place
-        // of the old, but since we're at the transposition step for the old inst, and
-        // already have it's aggregate gradient, there's no need to worry about the
-        // 'gradientsMap' being out-of-date
+        // Only handle arithmetic on uniform types. If the types aren't uniform, promote
+        // the operands without reconstructing the forward instruction. A differential
+        // promotion belongs in the forward block, while a primal promotion belongs at
+        // its reverse-mode use, so no single block can hold a reconstructed instruction
+        // that references both kinds while preserving SSA dominance.
         // TODO: There are some opportunities for optimization here (otherwise we might
         // be increasing the intermediate data size unnecessarily)
         //
-        fwdInst = promoteOperandsToTargetType(builder, fwdInst);
+        auto operands = promoteOperandsToTargetType(builder, fwdInst);
 
-        auto operandType = fwdInst->getOperand(0)->getDataType();
+        auto operandType = operands[0]->getDataType();
 
         switch (fwdInst->getOp())
         {
@@ -2512,35 +2461,35 @@ struct DiffTransposePass
             {
                 // (Out = dA + dB) -> [(dA += dOut), (dB += dOut)]
                 return TranspositionResult(List<RevGradient>(
-                    RevGradient(fwdInst->getOperand(0), revValue, fwdInst),
-                    RevGradient(fwdInst->getOperand(1), revValue, fwdInst)));
+                    RevGradient(operands[0], revValue, fwdInst),
+                    RevGradient(operands[1], revValue, fwdInst)));
             }
         case kIROp_Sub:
             {
                 // (Out = dA - dB) -> [(dA += dOut), (dB -= dOut)]
                 return TranspositionResult(List<RevGradient>(
-                    RevGradient(fwdInst->getOperand(0), revValue, fwdInst),
+                    RevGradient(operands[0], revValue, fwdInst),
                     RevGradient(
-                        fwdInst->getOperand(1),
+                        operands[1],
                         builder->emitNeg(revValue->getDataType(), revValue),
                         fwdInst)));
             }
         case kIROp_Mul:
             {
-                if (isDifferentialInst(fwdInst->getOperand(0)))
+                if (isDifferentialInst(operands[0]))
                 {
                     // (Out = dA * B) -> (dA += B * dOut)
                     return TranspositionResult(List<RevGradient>(RevGradient(
-                        fwdInst->getOperand(0),
-                        builder->emitMul(operandType, fwdInst->getOperand(1), revValue),
+                        operands[0],
+                        builder->emitMul(operandType, operands[1], revValue),
                         fwdInst)));
                 }
-                else if (isDifferentialInst(fwdInst->getOperand(1)))
+                else if (isDifferentialInst(operands[1]))
                 {
                     // (Out = A * dB) -> (dB += A * dOut)
                     return TranspositionResult(List<RevGradient>(RevGradient(
-                        fwdInst->getOperand(1),
-                        builder->emitMul(operandType, fwdInst->getOperand(0), revValue),
+                        operands[1],
+                        builder->emitMul(operandType, operands[0], revValue),
                         fwdInst)));
                 }
                 SLANG_ASSERT_FAILURE("Neither operand of a mul instruction is a differential inst");
@@ -2548,14 +2497,14 @@ struct DiffTransposePass
             }
         case kIROp_Div:
             {
-                if (isDifferentialInst(fwdInst->getOperand(0)))
+                if (isDifferentialInst(operands[0]))
                 {
-                    SLANG_RELEASE_ASSERT(!isDifferentialInst(fwdInst->getOperand(1)));
+                    SLANG_RELEASE_ASSERT(!isDifferentialInst(operands[1]));
 
                     // (Out = dA / B) -> (dA += dOut / B)
                     return TranspositionResult(List<RevGradient>(RevGradient(
-                        fwdInst->getOperand(0),
-                        builder->emitDiv(operandType, revValue, fwdInst->getOperand(1)),
+                        operands[0],
+                        builder->emitDiv(operandType, revValue, operands[1]),
                         fwdInst)));
                 }
                 SLANG_ASSERT_FAILURE("The first operand of a div inst must be a differential inst");
@@ -2563,11 +2512,11 @@ struct DiffTransposePass
             }
         case kIROp_Neg:
             {
-                if (isDifferentialInst(fwdInst->getOperand(0)))
+                if (isDifferentialInst(operands[0]))
                 {
                     // (Out = -dA) -> (dA += -dOut)
                     return TranspositionResult(List<RevGradient>(RevGradient(
-                        fwdInst->getOperand(0),
+                        operands[0],
                         builder->emitNeg(operandType, revValue),
                         fwdInst)));
                 }

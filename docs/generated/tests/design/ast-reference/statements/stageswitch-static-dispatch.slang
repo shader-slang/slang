@@ -1,21 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#targetswitchstmt-stageswitchstmt-targetcasestmt
-//META: doc_section_digest=bda3b9e2ee202a8291e932d7767da7f7aac9944fa990f3b9e42bb6aa33d4e673
-//META: purpose=A StageSwitchStmt dispatches statically by pipeline stage; only the case body whose label matches the entry point's stage survives in the emitted code, and the other cases are resolved away.
+//META: doc_section_digest=cd98281cc967041ce075594e739c4a374f2cf6163574c3a2a95a8571934a11b0
+//META: purpose=A StageSwitchStmt dispatches statically by pipeline stage; only the case body whose label matches the entry point's stage reaches the emitted code.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says StageSwitchStmt is "the same shape but dispatches on
-// pipeline stage" and both target/stage switches are "resolved away
-// during IR lowering; only one case body survives in the emitted
-// code". We test by compiling for a compute entry: the
-// `case fragment:` body must not appear, and the `default:` value
-// must be the one emitted. The C++ text emit makes the resolution
-// directly visible.
+// Verifies `__stage_switch` picks its case at compile time from the
+// entry point's pipeline stage. A compute entry matches no
+// `case fragment:`, so the `default` body must be the emitted one; the
+// CHECK asserts the helper's emitted C++ returns the default value.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
 

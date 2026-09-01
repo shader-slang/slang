@@ -11,9 +11,9 @@
 //
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
-#include "../core/slang-math.h"
-#include "../core/slang-string-util.h"
 #include "core/slang-char-util.h"
+#include "core/slang-math.h"
+#include "core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-ast-print.h"
@@ -330,6 +330,24 @@ void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, Cont
     destScope->nextSibling = subScope;
 }
 
+bool isOwnModuleOrIncludedFileScope(ContainerDecl* containerDecl, ModuleDecl* moduleDecl)
+{
+    // The module's own scope, or one of its own `__include`d files (a `FileDecl`
+    // whose parent is this module). Everything else on the module's sibling chain is
+    // excluded from re-export: a `using`-spliced namespace (lookup-local, not part of
+    // the imported surface), or a *foreign* module's `FileDecl` that a plain,
+    // non-`__exported` transitive `import` put on the chain (its `parentDecl` is that
+    // other module — `import` is non-transitive; only `__exported import` re-exports).
+    // The `parentDecl == moduleDecl` conjunct is load-bearing: any foreign module's
+    // `FileDecl` that lands on this chain has its `parentDecl` pointing at that other
+    // module, so it is dropped regardless of how it arrived. Dropping the conjunct
+    // would re-export those foreign files and make plain `import` transitive.
+    // See shader-slang/slang#11443.
+    if (containerDecl == moduleDecl)
+        return true;
+    return as<FileDecl>(containerDecl) && containerDecl->parentDecl == moduleDecl;
+}
+
 ContainerDecl* isStaticScopeDecl(Decl* decl)
 {
     if (as<NamespaceDeclBase>(decl) || as<FileDecl>(decl))
@@ -369,10 +387,19 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     // What we do instead is see if there's already been a declRef
     // constructed for this expression and rest assured that it's already
     // had a diagnostic emitted.
+    //
+    // The already-resolved declRef must refer to the *same* declaration we are
+    // about to diagnose. For a constructor call such as `int4(int2(1,2), 3)` the
+    // invoke's `functionExpr` is a reference to the *type* `int4`, which always
+    // carries a declRef (to the type, not the constructor). Without the
+    // same-decl check we would treat the type reference as "already diagnosed"
+    // and silently skip the constructor's own `[deprecated]` / `[RemovedSince]`
+    // diagnostic.
     auto originalAppExpr = as<AppExprBase>(originalExpr);
     auto originalAppFunDecl =
         originalAppExpr ? as<DeclRefExpr>(originalAppExpr->functionExpr) : nullptr;
-    if (originalAppFunDecl && originalAppFunDecl->declRef)
+    if (originalAppFunDecl && originalAppFunDecl->declRef &&
+        originalAppFunDecl->declRef.getDecl() == declRef.getDecl())
     {
         return;
     }
@@ -1032,7 +1059,15 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
         }
     }
 
-    return ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
+    auto resultExpr = ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
+    // A property reference does not produce an `InvokeExpr` during semantic checking. Register
+    // its accessors here so that lowering can later select the getter or setter without losing
+    // the derivative associations needed by the enclosing differentiable function.
+    if (m_parentDifferentiableAttr && item.declRef.as<PropertyDecl>())
+    {
+        registerAssociatedMethods(this, item.declRef);
+    }
+    return resultExpr;
 }
 
 void SemanticsVisitor::suggestCompletionItems(
@@ -1073,20 +1108,37 @@ Expr* SemanticsVisitor::createLookupResultExpr(
     }
 }
 
-DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
+static DeclVisibility _getTypeVisibility(
+    Type* type,
+    Dictionary<Type*, DeclVisibility>& typeVisibilityCache)
 {
+    if (auto cachedVisibility = typeVisibilityCache.tryGetValue(type))
+        return *cachedVisibility;
+
+    DeclVisibility visibility = DeclVisibility::Public;
     if (auto declRefType = as<DeclRefType>(type))
     {
-        auto v = getDeclVisibility(declRefType->getDeclRef().getDecl());
+        visibility = getDeclVisibility(declRefType->getDeclRef().getDecl());
         auto args = findInnerMostGenericArgs(SubstitutionSet(declRefType->getDeclRef()));
         for (auto arg : args)
         {
             if (auto typeArg = as<DeclRefType>(arg))
-                v = Math::Min(v, getTypeVisibility(typeArg));
+                visibility =
+                    Math::Min(visibility, _getTypeVisibility(typeArg, typeVisibilityCache));
         }
-        return v;
     }
-    return DeclVisibility::Public;
+
+    // Cache only completed results. Consider `Pair<T, T>`: both arguments point to the same
+    // canonical type DAG, so the second edge should reuse the visibility collected through the
+    // first instead of traversing the entire DAG again.
+    typeVisibilityCache.add(type, visibility);
+    return visibility;
+}
+
+DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
+{
+    Dictionary<Type*, DeclVisibility> typeVisibilityCache;
+    return _getTypeVisibility(type, typeVisibilityCache);
 }
 
 bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope)
@@ -2164,8 +2216,9 @@ void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
         auto thisExpr = as<ThisExpr>(memberExpr->baseExpression);
         if (thisExpr && isTypeDifferentiable(memberExpr->type.type))
         {
+            auto noDiffThisAttr = this->m_parentFunc->findModifier<NoDiffThisAttribute>();
             if (isTypeDifferentiable(calcThisType(thisExpr->type.type)) ||
-                this->m_parentFunc->findModifier<NoDiffThisAttribute>())
+                (noDiffThisAttr && !noDiffThisAttr->isSynthesized))
             {
                 return;
             }
@@ -3400,6 +3453,19 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
 void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 {
+    // A subscript or property denotes storage, while its accessors are the functions that are
+    // actually called. Register every accessor because the getter-versus-setter decision is
+    // intentionally deferred until lowering materializes the storage reference.
+    if (declRef.as<SubscriptDecl>() || declRef.as<PropertyDecl>())
+    {
+        for (auto accessorDeclRef :
+             getMembersOfType<AccessorDecl>(context->getASTBuilder(), declRef.as<ContainerDecl>()))
+        {
+            registerAssociatedMethods(context, accessorDeclRef);
+        }
+        return;
+    }
+
     // Lower witness for ForwardDifferentiable for this function.
     // First we'll turn it into a func-as-type-expr, then check that
     // to get the function reference as a type, and then get the witness
@@ -3578,7 +3644,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     // Default behavior is to look at all available `__subscript`
     // declarations on the type and try to call one of them.
 
-    auto operatorName = getName("operator[]");
+    auto operatorName = getSubscriptOperatorName(m_astBuilder);
 
     LookupResult lookupResult = lookUpMember(
         m_astBuilder,
@@ -3628,14 +3694,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 
             if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
             {
-                if (auto subscriptDeclRef = fnExpr->declRef.as<SubscriptDecl>())
-                {
-                    for (auto accessorDeclRef :
-                         getMembersOfType<AccessorDecl>(m_astBuilder, subscriptDeclRef))
-                        registerAssociatedMethods(this, accessorDeclRef);
-                }
-                else
-                    registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
+                registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
             }
         }
     }
@@ -4039,10 +4098,11 @@ static Expr* _peelCastsAndParens(Expr* expr)
 }
 
 // Check whether two expressions refer to the same storage location by
-// comparing their structure in lockstep. Handles bare variable
-// references, member accesses (s.x == s.x, but not s.x == s.y), and
-// subscripts with matching constant indices (arr[0] == arr[0], but not
-// arr[0] == arr[1]). Returns false for anything it can't prove equal.
+// comparing their structure in lockstep. Handles the implicit object
+// (`this` == `this`), bare variable / static-member references, member
+// accesses (s.x == s.x, but not s.x == s.y), and subscripts with matching
+// constant indices (arr[0] == arr[0], but not arr[0] == arr[1]). Returns
+// false for anything it can't prove equal.
 static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
 {
     a = _peelCastsAndParens(a);
@@ -4050,14 +4110,22 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     if (!a || !b)
         return false;
 
-    // Same declaration reference.
-    if (auto aDeclRef = as<DeclRefExpr>(a))
-    {
-        auto bDeclRef = as<DeclRefExpr>(b);
-        return bDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
-    }
+    // Same implicit object: `this` vs `this`. There is exactly one `this` in a
+    // given method body, so any two `ThisExpr` nodes necessarily refer to the
+    // same object; that is why this returns true without comparing them further
+    // (there is no per-`this` identity to compare, unlike a named variable).
+    // Inside a method an unqualified member `x` is rewritten to
+    // `MemberExpr(base=ThisExpr, decl=x)`, so the MemberExpr recursion below
+    // bottoms out here on the two `this` bases; this is what still diagnoses
+    // `twoInoutInt(x, x)` (i.e. `this.x` aliasing itself). ThisExpr does not
+    // derive from DeclRefExpr, so it needs its own case.
+    if (as<ThisExpr>(a))
+        return as<ThisExpr>(b) != nullptr;
 
-    // Same member of the same base: s.x vs s.x.
+    // Same member of the same base: s.x vs s.x, but not s.x vs t.x. Checked
+    // before the bare-DeclRefExpr case below because MemberExpr derives from
+    // DeclRefExpr, and that branch would ignore the base object. (DerefMemberExpr
+    // for buffer-element member access derives from MemberExpr, so it lands here.)
     if (auto aMember = as<MemberExpr>(a))
     {
         auto bMember = as<MemberExpr>(b);
@@ -4066,6 +4134,17 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
         if (aMember->declRef.getDecl() != bMember->declRef.getDecl())
             return false;
         return _exprsDefinitelyAlias(aMember->baseExpression, bMember->baseExpression);
+    }
+
+    // Same bare declaration reference: a bare variable (VarExpr) or static
+    // member (StaticMemberExpr), which have no base object to compare.
+    if (auto aDeclRef = as<DeclRefExpr>(a))
+    {
+        auto bDeclRef = as<DeclRefExpr>(b);
+        // A bare DeclRefExpr is a VarExpr or StaticMemberExpr — any DeclRefExpr
+        // that is not a (non-static) MemberExpr, which was already handled above.
+        bool bIsBareDeclRef = bDeclRef && !as<MemberExpr>(b);
+        return bIsBareDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
     }
 
     // Same element of the same base: arr[0] vs arr[0].
@@ -6233,6 +6312,16 @@ static bool _isSizeOfType(Type* type)
         return false;
     }
 
+    // A `ModifiedType`'s modifiers are layout-transparent, so whether a type has
+    // a size is decided entirely by its base: `sizeof(unorm float4)` is just
+    // `sizeof(float4)`. This matters because the modifier survives into the type
+    // of an ordinary value — loading from a `RWTexture2D<unorm float4>` yields a
+    // `unorm float4` — so rejecting the wrapper here would reject `sizeof` on a
+    // value the user never spelled a modifier on. Unwrapping keeps the list
+    // below about *kinds* of type rather than repeating each kind in a modified
+    // form.
+    type = unwrapModifiedType(type);
+
     if (as<ArithmeticExpressionType>(type) || as<ArrayExpressionType>(type) ||
         as<PtrTypeBase>(type) || as<TupleType>(type) || as<GenericDeclRefType>(type))
     {
@@ -7366,13 +7455,15 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
         arg = CheckTerm(arg);
     }
 
-    // LEGACY FEATURE: As a backwards-compatibility feature
-    // for HLSL, we will allow for a cast to a `struct` type
-    // from a literal zero, with the semantics of default
-    // initialization.
-    //
-    if (auto declRefType = as<DeclRefType>(typeExp.type))
+    if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang202cOrLater(this))
     {
+        // SLANG <=2026 LEGACY FEATURE:
+        //
+        // As a backwards-compatibility feature for HLSL, we will allow for a cast
+        // to a `struct` type from a literal zero, with the semantics of default initialization.
+        //
+        // In Slang 2026, a warning is issued to encourage migrating away from
+        // this feature.
         if (const auto structDeclRef = as<StructDecl>(declRefType->getDeclRef()))
         {
             if (expr->arguments.getCount() == 1)
@@ -7427,6 +7518,17 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         initListExpr->useCStyleInitialization = false;
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
+                        // In Slang 2026 mode, warn that a cast from literal 0
+                        // changes semantics for regular structs (i.e., anything
+                        // that the user defines).
+                        //
+                        // We don't warn about casts from literal 0 to core
+                        // module types (e.g., float, vector, etc). The default
+                        // initializers of these types have the zeroing
+                        // semantics.
+                        if (isSlang2026OrLater(this) && !isFromCoreModule(structDeclRef.getDecl()))
+                            getSink()->diagnose(
+                                Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 
                         return coerce(
                             CoercionSite::General,
@@ -8538,6 +8640,27 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                 base = baseExpression;
             }
         }
+        else if (auto subscriptDeclRef = baseDeclRef.as<SubscriptDecl>())
+        {
+            // Accessors are declarations nested in a subscript, so a qualified lookup such as
+            // `Type::__subscript::get` should look directly in the resolved subscript rather than
+            // in its function type.
+            LookupResult lookupResult = lookUpDirectAndTransparentMembers(
+                m_astBuilder,
+                this,
+                expr->name,
+                subscriptDeclRef.getDecl(),
+                subscriptDeclRef,
+                LookupMask::Default,
+                getDeclToExcludeFromLookup());
+
+            AddToLookupResult(globalLookupResult, lookupResult);
+            // `baseExpression` is the checked inner `Type::__subscript` reference, so it must
+            // retain the original type expression as its base. The accessor reference must use
+            // that type as its unbound base instead of the function-valued subscript expression.
+            base = GetBaseExpr(baseExpression);
+            SLANG_RELEASE_ASSERT(base);
+        }
         else if (auto callableDecl = as<CallableDecl>(baseDeclRef))
         {
             // Make a decl-ref-type out of the CallableDecl.
@@ -9422,7 +9545,13 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     const auto& spirvInfo = getSession()->spirvCoreGrammarInfo;
 
     // We will iterate over all the operands in all the insts and check
-    // them
+    // them. Setting `failed` makes us return an error-typed expression via
+    // `CreateErrorExpr` at the end of this function; a caller only keeps that
+    // expression away from IR lowering (which aborts on an ErrorType) when the
+    // sink's error count is non-zero. So every site that sets `failed` must
+    // diagnose an *error*, never a warning — a warning-severity `failed` path
+    // is what caused the abort in #12497. (The lone warning in this function,
+    // SpirvLayoutSensitiveTypeInAsm, deliberately does not set `failed`.)
     bool failed = false;
 
     // Track %id's that have been defined in this asm block.
@@ -9437,10 +9566,12 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
 
         if (opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
         {
+            // Per the `failed` invariant above, this diagnoses an error (not
+            // the parser's E29106 semicolon-hint warning): the opcode takes no
+            // operands, so this is a definite error rather than a recovery guess.
             failed = true;
-            getSink()->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
+            getSink()->diagnose(Diagnostics::SpirvInstructionTakesNoOperands{
                 .opcode = inst.opcode.token.getContent(),
-                .maxOperands = 0,
                 .location = inst.opcode.token.loc});
             continue;
         }

@@ -192,15 +192,6 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
         return;
     }
 
-    if (auto functionDeclBase = as<FunctionDeclBase>(decl))
-    {
-        for (auto constraint : functionDeclBase->getDirectMemberDeclsOfType<TypeConstraintDecl>())
-        {
-            _processFindDeclsExportSymbolsRec(constraint);
-        }
-        return;
-    }
-
     // If it's a container process it's children
     if (auto containerDecl = as<ContainerDecl>(decl))
     {

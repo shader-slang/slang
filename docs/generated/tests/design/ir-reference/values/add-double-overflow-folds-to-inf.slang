@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#literal-payload-encoding
-//META: doc_section_digest=04423d40739a5430fb339507cc0da277b4a8a29153c176db3ec3d56a42a4070b
+//META: doc_section_digest=5f27d4bb5fbd1429627db68bec594389689c236998e7182eaaf350ae3ceda2ee
 //META: purpose=Boundary: a `double` literal at the edge of the documented finite range survives lowering and the IR formatter renders the upper-finite value as `inf : Double` when the literal would overflow double's normal range.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // the IEEE-754 inf marker for the overflowing print path. The
 // payload itself is preserved (verified by downstream emit).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double da;
 uniform RWStructuredBuffer<double> buf;

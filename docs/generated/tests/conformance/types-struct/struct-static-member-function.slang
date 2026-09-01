@@ -15,6 +15,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute -O0
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
@@ -44,6 +45,15 @@ void main()
 // GLSL emits the static member function as a module-scope function with the mangled name.
 // GLSL: TestStruct_getB_{{[0-9]+}}
 // GLSL: return
+
+// SPIR-V emits the static member function as a module-scope function whose body starts
+// immediately with OpLabel: there is no OpFunctionParameter, i.e. no `this` is passed. Pinned
+// at -O0 because the call is inlined and folded away at the default optimization level.
+// SPV: OpName %TestStruct_getB "TestStruct.getB"
+// SPV: %TestStruct_getB = OpFunction %int None
+// SPV-NEXT: {{%[0-9]+}} = OpLabel
+// SPV-NEXT: {{%[0-9]+}} = OpLoad %int %b
+// SPV-NEXT: OpReturnValue
 
 // Metal emits the static member function taking a KernelContext pointer.
 // METAL: TestStruct_getB_{{[0-9]+}}

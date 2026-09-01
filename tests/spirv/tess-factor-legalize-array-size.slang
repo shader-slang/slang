@@ -10,12 +10,12 @@
 // SPIRV: OpDecorate %gl_TessLevelInner BuiltIn TessLevelInner
 
 // SPIRV-DAG: OpStore %gl_TessLevelOuter %[[OuterOpCompositeConstruct:[1-9][0-9]*]]
-// SPIRV-DAG: %[[OuterOpCompositeConstruct]] = OpCompositeConstruct %[[OuterOpTypeArray:[a-zA-Z_0-9]*]]
+// SPIRV-DAG: %[[OuterOpCompositeConstruct]] = {{Op(CompositeConstruct|ConstantComposite)}} %[[OuterOpTypeArray:[a-zA-Z_0-9]*]]
 // SPIRV-DAG: %[[OuterOpTypeArray]] = OpTypeArray %{{[^ ]*}} %[[OuterOpConstant:[a-zA-Z_0-9]*]]
 // SPIRV-DAG: %[[OuterOpConstant]] = OpConstant %{{[^ ]*}} 4
 
 // SPIRV-DAG: OpStore %gl_TessLevelInner %[[InnerOpCompositeConstruct:[1-9][0-9]*]]
-// SPIRV-DAG: %[[InnerOpCompositeConstruct]] = OpCompositeConstruct %[[InnerOpTypeArray:[a-zA-Z_0-9]*]]
+// SPIRV-DAG: %[[InnerOpCompositeConstruct]] = {{Op(CompositeConstruct|ConstantComposite)}} %[[InnerOpTypeArray:[a-zA-Z_0-9]*]]
 // SPIRV-DAG: %[[InnerOpTypeArray]] = OpTypeArray %{{[^ ]*}} %[[InnerOpConstant:[a-zA-Z_0-9]*]]
 // SPIRV-DAG: %[[InnerOpConstant]] = OpConstant %{{[^ ]*}} 2
 

@@ -1,7 +1,7 @@
 // slang-doc-extractor.cpp
 #include "slang-doc-extractor.h"
 
-#include "../core/slang-string-util.h"
+#include "core/slang-string-util.h"
 
 namespace Slang
 {

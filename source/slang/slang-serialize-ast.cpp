@@ -10,7 +10,6 @@
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-serialize-fossil.h"
-#include "slang-serialize-riff.h"
 
 //
 #include "slang-serialize-ast.cpp.fiddle"
