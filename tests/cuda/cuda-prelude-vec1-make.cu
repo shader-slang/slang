@@ -8,11 +8,17 @@
 //      compiles if RayDesc lives in the always-compiled prelude region. slang-test
 //      cannot catch this: its -target ptx lane runs through NVRTC and is silently
 //      ignored on tiers without it.
+//   3. Fast-math transcendental redirects (#12619) — this fixture defines
+//      SLANG_CUDA_ENABLE_FAST_MATH, so testFastMathWrappers only compiles if the
+//      gated `__*f` intrinsic names/arities are correct. slang-test cannot catch a
+//      bad name/arity: the CUDA prelude is emitted as an `#include`, so the `#ifdef`
+//      bodies never appear in slangc's textual output and compile nowhere else.
 // __half is included to pin the known-good sibling pattern.
 
 #define SLANG_CUDA_ENABLE_HALF 1
 #define SLANG_CUDA_ENABLE_BF16 1
 #define SLANG_CUDA_ENABLE_FP8 1
+#define SLANG_CUDA_ENABLE_FAST_MATH 1
 #include "slang-cuda-prelude.h"
 
 static_assert(
@@ -46,4 +52,23 @@ __global__ void testRayDescIsDefinedWithoutOptiX(float3* out)
     out[0] = ray.Origin;
     out[1] = ray.Direction;
     out[2] = make_float3(ray.TMin, ray.TMax, 0.0f);
+}
+
+// With SLANG_CUDA_ENABLE_FAST_MATH defined above, this instantiates the fast branch
+// of every gated wrapper, so a wrong `__*f` name or arity fails to compile here.
+// It also references F16_tan/F16_pow (which reroute through F32_tan/F32_pow) and a
+// representative sample of the un-redirected wrappers (F32_exp2, F64_sin, F64_exp).
+__global__ void testFastMathWrappers(float* fout, __half* hout, double* dout)
+{
+    float x = fout[0];
+    float s, c;
+    F32_sincos(x, &s, &c);
+    fout[0] = F32_sin(x) + F32_cos(x) + s + c + F32_tan(x) + F32_log(x) + F32_log2(x) +
+              F32_log10(x) + F32_exp(x) + F32_pow(x, 2.0f) + F32_exp2(x);
+
+    __half h = hout[0];
+    hout[0] = F16_tan(h) + F16_pow(h, h);
+
+    double d = dout[0];
+    dout[0] = F64_sin(d) + F64_exp(d);
 }

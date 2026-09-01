@@ -1871,9 +1871,16 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void F16_sincos(__half f, __half* s, __half* 
     *c = ::hcos(f);
 }
 
+// Forward-declared here because the F32 section follows the F16 section, and the
+// two half wrappers below promote to float through the F32 wrappers (see below).
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_tan(float f);
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_pow(float a, float b);
+
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_tan(__half f)
 {
-    return __float2half(::tanf(__half2float(f)));
+    // Route through F32_tan (not ::tanf directly) so half tan honors the same
+    // SLANG_CUDA_ENABLE_FAST_MATH redirect as float tan; no native half `htan`.
+    return __float2half(F32_tan(__half2float(f)));
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_asin(__half f)
 {
@@ -1981,7 +1988,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_max(__half a, __half b)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_pow(__half a, __half b)
 {
-    return __float2half(::powf(__half2float(a), __half2float(b)));
+    // Route through F32_pow (not ::powf directly) so half pow honors the same
+    // SLANG_CUDA_ENABLE_FAST_MATH redirect as float pow; no native half `hpow`.
+    return __float2half(F32_pow(__half2float(a), __half2float(b)));
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_fmod(__half a, __half b)
 {
@@ -2041,6 +2050,13 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_round(float f)
 {
     return ::roundf(f);
 }
+// SLANG_CUDA_ENABLE_FAST_MATH is emitted into the CUDA output by Slang's CUDA
+// back-end under `-fp-mode fast`. When defined, the transcendental wrappers that
+// have an approximate `__*f` CUDA intrinsic redirect to it, trading accuracy for a
+// much smaller instruction count; otherwise they use the precise `::` form. Only
+// the wrappers with such an intrinsic are gated (sin/cos/sincos/tan/log/log2/log10/
+// exp/pow, plus half tan/pow which route through the float wrappers); exp2/atan2/
+// asin/acos/atan/sqrt and all F64 wrappers have no fast form and stay precise.
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_sin(float f)
 {
 #ifdef SLANG_CUDA_ENABLE_FAST_MATH

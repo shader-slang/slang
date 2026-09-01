@@ -265,9 +265,9 @@ One area where this optimization isn't fully used is in comparisons - as in effe
 Fast Math
 =========
 
-When compiling with `-fp-mode fast`, Slang will define `SLANG_CUDA_ENABLE_FAST_MATH` when `slang-cuda-prelude.h` is included. This redirects the single-precision transcendental wrappers that have a fast approximate CUDA intrinsic (`sin`, `cos`, `sincos`, `tan`, `log`, `log2`, `log10`, `exp`, `pow`) to their `__*f` forms (`__sinf`, `__cosf`, and so on), which can substantially reduce the emitted instruction count at the cost of reduced accuracy. This trade-off is why it is opt-in; without `-fp-mode fast` every wrapper keeps its default form.
+When compiling with `-fp-mode fast`, Slang emits `#define SLANG_CUDA_ENABLE_FAST_MATH` ahead of the `slang-cuda-prelude.h` include. This redirects the single-precision transcendental wrappers that have a fast approximate CUDA intrinsic (`sin`, `cos`, `sincos`, `tan`, `log`, `log2`, `log10`, `exp`, `pow`) to their `__*f` forms (`__sinf`, `__cosf`, and so on), which can substantially reduce the emitted instruction count at the cost of reduced accuracy. Among the half-precision counterparts of these functions, `tan` and `pow` promote to `float` and route through the float wrappers, so they follow the same redirect; the remaining seven (`sin`, `cos`, `sincos`, `log`, `log2`, `log10`, `exp`) use native `__half` intrinsics (`hsin`, `hcos`, `hlog`, `hlog2`, `hlog10`, `hexp`) and are unaffected. This trade-off is why it is opt-in; without `-fp-mode fast` every wrapper keeps its default form.
 
-Wrappers with no `__*f` fast intrinsic (`exp2`, `atan2`, `asin`, `acos`, `atan`, `sqrt`, and the hyperbolic functions) are not redirected by this define — they keep their existing standard-library implementation — as do all double-precision (`F64_*`) wrappers, since CUDA provides no approximate double intrinsics.
+Wrappers with no fast intrinsic (`exp2`, `atan2`, `asin`, `acos`, `atan`, `sqrt`, and the hyperbolic functions) are not redirected by this define — they keep their existing standard-library implementation — as do all double-precision (`F64_*`) wrappers, since CUDA provides no approximate double intrinsics.
 
 Wave Intrinsics
 ===============

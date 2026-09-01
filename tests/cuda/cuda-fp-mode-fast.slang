@@ -3,6 +3,8 @@
 
 //TEST:SIMPLE(filecheck=FAST): -stage compute -entry computeMain -target cuda -fp-mode fast
 //TEST:SIMPLE(filecheck=DEFAULT): -stage compute -entry computeMain -target cuda
+// The define is CUDA-only: it must never leak into the shared C++ base emitter's output.
+//TEST:SIMPLE(filecheck=CPP): -stage compute -entry computeMain -target cpp -fp-mode fast
 
 RWStructuredBuffer<float> outBuf;
 
@@ -18,3 +20,5 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 //FAST: slang-cuda-prelude.h
 
 //DEFAULT-NOT: SLANG_CUDA_ENABLE_FAST_MATH
+
+//CPP-NOT: SLANG_CUDA_ENABLE_FAST_MATH
