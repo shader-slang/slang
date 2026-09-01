@@ -8,9 +8,40 @@
 #include "slang-com-helper.h"
 #include "slang.h"
 
+#include <atomic>
+
 namespace SlangRecord
 {
 using namespace Slang;
+
+/// A properly reference-counted no-op file system used as the replay stand-in
+/// for a recorded custom file system on the reading `kCustomFileSystemHandle`
+/// arm of `createSession` (see below).
+///
+/// The user's real custom file system is not available during playback, so a
+/// placeholder is wrapped in its place. Behaviour matches `NULLFileSystem`
+/// (all file I/O operations return `SLANG_E_NOT_AVAILABLE`), but the lifetime
+/// model differs: `NULLFileSystem` is a singleton whose `addRef`/`release` are no-ops,
+/// so a per-call heap instance of it could never reach a zero refcount and would
+/// leak. This subclass counts references per instance and deletes itself on the
+/// final release, so a fresh instance can be created for each replayed custom-FS
+/// session -- giving each a distinct proxy registration, which preserves the
+/// record/playback handle sequence -- without leaking.
+class ReplayNullFileSystem : public NULLFileSystem
+{
+public:
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return ++m_refCount; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        uint32_t remaining = --m_refCount;
+        if (remaining == 0)
+            delete this;
+        return remaining;
+    }
+
+private:
+    std::atomic<uint32_t> m_refCount = 1;
+};
 
 class GlobalSessionProxy : public ProxyBase<slang::IGlobalSession>
 {
@@ -125,9 +156,16 @@ public:
                 }
             case kCustomFileSystemHandle:
                 {
-                    auto nfs = new NULLFileSystem();
-                    nfs->addRef();
-                    desc2.fileSystem = wrapObject(nfs);
+                    // Create a fresh stand-in file system for the recorded custom
+                    // file system (unavailable at playback). It must be a distinct
+                    // object per call so each replayed custom-FS session takes its
+                    // own proxy registration, matching the recorded handle sequence.
+                    // wrapObject() -> tryWrap() adopts one reference by calling
+                    // release(), so hand over the single reference from `new` (do
+                    // not pre-add another, or the object would never be freed).
+                    // ReplayNullFileSystem's per-instance ref counting then deletes
+                    // it once the wrapper proxy is destroyed.
+                    desc2.fileSystem = wrapObject(new ReplayNullFileSystem());
                     ownsFileSystemWrapper = true;
                     break;
                 }
