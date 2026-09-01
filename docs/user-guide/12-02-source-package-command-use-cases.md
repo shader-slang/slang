@@ -12,6 +12,10 @@ directory to an application made from several packages, saying what you do by ha
 same application when an upstream package changes its graph and when you extract part of your own
 application into a package.
 
+Journeys 1 through 7 use only stable commands, so they describe what the tool supports today
+without any opt-in. Host executable compilation and `run` are experimental, and everything about
+them is collected in Journey 8, the last journey, so it can be read or ignored on its own.
+
 This is also a behavioral contract for the package tool. The maintainer appendix turns the
 journeys into must/must-not checks for future command changes.
 
@@ -43,8 +47,8 @@ Assume you are starting an application named `image-viewer` and no package exist
 
 ### Goal
 
-Create a valid package, compile one module as a native executable, and make the first source
-control commit.
+Create a valid package, produce its source and module bundles, and make the first source control
+commit.
 
 ### Human does
 
@@ -81,28 +85,19 @@ placeholder text in `LICENSE`, then add the first module:
 // src/image-viewer.slang
 module image_viewer;
 
-export __extern_cpp int main()
+public float3 toneMap(float3 color)
 {
-    return 0;
+    return color / (1.0f + color);
 }
 ```
 
-The filename uses a hyphen while the declaration uses the canonical underscore spelling. Add the
-matching executable to the root-level `host` section in `slang-package.json`:
+The filename uses a hyphen while the declaration uses the canonical underscore spelling.
 
-```json
-"host": {
-  "executables": ["image-viewer"],
-  "default": "image-viewer"
-}
-```
-
-Run the package-quality gate, build, and then run the artifact:
+Run the package-quality gate and then build:
 
 ```sh
 slang package validate
-slang package --experimental build
-slang package --experimental run
+slang package build
 ```
 
 Finally, initialize source control if needed and commit:
@@ -121,24 +116,21 @@ or `slang-workspace.json`.
 - `init` creates the manifest, conventional directories, license placeholder, and ignore rules.
 - `validate` checks the closed manifest schema, license, export directories, module declarations,
   and installed toolchain. A package with no dependencies does not need a lock.
-- `build` repeats full validation, emits source and module bundles under `build/bundle/`, and
-  collects Markdown under `build/docs/`. With the global experimental opt-in, it also compiles
-  configured host executables.
-- Experimental `run` executes the existing configured binary. It forwards trailing arguments but
-  does not rebuild.
+- `build` repeats full validation, emits source and module bundles under `build/bundle/`, collects
+  Markdown under `build/docs/`, and regenerates `build/search-paths`.
 
 ### Current gaps and pitfalls
 
 - `init` is intentionally scoped to the manifest, directories, ignore rules, and license reminder.
   It does not write a first source file, and its placeholder license makes the default `validate`,
   `update`, and `build` paths fail until you choose a real license.
-- There is no package-level build script. Host executables need a supported C++ compiler and the
-  sibling Slang tools available at runtime.
 - `slang package test` is reserved but not implemented. The generated `tests/` directory is only a
   convention today.
-- `run` does not build, and `docs` does not regenerate documentation. Run `build` first.
+- `docs` does not regenerate documentation. Run `build` first.
 - An application that invokes `slangc` itself must consume the export paths written to
   `build/search-paths`; the package state is not injected into arbitrary compiler sessions.
+- Adding a `host` section changes which commands work. Plain `build` then fails and names the
+  experimental command to re-run; Journey 8 covers that path.
 
 ### First checkpoint
 
@@ -148,8 +140,7 @@ At this point a new clone can reproduce the package without dependency resolutio
 git clone <image-viewer-url>
 cd image-viewer
 slang package validate
-slang package --experimental build
-slang package --experimental run
+slang package build
 ```
 
 There is no lock yet because the package has no dependencies. Once dependencies are added, the
@@ -208,7 +199,7 @@ Apply the solve, then validate and build:
 slang package update
 slang package validate
 slang package status
-slang package --experimental build
+slang package build
 ```
 
 Review and commit both files:
@@ -239,7 +230,7 @@ version, dependencies, and exports selected for this workspace.
 
   ```sh
   slang package fetch
-  slang package --experimental build
+  slang package build
   ```
 
   This is the normal clean-clone and CI path. CI should not run `update`.
@@ -250,8 +241,7 @@ From this point forward, the clean-clone flow has a lock and starts with fetch:
 git clone <image-viewer-url>
 cd image-viewer
 slang package fetch
-slang package --experimental build
-slang package --experimental run
+slang package build
 ```
 
 ### Current gaps and pitfalls
@@ -713,7 +703,7 @@ Then return to the root workspace:
 ```sh
 slang package update --dry-run
 slang package update
-slang package --experimental build
+slang package build
 ```
 
 The path package stays under `packages/color-math`; it is not copied to `deps/`. Commit the child
@@ -794,6 +784,83 @@ application can consume it.
   package with the same name already present in the graph.
 - Moving a module can expose accidental dependency direction or visibility problems. The package
   tool detects graph and layout errors, not architectural cycles in your intended API.
+
+## Journey 8: build and run a host executable (experimental)
+
+Everything before this point uses stable commands. Host executable compilation and `run` are
+experimental, so they are separated here: the journeys above stay valid whether or not this
+feature ships in its current form.
+
+### Goal
+
+Compile a package module into a native executable and run it, accepting that the command spelling
+and the feature itself may change.
+
+### Human does
+
+Starting from the `image-viewer` package of Journey 1, give the entry module a C++-visible entry
+point:
+
+```slang
+// src/image-viewer.slang
+module image_viewer;
+
+export __extern_cpp int main()
+{
+    return 0;
+}
+```
+
+Declare the executable in the root-level `host` section of `slang-package.json`:
+
+```json
+"host": {
+  "executables": ["image-viewer"],
+  "default": "image-viewer"
+}
+```
+
+At this point plain `slang package build` fails on purpose, because the manifest now asks for
+output that only the experimental path produces. Opt in with the global flag, which must appear
+before the subcommand:
+
+```sh
+slang package --experimental build
+slang package --experimental run
+```
+
+`run` accepts an optional executable name and forwards every remaining argument to the artifact
+verbatim, with no `--` separator:
+
+```sh
+slang package --experimental run image-viewer --input frame.exr
+```
+
+The leading value is treated as an executable name only when it matches a configured one, so an
+application flag in that position is still forwarded.
+
+### Tool does
+
+- `build` performs the same validation and bundle work as the stable path, and additionally
+  compiles each configured host executable.
+- `build` without `--experimental` fails with the exact command to re-run, rather than silently
+  skipping host output. A package with no `host` section is unaffected.
+- `run` executes the already-built artifact selected by the optional name, otherwise
+  `host.default` or the only configured executable. It never builds and never resolves packages.
+- `slang package --experimental help` lists the experimental commands; stable help omits them.
+
+### Current gaps and pitfalls
+
+- There is no package-level build script. Host executables need a supported C++ compiler and the
+  sibling Slang tools available at runtime, and the tool does not check for the C++ compiler as
+  part of the toolchain constraint.
+- Because `run` never builds, a stale artifact runs silently after a source edit. Run `build`
+  first.
+- If the artifact does not exist, `run` reports the missing path and the build command instead of
+  attempting a compile.
+- Adding `host.executables` makes the stable build path unusable for that package, so a repository
+  that must build without the experimental opt-in should keep host configuration out of its
+  manifest.
 
 ## Lessons from established package workflows
 
@@ -898,8 +965,8 @@ without performing another update.
 Slang does not need npm-style hoisting, Gradle's opt-in locking model, or a registry-first
 publishing workflow to fix the journeys above. Remaining improvements include committed
 multi-package composition, package-content preview, testing, and transactional updates. Unlike
-Cargo's introductory loop, experimental `slang package --experimental run` should not be read as
-build-and-run; it deliberately executes only an existing artifact.
+Cargo's introductory loop, experimental `run` should not be read as build-and-run; it deliberately
+executes only an existing artifact.
 
 ## How flags change the journeys
 
@@ -995,14 +1062,16 @@ row whose version the local tree represents. Supply it for a newly introduced na
 local tree represents another version. The value must satisfy every incoming constraint when you
 run `update`.
 
-### `--experimental build` and `--experimental run [NAME] [ARGS...]`
+### `--experimental`
 
-The global flag must appear before the subcommand:
-`slang package --experimental build` or `slang package --experimental run`. A manifest with
-`host.executables` makes ordinary build fail with that instruction rather than silently skipping
-host output. Run's optional leading name selects a configured executable; otherwise
-`host.default` (or the only configured executable) is used. Remaining values are forwarded to the
-existing artifact. This selection does not trigger build or package resolution.
+**Use it when:** you are working on host executables, which is the only experimental feature
+today. Journey 8 covers that workflow.
+
+**It changes:** `build` also compiles configured host executables, and `run` becomes available.
+The flag is global and must appear before the subcommand. Every other journey in this chapter is
+unaffected by it.
+
+**It does not change:** validation, resolution, bundle output, or documentation collection.
 
 ### Help spellings and commands without flags
 
@@ -1075,9 +1144,9 @@ dependencies therefore appear only in each consumer's root lock.
 
 ### Run, docs, and test do less than their names may imply
 
-`run` does not build, `docs` only prints the generated location, and `test` is unimplemented.
-Narrow side effects make commands predictable, but missing `build --run`, documentation generation,
-and package testing leave common loops manual.
+Experimental `run` does not build, `docs` only prints the generated location, and `test` is
+unimplemented. Narrow side effects make commands predictable, but missing `build --run`,
+documentation generation, and package testing leave common loops manual.
 
 ### One package name has one version
 
@@ -1138,8 +1207,6 @@ them or update this chapter and its regression tests in the same change.
 - `init` creates the manifest, conventional directories, placeholder license, and ignore entries.
 - Default `validate`, `update`, and `build` reject the license placeholder.
 - A dependency-free valid package can validate and build without a lock.
-- Host executable build and run require global `--experimental`; run executes an existing artifact
-  and never silently builds it.
 
 ### Resolve and reproduce contract
 
@@ -1201,6 +1268,17 @@ them or update this chapter and its regression tests in the same change.
 - `docs` prints the generated documentation location but does not regenerate it.
 - `test` reports that package testing is not implemented.
 - A command failure must not claim that an update, fetch, or build succeeded.
+
+### Experimental host contract
+
+Keep this separable from the contracts above, so the stable journeys hold whether or not host
+executables ship in their current form.
+
+- Host executable build and `run` require the global `--experimental` flag before the subcommand.
+- `build` without the flag fails only when the manifest configures host executables, and names the
+  command to re-run instead of skipping host output.
+- Stable help omits experimental commands; `--experimental help` lists them.
+- `run` executes an existing artifact and never silently builds or resolves.
 
 ## Executable test anchors
 

@@ -162,6 +162,10 @@ package-specific update mode yet.
 slang package --experimental build
 ```
 
+This example needs the experimental opt-in only because its manifest configures
+`host.executables`. A package without a `host` section builds its bundles and docs with plain
+`slang package build`; host executable compilation and `run` are the experimental part.
+
 Build validates the materialized graph, then:
 
 - When `workspace.bundle.modules` is enabled (the default), emits a `.slang-module` for every
@@ -253,6 +257,8 @@ slang package fetch
 slang package status
 slang package --experimental build
 ```
+
+Drop `--experimental` for a package that configures no host executables.
 
 CI should not run `update`. Update is a deliberate choice to take newer tags and rewrite the
 committed lock. After you have reviewed `update --dry-run` locally, commit the new lock and let
