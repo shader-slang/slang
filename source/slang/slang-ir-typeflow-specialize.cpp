@@ -874,8 +874,41 @@ struct TypeFlowSpecializationContext
     // This type can be used for insts that are semantically a tuple of a tag (to select a table)
     // and a payload to contain the existential value.
     //
+    // Memoizes `makeTaggedUnionType`. The result is a pure function of
+    // `tableSet`: the walk below derives one concrete/base type per element and
+    // hands the pair to the hash-consing builder, so the same set inst always
+    // produces the same tagged-union type. Witness-table sets are themselves
+    // hash-consed, so pointer identity is set identity.
+    //
+    // This matters because the type-flow fixpoint calls this once per lattice
+    // join, not once per converged value: when N concrete types flow into one
+    // existential the same sets recur constantly, and each call otherwise
+    // re-walks the set and rebuilds a HashSet.
+    //
+    // Keying on a raw pointer is safe here, and the two properties it rests on
+    // are worth stating because a change to either would make a cache hit
+    // return a silently wrong type rather than crash:
+    //
+    //   * A set inst's address is never recycled within a run.
+    //     `IRInst::removeAndDeallocate` unregisters the inst from the
+    //     deduplication maps and detaches it, but never returns its storage to
+    //     the module's `MemoryArena`, which only reclaims on reset at teardown.
+    //     So a key left behind by a discarded set can never come to alias a
+    //     different live one.
+    //   * Mutating a set produces a *new* inst rather than editing one in
+    //     place: re-canonicalisation in `slang-ir.cpp` builds the replacement
+    //     with `getSet` and then `replaceUsesWith` + `removeAndDeallocate`s the
+    //     old one. So a live key's element list cannot change underneath us.
+    //
+    // This is the same pointer-identity property the fixpoint already depends
+    // on for its termination test, `areInfosEqual`.
+    Dictionary<IRWitnessTableSet*, IRTaggedUnionType*> taggedUnionTypeCache;
+
     IRTaggedUnionType* makeTaggedUnionType(IRWitnessTableSet* tableSet)
     {
+        if (auto cached = taggedUnionTypeCache.tryGetValue(tableSet))
+            return *cached;
+
         IRBuilder builder(module);
         HashSet<IRInst*> typeSet;
 
@@ -906,9 +939,11 @@ struct TypeFlowSpecializationContext
             });
 
         // Create the tagged union type out of the type and table collection.
-        return builder.getTaggedUnionType(
+        auto result = builder.getTaggedUnionType(
             tableSet,
             cast<IRTypeSet>(builder.getSet(kIROp_TypeSet, typeSet)));
+        taggedUnionTypeCache[tableSet] = result;
+        return result;
     }
 
     // Check if a witness table set references a [Specialize]-only interface.
@@ -1118,15 +1153,64 @@ struct TypeFlowSpecializationContext
         if (set1 == set2)
             return set1;
 
-        HashSet<IRInst*> allValues;
-        // Collect all values from both sets
-        forEachInSet(module, set1, [&](IRInst* value) { allValues.add(value); });
-        forEachInSet(module, set2, [&](IRInst* value) { allValues.add(value); });
-
+        // A set's operands are canonically ordered by unique ID (that is what
+        // `IRBuilder::getSet` establishes), and both inputs here are existing
+        // sets. So the union is a linear merge of two sorted sequences.
+        //
+        // The previous form collected both sides into a `HashSet` and handed
+        // that to `getSet`, which copied it into a list and sorted it again --
+        // so every join paid O(n+m) hashing plus an O((n+m) log(n+m)) sort to
+        // rebuild an order both inputs already had. This is the hot path of the
+        // type-flow fixpoint, where a variable's set grows one element at a
+        // time, so that round-trip dominates the join.
         IRBuilder builder(module);
-        return as<T>(builder.getSet(
+        const UInt count1 = set1->getOperandCount();
+        const UInt count2 = set2->getOperandCount();
+
+        List<IRInst*>& merged = *module->getContainerPool().getList<IRInst>();
+        merged.reserve(count1 + count2);
+
+        // The two branches below key on different things -- de-duplication on
+        // pointer identity, ordering on `getUniqueID` -- and they agree because
+        // the ID map is one-to-one. Elements are hash-consed, so equal members
+        // are pointer-equal; distinct insts always have distinct IDs. An ID tie
+        // therefore implies `a == b` and is taken by the early-out, so the
+        // `else` below can never be reached by a tie between distinct operands.
+        UInt i = 0;
+        UInt j = 0;
+        while (i < count1 && j < count2)
+        {
+            IRInst* a = set1->getElement(i);
+            IRInst* b = set2->getElement(j);
+            if (a == b)
+            {
+                merged.add(a);
+                ++i;
+                ++j;
+                continue;
+            }
+            if (builder.getUniqueID(a) < builder.getUniqueID(b))
+            {
+                merged.add(a);
+                ++i;
+            }
+            else
+            {
+                merged.add(b);
+                ++j;
+            }
+        }
+        for (; i < count1; ++i)
+            merged.add(set1->getElement(i));
+        for (; j < count2; ++j)
+            merged.add(set2->getElement(j));
+
+        auto unioned = builder.getSetFromSortedElements(
             set1->getOp(),
-            allValues)); // Create a new set with the union of values
+            (UInt)merged.getCount(),
+            merged.getBuffer());
+        module->getContainerPool().free(&merged);
+        return as<T>(unioned);
     }
 
     // Performs a flat (non-structural) union of two propagation infos that are

@@ -19,8 +19,8 @@
 // raise the level; the INC run cannot repeat that assertion because the
 // embedded source text itself now contains the inst's name.
 
-//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
-//TEST:SIMPLE(filecheck=INC):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1 -debug-info-include-source
+//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=INC):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1 -debug-info-include-source
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;
