@@ -14974,7 +14974,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
     //     `[HasTrivialForwardDerivative]`, it also covers the custom-derivative attributes
     //     `[ForwardDerivative]`, `[BackwardDerivative]`, `[ForwardDerivativeOf]` and
     //     `[BackwardDerivativeOf]`, which reach it through `UserDefinedDerivativeAttribute` and
-    //     `DerivativeOfAttribute` (`slang-ast-modifier.h:1883-1965`).
+    //     `DerivativeOfAttribute` (both in `slang-ast-modifier.h`).
     //   - Also covered, via `MaybeDifferentiableAttribute`: interface requirements marked as
     //     optionally conforming to `IForwardDifferentiable`/`IBackwardDifferentiable`. This is the
     //     one case where the trigger fires on a requirement rather than an implementation.

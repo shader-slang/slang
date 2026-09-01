@@ -67,18 +67,44 @@ SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
     _loadModule(firstSession, "plainModule", "float identity(float value) { return value; }");
     SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount);
 
-    // The base-surface autodiff symbols (diffPair, the update helpers, detach, and the tensor-view
-    // types) live in the eager `autodiff-base` segment folded into the core module, so ordinary
-    // code may use them without pulling in the lazy supplement. A `//TEST:SIMPLE:` shader cannot
-    // observe load state, so assert here that referencing this whole cluster leaves the supplement
-    // unloaded. This is the guard against a base-surface declaration silently regressing to require
-    // the supplement.
+    // The base-surface autodiff symbols live in the eager `autodiff-base` segment folded into the
+    // core module, so ordinary code may use them without pulling in the lazy supplement. This is
+    // the guard against a base-surface declaration silently regressing to require the supplement.
+    //
+    // It has to be a count assertion here rather than in the companion
+    // `tests/autodiff/lazy-load-base-surface.slang`: a `//TEST:SIMPLE:` shader can only show the
+    // cluster still *compiles*, and would keep passing if a symbol started triggering the load,
+    // because the load then just succeeds silently.
+    //
+    // Deliberately excluded: a concrete `struct : IDifferentiable`. Checking one loads the
+    // supplement today -- see `lazyAutodiffConcreteDifferentiableConformanceLoadsSupplement`
+    // below, which pins that separately. Every symbol listed here was individually confirmed not
+    // to load it.
     _loadModule(
         firstSession,
         "baseSurfaceModule",
-        "float useBase(float v) {"
-        "  var p = diffPair(v, 1.0); updateDiff(p, 2.0);"
-        "  DiffTensorView<float> dv; return detach(p.p); }");
+        R"(
+            struct PlainTensorTypes
+            {
+                TensorView<float> view;
+                DiffTensorView<float> diffView;
+                TorchTensor<float> tensor;
+            }
+
+            float useAutodiffHelpersWithoutDifferentiating(float value)
+            {
+                var pair = diffPair(value, 1.0);
+                updatePrimal(pair, value + 1.0);
+                updateDiff(pair, 2.0);
+                updatePair(pair, value + 2.0, 3.0);
+                let values = makeArrayFromElement<float, 2>(pair.p);
+                return detach(values[0]);
+            }
+
+            void useDifferentiableConstraint<T : IDifferentiable>(T value) { }
+
+            interface IRefinesDifferentiable : IDifferentiable { }
+        )");
     SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount);
 
     // A `[PrimalSubstituteOf]` attribute is not a differentiability header modifier, so it does not
@@ -157,11 +183,14 @@ SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
 // `SharedSemanticsContext` directly -- reachable only because this suite links the compiler
 // statically.
 //
-// Associations rather than candidate extensions are what the supplement contributes: the split
-// left every `extension` declaration in the eager `autodiff-base` segment, while the registered
-// `[ForwardDerivativeOf]`/`[BackwardDerivativeOf]` implementations that remain are recorded
-// against the module owning the *derivative*, which is the supplement.
-SLANG_UNIT_TEST(lazyAutodiffModuleMergeDoesNotDuplicateAssociations)
+// Both halves of the merge are checked, because the supplement contributes both kinds of entry.
+// `diff.meta.slang` contains no `extension` blocks -- the split left those in the eager
+// `autodiff-base` segment -- but candidate extensions are not only written by `extension` syntax:
+// checking a `[ForwardDerivativeOf]`/`[BackwardDerivativeOf]` declaration synthesizes one, and
+// this PR's ownership fix registers it against the module owning the *derivative*, which is the
+// supplement. Reading the maps directly rather than counting `extension` blocks in the source is
+// what distinguishes the two.
+SLANG_UNIT_TEST(lazyAutodiffModuleMergeDoesNotDuplicateEntries)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -196,9 +225,16 @@ SLANG_UNIT_TEST(lazyAutodiffModuleMergeDoesNotDuplicateAssociations)
         primalDecl = entry.key;
         break;
     }
-    // If this fires, the supplement contributes no associations and the merge below has nothing
-    // to duplicate -- the test would pass while asserting nothing.
+    Decl* extendedDecl = nullptr;
+    for (const auto& entry : supplementDecl->mapDeclToCandidateExtensions)
+    {
+        extendedDecl = entry.first;
+        break;
+    }
+    // If either fires, the supplement contributes no entry of that kind, the corresponding merge
+    // below has nothing to duplicate, and the test would pass while asserting nothing.
     SLANG_CHECK_ABORT(primalDecl != nullptr);
+    SLANG_CHECK_ABORT(extendedDecl != nullptr);
 
     ComPtr<slang::ISession> reusedSession;
     SLANG_CHECK_ABORT(
@@ -208,11 +244,63 @@ SLANG_UNIT_TEST(lazyAutodiffModuleMergeDoesNotDuplicateAssociations)
     DiagnosticSink sink(linkage->getSourceManager(), nullptr);
     SharedSemanticsContext context(linkage, nullptr, &sink);
 
-    // Building the view now picks the supplement up through `Session::coreModules`.
-    const Index countBeforeMerge = context.getAssociatedDeclsForDecl(primalDecl).getCount();
-    SLANG_CHECK(countBeforeMerge > 0);
+    // Building the views now picks the supplement up through `Session::coreModules`.
+    const Index associationsBeforeMerge = context.getAssociatedDeclsForDecl(primalDecl).getCount();
+    const Index extensionsBeforeMerge =
+        context.getCandidateExtensionsForTypeDecl(extendedDecl).getCount();
+    SLANG_CHECK(associationsBeforeMerge > 0);
+    SLANG_CHECK(extensionsBeforeMerge > 0);
 
     context.addLoadedAutodiffModule(supplementDecl);
 
-    SLANG_CHECK(context.getAssociatedDeclsForDecl(primalDecl).getCount() == countBeforeMerge);
+    SLANG_CHECK(
+        context.getAssociatedDeclsForDecl(primalDecl).getCount() == associationsBeforeMerge);
+    SLANG_CHECK(
+        context.getCandidateExtensionsForTypeDecl(extendedDecl).getCount() ==
+        extensionsBeforeMerge);
+}
+
+// Declaring a concrete `struct : IDifferentiable` loads the supplement, even with no
+// `[Differentiable]` member, no `fwd_diff`/`bwd_diff`, and no derivative of any kind written by
+// hand. Conformance synthesis produces `dzero`/`dadd` carrying a differentiability modifier, and
+// checking those is a load trigger.
+//
+// This is pinned rather than asserted-against because it is a live question, not a settled
+// contract. The PR's own motivation offers `struct Parameters : IDifferentiable { float
+// values[2]; Optional<float> optionalValue; }` as ordinary language surface, and the split does
+// keep that surface *findable* -- it compiles, which is what
+// `tests/autodiff/lazy-load-base-surface.slang` shows. What it does not do is keep it
+// supplement-free, so a session that only declares differentiable data still materializes the
+// derivative machinery it never differentiates with.
+//
+// The narrowing matters if this is revisited: a generic constraint `T : IDifferentiable` and an
+// interface refining `IDifferentiable` both stay clean (asserted above). Only concrete conformance
+// on a struct trips it.
+SLANG_UNIT_TEST(lazyAutodiffConcreteDifferentiableConformanceLoadsSupplement)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const Index baseCoreModuleCount = _loadedBuiltinModuleCount(globalSession);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    _loadModule(
+        session,
+        "concreteConformanceModule",
+        "struct PlainAggregate : IDifferentiable"
+        "{"
+        "    float values[2];"
+        "    Optional<float> optionalValue;"
+        "}");
+    SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
 }
