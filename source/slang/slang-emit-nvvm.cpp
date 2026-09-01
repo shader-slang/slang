@@ -5207,6 +5207,117 @@ struct NVVMPointerBitCast
     bool resultIsPointer = false;
 };
 
+// Describes the exact bit transport emitted by AnyValue marshalling for a bindless
+// DescriptorHandle<StructuredBuffer<T>>. CUDA defines the handle as the resource's native
+// 16-byte `{global T*, uint64 count}` view, while AnyValue stores those bytes as `uint4`.
+// The high-level handle intentionally remains opaque until this target-specific boundary.
+struct NVVMRawBufferDescriptorBitCast
+{
+    IRInst* value = nullptr;
+    IRType* handleType = nullptr;
+    IRVectorType* payloadType = nullptr;
+    NVVMRawBufferType rawBufferType;
+    bool resultIsHandle = false;
+    NVVMValueRecipeStep steps[3] = {};
+    uint32_t stepCount = 0;
+};
+
+bool _getNVVMRawBufferDescriptorBitCast(IRInst* inst, NVVMRawBufferDescriptorBitCast& outCast)
+{
+    outCast = {};
+    if (!inst || inst->getOp() != kIROp_BitCast || inst->getOperandCount() != 1)
+        return false;
+
+    IRInst* value = inst->getOperand(0);
+    if (!value)
+        return false;
+    IRType* sourceType = value->getDataType();
+    IRType* resultType = inst->getDataType();
+    IRType* handleType = asNVVMSupportedDescriptorHandleType(resultType) ? resultType : sourceType;
+    IRType* payloadType = handleType == resultType ? sourceType : resultType;
+    const bool resultIsHandle = handleType == resultType;
+
+    bool payloadIsSigned = false;
+    uint32_t payloadLaneCount = 0;
+    auto payloadVector =
+        asNVVMSupportedI32VectorType(payloadType, &payloadIsSigned, &payloadLaneCount);
+    IRType* resourceType = nullptr;
+    NVVMRawBufferType rawBufferType;
+    if (!asNVVMSupportedDescriptorHandleType(handleType, &resourceType) || !payloadVector ||
+        payloadIsSigned || payloadLaneCount != 4 ||
+        !getNVVMSupportedRawBufferType(resourceType, rawBufferType))
+    {
+        return false;
+    }
+
+    if (resultIsHandle)
+    {
+        const SlangNVVMValueTypeDesc conversionOperands[] = {NVVMSemantics::kUnsignedI32};
+        const SlangNVVMValueTypeDesc binaryOperands[] = {
+            NVVMSemantics::kUnsignedI64,
+            NVVMSemantics::kUnsignedI64,
+        };
+        if (!_setNVVMSupportedValueRecipeStep(
+                outCast.steps[0],
+                SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+                NVVMSemantics::kUnsignedI64,
+                conversionOperands,
+                SLANG_COUNT_OF(conversionOperands),
+                "descriptor count word zero extension") ||
+            !_setNVVMSupportedValueRecipeStep(
+                outCast.steps[1],
+                SLANG_NVVM_VALUE_OP_SHIFT_LEFT,
+                NVVMSemantics::kUnsignedI64,
+                binaryOperands,
+                SLANG_COUNT_OF(binaryOperands),
+                "descriptor count high-word shift") ||
+            !_setNVVMSupportedValueRecipeStep(
+                outCast.steps[2],
+                SLANG_NVVM_VALUE_OP_BIT_OR,
+                NVVMSemantics::kUnsignedI64,
+                binaryOperands,
+                SLANG_COUNT_OF(binaryOperands),
+                "descriptor count word combination"))
+        {
+            return false;
+        }
+        outCast.stepCount = 3;
+    }
+    else
+    {
+        const SlangNVVMValueTypeDesc conversionOperands[] = {NVVMSemantics::kUnsignedI64};
+        const SlangNVVMValueTypeDesc shiftOperands[] = {
+            NVVMSemantics::kUnsignedI64,
+            NVVMSemantics::kUnsignedI64,
+        };
+        if (!_setNVVMSupportedValueRecipeStep(
+                outCast.steps[0],
+                SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+                NVVMSemantics::kUnsignedI32,
+                conversionOperands,
+                SLANG_COUNT_OF(conversionOperands),
+                "descriptor count word extraction") ||
+            !_setNVVMSupportedValueRecipeStep(
+                outCast.steps[1],
+                SLANG_NVVM_VALUE_OP_SHIFT_RIGHT,
+                NVVMSemantics::kUnsignedI64,
+                shiftOperands,
+                SLANG_COUNT_OF(shiftOperands),
+                "descriptor count high-word shift"))
+        {
+            return false;
+        }
+        outCast.stepCount = 2;
+    }
+
+    outCast.value = value;
+    outCast.handleType = handleType;
+    outCast.payloadType = payloadVector;
+    outCast.rawBufferType = rawBufferType;
+    outCast.resultIsHandle = resultIsHandle;
+    return true;
+}
+
 bool _isNVVMPointerBitPatternType(IRInst* type)
 {
     uint32_t bitWidth = 0;
@@ -6107,6 +6218,18 @@ void _requireNVVMUInt64WordConstructionOperations(
     };
     for (auto step : steps)
         _requireValueOperation(requirements, step->getDesc(), step->diagnosticName);
+}
+
+void _requireNVVMRawBufferDescriptorBitCastOperations(
+    NVVMValueOperationRequirements& requirements,
+    const NVVMRawBufferDescriptorBitCast& bitCast)
+{
+    SLANG_ASSERT(bitCast.stepCount >= 2 && bitCast.stepCount <= SLANG_COUNT_OF(bitCast.steps));
+    for (uint32_t i = 0; i < bitCast.stepCount; ++i)
+    {
+        const auto& step = bitCast.steps[i];
+        _requireValueOperation(requirements, step.getDesc(), step.diagnosticName);
+    }
 }
 
 // Resolves canonical Slang value operations to either a fixed exact row or one bounded family.
@@ -7787,6 +7910,14 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_BitCast:
                 {
+                    NVVMRawBufferDescriptorBitCast descriptorCast;
+                    if (_getNVVMRawBufferDescriptorBitCast(inst, descriptorCast))
+                    {
+                        _requireNVVMRawBufferDescriptorBitCastOperations(
+                            requirements.valueOperations,
+                            descriptorCast);
+                        break;
+                    }
                     NVVMPointerBitCast pointerCast;
                     if (_getNVVMPointerBitCast(inst, pointerCast))
                         break;
@@ -8465,6 +8596,18 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_BitCast:
                 {
+                    NVVMRawBufferDescriptorBitCast descriptorCast;
+                    if (_getNVVMRawBufferDescriptorBitCast(inst, descriptorCast))
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                            codeGenContext,
+                            descriptorCast.value,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                        availableValues.add(inst);
+                        break;
+                    }
                     NVVMPointerBitCast pointerCast;
                     if (_getNVVMPointerBitCast(inst, pointerCast))
                     {
@@ -10021,6 +10164,209 @@ SlangResult _emitNVVMUInt64WordConstruction(
         combineOperands,
         SLANG_COUNT_OF(combineOperands),
         outValue);
+}
+
+SlangResult _emitNVVMRawBufferDescriptorBitCast(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMRawBufferDescriptorBitCast& bitCast,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext,
+    SlangNVVMValueHandle& outValue)
+{
+    outValue = nullptr;
+    SlangNVVMValueHandle input = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        bitCast.value,
+        valueMap,
+        typeContext,
+        input));
+
+    SlangNVVMTypeHandle uintType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "descriptor payload word type",
+        builder.getIntegerType(module, 32, uintType)));
+    SlangNVVMTypeHandle uint2Type = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "descriptor pointer payload type",
+        builder.getVectorType(module, uintType, 2, uint2Type)));
+
+    SlangNVVMValueHandle indices[4] = {};
+    for (uint32_t i = 0; i < SLANG_COUNT_OF(indices); ++i)
+    {
+        SLANG_RETURN_ON_FAIL(
+            _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, i, indices[i]));
+    }
+
+    if (!bitCast.resultIsHandle)
+    {
+        SlangNVVMValueHandle dataPointer = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "descriptor raw-buffer data extraction",
+            builder.emitAggregateElementExtract(module, input, 0, dataPointer)));
+        SlangNVVMValueHandle count = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "descriptor raw-buffer count extraction",
+            builder.emitAggregateElementExtract(module, input, 1, count)));
+
+        SlangNVVMValueHandle pointerWords = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "descriptor data-pointer bit transport",
+            builder.emitBitCast(module, uint2Type, dataPointer, pointerWords)));
+        SlangNVVMValueHandle words[4] = {};
+        for (uint32_t i = 0; i < 2; ++i)
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "descriptor data-pointer word extraction",
+                builder.emitSequentialElementExtract(module, pointerWords, indices[i], words[i])));
+        }
+
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            bitCast.steps[0],
+            &count,
+            1,
+            words[2]));
+        SlangNVVMValueHandle shiftAmount = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 64, 32, shiftAmount));
+        const SlangNVVMValueHandle shiftOperands[] = {count, shiftAmount};
+        SlangNVVMValueHandle shiftedCount = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            bitCast.steps[1],
+            shiftOperands,
+            SLANG_COUNT_OF(shiftOperands),
+            shiftedCount));
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            bitCast.steps[0],
+            &shiftedCount,
+            1,
+            words[3]));
+
+        SlangNVVMTypeHandle payloadType = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            typeContext.lowerType(bitCast.payloadType, NVVMTypeUse::Value, payloadType));
+        return _requireBuilderOperation(
+            codeGenContext,
+            "descriptor AnyValue payload construction",
+            builder
+                .emitVectorConstruct(module, payloadType, words, SLANG_COUNT_OF(words), outValue));
+    }
+
+    SlangNVVMValueHandle words[4] = {};
+    for (uint32_t i = 0; i < SLANG_COUNT_OF(words); ++i)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "descriptor AnyValue payload word extraction",
+            builder.emitSequentialElementExtract(module, input, indices[i], words[i])));
+    }
+    SlangNVVMValueHandle pointerWords = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "descriptor pointer payload construction",
+        builder.emitVectorConstruct(module, uint2Type, words, 2, pointerWords)));
+
+    SlangNVVMTypeHandle elementType = nullptr;
+    if (bitCast.rawBufferType.kind == NVVMRawBufferKind::ByteAddress)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "descriptor byte-address-buffer element type",
+            builder.getIntegerType(module, 32, elementType)));
+    }
+    else
+    {
+        const NVVMTypeUse elementUse =
+            isNVVMSupportedStructuredBufferStorageType(bitCast.rawBufferType.structuredElementType)
+                ? NVVMTypeUse::StructuredBufferStorage
+                : NVVMTypeUse::Value;
+        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+            bitCast.rawBufferType.structuredElementType,
+            elementUse,
+            elementType));
+    }
+    SlangNVVMTypeHandle dataPointerType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "descriptor raw-buffer data-pointer type",
+        builder.getPointerType(
+            module,
+            elementType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            dataPointerType)));
+    SlangNVVMValueHandle dataPointer = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "descriptor data-pointer reconstruction",
+        builder.emitBitCast(module, dataPointerType, pointerWords, dataPointer)));
+
+    SlangNVVMValueHandle countWords64[2] = {};
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            bitCast.steps[0],
+            &words[i + 2],
+            1,
+            countWords64[i]));
+    }
+    SlangNVVMValueHandle shiftAmount = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 64, 32, shiftAmount));
+    const SlangNVVMValueHandle shiftOperands[] = {countWords64[1], shiftAmount};
+    SlangNVVMValueHandle shiftedHighWord = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        bitCast.steps[1],
+        shiftOperands,
+        SLANG_COUNT_OF(shiftOperands),
+        shiftedHighWord));
+    const SlangNVVMValueHandle combineOperands[] = {countWords64[0], shiftedHighWord};
+    SlangNVVMValueHandle count = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        bitCast.steps[2],
+        combineOperands,
+        SLANG_COUNT_OF(combineOperands),
+        count));
+
+    SlangNVVMTypeHandle handleType = nullptr;
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(bitCast.handleType, NVVMTypeUse::Value, handleType));
+    const SlangNVVMValueHandle handleElements[] = {dataPointer, count};
+    return _requireBuilderOperation(
+        codeGenContext,
+        "descriptor raw-buffer view reconstruction",
+        builder.emitAggregateConstruct(
+            module,
+            handleType,
+            handleElements,
+            SLANG_COUNT_OF(handleElements),
+            outValue));
 }
 
 SlangResult _emitNVVMAtomicReduction(
@@ -13430,6 +13776,21 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_BitCast:
                     {
+                        NVVMRawBufferDescriptorBitCast descriptorCast;
+                        if (_getNVVMRawBufferDescriptorBitCast(inst, descriptorCast))
+                        {
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMRawBufferDescriptorBitCast(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                descriptorCast,
+                                valueMap,
+                                typeContext,
+                                loweredValue));
+                            valueMap[inst] = loweredValue;
+                            break;
+                        }
                         NVVMPointerBitCast pointerCast;
                         if (!_getNVVMPointerBitCast(inst, pointerCast))
                         {

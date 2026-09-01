@@ -7225,6 +7225,35 @@ SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 emits 1,619-
 aligned vector-array workload versus 12,548 bytes from NVRTC, and 4,596-byte PTX for the unaligned
 Half-vector workload versus 17,466 bytes from NVRTC. Timings remain exploratory.
 
+### Slice 172: Canonical descriptor-handle AnyValue transport
+
+AnyValue packing for a bindless target intentionally treats a descriptor handle as the target's
+native resource value. A `DescriptorHandle<StructuredBuffer<T>>` is therefore 16 bytes and is
+transported as `uint4`. The handle remains opaque in common Slang IR: the generic aggregate
+bit-cast pass must preserve this exact operation because it cannot correctly invent scalar leaves
+for the handle's pointer field.
+
+At the direct-NVVM boundary, the selected raw-buffer handle has the established provider type
+`{global T*, uint64 count}`. The compiler classifies only the exact bidirectional
+`DescriptorHandle<RawBuffer> <-> vector<uint,4>` bit cast. Packing extracts the pointer and count,
+transports the pointer through `uint2`, and splits the count into two words. Unpacking performs the
+inverse word construction and builds the raw-buffer aggregate. Existing generic aggregate,
+vector, pointer-bit, conversion, shift, and bitwise operations express the whole recipe; provider
+ABI revision 32 is unchanged. Texture/sampler handles, signed payloads, other lane counts, and
+unsupported resource types are not inferred from this rule.
+
+Frozen `layout-descriptor-handle-array`, `layout-descriptor-handle-dispatch`, and
+`layout-descriptor-handle-multi` become correct at O0 and O3 and gain six permanent direct lanes.
+Frozen corpus v1 remains exactly 452 workloads/427 healthy references and advances from
+409/409/409 to 412/412/412, with exactly three gains and no old-correct regression. Discovery
+remains exactly 82/72 at 69/69/69 with no changed row. The selected prefix passes 433/433 and the
+permanent NVVM category passes 72/72.
+
+All three representative gates produce accepted native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 PTX sizes are 3,014, 2,523,
+and 3,013 bytes for the array, dispatch, and multi-handle workloads respectively, versus 11,385,
+10,784, and 11,405 bytes from NVRTC. Timings remain exploratory.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

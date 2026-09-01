@@ -2455,3 +2455,18 @@ denominator, with exactly two gains and no old-correct loss. Discovery remains 6
 with no changed row. The selected prefix passes 433/433, the permanent NVVM category passes 66/66,
 and both measurement gates produce accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct
 O3 SM70/SM80/SM90 configurations.
+
+Slice 172 preserves AnyValue's canonical bindless raw-buffer descriptor transport until the
+direct emitter owns its physical type. Common marshalling intentionally bit-casts the opaque
+`DescriptorHandle<StructuredBuffer<T>>` to four unsigned words. At the direct boundary, the
+handle is the exact provider aggregate `{global T*, uint64 count}`; compiler-side legalization
+extracts or reconstructs those two fields with existing generic aggregate, vector, pointer-bit,
+and integer operations. Other descriptor payload shapes remain rejected. Provider ABI revision 32
+is unchanged.
+
+The three frozen dynamic-dispatch descriptor-layout workloads gain six permanent direct lanes.
+Frozen v1 advances from 409/409/409 to 412/412/412 over its unchanged 427 healthy denominator,
+with exactly three gains and no old-correct loss. Discovery remains 69/69/69 over 72 with no
+changed row. The selected prefix passes 433/433, the permanent NVVM category passes 72/72, and all
+three measurement gates produce accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct
+O3 SM70/SM80/SM90 configurations.

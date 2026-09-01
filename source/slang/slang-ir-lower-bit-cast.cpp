@@ -244,6 +244,27 @@ struct BitCastLoweringContext
         IRSizeAndAlignment fromTypeSize;
         getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize);
 
+        // DescriptorHandle<T> is intentionally opaque in canonical Slang IR, while a bindless
+        // target gives it the same physical representation as T. AnyValue's one canonical
+        // 16-byte raw-buffer transport is a bit cast between that handle and `uint4`. The direct
+        // NVVM emitter owns the target representation and legalizes this exact operation after
+        // lowering T to `{global T*, uint64 count}`. Recursing through the opaque handle here
+        // would instead invent scalar extraction from one unsupported 16-byte leaf.
+        auto descriptorType = as<IRDescriptorHandleType>(fromType);
+        auto payloadType = descriptorType ? as<IRVectorType>(toType) : nullptr;
+        if (!descriptorType)
+        {
+            descriptorType = as<IRDescriptorHandleType>(toType);
+            payloadType = descriptorType ? as<IRVectorType>(fromType) : nullptr;
+        }
+        auto payloadCount = payloadType ? as<IRIntLit>(payloadType->getElementCount()) : nullptr;
+        if (targetProgram->shouldEmitNVVMDirectly() && descriptorType && payloadType &&
+            payloadType->getElementType()->getOp() == kIROp_UIntType && payloadCount &&
+            payloadCount->value.intVal == 4 && fromTypeSize.size == 16 && toTypeSize.size == 16)
+        {
+            return;
+        }
+
         // Check if the target is directly emitted SPIRV and if the target is SPIRV 1.5 or later
         bool isDirectSpirv = false;
         bool isSpirv15OrLater = false;

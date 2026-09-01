@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "descriptor-handle-array-anyvalue",
+      "source": "tests/language-feature/dynamic-dispatch/layout-descriptor-handle-array.slang",
+      "census_id": "language-feature/dynamic-dispatch/layout-descriptor-handle-array.slang#cuda-1"
+    },
+    {
+      "name": "descriptor-handle-dispatch-anyvalue",
+      "source": "tests/language-feature/dynamic-dispatch/layout-descriptor-handle-dispatch.slang",
+      "census_id": "language-feature/dynamic-dispatch/layout-descriptor-handle-dispatch.slang#cuda-1"
+    },
+    {
+      "name": "descriptor-handle-multi-anyvalue",
+      "source": "tests/language-feature/dynamic-dispatch/layout-descriptor-handle-multi.slang",
+      "census_id": "language-feature/dynamic-dispatch/layout-descriptor-handle-multi.slang#cuda-1"
+    }
+  ]
+}
