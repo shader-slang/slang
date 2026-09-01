@@ -2566,3 +2566,16 @@ old-correct loss. Discovery stays 72/72/72 over 72 with no changed row. The sele
 437/437, the permanent NVVM category passes 90/90, and the gather measurement gate produces
 accepted PTX/cubins for the native reference, direct O0 SM70, and direct O3 SM70/SM80/SM90
 configurations.
+
+Slice 182 moves the fixed semantic catalog off CUDA text. An optional internal tag on 105
+standard-module intrinsic-assembly statements survives specialization; the NVVM legalizer consumes
+it to produce `IRNVVMIntrinsic(semantic-id)`. The complete specialized helper signature supplies
+the exact overload, including homogeneous Half promotion and void barriers. All 72 fixed catalog
+rows are now provider semantics and types only, and the direct route has no fallback lookup for
+their former CUDA spellings.
+
+Resource, atomic, out-parameter recipe, and compound-wave GenericAsm families are deliberately not
+encoded in this value opcode because their canonical semantics require richer typed payloads.
+Provider ABI revision 34 is unchanged. Frozen corpus v1 remains 418/418/418 over 427 healthy
+references, discovery remains 72/72/72 over 72, the selected prefix passes 437/437, and the NVVM
+category passes 92/92.

@@ -7435,8 +7435,8 @@ T abs(T x)
     case hlsl: __intrinsic_asm "abs";
     case glsl: __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
-    case cuda: __intrinsic_asm "$P_abs($0)";
-    case cpp: __intrinsic_asm "$P_abs($0)";
+    case cuda: __intrinsic_asm(nvvmAbs) "$P_abs($0)";
+    case cpp: __intrinsic_asm(nvvmAbs) "$P_abs($0)";
     case spirv: return spirv_asm {
         result:$$T = OpExtInst glsl450 SAbs $x
     };
@@ -7491,8 +7491,8 @@ T abs(T x)
     case hlsl: __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
     case glsl: __intrinsic_asm "abs";
-    case cuda: __intrinsic_asm "$P_abs($0)";
-    case cpp: __intrinsic_asm "$P_abs($0)";
+    case cuda: __intrinsic_asm(nvvmAbs) "$P_abs($0)";
+    case cpp: __intrinsic_asm(nvvmAbs) "$P_abs($0)";
     case spirv: return spirv_asm {
         result:$$T = OpExtInst glsl450 FAbs $x;
     };
@@ -7580,8 +7580,8 @@ T acos(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_acos($0)";
-    case cuda: __intrinsic_asm "$P_acos($0)";
+    case cpp: __intrinsic_asm(nvvmAcos) "$P_acos($0)";
+    case cuda: __intrinsic_asm(nvvmAcos) "$P_acos($0)";
     case glsl: __intrinsic_asm "acos";
     case hlsl: __intrinsic_asm "acos";
     case metal: __intrinsic_asm "acos";
@@ -7812,7 +7812,7 @@ void AllMemoryBarrier()
     {
     case hlsl: __intrinsic_asm "AllMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
-    case cuda: __intrinsic_asm "__threadfence()";
+    case cuda: __intrinsic_asm(nvvmDeviceMemoryBarrier) "__threadfence()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -7832,7 +7832,7 @@ void AllMemoryBarrierWithGroupSync()
     {
     case hlsl: __intrinsic_asm "AllMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
-    case cuda: __intrinsic_asm "__syncthreads()";
+    case cuda: __intrinsic_asm(nvvmWorkgroupBarrier) "__syncthreads()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -8040,8 +8040,8 @@ float asfloat(int x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_asfloat($0)";
-    case cuda: __intrinsic_asm "$P_asfloat($0)";
+    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asfloat($0)";
+    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asfloat($0)";
     case glsl: __intrinsic_asm "intBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8059,8 +8059,8 @@ float asfloat(uint x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_asfloat($0)";
-    case cuda: __intrinsic_asm "$P_asfloat($0)";
+    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asfloat($0)";
+    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asfloat($0)";
     case glsl: __intrinsic_asm "uintBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8166,8 +8166,8 @@ T asin(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_asin($0)";
-    case cuda: __intrinsic_asm "$P_asin($0)";
+    case cpp: __intrinsic_asm(nvvmAsin) "$P_asin($0)";
+    case cuda: __intrinsic_asm(nvvmAsin) "$P_asin($0)";
     case glsl: __intrinsic_asm "asin";
     case hlsl: __intrinsic_asm "asin";
     case metal: __intrinsic_asm "asin";
@@ -8277,8 +8277,8 @@ int asint(float x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_asint($0)";
-    case cuda: __intrinsic_asm "$P_asint($0)";
+    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asint($0)";
+    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asint($0)";
     case glsl: __intrinsic_asm "floatBitsToInt";
     case hlsl: __intrinsic_asm "asint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8296,8 +8296,8 @@ int asint(uint x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_asint($0)";
-    case cuda: __intrinsic_asm "$P_asint($0)";
+    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asint($0)";
+    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asint($0)";
     case glsl: __intrinsic_asm "int($0)";
     case hlsl: __intrinsic_asm "asint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8433,8 +8433,8 @@ uint asuint(float x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_asuint($0)";
-    case cuda: __intrinsic_asm "$P_asuint($0)";
+    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asuint($0)";
+    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asuint($0)";
     case glsl: __intrinsic_asm "floatBitsToUint";
     case hlsl: __intrinsic_asm "asuint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8452,8 +8452,8 @@ uint asuint(int x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_asuint($0)";
-    case cuda: __intrinsic_asm "$P_asuint($0)";
+    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asuint($0)";
+    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asuint($0)";
     case glsl: __intrinsic_asm "uint($0)";
     case hlsl: __intrinsic_asm "asuint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8765,8 +8765,8 @@ T atan(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_atan($0)";
-    case cuda: __intrinsic_asm "$P_atan($0)";
+    case cpp: __intrinsic_asm(nvvmAtan) "$P_atan($0)";
+    case cuda: __intrinsic_asm(nvvmAtan) "$P_atan($0)";
     case glsl: __intrinsic_asm "atan";
     case hlsl: __intrinsic_asm "atan";
     case metal: __intrinsic_asm "atan";
@@ -8823,8 +8823,8 @@ T atan2(T y, T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_atan2($0, $1)";
-    case cuda: __intrinsic_asm "$P_atan2($0, $1)";
+    case cpp: __intrinsic_asm(nvvmAtan2) "$P_atan2($0, $1)";
+    case cuda: __intrinsic_asm(nvvmAtan2) "$P_atan2($0, $1)";
     case glsl: __intrinsic_asm "atan($0,$1)";
     case hlsl: __intrinsic_asm "atan2";
     case metal: __intrinsic_asm "atan2";
@@ -8936,8 +8936,8 @@ T ceil(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_ceil($0)";
-    case cuda: __intrinsic_asm "$P_ceil($0)";
+    case cpp: __intrinsic_asm(nvvmCeil) "$P_ceil($0)";
+    case cuda: __intrinsic_asm(nvvmCeil) "$P_ceil($0)";
     case glsl: __intrinsic_asm "ceil";
     case hlsl: __intrinsic_asm "ceil";
     case metal: __intrinsic_asm "ceil";
@@ -9267,8 +9267,8 @@ T cos(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_cos($0)";
-    case cuda: __intrinsic_asm "$P_cos($0)";
+    case cpp: __intrinsic_asm(nvvmCos) "$P_cos($0)";
+    case cuda: __intrinsic_asm(nvvmCos) "$P_cos($0)";
     case glsl: __intrinsic_asm "cos";
     case hlsl: __intrinsic_asm "cos";
     case metal: __intrinsic_asm "cos";
@@ -9324,8 +9324,8 @@ T cosh(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_cosh($0)";
-    case cuda: __intrinsic_asm "$P_cosh($0)";
+    case cpp: __intrinsic_asm(nvvmCosh) "$P_cosh($0)";
+    case cuda: __intrinsic_asm(nvvmCosh) "$P_cosh($0)";
     case glsl: __intrinsic_asm "cosh";
     case hlsl: __intrinsic_asm "cosh";
     case metal: __intrinsic_asm "cosh";
@@ -9455,7 +9455,7 @@ uint countbits(T value)
         __intrinsic_asm "($TR)popcount($0)";
     case cuda:
     case cpp:
-        __intrinsic_asm "$P_countbits($0)";
+        __intrinsic_asm(nvvmCountBits) "$P_countbits($0)";
     case spirv:
         if(T is int64_t || T  is uint64_t)
         {
@@ -9958,7 +9958,7 @@ void DeviceMemoryBarrier()
     {
     case hlsl: __intrinsic_asm "DeviceMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
-    case cuda: __intrinsic_asm "__threadfence()";
+    case cuda: __intrinsic_asm(nvvmDeviceMemoryBarrier) "__threadfence()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -9978,7 +9978,7 @@ void DeviceMemoryBarrierWithGroupSync()
     {
     case hlsl: __intrinsic_asm "DeviceMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
-    case cuda: __intrinsic_asm "__syncthreads()";
+    case cuda: __intrinsic_asm(nvvmWorkgroupBarrier) "__syncthreads()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -10495,8 +10495,8 @@ T exp(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_exp($0)";
-    case cuda: __intrinsic_asm "$P_exp($0)";
+    case cpp: __intrinsic_asm(nvvmExp) "$P_exp($0)";
+    case cuda: __intrinsic_asm(nvvmExp) "$P_exp($0)";
     case glsl: __intrinsic_asm "exp";
     case hlsl: __intrinsic_asm "exp";
     case metal: __intrinsic_asm "exp";
@@ -10572,9 +10572,9 @@ T exp2(T x)
         __intrinsic_asm "exp2($0)";
     case metal: __intrinsic_asm "exp2";
     case cpp:
-        __intrinsic_asm "$P_exp2($0)";
+        __intrinsic_asm(nvvmExp2) "$P_exp2($0)";
     case cuda:
-        __intrinsic_asm "$P_exp2($0)";
+        __intrinsic_asm(nvvmExp2) "$P_exp2($0)";
     case wgsl:
         __intrinsic_asm "exp2";
     case llvm:
@@ -10782,7 +10782,7 @@ float f16tof32(float16_t value)
     {
     case glsl: __intrinsic_asm "unpackHalf2x16($0).x";
     case hlsl: __intrinsic_asm "f16tof32($0)";
-    case cuda: __intrinsic_asm "__half2float($0)";
+    case cuda: __intrinsic_asm(nvvmFloatConvert) "__half2float($0)";
     case cpp: __intrinsic_asm "f16tof32($0)";
     case metal: __intrinsic_asm "float($0)";
     case spirv:
@@ -10824,7 +10824,7 @@ float16_t f32tof16_(float value)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__float2half";
+    case cuda: __intrinsic_asm(nvvmFloatConvert) "__float2half";
     case glsl: __intrinsic_asm "packHalf2x16(vec2($0,0.0))";
     case metal: __intrinsic_asm "half($0)";
     case spirv: return spirv_asm {
@@ -10842,7 +10842,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__float2half";
+    case cuda: __intrinsic_asm(nvvmFloatConvert) "__float2half";
     case metal: __intrinsic_asm "$TR($0)";
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value
@@ -10945,8 +10945,8 @@ uint firstbithigh<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_firstbithigh($0)";
-    case cuda: __intrinsic_asm "$P_firstbithigh($0)";
+    case cpp: __intrinsic_asm(nvvmFirstBitHigh) "$P_firstbithigh($0)";
+    case cuda: __intrinsic_asm(nvvmFirstBitHigh) "$P_firstbithigh($0)";
     case glsl:
         __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
@@ -11056,8 +11056,8 @@ uint firstbitlow<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_firstbitlow($0)";
-    case cuda: __intrinsic_asm "$P_firstbitlow($0)";
+    case cpp: __intrinsic_asm(nvvmFirstBitLow) "$P_firstbitlow($0)";
+    case cuda: __intrinsic_asm(nvvmFirstBitLow) "$P_firstbitlow($0)";
     case glsl:
         if (T is int64_t || T is uint64_t)
             __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
@@ -11133,8 +11133,8 @@ T floor(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_floor($0)";
-    case cuda: __intrinsic_asm "$P_floor($0)";
+    case cpp: __intrinsic_asm(nvvmFloor) "$P_floor($0)";
+    case cuda: __intrinsic_asm(nvvmFloor) "$P_floor($0)";
     case glsl: __intrinsic_asm "floor";
     case hlsl: __intrinsic_asm "floor";
     case metal: __intrinsic_asm "floor";
@@ -11192,8 +11192,8 @@ T fma(T a, T b, T c)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_fma($0, $1, $2)";
-    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
+    case cpp: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
+    case cuda: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
     case glsl: __intrinsic_asm "fma";
     case hlsl:
         if (__isFloat<T>() || __isHalf<T>())
@@ -11304,8 +11304,8 @@ T fmod(T x, T y)
 
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_fmod($0, $1)";
-    case cuda: __intrinsic_asm "$P_fmod($0, $1)";
+    case cpp: __intrinsic_asm(nvvmFmod) "$P_fmod($0, $1)";
+    case cuda: __intrinsic_asm(nvvmFmod) "$P_fmod($0, $1)";
     case glsl:
         // GLSL doesn't have a function for remainder.
         __intrinsic_asm "(($0 < 0.0) ? -mod(-$0,abs($1)) : mod($0,abs($1)))";
@@ -11367,8 +11367,8 @@ T frac(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_frac($0)";
-    case cuda: __intrinsic_asm "$P_frac($0)";
+    case cpp: __intrinsic_asm(nvvmFrac) "$P_frac($0)";
+    case cuda: __intrinsic_asm(nvvmFrac) "$P_frac($0)";
     case glsl: __intrinsic_asm "fract";
     case hlsl: __intrinsic_asm "frac";
     case metal: __intrinsic_asm "fract";
@@ -11852,7 +11852,7 @@ void GroupMemoryBarrier()
     {
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeWorkgroup, gl_StorageSemanticsShared, gl_SemanticsAcquireRelease)";
     case hlsl: __intrinsic_asm "GroupMemoryBarrier";
-    case cuda: __intrinsic_asm "__threadfence_block";
+    case cuda: __intrinsic_asm(nvvmWorkgroupMemoryBarrier) "__threadfence_block";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_threadgroup)";
     case spirv:
         spirv_asm
@@ -11870,7 +11870,7 @@ void __subgroupBarrier()
     {
     case glsl: __intrinsic_asm "subgroupBarrier";
     case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
-    case cuda: __intrinsic_asm "__syncthreads()";
+    case cuda: __intrinsic_asm(nvvmWorkgroupBarrier) "__syncthreads()";
     case metal: __intrinsic_asm "simdgroup_barrier(mem_flags::none)";
     case spirv:
         spirv_asm
@@ -11890,7 +11890,7 @@ void GroupMemoryBarrierWithGroupSync()
     {
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeWorkgroup, gl_StorageSemanticsShared, gl_SemanticsAcquireRelease)";
     case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
-    case cuda: __intrinsic_asm "__syncthreads()";
+    case cuda: __intrinsic_asm(nvvmWorkgroupBarrier) "__syncthreads()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_threadgroup)";
     case spirv:
         spirv_asm
@@ -12494,8 +12494,8 @@ T log(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_log($0)";
-    case cuda: __intrinsic_asm "$P_log($0)";
+    case cpp: __intrinsic_asm(nvvmLog) "$P_log($0)";
+    case cuda: __intrinsic_asm(nvvmLog) "$P_log($0)";
     case glsl: __intrinsic_asm "log";
     case hlsl: __intrinsic_asm "log";
     case metal: __intrinsic_asm "log";
@@ -12555,8 +12555,8 @@ T log10(T x)
     case metal: __intrinsic_asm "log10";
     case wgsl: __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
     case glsl: __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
-    case cuda: __intrinsic_asm "$P_log10($0)";
-    case cpp: __intrinsic_asm "$P_log10($0)";
+    case cuda: __intrinsic_asm(nvvmLog10) "$P_log10($0)";
+    case cpp: __intrinsic_asm(nvvmLog10) "$P_log10($0)";
     case spirv:
     {
         const T tmp = T(0.43429448190325182765112891891661);
@@ -12618,8 +12618,8 @@ T log2(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_log2($0)";
-    case cuda: __intrinsic_asm "$P_log2($0)";
+    case cpp: __intrinsic_asm(nvvmLog2) "$P_log2($0)";
+    case cuda: __intrinsic_asm(nvvmLog2) "$P_log2($0)";
     case glsl: __intrinsic_asm "log2";
     case hlsl: __intrinsic_asm "log2";
     case metal: __intrinsic_asm "log2";
@@ -12677,8 +12677,8 @@ T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_fma($0, $1, $2)";
-    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
+    case cpp: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
+    case cuda: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
     case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
     case metal: __intrinsic_asm "fma";
@@ -12730,8 +12730,8 @@ T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_fma($0, $1, $2)";
-    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
+    case cpp: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
+    case cuda: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
     case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
     case spirv: return spirv_asm {
@@ -12787,8 +12787,8 @@ T __max_impl(T x, T y)
     case glsl: __intrinsic_asm "max";
     case metal: __intrinsic_asm "max";
     case wgsl: __intrinsic_asm "max";
-    case cuda: __intrinsic_asm "$P_max($0, $1)";
-    case cpp: __intrinsic_asm "$P_max($0, $1)";
+    case cuda: __intrinsic_asm(nvvmMax) "$P_max($0, $1)";
+    case cpp: __intrinsic_asm(nvvmMax) "$P_max($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm { result:$$T = OpExtInst glsl450 FMax $x $y };
@@ -13071,8 +13071,8 @@ T __min_impl(T x, T y)
     case glsl: __intrinsic_asm "min";
     case metal: __intrinsic_asm "min";
     case wgsl: __intrinsic_asm "min";
-    case cuda: __intrinsic_asm "$P_min($0, $1)";
-    case cpp: __intrinsic_asm "$P_min($0, $1)";
+    case cuda: __intrinsic_asm(nvvmMin) "$P_min($0, $1)";
+    case cpp: __intrinsic_asm(nvvmMin) "$P_min($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm { result:$$T = OpExtInst glsl450 FMin $x $y };
@@ -14024,8 +14024,8 @@ T pow(T x, T y)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_pow($0, $1)";
-    case cuda: __intrinsic_asm "$P_pow($0, $1)";
+    case cpp: __intrinsic_asm(nvvmPow) "$P_pow($0, $1)";
+    case cuda: __intrinsic_asm(nvvmPow) "$P_pow($0, $1)";
     case glsl: __intrinsic_asm "pow";
     case hlsl: __intrinsic_asm "pow";
     case metal: __intrinsic_asm "pow";
@@ -14448,7 +14448,7 @@ T reversebits<T : __BuiltinIntegerType>(T value)
             __intrinsic_asm "bitfieldReverse";
     case cuda:
     case cpp:
-        __intrinsic_asm "$P_reversebits($0)";
+        __intrinsic_asm(nvvmReverseBits) "$P_reversebits($0)";
     case metal:
         __intrinsic_asm "reverse_bits";
     case spirv:
@@ -14560,8 +14560,8 @@ T round(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_round($0)";
-    case cuda: __intrinsic_asm "$P_round($0)";
+    case cpp: __intrinsic_asm(nvvmRound) "$P_round($0)";
+    case cuda: __intrinsic_asm(nvvmRound) "$P_round($0)";
     case glsl: __intrinsic_asm "round";
     case hlsl: __intrinsic_asm "round";
     case metal: __intrinsic_asm "round";
@@ -14616,8 +14616,8 @@ T rsqrt(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_rsqrt($0)";
-    case cuda: __intrinsic_asm "$P_rsqrt($0)";
+    case cpp: __intrinsic_asm(nvvmRsqrt) "$P_rsqrt($0)";
+    case cuda: __intrinsic_asm(nvvmRsqrt) "$P_rsqrt($0)";
     case glsl: __intrinsic_asm "inversesqrt($0)";
     case hlsl: __intrinsic_asm "rsqrt";
     case metal: __intrinsic_asm "rsqrt";
@@ -14774,7 +14774,7 @@ int sign(T x)
     case glsl: __intrinsic_asm "int(sign($0))";
     case cuda:
     case cpp:
-        __intrinsic_asm "$P_sign($0)";
+        __intrinsic_asm(nvvmSign) "$P_sign($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm
@@ -14845,8 +14845,8 @@ T sin(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_sin($0)";
-    case cuda: __intrinsic_asm "$P_sin($0)";
+    case cpp: __intrinsic_asm(nvvmSin) "$P_sin($0)";
+    case cuda: __intrinsic_asm(nvvmSin) "$P_sin($0)";
     case glsl: __intrinsic_asm "sin";
     case hlsl: __intrinsic_asm "sin";
     case metal: __intrinsic_asm "sin";
@@ -14999,8 +14999,8 @@ T sinh(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_sinh($0)";
-    case cuda: __intrinsic_asm "$P_sinh($0)";
+    case cpp: __intrinsic_asm(nvvmSinh) "$P_sinh($0)";
+    case cuda: __intrinsic_asm(nvvmSinh) "$P_sinh($0)";
     case glsl: __intrinsic_asm "sinh";
     case hlsl: __intrinsic_asm "sinh";
     case metal: __intrinsic_asm "sinh";
@@ -15145,8 +15145,8 @@ T sqrt(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_sqrt($0)";
-    case cuda: __intrinsic_asm "$P_sqrt($0)";
+    case cpp: __intrinsic_asm(nvvmSqrt) "$P_sqrt($0)";
+    case cuda: __intrinsic_asm(nvvmSqrt) "$P_sqrt($0)";
     case glsl: __intrinsic_asm "sqrt";
     case hlsl: __intrinsic_asm "sqrt";
     case metal: __intrinsic_asm "sqrt";
@@ -15258,8 +15258,8 @@ T tan(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_tan($0)";
-    case cuda: __intrinsic_asm "$P_tan($0)";
+    case cpp: __intrinsic_asm(nvvmTan) "$P_tan($0)";
+    case cuda: __intrinsic_asm(nvvmTan) "$P_tan($0)";
     case glsl: __intrinsic_asm "tan";
     case hlsl: __intrinsic_asm "tan";
     case metal: __intrinsic_asm "tan";
@@ -15315,8 +15315,8 @@ T tanh(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_tanh($0)";
-    case cuda: __intrinsic_asm "$P_tanh($0)";
+    case cpp: __intrinsic_asm(nvvmTanh) "$P_tanh($0)";
+    case cuda: __intrinsic_asm(nvvmTanh) "$P_tanh($0)";
     case glsl: __intrinsic_asm "tanh";
     case hlsl: __intrinsic_asm "tanh";
     case metal: __intrinsic_asm "tanh";
@@ -15469,8 +15469,8 @@ T trunc(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_trunc($0)";
-    case cuda: __intrinsic_asm "$P_trunc($0)";
+    case cpp: __intrinsic_asm(nvvmTrunc) "$P_trunc($0)";
+    case cuda: __intrinsic_asm(nvvmTrunc) "$P_trunc($0)";
     case glsl: __intrinsic_asm "trunc";
     case hlsl: __intrinsic_asm "trunc";
     case metal: __intrinsic_asm "trunc";
@@ -15581,7 +15581,7 @@ bool WaveMaskIsFirstLane(WaveMask mask)
     case glsl:
         __intrinsic_asm "subgroupElect()";
     case cuda:
-        __intrinsic_asm "(($0 & -$0) == (WarpMask(1) << _getLaneId()))";
+        __intrinsic_asm(nvvmWaveMaskIsFirstLane) "(($0 & -$0) == (WarpMask(1) << _getLaneId()))";
     case hlsl:
         __intrinsic_asm "WaveIsFirstLane()";
     case spirv:
@@ -15603,7 +15603,7 @@ bool WaveMaskAllTrue(WaveMask mask, bool condition)
     case glsl:
         __intrinsic_asm "subgroupAll($1)";
     case cuda:
-        __intrinsic_asm "(__all_sync($0, $1) != 0)";
+        __intrinsic_asm(nvvmWaveMaskAllTrue) "(__all_sync($0, $1) != 0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllTrue($1)";
     case spirv:
@@ -15625,7 +15625,7 @@ bool WaveMaskAnyTrue(WaveMask mask, bool condition)
     case glsl:
         __intrinsic_asm "subgroupAny($1)";
     case cuda:
-        __intrinsic_asm "(__any_sync($0, $1) != 0)";
+        __intrinsic_asm(nvvmWaveMaskAnyTrue) "(__any_sync($0, $1) != 0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAnyTrue($1)";
     case spirv:
@@ -15647,7 +15647,7 @@ WaveMask WaveMaskBallot(WaveMask mask, bool condition)
     case glsl:
         __intrinsic_asm "subgroupBallot($1).x";
     case cuda:
-        __intrinsic_asm "__ballot_sync($0, $1)";
+        __intrinsic_asm(nvvmWaveMaskBallot) "__ballot_sync($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBallot($1)";
     case spirv:
@@ -15794,7 +15794,7 @@ T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupBroadcast($1, $2)";
-    case cuda: __intrinsic_asm "__shfl_sync($0, $1, $2)";
+    case cuda: __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
         let ulane = uint(lane);
@@ -15846,7 +15846,7 @@ T WaveMaskReadLaneAt(WaveMask mask, T value, int lane)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupShuffle($1, $2)";
-    case cuda: __intrinsic_asm "__shfl_sync($0, $1, $2)";
+    case cuda: __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
         let ulane = uint(lane);
@@ -16236,7 +16236,7 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
     case cuda:
-        __intrinsic_asm "_waveAllEqual($0, $1)";
+        __intrinsic_asm(nvvmWaveMaskAllEqual) "_waveAllEqual($0, $1)";
     case spirv:
         return spirv_asm
         {
@@ -16391,7 +16391,7 @@ T WaveMaskReadLaneFirst(WaveMask mask, T expr)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupBroadcastFirst($1)";
-    case cuda: __intrinsic_asm "_waveReadFirst($0, $1)";
+    case cuda: __intrinsic_asm(nvvmWaveReadLaneFirst) "_waveReadFirst($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst($1)";
     case spirv:
         return spirv_asm {OpCapability GroupNonUniformBallot; OpGroupNonUniformBroadcastFirst $$T result Subgroup $expr};
@@ -17223,7 +17223,7 @@ uint WaveGetLaneCount()
     __target_switch
     {
     case glsl: __intrinsic_asm  "(gl_SubgroupSize)";
-    case cuda: __intrinsic_asm  "(warpSize)";
+    case cuda: __intrinsic_asm(nvvmWaveLaneCount) "(warpSize)";
     case hlsl: __intrinsic_asm  "WaveGetLaneCount()";
     case spirv:
         return spirv_asm
@@ -17250,7 +17250,7 @@ uint WaveGetLaneIndex()
     __target_switch
     {
     case glsl: __intrinsic_asm  "(gl_SubgroupInvocationID)";
-    case cuda: __intrinsic_asm  "_getLaneId()";
+    case cuda: __intrinsic_asm(nvvmWaveLaneIndex) "_getLaneId()";
     case hlsl: __intrinsic_asm  "WaveGetLaneIndex()";
     case spirv:
         return spirv_asm
@@ -26246,7 +26246,7 @@ uint3 cudaThreadIdx()
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "(threadIdx)";
+    case cuda: __intrinsic_asm(nvvmThreadIndex) "(threadIdx)";
     }
 }
 
@@ -26257,7 +26257,7 @@ uint3 cudaBlockIdx()
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "(blockIdx)";
+    case cuda: __intrinsic_asm(nvvmBlockIndex) "(blockIdx)";
     }
 }
 
@@ -26268,7 +26268,7 @@ uint3 cudaBlockDim()
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "(blockDim)";
+    case cuda: __intrinsic_asm(nvvmBlockDimensions) "(blockDim)";
     }
 }
 
@@ -26279,7 +26279,7 @@ uint3 cudaGridDim()
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "(gridDim)";
+    case cuda: __intrinsic_asm(nvvmGridDimensions) "(gridDim)";
     }
 }
 

@@ -7444,6 +7444,19 @@ following CUDA GenericAsm; deleting it would lose live semantics. Frozen corpus 
 418/418/418 through `matrix-double`, while discovery remains 72/72/72. Provider ABI revision 34 is
 unchanged.
 
+### Slice 182: Producer-owned fixed intrinsic semantics
+
+The CUDA standard module now tags 105 fixed intrinsic-assembly producers with one of 72 typed
+value-operation identities. NVVM legalization consumes those tags and replaces the selected helper
+body with `IRNVVMIntrinsic`; direct preflight and emission use the semantic ID plus the complete
+specialized signature. The typed semantic catalog no longer contains CUDA source spellings or a
+text/signature fallback matcher.
+
+This representation intentionally stops at the fixed catalog. Texture, surface, atomic, scalar
+out-parameter, and compound-wave families need richer typed payloads than one value-operation ID
+and retain their bounded exact recognizers until their producers can carry those semantics. The
+provider ABI remains revision 34. Frozen corpus v1 stays 418/418/418 and discovery stays 72/72/72.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

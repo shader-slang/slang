@@ -160,6 +160,9 @@ FIDDLE()
 class IntrinsicAsmStmt : public Stmt
 {
     FIDDLE(...)
+    // Optional compiler-owned semantic identity for target-specific lowering. The textual body
+    // remains the source-emitter spelling, while this token survives as typed IR metadata.
+    FIDDLE() Token semanticToken;
     FIDDLE() String asmText;
 
     FIDDLE() List<Expr*> args;

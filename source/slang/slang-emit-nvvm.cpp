@@ -2660,91 +2660,6 @@ bool _resolveNVVMEphemeralValue(IRInst* inst, NVVMResolvedEphemeralValue& outVal
     }
 }
 
-// Matches one canonical Slang type against a provider-owned semantic type role.
-bool _isNVVMSemanticType(IRType* type, const SlangNVVMValueTypeDesc& semanticType)
-{
-    if (!type)
-        return false;
-
-    if (semanticType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
-    {
-        return semanticType.bitWidth == 0 && semanticType.laneCount == 0 && as<IRVoidType>(type);
-    }
-    if (semanticType.laneCount >= 2 && semanticType.laneCount <= 4)
-    {
-        bool isSigned = false;
-        uint32_t elementCount = 0;
-        return semanticType.bitWidth == 32 &&
-               asNVVMSupportedI32VectorType(type, &isSigned, &elementCount) &&
-               semanticType.laneCount == elementCount &&
-               (semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER) == isSigned;
-    }
-    if (semanticType.laneCount != 1)
-        return false;
-
-    switch (semanticType.kind)
-    {
-    case SLANG_NVVM_VALUE_TYPE_BOOL:
-        return semanticType.bitWidth == 1 && isNVVMBoolType(type);
-    case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER:
-    case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER:
-        {
-            uint32_t bitWidth = 0;
-            bool isSigned = false;
-            return isNVVMSupportedIntegerScalarType(type, &bitWidth, &isSigned) &&
-                   semanticType.bitWidth == bitWidth &&
-                   (semanticType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER) == isSigned;
-        }
-    case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT:
-        {
-            uint32_t bitWidth = 0;
-            return isNVVMSupportedFloatingPointScalarType(type, &bitWidth) &&
-                   semanticType.bitWidth == bitWidth;
-        }
-    default:
-        return false;
-    }
-}
-
-// Checks the complete canonical helper signature against one typed semantic catalog row.
-bool _isNVVMGenericAsmSemanticSignature(
-    IRFunc* function,
-    const NVVMSemantics::CatalogEntry& semantic)
-{
-    if (!function || function->getParamCount() != semantic.operandCount ||
-        !_isNVVMSemanticType(function->getResultType(), semantic.resultType))
-    {
-        return false;
-    }
-
-    for (uint32_t i = 0; i < semantic.operandCount; ++i)
-    {
-        if (!_isNVVMSemanticType(function->getParamType(i), semantic.operandTypes[i]))
-            return false;
-    }
-    return true;
-}
-
-// Maps an exact CUDA-selected GenericAsm terminator to one typed provider semantic.
-const NVVMSemantics::CatalogEntry* _findNVVMGenericAsmSemantic(
-    IRGenericAsm* genericAsm,
-    IRFunc* function)
-{
-    if (!genericAsm || !function)
-        return nullptr;
-
-    for (const NVVMSemantics::CatalogEntry& semantic : NVVMSemantics::kCatalog)
-    {
-        if (semantic.genericAsm &&
-            genericAsm->getAsm() == UnownedStringSlice(semantic.genericAsm) &&
-            _isNVVMGenericAsmSemanticSignature(function, semantic))
-        {
-            return &semantic;
-        }
-    }
-    return nullptr;
-}
-
 struct NVVMResolvedSurfaceOperation
 {
     SlangNVVMSurfaceOperationDesc desc = {};
@@ -3630,50 +3545,42 @@ const NVVMGenericAsmOperationSpelling* _findNVVMGenericAsmOperationSpelling(
 // Returns whether `genericAsm` is the complete executable body of one linked value helper. CUDA
 // target specialization produces this exact shape after selecting an intrinsic-asm case; compound
 // legalization below must not infer semantics from a fragment embedded in an arbitrary function.
-bool _isCanonicalNVVMGenericAsmValueHelper(IRGenericAsm* genericAsm, IRFunc* function)
+bool _isCanonicalNVVMIntrinsicValueHelper(IRInst* terminator, IRFunc* function)
 {
     IRBlock* block = function ? function->getFirstBlock() : nullptr;
-    if (!genericAsm || !block || block->getNextBlock() || genericAsm->getParent() != block ||
-        genericAsm->getOperandCount() != 1)
+    if (!terminator || !block || block->getNextBlock() || terminator->getParent() != block)
     {
         return false;
     }
     for (auto inst : block->getOrdinaryInsts())
     {
-        if (inst != genericAsm)
+        if (inst != terminator)
             return false;
     }
     return true;
 }
 
-// Recognizes canonical one-block value helpers emitted by the CUDA prelude. The final assembly
-// spelling selects a semantic operation, while the specialized function signature supplies its
-// exact typed contract. This keeps all accepted overloads on the generic queried value-operation
-// path and leaves source intrinsic names and fixture paths out of lowering.
-bool _resolveNVVMGenericAsmValueOperation(
-    IRGenericAsm* genericAsm,
+bool _resolveNVVMSemanticValueOperation(
+    IRInst* terminator,
     IRFunc* function,
+    SlangNVVMValueOperation semanticOperation,
+    uint32_t operandCount,
     NVVMGenericAsmValueOperation& outOperation)
 {
     outOperation = {};
-    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function))
+    if (!_isCanonicalNVVMIntrinsicValueHelper(terminator, function))
         return false;
 
-    const NVVMGenericAsmOperationSpelling* spelling =
-        _findNVVMGenericAsmOperationSpelling(genericAsm->getAsm());
-    if (!spelling)
-        return false;
-    outOperation.operation = spelling->operation;
-    outOperation.operandCount = spelling->operandCount;
-
-    if (function->getParamCount() != outOperation.operandCount ||
+    outOperation.operation = semanticOperation;
+    outOperation.operandCount = operandCount;
+    if (function->getParamCount() != operandCount ||
         !_getNVVMSemanticType(function->getResultType(), outOperation.resultType))
     {
         return false;
     }
 
     IRParam* parameter = function->getFirstParam();
-    for (uint32_t i = 0; i < outOperation.operandCount; ++i)
+    for (uint32_t i = 0; i < operandCount; ++i)
     {
         if (!parameter ||
             !_getNVVMSemanticType(parameter->getDataType(), outOperation.operandTypes[i]))
@@ -3695,12 +3602,54 @@ bool _resolveNVVMGenericAsmValueOperation(
 
     NVVMSemantics::ValueOperationFamilyResolution family;
     if (!NVVMSemantics::resolveValueOperationFamily(operation, family))
-    {
         return false;
-    }
     outOperation.diagnosticName = family.diagnosticName;
     outOperation.requiresCUDADeviceLibrary = family.requiresCUDADeviceLibrary;
     return true;
+}
+
+// Recognizes canonical one-block value helpers emitted by the CUDA prelude. The final assembly
+// spelling selects a semantic operation, while the specialized function signature supplies its
+// exact typed contract. This keeps all accepted overloads on the generic queried value-operation
+// path and leaves source intrinsic names and fixture paths out of lowering.
+bool _resolveNVVMGenericAsmValueOperation(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMGenericAsmValueOperation& outOperation)
+{
+    outOperation = {};
+    if (!_isCanonicalNVVMIntrinsicValueHelper(genericAsm, function) ||
+        genericAsm->getOperandCount() != 1)
+        return false;
+
+    const NVVMGenericAsmOperationSpelling* spelling =
+        _findNVVMGenericAsmOperationSpelling(genericAsm->getAsm());
+    if (!spelling)
+        return false;
+    return _resolveNVVMSemanticValueOperation(
+        genericAsm,
+        function,
+        spelling->operation,
+        spelling->operandCount,
+        outOperation);
+}
+
+bool _resolveNVVMTaggedValueOperation(
+    IRNVVMIntrinsic* intrinsic,
+    IRFunc* function,
+    NVVMGenericAsmValueOperation& outOperation)
+{
+    if (!intrinsic || intrinsic->getOperandCount() != 1)
+        return false;
+    auto semantic = as<IRIntLit>(intrinsic->getOperand(0));
+    if (!semantic || function->getParamCount() > 3)
+        return false;
+    return _resolveNVVMSemanticValueOperation(
+        intrinsic,
+        function,
+        SlangNVVMValueOperation(semantic->getValue()),
+        uint32_t(function->getParamCount()),
+        outOperation);
 }
 
 // Describes one queried scalar operation in a compiler-owned compound recipe. The descriptor is
@@ -3841,6 +3790,84 @@ bool _appendNVVMScalarIntrinsicBinaryStep(
         diagnosticName);
 }
 
+// Resolves the promoted-Half recipe from producer-owned semantic identity. The ordinary CUDA
+// spelling is intentionally unavailable after NVVM legalization; the complete helper signature
+// still proves whether the operation needs Float32 promotion.
+bool _resolveNVVMTaggedScalarIntrinsicRecipe(
+    IRNVVMIntrinsic* intrinsic,
+    IRFunc* function,
+    NVVMScalarIntrinsicRecipe& outRecipe)
+{
+    outRecipe = {};
+    if (!_isCanonicalNVVMIntrinsicValueHelper(intrinsic, function) ||
+        intrinsic->getOperandCount() != 1 || function->getParamCount() == 0 ||
+        function->getParamCount() > SLANG_COUNT_OF(outRecipe.parameters) ||
+        !_getNVVMSemanticType(function->getResultType(), outRecipe.resultType))
+    {
+        return false;
+    }
+    auto semantic = as<IRIntLit>(intrinsic->getOperand(0));
+    if (!semantic)
+        return false;
+    const auto operation = SlangNVVMValueOperation(semantic->getValue());
+
+    IRParam* parameter = function->getFirstParam();
+    for (uint32_t i = 0; i < function->getParamCount(); ++i)
+    {
+        if (!parameter ||
+            !_getNVVMSemanticType(parameter->getDataType(), outRecipe.parameterTypes[i]) ||
+            !NVVMSemantics::areSameType(outRecipe.parameterTypes[i], NVVMSemantics::kFloat16))
+        {
+            return false;
+        }
+        outRecipe.parameters[i] = parameter;
+        parameter = parameter->getNextParam();
+    }
+    SLANG_ASSERT(!parameter);
+    outRecipe.parameterCount = uint32_t(function->getParamCount());
+
+    const bool returnsHalf =
+        NVVMSemantics::areSameType(outRecipe.resultType, NVVMSemantics::kFloat16);
+    const bool returnsSign =
+        operation == SLANG_NVVM_VALUE_OP_SIGN &&
+        NVVMSemantics::areSameType(outRecipe.resultType, NVVMSemantics::kSignedI32);
+    if (!returnsHalf && !returnsSign)
+        return false;
+
+    outRecipe.kind = NVVMScalarIntrinsicRecipeKind::PromotedHalfValue;
+    outRecipe.diagnosticName = "promoted Float16 scalar math operation";
+    if (!_appendNVVMScalarIntrinsicUnaryStep(
+            outRecipe,
+            SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+            NVVMSemantics::kFloat32,
+            NVVMSemantics::kFloat16,
+            outRecipe.diagnosticName))
+    {
+        return false;
+    }
+    SlangNVVMValueTypeDesc promotedOperandTypes[3] = {};
+    for (uint32_t i = 0; i < outRecipe.parameterCount; ++i)
+        promotedOperandTypes[i] = NVVMSemantics::kFloat32;
+    const SlangNVVMValueTypeDesc promotedResultType =
+        returnsHalf ? NVVMSemantics::kFloat32 : NVVMSemantics::kSignedI32;
+    if (!_appendNVVMScalarIntrinsicRecipeStep(
+            outRecipe,
+            operation,
+            promotedResultType,
+            promotedOperandTypes,
+            outRecipe.parameterCount,
+            outRecipe.diagnosticName))
+    {
+        return false;
+    }
+    return !returnsHalf || _appendNVVMScalarIntrinsicUnaryStep(
+                               outRecipe,
+                               SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                               NVVMSemantics::kFloat16,
+                               NVVMSemantics::kFloat32,
+                               outRecipe.diagnosticName);
+}
+
 // Recognizes the remaining finalized scalar intrinsic helpers selected by the CUDA prelude. Each
 // row checks the complete linked signature, including exact out-parameter roles, before attaching
 // a typed recipe. Assembly is a bounded semantic key here, not text passed to or parsed by LLVM.
@@ -3850,7 +3877,8 @@ bool _resolveNVVMScalarIntrinsicRecipe(
     NVVMScalarIntrinsicRecipe& outRecipe)
 {
     outRecipe = {};
-    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function) ||
+    if (!_isCanonicalNVVMIntrinsicValueHelper(genericAsm, function) ||
+        genericAsm->getOperandCount() != 1 ||
         !_getNVVMSemanticType(function->getResultType(), outRecipe.resultType) ||
         function->getParamCount() > SLANG_COUNT_OF(outRecipe.parameters))
     {
@@ -4407,7 +4435,8 @@ bool _resolveNVVMGenericAsmCompoundOperation(
     NVVMGenericAsmCompoundOperation& outOperation)
 {
     outOperation = {};
-    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function) ||
+    if (!_isCanonicalNVVMIntrinsicValueHelper(genericAsm, function) ||
+        genericAsm->getOperandCount() != 1 ||
         !_getNVVMSemanticType(function->getResultType(), outOperation.resultType))
     {
         return false;
@@ -4986,7 +5015,8 @@ bool _resolveNVVMMaskedWaveScalarOperation(
     NVVMMaskedWaveScalarOperation& outOperation)
 {
     outOperation = {};
-    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function))
+    if (!_isCanonicalNVVMIntrinsicValueHelper(genericAsm, function) ||
+        genericAsm->getOperandCount() != 1)
         return false;
 
     const NVVMMaskedWaveSpelling* spelling =
@@ -5118,7 +5148,8 @@ bool _resolveNVVMAggregateWaveOperation(
     NVVMAggregateWaveOperation& outOperation)
 {
     outOperation = {};
-    if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function))
+    if (!_isCanonicalNVVMIntrinsicValueHelper(genericAsm, function) ||
+        genericAsm->getOperandCount() != 1)
         return false;
 
     const UnownedStringSlice assembly = genericAsm->getAsm();
@@ -8343,6 +8374,42 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_NVVMIntrinsic:
+                {
+                    auto intrinsic = as<IRNVVMIntrinsic>(inst);
+                    NVVMGenericAsmValueOperation valueOperation;
+                    NVVMScalarIntrinsicRecipe scalarRecipe;
+                    if (isEntryPoint || intrinsic != terminator)
+                    {
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("nvvmIntrinsic"));
+                    }
+                    if (_resolveNVVMTaggedValueOperation(intrinsic, function, valueOperation))
+                    {
+                        _requireValueOperation(
+                            requirements.valueOperations,
+                            valueOperation.getOperationDesc(),
+                            valueOperation.diagnosticName);
+                        requirements.requiresCUDADeviceLibrary |=
+                            valueOperation.requiresCUDADeviceLibrary;
+                    }
+                    else if (_resolveNVVMTaggedScalarIntrinsicRecipe(
+                                 intrinsic,
+                                 function,
+                                 scalarRecipe))
+                    {
+                        _requireNVVMScalarIntrinsicRecipeOperations(
+                            requirements.valueOperations,
+                            scalarRecipe);
+                        requirements.requiresCUDADeviceLibrary |=
+                            scalarRecipe.requiresCUDADeviceLibrary;
+                    }
+                    else
+                    {
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("nvvmIntrinsic"));
+                    }
+                }
+                break;
+
             case kIROp_GenericAsm:
                 {
                     auto genericAsm = as<IRGenericAsm>(inst);
@@ -8350,8 +8417,6 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedGenericAsm(codeGenContext, genericAsm, function);
                     }
-                    const NVVMSemantics::CatalogEntry* semantic =
-                        _findNVVMGenericAsmSemantic(genericAsm, function);
                     NVVMScalarTruthiness truthiness;
                     NVVMGenericAsmValueOperation valueOperation;
                     NVVMScalarIntrinsicRecipe scalarRecipe;
@@ -8510,18 +8575,7 @@ SlangResult _validateNVVMFunction(
                             textureDiagnosticName);
                         break;
                     }
-                    if (functionBlocks.getCount() != 1 || genericAsm->getOperandCount() != 1 ||
-                        !semantic)
-                    {
-                        return _diagnoseUnsupportedGenericAsm(codeGenContext, genericAsm, function);
-                    }
-                    const SlangNVVMValueOperationDesc operation =
-                        NVVMSemantics::getOperationDesc(*semantic);
-                    _requireValueOperation(
-                        requirements.valueOperations,
-                        operation,
-                        semantic->diagnosticName);
-                    requirements.requiresCUDADeviceLibrary |= semantic->requiresCUDADeviceLibrary;
+                    return _diagnoseUnsupportedGenericAsm(codeGenContext, genericAsm, function);
                 }
                 break;
 
@@ -9193,6 +9247,7 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_NVVMIntrinsic:
             case kIROp_GenericAsm:
                 SLANG_ASSERT(inst == terminator);
                 hasHelperReturn = true;
@@ -14759,6 +14814,71 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_NVVMIntrinsic:
+                    {
+                        auto intrinsic = as<IRNVVMIntrinsic>(inst);
+                        NVVMGenericAsmValueOperation valueOperation;
+                        if (_resolveNVVMTaggedValueOperation(intrinsic, function, valueOperation))
+                        {
+                            SlangNVVMValueHandle loweredOperands[3] = {};
+                            for (uint32_t i = 0; i < valueOperation.operandCount; ++i)
+                            {
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    valueOperation.parameters[i],
+                                    valueMap,
+                                    typeContext,
+                                    loweredOperands[i]));
+                            }
+                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                valueOperation.diagnosticName,
+                                builder.emitValueOperation(
+                                    moduleScope.module,
+                                    valueOperation.getOperationDesc(),
+                                    loweredOperands,
+                                    valueOperation.operandCount,
+                                    loweredValue)));
+                            if (as<IRVoidType>(function->getResultType()))
+                            {
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "semantic void return",
+                                    builder.emitReturnVoid(moduleScope.module)));
+                            }
+                            else
+                            {
+                                SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    function,
+                                    "semantic value operation return",
+                                    loweredValue));
+                            }
+                            break;
+                        }
+
+                        NVVMScalarIntrinsicRecipe scalarRecipe;
+                        const bool hasScalarRecipe = _resolveNVVMTaggedScalarIntrinsicRecipe(
+                            intrinsic,
+                            function,
+                            scalarRecipe);
+                        SLANG_RELEASE_ASSERT(hasScalarRecipe);
+                        SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicRecipe(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            function,
+                            scalarRecipe,
+                            valueMap,
+                            typeContext));
+                    }
+                    break;
+
                 case kIROp_GenericAsm:
                     {
                         auto genericAsm = as<IRGenericAsm>(inst);
@@ -15285,53 +15405,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             break;
                         }
 
-                        const NVVMSemantics::CatalogEntry* semantic =
-                            _findNVVMGenericAsmSemantic(genericAsm, function);
-                        SLANG_RELEASE_ASSERT(semantic);
-                        List<SlangNVVMValueHandle> loweredArguments;
-                        for (auto parameter : function->getParams())
-                        {
-                            SlangNVVMValueHandle loweredArgument = nullptr;
-                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                parameter,
-                                valueMap,
-                                typeContext,
-                                loweredArgument));
-                            loweredArguments.add(loweredArgument);
-                        }
-                        SlangNVVMValueHandle loweredValue = nullptr;
-                        const SlangNVVMValueOperationDesc operation =
-                            NVVMSemantics::getOperationDesc(*semantic);
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            semantic->diagnosticName,
-                            builder.emitValueOperation(
-                                moduleScope.module,
-                                operation,
-                                loweredArguments.getCount() ? loweredArguments.getBuffer()
-                                                            : nullptr,
-                                size_t(loweredArguments.getCount()),
-                                loweredValue)));
-                        if (semantic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
-                        {
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                "void return",
-                                builder.emitReturnVoid(moduleScope.module)));
-                        }
-                        else
-                        {
-                            SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                function,
-                                "generic value return",
-                                loweredValue));
-                        }
+                        return _diagnoseUnsupportedGenericAsm(codeGenContext, genericAsm, function);
                     }
                     break;
 

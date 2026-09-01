@@ -1519,6 +1519,13 @@ local insts = {
 				},
 			},
 			{
+				nvvmIntrinsic = {
+					struct_name = "NVVMIntrinsic",
+					-- A legalized NVVM intrinsic carries a semantic ID followed by source operands.
+					min_operands = 1,
+				},
+			},
+			{
 				UnreachableBase = {
 					{
 						missingReturn = {},
@@ -1780,6 +1787,12 @@ local insts = {
 				intrinsicOp = {
 					struct_name = "IntrinsicOpDecoration",
 					operands = { { "intrinsicOpOperand", "IRIntLit" } },
+				},
+			},
+			{
+				nvvmSemantic = {
+					struct_name = "NVVMSemanticDecoration",
+					operands = { { "semanticOperand", "IRIntLit" } },
 				},
 			},
 			{

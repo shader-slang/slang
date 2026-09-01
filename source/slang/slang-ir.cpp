@@ -575,6 +575,7 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
     case kIROp_Unreachable:
     case kIROp_MissingReturn:
     case kIROp_GenericAsm:
+    case kIROp_NVVMIntrinsic:
         break;
 
     case kIROp_UnconditionalBranch:

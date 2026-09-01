@@ -1,6 +1,7 @@
 // lower.cpp
 #include "slang-lower-to-ir.h"
 
+#include "compiler-core/slang-nvvm-ir-builder-api.h"
 #include "core/slang-char-encode.h"
 #include "core/slang-char-util.h"
 #include "core/slang-hash.h"
@@ -50,6 +51,88 @@
 
 namespace Slang
 {
+
+namespace
+{
+
+struct NVVMIntrinsicAsmSemanticName
+{
+    const char* name;
+    SlangNVVMValueOperation operation;
+};
+
+// These names are compiler-internal source-module vocabulary. They identify an operation rather
+// than a CUDA spelling, so target specialization may retain semantic intent independently of text.
+static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
+    {"nvvmAbs", SLANG_NVVM_VALUE_OP_ABS},
+    {"nvvmAcos", SLANG_NVVM_VALUE_OP_ACOS},
+    {"nvvmAsin", SLANG_NVVM_VALUE_OP_ASIN},
+    {"nvvmAtan", SLANG_NVVM_VALUE_OP_ATAN},
+    {"nvvmAtan2", SLANG_NVVM_VALUE_OP_ATAN2},
+    {"nvvmBitReinterpret", SLANG_NVVM_VALUE_OP_BIT_REINTERPRET},
+    {"nvvmCeil", SLANG_NVVM_VALUE_OP_CEIL},
+    {"nvvmCos", SLANG_NVVM_VALUE_OP_COS},
+    {"nvvmCosh", SLANG_NVVM_VALUE_OP_COSH},
+    {"nvvmCountBits", SLANG_NVVM_VALUE_OP_COUNT_BITS},
+    {"nvvmExp", SLANG_NVVM_VALUE_OP_EXP},
+    {"nvvmExp2", SLANG_NVVM_VALUE_OP_EXP2},
+    {"nvvmFirstBitHigh", SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH},
+    {"nvvmFirstBitLow", SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW},
+    {"nvvmFloatConvert", SLANG_NVVM_VALUE_OP_FLOAT_CONVERT},
+    {"nvvmFloor", SLANG_NVVM_VALUE_OP_FLOOR},
+    {"nvvmFma", SLANG_NVVM_VALUE_OP_FMA},
+    {"nvvmFmod", SLANG_NVVM_VALUE_OP_FMOD},
+    {"nvvmFrac", SLANG_NVVM_VALUE_OP_FRAC},
+    {"nvvmLog", SLANG_NVVM_VALUE_OP_LOG},
+    {"nvvmLog2", SLANG_NVVM_VALUE_OP_LOG2},
+    {"nvvmLog10", SLANG_NVVM_VALUE_OP_LOG10},
+    {"nvvmBlockDimensions", SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS},
+    {"nvvmBlockIndex", SLANG_NVVM_VALUE_OP_BLOCK_INDEX},
+    {"nvvmGridDimensions", SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS},
+    {"nvvmMax", SLANG_NVVM_VALUE_OP_MAX},
+    {"nvvmMin", SLANG_NVVM_VALUE_OP_MIN},
+    {"nvvmPow", SLANG_NVVM_VALUE_OP_POW},
+    {"nvvmReverseBits", SLANG_NVVM_VALUE_OP_REVERSE_BITS},
+    {"nvvmRound", SLANG_NVVM_VALUE_OP_ROUND},
+    {"nvvmRsqrt", SLANG_NVVM_VALUE_OP_RSQRT},
+    {"nvvmSign", SLANG_NVVM_VALUE_OP_SIGN},
+    {"nvvmSin", SLANG_NVVM_VALUE_OP_SIN},
+    {"nvvmSinh", SLANG_NVVM_VALUE_OP_SINH},
+    {"nvvmSqrt", SLANG_NVVM_VALUE_OP_SQRT},
+    {"nvvmTan", SLANG_NVVM_VALUE_OP_TAN},
+    {"nvvmTanh", SLANG_NVVM_VALUE_OP_TANH},
+    {"nvvmTrunc", SLANG_NVVM_VALUE_OP_TRUNC},
+    {"nvvmDeviceMemoryBarrier", SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER},
+    {"nvvmWaveMaskAllEqual", SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL},
+    {"nvvmWaveMaskAllTrue", SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE},
+    {"nvvmWaveMaskAnyTrue", SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE},
+    {"nvvmWaveMaskBallot", SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT},
+    {"nvvmWaveMaskIsFirstLane", SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE},
+    {"nvvmWaveLaneCount", SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT},
+    {"nvvmWaveLaneIndex", SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX},
+    {"nvvmWaveReadLaneAt", SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT},
+    {"nvvmWaveReadLaneFirst", SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST},
+    {"nvvmWorkgroupBarrier", SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER},
+    {"nvvmWorkgroupMemoryBarrier", SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER},
+    {"nvvmThreadIndex", SLANG_NVVM_VALUE_OP_THREAD_INDEX},
+};
+
+bool _findNVVMIntrinsicAsmSemantic(
+    const UnownedStringSlice& name,
+    SlangNVVMValueOperation& outOperation)
+{
+    for (const auto& entry : kNVVMIntrinsicAsmSemanticNames)
+    {
+        if (name == UnownedStringSlice(entry.name))
+        {
+            outOperation = entry.operation;
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace
 
 // This file implements lowering of the Slang AST to a simpler SSA
 // intermediate representation.
@@ -9523,11 +9606,22 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 args.add(argVal.val);
             }
         }
-        builder->emitIntrinsicInst(
+        IRInst* genericAsm = builder->emitIntrinsicInst(
             nullptr,
             kIROp_GenericAsm,
             args.getCount(),
             args.getArrayView().getBuffer());
+        if (stmt->semanticToken.type != TokenType::Unknown)
+        {
+            SlangNVVMValueOperation operation = 0;
+            const bool hasKnownSemantic =
+                _findNVVMIntrinsicAsmSemantic(stmt->semanticToken.getContent(), operation);
+            SLANG_RELEASE_ASSERT(hasKnownSemantic);
+            builder->addDecoration(
+                genericAsm,
+                kIROp_NVVMSemanticDecoration,
+                builder->getIntValue(builder->getIntType(), operation));
+        }
     }
 
     void visitSwitchStmt(SwitchStmt* stmt)

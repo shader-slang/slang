@@ -47,7 +47,6 @@ struct CatalogEntry
     SlangNVVMValueTypeDesc operandTypes[3];
     uint32_t operandCount;
     const char* diagnosticName;
-    const char* genericAsm;
     bool requiresCUDADeviceLibrary = false;
 };
 
@@ -110,8 +109,7 @@ inline constexpr SlangNVVMValueTypeDesc kSignedI32x2 = {
 };
 
 // This is the only table that maps an established typed semantic to its provider operation.
-// GenericAsm spellings are present only for semantics produced through that canonical CUDA helper
-// shape; ordinary IR operations select the same typed rows without a spelling.
+// Producer and target spellings are deliberately absent from the typed provider contract.
 inline constexpr CatalogEntry kCatalog[] = {
     {
         SLANG_NVVM_VALUE_OP_ADD,
@@ -119,7 +117,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 addition",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_SUBTRACT,
@@ -127,7 +124,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 subtraction",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_MULTIPLY,
@@ -135,7 +131,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 multiplication",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_AND,
@@ -143,7 +138,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 bitwise AND",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_OR,
@@ -151,7 +145,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 bitwise OR",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_XOR,
@@ -159,7 +152,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 bitwise XOR",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_NOT,
@@ -167,7 +159,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kNoType, kNoType},
         1,
         "signed i32 bitwise NOT",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_NEGATE,
@@ -175,7 +166,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kNoType, kNoType},
         1,
         "signed i32 arithmetic negation",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_EQUAL,
@@ -183,7 +173,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 equality comparison",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_NOT_EQUAL,
@@ -191,7 +180,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 inequality comparison",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_LESS_THAN,
@@ -199,7 +187,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 less-than comparison",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_GREATER_THAN,
@@ -207,7 +194,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 greater-than comparison",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_LESS_EQUAL,
@@ -215,7 +201,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 less-than-or-equal comparison",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_GREATER_EQUAL,
@@ -223,7 +208,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kSignedI32, kNoType},
         2,
         "signed i32 greater-than-or-equal comparison",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_ADD,
@@ -231,7 +215,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 addition",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_SUBTRACT,
@@ -239,7 +222,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 subtraction",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_MULTIPLY,
@@ -247,7 +229,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 multiplication",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_DIVIDE,
@@ -255,7 +236,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 division",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_NEGATE,
@@ -263,7 +243,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "float32 negation",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_EQUAL,
@@ -271,7 +250,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 ordered equality",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_NOT_EQUAL,
@@ -279,7 +257,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 unordered inequality",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_LESS_THAN,
@@ -287,7 +264,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 ordered less-than",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_GREATER_THAN,
@@ -295,7 +271,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 ordered greater-than",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_LESS_EQUAL,
@@ -303,7 +278,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 ordered less-than-or-equal",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_GREATER_EQUAL,
@@ -311,7 +285,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kFloat32, kNoType},
         2,
         "float32 ordered greater-than-or-equal",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
@@ -319,7 +292,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "floating-point width conversion",
-        "__float2half",
     },
     {
         SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
@@ -327,7 +299,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat16, kNoType, kNoType},
         1,
         "floating-point width conversion",
-        "__half2float($0)",
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
@@ -335,7 +306,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "32-bit value reinterpretation",
-        "$P_asint($0)",
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
@@ -343,7 +313,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kNoType, kNoType},
         1,
         "32-bit value reinterpretation",
-        "$P_asint($0)",
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
@@ -351,7 +320,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "32-bit value reinterpretation",
-        "$P_asuint($0)",
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
@@ -359,7 +327,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kNoType, kNoType},
         1,
         "32-bit value reinterpretation",
-        "$P_asuint($0)",
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
@@ -367,7 +334,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kSignedI32, kNoType, kNoType},
         1,
         "32-bit value reinterpretation",
-        "$P_asfloat($0)",
     },
     {
         SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
@@ -375,7 +341,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kNoType, kNoType},
         1,
         "32-bit value reinterpretation",
-        "$P_asfloat($0)",
     },
     {
         SLANG_NVVM_VALUE_OP_SQRT,
@@ -383,7 +348,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "float32 square root",
-        "$P_sqrt($0)",
     },
     {
         SLANG_NVVM_VALUE_OP_TRUNC,
@@ -391,7 +355,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "float32 truncation",
-        "$P_trunc($0)",
         true,
     },
     {
@@ -400,7 +363,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "float32 sine",
-        "$P_sin($0)",
         true,
     },
     {
@@ -409,7 +371,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "float32 cosine",
-        "$P_cos($0)",
         true,
     },
     {
@@ -418,7 +379,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat64, kNoType, kNoType},
         1,
         "float64 sine",
-        "$P_sin($0)",
         true,
     },
     {
@@ -427,7 +387,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat64, kNoType, kNoType},
         1,
         "float64 cosine",
-        "$P_cos($0)",
         true,
     },
     {
@@ -436,7 +395,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "float32 frexp fraction",
-        nullptr,
         true,
     },
     {
@@ -445,7 +403,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "float32 frexp exponent",
-        nullptr,
         true,
     },
     {
@@ -454,7 +411,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat64, kNoType, kNoType},
         1,
         "float64 frexp fraction",
-        nullptr,
         true,
     },
     {
@@ -463,7 +419,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat64, kNoType, kNoType},
         1,
         "float64 frexp exponent",
-        nullptr,
         true,
     },
     {
@@ -472,7 +427,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "float32 modf fraction",
-        nullptr,
         true,
     },
     {
@@ -481,7 +435,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat32, kNoType, kNoType},
         1,
         "float32 modf integral part",
-        nullptr,
         true,
     },
     {
@@ -490,7 +443,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat64, kNoType, kNoType},
         1,
         "float64 modf fraction",
-        nullptr,
         true,
     },
     {
@@ -499,7 +451,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat64, kNoType, kNoType},
         1,
         "float64 modf integral part",
-        nullptr,
         true,
     },
     {
@@ -508,7 +459,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kNoType, kNoType, kNoType},
         0,
         "wave lane index intrinsic",
-        "_getLaneId()",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT,
@@ -516,7 +466,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kNoType, kNoType, kNoType},
         0,
         "wave lane count intrinsic",
-        "(warpSize)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
@@ -524,7 +473,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kUnsignedI32, kSignedI32},
         3,
         "UInt wave read-lane-at intrinsic",
-        "__shfl_sync($0, $1, $2)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
@@ -532,7 +480,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kSignedI32, kSignedI32},
         3,
         "Int wave read-lane-at intrinsic",
-        "__shfl_sync($0, $1, $2)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
@@ -540,7 +487,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kFloat32, kSignedI32},
         3,
         "Float wave read-lane-at intrinsic",
-        "__shfl_sync($0, $1, $2)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT,
@@ -548,7 +494,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kBool, kNoType},
         2,
         "wave-mask ballot intrinsic",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
@@ -556,7 +501,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kUnsignedI32, kNoType},
         2,
         "UInt wave read-lane-first intrinsic",
-        "_waveReadFirst($0, $1)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
@@ -564,7 +508,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kSignedI32, kNoType},
         2,
         "Int wave read-lane-first intrinsic",
-        "_waveReadFirst($0, $1)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
@@ -572,7 +515,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kFloat32, kNoType},
         2,
         "Float wave read-lane-first intrinsic",
-        "_waveReadFirst($0, $1)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE,
@@ -580,7 +522,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kNoType, kNoType},
         1,
         "wave-mask is-first-lane intrinsic",
-        "(($0 & -$0) == (WarpMask(1) << _getLaneId()))",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE,
@@ -588,7 +529,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kBool, kNoType},
         2,
         "wave-mask any-true intrinsic",
-        "(__any_sync($0, $1) != 0)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE,
@@ -596,7 +536,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kBool, kNoType},
         2,
         "wave-mask all-true intrinsic",
-        "(__all_sync($0, $1) != 0)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
@@ -604,7 +543,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kSignedI32, kNoType},
         2,
         "signed-i32 wave-mask all-equal intrinsic",
-        "_waveAllEqual($0, $1)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
@@ -612,7 +550,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kUnsignedI32, kNoType},
         2,
         "unsigned-i32 wave-mask all-equal intrinsic",
-        "_waveAllEqual($0, $1)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
@@ -620,7 +557,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kFloat32, kNoType},
         2,
         "float32 wave-mask all-equal intrinsic",
-        "_waveAllEqual($0, $1)",
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH,
@@ -628,7 +564,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kSignedI32, kNoType},
         2,
         "signed-i32 wave-mask match intrinsic",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH,
@@ -636,7 +571,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kUnsignedI32, kNoType},
         2,
         "unsigned-i32 wave-mask match intrinsic",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH,
@@ -644,7 +578,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kFloat32, kNoType},
         2,
         "float32 wave-mask match intrinsic",
-        nullptr,
     },
     {
         SLANG_NVVM_VALUE_OP_THREAD_INDEX,
@@ -652,7 +585,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kNoType, kNoType, kNoType},
         0,
         "CUDA thread index",
-        "(threadIdx)",
     },
     {
         SLANG_NVVM_VALUE_OP_BLOCK_INDEX,
@@ -660,7 +592,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kNoType, kNoType, kNoType},
         0,
         "CUDA block index",
-        "(blockIdx)",
     },
     {
         SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS,
@@ -668,7 +599,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kNoType, kNoType, kNoType},
         0,
         "CUDA block dimensions",
-        "(blockDim)",
     },
     {
         SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS,
@@ -676,7 +606,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kNoType, kNoType, kNoType},
         0,
         "CUDA grid dimensions",
-        "(gridDim)",
     },
     {
         SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER,
@@ -684,7 +613,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kNoType, kNoType, kNoType},
         0,
         "CUDA workgroup barrier",
-        "__syncthreads()",
     },
     {
         SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER,
@@ -692,7 +620,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kNoType, kNoType, kNoType},
         0,
         "CUDA device memory barrier",
-        "__threadfence()",
     },
     {
         SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER,
@@ -700,7 +627,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kNoType, kNoType, kNoType},
         0,
         "CUDA workgroup memory fence",
-        "__threadfence_block",
     },
 };
 

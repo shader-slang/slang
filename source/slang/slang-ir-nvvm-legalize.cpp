@@ -185,6 +185,44 @@ struct NVVMFoldedLayoutQuery
     IRIntegerValue value = 0;
 };
 
+// Converts producer-tagged target text into the direct backend's typed terminator. The tag is the
+// semantic source of truth; the CUDA spelling is deliberately not copied into NVVM-ready IR.
+void _legalizeNVVMSemanticIntrinsics(LinkedIR& linkedIR)
+{
+    List<IRGenericAsm*> genericAsmInstructions;
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        auto function = as<IRFunc>(globalInst);
+        if (!function)
+            continue;
+        for (auto block : function->getBlocks())
+        {
+            auto genericAsm = as<IRGenericAsm>(block->getTerminator());
+            if (genericAsm && genericAsm->findDecoration<IRNVVMSemanticDecoration>())
+                genericAsmInstructions.add(genericAsm);
+        }
+    }
+
+    IRBuilder builder(linkedIR.module);
+    for (auto genericAsm : genericAsmInstructions)
+    {
+        auto semantic = genericAsm->findDecoration<IRNVVMSemanticDecoration>();
+        SLANG_RELEASE_ASSERT(semantic);
+        List<IRInst*> operands;
+        operands.add(semantic->getSemanticOperand());
+        for (UInt i = 1; i < genericAsm->getOperandCount(); ++i)
+            operands.add(genericAsm->getOperand(i));
+
+        builder.setInsertBefore(genericAsm);
+        builder.emitIntrinsicInst(
+            nullptr,
+            kIROp_NVVMIntrinsic,
+            operands.getCount(),
+            operands.getBuffer());
+        genericAsm->removeAndDeallocate();
+    }
+}
+
 SlangResult _foldNVVMCompileTimeLayoutQueries(CodeGenContext* codeGenContext, LinkedIR& linkedIR)
 {
     List<NVVMFoldedLayoutQuery> folds;
@@ -345,6 +383,7 @@ SlangResult legalizeIRForNVVM(CodeGenContext* codeGenContext, LinkedIR& linkedIR
 
     SLANG_RETURN_ON_FAIL(_foldNVVMCompileTimeLayoutQueries(codeGenContext, linkedIR));
     SLANG_RETURN_ON_FAIL(_removeNVVMCompileTimeOnlyInstructions(codeGenContext, linkedIR));
+    _legalizeNVVMSemanticIntrinsics(linkedIR);
 
     IRDeadCodeEliminationOptions options;
     options.keepLayoutsAlive = true;
