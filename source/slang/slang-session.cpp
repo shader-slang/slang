@@ -246,7 +246,31 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        SHA1::Digest sourceDigest = computeSourceBlobDigest(source);
+        // When `source` is null, read the file at `path` and reuse the one blob
+        // for the digest and the load so both see identical bytes, incl.
+        // session-only sources the File::exists fallback below cannot see.
+        ComPtr<ISlangBlob> sourceBlob(source);
+        if (!sourceBlob && blobType == ModuleBlobType::Source && path)
+        {
+            // A custom file system may return failure while still writing a
+            // blob; treat any failure as "no source" so the guard below runs.
+            if (SLANG_FAILED(getFileSystemExt()->loadFile(path, sourceBlob.writeRef())))
+                sourceBlob.setNull();
+        }
+
+        if (!sourceBlob)
+        {
+            // Reached with nothing to load: a source `path` that could not be
+            // read, an absent `path`, or a null IR blob. `source` is user-facing
+            // input that may legitimately be null (a source module loads from
+            // `path`), so diagnose rather than assert (#12852); the message
+            // names `path` when there is one.
+            sink.diagnose(Diagnostics::CannotOpenFile{.path = path ? String(path) : String()});
+            sink.getBlobIfNeeded(outDiagnostics);
+            return nullptr;
+        }
+
+        SHA1::Digest sourceDigest = computeSourceBlobDigest(sourceBlob);
 
         String moduleNameStr = moduleName;
         if (!moduleName)
@@ -295,7 +319,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
             }
         }
         RefPtr<Module> module =
-            loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
+            loadModuleImpl(name, pathInfo, sourceBlob, SourceLoc(), &sink, nullptr, blobType);
         if (module)
             module->setSourceDigest(sourceDigest);
         sink.getBlobIfNeeded(outDiagnostics);

@@ -12,7 +12,7 @@
 // The upper-equal edge: count = width of the operand type. The
 // inline payload-encoded count is the documented operand layout.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint a;
 uniform RWStructuredBuffer<uint> buf;

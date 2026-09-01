@@ -14,7 +14,7 @@
 // `return_val`; the outer ifElse merges fall through to a final
 // `return_val(-1)`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform int b;

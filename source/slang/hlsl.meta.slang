@@ -19712,15 +19712,10 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
-    // Here, we don't require 'raytracing' capability, instead, we add the
-    // extension directly in the generated code. The reason is that this
-    // struct is used in both raytracing and rayquery APIs, our current capability
-    // system cannot represent this struct with raytracing OR rayquery capability.
-    // So, we cannot add capability requirement on the struct itself.
-    // However, any use of this type will definitely require either raytracing or rayquery,
-    // so we have the guarantee that either raytracing or rayquery capability will be present.
-    // But if rayquery want to use this struct that is constructed from a descriptor handle,
-    // we need to make sure the raytracing extension is present.
+    // Shared by the raytracing and rayquery APIs; since the capability system cannot
+    // express "raytracing OR rayquery", this struct carries no capability of its own.
+    // Its SPIR-V type-emit supplies the required extension via the "any" mechanism,
+    // resolving to whichever ray capability is actually in effect.
     __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl_spirv)]
     [__readNone]
@@ -19730,7 +19725,6 @@ struct RaytracingAccelerationStructure
         {
         case spirv:
             return spirv_asm {
-                OpExtension "SPV_KHR_ray_tracing";
                 result: $$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address;
             };
         case glsl:
@@ -19797,11 +19791,14 @@ int __callablePayloadLocation(__ref Payload payload);
 /// @remarks Used to implement dynamic shader calls during ray tracing
 /// @category raytracing
 __generic<Payload>
-[require(glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
+[require(cuda_glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch
     {
+    // $0 is the shader index, and $1 is the already-pointer-typed inout payload, matching the
+    // callee's pointer parameter. CallShader always returns void; results flow back through $1.
+    case cuda: __intrinsic_asm "optixDirectCall<void>($0, $1)";
     case hlsl: __intrinsic_asm "CallShader";
     case glsl:
         {
@@ -27572,6 +27569,35 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     }
 }
 
+// A SubpassInput / SubpassInputMS is an opaque image descriptor, so like `_Texture` above it can be
+// recovered from the `UntypedResourceHandle` that `ResourceDescriptorHeap[i]` yields.
+__generic<T, let isMS : int>
+extension __SubpassImpl<T, isMS> : __IDynamicResourceCastable<__DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+
+    typealias Handle = DescriptorHandle<This>;
+
+    static const DescriptorKind kind = DescriptorKind.Texture;
+    static const DescriptorAccess descriptorAccess = DescriptorAccess.Read;
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(DescriptorHandle<This> bindless)
+    {
+        return getDescriptorFromHandle(bindless);
+    }
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
+    }
+}
+
 ${
 struct DynamicResourceTypeInfo
 {
@@ -27586,10 +27612,10 @@ const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
     { "RWStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
     { "AppendStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
     { "ConsumeStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
-    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "RasterizerOrdered" },
     { "ByteAddressBuffer", "StorageBuffer", "General", "Read" },
     { "RWByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
-    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "RasterizerOrdered" },
     { "SamplerState", "Sampler", "Sampler", "Unknown" },
     { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
     { "ConstantBuffer<T, L>", "ConstantBuffer", "General", "Read" },

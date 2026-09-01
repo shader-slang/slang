@@ -429,13 +429,50 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(
     SLANG_UNUSED(entryPointDecor);
 }
 
+static bool _isCudaDeviceFunctionDefinitionExported(IRFunc* func)
+{
+    // Slang visibility controls IR linking, not linkage between emitted CUDA translation units.
+    // A public definition can be included in multiple separately emitted CUDA modules, so giving
+    // all public device functions external CUDA linkage can cause multiple-definition errors when
+    // those modules are linked together.
+    //
+    // Give non-entry-point __device__ function definitions internal linkage by default. Only give
+    // them external linkage when their IR carries one of the export decorations recognized below.
+    for (auto decor : func->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_HLSLExportDecoration:
+        case kIROp_CudaDeviceExportDecoration:
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
+}
+
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
         return;
-    if (inst->findDecoration<IREntryPointDecoration>())
+
+    if (auto entryPointDecor = inst->findDecoration<IREntryPointDecoration>())
     {
-        m_writer->emit("extern \"C\" __global__ ");
+        m_writer->emit("extern \"C\" ");
+
+        // Emit OptiX callables as __device__, which follows OptiX best
+        // practices and keeps pointer parameters for generated functions in the
+        // generic address space, allowing callees to write to them.
+        if (entryPointDecor->getProfile().getStage() == Stage::Callable)
+        {
+            m_writer->emit("__device__ ");
+        }
+        else
+        {
+            m_writer->emit("__global__ ");
+        }
+
         return;
     }
 
@@ -449,6 +486,15 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
     else
     {
+        // Forward declarations of definitions also pass through this hook and satisfy
+        // isDefinition(), giving their declarations and definitions matching internal linkage. A
+        // declaration-only function may be defined in another CUDA translation unit and must
+        // remain externally linkable.
+        if (auto func = as<IRFunc>(inst);
+            func && func->isDefinition() && !_isCudaDeviceFunctionDefinitionExported(func))
+        {
+            m_writer->emit("static ");
+        }
         m_writer->emit("__device__ ");
 
         // `__noinline__` is a declaration specifier, so it belongs in this specifier
@@ -463,9 +509,8 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 
 String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
-    // We have an entry-point function in the IR module, which we
-    // will want to emit as a `__global__` function in the generated
-    // CUDA C++.
+    // We have an entry-point function in the IR module and need to
+    // generate the name of the corresponding CUDA C++ function.
     //
     // The most common case will be a compute kernel, in which case
     // we will emit the function more or less as-is, including

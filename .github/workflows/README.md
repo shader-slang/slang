@@ -54,7 +54,7 @@ flowchart LR
 
   build["ci-slang-build.yml<br>ci-slang-build-container.yml"]
   test["ci-slang-test.yml / -container<br>ci-rhi-test.yml / -container"]
-  suites["ci-falcor-test.yml<br>ci-slang-regression-test.yml<br>ci-mdl-benchmark-test.yml<br>ci-materialx-regression-test.yml"]
+  suites["ci-falcor-test.yml<br>ci-falcor-perf-test.yml<br>ci-slang-regression-test.yml<br>ci-mdl-benchmark-test.yml<br>ci-materialx-regression-test.yml"]
   san["ci-slang-sanitizer.yml"]
   cov["ci-slang-coverage-test.yml"]
   coptbuild["cmake-options-build.yml / -container"]
@@ -129,6 +129,7 @@ is deleted right after — so check the workflow's own run list, not the PR.
 | `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                                                                |
 | `check-actionlint.yml`            | yes    | no          | Lints the workflow YAML in this directory.                                                            |
 | `check-submodules.yml`            | yes    | no          | Verifies `external/**` submodule pins are reachable.                                                  |
+| `check-cmake-binary-dir.yml`      | yes    | no          | Rejects `CMAKE_BINARY_DIR` in first-party CMake (use `slang_BINARY_DIR`).                             |
 | `check-doc-gaps.yml`              | yes    | no          | Hard-gates the generated-doc structural lint; reports the doc-gap queue as advisory. Also runs daily. |
 | `check-pr-label.yml`              | yes    | no          | Requires exactly one `pr:` classification label.                                                      |
 | `check-toc.yml`                   | yes    | no          | Checks the user-guide TOC; `/regenerate-toc` auto-fixes.                                              |
@@ -162,6 +163,7 @@ No trigger of their own; see the first diagram for who calls them. The
 | `ci-slang-sanitizer.yml`                                       | Sanitizer-instrumented build and test.   |
 | `ci-slang-coverage-test.yml`                                   | Instrumented build plus coverage report. |
 | `ci-falcor-test.yml`                                           | Compile Falcor's shaders.                |
+| `ci-falcor-perf-test.yml`                                      | Falcor compiler perf test.               |
 | `ci-slang-regression-test.yml`                                 | Compile-regression suite.                |
 | `ci-mdl-benchmark-test.yml`                                    | MDL benchmark run.                       |
 | `ci-materialx-regression-test.yml`                             | MaterialX integration test.              |
@@ -236,12 +238,11 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 
 ## 7. Manual only
 
-| Workflow                          | Purpose                                                      |
-| --------------------------------- | ------------------------------------------------------------ |
-| `ci-retry.yml`                    | Waits for a run to finish, then reruns its failed jobs.      |
-| `perf-compile-release-sweep.yml`  | Backfills compile-performance history across past releases.  |
-| `check-spirv-tools.yml`           | Placeholder for a SPIRV-Tools tip-of-tree check.             |
-| `ci-probe-windows-arm-vs2026.yml` | Capability probe for the VS2026 Windows-on-ARM hosted image. |
+| Workflow                         | Purpose                                                     |
+| -------------------------------- | ----------------------------------------------------------- |
+| `ci-retry.yml`                   | Waits for a run to finish, then reruns its failed jobs.     |
+| `perf-compile-release-sweep.yml` | Backfills compile-performance history across past releases. |
+| `check-spirv-tools.yml`          | Placeholder for a SPIRV-Tools tip-of-tree check.            |
 
 ## 8. Composite actions
 

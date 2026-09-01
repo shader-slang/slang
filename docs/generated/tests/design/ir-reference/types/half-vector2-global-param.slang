@@ -12,7 +12,7 @@
 // Vec composes with the narrow Half float scalar to form Vec(Half, 2 :
 // Int). A `half2` global surfaces `Vec(Half, 2 : Int)` in the dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform half2 v;
 uniform RWStructuredBuffer<float> buf;

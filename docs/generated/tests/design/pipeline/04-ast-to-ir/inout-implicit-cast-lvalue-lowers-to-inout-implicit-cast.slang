@@ -19,7 +19,7 @@
 // local is seeded from a `uniform` and read back into the output buffer so
 // neither the variable nor the call can be eliminated.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<uint> outputBuffer;
 uniform uint seed;

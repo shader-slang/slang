@@ -14,7 +14,7 @@
 // interfaces; the CHECK-DAGs pin the `Type`-typed parameter for `T` plus one
 // `witness_table_t` parameter naming `%IFoo` and another naming `%IBar`. A
 // single fused witness parameter would leave one of the last two unmatched.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int foo(int x); };
 interface IBar { int bar(int x); };

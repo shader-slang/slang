@@ -1391,6 +1391,9 @@ PENDING_APPROVALS_JS = """
 </div>
 <script>
 (function () {
+  function esc(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
   var repo = document.getElementById("pending-approvals-section").dataset.repo;
   var url = "https://api.github.com/repos/" + repo + "/actions/runs?status=waiting&per_page=100";
   fetch(url)
@@ -1499,10 +1502,6 @@ PENDING_APPROVALS_JS = """
         // incident -- this stays informational regardless of wait time.
         fg = "#0d6efd"; bg = "#cfe2ff"; label = "WAITING";
         summary = pending.length + " waiting, oldest " + oldest + " min";
-      }
-
-      function esc(s) {
-        return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
       }
 
       var html = '<div style="border-left:4px solid ' + fg + ';background:' + bg +

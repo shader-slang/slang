@@ -14,7 +14,7 @@
 // of the pipeline. The `### AFTER eliminatePhis:` header is the
 // observable footprint.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after eliminatePhis -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after eliminatePhis -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

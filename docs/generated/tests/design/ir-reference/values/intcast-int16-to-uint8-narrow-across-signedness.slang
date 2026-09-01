@@ -13,7 +13,7 @@
 // the small-int corner of the ladder, complementing the 32-bit
 // and 64-bit cases.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int16_t i16a;
 uniform RWStructuredBuffer<uint8_t> buf;
