@@ -1871,8 +1871,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void F16_sincos(__half f, __half* s, __half* 
     *c = ::hcos(f);
 }
 
-// Forward-declared here because the F32 section follows the F16 section, and the
-// two half wrappers below promote to float through the F32 wrappers (see below).
+// Forward-declared here because the F32 section follows the F16 section; F16_tan/F16_pow
+// just below promote to float through these gated wrappers to inherit the fast-math
+// redirect (the SLANG_CUDA_ENABLE_FAST_MATH policy is documented above F32_sin).
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_tan(float f);
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_pow(float a, float b);
 
@@ -1882,6 +1883,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_tan(__half f)
     // SLANG_CUDA_ENABLE_FAST_MATH redirect as float tan; no native half `htan`.
     return __float2half(F32_tan(__half2float(f)));
 }
+// asin/acos/atan (and the hyperbolics below) also promote to float, but unlike tan/pow
+// they have no gated fast intrinsic, so routing them through F32 would be pointless
+// indirection; they call the precise libm form directly.
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_asin(__half f)
 {
     return __float2half(::asinf(__half2float(f)));
@@ -2059,7 +2063,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_round(float f)
 // asin/acos/atan/sqrt and all F64 wrappers have no fast form and stay precise.
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_sin(float f)
 {
-#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+#if SLANG_CUDA_ENABLE_FAST_MATH
     return __sinf(f);
 #else
     return ::sinf(f);
@@ -2067,7 +2071,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_sin(float f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_cos(float f)
 {
-#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+#if SLANG_CUDA_ENABLE_FAST_MATH
     return __cosf(f);
 #else
     return ::cosf(f);
@@ -2075,7 +2079,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_cos(float f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void F32_sincos(float f, float* s, float* c)
 {
-#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+#if SLANG_CUDA_ENABLE_FAST_MATH
     __sincosf(f, s, c);
 #else
     ::sincosf(f, s, c);
@@ -2083,7 +2087,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void F32_sincos(float f, float* s, float* c)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_tan(float f)
 {
-#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+#if SLANG_CUDA_ENABLE_FAST_MATH
     return __tanf(f);
 #else
     return ::tanf(f);
@@ -2127,7 +2131,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_atanh(float f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log2(float f)
 {
-#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+#if SLANG_CUDA_ENABLE_FAST_MATH
     return __log2f(f);
 #else
     return ::log2f(f);
@@ -2135,7 +2139,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log2(float f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log(float f)
 {
-#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+#if SLANG_CUDA_ENABLE_FAST_MATH
     return __logf(f);
 #else
     return ::logf(f);
@@ -2143,7 +2147,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log(float f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log10(float f)
 {
-#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+#if SLANG_CUDA_ENABLE_FAST_MATH
     return __log10f(f);
 #else
     return ::log10f(f);
@@ -2157,7 +2161,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_exp2(float f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_exp(float f)
 {
-#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+#if SLANG_CUDA_ENABLE_FAST_MATH
     return __expf(f);
 #else
     return ::expf(f);
@@ -2212,7 +2216,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_max(float a, float b)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_pow(float a, float b)
 {
-#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+#if SLANG_CUDA_ENABLE_FAST_MATH
     return __powf(a, b);
 #else
     return ::powf(a, b);
