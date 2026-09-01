@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "canonical-half-scalar-math",
+      "source": "tests/hlsl-intrinsic/scalar-half.slang",
+      "census_id": "hlsl-intrinsic/scalar-half.slang#cuda-1"
+    }
+  ]
+}

@@ -330,6 +330,7 @@ enum class FakeNVVMBuilderScalarFamily : uint32_t
     Compare,
     FloatingUnary,
     FloatingBinary,
+    FloatingTernary,
     FloatingCompare,
     Select,
     Count,
@@ -754,7 +755,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderPointerTypeStorage vectorPointerTypeStorage[4][3];
     FakeNVVMBuilderParameterStorage parameterStorage[32 * 8];
     FakeNVVMBuilderLoadStorage loadStorage[64];
-    FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[128];
+    FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[256];
     FakeNVVMBuilderIntrinsicStorage intrinsicStorage[32];
     FakeNVVMBuilderSurfaceOperationStorage surfaceOperationStorage[32];
     FakeNVVMBuilderTextureOperationStorage textureOperationStorage[16];
@@ -5871,6 +5872,19 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
         return _recordFakeNVVMBuilderScalarOperation(
             module,
             {FakeNVVMBuilderScalarFamily::FloatingBinary, uint32_t(operation->operation)},
+            operands,
+            uint32_t(operandCount),
+            outValue,
+            &operation->resultType,
+            operation->operandTypes);
+    }
+    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatTernary)
+    {
+        gFakeNVVMBuilder.emittedValueOperations.add(
+            {FakeNVVMBuilderScalarFamily::FloatingTernary, uint32_t(operation->operation)});
+        return _recordFakeNVVMBuilderScalarOperation(
+            module,
+            {FakeNVVMBuilderScalarFamily::FloatingTernary, uint32_t(operation->operation)},
             operands,
             uint32_t(operandCount),
             outValue,
@@ -11788,6 +11802,69 @@ bool nanHalf(half value)
     }
 }
 
+half minimumHalf(half left, half right)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_min($0, $1)";
+    default: return min(left, right);
+    }
+}
+
+half maximumHalf(half left, half right)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_max($0, $1)";
+    default: return max(left, right);
+    }
+}
+
+int signHalf(half value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_sign($0)";
+    default: return value < half(0) ? -1 : value > half(0) ? 1 : 0;
+    }
+}
+
+half hyperbolicSineHalf(half value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_sinh($0)";
+    default: return value;
+    }
+}
+
+half hyperbolicCosineHalf(half value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_cosh($0)";
+    default: return value;
+    }
+}
+
+half hyperbolicTangentHalf(half value)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_tanh($0)";
+    default: return value;
+    }
+}
+
+half fusedMultiplyAddHalf(half left, half right, half addend)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
+    default: return left * right + addend;
+    }
+}
+
 void sineCosineFloat(float value, out float sineValue, out float cosineValue)
 {
     __target_switch
@@ -11834,6 +11911,28 @@ double frexpDouble(double value, out int exponent)
     }
 }
 
+half frexpHalf(half value, out int exponent)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_frexp($0, $1)";
+    default:
+        exponent = 0;
+        return value;
+    }
+}
+
+half modfHalf(half value, out half integral)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "$P_modf($0, $1)";
+    default:
+        integral = value;
+        return half(0);
+    }
+}
+
 [CUDAKernel]
 void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
@@ -11859,6 +11958,15 @@ void computeMain(
     int doubleExponent;
     float floatFraction = frexpFloat(value, floatExponent);
     double doubleFraction = frexpDouble(assembled, doubleExponent);
+    int halfExponent;
+    half halfFraction = frexpHalf(signedHalf, halfExponent);
+    half integralHalf;
+    half fractionalHalf = modfHalf(unsignedHalf, integralHalf);
+    half halfMath =
+        minimumHalf(signedHalf, unsignedHalf) + maximumHalf(signedHalf, unsignedHalf) +
+        hyperbolicSineHalf(signedHalf) + hyperbolicCosineHalf(unsignedHalf) +
+        hyperbolicTangentHalf(signedHalf) +
+        fusedMultiplyAddHalf(signedHalf, unsignedHalf, half(1));
     int classifications =
         (finiteHalf(signedHalf) ? 1 : 0) +
         (finiteFloat(value) ? 2 : 0) +
@@ -11870,7 +11978,9 @@ void computeMain(
     destination[0] =
         int(halfBits) + int(unpacked) + int(packed + low + high) +
         int(sineFloat + cosineFloat + sineDouble + cosineDouble) +
-        int(floatFraction + doubleFraction) + floatExponent + doubleExponent + classifications;
+        int(floatFraction + doubleFraction) + floatExponent + doubleExponent + classifications +
+        signHalf(signedHalf) + halfExponent + int(halfFraction + fractionalHalf + integralHalf) +
+        int(halfMath);
 }
 )SLANG";
 

@@ -7349,6 +7349,28 @@ The representative matrix gate produces accepted native NVRTC, direct O0 SM70, a
 SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 PTX is 104,640 bytes versus
 109,591 bytes native, while direct O0 PTX is 321,704 bytes. Timings remain exploratory.
 
+### Slice 177: Canonical Half scalar math
+
+Canonical one-block CUDA scalar-Half math helpers now share one compiler-owned promotion recipe.
+The exact finalized assembly spelling and complete specialized signature select the operation;
+every Half input converts to Float32, the typed Float32 semantic executes, and a floating result
+converts back to Half once. `sign` retains its signed-i32 result. `frexp` and `modf` use explicit
+recipes because their out parameters give them different result topologies.
+
+Provider ABI revision 33 adds the concrete generic operations absent from revision 32: scalar
+Float32/64 `sinh`, `cosh`, `tanh`, fused `fma`, and pure `modf` fraction/integral projections. The
+provider maps these to libdevice. Its private `modf` temporary preserves the operation's two-result
+semantics without exporting LLVM pointer details through the typed ABI.
+
+Frozen `hlsl-intrinsic/scalar-half` becomes correct at O0 and O3 and gains two permanent direct
+lanes. Frozen v1 remains exactly 452/427 and advances from 414/414/414 to 415/415/415, with one
+gain and no old-correct loss. Discovery remains exactly 82/72 at 72/72/72 with no changed row. The
+selected prefix passes 434/434 and the permanent NVVM category passes 84/84.
+
+The representative Half gate produces accepted native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 PTX is 33,284 bytes versus
+64,486 bytes native, while direct O0 PTX is 126,480 bytes. Timings remain exploratory.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

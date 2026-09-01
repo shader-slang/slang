@@ -1,0 +1,292 @@
+{
+  "schema": 1,
+  "corpus": "rolling discovery corpus",
+  "metrics": {
+    "selected_workloads": 82,
+    "healthy_reference_denominator": 72,
+    "o0_correct": 72,
+    "o3_correct": 72,
+    "both_correct": 72
+  },
+  "classification_totals": {
+    "nvrtc-o3": {
+      "correct": 72,
+      "infrastructure": 8,
+      "runtime-mismatch": 2
+    },
+    "nvvm-o0": {
+      "correct": 72,
+      "infrastructure": 7,
+      "runtime-mismatch": 1,
+      "preflight": 2
+    },
+    "nvvm-o3": {
+      "correct": 72,
+      "infrastructure": 7,
+      "runtime-mismatch": 1,
+      "preflight": 2
+    }
+  },
+  "pareto": {
+    "nvrtc-o3": [
+      {
+        "cluster": "infrastructure-cuda-capability",
+        "count": 7,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "infrastructure"
+        ],
+        "exact_shapes": [
+          "target capability requirement"
+        ],
+        "producer": "entry-point target-requirement checking -> E36107",
+        "diagnostics": [
+          "E36107: target capability requirements make the entry point unavailable to CUDA"
+        ],
+        "examples": [
+          "bugs/gh-6657-nonbindless-uniform.slang",
+          "compute/atomics-buffer.slang",
+          "compute/constexpr.slang",
+          "language-feature/pointer/coherent-load-store-groupshared.slang"
+        ]
+      },
+      {
+        "cluster": "infrastructure-nvrtc-resource-compilation",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "infrastructure"
+        ],
+        "exact_shapes": [
+          "NVRTC CUDA C++ compilation"
+        ],
+        "producer": "Slang CUDA C++ resource emission -> NVRTC 12.9",
+        "diagnostics": [
+          "nvrtc 12.9: build/nvvm-census/slice177-discovery/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang(17): error : this declaration has no storage class or type specifier"
+        ],
+        "examples": [
+          "compute/texture-subscript-multisample.slang"
+        ]
+      },
+      {
+        "cluster": "runtime-matrix-layout",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "runtime-mismatch"
+        ],
+        "exact_shapes": [
+          "runtime result buffer (no unsupported canonical IR shape)"
+        ],
+        "producer": "NVRTC/direct-LLVM PTX execution -> compare-compute result buffer",
+        "diagnostics": [
+          "expected [type: float | 11.000000 | 22.000000], actual [type: float | 11.000000 | 1.000000]"
+        ],
+        "examples": [
+          "compute/non-square-column-major.slang"
+        ]
+      },
+      {
+        "cluster": "runtime-resource-query",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "runtime-mismatch"
+        ],
+        "exact_shapes": [
+          "runtime result buffer (no unsupported canonical IR shape)"
+        ],
+        "producer": "NVRTC/direct-LLVM PTX resource execution -> compare-compute result buffer",
+        "diagnostics": [
+          "expected [4C800000 | 4D008000 | 4C008080 | 4D808000 | 4C000080 | 4C808060 | 4D808008 | 3F800000], actual [4C800000 | 4D008000 | 4C008080 | 4D808000 | 4C000000 | 4C808000 | 4D808000 | 3F800000]"
+        ],
+        "examples": [
+          "compute/texture-get-dimensions.slang"
+        ]
+      }
+    ],
+    "nvvm-o0": [
+      {
+        "cluster": "infrastructure-cuda-capability",
+        "count": 7,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "infrastructure"
+        ],
+        "exact_shapes": [
+          "target capability requirement"
+        ],
+        "producer": "entry-point target-requirement checking -> E36107",
+        "diagnostics": [
+          "E36107: target capability requirements make the entry point unavailable to CUDA"
+        ],
+        "examples": [
+          "bugs/gh-6657-nonbindless-uniform.slang",
+          "compute/atomics-buffer.slang",
+          "compute/constexpr.slang",
+          "language-feature/pointer/coherent-load-store-groupshared.slang"
+        ]
+      },
+      {
+        "cluster": "aggregate-struct-field-pointer",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>"
+        ],
+        "producer": "IRBuilder::emitFieldAddress -> IRFieldAddress; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'"
+        ],
+        "examples": [
+          "compute/texture-subscript-multisample.slang"
+        ]
+      },
+      {
+        "cluster": "generic-asm-texture-query",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)"
+        ],
+        "producer": "CUDA prelude texture dimensions -> StmtLoweringVisitor::visitIntrinsicAsmStmt -> IRGenericAsm; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'"
+        ],
+        "examples": [
+          "compute/texture-get-dimensions.slang"
+        ]
+      },
+      {
+        "cluster": "runtime-matrix-layout",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "runtime-mismatch"
+        ],
+        "exact_shapes": [
+          "runtime result buffer (no unsupported canonical IR shape)"
+        ],
+        "producer": "NVRTC/direct-LLVM PTX execution -> compare-compute result buffer",
+        "diagnostics": [
+          "expected [type: float | 11.000000 | 22.000000], actual [type: float | 11.000000 | 1.000000]"
+        ],
+        "examples": [
+          "compute/non-square-column-major.slang"
+        ]
+      }
+    ],
+    "nvvm-o3": [
+      {
+        "cluster": "infrastructure-cuda-capability",
+        "count": 7,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "infrastructure"
+        ],
+        "exact_shapes": [
+          "target capability requirement"
+        ],
+        "producer": "entry-point target-requirement checking -> E36107",
+        "diagnostics": [
+          "E36107: target capability requirements make the entry point unavailable to CUDA"
+        ],
+        "examples": [
+          "bugs/gh-6657-nonbindless-uniform.slang",
+          "compute/atomics-buffer.slang",
+          "compute/constexpr.slang",
+          "language-feature/pointer/coherent-load-store-groupshared.slang"
+        ]
+      },
+      {
+        "cluster": "aggregate-struct-field-pointer",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>"
+        ],
+        "producer": "IRBuilder::emitFieldAddress -> IRFieldAddress; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'"
+        ],
+        "examples": [
+          "compute/texture-subscript-multisample.slang"
+        ]
+      },
+      {
+        "cluster": "generic-asm-texture-query",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)"
+        ],
+        "producer": "CUDA prelude texture dimensions -> StmtLoweringVisitor::visitIntrinsicAsmStmt -> IRGenericAsm; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'"
+        ],
+        "examples": [
+          "compute/texture-get-dimensions.slang"
+        ]
+      },
+      {
+        "cluster": "runtime-matrix-layout",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "runtime-mismatch"
+        ],
+        "exact_shapes": [
+          "runtime result buffer (no unsupported canonical IR shape)"
+        ],
+        "producer": "NVRTC/direct-LLVM PTX execution -> compare-compute result buffer",
+        "diagnostics": [
+          "expected [type: float | 11.000000 | 22.000000], actual [type: float | 11.000000 | 1.000000]"
+        ],
+        "examples": [
+          "compute/non-square-column-major.slang"
+        ]
+      }
+    ]
+  },
+  "frozen_corpus_v1_slice_146_clusters": {
+    "nvrtc-o3": {
+      "infrastructure-native-reference": 3
+    },
+    "nvvm-o0": {
+      "runtime-bounds-zero-index": 1,
+      "runtime-sm90-mixed-width-atomic": 1,
+      "helper-abi-type-contract": 5,
+      "preflight-other": 3,
+      "residual-target-marker-or-undefined-value": 3,
+      "generic-asm-atomic": 1,
+      "generic-asm-texture": 1,
+      "generic-asm-wave-reconvergence": 6,
+      "runtime-anyvalue-layout": 1,
+      "generic-asm-device-clock": 1
+    },
+    "nvvm-o3": {
+      "runtime-bounds-zero-index": 1,
+      "runtime-sm90-mixed-width-atomic": 1,
+      "helper-abi-type-contract": 5,
+      "preflight-other": 3,
+      "residual-target-marker-or-undefined-value": 3,
+      "generic-asm-atomic": 1,
+      "generic-asm-texture": 1,
+      "generic-asm-wave-reconvergence": 6,
+      "runtime-anyvalue-layout": 1,
+      "generic-asm-device-clock": 1
+    }
+  }
+}

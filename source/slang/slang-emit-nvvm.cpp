@@ -3639,6 +3639,65 @@ struct NVVMGenericAsmValueOperation
     }
 };
 
+struct NVVMGenericAsmOperationSpelling
+{
+    const char* assembly;
+    SlangNVVMValueOperation operation;
+    uint32_t operandCount;
+};
+
+// Keeps the exact finalized CUDA helper spelling to typed-operation mapping in one place. Both a
+// directly supported signature and a compiler-owned legalization recipe select from this table;
+// neither path parses placeholders or reconstructs the source intrinsic name.
+static const NVVMGenericAsmOperationSpelling kNVVMGenericAsmOperationSpellings[] = {
+    {"$P_min($0, $1)", SLANG_NVVM_VALUE_OP_MIN, 2},
+    {"$P_max($0, $1)", SLANG_NVVM_VALUE_OP_MAX, 2},
+    {"$P_countbits($0)", SLANG_NVVM_VALUE_OP_COUNT_BITS, 1},
+    {"$P_reversebits($0)", SLANG_NVVM_VALUE_OP_REVERSE_BITS, 1},
+    {"$P_firstbithigh($0)", SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH, 1},
+    {"$P_firstbitlow($0)", SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW, 1},
+    {"$P_abs($0)", SLANG_NVVM_VALUE_OP_ABS, 1},
+    {"$P_acos($0)", SLANG_NVVM_VALUE_OP_ACOS, 1},
+    {"$P_asin($0)", SLANG_NVVM_VALUE_OP_ASIN, 1},
+    {"$P_atan($0)", SLANG_NVVM_VALUE_OP_ATAN, 1},
+    {"$P_atan2($0, $1)", SLANG_NVVM_VALUE_OP_ATAN2, 2},
+    {"$P_ceil($0)", SLANG_NVVM_VALUE_OP_CEIL, 1},
+    {"$P_cos($0)", SLANG_NVVM_VALUE_OP_COS, 1},
+    {"$P_exp($0)", SLANG_NVVM_VALUE_OP_EXP, 1},
+    {"$P_exp2($0)", SLANG_NVVM_VALUE_OP_EXP2, 1},
+    {"$P_floor($0)", SLANG_NVVM_VALUE_OP_FLOOR, 1},
+    {"$P_fma($0, $1, $2)", SLANG_NVVM_VALUE_OP_FMA, 3},
+    {"$P_fmod($0, $1)", SLANG_NVVM_VALUE_OP_FMOD, 2},
+    {"$P_frac($0)", SLANG_NVVM_VALUE_OP_FRAC, 1},
+    {"$P_isnan($0)", SLANG_NVVM_VALUE_OP_IS_NAN, 1},
+    {"$P_log($0)", SLANG_NVVM_VALUE_OP_LOG, 1},
+    {"$P_log2($0)", SLANG_NVVM_VALUE_OP_LOG2, 1},
+    {"$P_log10($0)", SLANG_NVVM_VALUE_OP_LOG10, 1},
+    {"$P_pow($0, $1)", SLANG_NVVM_VALUE_OP_POW, 2},
+    {"$P_round($0)", SLANG_NVVM_VALUE_OP_ROUND, 1},
+    {"$P_rsqrt($0)", SLANG_NVVM_VALUE_OP_RSQRT, 1},
+    {"$P_sign($0)", SLANG_NVVM_VALUE_OP_SIGN, 1},
+    {"$P_sin($0)", SLANG_NVVM_VALUE_OP_SIN, 1},
+    {"$P_sinh($0)", SLANG_NVVM_VALUE_OP_SINH, 1},
+    {"$P_sqrt($0)", SLANG_NVVM_VALUE_OP_SQRT, 1},
+    {"$P_tan($0)", SLANG_NVVM_VALUE_OP_TAN, 1},
+    {"$P_tanh($0)", SLANG_NVVM_VALUE_OP_TANH, 1},
+    {"$P_cosh($0)", SLANG_NVVM_VALUE_OP_COSH, 1},
+    {"$P_trunc($0)", SLANG_NVVM_VALUE_OP_TRUNC, 1},
+    {"__ballot_sync($0, $1)", SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT, 2},
+};
+
+const NVVMGenericAsmOperationSpelling* _findNVVMGenericAsmOperationSpelling(
+    const UnownedStringSlice& assembly)
+{
+    for (const auto& candidate : kNVVMGenericAsmOperationSpellings)
+    {
+        if (assembly == UnownedStringSlice(candidate.assembly))
+            return &candidate;
+    }
+    return nullptr;
+}
+
 // Returns whether `genericAsm` is the complete executable body of one linked value helper. CUDA
 // target specialization produces this exact shape after selecting an intrinsic-asm case; compound
 // legalization below must not infer semantics from a fragment embedded in an arbitrary function.
@@ -3671,52 +3730,8 @@ bool _resolveNVVMGenericAsmValueOperation(
     if (!_isCanonicalNVVMGenericAsmValueHelper(genericAsm, function))
         return false;
 
-    struct GenericAsmOperationSpelling
-    {
-        const char* assembly;
-        SlangNVVMValueOperation operation;
-        uint32_t operandCount;
-    };
-    static const GenericAsmOperationSpelling kOperationSpellings[] = {
-        {"$P_min($0, $1)", SLANG_NVVM_VALUE_OP_MIN, 2},
-        {"$P_max($0, $1)", SLANG_NVVM_VALUE_OP_MAX, 2},
-        {"$P_countbits($0)", SLANG_NVVM_VALUE_OP_COUNT_BITS, 1},
-        {"$P_reversebits($0)", SLANG_NVVM_VALUE_OP_REVERSE_BITS, 1},
-        {"$P_firstbithigh($0)", SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH, 1},
-        {"$P_firstbitlow($0)", SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW, 1},
-        {"$P_abs($0)", SLANG_NVVM_VALUE_OP_ABS, 1},
-        {"$P_acos($0)", SLANG_NVVM_VALUE_OP_ACOS, 1},
-        {"$P_asin($0)", SLANG_NVVM_VALUE_OP_ASIN, 1},
-        {"$P_atan($0)", SLANG_NVVM_VALUE_OP_ATAN, 1},
-        {"$P_atan2($0, $1)", SLANG_NVVM_VALUE_OP_ATAN2, 2},
-        {"$P_ceil($0)", SLANG_NVVM_VALUE_OP_CEIL, 1},
-        {"$P_exp($0)", SLANG_NVVM_VALUE_OP_EXP, 1},
-        {"$P_exp2($0)", SLANG_NVVM_VALUE_OP_EXP2, 1},
-        {"$P_floor($0)", SLANG_NVVM_VALUE_OP_FLOOR, 1},
-        {"$P_fmod($0, $1)", SLANG_NVVM_VALUE_OP_FMOD, 2},
-        {"$P_frac($0)", SLANG_NVVM_VALUE_OP_FRAC, 1},
-        {"$P_isnan($0)", SLANG_NVVM_VALUE_OP_IS_NAN, 1},
-        {"$P_log($0)", SLANG_NVVM_VALUE_OP_LOG, 1},
-        {"$P_log2($0)", SLANG_NVVM_VALUE_OP_LOG2, 1},
-        {"$P_log10($0)", SLANG_NVVM_VALUE_OP_LOG10, 1},
-        {"$P_pow($0, $1)", SLANG_NVVM_VALUE_OP_POW, 2},
-        {"$P_round($0)", SLANG_NVVM_VALUE_OP_ROUND, 1},
-        {"$P_rsqrt($0)", SLANG_NVVM_VALUE_OP_RSQRT, 1},
-        {"$P_sign($0)", SLANG_NVVM_VALUE_OP_SIGN, 1},
-        {"$P_sqrt($0)", SLANG_NVVM_VALUE_OP_SQRT, 1},
-        {"$P_tan($0)", SLANG_NVVM_VALUE_OP_TAN, 1},
-        {"$P_trunc($0)", SLANG_NVVM_VALUE_OP_TRUNC, 1},
-        {"__ballot_sync($0, $1)", SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT, 2},
-    };
-    const GenericAsmOperationSpelling* spelling = nullptr;
-    for (const auto& candidate : kOperationSpellings)
-    {
-        if (genericAsm->getAsm() == UnownedStringSlice(candidate.assembly))
-        {
-            spelling = &candidate;
-            break;
-        }
-    }
+    const NVVMGenericAsmOperationSpelling* spelling =
+        _findNVVMGenericAsmOperationSpelling(genericAsm->getAsm());
     if (!spelling)
         return false;
     outOperation.operation = spelling->operation;
@@ -3797,6 +3812,7 @@ void _setNVVMValueRecipeStep(
 enum class NVVMScalarIntrinsicRecipeKind
 {
     None,
+    PromotedHalfValue,
     HalfFromBits,
     HalfToBits,
     FloatFromPackedHalf,
@@ -3808,6 +3824,8 @@ enum class NVVMScalarIntrinsicRecipeKind
     IsNaNHalf,
     SinCos,
     Frexp,
+    FrexpHalf,
+    ModfHalf,
 };
 
 struct NVVMScalarIntrinsicRecipe
@@ -3927,6 +3945,63 @@ bool _resolveNVVMScalarIntrinsicRecipe(
     }
     SLANG_ASSERT(!parameter);
     outRecipe.parameterCount = uint32_t(function->getParamCount());
+
+    // CUDA's scalar Half math helpers have the same final intrinsic-assembly spellings as their
+    // Float32 overloads. Every Half input is represented exactly by Float32, so evaluate the
+    // already-supported Float32 semantic and narrow its floating result once. The complete helper
+    // signature above proves this is a homogeneous scalar Half overload; mixed or out-parameter
+    // shapes continue to the explicit recipes below.
+    if (const auto spelling = _findNVVMGenericAsmOperationSpelling(genericAsm->getAsm()))
+    {
+        const bool returnsHalf =
+            NVVMSemantics::areSameType(outRecipe.resultType, NVVMSemantics::kFloat16);
+        const bool returnsSign =
+            spelling->operation == SLANG_NVVM_VALUE_OP_SIGN &&
+            NVVMSemantics::areSameType(outRecipe.resultType, NVVMSemantics::kSignedI32);
+        bool hasHomogeneousHalfInputs =
+            outRecipe.parameterCount == spelling->operandCount && outRecipe.parameterCount >= 1;
+        for (uint32_t i = 0; i < outRecipe.parameterCount; ++i)
+        {
+            hasHomogeneousHalfInputs =
+                hasHomogeneousHalfInputs && !outRecipe.parameterIsOut[i] &&
+                NVVMSemantics::areSameType(outRecipe.parameterTypes[i], NVVMSemantics::kFloat16);
+        }
+        if (hasHomogeneousHalfInputs && (returnsHalf || returnsSign))
+        {
+            outRecipe.kind = NVVMScalarIntrinsicRecipeKind::PromotedHalfValue;
+            outRecipe.diagnosticName = "promoted Float16 scalar math operation";
+            if (!_appendNVVMScalarIntrinsicUnaryStep(
+                    outRecipe,
+                    SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                    NVVMSemantics::kFloat32,
+                    NVVMSemantics::kFloat16,
+                    outRecipe.diagnosticName))
+            {
+                return false;
+            }
+            SlangNVVMValueTypeDesc promotedOperandTypes[3] = {};
+            for (uint32_t i = 0; i < outRecipe.parameterCount; ++i)
+                promotedOperandTypes[i] = NVVMSemantics::kFloat32;
+            const SlangNVVMValueTypeDesc promotedResultType =
+                returnsHalf ? NVVMSemantics::kFloat32 : NVVMSemantics::kSignedI32;
+            if (!_appendNVVMScalarIntrinsicRecipeStep(
+                    outRecipe,
+                    spelling->operation,
+                    promotedResultType,
+                    promotedOperandTypes,
+                    outRecipe.parameterCount,
+                    outRecipe.diagnosticName))
+            {
+                return false;
+            }
+            return !returnsHalf || _appendNVVMScalarIntrinsicUnaryStep(
+                                       outRecipe,
+                                       SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                                       NVVMSemantics::kFloat16,
+                                       NVVMSemantics::kFloat32,
+                                       outRecipe.diagnosticName);
+        }
+    }
 
     struct RecipeSignature
     {
@@ -4065,6 +4140,20 @@ bool _resolveNVVMScalarIntrinsicRecipe(
          2,
          2,
          "Float64 frexp pair"},
+        {"$P_frexp($0, $1)",
+         NVVMScalarIntrinsicRecipeKind::FrexpHalf,
+         NVVMSemantics::kFloat16,
+         {NVVMSemantics::kFloat16, NVVMSemantics::kSignedI32},
+         2,
+         2,
+         "promoted Float16 frexp pair"},
+        {"$P_modf($0, $1)",
+         NVVMScalarIntrinsicRecipeKind::ModfHalf,
+         NVVMSemantics::kFloat16,
+         {NVVMSemantics::kFloat16, NVVMSemantics::kFloat16},
+         2,
+         2,
+         "promoted Float16 modf pair"},
     };
 
     const RecipeSignature* signature = nullptr;
@@ -4290,6 +4379,62 @@ bool _resolveNVVMScalarIntrinsicRecipe(
                    SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
                    NVVMSemantics::kSignedI32,
                    outRecipe.parameterTypes[0],
+                   outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::FrexpHalf:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                   NVVMSemantics::kFloat32,
+                   NVVMSemantics::kFloat16,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
+                   NVVMSemantics::kFloat32,
+                   NVVMSemantics::kFloat32,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
+                   NVVMSemantics::kSignedI32,
+                   NVVMSemantics::kFloat32,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                   NVVMSemantics::kFloat16,
+                   NVVMSemantics::kFloat32,
+                   outRecipe.diagnosticName);
+    case NVVMScalarIntrinsicRecipeKind::ModfHalf:
+        return _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                   NVVMSemantics::kFloat32,
+                   NVVMSemantics::kFloat16,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_MODF_FRACTION,
+                   NVVMSemantics::kFloat32,
+                   NVVMSemantics::kFloat32,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_MODF_INTEGRAL,
+                   NVVMSemantics::kFloat32,
+                   NVVMSemantics::kFloat32,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                   NVVMSemantics::kFloat16,
+                   NVVMSemantics::kFloat32,
+                   outRecipe.diagnosticName) &&
+               _appendNVVMScalarIntrinsicUnaryStep(
+                   outRecipe,
+                   SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                   NVVMSemantics::kFloat16,
+                   NVVMSemantics::kFloat32,
                    outRecipe.diagnosticName);
     default:
         return false;
@@ -11368,6 +11513,48 @@ SlangResult _emitNVVMScalarIntrinsicRecipe(
     SlangNVVMValueHandle result = nullptr;
     switch (recipe.kind)
     {
+    case NVVMScalarIntrinsicRecipeKind::PromotedHalfValue:
+        {
+            SLANG_RELEASE_ASSERT(recipe.parameterCount >= 1 && recipe.parameterCount <= 3);
+            SlangNVVMValueHandle promotedParameters[3] = {};
+            for (uint32_t i = 0; i < recipe.parameterCount; ++i)
+            {
+                SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                    codeGenContext,
+                    builder,
+                    module,
+                    recipe.steps[0],
+                    &parameters[i],
+                    1,
+                    promotedParameters[i]));
+            }
+            SlangNVVMValueHandle promotedResult = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                promotedParameters,
+                recipe.parameterCount,
+                promotedResult));
+            if (recipe.stepCount == 2)
+            {
+                result = promotedResult;
+            }
+            else
+            {
+                SLANG_RELEASE_ASSERT(recipe.stepCount == 3);
+                SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                    codeGenContext,
+                    builder,
+                    module,
+                    recipe.steps[2],
+                    &promotedResult,
+                    1,
+                    result));
+            }
+        }
+        break;
     case NVVMScalarIntrinsicRecipeKind::HalfFromBits:
     case NVVMScalarIntrinsicRecipeKind::HalfToBits:
         SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
@@ -11739,6 +11926,109 @@ SlangResult _emitNVVMScalarIntrinsicRecipe(
                 1,
                 parameters[1],
                 exponent));
+        }
+        break;
+    case NVVMScalarIntrinsicRecipeKind::FrexpHalf:
+        {
+            SlangNVVMValueHandle promotedParameter = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[0],
+                parameters,
+                1,
+                promotedParameter));
+            SlangNVVMValueHandle promotedFraction = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                &promotedParameter,
+                1,
+                promotedFraction));
+            SlangNVVMValueHandle exponent = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[2],
+                &promotedParameter,
+                1,
+                exponent));
+            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicOutStore(
+                codeGenContext,
+                builder,
+                module,
+                recipe,
+                1,
+                parameters[1],
+                exponent));
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[3],
+                &promotedFraction,
+                1,
+                result));
+        }
+        break;
+    case NVVMScalarIntrinsicRecipeKind::ModfHalf:
+        {
+            SlangNVVMValueHandle promotedParameter = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[0],
+                parameters,
+                1,
+                promotedParameter));
+            SlangNVVMValueHandle promotedFraction = nullptr;
+            SlangNVVMValueHandle promotedIntegral = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[1],
+                &promotedParameter,
+                1,
+                promotedFraction));
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[2],
+                &promotedParameter,
+                1,
+                promotedIntegral));
+            SlangNVVMValueHandle integral = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[4],
+                &promotedIntegral,
+                1,
+                integral));
+            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicOutStore(
+                codeGenContext,
+                builder,
+                module,
+                recipe,
+                1,
+                parameters[1],
+                integral));
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                recipe.steps[3],
+                &promotedFraction,
+                1,
+                result));
         }
         break;
     default:

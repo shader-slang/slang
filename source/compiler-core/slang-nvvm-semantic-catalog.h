@@ -17,6 +17,7 @@ enum class ValueOperationFamily : uint32_t
     IntegerCompare,
     FloatUnary,
     FloatBinary,
+    FloatTernary,
     FloatClassification,
     FloatSign,
     FloatCompare,
@@ -462,6 +463,42 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kFloat64, kNoType, kNoType},
         1,
         "float64 frexp exponent",
+        nullptr,
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_MODF_FRACTION,
+        kFloat32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "float32 modf fraction",
+        nullptr,
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_MODF_INTEGRAL,
+        kFloat32,
+        {kFloat32, kNoType, kNoType},
+        1,
+        "float32 modf integral part",
+        nullptr,
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_MODF_FRACTION,
+        kFloat64,
+        {kFloat64, kNoType, kNoType},
+        1,
+        "float64 modf fraction",
+        nullptr,
+        true,
+    },
+    {
+        SLANG_NVVM_VALUE_OP_MODF_INTEGRAL,
+        kFloat64,
+        {kFloat64, kNoType, kNoType},
+        1,
+        "float64 modf integral part",
         nullptr,
         true,
     },
@@ -915,7 +952,9 @@ inline bool resolveValueOperationFamily(
         desc.operation == SLANG_NVVM_VALUE_OP_LOG2 || desc.operation == SLANG_NVVM_VALUE_OP_LOG10 ||
         desc.operation == SLANG_NVVM_VALUE_OP_ROUND ||
         desc.operation == SLANG_NVVM_VALUE_OP_RSQRT || desc.operation == SLANG_NVVM_VALUE_OP_SQRT ||
-        desc.operation == SLANG_NVVM_VALUE_OP_TAN || desc.operation == SLANG_NVVM_VALUE_OP_TRUNC;
+        desc.operation == SLANG_NVVM_VALUE_OP_SINH || desc.operation == SLANG_NVVM_VALUE_OP_COSH ||
+        desc.operation == SLANG_NVVM_VALUE_OP_TANH || desc.operation == SLANG_NVVM_VALUE_OP_TAN ||
+        desc.operation == SLANG_NVVM_VALUE_OP_TRUNC;
     if (isScalarFloat16Abs || (isScalarFloat32Or64Unary && isScalarMathUnary))
     {
         outResolution = {
@@ -992,6 +1031,18 @@ inline bool resolveValueOperationFamily(
             "scalar floating-point minimum or maximum",
             true,
         };
+        return true;
+    }
+
+    const bool isScalarFloat32Or64Ternary =
+        desc.operandCount == 3 && desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+        (desc.resultType.bitWidth == 32 || desc.resultType.bitWidth == 64) &&
+        desc.resultType.laneCount == 1 && areSameType(desc.resultType, desc.operandTypes[0]) &&
+        areSameType(desc.resultType, desc.operandTypes[1]) &&
+        areSameType(desc.resultType, desc.operandTypes[2]);
+    if (isScalarFloat32Or64Ternary && desc.operation == SLANG_NVVM_VALUE_OP_FMA)
+    {
+        outResolution = {ValueOperationFamily::FloatTernary, "scalar fused multiply-add", true};
         return true;
     }
 

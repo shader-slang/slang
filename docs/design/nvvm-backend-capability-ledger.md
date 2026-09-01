@@ -2526,3 +2526,15 @@ Frozen `hlsl-intrinsic/matrix-float` gains two permanent direct lanes. Frozen v1
 no old-correct loss. Discovery stays 72/72/72 over 72 with no changed row. The selected prefix
 passes 433/433, the permanent NVVM category passes 82/82, and the measurement gate produces
 accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.
+
+Slice 177 gives exact homogeneous scalar-Half CUDA math helpers one Float32-promotion recipe. The
+compiler selects it by complete helper assembly and specialized signature, promotes all operands,
+uses the shared typed semantic catalog, and narrows a Half result once. `sign`, `frexp`, and `modf`
+retain their exact integer/out-parameter topologies. Revision 33 adds scalar Float32/64 hyperbolic,
+fused multiply-add, and `modf` projection operations backed by libdevice.
+
+Frozen `hlsl-intrinsic/scalar-half` gains two permanent direct lanes. Frozen v1 advances from
+414/414/414 to 415/415/415 over its unchanged 427 healthy denominator, with exactly one gain and
+no old-correct loss. Discovery stays 72/72/72 over 72 with no changed row. The selected prefix
+passes 434/434, the permanent NVVM category passes 84/84, and the measurement gate produces
+accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.

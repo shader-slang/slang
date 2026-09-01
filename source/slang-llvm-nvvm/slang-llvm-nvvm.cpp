@@ -3244,8 +3244,14 @@ static const char* _getLibdeviceFunctionName(
             return isFloat32 ? "__nv_rsqrtf" : "__nv_rsqrt";
         case SLANG_NVVM_VALUE_OP_SIN:
             return isFloat32 ? "__nv_sinf" : "__nv_sin";
+        case SLANG_NVVM_VALUE_OP_SINH:
+            return isFloat32 ? "__nv_sinhf" : "__nv_sinh";
+        case SLANG_NVVM_VALUE_OP_COSH:
+            return isFloat32 ? "__nv_coshf" : "__nv_cosh";
         case SLANG_NVVM_VALUE_OP_TAN:
             return isFloat32 ? "__nv_tanf" : "__nv_tan";
+        case SLANG_NVVM_VALUE_OP_TANH:
+            return isFloat32 ? "__nv_tanhf" : "__nv_tanh";
         case SLANG_NVVM_VALUE_OP_TRUNC:
             return isFloat32 ? "__nv_truncf" : "__nv_trunc";
         default:
@@ -3270,6 +3276,8 @@ static const char* _getLibdeviceFunctionName(
             return nullptr;
         }
     }
+    if (operandCount == 3 && operation == SLANG_NVVM_VALUE_OP_FMA)
+        return isFloat32 ? "__nv_fmaf" : "__nv_fma";
     return nullptr;
 }
 
@@ -3296,15 +3304,15 @@ static SlangResult _emitLibdeviceOperation(
         operation.resultType.bitWidth,
         operation.operandCount);
     if (!state || !insertionBlock || !operands || !outValue || !functionName ||
-        (!isFloat32 && !isFloat64) || operation.operandCount < 1 || operation.operandCount > 2)
+        (!isFloat32 && !isFloat64) || operation.operandCount < 1 || operation.operandCount > 3)
     {
         return SLANG_E_INVALID_ARG;
     }
 
     llvm::Type* resultType = isFloat32 ? llvm::Type::getFloatTy(state->context)
                                        : llvm::Type::getDoubleTy(state->context);
-    llvm::SmallVector<llvm::Value*, 2> llvmOperands;
-    llvm::SmallVector<llvm::Type*, 2> parameterTypes;
+    llvm::SmallVector<llvm::Value*, 3> llvmOperands;
+    llvm::SmallVector<llvm::Type*, 3> parameterTypes;
     for (size_t i = 0; i < operation.operandCount; ++i)
     {
         llvm::Value* operand = _getValue(operands[i]);
@@ -3418,6 +3426,75 @@ static SlangResult _emitFrexpProjectionOperation(
     return SLANG_OK;
 }
 
+// Emits one pure projection of libdevice modf through the existing one-result value-operation
+// callback. Keeping temporary integral storage inside the provider preserves signed zero,
+// infinity, and NaN behavior without exposing an LLVM pointer through the semantic ABI.
+static SlangResult _emitModfProjectionOperation(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMValueOperationDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
+    llvm::Value* operand =
+        operands && operation.operandCount == 1 ? _getValue(operands[0]) : nullptr;
+    const bool isFloat32 =
+        Slang::NVVMSemantics::areSameType(operation.resultType, Slang::NVVMSemantics::kFloat32);
+    const bool isFloat64 =
+        Slang::NVVMSemantics::areSameType(operation.resultType, Slang::NVVMSemantics::kFloat64);
+    const bool isFraction = operation.operation == SLANG_NVVM_VALUE_OP_MODF_FRACTION;
+    const bool isIntegral = operation.operation == SLANG_NVVM_VALUE_OP_MODF_INTEGRAL;
+    if (!state || !insertionBlock || !operand || (!isFloat32 && !isFloat64) ||
+        (!isFraction && !isIntegral) || !outValue ||
+        !Slang::NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[0]) ||
+        !_isValueUsableAtInsertionPoint(state, insertionBlock, operand))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    llvm::Type* floatingType = isFloat32 ? llvm::Type::getFloatTy(state->context)
+                                         : llvm::Type::getDoubleTy(state->context);
+    llvm::Function* function = insertionBlock->getParent();
+    if (!function || operand->getType() != floatingType)
+        return SLANG_E_INVALID_ARG;
+
+    llvm::Type* pointerType = llvm::PointerType::getUnqual(floatingType);
+    llvm::FunctionType* functionType =
+        llvm::FunctionType::get(floatingType, {floatingType, pointerType}, false);
+    const char* functionName = isFloat32 ? "__nv_modff" : "__nv_modf";
+    llvm::Function* modf = state->module->getFunction(functionName);
+    if (modf && (modf->getFunctionType() != functionType || !modf->isDeclaration()))
+        return SLANG_E_INVALID_ARG;
+    if (!modf)
+    {
+        modf = llvm::Function::Create(
+            functionType,
+            llvm::GlobalValue::ExternalLinkage,
+            functionName,
+            state->module.get());
+    }
+
+    llvm::IRBuilder<> entryBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
+    llvm::AllocaInst* integralStorage =
+        entryBuilder.CreateAlloca(floatingType, nullptr, "modf.integral");
+    integralStorage->setAlignment(llvm::Align(isFloat32 ? 4 : 8));
+
+    llvm::Value* fraction = state->builder.CreateCall(modf, {operand, integralStorage});
+    llvm::Value* result = isFraction ? fraction
+                                     : state->builder.CreateAlignedLoad(
+                                           floatingType,
+                                           integralStorage,
+                                           llvm::Align(isFloat32 ? 4 : 8));
+    if (!result || result->getType() != floatingType)
+        return SLANG_E_INVALID_ARG;
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
 static SlangResult _emitCatalogOperation(
     SlangNVVMModuleHandle module,
     const Slang::NVVMSemantics::CatalogEntry& entry,
@@ -3429,6 +3506,11 @@ static SlangResult _emitCatalogOperation(
         entry.operation == SLANG_NVVM_VALUE_OP_FREXP_EXPONENT)
     {
         return _emitFrexpProjectionOperation(module, operation, operands, outValue);
+    }
+    if (entry.operation == SLANG_NVVM_VALUE_OP_MODF_FRACTION ||
+        entry.operation == SLANG_NVVM_VALUE_OP_MODF_INTEGRAL)
+    {
+        return _emitModfProjectionOperation(module, operation, operands, outValue);
     }
     if (entry.requiresCUDADeviceLibrary)
         return _emitLibdeviceOperation(module, operation, operands, outValue);
@@ -3823,6 +3905,10 @@ static SlangResult _emitValueOperationFamily(
             return SLANG_E_INVALID_ARG;
         }
         break;
+    case Slang::NVVMSemantics::ValueOperationFamily::FloatTernary:
+        return operation.operation == SLANG_NVVM_VALUE_OP_FMA
+                   ? _emitLibdeviceOperation(module, operation, operands, outValue)
+                   : SLANG_E_INVALID_ARG;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatClassification:
         result = state->builder.CreateFCmpUNO(llvmOperands[0], llvmOperands[0]);
         break;
