@@ -7281,6 +7281,29 @@ SM70/SM80/SM90 PTX and cubins through CUDA 12.9. Direct O3 SM70 PTX is 3,235 byt
 native for interface out/inout transport and 537 bytes versus 8,510 native for double indirection.
 Timings remain exploratory.
 
+### Slice 174: Physical parameter-group helper references
+
+CUDA buffer-element lowering may replace a logical constant-buffer element with a decorated
+`PhysicalType` struct whose fields carry the exact external storage representation. Direct NVVM
+now recognizes that finite storage struct as a distinct role and carries it from a synthesized
+parameter-group global through an immutable `BorrowInParam`, a decorated local temporary, and
+nested helper calls. Ordinary helper aggregates remain on their value representation.
+
+Physical reference, local, and device pointer classifiers require their complete canonical
+spellings and lower the pointee through `ParameterGroupStorage`. Nested field resolution preserves
+an explicit physical-storage root role. This is important for physical matrix fields: the root is
+semantically immutable, while the canonical `GetElementPtr` result is spelled as a read-write
+generic pointer. The emitter retains immutable load behavior separately and uses the established
+compact parameter-group vector representation for stride-12 three-lane vectors. Existing typed
+field, element, load, store, address-space-cast, and call operations are sufficient; provider ABI
+revision 32 is unchanged.
+
+Discovery `optimization/arrray-storage-lowering` becomes correct at O0 and O3 and gains two
+permanent direct lanes. Frozen v1 remains exactly 452/427 at 413/413/413 with no changed row.
+Discovery remains exactly 82/72 and advances from 70/70/70 to 71/71/71, with one gain and no loss.
+The selected prefix passes 433/433, the permanent NVVM category passes 78/78, and the gate
+assembles through CUDA 12.9 for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

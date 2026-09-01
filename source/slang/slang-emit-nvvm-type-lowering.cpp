@@ -355,7 +355,7 @@ IRArrayType* asNVVMSupportedAggregateStorageArrayType(IRInst* type, uint32_t* ou
 
 static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
-    if (isNVVMSupportedIntegerScalarType(type) || isNVVMFloat16Type(type) ||
+    if (isNVVMSupportedIntegerScalarType(type) || isNVVMBoolType(type) || isNVVMFloat16Type(type) ||
         isNVVMFloat32Type(type) || asNVVMSupported32BitNumericVectorType(type) ||
         asNVVMSupportedCompactParameterGroupVectorType(type))
     {
@@ -415,25 +415,6 @@ static bool _isNVVMSupportedAggregateStorageType(IRInst* type, HashSet<IRInst*>&
         return false;
 
     activeTypes.add(type);
-    if (structType->findDecoration<IRPhysicalTypeDecoration>())
-    {
-        IRStructField* onlyField = nullptr;
-        for (auto field : structType->getFields())
-        {
-            if (onlyField || !_asNVVMSupportedAggregateStorageArrayType(
-                                 field->getFieldType(),
-                                 nullptr,
-                                 activeTypes))
-            {
-                activeTypes.remove(type);
-                return false;
-            }
-            onlyField = field;
-        }
-        activeTypes.remove(type);
-        return onlyField != nullptr;
-    }
-
     bool hasField = false;
     for (auto field : structType->getFields())
     {
@@ -750,6 +731,86 @@ IRPtrTypeBase* asNVVMSupportedHelperReferencePointerType(IRInst* type, IRType** 
         pointerType->getAddressSpace() != AddressSpace::Generic || !dataLayout ||
         dataLayout->getOp() != kIROp_DefaultBufferLayoutType ||
         (!isNVVMSupportedHelperValueType(valueType) && !asNVVMSupportedAtomicType(valueType)))
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
+IRStructType* asNVVMSupportedPhysicalAggregateStorageStructType(IRInst* type)
+{
+    auto structType = asNVVMSupportedAggregateStorageStructType(type);
+    return structType && structType->findDecoration<IRPhysicalTypeDecoration>() ? structType
+                                                                                : nullptr;
+}
+
+IRPtrTypeBase* asNVVMSupportedPhysicalStorageReferencePointerType(
+    IRInst* type,
+    IRStructType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+
+    auto pointerType = as<IRPtrTypeBase>(type);
+    auto valueType =
+        pointerType ? asNVVMSupportedPhysicalAggregateStorageStructType(pointerType->getValueType())
+                    : nullptr;
+    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    if (!pointerType || pointerType->getOp() != kIROp_BorrowInParamType ||
+        pointerType->getOperandCount() != 4 ||
+        pointerType->getAccessQualifier() != AccessQualifier::Read ||
+        pointerType->getAddressSpace() != AddressSpace::Generic || !dataLayout ||
+        dataLayout->getOp() != kIROp_DefaultBufferLayoutType || !valueType)
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
+IRPtrTypeBase* asNVVMSupportedLocalPhysicalStoragePointerType(
+    IRInst* type,
+    IRStructType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+
+    auto pointerType = as<IRPtrTypeBase>(type);
+    auto valueType =
+        pointerType ? asNVVMSupportedPhysicalAggregateStorageStructType(pointerType->getValueType())
+                    : nullptr;
+    if (!pointerType || pointerType->getOp() != kIROp_PtrType ||
+        pointerType->getOperandCount() != 1 ||
+        pointerType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        pointerType->getAddressSpace() != AddressSpace::Generic || !valueType)
+    {
+        return nullptr;
+    }
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
+IRPtrTypeBase* asNVVMSupportedDevicePhysicalStoragePointerType(
+    IRInst* type,
+    IRStructType** outValueType)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+
+    auto pointerType = as<IRPtrTypeBase>(type);
+    auto valueType =
+        pointerType ? asNVVMSupportedPhysicalAggregateStorageStructType(pointerType->getValueType())
+                    : nullptr;
+    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    if (!pointerType || pointerType->getOp() != kIROp_PtrType ||
+        pointerType->getOperandCount() != 4 ||
+        pointerType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        pointerType->getAddressSpace() != AddressSpace::UserPointer || !dataLayout ||
+        dataLayout->getOp() != kIROp_DefaultBufferLayoutType || !valueType)
     {
         return nullptr;
     }
@@ -1172,6 +1233,8 @@ static uint32_t _getNVVMResourceValueAlignment(IRInst* type, HashSet<IRInst*>& a
         return getNVVMCopyableValueAlignment(atomicValueType);
     if (isNVVMBoolType(type))
         return 1;
+    if (asNVVMSupportedDevicePhysicalStoragePointerType(type))
+        return 8;
 
     IRType* parameterGroupElementType = nullptr;
     if (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType))
@@ -1636,7 +1699,7 @@ static bool _hasNVVMParameterGroupStorageValueRepresentation(
     IRInst* type,
     HashSet<IRInst*>& activeTypes)
 {
-    if (isNVVMSupportedIntegerScalarType(type) || isNVVMFloat16Type(type) ||
+    if (isNVVMSupportedIntegerScalarType(type) || isNVVMBoolType(type) || isNVVMFloat16Type(type) ||
         isNVVMFloat32Type(type))
         return true;
 
@@ -1733,12 +1796,12 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedDeviceCopyableValuePointerType(type) ||
+           asNVVMSupportedDevicePhysicalStoragePointerType(type) ||
            asNVVMSupportedParameterGroupType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceField(field, surfaceType, storageFormat) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
-           asNVVMSupportedDescriptorHandleType(type) ||
-           asNVVMSupportedSamplerStorageType(type) ||
+           asNVVMSupportedDescriptorHandleType(type) || asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type) ||
            asNVVMSupportedAggregateStorageArrayType(type);
 }
@@ -2177,6 +2240,14 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRType* helperReferenceValueType = nullptr;
     IRPtrTypeBase* helperReferencePointer =
         asNVVMSupportedHelperReferencePointerType(type, &helperReferenceValueType);
+    IRStructType* physicalStorageReferenceValueType = nullptr;
+    IRPtrTypeBase* physicalStorageReferencePointer =
+        asNVVMSupportedPhysicalStorageReferencePointerType(
+            type,
+            &physicalStorageReferenceValueType);
+    IRStructType* localPhysicalStorageValueType = nullptr;
+    IRPtrTypeBase* localPhysicalStoragePointer =
+        asNVVMSupportedLocalPhysicalStoragePointerType(type, &localPhysicalStorageValueType);
     IRType* sharedHelperPointerValueType = nullptr;
     IRPtrTypeBase* sharedHelperPointer =
         asNVVMSupportedSharedHelperPointerType(type, &sharedHelperPointerValueType);
@@ -2186,6 +2257,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRType* deviceHelperPointerValueType = nullptr;
     IRPtrTypeBase* deviceHelperPointer =
         asNVVMSupportedDeviceHelperValuePointerType(type, &deviceHelperPointerValueType);
+    IRStructType* devicePhysicalStorageValueType = nullptr;
+    IRPtrTypeBase* devicePhysicalStoragePointer =
+        asNVVMSupportedDevicePhysicalStoragePointerType(type, &devicePhysicalStorageValueType);
     const bool isHelperValue = isNVVMSupportedHelperValueType(type);
     const bool isPointerBearingHelperValue =
         isHelperValue && !isNVVMSupportedCopyableValueType(type);
@@ -2235,25 +2309,29 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           localHelperPointer || isRawBuffer || isSampledTexture)) ||
         (use == NVVMTypeUse::EntryPointParameter &&
          (isInteger || isFloat32 || resourceStructType || deviceNumericPointer ||
-          deviceCopyablePointer || deviceArrayPointer || isRawBuffer ||
+          deviceCopyablePointer || devicePhysicalStoragePointer || deviceArrayPointer ||
+          isRawBuffer ||
           (parameterGroup &&
            hasNVVMParameterGroupStorageValueRepresentation(parameterGroupElementType)))) ||
         (use == NVVMTypeUse::HelperParameter &&
          (isHelperValue || resourceStructType || localResourceStructPointer ||
           localCopyablePointer || localHelperPointer || helperReferencePointer ||
-          sharedHelperPointer || isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
+          physicalStorageReferencePointer || localPhysicalStoragePointer || sharedHelperPointer ||
+          isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::HelperValue && isHelperValue) ||
         (use == NVVMTypeUse::Value &&
          (isHelperValue || resourceStructType || fixedResourceArrayType ||
-          physicalArrayStructType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
-          isBufferDataPointer || parameterGroup || isSurface || isSampledTexture || samplerValue ||
-          resourceElementPointer || sharedElementPointer || sharedHelperPointer || atomicType)) ||
+          physicalArrayStructType || deviceNumericPointer || devicePhysicalStoragePointer ||
+          deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup || isSurface ||
+          isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer ||
+          sharedHelperPointer || atomicType)) ||
         (use == NVVMTypeUse::Storage &&
          (isInteger || isFloat32 || isNVVMFloat16Type(type) ||
           asNVVMSupported32BitNumericVectorType(type) || compactParameterGroupVectorType ||
-          structType || aggregateStorageArrayType || deviceCopyablePointer || isRawBuffer ||
-          parameterGroup || isSurface || isSampledTexture || samplerStorage ||
-          unsizedSamplerArrayStorage || atomicType || descriptorHandle)) ||
+          structType || aggregateStorageArrayType || deviceCopyablePointer ||
+          devicePhysicalStoragePointer || isRawBuffer || parameterGroup || isSurface ||
+          isSampledTexture || samplerStorage || unsizedSamplerArrayStorage || atomicType ||
+          descriptorHandle)) ||
         (use == NVVMTypeUse::ParameterGroupStorage && isNVVMSupportedAggregateStorageType(type)) ||
         (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage);
     if (!isLegal)
@@ -2344,6 +2422,19 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             false));
         m_aggregateStorageTypeMap[type] = outType;
         return SLANG_OK;
+    }
+
+    if ((use == NVVMTypeUse::EntryPointParameter || use == NVVMTypeUse::Storage ||
+         use == NVVMTypeUse::Value) &&
+        devicePhysicalStoragePointer)
+    {
+        return _lowerPointerType(
+            type,
+            devicePhysicalStorageValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            outType,
+            NVVMTypeUse::ParameterGroupStorage,
+            false);
     }
 
     if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
@@ -2437,6 +2528,28 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType,
             NVVMTypeUse::Value,
+            false);
+    }
+
+    if (use == NVVMTypeUse::HelperParameter && physicalStorageReferencePointer)
+    {
+        return _lowerPointerType(
+            type,
+            physicalStorageReferenceValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            outType,
+            NVVMTypeUse::ParameterGroupStorage,
+            false);
+    }
+
+    if (use == NVVMTypeUse::HelperParameter && localPhysicalStoragePointer)
+    {
+        return _lowerPointerType(
+            type,
+            localPhysicalStorageValueType,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            outType,
+            NVVMTypeUse::ParameterGroupStorage,
             false);
     }
 

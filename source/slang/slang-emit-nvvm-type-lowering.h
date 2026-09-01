@@ -88,6 +88,9 @@ IRStructType* asNVVMSupportedAggregateStorageStructType(IRInst* type);
 /// Returns whether a type is in the recursive aggregate-storage algebra.
 bool isNVVMSupportedAggregateStorageType(IRInst* type);
 
+/// Returns a physical struct accepted by the parameter-group storage algebra.
+IRStructType* asNVVMSupportedPhysicalAggregateStorageStructType(IRInst* type);
+
 /// Returns whether `type` is a finite value composed from selected scalar/vector leaves, fixed
 /// arrays, and nonempty structs.
 bool isNVVMSupportedCopyableValueType(IRInst* type);
@@ -139,6 +142,21 @@ IRAtomicType* asNVVMSupportedAtomicType(IRInst* type, IRType** outValueType = nu
 IRPtrTypeBase* asNVVMSupportedHelperReferencePointerType(
     IRInst* type,
     IRType** outValueType = nullptr);
+
+/// Returns an exact immutable helper reference to a physical parameter-group storage struct.
+IRPtrTypeBase* asNVVMSupportedPhysicalStorageReferencePointerType(
+    IRInst* type,
+    IRStructType** outValueType = nullptr);
+
+/// Returns an exact generic local pointer to a physical parameter-group storage struct.
+IRPtrTypeBase* asNVVMSupportedLocalPhysicalStoragePointerType(
+    IRInst* type,
+    IRStructType** outValueType = nullptr);
+
+/// Returns an exact CUDA device pointer to a physical parameter-group storage struct.
+IRPtrTypeBase* asNVVMSupportedDevicePhysicalStoragePointerType(
+    IRInst* type,
+    IRStructType** outValueType = nullptr);
 
 /// Returns an exact group-shared pointer to a finite helper value carried through a helper.
 IRPtrTypeBase* asNVVMSupportedSharedHelperPointerType(

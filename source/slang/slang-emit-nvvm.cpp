@@ -180,6 +180,7 @@ struct NVVMStructField
     uint32_t fieldIndex = 0;
     bool isConventionalGlobal = false;
     bool isMutable = false;
+    bool isPhysicalStorage = false;
 };
 
 struct NVVMSequentialElementPointer
@@ -232,6 +233,11 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
                          : nullptr;
         if (!structType && basePointerType)
             structType = asNVVMSupportedResourceStructType(basePointerType->getValueType());
+        if (!structType && basePointerType)
+        {
+            structType =
+                asNVVMSupportedPhysicalAggregateStorageStructType(basePointerType->getValueType());
+        }
         if (!structType || !_getNVVMStructFieldAddress(parentFieldAddress, parentAddress) ||
             !isTypeEqual(parentAddress.field->getFieldType(), structType))
         {
@@ -239,6 +245,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         }
         outAddress.isConventionalGlobal = parentAddress.isConventionalGlobal;
         outAddress.isMutable = parentAddress.isMutable;
+        outAddress.isPhysicalStorage = parentAddress.isPhysicalStorage;
     }
     else if (
         auto resourceElementPointer = asNVVMSupportedRWStructuredBufferElementPointerType(
@@ -263,25 +270,54 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
     }
     else
     {
-        IRType* copyableValueType = nullptr;
-        auto localCopyablePointer = asNVVMSupportedLocalCopyableValuePointerType(
+        IRStructType* physicalStorageReferenceType = nullptr;
+        auto physicalStorageReference = as<IRParam>(fieldAddress->getBase())
+                                            ? asNVVMSupportedPhysicalStorageReferencePointerType(
+                                                  fieldAddress->getBase()->getDataType(),
+                                                  &physicalStorageReferenceType)
+                                            : nullptr;
+        IRStructType* localPhysicalStorageType = nullptr;
+        auto localPhysicalStoragePointer = asNVVMSupportedLocalPhysicalStoragePointerType(
             fieldAddress->getBase()->getDataType(),
-            &copyableValueType);
+            &localPhysicalStorageType);
+        if (physicalStorageReference)
+        {
+            structType = physicalStorageReferenceType;
+            outAddress.isPhysicalStorage = true;
+        }
+        else if (localPhysicalStoragePointer)
+        {
+            structType = localPhysicalStorageType;
+            outAddress.isMutable = true;
+            outAddress.isPhysicalStorage = true;
+        }
+        IRType* copyableValueType = nullptr;
+        auto localCopyablePointer = structType ? nullptr
+                                               : asNVVMSupportedLocalCopyableValuePointerType(
+                                                     fieldAddress->getBase()->getDataType(),
+                                                     &copyableValueType);
         IRType* helperReferenceValueType = nullptr;
         auto helperReference = as<IRParam>(fieldAddress->getBase())
                                    ? asNVVMSupportedHelperReferencePointerType(
                                          fieldAddress->getBase()->getDataType(),
                                          &helperReferenceValueType)
                                    : nullptr;
-        structType = localCopyablePointer
-                         ? asNVVMSupportedCopyableStructType(copyableValueType)
-                         : nullptr;
-        if (structType)
+        if (!structType)
+        {
+            structType = localCopyablePointer ? asNVVMSupportedCopyableStructType(copyableValueType)
+                                              : nullptr;
+        }
+        if (localCopyablePointer && structType)
         {
             // Consider `void initialize(out Payload value) { value.count = 1; }`. The helper ABI
             // already proves the exact `OutParam<Payload>` representation; field selection only
             // needs to retain that mutable root role.
             outAddress.isMutable = true;
+        }
+        else if (physicalStorageReference || localPhysicalStoragePointer)
+        {
+            // The exact physical-storage classifier above already selected the struct and root
+            // access. Keep that producer-owned immutable/local distinction unchanged.
         }
         else if (helperReference)
         {
@@ -382,6 +418,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
                asNVVMSupportedResourceStructType(fieldType) ||
                asNVVMSupportedDeviceCopyableValuePointerType(fieldType) ||
+               asNVVMSupportedDevicePhysicalStoragePointerType(fieldType) ||
                asNVVMSupportedParameterGroupType(fieldType) ||
                getNVVMSupportedSurfaceField(outAddress.field, surfaceType, storageFormat) ||
                getNVVMSupportedReadOnlyTextureType(fieldType, sampledTextureType) ||
@@ -835,6 +872,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     NVVMSharedGlobal sharedGlobal;
     bool isSharedGlobalBase = false;
     bool isImmutable = false;
+    bool hasImmutablePhysicalStorageFieldBase = false;
     NVVMStructuredBufferElementPointer resourceElement;
     const bool hasResourceElementBase =
         base && _getNVVMStructuredBufferElementPointer(base, resourceElement);
@@ -902,6 +940,8 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
                                       fieldAddress.field->getFieldType());
                 baseType = as<IRPtrTypeBase>(base->getDataType());
                 isImmutable = !fieldAddress.isMutable;
+                hasImmutablePhysicalStorageFieldBase =
+                    isImmutable && fieldAddress.isPhysicalStorage && arrayType;
             }
         }
         if (arrayType)
@@ -957,11 +997,16 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     IRType* expectedElementType = arrayType    ? arrayType->getElementType()
                                   : vectorType ? vectorType->getElementType()
                                                : nullptr;
-    const AccessQualifier expectedAccess =
-        baseType ? baseType->getAccessQualifier() : AccessQualifier::ReadWrite;
-    const AddressSpace expectedAddressSpace =
-        isSharedGlobalBase ? AddressSpace::GroupShared
-                           : baseType ? baseType->getAddressSpace() : AddressSpace::Generic;
+    // Physical storage field lowering keeps the immutable root in the field resolver but emits
+    // the canonical GetElementPtr result with the ordinary ReadWrite access operand. Preserve
+    // immutability through `isImmutable`; the result spelling is a producer-owned pointer detail.
+    const AccessQualifier expectedAccess = hasImmutablePhysicalStorageFieldBase
+                                               ? AccessQualifier::ReadWrite
+                                           : baseType ? baseType->getAccessQualifier()
+                                                      : AccessQualifier::ReadWrite;
+    const AddressSpace expectedAddressSpace = isSharedGlobalBase ? AddressSpace::GroupShared
+                                              : baseType         ? baseType->getAddressSpace()
+                                                                 : AddressSpace::Generic;
     const bool hasCanonicalLocalLayout =
         (resultType && (resultType->getOperandCount() == 1 || resultType->getOperandCount() == 3) &&
          !resultLayout) ||
@@ -1529,15 +1574,17 @@ bool _getNVVMAggregateStorageLayout(
     if (getNVVMSupportedSurfaceType(type, surfaceType) ||
         getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
         asNVVMSupportedSamplerStorageType(type) ||
-        asNVVMSupportedDeviceCopyableValuePointerType(type))
+        asNVVMSupportedDeviceCopyableValuePointerType(type) ||
+        asNVVMSupportedDevicePhysicalStoragePointerType(type))
     {
         outLayout.size = kNVVMPointerAlignment;
         outLayout.alignment = kNVVMPointerAlignment;
         return true;
     }
 
-    if (!isNVVMSupportedIntegerScalarType(type) && !isNVVMFloat16Type(type) &&
-        !isNVVMFloat32Type(type) && !asNVVMSupported32BitNumericVectorType(type))
+    if (!isNVVMSupportedIntegerScalarType(type) && !isNVVMBoolType(type) &&
+        !isNVVMFloat16Type(type) && !isNVVMFloat32Type(type) &&
+        !asNVVMSupported32BitNumericVectorType(type))
     {
         return false;
     }
@@ -1570,6 +1617,20 @@ bool _hasNVVMCompatibleAggregateStorageLayout(
                &cudaLayout)) &&
            providerLayout.size == cudaLayout.size &&
            providerLayout.alignment == cudaLayout.alignment;
+}
+
+uint32_t _getNVVMPhysicalAggregateStorageAlignment(CodeGenContext* codeGenContext, IRType* type)
+{
+    if (!asNVVMSupportedPhysicalAggregateStorageStructType(type))
+        return 0;
+
+    IRSizeAndAlignment layout;
+    if (!_getNVVMAggregateStorageLayout(codeGenContext, type, layout) || layout.alignment <= 0 ||
+        layout.alignment > UINT32_MAX)
+    {
+        return 0;
+    }
+    return uint32_t(layout.alignment);
 }
 
 // Retains the canonical declaration closure of a selected struct. Nested aggregate fields and
@@ -6874,6 +6935,8 @@ SlangResult _validatePointerValue(
         value ? asNVVMSupportedDeviceCopyableValuePointerType(value->getDataType()) : nullptr;
     auto deviceHelperPtrType =
         value ? asNVVMSupportedDeviceHelperValuePointerType(value->getDataType()) : nullptr;
+    auto devicePhysicalStoragePtrType =
+        value ? asNVVMSupportedDevicePhysicalStoragePointerType(value->getDataType()) : nullptr;
     NVVMRawBufferElementPointer rawBufferElementPointer;
     NVVMStructuredBufferElementPointer structuredBufferElementPointer;
     const bool hasStructuredBufferElementProducer =
@@ -6902,9 +6965,17 @@ SlangResult _validatePointerValue(
         value && (value->getOp() == kIROp_Var || as<IRParam>(value))
             ? asNVVMSupportedLocalCopyableValuePointerType(value->getDataType())
             : nullptr;
+    auto localPhysicalStoragePtrType =
+        value && value->getOp() == kIROp_Var
+            ? asNVVMSupportedLocalPhysicalStoragePointerType(value->getDataType())
+            : nullptr;
     auto helperReferencePtrType =
         value && as<IRParam>(value)
             ? asNVVMSupportedHelperReferencePointerType(value->getDataType())
+            : nullptr;
+    auto physicalStorageReferencePtrType =
+        value && as<IRParam>(value)
+            ? asNVVMSupportedPhysicalStorageReferencePointerType(value->getDataType())
             : nullptr;
     auto sharedHelperPtrType =
         value ? asNVVMSupportedSharedHelperPointerType(value->getDataType()) : nullptr;
@@ -6925,17 +6996,22 @@ SlangResult _validatePointerValue(
         devicePtrType = deviceCopyablePtrType;
     if (!devicePtrType)
         devicePtrType = deviceHelperPtrType;
-    IRPtrTypeBase* acceptedPtrType = devicePtrType              ? devicePtrType
-                                     : sharedElementPtrType     ? sharedElementPtrType
-                                     : sharedGlobalPtrType      ? sharedGlobalPtrType
-                                     : resourceElementPtrType   ? resourceElementPtrType
-                                     : localCopyablePtrType     ? localCopyablePtrType
-                                     : sequentialElementPtrType ? sequentialElementPtrType
-                                     : localStructPtrType       ? localStructPtrType
-                                     : localHelperPtrType       ? localHelperPtrType
-                                     : helperReferencePtrType   ? helperReferencePtrType
-                                     : sharedHelperPtrType      ? sharedHelperPtrType
-                                                                : fieldPtrType;
+    if (!devicePtrType)
+        devicePtrType = devicePhysicalStoragePtrType;
+    IRPtrTypeBase* acceptedPtrType = devicePtrType                 ? devicePtrType
+                                     : sharedElementPtrType        ? sharedElementPtrType
+                                     : sharedGlobalPtrType         ? sharedGlobalPtrType
+                                     : resourceElementPtrType      ? resourceElementPtrType
+                                     : localCopyablePtrType        ? localCopyablePtrType
+                                     : localPhysicalStoragePtrType ? localPhysicalStoragePtrType
+                                     : sequentialElementPtrType    ? sequentialElementPtrType
+                                     : localStructPtrType          ? localStructPtrType
+                                     : localHelperPtrType          ? localHelperPtrType
+                                     : helperReferencePtrType      ? helperReferencePtrType
+                                     : physicalStorageReferencePtrType
+                                         ? physicalStorageReferencePtrType
+                                     : sharedHelperPtrType ? sharedHelperPtrType
+                                                           : fieldPtrType;
     if (!acceptedPtrType)
     {
         StringBuilder construct;
@@ -6951,10 +7027,10 @@ SlangResult _validatePointerValue(
     const bool isAtomicConsumer =
         _resolveNVVMAtomicOperation(consumer, atomicOperation) && atomicOperation.pointer == value;
     NVVMSequentialElementPointer childElementPointer;
-    const bool hasSequentialChild =
-        consumer && consumer->getOp() == kIROp_GetElementPtr && consumer->getOperandCount() == 2 &&
-        consumer->getOperand(0) == value &&
-        _getNVVMSequentialElementPointer(consumer, childElementPointer);
+    const bool hasSequentialChild = consumer && consumer->getOp() == kIROp_GetElementPtr &&
+                                    consumer->getOperandCount() == 2 &&
+                                    consumer->getOperand(0) == value &&
+                                    _getNVVMSequentialElementPointer(consumer, childElementPointer);
     if (resourceElementPtrType && consumer->getOp() != kIROp_Load &&
         consumer->getOp() != kIROp_Store && consumer->getOp() != kIROp_SwizzledStore &&
         !isAtomicConsumer && consumer->getOp() != kIROp_Call && !hasSequentialChild)
@@ -7112,6 +7188,8 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
            asNVVMSupportedHelperReferencePointerType(type) ||
+           asNVVMSupportedPhysicalStorageReferencePointerType(type) ||
+           asNVVMSupportedLocalPhysicalStoragePointerType(type) ||
            asNVVMSupportedSharedHelperPointerType(type) ||
            asNVVMSupportedDeviceHelperValuePointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
@@ -7188,6 +7266,29 @@ bool _isSupportedNVVMHelperArgument(IRInst* argument, IRType* parameterType)
              argumentPointer->getAccessQualifier() == AccessQualifier::ReadWrite);
         if (argumentPointer && hasRequiredAccess &&
             isTypeEqual(argumentValueType, parameterReferenceValueType))
+        {
+            return true;
+        }
+    }
+
+    IRStructType* parameterPhysicalStorageType = nullptr;
+    auto parameterPhysicalStorageReference = asNVVMSupportedPhysicalStorageReferencePointerType(
+        parameterType,
+        &parameterPhysicalStorageType);
+    if (parameterPhysicalStorageReference)
+    {
+        IRType* argumentParameterGroupElementType = nullptr;
+        if (asNVVMSupportedParameterGroupType(argumentType, &argumentParameterGroupElementType) &&
+            isTypeEqual(argumentParameterGroupElementType, parameterPhysicalStorageType))
+        {
+            return true;
+        }
+
+        IRStructType* argumentPhysicalStorageType = nullptr;
+        if (asNVVMSupportedLocalPhysicalStoragePointerType(
+                argumentType,
+                &argumentPhysicalStorageType) &&
+            isTypeEqual(argumentPhysicalStorageType, parameterPhysicalStorageType))
         {
             return true;
         }
@@ -7669,6 +7770,24 @@ SlangResult _validateNVVMFunction(
             {
             case kIROp_Var:
                 {
+                    IRStructType* physicalStorageType = nullptr;
+                    if (asNVVMSupportedLocalPhysicalStoragePointerType(
+                            inst->getDataType(),
+                            &physicalStorageType))
+                    {
+                        IRSizeAndAlignment physicalLayout;
+                        if (!_getNVVMAggregateStorageLayout(
+                                codeGenContext,
+                                physicalStorageType,
+                                physicalLayout) ||
+                            physicalLayout.size <= 0 || physicalLayout.alignment <= 0)
+                        {
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("local physical parameter-group storage layout"));
+                        }
+                        break;
+                    }
                     IRType* copyableValueType = nullptr;
                     if (asNVVMSupportedLocalCopyableValuePointerType(
                             inst->getDataType(),
@@ -7731,7 +7850,11 @@ SlangResult _validateNVVMFunction(
                             codeGenContext,
                             toSlice("structured-buffer load type"));
                     }
-                    if (!storageType && !_getNVVMExecutableValueAlignment(inst->getDataType()) &&
+                    if (!storageType &&
+                        !_getNVVMPhysicalAggregateStorageAlignment(
+                            codeGenContext,
+                            inst->getDataType()) &&
+                        !_getNVVMExecutableValueAlignment(inst->getDataType()) &&
                         !asNVVMSupportedParameterGroupType(inst->getDataType()))
                     {
                         return _diagnoseUnsupportedIRType(
@@ -8742,11 +8865,14 @@ SlangResult _validateNVVMFunction(
                                 argument->getDataType()) ||
                             asNVVMSupportedLocalCopyableValuePointerType(argument->getDataType()) ||
                             asNVVMSupportedLocalHelperValuePointerType(argument->getDataType()) ||
-                            asNVVMSupportedDeviceHelperValuePointerType(
-                                argument->getDataType()) ||
+                            asNVVMSupportedDeviceHelperValuePointerType(argument->getDataType()) ||
                             asNVVMSupportedRWStructuredBufferElementPointerType(
                                 argument->getDataType()) ||
                             asNVVMSupportedHelperReferencePointerType(argument->getDataType()) ||
+                            asNVVMSupportedPhysicalStorageReferencePointerType(
+                                argument->getDataType()) ||
+                            asNVVMSupportedLocalPhysicalStoragePointerType(
+                                argument->getDataType()) ||
                             asNVVMSupportedSharedHelperPointerType(argument->getDataType()) ||
                             asNVVMSupportedSharedElementPointerType(argument->getDataType()) ||
                             asNVVMSupportedDerivedCopyableValuePointerType(argument->getDataType()))
@@ -13182,9 +13308,18 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_Var:
                     {
                         IRType* valueType = nullptr;
-                        if (!asNVVMSupportedLocalCopyableValuePointerType(
+                        NVVMTypeUse valueUse = NVVMTypeUse::Value;
+                        IRStructType* physicalStorageType = nullptr;
+                        if (asNVVMSupportedLocalPhysicalStoragePointerType(
                                 inst->getDataType(),
-                                &valueType))
+                                &physicalStorageType))
+                        {
+                            valueType = physicalStorageType;
+                            valueUse = NVVMTypeUse::ParameterGroupStorage;
+                        }
+                        else if (!asNVVMSupportedLocalCopyableValuePointerType(
+                                     inst->getDataType(),
+                                     &valueType))
                         {
                             if (!asNVVMSupportedLocalHelperValuePointerType(
                                     inst->getDataType(),
@@ -13199,13 +13334,27 @@ SlangResult emitNVVMIRFromLinkedIR(
                         }
                         SlangNVVMTypeHandle loweredValueType = nullptr;
                         SLANG_RETURN_ON_FAIL(
-                            typeContext.lowerType(valueType, NVVMTypeUse::Value, loweredValueType));
-                        const uint32_t alignment = _getNVVMExecutableValueAlignment(valueType);
+                            typeContext.lowerType(valueType, valueUse, loweredValueType));
+                        uint32_t alignment = _getNVVMExecutableValueAlignment(valueType);
+                        if (valueUse == NVVMTypeUse::ParameterGroupStorage)
+                        {
+                            IRSizeAndAlignment physicalLayout;
+                            SLANG_RELEASE_ASSERT(_getNVVMAggregateStorageLayout(
+                                codeGenContext,
+                                valueType,
+                                physicalLayout));
+                            SLANG_RELEASE_ASSERT(
+                                physicalLayout.alignment > 0 &&
+                                physicalLayout.alignment <= UINT32_MAX);
+                            alignment = uint32_t(physicalLayout.alignment);
+                        }
                         SLANG_RELEASE_ASSERT(alignment);
                         SlangNVVMValueHandle loweredStorage = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "local copyable storage",
+                            valueUse == NVVMTypeUse::ParameterGroupStorage
+                                ? "local physical parameter-group storage"
+                                : "local copyable storage",
                             builder.emitLocalStorage(
                                 moduleScope.module,
                                 loweredValueType,
@@ -13290,11 +13439,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        uint32_t alignment =
-                            compactStorageVector
-                                ? getNVVMNumericValueAlignment(
-                                      compactStorageVector->getElementType())
-                                : _getNVVMExecutableValueAlignment(load->getDataType());
+                        uint32_t alignment = compactStorageVector
+                                                 ? getNVVMNumericValueAlignment(
+                                                       compactStorageVector->getElementType())
+                                                 : _getNVVMPhysicalAggregateStorageAlignment(
+                                                       codeGenContext,
+                                                       load->getDataType());
+                        if (!alignment)
+                            alignment = _getNVVMExecutableValueAlignment(load->getDataType());
                         if (structuredStorageType)
                         {
                             alignment = _getNVVMStructuredBufferMemoryAlignment(
@@ -13480,8 +13632,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredPointer));
-                        uint32_t alignment =
-                            _getNVVMExecutableValueAlignment(store->getVal()->getDataType());
+                        uint32_t alignment = _getNVVMPhysicalAggregateStorageAlignment(
+                            codeGenContext,
+                            store->getVal()->getDataType());
+                        if (!alignment)
+                        {
+                            alignment =
+                                _getNVVMExecutableValueAlignment(store->getVal()->getDataType());
+                        }
                         if (structuredStorageType)
                         {
                             alignment = _getNVVMStructuredBufferMemoryAlignment(
@@ -13958,10 +14116,19 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 helperValueMap,
                                 typeContext,
                                 loweredArgument));
-                            if (asNVVMSupportedHelperReferencePointerType(
+                            const bool hasGlobalPhysicalStorageArgument =
+                                asNVVMSupportedPhysicalStorageReferencePointerType(
                                     callee->getParamType(argumentIndex),
                                     nullptr) &&
-                                _isNVVMGlobalHelperReferenceArgument(call->getArg(argumentIndex)))
+                                asNVVMSupportedParameterGroupType(
+                                    call->getArg(argumentIndex)->getDataType(),
+                                    nullptr);
+                            if ((asNVVMSupportedHelperReferencePointerType(
+                                     callee->getParamType(argumentIndex),
+                                     nullptr) &&
+                                 _isNVVMGlobalHelperReferenceArgument(
+                                     call->getArg(argumentIndex))) ||
+                                hasGlobalPhysicalStorageArgument)
                             {
                                 SlangNVVMTypeHandle loweredReferenceType = nullptr;
                                 SLANG_RETURN_ON_FAIL(typeContext.lowerType(

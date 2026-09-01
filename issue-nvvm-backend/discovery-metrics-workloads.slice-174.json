@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "physical-parameter-group-helper-reference",
+      "source": "tests/optimization/arrray-storage-lowering.slang",
+      "census_id": "optimization/arrray-storage-lowering.slang#discovery-1"
+    }
+  ]
+}

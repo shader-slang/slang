@@ -2484,3 +2484,18 @@ healthy denominator; discovery advances from 69/69/69 to 70/70/70 over its uncha
 references. Both have exactly one gain and no old-correct loss. The selected prefix passes
 433/433, the permanent NVVM category passes 76/76, and both measurement gates produce accepted
 PTX/cubins for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.
+
+Slice 174 gives CUDA `PhysicalType` parameter-group structs one explicit storage role across
+synthesized globals, immutable helper references, decorated local temporaries, and nested field
+selection. Exact physical reference/local/device pointer classifiers lower their pointees through
+the established parameter-group storage algebra. Field resolution separately preserves semantic
+immutability and the producer-owned read-write `GetElementPtr` spelling used by physical matrix
+arrays; compact vector storage continues to supply the proven CUDA stride and alignment. Provider
+ABI revision 32 is unchanged.
+
+Discovery `optimization/arrray-storage-lowering` gains two permanent direct lanes. Frozen v1 stays
+413/413/413 over its unchanged 427 healthy denominator with no changed row. Discovery advances
+from 70/70/70 to 71/71/71 over its unchanged 72 healthy references, with exactly one gain and no
+loss. The selected prefix passes 433/433, the permanent NVVM category passes 78/78, and the
+measurement gate produces accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90 configurations.
