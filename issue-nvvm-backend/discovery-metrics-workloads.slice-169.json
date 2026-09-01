@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "narrow-vector-byte-address",
+      "source": "tests/hlsl-intrinsic/byte-address-buffer/byte-address-16bit-vector.slang",
+      "census_id": "hlsl-intrinsic/byte-address-buffer/byte-address-16bit-vector.slang#cuda-1"
+    },
+    {
+      "name": "half-byte-address-atomic",
+      "source": "tests/hlsl-intrinsic/byte-address-buffer/byte-address-half-atomics.slang",
+      "census_id": "hlsl-intrinsic/byte-address-buffer/byte-address-half-atomics.slang#cuda-1"
+    },
+    {
+      "name": "wide-byte-address-cas",
+      "source": "tests/slang-extension/cas-int64-byte-address-buffer.slang",
+      "census_id": "slang-extension/cas-int64-byte-address-buffer.slang#cuda-1"
+    }
+  ]
+}

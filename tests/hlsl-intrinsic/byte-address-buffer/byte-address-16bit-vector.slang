@@ -13,6 +13,8 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -llvm -compute -shaderobj
 
 // Unavailable on D3D and fxc-based targets, because fxc doesn't

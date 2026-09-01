@@ -6904,8 +6904,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     unsupportedAtomicOperation = selectedFloatingAddOperation;
     unsupportedAtomicOperation.operation = SLANG_NVVM_ATOMIC_OP_MAX;
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
-    unsupportedAtomicOperation = selectedFloatingAddOperation;
-    unsupportedAtomicOperation.valueType.bitWidth = 16;
+    SlangNVVMAtomicOperationDesc selectedHalfAddOperation = selectedFloatingAddOperation;
+    selectedHalfAddOperation.valueType.bitWidth = 16;
+    SLANG_CHECK(builder.supportsAtomicOperation(selectedHalfAddOperation));
+    unsupportedAtomicOperation = selectedHalfAddOperation;
+    unsupportedAtomicOperation.valueType.bitWidth = 8;
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
     unsupportedAtomicOperation = atomicOperation;
     unsupportedAtomicOperation.addressSpace = SlangNVVMAddressSpace(99);

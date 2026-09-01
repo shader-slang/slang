@@ -2410,3 +2410,18 @@ exactly two gains and no loss. Frozen v1 remains 402/402/402 over its unchanged 
 denominator with no changed row or old-correct loss. The selected prefix passes 433/433, the
 permanent NVVM category passes 50/50, and both new measurement gates produce accepted PTX/cubins
 for the NVRTC reference, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.
+
+Slice 169 widens canonical byte-address values to selected 16/32/64-bit integer, Half/Float32, and
+finite selected-vector leaves. Omitted alignment is `min(4, natural alignment)`, preserving the
+established byte-address producer guarantee without overstating narrow accesses. Canonical Half
+atomic add reuses the equivalent structured-buffer path and an exact provider-owned
+`atom.global.add.noftz.f16` implementation. Exact complete CUDA-prelude helpers bridge raw-buffer
+Float32 add and UInt64 compare-exchange to the existing generic byte-offset and atomic operations.
+Vector Half reductions and unrelated GenericAsm remain rejected. Provider ABI revision 32 is
+unchanged.
+
+Five frozen workloads gain ten permanent direct lanes. Frozen v1 advances from 402/402/402 to
+407/407/407 over its unchanged 427 healthy denominator, with no old-correct loss. Discovery stays
+68/68/68 over 72. The selected prefix passes 433/433, the permanent NVVM category passes 60/60,
+and three representative gates produce accepted PTX/cubins for native NVRTC, direct O0 SM70, and
+direct O3 SM70/SM80/SM90 configurations.

@@ -925,6 +925,32 @@ static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     }
 
     llvm::Value* originalValue = nullptr;
+    if (hasExpectedFloatingType && operation->valueType.bitWidth == 16 &&
+        operation->operation == SLANG_NVVM_ATOMIC_OP_ADD)
+    {
+        // NVVM IR's legacy floating atomic-add intrinsics cover only Float32 and Float64, while
+        // CUDA's canonical scalar Half operation is the PTX `atom.add.noftz.f16` instruction.
+        // Keep the provider input typed as Half, then cross the PTX inline-assembly boundary using
+        // the exact i16 register bits accepted by LLVM's `h` constraint. The pointer stays in the
+        // already-validated global address space and the returned bits restore the Half result.
+        llvm::Type* int16Type = llvm::Type::getInt16Ty(state->context);
+        llvm::PointerType* int16PointerType =
+            llvm::PointerType::get(int16Type, SLANG_NVVM_ADDRESS_SPACE_GLOBAL);
+        llvm::Value* integerPointer = state->builder.CreateBitCast(llvmPointer, int16PointerType);
+        llvm::Value* integerValue = state->builder.CreateBitCast(llvmValues[0], int16Type);
+        llvm::FunctionType* functionType =
+            llvm::FunctionType::get(int16Type, {int16PointerType, int16Type}, false);
+        llvm::InlineAsm* inlineAsm = llvm::InlineAsm::get(
+            functionType,
+            "atom.global.add.noftz.f16 $0, [$1], $2;",
+            "=h,l,h",
+            true);
+        llvm::Value* resultBits =
+            state->builder.CreateCall(inlineAsm, {integerPointer, integerValue});
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
+            state->builder.CreateBitCast(resultBits, pointeeType));
+        return SLANG_OK;
+    }
     if (operation->operation == SLANG_NVVM_ATOMIC_OP_LOAD)
     {
         // libNVVM 2.0 rejects LLVM atomic load/store instructions. A relaxed compare-exchange of

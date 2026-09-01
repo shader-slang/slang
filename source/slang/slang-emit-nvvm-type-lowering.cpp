@@ -197,10 +197,14 @@ bool isNVVMSupportedNumericValueType(IRInst* type)
 static bool _isNVVMSupportedByteAddressLeafValueType(IRInst* type)
 {
     uint32_t integerBitWidth = 0;
-    const bool isSupportedInteger = isNVVMSupportedIntegerScalarType(type, &integerBitWidth) &&
-                                    (integerBitWidth == 32 || integerBitWidth == 64);
-    return isSupportedInteger || isNVVMFloat32Type(type) ||
-           asNVVMSupported32BitNumericVectorType(type);
+    const bool isSupportedInteger =
+        isNVVMSupportedIntegerScalarType(type, &integerBitWidth) &&
+        (integerBitWidth == 16 || integerBitWidth == 32 || integerBitWidth == 64);
+    if (isSupportedInteger || isNVVMFloat16Type(type) || isNVVMFloat32Type(type))
+        return true;
+
+    auto vectorType = asNVVMSupportedNumericVectorType(type);
+    return vectorType && _isNVVMSupportedByteAddressLeafValueType(vectorType->getElementType());
 }
 
 IRArrayType* asNVVMSupportedNumericArrayType(IRInst* type, uint32_t* outElementCount)

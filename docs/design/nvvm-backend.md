@@ -7145,6 +7145,34 @@ discovery remains exactly 82/72 and advances from 66/66/66 to 68/68/68 with exac
 and no loss. The selected prefix passes 433/433, the permanent NVVM category passes 50/50, and both
 new gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
 
+### Slice 169: Typed byte-address memory and common atomics
+
+Byte-address legalization may decompose a source aggregate into selected scalar Int16, UInt16,
+Half, or Float32 accesses and finite vectors of those leaves. Direct NVVM now admits that exact
+physical family. An omitted or zero alignment means `min(4, natural alignment)`: existing wide,
+vector, and array accesses retain their four-byte producer guarantee, while narrow leaves at
+two-byte offsets do not overstate LLVM alignment. Explicit nonzero power-of-two alignment remains
+an exact producer promise.
+
+Canonical Half byte-address atomics use the established equivalent structured-buffer view and
+typed element pointer. The provider lowers the selected relaxed global scalar Half add descriptor
+to exact `atom.global.add.noftz.f16` PTX inline assembly, transporting pointer and value through
+typed i16 bits and restoring the returned Half value. This avoids unsupported LLVM/NVVM floating
+atomic syntax without rewriting serialized IR. Other Half atomic operations and vector Half
+reductions remain rejected.
+
+The CUDA prelude retains Float32 byte-address add and UInt64 compare-exchange as complete
+single-GenericAsm helpers. Direct NVVM matches their exact assembly, one-block body, typed
+read-write byte-address buffer, UInt32 byte offset, scalar operands, and typed out parameter. It
+then reuses generic raw-view extraction, byte-offset pointer formation, atomic emission, and result
+store. No helper name, fixture name, or assembly substring is interpreted. Provider ABI revision
+32 is unchanged.
+
+Five frozen workloads gain ten permanent direct lanes. Frozen corpus v1 remains exactly 452/427
+and advances from 402/402/402 to 407/407/407 O0/O3/both with no old-correct regression. Discovery
+remains exactly 82/72 at 68/68/68. The selected prefix passes 433/433, the permanent NVVM category
+passes 60/60, and all three representative gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

@@ -659,9 +659,25 @@ struct NVVMByteAddressAccess
     bool isStore = false;
 };
 
+// Returns the implicit alignment of one value retained by byte-address legalization. Consider
+// `struct Data { int16_t a; int16_t b; }`: legalization emits scalar Int16 accesses at offsets zero
+// and two, with an omitted/zero alignment operand. The producer guarantees at most four-byte
+// alignment, reduced to the physical value alignment for narrower values.
+uint32_t _getNVVMByteAddressValueAlignment(IRType* type)
+{
+    uint32_t naturalAlignment = getNVVMNumericValueAlignment(type);
+    if (!naturalAlignment)
+    {
+        auto arrayType = asNVVMSupportedNumericArrayType(type);
+        naturalAlignment =
+            arrayType ? getNVVMNumericValueAlignment(arrayType->getElementType()) : 0;
+    }
+    return naturalAlignment < 4 ? naturalAlignment : 4;
+}
+
 // Resolves the canonical selected numeric scalar/vector byte-address load and store family. A zero
-// or omitted alignment carries the ordinary four-byte contract; an explicit alignment is a
-// power-of-two promise that can be forwarded unchanged to LLVM.
+// or omitted alignment carries the ordinary at-most-four-byte contract; an explicit alignment is
+// a power-of-two promise that can be forwarded unchanged to LLVM.
 bool _getNVVMByteAddressAccess(IRInst* inst, NVVMByteAddressAccess& outAccess)
 {
     outAccess = {};
@@ -694,7 +710,9 @@ bool _getNVVMByteAddressAccess(IRInst* inst, NVVMByteAddressAccess& outAccess)
         return false;
     }
 
-    uint32_t alignment = kNVVMScalar32Alignment;
+    uint32_t alignment = _getNVVMByteAddressValueAlignment(valueType);
+    if (!alignment)
+        return false;
     if (alignmentOperand)
     {
         auto alignmentLiteral = as<IRIntLit>(alignmentOperand);
@@ -750,12 +768,13 @@ bool _getNVVMEquivalentStructuredBuffer(IRInst* inst, NVVMEquivalentStructuredBu
         return false;
     }
 
+    IRType* physicalElementType = outConversion.resultType.structuredElementType;
     uint32_t integerBitWidth = 0;
-    const bool isSelectedInteger = isNVVMSupportedIntegerScalarType(
-                                       outConversion.resultType.structuredElementType,
-                                       &integerBitWidth) &&
-                                   (integerBitWidth == 32 || integerBitWidth == 64);
-    if (!isSelectedInteger && !isNVVMFloat32Type(outConversion.resultType.structuredElementType))
+    const bool isSelectedInteger =
+        isNVVMSupportedIntegerScalarType(physicalElementType, &integerBitWidth) &&
+        (integerBitWidth == 16 || integerBitWidth == 32 || integerBitWidth == 64);
+    if (!isSelectedInteger && !isNVVMFloat16Type(physicalElementType) &&
+        !isNVVMFloat32Type(physicalElementType))
     {
         return false;
     }
@@ -5168,6 +5187,115 @@ struct NVVMResolvedAtomicReduction
     bool negatesValue = false;
 };
 
+struct NVVMResolvedByteAddressAtomic
+{
+    SlangNVVMAtomicOperationDesc desc = {};
+    IRParam* bufferParameter = nullptr;
+    IRParam* offsetParameter = nullptr;
+    IRParam* valueParameters[2] = {};
+    uint32_t valueCount = 0;
+    IRParam* resultPointerParameter = nullptr;
+    IRType* valueIRType = nullptr;
+    const char* diagnosticName = nullptr;
+};
+
+// Resolves the complete CUDA-prelude helper retained for byte-address Float32 add and UInt64 CAS.
+// These functions are canonical GenericAsm producers rather than core atomic instructions. Match
+// the entire body, assembly, and typed signature so emission never parses `_getPtrAt<T>` text or
+// infers a source method from a name.
+bool _resolveNVVMByteAddressAtomic(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    NVVMResolvedByteAddressAtomic& outAtomic)
+{
+    outAtomic = {};
+    IRBlock* block = function ? function->getFirstBlock() : nullptr;
+    if (!genericAsm || !block || block->getNextBlock() || genericAsm->getParent() != block ||
+        genericAsm->getOperandCount() != 1 || !as<IRVoidType>(function->getResultType()))
+    {
+        return false;
+    }
+    for (auto inst : block->getOrdinaryInsts())
+    {
+        if (inst != genericAsm)
+            return false;
+    }
+
+    const UnownedStringSlice assembly = genericAsm->getAsm();
+    const bool isFloatAdd =
+        assembly == UnownedStringSlice("(*$3 = atomicAdd($0._getPtrAt<float>($1), $2))");
+    const bool isUInt64CAS =
+        assembly == UnownedStringSlice("(*$4 = atomicCAS($0._getPtrAt<uint64_t>($1), $2, $3))");
+    if ((!isFloatAdd && !isUInt64CAS) || function->getParamCount() != (isFloatAdd ? 4u : 5u))
+    {
+        return false;
+    }
+
+    IRParam* bufferParameter = function->getFirstParam();
+    IRParam* offsetParameter = bufferParameter ? bufferParameter->getNextParam() : nullptr;
+    IRParam* firstValueParameter = offsetParameter ? offsetParameter->getNextParam() : nullptr;
+    IRParam* secondValueParameter =
+        isUInt64CAS && firstValueParameter ? firstValueParameter->getNextParam() : nullptr;
+    IRParam* resultPointerParameter =
+        isUInt64CAS ? (secondValueParameter ? secondValueParameter->getNextParam() : nullptr)
+                    : (firstValueParameter ? firstValueParameter->getNextParam() : nullptr);
+    NVVMRawBufferType bufferType;
+    IRType* valueType = firstValueParameter ? firstValueParameter->getDataType() : nullptr;
+    IRType* resultValueType = nullptr;
+    auto resultPointerType = resultPointerParameter ? asNVVMSupportedLocalNumericPointerType(
+                                                          resultPointerParameter->getDataType(),
+                                                          &resultValueType)
+                                                    : nullptr;
+    if (!bufferParameter || !offsetParameter || !firstValueParameter || !resultPointerParameter ||
+        resultPointerParameter->getNextParam() ||
+        !getNVVMSupportedRawBufferType(bufferParameter->getDataType(), bufferType) ||
+        bufferType.kind != NVVMRawBufferKind::ByteAddress ||
+        bufferType.access != NVVMBufferAccess::ReadWrite ||
+        !isNVVMUnsignedI32Type(offsetParameter->getDataType()) ||
+        (isFloatAdd && !isNVVMFloat32Type(valueType)) ||
+        (isUInt64CAS && (!secondValueParameter ||
+                         (!isNVVMSupportedIntegerScalarType(valueType) ||
+                          !isTypeEqual(secondValueParameter->getDataType(), valueType)))) ||
+        !resultPointerType || resultPointerType->getOp() != kIROp_OutParamType ||
+        !isTypeEqual(resultValueType, valueType))
+    {
+        return false;
+    }
+
+    uint32_t integerBitWidth = 0;
+    bool integerIsSigned = false;
+    if (isUInt64CAS &&
+        (!isNVVMSupportedIntegerScalarType(valueType, &integerBitWidth, &integerIsSigned) ||
+         integerBitWidth != 64 || integerIsSigned))
+    {
+        return false;
+    }
+
+    SlangNVVMValueTypeDesc semanticType = {};
+    if (!_getNVVMSemanticType(valueType, semanticType))
+        return false;
+    outAtomic.desc = {
+        isFloatAdd ? SLANG_NVVM_ATOMIC_OP_ADD : SLANG_NVVM_ATOMIC_OP_COMPARE_EXCHANGE,
+        semanticType,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        SLANG_NVVM_MEMORY_ORDER_RELAXED,
+        SLANG_NVVM_MEMORY_ORDER_RELAXED,
+    };
+    if (!NVVMSemantics::isSupported(outAtomic.desc))
+        return false;
+
+    outAtomic.bufferParameter = bufferParameter;
+    outAtomic.offsetParameter = offsetParameter;
+    outAtomic.valueParameters[0] = firstValueParameter;
+    outAtomic.valueParameters[1] = secondValueParameter;
+    outAtomic.valueCount = isFloatAdd ? 1u : 2u;
+    outAtomic.resultPointerParameter = resultPointerParameter;
+    outAtomic.valueIRType = valueType;
+    outAtomic.diagnosticName =
+        isFloatAdd ? "raw-buffer Float32 atomic add" : "raw-buffer UInt64 compare-exchange";
+    return true;
+}
+
 // Resolves one final CUDA atomic-reduction helper from its complete assembly/signature contract.
 // The helper reference is semantic; `Atomic<T>` and `T` references both point at physical `T`.
 bool _resolveNVVMAtomicReduction(
@@ -7647,6 +7775,7 @@ SlangResult _validateNVVMFunction(
                     NVVMGenericAsmCompoundOperation compoundOperation;
                     NVVMMaskedWaveScalarOperation maskedWaveOperation;
                     NVVMAggregateWaveOperation aggregateWaveOperation;
+                    NVVMResolvedByteAddressAtomic byteAddressAtomic;
                     NVVMResolvedAtomicReduction atomicReduction;
                     NVVMResolvedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
@@ -7656,6 +7785,14 @@ SlangResult _validateNVVMFunction(
                             requirements.valueOperations,
                             truthiness.getOperationDesc(),
                             truthiness.diagnosticName);
+                        break;
+                    }
+                    if (_resolveNVVMByteAddressAtomic(genericAsm, function, byteAddressAtomic))
+                    {
+                        _requireAtomicOperation(
+                            requirements.atomicOperations,
+                            byteAddressAtomic.desc,
+                            byteAddressAtomic.diagnosticName);
                         break;
                     }
                     if (_resolveNVVMAtomicReduction(genericAsm, function, atomicReduction))
@@ -9853,6 +9990,91 @@ SlangResult _emitNVVMAtomicReduction(
     return _requireBuilderOperation(
         codeGenContext,
         "atomic reduction void return",
+        builder.emitReturnVoid(module));
+}
+
+SlangResult _emitNVVMByteAddressAtomic(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    const NVVMResolvedByteAddressAtomic& operation,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext)
+{
+    SlangNVVMValueHandle buffer = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.bufferParameter,
+        valueMap,
+        typeContext,
+        buffer));
+    SlangNVVMValueHandle dataPointer = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "raw-buffer atomic data pointer",
+        builder.emitAggregateElementExtract(module, buffer, 0, dataPointer)));
+
+    SlangNVVMValueHandle byteOffset = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.offsetParameter,
+        valueMap,
+        typeContext,
+        byteOffset));
+    SlangNVVMTypeHandle valueType = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        typeContext.lowerType(operation.valueIRType, NVVMTypeUse::Value, valueType));
+    SlangNVVMValueHandle typedPointer = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "raw-buffer atomic byte offset",
+        builder.emitByteOffsetPointer(module, dataPointer, byteOffset, valueType, typedPointer)));
+
+    SlangNVVMValueHandle atomicOperands[3] = {typedPointer, nullptr, nullptr};
+    for (uint32_t i = 0; i < operation.valueCount; ++i)
+    {
+        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+            codeGenContext,
+            builder,
+            module,
+            operation.valueParameters[i],
+            valueMap,
+            typeContext,
+            atomicOperands[i + 1]));
+    }
+    SlangNVVMValueHandle originalValue = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        operation.diagnosticName,
+        builder.emitAtomicOperation(
+            module,
+            operation.desc,
+            atomicOperands,
+            operation.valueCount + 1,
+            originalValue)));
+
+    SlangNVVMValueHandle resultPointer = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.resultPointerParameter,
+        valueMap,
+        typeContext,
+        resultPointer));
+    const uint32_t alignment = getNVVMNumericValueAlignment(operation.valueIRType);
+    SLANG_RELEASE_ASSERT(alignment);
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "raw-buffer atomic result store",
+        builder.emitStore(module, originalValue, resultPointer, alignment)));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "raw-buffer atomic void return",
         builder.emitReturnVoid(module));
 }
 
@@ -13478,6 +13700,18 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_GenericAsm:
                     {
                         auto genericAsm = as<IRGenericAsm>(inst);
+                        NVVMResolvedByteAddressAtomic byteAddressAtomic;
+                        if (_resolveNVVMByteAddressAtomic(genericAsm, function, byteAddressAtomic))
+                        {
+                            SLANG_RETURN_ON_FAIL(_emitNVVMByteAddressAtomic(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                byteAddressAtomic,
+                                valueMap,
+                                typeContext));
+                            break;
+                        }
                         NVVMResolvedAtomicReduction atomicReduction;
                         if (_resolveNVVMAtomicReduction(genericAsm, function, atomicReduction))
                         {

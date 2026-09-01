@@ -1122,7 +1122,8 @@ inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
         desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
         desc.operation == SLANG_NVVM_ATOMIC_OP_ADD &&
         desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-        (desc.valueType.bitWidth == 32 || desc.valueType.bitWidth == 64) &&
+        (desc.valueType.bitWidth == 16 || desc.valueType.bitWidth == 32 ||
+         desc.valueType.bitWidth == 64) &&
         desc.valueType.laneCount == 1;
     const bool isCommonMemoryOperation = isAtomicAddressSpace && (isSelectedInteger || isF32) &&
                                          (desc.operation == SLANG_NVVM_ATOMIC_OP_LOAD ||

@@ -6,6 +6,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -output-using-type -shaderobj
 
 // The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI is going to be used
