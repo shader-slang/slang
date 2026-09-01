@@ -1712,6 +1712,14 @@ SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLay
 
     if (auto genericParamTypeLayout = as<GenericParamTypeLayout>(typeLayout))
     {
+        // `-1` here does not necessarily mean "not a generic-param layout": on the
+        // program-less `ISession::getTypeLayout` path there is no global ordering of
+        // generic parameters to index into, so `_createTypeLayoutForGlobalGenericTypeParam`
+        // (slang-type-layout.cpp) also records `-1` for a genuine `GenericParamTypeLayout`.
+        // Callers that need to distinguish "not a generic-param layout" from
+        // "generic-param layout with no global index available" must check
+        // `getKind() == SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER` first, rather than
+        // relying on this return value alone.
         return (int)genericParamTypeLayout->paramIndex;
     }
     else

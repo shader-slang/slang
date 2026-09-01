@@ -1204,16 +1204,87 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionGlobalTypeParamSessionGetTypeLayout)
         slang::LayoutRules::Default,
         layoutDiagnostics.writeRef());
 
-    // Must not crash and must return a layout with the single `TParam` field. The
-    // field's global-generic param index is unavailable on the program-less path
-    // (paramIndex = -1), but reflecting that index is not part of this test's
-    // contract; the point is that laying out the `type_param`-typed field does not
-    // dereference a null program layout.
+    // Must not crash and must return a layout with the single `TParam` field.
     SLANG_CHECK(wrapLayout != nullptr);
     if (wrapLayout)
     {
         SLANG_CHECK(wrapLayout->getFieldCount() == 1);
+        if (wrapLayout->getFieldCount() == 1)
+        {
+            // Pin the documented program-less contract for the field's type layout
+            // (see the comment on `_createTypeLayoutForGlobalGenericTypeParam` in
+            // slang-type-layout.cpp and on `spReflectionTypeLayout_getGenericParamIndex`
+            // in slang-reflection-api.cpp): the field is still reflected as a genuine
+            // GenericTypeParameter kind, but its global-generic index is unavailable
+            // without a program, so `getGenericParamIndex()` returns the same -1 value
+            // used elsewhere for "not a generic-param layout". A caller must check
+            // `getKind()` first to disambiguate; this test exercises exactly that
+            // two-step contract so a regression in either the kind or the index value
+            // is caught.
+            auto fieldTypeLayout = wrapLayout->getFieldByIndex(0)->getTypeLayout();
+            SLANG_CHECK(fieldTypeLayout != nullptr);
+            if (fieldTypeLayout)
+            {
+                SLANG_CHECK(
+                    fieldTypeLayout->getKind() ==
+                    slang::TypeReflection::Kind::GenericTypeParameter);
+                SLANG_CHECK(fieldTypeLayout->getGenericParamIndex() == -1);
+            }
+        }
     }
+}
+
+// Link `baseModule` (which exports `perProgramCacheBase`, containing `Scene` with an
+// `extern AccelerationStructure` member) against the given config module in `session`,
+// and return the resolved field count of `Scene.accelStruct` as seen through
+// `programLayout->getTypeLayout`. Used by
+// `linkTimeTypeReflectionStructMemberPerProgramCache` to link the same base module
+// against two different configs and check that each linked program's cached type
+// layout reflects its own resolved shape rather than aliasing the other program's.
+static int getResolvedAccelStructFieldCount(
+    slang::ISession* session,
+    slang::IComponentType* baseModule,
+    const char* configName,
+    const char* configBody)
+{
+    ComPtr<slang::IBlob> diagnosticBlob;
+    String configSource = "import perProgramCacheBase;\n" + String(configBody);
+    auto configModule = session->loadModuleFromSourceString(
+        configName,
+        (String(configName) + ".slang").getBuffer(),
+        configSource.getBuffer(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(configModule != nullptr);
+
+    slang::IComponentType* components[] = {baseModule, configModule};
+    ComPtr<slang::IComponentType> compositeProgram;
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    auto programLayout = linkedProgram->getLayout();
+    SLANG_CHECK_ABORT(programLayout != nullptr);
+
+    auto sceneType = programLayout->findTypeByName("Scene");
+    SLANG_CHECK_ABORT(sceneType != nullptr);
+
+    auto sceneLayout = programLayout->getTypeLayout(sceneType);
+    SLANG_CHECK_ABORT(sceneLayout != nullptr);
+
+    // Two back-to-back calls on the same program must be memoized to the same pointer.
+    SLANG_CHECK(programLayout->getTypeLayout(sceneType) == sceneLayout);
+
+    SLANG_CHECK_ABORT(sceneLayout->getFieldCount() == 1);
+    auto accelStructTypeLayout = sceneLayout->getFieldByIndex(0)->getTypeLayout();
+    SLANG_CHECK_ABORT(accelStructTypeLayout != nullptr);
+    return (int)accelStructTypeLayout->getFieldCount();
 }
 
 // Test for issue #10749 (per-program cache correctness): the same base module with an
@@ -1271,50 +1342,6 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerProgramCache)
         diagnosticBlob.writeRef());
     SLANG_CHECK_ABORT(baseModule != nullptr);
 
-    // Link the shared base module against the given config module and return the
-    // resolved field count of `Scene.accelStruct` as seen through
-    // `programLayout->getTypeLayout`.
-    auto resolvedAccelStructFieldCount = [&](const char* configName, const char* configBody) -> int
-    {
-        String configSource = "import perProgramCacheBase;\n" + String(configBody);
-        auto configModule = session->loadModuleFromSourceString(
-            configName,
-            (String(configName) + ".slang").getBuffer(),
-            configSource.getBuffer(),
-            diagnosticBlob.writeRef());
-        SLANG_CHECK_ABORT(configModule != nullptr);
-
-        slang::IComponentType* components[] = {baseModule, configModule};
-        ComPtr<slang::IComponentType> compositeProgram;
-        session->createCompositeComponentType(
-            components,
-            2,
-            compositeProgram.writeRef(),
-            diagnosticBlob.writeRef());
-        SLANG_CHECK_ABORT(compositeProgram != nullptr);
-
-        ComPtr<slang::IComponentType> linkedProgram;
-        compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
-        SLANG_CHECK_ABORT(linkedProgram != nullptr);
-
-        auto programLayout = linkedProgram->getLayout();
-        SLANG_CHECK_ABORT(programLayout != nullptr);
-
-        auto sceneType = programLayout->findTypeByName("Scene");
-        SLANG_CHECK_ABORT(sceneType != nullptr);
-
-        auto sceneLayout = programLayout->getTypeLayout(sceneType);
-        SLANG_CHECK_ABORT(sceneLayout != nullptr);
-
-        // Two back-to-back calls on the same program must be memoized to the same pointer.
-        SLANG_CHECK(programLayout->getTypeLayout(sceneType) == sceneLayout);
-
-        SLANG_CHECK_ABORT(sceneLayout->getFieldCount() == 1);
-        auto accelStructTypeLayout = sceneLayout->getFieldByIndex(0)->getTypeLayout();
-        SLANG_CHECK_ABORT(accelStructTypeLayout != nullptr);
-        return (int)accelStructTypeLayout->getFieldCount();
-    };
-
     // Config A resolves AccelerationStructure to a type with one field.
     const char* configA = R"(
         struct HWAccelerationStructureA : IAccelerationStructure {
@@ -1334,8 +1361,10 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerProgramCache)
         export struct AccelerationStructure : IAccelerationStructure = HWAccelerationStructureB;
     )";
 
-    int fieldsA = resolvedAccelStructFieldCount("perProgramCacheConfigA", configA);
-    int fieldsB = resolvedAccelStructFieldCount("perProgramCacheConfigB", configB);
+    int fieldsA =
+        getResolvedAccelStructFieldCount(session, baseModule, "perProgramCacheConfigA", configA);
+    int fieldsB =
+        getResolvedAccelStructFieldCount(session, baseModule, "perProgramCacheConfigB", configB);
 
     // Each program reports its own resolved shape. If the cache were shared across
     // programs keyed only by {type, rules}, the second query would alias the first

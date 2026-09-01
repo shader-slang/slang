@@ -64,7 +64,7 @@ public:
     /// entries by a raw `ProgramLayout*` on the `TargetRequest` would risk a
     /// freed program's address being reused by a later program and aliasing a
     /// stale entry.
-    Dictionary<TargetRequest::TypeLayoutKey, RefPtr<TypeLayout>>& getTypeLayouts()
+    Dictionary<TargetRequest::TypeLayoutKey, RefPtr<TypeLayout>>& getProgramScopedTypeLayouts()
     {
         return m_typeLayouts;
     }
@@ -143,7 +143,7 @@ private:
     RefPtr<ProgramLayout> m_layout;
 
     // Type layouts computed on the fly by the reflection API for this program
-    // on this target. See `getTypeLayouts`.
+    // on this target. See `getProgramScopedTypeLayouts`.
     Dictionary<TargetRequest::TypeLayoutKey, RefPtr<TypeLayout>> m_typeLayouts;
 
     CompilerOptionSet m_optionSet;

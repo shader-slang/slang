@@ -137,9 +137,9 @@ public:
     // every program, so entries here never dangle.
     //
     // When a `ProgramLayout` IS available, the cache instead lives on the
-    // owning `TargetProgram` (see `TargetProgram::getTypeLayouts`), so that a
-    // cache entry has exactly the program's lifetime and cannot be aliased by a
-    // later program reusing a freed `ProgramLayout` address.
+    // owning `TargetProgram` (see `TargetProgram::getProgramScopedTypeLayouts`), so
+    // that a cache entry has exactly the program's lifetime and cannot be aliased by
+    // a later program reusing a freed `ProgramLayout` address.
     struct TypeLayoutKey
     {
         Type* type;
@@ -158,7 +158,10 @@ public:
     };
     Dictionary<TypeLayoutKey, RefPtr<TypeLayout>> typeLayouts;
 
-    Dictionary<TypeLayoutKey, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
+    Dictionary<TypeLayoutKey, RefPtr<TypeLayout>>& getProgramlessTypeLayouts()
+    {
+        return typeLayouts;
+    }
 
     TypeLayout* getTypeLayout(
         Type* type,

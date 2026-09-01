@@ -5090,11 +5090,12 @@ static TypeLayoutResult _createTypeLayoutForGlobalGenericTypeParam(
     //
     // On the program-less reflection path (`ISession::getTypeLayout`) there is no
     // global ordering of generic parameters to index into, so we record -1
-    // ("no global index available"). This shares the integer value of the
-    // reflection sentinel for "not a generic param type", but the two are not
-    // ambiguous in practice: that sentinel is produced for non-generic-param
-    // type layouts, whereas this branch only runs for a GlobalGenericParamDecl
-    // type queried without a program, where no meaningful global index exists.
+    // ("no global index available"). This shares the integer value of the public
+    // reflection API's sentinel for "not a generic param type"
+    // (`spReflectionTypeLayout_getGenericParamIndex` in slang-reflection-api.cpp),
+    // so a caller cannot distinguish the two states from the returned int alone;
+    // it must check `getKind() == GenericTypeParameter` first. See the contract
+    // documented at `spReflectionTypeLayout_getGenericParamIndex`.
     typeLayout->type = type;
     typeLayout->paramIndex = context.programLayout ? findGlobalGenericSpecializationParamIndex(
                                                          context.programLayout->getProgram(),

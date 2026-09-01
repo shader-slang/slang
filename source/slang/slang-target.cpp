@@ -248,6 +248,14 @@ TypeLayout* TargetRequest::getTypeLayout(
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
+    // The per-program cache below is selected via `programLayout->getTargetProgram()`,
+    // so its correctness depends on that `TargetProgram` belonging to `this`
+    // `TargetRequest` -- otherwise a layout computed with this target's rules would be
+    // cached against, and later returned for, a different target's program. Assert the
+    // invariant at the boundary rather than let a mismatched caller silently cache
+    // against the wrong program.
+    SLANG_ASSERT(!programLayout || programLayout->getTargetReq() == this);
+
     // When a `ProgramLayout` is supplied, the layout context can resolve
     // `extern` declarations against their link-time definitions (via
     // `buildExternTypeMap`) and establish the global ordering of generic type
@@ -275,8 +283,9 @@ TypeLayout* TargetRequest::getTypeLayout(
     // The program-less path has no such hazard: `Type*` lives in the
     // linkage-owned `ASTBuilder` arena that outlives every program, so its
     // entries stay on this `TargetRequest`.
-    auto& typeLayoutCache =
-        programLayout ? programLayout->getTargetProgram()->getTypeLayouts() : getTypeLayouts();
+    auto& typeLayoutCache = programLayout
+                                ? programLayout->getTargetProgram()->getProgramScopedTypeLayouts()
+                                : getProgramlessTypeLayouts();
 
     RefPtr<TypeLayout> result;
     auto key = TypeLayoutKey{type, rules};
