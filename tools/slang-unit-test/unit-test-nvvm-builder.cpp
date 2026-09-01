@@ -79,27 +79,91 @@ static SlangResult _emitNVVMScalarBuilderOperation(
     switch (operation)
     {
     case NVVMScalarTestOperation::Multiply:
-        return builder.emitIntegerMultiply(module, left, right, outValue);
+        return _emitNVVMTestIntegerBinary(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_MULTIPLY,
+            left,
+            right,
+            outValue);
     case NVVMScalarTestOperation::BitAnd:
-        return builder.emitIntegerBitAnd(module, left, right, outValue);
+        return _emitNVVMTestIntegerBinary(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_BIT_AND,
+            left,
+            right,
+            outValue);
     case NVVMScalarTestOperation::BitOr:
-        return builder.emitIntegerBitOr(module, left, right, outValue);
+        return _emitNVVMTestIntegerBinary(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_BIT_OR,
+            left,
+            right,
+            outValue);
     case NVVMScalarTestOperation::BitXor:
-        return builder.emitIntegerBitXor(module, left, right, outValue);
+        return _emitNVVMTestIntegerBinary(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_BIT_XOR,
+            left,
+            right,
+            outValue);
     case NVVMScalarTestOperation::BitNot:
-        return builder.emitIntegerBitNot(module, left, outValue);
+        return _emitNVVMTestIntegerUnary(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_BIT_NOT,
+            left,
+            outValue);
     case NVVMScalarTestOperation::Negate:
-        return builder.emitIntegerNegate(module, left, outValue);
+        return _emitNVVMTestIntegerUnary(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_NEGATE,
+            left,
+            outValue);
     case NVVMScalarTestOperation::Equal:
-        return builder.emitIntegerEqual(module, left, right, outValue);
+        return _emitNVVMTestIntegerCompare(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_EQUAL,
+            left,
+            right,
+            outValue);
     case NVVMScalarTestOperation::NotEqual:
-        return builder.emitIntegerNotEqual(module, left, right, outValue);
+        return _emitNVVMTestIntegerCompare(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_NOT_EQUAL,
+            left,
+            right,
+            outValue);
     case NVVMScalarTestOperation::SignedGreaterThan:
-        return builder.emitIntegerSignedGreaterThan(module, left, right, outValue);
+        return _emitNVVMTestIntegerCompare(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_GREATER_THAN,
+            left,
+            right,
+            outValue);
     case NVVMScalarTestOperation::SignedLessEqual:
-        return builder.emitIntegerSignedLessEqual(module, left, right, outValue);
+        return _emitNVVMTestIntegerCompare(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_LESS_EQUAL,
+            left,
+            right,
+            outValue);
     case NVVMScalarTestOperation::SignedGreaterEqual:
-        return builder.emitIntegerSignedGreaterEqual(module, left, right, outValue);
+        return _emitNVVMTestIntegerCompare(
+            builder,
+            module,
+            SLANG_NVVM_VALUE_OP_GREATER_EQUAL,
+            left,
+            right,
+            outValue);
     }
     return SLANG_E_INVALID_ARG;
 }
@@ -1496,48 +1560,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsUnknownOperationsWithoutMutation)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.serializeModule(scope.module, SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY, before)));
 
-    SlangNVVMValueHandle output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-    SLANG_CHECK(
-        builder.emitIntegerUnary(scope.module, SlangNVVMValueOperation(99), nullptr, output) ==
-        SLANG_E_INVALID_ARG);
-    SLANG_CHECK(output == nullptr);
-    output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-    SLANG_CHECK(
-        builder.emitIntegerBinaryOperation(
-            scope.module,
-            SlangNVVMValueOperation(99),
-            nullptr,
-            nullptr,
-            output) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK(output == nullptr);
-    output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-    SLANG_CHECK(
-        builder.emitIntegerCompare(
-            scope.module,
-            SlangNVVMValueOperation(99),
-            nullptr,
-            nullptr,
-            output) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK(output == nullptr);
-    output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-    SLANG_CHECK(
-        builder.emitFloatingBinary(
-            scope.module,
-            SlangNVVMValueOperation(99),
-            nullptr,
-            nullptr,
-            output) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK(output == nullptr);
-    output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-    SLANG_CHECK(
-        builder.emitFloatingCompare(
-            scope.module,
-            SlangNVVMValueOperation(99),
-            nullptr,
-            nullptr,
-            output) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK(output == nullptr);
-
     const SlangNVVMBuilderValueOperationsAPI* valueAPI = builder.getValueOperationsAPI();
     SLANG_CHECK_ABORT(valueAPI != nullptr);
     const SlangNVVMValueTypeDesc signedI32 = {
@@ -1555,7 +1577,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsUnknownOperationsWithoutMutation)
     uint32_t supported = 1;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(valueAPI->isOperationSupported(&operationDesc, &supported)));
     SLANG_CHECK(supported == 0);
-    output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SlangNVVMValueHandle output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     const SlangNVVMValueHandle operandValues[] = {nullptr, nullptr};
     SLANG_CHECK(
         valueAPI->emitOperation(
@@ -2441,9 +2463,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, laterBlock)));
     SlangNVVMValueHandle laterValue = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder
-            .emitFloatingBinary(scope.module, SLANG_NVVM_VALUE_OP_ADD, left, right, laterValue)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestFloatingBinary(
+        builder,
+        scope.module,
+        SLANG_NVVM_VALUE_OP_ADD,
+        left,
+        right,
+        laterValue)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, entryBlock)));
@@ -2458,7 +2484,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
     {
         SlangNVVMValueHandle output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
         SLANG_CHECK(
-            builder.emitFloatingBinary(
+            _emitNVVMTestFloatingBinary(
+                builder,
                 scope.module,
                 SLANG_NVVM_VALUE_OP_ADD,
                 operands[0],
@@ -2468,7 +2495,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
 
         output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
         SLANG_CHECK(
-            builder.emitFloatingCompare(
+            _emitNVVMTestFloatingCompare(
+                builder,
                 scope.module,
                 SLANG_NVVM_VALUE_OP_EQUAL,
                 operands[0],
@@ -2487,35 +2515,67 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidFloat32Operations)
     {
         SlangNVVMValueHandle output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
         SLANG_CHECK(
-            builder.emitFloatingUnary(scope.module, SLANG_NVVM_VALUE_OP_NEGATE, operand, output) ==
-            SLANG_E_INVALID_ARG);
+            _emitNVVMTestFloatingUnary(
+                builder,
+                scope.module,
+                SLANG_NVVM_VALUE_OP_NEGATE,
+                operand,
+                output) == SLANG_E_INVALID_ARG);
         SLANG_CHECK(output == nullptr);
     }
 
     SlangNVVMValueHandle sum = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitFloatingBinary(scope.module, SLANG_NVVM_VALUE_OP_ADD, left, right, sum)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestFloatingBinary(
+        builder,
+        scope.module,
+        SLANG_NVVM_VALUE_OP_ADD,
+        left,
+        right,
+        sum)));
     SlangNVVMValueHandle negated = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitFloatingUnary(scope.module, SLANG_NVVM_VALUE_OP_NEGATE, left, negated)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestFloatingUnary(
+        builder,
+        scope.module,
+        SLANG_NVVM_VALUE_OP_NEGATE,
+        left,
+        negated)));
     SlangNVVMValueHandle equal = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitFloatingCompare(scope.module, SLANG_NVVM_VALUE_OP_EQUAL, left, right, equal)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestFloatingCompare(
+        builder,
+        scope.module,
+        SLANG_NVVM_VALUE_OP_EQUAL,
+        left,
+        right,
+        equal)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
     SlangNVVMValueHandle output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitFloatingBinary(scope.module, SLANG_NVVM_VALUE_OP_ADD, left, right, output) ==
-        SLANG_E_INVALID_ARG);
+        _emitNVVMTestFloatingBinary(
+            builder,
+            scope.module,
+            SLANG_NVVM_VALUE_OP_ADD,
+            left,
+            right,
+            output) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(output == nullptr);
     output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitFloatingCompare(scope.module, SLANG_NVVM_VALUE_OP_EQUAL, left, right, output) ==
-        SLANG_E_INVALID_ARG);
+        _emitNVVMTestFloatingCompare(
+            builder,
+            scope.module,
+            SLANG_NVVM_VALUE_OP_EQUAL,
+            left,
+            right,
+            output) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(output == nullptr);
     output = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitFloatingUnary(scope.module, SLANG_NVVM_VALUE_OP_NEGATE, left, output) ==
-        SLANG_E_INVALID_ARG);
+        _emitNVVMTestFloatingUnary(
+            builder,
+            scope.module,
+            SLANG_NVVM_VALUE_OP_NEGATE,
+            left,
+            output) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(output == nullptr);
 
     ComPtr<ISlangBlob> assemblyBlob;
@@ -4709,7 +4769,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
         foreignBlock)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(foreignModule.module, foreignBlock)));
     SlangNVVMValueHandle foreignCondition = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerSignedLessThan(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerSignedLessThan(
+        builder,
         foreignModule.module,
         foreignX,
         foreignY,
@@ -4737,7 +4798,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
 
     SlangNVVMValueHandle rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitIntegerBinary(
+        _emitNVVMTestIntegerBinary(
+            builder,
             firstModule.module,
             SLANG_NVVM_VALUE_OP_ADD,
             firstX,
@@ -4750,8 +4812,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     // cannot be consumed at the first function's insertion point.
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(firstModule.module, secondBlock)));
     SlangNVVMValueHandle secondCondition = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitIntegerSignedLessThan(firstModule.module, secondX, secondY, secondCondition)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerSignedLessThan(
+        builder,
+        firstModule.module,
+        secondX,
+        secondY,
+        secondCondition)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(firstModule.module)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(firstModule.module, entryBlock)));
@@ -4792,7 +4858,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     // another provider module must be rejected before any first-module instruction is created.
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitIntegerBinary(
+        _emitNVVMTestIntegerBinary(
+            builder,
             firstModule.module,
             SLANG_NVVM_VALUE_OP_ADD,
             firstX,
@@ -4801,8 +4868,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitIntegerSignedLessThan(firstModule.module, firstY, foreignY, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
+        _emitNVVMTestIntegerSignedLessThan(
+            builder,
+            firstModule.module,
+            firstY,
+            foreignY,
+            rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     SLANG_CHECK(
         builder
@@ -4812,16 +4883,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
 
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitIntegerBinary(
-            firstModule.module,
-            SlangNVVMValueOperation(SLANG_NVVM_VALUE_OP_SUBTRACT + 1),
-            firstX,
-            firstY,
-            rejectedValue) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK(rejectedValue == nullptr);
-    rejectedValue = firstFunction;
-    SLANG_CHECK(
-        builder.emitIntegerBinary(
+        _emitNVVMTestIntegerBinary(
+            builder,
             firstModule.module,
             SLANG_NVVM_VALUE_OP_ADD,
             firstX,
@@ -4830,7 +4893,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitIntegerBinary(
+        _emitNVVMTestIntegerBinary(
+            builder,
             firstModule.module,
             SLANG_NVVM_VALUE_OP_ADD,
             firstX,
@@ -4839,8 +4903,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitIntegerSignedLessThan(firstModule.module, firstX, secondY, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
+        _emitNVVMTestIntegerSignedLessThan(
+            builder,
+            firstModule.module,
+            firstX,
+            secondY,
+            rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     SLANG_CHECK(
         builder.emitStore(firstModule.module, secondX, firstDestination, 4) == SLANG_E_INVALID_ARG);
@@ -4863,14 +4931,19 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     // Every rejected call above must leave the entry block untouched, so one valid graph still
     // verifies and contains exactly the instructions deliberately emitted below.
     SlangNVVMValueHandle condition = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitIntegerSignedLessThan(firstModule.module, firstX, firstY, condition)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerSignedLessThan(
+        builder,
+        firstModule.module,
+        firstX,
+        firstY,
+        condition)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitConditionalBranch(firstModule.module, condition, trueBlock, falseBlock)));
 
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitIntegerBinary(
+        _emitNVVMTestIntegerBinary(
+            builder,
             firstModule.module,
             SLANG_NVVM_VALUE_OP_ADD,
             firstX,
@@ -4881,9 +4954,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(firstModule.module, trueBlock)));
     SlangNVVMValueHandle sum = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder
-            .emitIntegerBinary(firstModule.module, SLANG_NVVM_VALUE_OP_ADD, firstX, firstY, sum)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerBinary(
+        builder,
+        firstModule.module,
+        SLANG_NVVM_VALUE_OP_ADD,
+        firstX,
+        firstY,
+        sum)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.emitStore(firstModule.module, sum, firstDestination, 4)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(firstModule.module, mergeBlock)));
@@ -4894,7 +4971,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     // false block.
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitIntegerBinary(
+        _emitNVVMTestIntegerBinary(
+            builder,
             firstModule.module,
             SLANG_NVVM_VALUE_OP_ADD,
             sum,
@@ -4905,7 +4983,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
         builder.emitStore(firstModule.module, sum, firstDestination, 4) == SLANG_E_INVALID_ARG);
 
     SlangNVVMValueHandle difference = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerBinary(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerBinary(
+        builder,
         firstModule.module,
         SLANG_NVVM_VALUE_OP_SUBTRACT,
         firstX,
@@ -4920,7 +4999,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarControlOperations)
     // unavailable here. The final assembly counts below prove these failures added no instructions.
     rejectedValue = firstFunction;
     SLANG_CHECK(
-        builder.emitIntegerBinary(
+        _emitNVVMTestIntegerBinary(
+            builder,
             firstModule.module,
             SLANG_NVVM_VALUE_OP_SUBTRACT,
             sum,
@@ -5069,19 +5149,18 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarSSAOperations)
 
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerPhi(foreignModule.module, mergeBlock, integerType, rejectedValue) ==
+        builder.emitPhi(foreignModule.module, mergeBlock, integerType, rejectedValue) ==
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerPhi(module.module, mergeBlock, voidType, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
+        builder.emitPhi(module.module, mergeBlock, voidType, rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
     SlangNVVMValueHandle condition = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitIntegerSignedLessThan(module.module, x, y, condition)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _emitNVVMTestIntegerSignedLessThan(builder, module.module, x, y, condition)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitConditionalBranch(module.module, condition, trueBlock, falseBlock)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, trueBlock)));
@@ -5094,37 +5173,28 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarSSAOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, mergeBlock)));
     SlangNVVMValueHandle sum = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitIntegerBinary(module.module, SLANG_NVVM_VALUE_OP_ADD, x, y, sum)));
+        _emitNVVMTestIntegerBinary(builder, module.module, SLANG_NVVM_VALUE_OP_ADD, x, y, sum)));
     SlangNVVMValueHandle phi = nullptr;
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitIntegerPhi(module.module, mergeBlock, integerType, phi)));
+        SLANG_SUCCEEDED(builder.emitPhi(module.module, mergeBlock, integerType, phi)));
     // Incoming validation requires the complete CFG; merge has no terminator yet.
-    SLANG_CHECK(
-        builder.addIntegerPhiIncoming(module.module, phi, x, trueBlock) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.addPhiIncoming(module.module, phi, x, trueBlock) == SLANG_E_INVALID_ARG);
     // The explicit target permits late phi insertion and must preserve the current insertion state.
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(module.module, phi, destination, 4)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
 
     // All blocks in the phi function are now terminated. Invalid incoming calls must not mutate it.
     SLANG_CHECK(
-        builder.addIntegerPhiIncoming(module.module, phi, condition, trueBlock) ==
-        SLANG_E_INVALID_ARG);
+        builder.addPhiIncoming(module.module, phi, condition, trueBlock) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(
-        builder.addIntegerPhiIncoming(module.module, phi, secondX, trueBlock) ==
-        SLANG_E_INVALID_ARG);
+        builder.addPhiIncoming(module.module, phi, secondX, trueBlock) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(
-        builder.addIntegerPhiIncoming(module.module, phi, foreignOne, trueBlock) ==
-        SLANG_E_INVALID_ARG);
-    SLANG_CHECK(
-        builder.addIntegerPhiIncoming(module.module, phi, x, orphanBlock) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK(
-        builder.addIntegerPhiIncoming(module.module, phi, sum, trueBlock) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.addIntegerPhiIncoming(module.module, phi, x, trueBlock)));
-    SLANG_CHECK(
-        builder.addIntegerPhiIncoming(module.module, phi, y, trueBlock) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.addIntegerPhiIncoming(module.module, phi, y, falseBlock)));
+        builder.addPhiIncoming(module.module, phi, foreignOne, trueBlock) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.addPhiIncoming(module.module, phi, x, orphanBlock) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.addPhiIncoming(module.module, phi, sum, trueBlock) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.addPhiIncoming(module.module, phi, x, trueBlock)));
+    SLANG_CHECK(builder.addPhiIncoming(module.module, phi, y, trueBlock) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.addPhiIncoming(module.module, phi, y, falseBlock)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(module.module, function)));
 
     ComPtr<ISlangBlob> assemblyBlob;
@@ -5251,14 +5321,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarFunctionOperations)
     const SlangNVVMValueHandle noInsertionArguments[] = {x};
     SlangNVVMValueHandle noInsertionResult = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerCall(
+        builder.emitCall(
             module.module,
             helper,
             noInsertionArguments,
             SLANG_COUNT_OF(noInsertionArguments),
             noInsertionResult) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(noInsertionResult == nullptr);
-    SLANG_CHECK(builder.emitIntegerReturn(module.module, x) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.emitValueReturn(module.module, x) == SLANG_E_INVALID_ARG);
 
     SlangNVVMBlockHandle helperBlock = nullptr;
     SlangNVVMBlockHandle callerEntry = nullptr;
@@ -5278,30 +5348,34 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarFunctionOperations)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.getIntegerConstant(module.module, integerType, 1, one)));
     SlangNVVMValueHandle helperResult = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerBinary(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerBinary(
+        builder,
         module.module,
         SLANG_NVVM_VALUE_OP_ADD,
         helperValue,
         one,
         helperResult)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerReturn(module.module, helperResult)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(module.module, helperResult)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, callerOther)));
     SlangNVVMValueHandle nonDominatingValue = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder
-            .emitIntegerBinary(module.module, SLANG_NVVM_VALUE_OP_ADD, x, y, nonDominatingValue)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitIntegerReturn(module.module, nonDominatingValue)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerBinary(
+        builder,
+        module.module,
+        SLANG_NVVM_VALUE_OP_ADD,
+        x,
+        y,
+        nonDominatingValue)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(module.module, nonDominatingValue)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, voidBlock)));
-    SLANG_CHECK(builder.emitIntegerReturn(module.module, voidFunctionValue) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.emitValueReturn(module.module, voidFunctionValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, callerEntry)));
     SlangNVVMValueHandle condition = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitIntegerSignedLessThan(module.module, x, y, condition)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _emitNVVMTestIntegerSignedLessThan(builder, module.module, x, y, condition)));
 
     const SlangNVVMValueHandle xArgument[] = {x};
     const SlangNVVMValueHandle conditionArgument[] = {condition};
@@ -5314,27 +5388,24 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarFunctionOperations)
         builder.getConstructionAPI()->emitCall(module.module, helper, xArgument, 1, nullptr) ==
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(
-        builder.emitIntegerCall(module.module, x, xArgument, 1, rejectedValue) ==
+        builder.emitCall(module.module, x, xArgument, 1, rejectedValue) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedValue == nullptr);
+    rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitCall(module.module, foreignHelper, xArgument, 1, rejectedValue) ==
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerCall(module.module, foreignHelper, xArgument, 1, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
+        builder.emitCall(module.module, helper, nullptr, 1, rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerCall(module.module, helper, nullptr, 1, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
+        builder.emitCall(module.module, helper, nullptr, 0, rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerCall(module.module, helper, nullptr, 0, rejectedValue) ==
-        SLANG_E_INVALID_ARG);
-    SLANG_CHECK(rejectedValue == nullptr);
-    rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-    SLANG_CHECK(
-        builder.emitIntegerCall(
+        builder.emitCall(
             module.module,
             helper,
             tooManyArguments,
@@ -5343,42 +5414,41 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidScalarFunctionOperations)
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerCall(module.module, helper, conditionArgument, 1, rejectedValue) ==
+        builder.emitCall(module.module, helper, conditionArgument, 1, rejectedValue) ==
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerCall(module.module, helper, helperArgument, 1, rejectedValue) ==
+        builder.emitCall(module.module, helper, helperArgument, 1, rejectedValue) ==
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerCall(module.module, helper, foreignArgument, 1, rejectedValue) ==
+        builder.emitCall(module.module, helper, foreignArgument, 1, rejectedValue) ==
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerCall(module.module, helper, nonDominatingArgument, 1, rejectedValue) ==
+        builder.emitCall(module.module, helper, nonDominatingArgument, 1, rejectedValue) ==
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
 
     // Invalid valued returns must likewise leave caller.entry unterminated for the valid graph.
-    SLANG_CHECK(builder.emitIntegerReturn(module.module, condition) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK(builder.emitIntegerReturn(module.module, helperValue) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK(builder.emitIntegerReturn(module.module, foreignValue) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK(
-        builder.emitIntegerReturn(module.module, nonDominatingValue) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.emitValueReturn(module.module, condition) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.emitValueReturn(module.module, helperValue) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.emitValueReturn(module.module, foreignValue) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.emitValueReturn(module.module, nonDominatingValue) == SLANG_E_INVALID_ARG);
 
     SlangNVVMValueHandle callResult = nullptr;
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitIntegerCall(module.module, helper, xArgument, 1, callResult)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerReturn(module.module, callResult)));
+        SLANG_SUCCEEDED(builder.emitCall(module.module, helper, xArgument, 1, callResult)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(module.module, callResult)));
     rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitIntegerCall(module.module, helper, xArgument, 1, rejectedValue) ==
+        builder.emitCall(module.module, helper, xArgument, 1, rejectedValue) ==
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
-    SLANG_CHECK(builder.emitIntegerReturn(module.module, x) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(builder.emitValueReturn(module.module, x) == SLANG_E_INVALID_ARG);
 
     ComPtr<ISlangBlob> assemblyBlob;
     String diagnostics;
@@ -5559,8 +5629,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerAddressingOperations)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
     SlangNVVMValueHandle condition = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitIntegerSignedLessThan(module.module, index, index, condition)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _emitNVVMTestIntegerSignedLessThan(builder, module.module, index, index, condition)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitConditionalBranch(module.module, condition, producerBlock, consumerBlock)));
 
@@ -5569,7 +5639,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidPointerAddressingOperations)
     SlangNVVMValueHandle producerInteger = nullptr;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.emitPointerOffset(module.module, source, index, producerPointer)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerBinary(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerBinary(
+        builder,
         module.module,
         SLANG_NVVM_VALUE_OP_ADD,
         index,
@@ -6026,14 +6097,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsInvalidSequentialAddressingOperations)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
     SlangNVVMValueHandle condition = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitIntegerSignedLessThan(module.module, index, index, condition)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _emitNVVMTestIntegerSignedLessThan(builder, module.module, index, index, condition)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitConditionalBranch(module.module, condition, producerBlock, consumerBlock)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, producerBlock)));
     SlangNVVMValueHandle nonDominatingIndex = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerBinary(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerBinary(
+        builder,
         module.module,
         SLANG_NVVM_VALUE_OP_ADD,
         index,
@@ -6801,8 +6873,12 @@ static void _runNVVMScalarInvalidOperations(
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
     SlangNVVMValueHandle scaffoldCondition = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitIntegerSignedLessThan(module.module, left, right, scaffoldCondition)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerSignedLessThan(
+        builder,
+        module.module,
+        left,
+        right,
+        scaffoldCondition)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitConditionalBranch(
         module.module,
         scaffoldCondition,
@@ -6811,7 +6887,8 @@ static void _runNVVMScalarInvalidOperations(
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, producerBlock)));
     SlangNVVMValueHandle nonDominating = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerBinary(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerBinary(
+        builder,
         module.module,
         SLANG_NVVM_VALUE_OP_ADD,
         left,
@@ -7229,15 +7306,16 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
     SlangNVVMValueHandle condition = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitIntegerSignedLessThan(module.module, value, value, condition)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _emitNVVMTestIntegerSignedLessThan(builder, module.module, value, value, condition)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.emitConditionalBranch(module.module, condition, producerBlock, consumerBlock)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, producerBlock)));
     SlangNVVMValueHandle nonDominatingValue = nullptr;
     SlangNVVMValueHandle nonDominatingPointer = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitIntegerBinary(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_emitNVVMTestIntegerBinary(
+        builder,
         module.module,
         SLANG_NVVM_VALUE_OP_ADD,
         value,

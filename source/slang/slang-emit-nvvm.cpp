@@ -630,8 +630,7 @@ bool _getNVVMStructuredBufferElementPointer(
     IRInst* buffer = inst->getOperand(0);
     IRInst* elementIndex = inst->getOperand(1);
     NVVMRawBufferType bufferType;
-    auto resultType =
-        asNVVMSupportedRWStructuredBufferElementPointerType(inst->getDataType());
+    auto resultType = asNVVMSupportedRWStructuredBufferElementPointerType(inst->getDataType());
     if (!buffer || !elementIndex || !isNVVMInteger32Type(elementIndex->getDataType()) ||
         !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
         bufferType.kind != NVVMRawBufferKind::Structured || !resultType ||
@@ -2122,9 +2121,7 @@ struct NVVMDefaultResourceValue
 // Resolves the exact resource leaves retained when optional lowering constructs the irrelevant
 // payload of `none`. Raw structured buffers use their established pointer/count view, while the
 // selected texture and sampler descriptor handles are aliases of an i64 resource handle.
-bool _resolveNVVMDefaultResourceValue(
-    IRInst* inst,
-    NVVMDefaultResourceValue& outDefaultValue)
+bool _resolveNVVMDefaultResourceValue(IRInst* inst, NVVMDefaultResourceValue& outDefaultValue)
 {
     outDefaultValue = {};
     if (!as<IRDefaultConstruct>(inst) || inst->getOperandCount() != 0)
@@ -4898,9 +4895,7 @@ struct NVVMUInt64WordConstruction
     NVVMValueRecipeStep combine;
 };
 
-bool _resolveNVVMUInt64WordConstruction(
-    IRInst* inst,
-    NVVMUInt64WordConstruction& outConstruction)
+bool _resolveNVVMUInt64WordConstruction(IRInst* inst, NVVMUInt64WordConstruction& outConstruction)
 {
     outConstruction = {};
     if (!inst || inst->getOp() != kIROp_MakeUInt64 || inst->getOperandCount() != 2 ||
@@ -5713,15 +5708,15 @@ bool _getNVVMDescriptorHandleConversion(IRInst* inst, IRInst*& outValue)
     IRType* resourceType = nullptr;
     if (inst->getOp() == kIROp_CastDescriptorHandleToResource)
     {
-        if (!value ||
-            !asNVVMSupportedDescriptorHandleType(value->getDataType(), &resourceType) ||
+        if (!value || !asNVVMSupportedDescriptorHandleType(value->getDataType(), &resourceType) ||
             inst->getDataType() != resourceType)
         {
             return false;
         }
     }
-    else if (!asNVVMSupportedDescriptorHandleType(inst->getDataType(), &resourceType) || !value ||
-             value->getDataType() != resourceType)
+    else if (
+        !asNVVMSupportedDescriptorHandleType(inst->getDataType(), &resourceType) || !value ||
+        value->getDataType() != resourceType)
     {
         return false;
     }
@@ -7292,8 +7287,7 @@ SlangResult _validatePointerValue(
     NVVMRawBufferElementPointer rawBufferElementPointer;
     NVVMStructuredBufferElementPointer structuredBufferElementPointer;
     const bool hasStructuredBufferElementProducer =
-        value &&
-        _getNVVMStructuredBufferElementPointer(value, structuredBufferElementPointer);
+        value && _getNVVMStructuredBufferElementPointer(value, structuredBufferElementPointer);
     const bool hasResourceElementProducer =
         hasStructuredBufferElementProducer ||
         (value && _getNVVMRawBufferElementPointer(value, rawBufferElementPointer));
@@ -7769,8 +7763,7 @@ SlangResult _emitNVVMFunctionValueReturn(
     return _requireBuilderOperation(
         codeGenContext,
         diagnosticName,
-        _usesGenericNVVMFunctions(function) ? builder.emitValueReturn(module, value)
-                                            : builder.emitIntegerReturn(module, value));
+        builder.emitValueReturn(module, value));
 }
 
 // Checks the exact helper ABI before adding a direct callee to the accepted closure.
@@ -8152,9 +8145,7 @@ SlangResult _validateNVVMFunction(
                             inst->getDataType(),
                             &helperValueType))
                     {
-                        if (!_hasNVVMCompatibleHelperValueLayout(
-                                codeGenContext,
-                                helperValueType))
+                        if (!_hasNVVMCompatibleHelperValueLayout(codeGenContext, helperValueType))
                         {
                             return _diagnoseUnsupportedIR(
                                 codeGenContext,
@@ -8698,9 +8689,8 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            inst->getOp() == kIROp_WaveMaskBallot
-                                ? toSlice("wave-mask ballot")
-                                : toSlice("wave-mask match"));
+                            inst->getOp() == kIROp_WaveMaskBallot ? toSlice("wave-mask ballot")
+                                                                  : toSlice("wave-mask match"));
                     }
                     _requireValueOperation(
                         requirements.valueOperations,
@@ -8987,8 +8977,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_MakeUInt64:
                 {
                     NVVMUInt64WordConstruction construction;
-                    SLANG_RELEASE_ASSERT(
-                        _resolveNVVMUInt64WordConstruction(inst, construction));
+                    SLANG_RELEASE_ASSERT(_resolveNVVMUInt64WordConstruction(inst, construction));
                     SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                         codeGenContext,
                         construction.lowWord,
@@ -10078,8 +10067,7 @@ SlangResult _emitNVVMDefaultResourceValue(
         defaultValue.kind == NVVMDefaultResourceValueKind::RawStructuredBuffer &&
         defaultValue.rawBufferType.structuredElementType);
     const NVVMTypeUse elementUse =
-        isNVVMSupportedStructuredBufferStorageType(
-            defaultValue.rawBufferType.structuredElementType)
+        isNVVMSupportedStructuredBufferStorageType(defaultValue.rawBufferType.structuredElementType)
             ? NVVMTypeUse::StructuredBufferStorage
             : NVVMTypeUse::Value;
     SlangNVVMTypeHandle elementType = nullptr;
@@ -10740,13 +10728,8 @@ SlangResult _emitNVVMUInt64WordConstruction(
     }
 
     SlangNVVMValueHandle shiftAmount = nullptr;
-    SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
-        codeGenContext,
-        builder,
-        module,
-        64,
-        32,
-        shiftAmount));
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 64, 32, shiftAmount));
     const SlangNVVMValueHandle shiftOperands[] = {words64[1], shiftAmount};
     SlangNVVMValueHandle shiftedHighWord = nullptr;
     SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
@@ -13796,8 +13779,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     parameterIndex,
                     parameter)));
             valueMap[param] = parameter;
-            if (function == entryPoint &&
-                asNVVMSupportedResourceStructType(param->getDataType()))
+            if (function == entryPoint && asNVVMSupportedResourceStructType(param->getDataType()))
             {
                 entryAggregatePointerMap[param] = parameter;
             }
@@ -13923,18 +13905,12 @@ SlangResult emitNVVMIRFromLinkedIR(
                 SlangNVVMValueHandle loweredPhi = nullptr;
                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                     codeGenContext,
-                    isNVVMSignedI32Type(param->getDataType()) ? "signed i32 phi"
-                                                              : "generic value phi",
-                    isNVVMSignedI32Type(param->getDataType()) ? builder.emitIntegerPhi(
-                                                                    moduleScope.module,
-                                                                    blockMap.getValue(block),
-                                                                    parameterType,
-                                                                    loweredPhi)
-                                                              : builder.emitPhi(
-                                                                    moduleScope.module,
-                                                                    blockMap.getValue(block),
-                                                                    parameterType,
-                                                                    loweredPhi)));
+                    "value phi",
+                    builder.emitPhi(
+                        moduleScope.module,
+                        blockMap.getValue(block),
+                        parameterType,
+                        loweredPhi)));
                 valueMap[param] = loweredPhi;
             }
         }
@@ -14064,10 +14040,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                     {
                         auto load = cast<IRLoad>(inst);
                         IRType* loadedParameterGroupElementType = nullptr;
-                        const bool isLoadedParameterGroupPointer =
-                            _getNVVMParameterGroupPointer(
-                                load->getPtr(),
-                                loadedParameterGroupElementType);
+                        const bool isLoadedParameterGroupPointer = _getNVVMParameterGroupPointer(
+                            load->getPtr(),
+                            loadedParameterGroupElementType);
                         SLANG_RELEASE_ASSERT(
                             !isLoadedParameterGroupPointer ||
                             hasNVVMParameterGroupStorageValueRepresentation(
@@ -14457,8 +14432,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_DefaultConstruct:
                     {
                         NVVMDefaultResourceValue defaultValue;
-                        SLANG_RELEASE_ASSERT(
-                            _resolveNVVMDefaultResourceValue(inst, defaultValue));
+                        SLANG_RELEASE_ASSERT(_resolveNVVMDefaultResourceValue(inst, defaultValue));
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMDefaultResourceValue(
                             codeGenContext,
@@ -14826,25 +14800,16 @@ SlangResult emitNVVMIRFromLinkedIR(
                         }
 
                         SlangNVVMValueHandle physicalValue = nullptr;
-                        const bool usesGenericFunctions = _usesGenericNVVMFunctions(callee);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            usesGenericFunctions ? "generic value call" : "signed i32 call",
-                            usesGenericFunctions
-                                ? builder.emitCall(
-                                      moduleScope.module,
-                                      functionMap.getValue(callee),
-                                      loweredArguments.getCount() ? loweredArguments.getBuffer()
-                                                                  : nullptr,
-                                      size_t(loweredArguments.getCount()),
-                                      physicalValue)
-                                : builder.emitIntegerCall(
-                                      moduleScope.module,
-                                      functionMap.getValue(callee),
-                                      loweredArguments.getCount() ? loweredArguments.getBuffer()
-                                                                  : nullptr,
-                                      size_t(loweredArguments.getCount()),
-                                      physicalValue)));
+                            "value call",
+                            builder.emitCall(
+                                moduleScope.module,
+                                functionMap.getValue(callee),
+                                loweredArguments.getCount() ? loweredArguments.getBuffer()
+                                                            : nullptr,
+                                size_t(loweredArguments.getCount()),
+                                physicalValue)));
                         SlangNVVMValueHandle loweredValue = physicalValue;
                         if (isNVVMFloat16Type(call->getDataType()))
                         {
@@ -16372,20 +16337,12 @@ SlangResult emitNVVMIRFromLinkedIR(
                         loweredArgument));
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
-                        isNVVMSignedI32Type(param->getDataType())
-                            ? "signed i32 phi incoming value"
-                            : "generic value phi incoming value",
-                        isNVVMSignedI32Type(param->getDataType())
-                            ? builder.addIntegerPhiIncoming(
-                                  moduleScope.module,
-                                  valueMap.getValue(param),
-                                  loweredArgument,
-                                  blockMap.getValue(predecessor))
-                            : builder.addPhiIncoming(
-                                  moduleScope.module,
-                                  valueMap.getValue(param),
-                                  loweredArgument,
-                                  blockMap.getValue(predecessor))));
+                        "value phi incoming value",
+                        builder.addPhiIncoming(
+                            moduleScope.module,
+                            valueMap.getValue(param),
+                            loweredArgument,
+                            blockMap.getValue(predecessor))));
                     ++phiParameterIndex;
                 }
             }

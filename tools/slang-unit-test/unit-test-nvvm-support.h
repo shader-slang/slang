@@ -32,6 +32,165 @@ namespace
 
 using namespace Slang::TestCUDA;
 
+// The tests describe scalar scaffolding through the same generic descriptor interface used by
+// production. These helpers keep fixture construction concise without adding a second public
+// builder contract for a fixed set of scalar types.
+static SlangResult _emitNVVMTestValueOperation(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueOperation operation,
+    SlangNVVMValueTypeDesc resultType,
+    SlangNVVMValueTypeDesc operandType,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    uint32_t operandCount,
+    SlangNVVMValueHandle& outValue)
+{
+    const SlangNVVMValueTypeDesc operandTypes[] = {operandType, operandType};
+    const SlangNVVMValueOperationDesc desc = {
+        operation,
+        resultType,
+        operandTypes,
+        operandCount,
+    };
+    const SlangNVVMValueHandle operands[] = {left, right};
+    return builder.emitValueOperation(module, desc, operands, operandCount, outValue);
+}
+
+static SlangResult _emitNVVMTestIntegerUnary(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueOperation operation,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle& outValue)
+{
+    return _emitNVVMTestValueOperation(
+        builder,
+        module,
+        operation,
+        NVVMSemantics::kSignedI32,
+        NVVMSemantics::kSignedI32,
+        value,
+        nullptr,
+        1,
+        outValue);
+}
+
+static SlangResult _emitNVVMTestIntegerBinary(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueOperation operation,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle& outValue)
+{
+    return _emitNVVMTestValueOperation(
+        builder,
+        module,
+        operation,
+        NVVMSemantics::kSignedI32,
+        NVVMSemantics::kSignedI32,
+        left,
+        right,
+        2,
+        outValue);
+}
+
+static SlangResult _emitNVVMTestIntegerCompare(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueOperation operation,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle& outValue)
+{
+    return _emitNVVMTestValueOperation(
+        builder,
+        module,
+        operation,
+        NVVMSemantics::kBool,
+        NVVMSemantics::kSignedI32,
+        left,
+        right,
+        2,
+        outValue);
+}
+
+static SlangResult _emitNVVMTestIntegerSignedLessThan(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle& outValue)
+{
+    return _emitNVVMTestIntegerCompare(
+        builder,
+        module,
+        SLANG_NVVM_VALUE_OP_LESS_THAN,
+        left,
+        right,
+        outValue);
+}
+
+static SlangResult _emitNVVMTestFloatingUnary(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueOperation operation,
+    SlangNVVMValueHandle value,
+    SlangNVVMValueHandle& outValue)
+{
+    return _emitNVVMTestValueOperation(
+        builder,
+        module,
+        operation,
+        NVVMSemantics::kFloat32,
+        NVVMSemantics::kFloat32,
+        value,
+        nullptr,
+        1,
+        outValue);
+}
+
+static SlangResult _emitNVVMTestFloatingBinary(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueOperation operation,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle& outValue)
+{
+    return _emitNVVMTestValueOperation(
+        builder,
+        module,
+        operation,
+        NVVMSemantics::kFloat32,
+        NVVMSemantics::kFloat32,
+        left,
+        right,
+        2,
+        outValue);
+}
+
+static SlangResult _emitNVVMTestFloatingCompare(
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueOperation operation,
+    SlangNVVMValueHandle left,
+    SlangNVVMValueHandle right,
+    SlangNVVMValueHandle& outValue)
+{
+    return _emitNVVMTestValueOperation(
+        builder,
+        module,
+        operation,
+        NVVMSemantics::kBool,
+        NVVMSemantics::kFloat32,
+        left,
+        right,
+        2,
+        outValue);
+}
+
 // These declarations mirror the small public libNVVM C ABI used by the production implementation.
 // Keeping the fake independent of CUDA headers verifies that libNVVM remains an optional build
 // dependency.
@@ -3236,9 +3395,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetFunctionType(
         resultVectorElementCount,
         resultVectorElementTypeKind);
     FakeNVVMBuilderScalarTypeKind resultResourceElementTypeKind;
-    const bool isResourceResult = _getFakeNVVMBuilderResourceViewElementTypeKind(
-        resultType,
-        resultResourceElementTypeKind);
+    const bool isResourceResult =
+        _getFakeNVVMBuilderResourceViewElementTypeKind(resultType, resultResourceElementTypeKind);
     const bool hasSupportedResult = resultType == _getFakeNVVMBuilderVoidType() ||
                                     resultType == _getFakeNVVMBuilderIntegerType() ||
                                     resultType == _getFakeNVVMBuilderBooleanType() ||
@@ -7576,14 +7734,22 @@ static SlangResult _populateFloat32ArithmeticKernel(
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
     if (operandCount == 1)
     {
-        SLANG_RETURN_ON_FAIL(
-            builder.emitFloatingUnary(module, SlangNVVMValueOperation(operation), left, sum));
+        SLANG_RETURN_ON_FAIL(_emitNVVMTestFloatingUnary(
+            builder,
+            module,
+            SlangNVVMValueOperation(operation),
+            left,
+            sum));
     }
     else
     {
-        SLANG_RETURN_ON_FAIL(
-            builder
-                .emitFloatingBinary(module, SlangNVVMValueOperation(operation), left, right, sum));
+        SLANG_RETURN_ON_FAIL(_emitNVVMTestFloatingBinary(
+            builder,
+            module,
+            SlangNVVMValueOperation(operation),
+            left,
+            right,
+            sum));
     }
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, sum, destination, 4));
     SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
@@ -7745,7 +7911,8 @@ static SlangResult _populateFloat32PhiKernel(
     SlangNVVMValueHandle zero = nullptr;
     SlangNVVMValueHandle condition = nullptr;
     SLANG_RETURN_ON_FAIL(builder.getIntegerConstant(module, integerType, 0, zero));
-    SLANG_RETURN_ON_FAIL(builder.emitIntegerCompare(
+    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntegerCompare(
+        builder,
         module,
         SLANG_NVVM_VALUE_OP_NOT_EQUAL,
         conditionValue,
@@ -7841,8 +8008,13 @@ static SlangResult _populateFloat32FunctionKernel(
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, helperBlock));
     SlangNVVMValueHandle sum = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.emitFloatingBinary(module, SLANG_NVVM_VALUE_OP_ADD, helperLeft, helperRight, sum));
+    SLANG_RETURN_ON_FAIL(_emitNVVMTestFloatingBinary(
+        builder,
+        module,
+        SLANG_NVVM_VALUE_OP_ADD,
+        helperLeft,
+        helperRight,
+        sum));
     SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, sum));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, kernelBlock));
@@ -8654,13 +8826,12 @@ static SlangResult _populateWavePredicateIntrinsicKernel(
     }
     const SlangNVVMValueHandle callArguments[] = {mask, value};
     intrinsicResult = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.emitCall(
-            module,
-            helper,
-            callArguments,
-            SLANG_COUNT_OF(callArguments),
-            intrinsicResult));
+    SLANG_RETURN_ON_FAIL(builder.emitCall(
+        module,
+        helper,
+        callArguments,
+        SLANG_COUNT_OF(callArguments),
+        intrinsicResult));
     SlangNVVMValueHandle storedValue = intrinsicResult;
     if (!returnsMask)
     {
@@ -13121,20 +13292,23 @@ static SlangResult _emitNVVMScalarTestOperation(
     switch (testCase.key.family)
     {
     case FakeNVVMBuilderScalarFamily::Unary:
-        return builder.emitIntegerUnary(
+        return _emitNVVMTestIntegerUnary(
+            builder,
             module,
             SlangNVVMValueOperation(testCase.key.operation),
             left,
             outValue);
     case FakeNVVMBuilderScalarFamily::Binary:
-        return builder.emitIntegerBinaryOperation(
+        return _emitNVVMTestIntegerBinary(
+            builder,
             module,
             SlangNVVMValueOperation(testCase.key.operation),
             left,
             right,
             outValue);
     case FakeNVVMBuilderScalarFamily::Compare:
-        return builder.emitIntegerCompare(
+        return _emitNVVMTestIntegerCompare(
+            builder,
             module,
             SlangNVVMValueOperation(testCase.key.operation),
             left,
@@ -13281,7 +13455,7 @@ static SlangResult _populateFloat32ComparisonKernel(
 
     SlangNVVMValueHandle result = nullptr;
     SLANG_RETURN_ON_FAIL(
-        builder.emitFloatingCompare(module, testCase.operation, left, right, result));
+        _emitNVVMTestFloatingCompare(builder, module, testCase.operation, left, right, result));
     return _emitNVVMBooleanResultAsI32(builder, module, function, destination, integerType, result);
 }
 
@@ -13450,19 +13624,25 @@ static SlangResult _populateScalarConditionalKernel(
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
     SlangNVVMValueHandle condition = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitIntegerSignedLessThan(module, x, y, condition));
+    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntegerSignedLessThan(builder, module, x, y, condition));
     SLANG_RETURN_ON_FAIL(builder.emitConditionalBranch(module, condition, trueBlock, falseBlock));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, trueBlock));
     SlangNVVMValueHandle sum = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitIntegerBinary(module, SLANG_NVVM_VALUE_OP_ADD, x, y, sum));
+    SLANG_RETURN_ON_FAIL(
+        _emitNVVMTestIntegerBinary(builder, module, SLANG_NVVM_VALUE_OP_ADD, x, y, sum));
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, sum, destination, 4));
     SLANG_RETURN_ON_FAIL(builder.emitBranch(module, mergeBlock));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, falseBlock));
     SlangNVVMValueHandle difference = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.emitIntegerBinary(module, SLANG_NVVM_VALUE_OP_SUBTRACT, x, y, difference));
+    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntegerBinary(
+        builder,
+        module,
+        SLANG_NVVM_VALUE_OP_SUBTRACT,
+        x,
+        y,
+        difference));
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, difference, destination, 4));
     SLANG_RETURN_ON_FAIL(builder.emitBranch(module, mergeBlock));
 
@@ -13560,26 +13740,27 @@ static SlangResult _populateScalarSSALoopKernel(
     SlangNVVMValueHandle sum = nullptr;
     SLANG_RETURN_ON_FAIL(builder.getIntegerConstant(module, integerType, 0, zero));
     SLANG_RETURN_ON_FAIL(builder.getIntegerConstant(module, integerType, 1, one));
-    SLANG_RETURN_ON_FAIL(builder.emitIntegerPhi(module, headerBlock, integerType, i));
-    SLANG_RETURN_ON_FAIL(builder.emitIntegerPhi(module, headerBlock, integerType, sum));
+    SLANG_RETURN_ON_FAIL(builder.emitPhi(module, headerBlock, integerType, i));
+    SLANG_RETURN_ON_FAIL(builder.emitPhi(module, headerBlock, integerType, sum));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, entryBlock));
     SLANG_RETURN_ON_FAIL(builder.emitBranch(module, headerBlock));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, headerBlock));
     SlangNVVMValueHandle condition = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitIntegerSignedLessThan(module, i, limit, condition));
+    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntegerSignedLessThan(builder, module, i, limit, condition));
     SLANG_RETURN_ON_FAIL(builder.emitConditionalBranch(module, condition, bodyBlock, exitBlock));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, bodyBlock));
     SlangNVVMValueHandle nextSum = nullptr;
     SLANG_RETURN_ON_FAIL(
-        builder.emitIntegerBinary(module, SLANG_NVVM_VALUE_OP_ADD, sum, i, nextSum));
+        _emitNVVMTestIntegerBinary(builder, module, SLANG_NVVM_VALUE_OP_ADD, sum, i, nextSum));
     SLANG_RETURN_ON_FAIL(builder.emitBranch(module, continueBlock));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, continueBlock));
     SlangNVVMValueHandle nextI = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitIntegerBinary(module, SLANG_NVVM_VALUE_OP_ADD, i, one, nextI));
+    SLANG_RETURN_ON_FAIL(
+        _emitNVVMTestIntegerBinary(builder, module, SLANG_NVVM_VALUE_OP_ADD, i, one, nextI));
     SLANG_RETURN_ON_FAIL(builder.emitBranch(module, headerBlock));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, exitBlock));
@@ -13588,10 +13769,10 @@ static SlangResult _populateScalarSSALoopKernel(
 
     // Add incoming edges only after the complete CFG exists, so the provider can validate both
     // predecessor membership and value availability at each predecessor terminator.
-    SLANG_RETURN_ON_FAIL(builder.addIntegerPhiIncoming(module, i, zero, entryBlock));
-    SLANG_RETURN_ON_FAIL(builder.addIntegerPhiIncoming(module, i, nextI, continueBlock));
-    SLANG_RETURN_ON_FAIL(builder.addIntegerPhiIncoming(module, sum, zero, entryBlock));
-    SLANG_RETURN_ON_FAIL(builder.addIntegerPhiIncoming(module, sum, nextSum, continueBlock));
+    SLANG_RETURN_ON_FAIL(builder.addPhiIncoming(module, i, zero, entryBlock));
+    SLANG_RETURN_ON_FAIL(builder.addPhiIncoming(module, i, nextI, continueBlock));
+    SLANG_RETURN_ON_FAIL(builder.addPhiIncoming(module, sum, zero, entryBlock));
+    SLANG_RETURN_ON_FAIL(builder.addPhiIncoming(module, sum, nextSum, continueBlock));
     SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, function));
     return SLANG_OK;
 }
@@ -13686,13 +13867,18 @@ static SlangResult _populateScalarFunctionKernel(
     SlangNVVMValueHandle one = nullptr;
     SLANG_RETURN_ON_FAIL(builder.getIntegerConstant(module, integerType, 1, one));
     SlangNVVMValueHandle incremented = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.emitIntegerBinary(module, SLANG_NVVM_VALUE_OP_ADD, helperValue, one, incremented));
-    SLANG_RETURN_ON_FAIL(builder.emitIntegerReturn(module, incremented));
+    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntegerBinary(
+        builder,
+        module,
+        SLANG_NVVM_VALUE_OP_ADD,
+        helperValue,
+        one,
+        incremented));
+    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, incremented));
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, kernelBlock));
     SlangNVVMValueHandle callResult = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitIntegerCall(module, helper, &kernelValue, 1, callResult));
+    SLANG_RETURN_ON_FAIL(builder.emitCall(module, helper, &kernelValue, 1, callResult));
     SLANG_RETURN_ON_FAIL(builder.emitStore(module, callResult, destination, 4));
     SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
     SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, kernel));

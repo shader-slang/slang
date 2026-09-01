@@ -189,60 +189,6 @@ public:
         const UnownedStringSlice& name,
         SlangNVVMValueHandle& outStorage) const;
 
-    /// Emits ADD or SUB for same-typed scalar integer values.
-    SlangResult emitIntegerBinary(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueOperation operation,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits one scalar-integer unary operation through the current semantic table.
-    SlangResult emitIntegerUnary(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueOperation operation,
-        SlangNVVMValueHandle value,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits one scalar-integer binary operation through the current semantic table.
-    SlangResult emitIntegerBinaryOperation(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueOperation operation,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits one scalar-integer comparison through the current semantic table.
-    SlangResult emitIntegerCompare(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueOperation operation,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits one scalar floating-point binary operation through the current semantic table.
-    SlangResult emitFloatingBinary(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueOperation operation,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits one scalar floating-point unary operation through the current semantic table.
-    SlangResult emitFloatingUnary(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueOperation operation,
-        SlangNVVMValueHandle value,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits one scalar floating-point comparison through the current semantic table.
-    SlangResult emitFloatingCompare(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueOperation operation,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
     /// Gets an exact scalar floating-point constant from its width-bounded IEEE-754 bits.
     SlangResult getFloatingPointConstant(
         SlangNVVMModuleHandle module,
@@ -276,13 +222,6 @@ public:
     /// Emits a typed valued return in the current function.
     SlangResult emitValueReturn(SlangNVVMModuleHandle module, SlangNVVMValueHandle value) const;
 
-    /// Emits a signed integer less-than comparison and returns its i1 result.
-    SlangResult emitIntegerSignedLessThan(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
     /// Terminates the current insertion block with an unconditional branch.
     SlangResult emitBranch(SlangNVVMModuleHandle module, SlangNVVMBlockHandle targetBlock) const;
 
@@ -308,31 +247,6 @@ public:
         SlangNVVMTypeHandle integerType,
         int64_t value,
         SlangNVVMValueHandle& outValue) const;
-
-    /// Emits an integer phi at the start of the explicit target block.
-    SlangResult emitIntegerPhi(
-        SlangNVVMModuleHandle module,
-        SlangNVVMBlockHandle targetBlock,
-        SlangNVVMTypeHandle integerType,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Adds a validated integer phi input from one predecessor edge.
-    SlangResult addIntegerPhiIncoming(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle phi,
-        SlangNVVMValueHandle value,
-        SlangNVVMBlockHandle predecessorBlock) const;
-
-    /// Emits a direct call to an integer function and returns its integer result.
-    SlangResult emitIntegerCall(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle callee,
-        const SlangNVVMValueHandle* arguments,
-        size_t argumentCount,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Terminates the current insertion block with an integer return value.
-    SlangResult emitIntegerReturn(SlangNVVMModuleHandle module, SlangNVVMValueHandle value) const;
 
     /// Emits a non-inbounds element offset from a typed pointer.
     SlangResult emitPointerOffset(
@@ -437,81 +351,6 @@ public:
         SlangNVVMTypeHandle resultType,
         SlangNVVMValueHandle pointer,
         SlangNVVMValueHandle& outPointer) const;
-
-    /// Emits multiplication for same-typed scalar integer values.
-    SlangResult emitIntegerMultiply(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits bitwise AND for same-typed scalar integer values.
-    SlangResult emitIntegerBitAnd(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits bitwise OR for same-typed scalar integer values.
-    SlangResult emitIntegerBitOr(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits bitwise XOR for same-typed scalar integer values.
-    SlangResult emitIntegerBitXor(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits bitwise NOT for a scalar integer value.
-    SlangResult emitIntegerBitNot(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle value,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits wrapping arithmetic negation for a scalar integer value.
-    SlangResult emitIntegerNegate(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle value,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits scalar integer equality and returns an i1 value.
-    SlangResult emitIntegerEqual(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits scalar integer inequality and returns an i1 value.
-    SlangResult emitIntegerNotEqual(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits scalar signed-integer greater-than and returns an i1 value.
-    SlangResult emitIntegerSignedGreaterThan(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits scalar signed-integer less-than-or-equal and returns an i1 value.
-    SlangResult emitIntegerSignedLessEqual(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
-
-    /// Emits scalar signed-integer greater-than-or-equal and returns an i1 value.
-    SlangResult emitIntegerSignedGreaterEqual(
-        SlangNVVMModuleHandle module,
-        SlangNVVMValueHandle left,
-        SlangNVVMValueHandle right,
-        SlangNVVMValueHandle& outValue) const;
 
     /// Terminates the current void-returning insertion block.
     SlangResult emitReturnVoid(SlangNVVMModuleHandle module) const;

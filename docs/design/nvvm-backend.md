@@ -7419,6 +7419,18 @@ SM70/SM80/SM90 PTX. The one-repetition reference emitted SM75 PTX in 710.0 ms an
 direct SM70 measured 428.0 ms and 6,519 bytes at O0, and 409.9 ms and 1,091 bytes at O3. These
 timings remain exploratory.
 
+### Slice 180: One current builder surface
+
+The host-side `NVVMIRBuilder` no longer exposes integer- and Float32-specific arithmetic,
+comparison, phi, call, or return conveniences alongside the current generic interfaces. Production
+emission now uses `emitValueOperation`, `emitPhi`, `addPhiIncoming`, `emitCall`, and
+`emitValueReturn` directly. Tests construct their scalar scaffolding with small local descriptor
+helpers so there remains one provider contract and one semantic catalog.
+
+This removed 471 lines from the builder facade and 43 more from the emitter without changing
+provider ABI revision 34. Frozen corpus v1 remains exactly 452/427 at 417/417/417 O0/O3/both;
+discovery remains 82/72 at 72/72/72.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
