@@ -6591,19 +6591,21 @@ bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOpe
     return true;
 }
 
-struct NVVMResolvedIntegerTruthiness
+struct NVVMResolvedNumericTruthiness
 {
     IRInst* value = nullptr;
     SlangNVVMValueTypeDesc valueType = {};
     NVVMValueRecipeStep comparison;
 };
 
-// Resolves the canonical checked integer-to-Boolean cast as truthiness rather than an integer
-// width conversion. This bounded recipe accepts one selected integer scalar and scalar Bool.
-bool _resolveNVVMIntegerTruthiness(IRInst* inst, NVVMResolvedIntegerTruthiness& outOperation)
+// Resolves a canonical checked numeric-to-Boolean cast as truthiness rather than a width
+// conversion. Integer lowering uses `IntCast`, while floating lowering uses `CastFloatToInt`;
+// their complete scalar source and Bool result types prove the shared nonzero comparison semantic.
+bool _resolveNVVMNumericTruthiness(IRInst* inst, NVVMResolvedNumericTruthiness& outOperation)
 {
     outOperation = {};
-    if (!inst || inst->getOp() != kIROp_IntCast || inst->getOperandCount() != 1)
+    if (!inst || (inst->getOp() != kIROp_IntCast && inst->getOp() != kIROp_CastFloatToInt) ||
+        inst->getOperandCount() != 1)
         return false;
 
     IRInst* value = inst->getOperand(0);
@@ -6611,8 +6613,10 @@ bool _resolveNVVMIntegerTruthiness(IRInst* inst, NVVMResolvedIntegerTruthiness& 
     if (!value || !_getNVVMSemanticType(inst->getDataType(), resultType) ||
         !_getNVVMSemanticType(value->getDataType(), outOperation.valueType) ||
         !NVVMSemantics::isSelectedBoolValue(resultType) || resultType.laneCount != 1 ||
-        !NVVMSemantics::isSelectedIntegerValue(outOperation.valueType) ||
-        resultType.laneCount != outOperation.valueType.laneCount)
+        outOperation.valueType.laneCount != 1 ||
+        (inst->getOp() == kIROp_IntCast
+             ? !NVVMSemantics::isSelectedIntegerValue(outOperation.valueType)
+             : !NVVMSemantics::isSelectedFloatValue(outOperation.valueType)))
     {
         return false;
     }
@@ -6627,7 +6631,8 @@ bool _resolveNVVMIntegerTruthiness(IRInst* inst, NVVMResolvedIntegerTruthiness& 
             resultType,
             operands,
             SLANG_COUNT_OF(operands),
-            "integer truthiness comparison"))
+            inst->getOp() == kIROp_IntCast ? "integer truthiness comparison"
+                                           : "floating-point truthiness comparison"))
     {
         return false;
     }
@@ -6828,9 +6833,9 @@ bool _resolveNVVMBitfieldOperation(IRInst* inst, NVVMResolvedBitfieldOperation& 
     return true;
 }
 
-void _requireNVVMIntegerTruthinessOperations(
+void _requireNVVMNumericTruthinessOperations(
     NVVMValueOperationRequirements& requirements,
-    const NVVMResolvedIntegerTruthiness& operation)
+    const NVVMResolvedNumericTruthiness& operation)
 {
     _requireValueOperation(
         requirements,
@@ -8239,10 +8244,10 @@ SlangResult _validateNVVMFunction(
             case kIROp_FloatCast:
             case kIROp_Select:
                 {
-                    NVVMResolvedIntegerTruthiness truthiness;
-                    if (_resolveNVVMIntegerTruthiness(inst, truthiness))
+                    NVVMResolvedNumericTruthiness truthiness;
+                    if (_resolveNVVMNumericTruthiness(inst, truthiness))
                     {
-                        _requireNVVMIntegerTruthinessOperations(
+                        _requireNVVMNumericTruthinessOperations(
                             requirements.valueOperations,
                             truthiness);
                         break;
@@ -8951,8 +8956,8 @@ SlangResult _validateNVVMFunction(
                     }
                     else
                     {
-                        NVVMResolvedIntegerTruthiness truthiness;
-                        if (!_resolveNVVMIntegerTruthiness(inst, truthiness))
+                        NVVMResolvedNumericTruthiness truthiness;
+                        if (!_resolveNVVMNumericTruthiness(inst, truthiness))
                         {
                             NVVMResolvedValueOperation operation;
                             SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
@@ -11114,11 +11119,11 @@ SlangResult _emitNVVMIntegerSplatConstant(
         outValue);
 }
 
-SlangResult _emitNVVMIntegerTruthiness(
+SlangResult _emitNVVMNumericTruthiness(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
-    const NVVMResolvedIntegerTruthiness& operation,
+    const NVVMResolvedNumericTruthiness& operation,
     NVVMValueMap& valueMap,
     NVVMTypeLoweringContext& typeContext,
     SlangNVVMValueHandle& outValue)
@@ -11133,16 +11138,39 @@ SlangResult _emitNVVMIntegerTruthiness(
         typeContext,
         value));
     SlangNVVMValueHandle zero = nullptr;
-    SLANG_RETURN_ON_FAIL(_emitNVVMIntegerSplatConstant(
-        codeGenContext,
-        builder,
-        module,
-        as<IRType>(operation.value->getDataType()),
-        operation.valueType,
-        0,
-        "integer truthiness zero",
-        typeContext,
-        zero));
+    if (NVVMSemantics::isSelectedIntegerValue(operation.valueType))
+    {
+        SLANG_RETURN_ON_FAIL(_emitNVVMIntegerSplatConstant(
+            codeGenContext,
+            builder,
+            module,
+            as<IRType>(operation.value->getDataType()),
+            operation.valueType,
+            0,
+            "integer truthiness zero",
+            typeContext,
+            zero));
+    }
+    else
+    {
+        SLANG_RELEASE_ASSERT(
+            NVVMSemantics::isSelectedFloatValue(operation.valueType) &&
+            operation.valueType.laneCount == 1);
+        SlangNVVMTypeHandle floatingType = nullptr;
+        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+            as<IRType>(operation.value->getDataType()),
+            NVVMTypeUse::Value,
+            floatingType));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "floating-point truthiness zero",
+            builder.getFloatingPointConstant(
+                module,
+                floatingType,
+                operation.valueType.bitWidth,
+                0,
+                zero)));
+    }
     const SlangNVVMValueHandle operands[] = {value, zero};
     SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
         codeGenContext,
@@ -14379,11 +14407,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_WaveMaskBallot:
                 case kIROp_WaveMaskMatch:
                     {
-                        NVVMResolvedIntegerTruthiness truthiness;
-                        if (_resolveNVVMIntegerTruthiness(inst, truthiness))
+                        NVVMResolvedNumericTruthiness truthiness;
+                        if (_resolveNVVMNumericTruthiness(inst, truthiness))
                         {
                             SlangNVVMValueHandle loweredValue = nullptr;
-                            SLANG_RETURN_ON_FAIL(_emitNVVMIntegerTruthiness(
+                            SLANG_RETURN_ON_FAIL(_emitNVVMNumericTruthiness(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,

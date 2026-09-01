@@ -7944,6 +7944,90 @@ SLANG_UNIT_TEST(nvvmSlangIntegerTruthinessAndBitfieldsUseTypedRecipes)
 #endif
 }
 
+SLANG_UNIT_TEST(nvvmSlangFloatingTruthinessUsesTypedComparisons)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMFloatingTruthinessSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        bool sawComparison[3] = {};
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_NOT_EQUAL ||
+                operation.resultType.kind != SLANG_NVVM_VALUE_TYPE_BOOL ||
+                operation.operandCount != 2 ||
+                operation.operandTypes[0].kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
+            {
+                continue;
+            }
+            switch (operation.operandTypes[0].bitWidth)
+            {
+            case 16:
+                sawComparison[0] = true;
+                break;
+            case 32:
+                sawComparison[1] = true;
+                break;
+            case 64:
+                sawComparison[2] = true;
+                break;
+            }
+        }
+        SLANG_CHECK(sawComparison[0]);
+        SLANG_CHECK(sawComparison[1]);
+        SLANG_CHECK(sawComparison[2]);
+
+        bool sawZero[3] = {};
+        for (Index i = 0; i < gFakeNVVMBuilder.floatingPointConstantBitPatterns.getCount(); ++i)
+        {
+            if (gFakeNVVMBuilder.floatingPointConstantBitPatterns[i] != 0)
+                continue;
+            switch (gFakeNVVMBuilder.floatingPointConstantBitWidths[i])
+            {
+            case 16:
+                sawZero[0] = true;
+                break;
+            case 32:
+                sawZero[1] = true;
+                break;
+            case 64:
+                sawZero[2] = true;
+                break;
+            }
+        }
+        SLANG_CHECK(sawZero[0]);
+        SLANG_CHECK(sawZero[1]);
+        SLANG_CHECK(sawZero[2]);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
 SLANG_UNIT_TEST(nvvmSlangScalarMathHelpersRequestTypedOperations)
 {
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
@@ -8396,7 +8480,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedMinMaxSignatureSource, "assembly=$P_min($0, $1)"},
         {kDirectNVVMUnsupportedIntegerBitSignatureSource, "assembly=$P_countbits($0)"},
         {kDirectNVVMUnsupportedVectorIntegerBitSource, "assembly=$P_reversebits($0)"},
-        {kDirectNVVMUnsupportedFloatingTruthinessSource, "castFloatToInt"},
         {kDirectNVVMUnsupportedVectorScalarMathSource, "assembly=$P_tan($0)"},
         {kDirectNVVMUnsupportedScalarIntrinsicRecipeSignatureSource,
          "assembly=$P_asuint($0, $1, $2)"},

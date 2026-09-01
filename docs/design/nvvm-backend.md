@@ -7371,6 +7371,27 @@ The representative Half gate produces accepted native NVRTC, direct O0 SM70, and
 SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 PTX is 33,284 bytes versus
 64,486 bytes native, while direct O0 PTX is 126,480 bytes. Timings remain exploratory.
 
+### Slice 178: Canonical scalar numeric truthiness
+
+Checked scalar numeric-to-Bool casts now share one compiler-owned nonzero recipe. Canonical
+integer `IntCast` and floating `CastFloatToInt` are distinguished by their complete source/result
+types, then compare the selected numeric value with an exact same-typed zero. Floating
+`NOT_EQUAL` uses unordered comparison, so both signed zeros are false while NaN is true.
+
+The recipe reuses typed integer/floating constants and the generic comparison operation. Actual
+floating-to-integer conversions still use `FLOAT_TO_INTEGER`; vectors and substandard floating
+types remain outside this scalar contract. Provider ABI revision 33 is unchanged.
+
+Frozen `language-feature/conversions/conversion-to-bool` becomes correct at O0 and O3 and gains
+two permanent direct lanes. Frozen v1 remains exactly 452/427 and advances from 415/415/415 to
+416/416/416, with one gain and no old-correct loss. Discovery remains exactly 82/72 at 72/72/72
+with no changed row. The selected prefix passes 435/435 and the permanent NVVM category passes
+86/86.
+
+The 65-result truthiness gate produces accepted native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 PTX is 30,174 bytes versus
+38,917 bytes native, while direct O0 PTX is 32,829 bytes. Timings remain exploratory.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

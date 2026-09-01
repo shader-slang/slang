@@ -12067,13 +12067,17 @@ void computeMain(
                      secondLane(vectorExtracted) + (hasValue ? 1 : 0);
 }
 )";
-static const char kDirectNVVMUnsupportedFloatingTruthinessSource[] = R"(
+static const char kDirectNVVMFloatingTruthinessSource[] = R"(
 [CUDAKernel]
 void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
-    uniform float value)
+    uniform float floatValue)
 {
-    *destination = bool(value) ? 1 : 0;
+    half halfValue = half(floatValue);
+    double doubleValue = double(floatValue);
+    destination[0] = bool(halfValue) ? 1 : 0;
+    destination[1] = bool(floatValue) ? 1 : 0;
+    destination[2] = bool(doubleValue) ? 1 : 0;
 }
 )";
 static const char kDirectNVVMIntegerBitAndSource[] = R"(

@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "canonical-scalar-numeric-truthiness",
+      "source": "tests/language-feature/conversions/conversion-to-bool.slang",
+      "census_id": "language-feature/conversions/conversion-to-bool.slang#cuda-1"
+    }
+  ]
+}

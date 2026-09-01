@@ -2538,3 +2538,15 @@ Frozen `hlsl-intrinsic/scalar-half` gains two permanent direct lanes. Frozen v1 
 no old-correct loss. Discovery stays 72/72/72 over 72 with no changed row. The selected prefix
 passes 434/434, the permanent NVVM category passes 84/84, and the measurement gate produces
 accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.
+
+Slice 178 generalizes the scalar truthiness recipe across selected integer and floating sources.
+The canonical Bool-result `IntCast` or `CastFloatToInt` compares against exact typed zero through
+the existing generic `NOT_EQUAL` operation. Unordered floating comparison preserves NaN
+truthiness, and actual floating-to-integer conversion remains a separate semantic. Provider ABI
+revision 33 is unchanged.
+
+Frozen `language-feature/conversions/conversion-to-bool` gains two permanent direct lanes. Frozen
+v1 advances from 415/415/415 to 416/416/416 over its unchanged 427 healthy denominator, with one
+gain and no old-correct loss. Discovery stays 72/72/72 over 72 with no changed row. The selected
+prefix passes 435/435, the permanent NVVM category passes 86/86, and the measurement gate produces
+accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.
