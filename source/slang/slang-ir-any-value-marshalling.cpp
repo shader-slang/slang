@@ -727,8 +727,12 @@ struct AnyValueMarshallingContext
     };
 
     // Count the leaves of `type`, requiring every one to be a 4-byte scalar whose
-    // bit pattern is marshalled verbatim into a `uint` payload slot; return -1 if any
-    // leaf is not such a scalar. A word scalar is packed by
+    // bit pattern is marshalled verbatim into a `uint` payload slot. Returns that leaf
+    // count, or -1 if any leaf is not such a scalar. The count may be 0 for a type with
+    // no word-scalar leaves (e.g. a transitively-empty aggregate) — 0 is not a rejection
+    // here; the caller `canBulkCopyMarshal` rejects a zero-size object via its
+    // `layout.size` gate, so the zero-leaf case is filtered there rather than in this
+    // function. A word scalar is packed by
     // `TypePackingContext::marshalBasicType` as a plain `bit_cast<uint>` store with no
     // normalization, sub-word masking, 64-bit splitting, or target-specific handling,
     // so a whole-object copy of it reproduces the field-wise store exactly.
@@ -762,10 +766,12 @@ struct AnyValueMarshallingContext
                 if (elementLeaves < 0)
                     return -1;
                 auto total = elementLeaves * getIntVal(vecType->getElementCount());
-                // Reject a zero-width vector (e.g. `vector<float,0>`) for the same reason
-                // as an empty struct/array below: it contributes no payload words, but a
-                // value containing it is split by legalization into a non-simple tuple that
-                // the whole-object bit-cast cannot handle.
+                // A zero-width vector contributes no word-scalar leaves. Unlike an empty struct —
+                // which legalization removes, leaving the enclosing object a contiguous run of word
+                // scalars — a `vector<float,0>` legalizes to `simple` unchanged and survives as a
+                // member of the emitted struct, so leaf-counting can no longer certify the object
+                // is the clean word-scalar run the whole-object `bit_cast` relies on. Reject it;
+                // the `IZeroVec` test pins this reject as load-bearing.
                 return total > 0 ? total : -1;
             }
         case kIROp_MatrixType:
@@ -777,10 +783,10 @@ struct AnyValueMarshallingContext
                 if (elementLeaves < 0)
                     return -1;
                 auto total = elementLeaves * getIntVal(arrType->getElementCount());
-                // Reject an empty (zero-leaf) aggregate: it carries no payload words,
-                // but `legalizeEmptyTypes` still splits a value containing it into a
-                // non-simple tuple, and a whole-object bit-cast has no type-legalization
-                // handler for such an operand (it would abort with "non-simple operand").
+                // A zero-leaf array (empty element type or zero length) has no word-scalar leaves,
+                // so — as with the zero-width vector above — leaf-counting cannot certify the
+                // object is the clean word-scalar run the whole-object `bit_cast` relies on. Reject
+                // it.
                 return total > 0 ? total : -1;
             }
         case kIROp_StructType:
@@ -793,9 +799,12 @@ struct AnyValueMarshallingContext
                         return -1;
                     total += fieldLeaves;
                 }
-                // See the array case: reject empty aggregates so a value that
-                // legalization would split never reaches the whole-object bit-cast.
-                return total > 0 ? total : -1;
+                // An interior empty struct field contributes no payload words and does not
+                // disqualify the fast path: legalization drops the empty field, leaving a
+                // byte-compatible object that boxes with a single whole-object bit-cast. A
+                // wholly-empty struct returns 0 (no word-scalar leaves); that zero-leaf object is
+                // rejected by `canBulkCopyMarshal`'s size gate, per this function's contract above.
+                return total;
             }
         default:
             return -1;

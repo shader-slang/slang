@@ -2094,6 +2094,48 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
     return LegalVal();
 }
 
+// Legalize a whole-object `bit_cast`, the shape the AnyValue bulk-copy marshalling fast path emits
+// to box a byte-compatible value. This is the legalization case for *every* `bit_cast`, but
+// `legalizeInst` re-uses (short-circuits) any instruction whose operands are all simple and whose
+// result type is simple before reaching this switch (see the `!anyComplex && ...Flavor::simple`
+// check below), so an ordinary cast such as `bit_cast<uint>(aFloat)` never arrives here and never
+// hits the final `SLANG_UNEXPECTED`. What does arrive has a non-simple result or a non-simple
+// operand; and
+// since a byte-compatible value never legalizes to a non-simple *tuple* (a tuple requires a special
+// resource/existential field, which the fast-path predicate rejects), only two degenerate forms
+// occur — the result type has no representation, or the source value's type is an empty aggregate
+// carrying no payload words. Any other non-simple bit-cast is out of contract and keeps the loud
+// failure the generic `default` path gives.
+static LegalVal legalizeBitCast(IRTypeLegalizationContext* context, IRInst* inst, LegalType type)
+{
+    auto builder = context->builder;
+
+    // Result has no representation: produce no value, as the generic `default` path does for an
+    // empty-typed instruction. The empty-*result* unpack (`bit_cast<EmptyCtx>(anyValue)`) lands
+    // here.
+    if (type.flavor == LegalType::Flavor::none)
+        return LegalVal();
+
+    // Empty source boxed into a fixed-size struct payload: zero-fill it, matching what the
+    // field-wise marshalling path writes. Three conditions must all hold; any that fails leaves the
+    // instruction on the loud `SLANG_UNEXPECTED` below in every build configuration:
+    //  - the result is `simple` (a non-simple result was handled above or is out of contract);
+    //  - the result is an `IRStructType` — the only producer of an empty-source-to-simple bit-cast
+    //    is the AnyValue pack (`bit_cast<AnyValueBox>(emptyCtx)`), and the marshalling pass lowers
+    //    that box to a concrete `uint`-payload struct before legalization runs, so an empty-source
+    //    cast whose result is a scalar/vector/pointer is out of contract and stays loud;
+    //  - the *source type* legalizes away to `none`. Gate on the source type, not the operand
+    //    value: `legalizeUndefined` also lowers an undefined value of a non-empty type to an empty
+    //    `LegalVal`, and such a value must stay loud rather than be silently zeroed.
+    if (type.flavor == LegalType::Flavor::simple && as<IRStructType>(type.getSimple()) &&
+        legalizeType(context, inst->getOperand(0)->getDataType()).flavor == LegalType::Flavor::none)
+    {
+        return LegalVal::simple(builder->emitDefaultConstruct(type.getSimple()));
+    }
+
+    SLANG_UNEXPECTED("non-simple operand(s) in bit-cast");
+}
+
 static LegalVal legalizeInst(
     IRTypeLegalizationContext* context,
     IRInst* inst,
@@ -2195,6 +2237,9 @@ static LegalVal legalizeInst(
         // out structured buffer
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
+    case kIROp_BitCast:
+        result = legalizeBitCast(context, inst, type);
+        break;
     default:
         if (type.flavor == LegalType::Flavor::none)
         {

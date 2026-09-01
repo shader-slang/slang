@@ -295,9 +295,10 @@ IWideScalar makeWideScalar(int id)
     }
 }
 
-// Reject: a transitively-empty aggregate. Without the guard the whole-object bit-cast
-// hits a value `legalizeEmptyTypes` split into a non-simple tuple and aborts, so a
-// regression fails the compile rather than only missing the -NOT.
+// Fast-path with a transitively-empty aggregate. The empty member legalizes to `none` and
+// carries no payload words, so the object stays byte-compatible and boxes with a single
+// whole-object bit-cast (see shader-slang/slang#12609). `HasEmpty2` puts the empty member
+// first, exercising that the surviving `float` leaves are still placed at offsets 0 and 4.
 
 struct Empty
 {
@@ -343,13 +344,11 @@ IEmpty makeEmpty(int id)
     }
 }
 
-// Reject: a nested zero-width vector. A `vector<float,0>` contributes no payload words, so a
-// struct built from word scalars plus one of them still sums to a positive leaf count and would
-// slip the `total > 0` guard on the struct case were the vector case not guarded too. The box is
-// exact (two `float` leaves = 8 bytes), so the zero-width vector is the *only* reason the fast
-// path must not fire — a sharp isolator for the vector-case guard. Like the empty aggregate, the
-// value is split by legalization into a non-simple tuple the whole-object bit-cast cannot handle,
-// so without the guard this is a hard compile abort rather than a missed -NOT.
+// Isolator for the vector-case guard. `HasZeroVec` is two `float`s plus a `vector<float,0>`. The
+// zero-width vector contributes no payload words; because the struct case accepts a zero-leaf
+// member, only the vector case's own reject keeps the enclosing struct off the fast path. The box
+// is exact (two `float` leaves = 8 bytes), so that reject is the *only* thing keeping this value
+// field-wise, and the `-NOT` checks below pin it.
 
 [anyValueSize(8)]
 interface IZeroVec
@@ -626,24 +625,25 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CPP-LABEL: HasI64Alt_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
 // CPP-NOT: slang_bit_cast<HasI64Alt_0>
 
-// IEmpty (empty-aggregate leaf, above): pack/unpack must stay field-wise.
+// IEmpty (empty-aggregate leaf, above): the empty member legalizes away, leaving a
+// byte-compatible object, so pack/unpack fast-path with a single whole-object bit-cast.
 // CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasEmpty_0
-// CUDA-NOT: slang_bit_cast<AnyValue
+// CUDA: slang_bit_cast<AnyValue8>
 // CUDA-LABEL: HasEmpty_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
-// CUDA-NOT: slang_bit_cast<HasEmpty_0>
+// CUDA: slang_bit_cast<HasEmpty_0>
 // CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasEmpty2_0
-// CUDA-NOT: slang_bit_cast<AnyValue
+// CUDA: slang_bit_cast<AnyValue8>
 // CUDA-LABEL: HasEmpty2_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
-// CUDA-NOT: slang_bit_cast<HasEmpty2_0>
+// CUDA: slang_bit_cast<HasEmpty2_0>
 
 // CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasEmpty_0
-// CPP-NOT: slang_bit_cast<AnyValue
+// CPP: slang_bit_cast<AnyValue8>
 // CPP-LABEL: HasEmpty_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
-// CPP-NOT: slang_bit_cast<HasEmpty_0>
+// CPP: slang_bit_cast<HasEmpty_0>
 // CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasEmpty2_0
-// CPP-NOT: slang_bit_cast<AnyValue
+// CPP: slang_bit_cast<AnyValue8>
 // CPP-LABEL: HasEmpty2_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
-// CPP-NOT: slang_bit_cast<HasEmpty2_0>
+// CPP: slang_bit_cast<HasEmpty2_0>
 
 // IInexact (above): InexactBig fits and fast-paths (control); InexactSmall must not.
 // CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(InexactBig_0
@@ -665,8 +665,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CPP-NOT: slang_bit_cast<InexactSmall_0>
 
 // IZeroVec (nested zero-width vector, above): pack/unpack must stay field-wise. Without the
-// `total > 0 ? total : -1` guard on the vector case, `HasZeroVec`/`HasZeroVec2` would slip the
-// struct-case guard and take the whole-object bit-cast, aborting on the non-simple tuple.
+// `total > 0 ? total : -1` guard on the *vector* case, the zero-width vector's zero leaves would
+// sum into the struct total — which now accepts a zero-leaf member — so `HasZeroVec`/`HasZeroVec2`
+// would take the whole-object bit-cast.
 // CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasZeroVec_0
 // CUDA-NOT: slang_bit_cast<AnyValue
 // CUDA-LABEL: HasZeroVec_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
