@@ -389,9 +389,18 @@ public:
 
 /// Optional extension kept separate from IDownstreamCompiler to preserve that interface's ABI
 /// across prebuilt compiler modules (e.g. the prebuilt slang-llvm loaded via
-/// createLLVMDownstreamCompiler_V4). Queried through `castAs`, so a module that predates this
-/// capability simply returns null for the UUID rather than exposing a shifted vtable.
-class IDownstreamCompilerPathProvider : public ICastable
+/// createLLVMDownstreamCompiler_V4). Reached through a compiler's existing `castAs`, so a module
+/// that predates this capability simply returns null for the UUID rather than exposing a shifted
+/// vtable.
+///
+/// Deliberately a standalone interface, NOT `ICastable`-derived: a compiler implements it
+/// alongside IDownstreamCompiler (which is already ICastable), and adding a second ICastable base
+/// would give the concrete class two ISlangUnknown subobjects. That is an ambiguous base whenever
+/// the concrete type is held by its own type in a `ComPtr` (as `createLLVMDownstreamCompiler_V4`
+/// does with `ComPtr<LLVMDownstreamCompiler>`), which fails to compile.
+/// `as<IDownstreamCompilerPathProvider>` only needs `getTypeGuid()` here, reached via the
+/// compiler's IDownstreamCompiler/ICastable, so no ICastable base is required on this interface.
+class IDownstreamCompilerPathProvider
 {
 public:
     SLANG_COM_INTERFACE(
