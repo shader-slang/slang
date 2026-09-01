@@ -14,7 +14,9 @@
 // `slang-global-session.h` returns `RefPtr<ASTBuilder>` by value, so it needs that type
 // complete; include its definition rather than relying on a transitive include.
 #include "slang/slang-ast-builder.h"
+#include "slang/slang-check-impl.h"
 #include "slang/slang-global-session.h"
+#include "slang/slang-module.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -137,4 +139,80 @@ SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
             }
         )");
     SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
+}
+
+// The multi-linkage merge is idempotent: it does not append the supplement's declaration
+// associations a second time to a context that already has them.
+//
+// The hazard is a `SharedSemanticsContext` that first builds its aggregate views *after* some
+// other linkage already loaded the supplement into `Session::coreModules`. Normal construction
+// then already includes the supplement, and a later differentiability trigger in that same
+// context still calls `addLoadedAutodiffModule`. Without the containment check in
+// `_mergeDeclAssociationsFromModule`, that second pass would duplicate every association the
+// supplement contributes.
+//
+// `lazyAutodiffModuleLoading` cannot see this. It asserts on the loaded-module count, which is
+// what stays the same whether or not the merge duplicates: the module is loaded once either way.
+// Observing the invariant requires the context's own association list, so this test drives a
+// `SharedSemanticsContext` directly -- reachable only because this suite links the compiler
+// statically.
+//
+// Associations rather than candidate extensions are what the supplement contributes: the split
+// left every `extension` declaration in the eager `autodiff-base` segment, while the registered
+// `[ForwardDerivativeOf]`/`[BackwardDerivativeOf]` implementations that remain are recorded
+// against the module owning the *derivative*, which is the supplement.
+SLANG_UNIT_TEST(lazyAutodiffModuleMergeDoesNotDuplicateAssociations)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    // A first linkage triggers the load, so the supplement is in `Session::coreModules` before
+    // the linkage under test is created.
+    ComPtr<slang::ISession> triggerSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, triggerSession.writeRef()) == SLANG_OK);
+    _loadModule(
+        triggerSession,
+        "triggerModule",
+        "[ForwardDifferentiable] float f(float value) { return sin(value); }");
+
+    Session* sessionImpl = static_cast<Session*>(globalSession.get());
+    Module* supplement = sessionImpl->getBuiltinModule(slang::BuiltinModuleName::Autodiff);
+    SLANG_CHECK_ABORT(supplement != nullptr);
+    ModuleDecl* supplementDecl = supplement->getModuleDecl();
+
+    // Any primal the supplement registers a derivative for will do; take the first.
+    Decl* primalDecl = nullptr;
+    for (auto& entry : supplementDecl->mapDeclToAssociatedDecls)
+    {
+        primalDecl = entry.key;
+        break;
+    }
+    // If this fires, the supplement contributes no associations and the merge below has nothing
+    // to duplicate -- the test would pass while asserting nothing.
+    SLANG_CHECK_ABORT(primalDecl != nullptr);
+
+    ComPtr<slang::ISession> reusedSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, reusedSession.writeRef()) == SLANG_OK);
+    Linkage* linkage = static_cast<Linkage*>(reusedSession.get());
+
+    DiagnosticSink sink(linkage->getSourceManager(), nullptr);
+    SharedSemanticsContext context(linkage, nullptr, &sink);
+
+    // Building the view now picks the supplement up through `Session::coreModules`.
+    const Index countBeforeMerge = context.getAssociatedDeclsForDecl(primalDecl).getCount();
+    SLANG_CHECK(countBeforeMerge > 0);
+
+    context.addLoadedAutodiffModule(supplementDecl);
+
+    SLANG_CHECK(context.getAssociatedDeclsForDecl(primalDecl).getCount() == countBeforeMerge);
 }
