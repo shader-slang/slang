@@ -12,7 +12,7 @@
 // Pins the `TextureShape3DType` carrier on a module-scope
 // `Texture3D` parameter's `global_param` result type.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture3D<float4> tex;
 uniform RWStructuredBuffer<int> outbuf;

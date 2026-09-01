@@ -15,7 +15,7 @@
 // `neg(MIN)` overflow edge is preserved as a single `neg`
 // instruction. Lowering does not pre-bake the overflow path.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

@@ -13,7 +13,7 @@
 // `vector<uint64_t, 2>` surfaces the largest unsigned scalar in a
 // minimum-multi-element vector.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform vector<uint64_t, 2> v;
 uniform RWStructuredBuffer<uint> buf;

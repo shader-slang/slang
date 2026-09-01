@@ -14,7 +14,7 @@
 // declares Big as return type. Body uses `get_field_addr` + `store`
 // to fill the local then returns it.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Big { int a; int b; int c; int d; }
 

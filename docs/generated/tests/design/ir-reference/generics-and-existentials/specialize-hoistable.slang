@@ -13,7 +13,7 @@
 // are emitted, and the CHECKs assert both spell their callee identically —
 // there is no second, distinct specialization spelling for the same
 // (base, args) pair.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform int b;

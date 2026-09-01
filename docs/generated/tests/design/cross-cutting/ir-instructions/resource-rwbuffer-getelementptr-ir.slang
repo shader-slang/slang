@@ -15,7 +15,7 @@
 // `store`s the value through it. A non-constant `uniform` index keeps
 // the pointer arithmetic in the IR.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int i;
 uniform int v;

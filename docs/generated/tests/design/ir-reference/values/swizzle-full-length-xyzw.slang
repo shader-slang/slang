@@ -12,7 +12,7 @@
 // The upper-equal edge: M = N = 4. The IR carries the four literal
 // indices verbatim on the operand list of the `swizzle` opcode.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float4 v;
 uniform RWStructuredBuffer<float4> buf;

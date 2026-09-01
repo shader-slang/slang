@@ -15,7 +15,7 @@
 // offset attached to the var layout and the size attached to the buffer's own
 // type layout, walking to each from the named `gAccum` field key.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 RWStructuredBuffer<float> gAccum;
 

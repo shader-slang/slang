@@ -16,7 +16,7 @@
 // dead) value-read path. `optionalHasValue` is constant-folded
 // away because the operand is statically known to be `none`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 
