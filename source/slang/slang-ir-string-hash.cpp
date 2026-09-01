@@ -104,7 +104,11 @@ Result checkGetStringHashInsts(IRModule* module, DiagnosticSink* sink)
 
     for (auto inst : insts)
     {
-        if (inst->getStringLit() == nullptr)
+        // Test the operand directly instead of through `getStringLit()`. That accessor is generated
+        // from the typed operand declaration and casts without checking, so it hands back a
+        // non-null `IRStringLit*` even when the operand is something else entirely -- which is
+        // precisely the case this check exists to reject.
+        if (as<IRStringLit>(inst->getOperand(0)) == nullptr)
         {
             if (sink)
             {

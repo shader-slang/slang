@@ -125,7 +125,12 @@ token text) from *decoding* its value, and the split is nearly clean:
 scanning does the minimum work needed to find where the literal ends
 plus a few purely syntactic checks (`invalidDigitForBase`,
 `octalLiteral`, `quoteCannotBeDelimiter`), while everything about the
-literal's *meaning* is deferred.
+literal's *meaning* is deferred. Of those three checks only
+`octalLiteral` is a warning: scanning continues into
+`_lexNumber(lexer, 8)`, so `017` still yields a usable base-8 literal
+token ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
+line 2097). `invalidDigitForBase` (line 551) and
+`quoteCannotBeDelimiter` (line 1797) are errors.
 
 Scanning happens in the lex driver. `_lexStringLiteralBody(lexer, char quote)`
 ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
@@ -169,6 +174,19 @@ in [slang-lexer.h](../../../../source/compiler-core/slang-lexer.h):
   unconsumed input, which is how a multi-character body is caught
   ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
   lines 1660-1725).
+
+An empty suffix classifies as `Float`, not `Double`, so the suffix
+alone can decide whether a literal is representable:
+
+```slang
+double a = 1e300lf; // Double: stays finite
+float b = 1e300;    // Float: out of range, decodes to INFINITY
+```
+
+`1e300` fits in a `double` but is far above the `float` maximum, so the
+suffix alone changes the decoded value
+([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
+lines 1273-1284, and line 1331 for the `float` parse).
 
 The string/char helpers take a `DiagnosticSink*` because all
 literal-value errors are reported at decode time: out-of-range code
@@ -254,6 +272,18 @@ wrapping it in an `ExpansionInputStream` for the `ExpandedParam` case so
 argument tokens are themselves macro-expanded — there is no per-invocation
 environment of pseudo-macros.
 
+An invocation whose argument count does not match the parameter list is
+diagnosed with `WrongNumberOfArgumentsToMacro` and skipped, so it
+contributes no tokens (lines 1870 and 1892); a variadic macro requires
+only its non-variadic parameters and accepts any number of trailing
+arguments. Expansion is self-suppressing rather than depth-limited:
+every in-flight invocation is on a "busy" list, and
+`_maybeBeginMacroInvocation` leaves the identifier unexpanded when
+`MacroInvocation::isBusy` finds its macro there (lines 1462 and 1728).
+A macro naming itself in its own body reaches the parser as a plain
+identifier, neither re-expanded nor diagnosed; the same list breaks
+mutual recursion across nested expansions.
+
 Inactive `#if` branches still flow through the lexer (so column /
 line accounting stays correct), but their contents are not expanded;
 only directives that may toggle the active / inactive state
@@ -273,6 +303,37 @@ holds the C / HLSL-style set (`#if` and friends, `#include`,
 `#define`, `#undef`, `#warning`, `#error`, `#line`, `#pragma`) plus
 the Slang language-selection directives `#language` / `#lang` and the
 GLSL directives `#version` / `#extension`.
+
+Every directive consumes its own line, so none contributes tokens to
+the output list. Of the four non-C entries, `#language` / `#lang`
+(line 4536) parse an optional `slang` name plus a version and set the
+source language and version that `preprocessSource` returns through
+`outDetectedLanguage` / `outLanguageVersion`
+([slang-preprocessor.h](../../../../source/slang/slang-preprocessor.h));
+`#version` (line 4501) takes an integer and switches the detected
+language to GLSL when it names a valid GLSL version; `#extension`
+(line 4496) is accepted and discarded.
+
+`#pragma` dispatches on a second name through `kPragmaDirectives`
+(line 4445), which holds two entries, `once` and `warning`.
+`#pragma once` records the containing file's unique identity in
+`pragmaOnceUniqueIdentities` (line 4272), and `HandleIncludeDirective`
+returns early for a later `#include` resolving to that identity (line
+3680). An unrecognized sub-directive is *not* an error:
+`findPragmaDirective` falls back to `handleUnknownPragmaDirective`
+(line 4242), which warns with `UnknownPragmaDirectiveIgnored` and skips
+the line — unlike an unknown `#`-directive, which
+`HandleInvalidDirective` (line 4614) reports as an error.
+
+`#if` and `#elif` conditions go through a recursive-descent evaluator
+whose value type is a plain signed `int` (`PreprocessorExpressionValue`,
+line 2984): no unsigned or 64-bit mode, and any non-zero result selects
+the branch. An identifier naming no object-like macro evaluates to `0`
+after the `UndefinedIdentifierInPreprocessorExpression` warning (line
+3117). `EvaluateInfixOp` (line 3194) applies the C++ operator directly
+and only `/` and `%` inspect their operands (a zero divisor is
+diagnosed and yields `0`), so overflow of `+`, `-`, `*`, or `<<` is
+neither detected nor diagnosed.
 
 ### `#include` resolution
 
@@ -318,8 +379,14 @@ source locations are chosen differently:
    No new `SourceView` is created for the invocation, so such a
    diagnostic points into the macro body rather than at the call site.
 2. **Argument tokens** — tokens taken from the call-site argument
-   list. They retain the call-site `SourceLoc`, since they are
-   physically lexed from the invocation.
+   list. `_getArgTokens` replays the recorded token range through a
+   `PretokenizedInputStream` without rewriting anything (lines 2351
+   and 2494), so each keeps the `SourceLoc` it was physically lexed
+   with at the invocation. A parameter used more than once replays the
+   *same* location every time: given `#define TWICE(x) ((x) + (x))`, a
+   diagnostic about the argument in `TWICE(undeclared)` points at
+   `undeclared` in the invocation, not at either `(x)` in the body —
+   where the category-1 rule would put it.
 3. **Constructed tokens** — synthesized fresh, with three different
    source-location rules
    ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)):
@@ -379,11 +446,18 @@ long as the view's `PathInfo::Type` is `TokenPaste`, emitting a
   caller that later asks a value-extraction helper for a literal's
   value passes its own sink and will see the decode-time diagnostics.
 - Preprocessor errors (unbalanced `#if`, unknown directive, missing
-  include) likewise emit through the sink, and the preprocessor keeps
-  going: a malformed directive is skipped to the end of its line, a
-  failed `#include` returns from its handler, a bad macro invocation
-  can expand to no tokens, and an unclosed conditional is diagnosed
-  when its file reaches end-of-file. The single `EndOfFile` token in
+  include, cyclic include, a `#else` / `#elif` / `#endif` with no open
+  conditional) likewise emit through the sink, and the preprocessor
+  keeps going: a malformed directive is skipped to the end of its
+  line, a failed `#include` returns from its handler, a bad macro
+  invocation can expand to no tokens, and an unclosed conditional is
+  diagnosed once per still-open conditional at end-of-file, as
+  `EndOfFileInPreprocessorConditional`
+  ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+  line 4773). The stray closer is a separate diagnostic,
+  `DirectiveWithoutIf` (line 3530); `CyclicInclude` fires
+  when a resolved include is already open on the include stack (line
+  3710), and that `#include` is skipped. The single `EndOfFile` token in
   the output is appended by `ReadAllTokens` only after the whole input
   stack has been popped.
 

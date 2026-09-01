@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debug-info-family
-//META: doc_section_digest=50809951cc8677fde31d92b4c0fe9b213a4fc77720df38216d197ee7561bc6d1
+//META: doc_section_digest=8f873a7e67bec608b74c11364d191e8a9af0122bb32b3a8409d1b57ac5e3d4bd
 //META: purpose=DebugInlinedAt records one frame of an inlining chain as line, column, source file and the debug function it was inlined into, with the outer-frame operand absent at the outermost frame.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
@@ -17,7 +17,7 @@
 // shown to be absent for this single-level inline, and the captured source id
 // is required to be the module's source record.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after performForceInlining -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<int> buf;
 

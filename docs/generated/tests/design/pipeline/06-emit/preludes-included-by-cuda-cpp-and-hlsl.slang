@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#preludes
-//META: doc_section_digest=33e1e96dddd1f86973fe4c606e101fe8d52ddd7cb099ae0023bde143a708def5
+//META: doc_section_digest=091b275029fec2ada8de32e2e319edf9cfb25bbf81a9aae52af9bcd1ee801e6d
 //META: purpose=The prelude registered for the emitted source language is written right after the front matter: CUDA emits `slang-cuda-prelude.h`, C++ emits `slang-cpp-prelude.h`, and the HLSL prelude contributes the `SLANG_HLSL_ENABLE_NVAPI`-guarded NVAPI extension include.
 //META: intent=functional
 //META: pipeline_stage=emit

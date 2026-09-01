@@ -62,6 +62,23 @@ in the parser's syntax-decl table (`g_parseSyntaxEntries[]`) so they
 can be redefined or extended through `syntax` / `attribute_syntax`
 declarations.
 
+Those two declarations are written
+`syntax <name> [: <SyntaxClass>] [= <existingKeyword>];` and
+`attribute_syntax [<Name>(<param> : <Type>, ...)] : <SyntaxClass>;`.
+Both name an AST node class, which `parseSyntaxDecl` and
+`parseAttributeSyntaxDecl` resolve through
+`ASTBuilder::findSyntaxClass`, so neither form can introduce syntax
+that builds a node the compiler does not already declare — the
+extension point is a new spelling for an existing node, not a new
+node. That is why both forms appear only in the core module in
+practice; `syntax constexpr : ConstExprModifier;` and
+`attribute_syntax [ExperimentalModule] : ExperimentalModuleAttribute;`
+in [core.meta.slang](../../../../source/slang/core.meta.slang) are
+representative. The `= <existingKeyword>` alias form copies the named
+keyword's parse callback and syntax class so the new spelling is a
+drop-in alias; no `.slang` source in the tree uses it at
+`source_commit`.
+
 ### Statement keywords
 
 Recognized in the statement parser by direct identifier comparison.
@@ -72,7 +89,7 @@ Cited line numbers refer to
 | Keyword | Where parsed |
 | --- | --- |
 | `if` | line 6921 (`LookAheadToken("if")`) in `Parser::ParseStatement` (line 6914). A second lookahead for `let` two tokens ahead (line 6923) routes the `if let` binding form to `parseIfLetStatement` (line 7284) instead of `parseIfStatement` (line 7373); `else` is consumed inside the latter at line 7382 |
-| `for` | line 6932 (statement entry). The compile-time form is reached from `parseCompileTimeStmt` (line 6900), which reads a `$` and then checks for `for` at line 6903 before calling `parseCompileTimeForStmt` (line 6854) |
+| `for` | line 6932 (statement entry). The compile-time form is reached from `parseCompileTimeStmt` (line 6900), which reads a `$` and then checks for `for` at line 6903 before calling `parseCompileTimeForStmt` (line 6854). Its header is not the ordinary `(init; cond; update)` triple but `$for(i in Range(N))`: `parseCompileTimeForStmt` reads the loop variable, then the literal tokens `in` and `Range`, then one or two range expressions — `Range(end)` or `Range(begin, end)` |
 | `while` | line 6934 |
 | `do` | line 6936 |
 | `break` | line 6938 |
@@ -102,6 +119,22 @@ parameter is optional — a bare `catch` catches every error type — and
 `ParseDoCatchStatement` loops while another `catch` follows, using each
 `CatchStmt` as the `tryBody` of the next so a chain of `catch` clauses
 nests rather than forming a flat list.
+
+Each compiler-internal row parses a fixed form, so a reader who meets
+one in core-module source can recognize it:
+
+- `__stage_switch { case <stage>: ... default: ... }` shares
+  `parseTargetSwitchStmtImpl` with `__target_switch`; the labels after
+  `case` are capability names resolved by `findCapabilityName`, and an
+  unrecognized one is diagnosed rather than treated as an identifier.
+- `__intrinsic_asm "<text>";`, optionally followed by a
+  comma-separated argument list before the semicolon
+  (`__intrinsic_asm "(gl_SubgroupID)";`).
+- `__GPU_FOREACH(<device>, <gridDims>, LAMBDA(uint3 <id>) { ... });`
+  — the literal token `LAMBDA` is part of the grammar, not a
+  user-supplied name.
+- `__requireCapability(<capability>, ...);`, a comma-separated list of
+  capability names, each again resolved by `findCapabilityName`.
 
 ### Decl keywords
 
@@ -146,6 +179,29 @@ non-stable.
 | `__file_decl` | Compiler-internal per-file decl group |
 | `__require_capability` | Capability requirement (`parseRequireCapabilityDecl`) |
 
+Three of the `__` rows have a form worth spelling out, because the
+callback name alone does not imply one:
+
+- `__constraint <type> == <type>;` states a type-equality requirement
+  and `__constraint <type> : <type>;` a subtype requirement. Either
+  becomes a `GenericTypeConstraintDecl` member of the enclosing
+  interface, refining `This` or an associated type inherited from a
+  base interface — `interface IDerived : IBase { __constraint DataType == This; }`
+  requires `This.DataType == This` of every conformer. It is only
+  meaningful in an interface body.
+- `__associatedfunc <function-type> <name>;` — a type expression
+  followed by the requirement's name. The core module uses it for the
+  autodiff function requirements, e.g.
+  `static __associatedfunc FwdDiffFuncType<FType> fwd_diff;` in
+  [core.meta.slang](../../../../source/slang/core.meta.slang).
+- `__func_extension` takes a higher-order target expression, a
+  parameter list, an optional `throws` clause, an optional
+  `-> <result type>`, and a body. The target is parsed by syntax-decl
+  lookup rather than a hardcoded operator list, so it is written with
+  one of the differentiation expression keywords, as in
+  `__func_extension<T : __BuiltinFloatingPointType, let N : int> fwd_diff(CoopVec<T, N>::__subscript::get)(DifferentialPair<CoopVec<T, N>> self, int index) -> DifferentialPair<T> { ... }`
+  from [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang).
+
 `struct`, `class`, and `enum` are also decl keywords, but they are
 **not** registered through `g_parseSyntaxEntries[]` /
 `_makeParseDecl`. Instead the parser dispatches on them via direct
@@ -159,6 +215,19 @@ parse routines (`ParseStruct` at line 6362, `ParseClass`
 at line 6433, `parseEnumDecl` at line 6482) construct the
 corresponding AST nodes directly.
 
+At the parse level `class` is by far the narrower of `class` and
+`struct`. `ParseClass` reads a required name, an optional inheritance
+clause, and a body, and nothing else. `ParseStruct` additionally
+accepts an anonymous form (it synthesizes a name when no identifier
+follows), a generic parameter list through `parseOptGenericDecl`, a
+body-less forward declaration `struct S;`, and the alias form
+`struct S = T;` — so a generic aggregate has to be written as a
+`struct`, because no path in `ParseClass` consumes a generic parameter
+list. Beyond that the parser draws no distinction: it builds a
+`ClassDecl` rather than a `StructDecl` and leaves every semantic
+consequence of that choice to later stages
+([../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md)).
+
 The same type-specifier parser also recognizes the variadic-pack type
 forms `expand` and `each` by direct identifier lookahead
 ([slang-parser.cpp lines
@@ -169,7 +238,15 @@ shape utilities (listed under `## Expression keywords`); none of these
 are in `g_parseSyntaxEntries[]` either. Immediately after them the same
 chain accepts `functype` (line 3462), which hands off to
 `parseFuncTypeExpr` (line 3247) to parse a function type; it too is
-matched by lookahead rather than registered as syntax.
+matched by lookahead rather than registered as syntax. The spelling is
+`functype(<parameter types>) -> <result type>` — zero or more
+comma-separated parameter type expressions, a mandatory `->`, and a
+result type. The core module uses it for higher-order parameters, as in
+`This MapElement(functype(uint32_t, uint32_t, T) -> T mapOp)` in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang); a
+parameter of such a type accepts a function name as its argument. A
+generic parameter list accepts the same keyword in the form
+`functype F` to declare a function-typed generic parameter.
 
 ### Modifier keywords
 
@@ -210,6 +287,17 @@ arguments (e.g. `layout`, `__target_intrinsic`).
 | `__prefix`, `__postfix` | Unary-operator placement modifiers |
 | `__exported` | Re-export `import` modifier |
 
+Every row above is registered with the `_makeParseModifier(keyword,
+getSyntaxClass<...>())` overload, whose callback is
+`parseSimpleSyntax`: it constructs an instance of the class and reads
+no further tokens. The keyword's entire parse-time meaning is therefore
+the node in the second column, and nothing about the declaration it is
+attached to is checked here. What each node class goes on to mean is
+documented per node class in
+[../ast-reference/modifiers.md](../ast-reference/modifiers.md) — that
+page, not this one, is where a reader looks for the user-observable
+effect of a modifier such as `row_major` or `nointerpolation`.
+
 #### Callback-parsed modifiers (some take arguments)
 
 | Keyword | Parses |
@@ -238,6 +326,37 @@ arguments (e.g. `layout`, `__target_intrinsic`).
 | `__implicit_conversion` | `parseImplicitConversionModifier` |
 | `__attributeTarget` | `parseAttributeTargetModifier` |
 
+Which of these actually take arguments is decided by the callback, not
+by the heading. Six of them read no tokens at all: `shared`,
+`volatile`, `coherent`, `restrict`, `readonly`, and `writeonly` are
+written bare, and their callbacks exist to choose or duplicate nodes
+rather than to parse operands — `shared` builds
+`HLSLGroupSharedModifier` when the parser's `allowGLSLInput` option is
+set and `HLSLEffectSharedModifier` otherwise, and `volatile` builds
+both the HLSL and the GLSL node while diagnosing the keyword as
+deprecated from language version 2025 and removed from 2026.
+`hitAttributeEXT` likewise takes no arguments.
+
+`layout` takes a parenthesized, comma-separated list of GLSL
+qualifiers, each a bare name or `name = expr`, as in
+`layout(local_size_x = 8, std430)`. The remaining, `__`-prefixed rows
+take a parenthesized argument list: an identifier for
+`__glsl_extension(GL_KHR_shader_subgroup_basic)`,
+`__wgsl_extension(subgroups)`, `__specialized_for_target(glsl)`, and
+`__attributeTarget(<SyntaxClass>)`; an integer for
+`__glsl_version(430)`, `__builtin_type(<tag>)`, and
+`__builtin_requirement(<kind>)`; a `major.minor` or quoted version for
+`__spirv_version(1.3)` and `__cuda_sm_version(7.0)`; a name with an
+optional tag for `__magic_type(<Name>[, <tag>])` and `__magic_enum`; an
+IR opcode plus optional integer operands for
+`__intrinsic_type(<op>[, <operand>]...)`; and a target name plus an
+optional definition for `__target_intrinsic(hlsl, "...")`. Four of them
+accept the parentheses only optionally, and mean something without
+them: bare `__intrinsic_op` derives the opcode from the function name
+instead of taking the integer or identifier it otherwise accepts, and
+`__target_intrinsic`, `__specialized_for_target`, and
+`__implicit_conversion` fall back to their defaults.
+
 ### Expression keywords
 
 Registered through `_makeParseExpr` in
@@ -263,6 +382,28 @@ Registered through `_makeParseExpr` in
 | `__getAddress` | Compiler-internal address-of |
 | `__floatAsInt` | Compiler-internal bit reinterpretation |
 
+The operand shape of each row is fixed by its callback, and most but
+not all of the rows are parenthesized:
+
+- `try` and `no_diff` take a following leaf expression with no
+  parentheses of their own — `try f(x)`, `no_diff f(x)`.
+- `__return_val` takes no operand at all; it is a bare reference to the
+  pending return value.
+- `fwd_diff` / `__fwd_diff`, `bwd_diff` / `__bwd_diff`, `__apply`,
+  `__func_as_type`, `__getAddress`, `__floatAsInt`, and `countof` take
+  exactly one parenthesized operand — `fwd_diff(f)`, `countof(pack)`.
+- `sizeof` and `alignof` take one operand plus an optional second
+  data-layout operand: `sizeof(T)` or `sizeof(T, Std140DataLayout)`.
+- `__first`, `__last`, `__trimFirst`, and `__trimLast` take one pack
+  operand; `__shapePermute` and `__shapeReduce` take two;
+  `__shapeConcat`, `__shapeSwap`, and `__packBranch` take three
+  (`__packBranch(<pack>, <empty type>, <non-empty type>)`).
+- `__dispatch_kernel(<function>, <dispatch size>, <thread-group size>)`
+  takes three.
+- `new` is a prefix operator over a postfix expression, so it is
+  written `new T(args)` — the type name and its argument list are
+  parsed first and then folded into the `NewExpr`.
+
 ## Core-module syntax declarations
 
 The four `*.meta.slang` files in
@@ -279,14 +420,32 @@ Process notes:
 - [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) layers in
   HLSL-compatibility names (`Texture2D`, `RWTexture2D`,
   `StructuredBuffer`, intrinsics like `mul`, `dot`, `length`, and the
-  wave intrinsics, including `WaveGetWaveIndex` and the `SV_WaveIndex` /
-  `SV_GroupIndex` builtins). It also declares the descriptor-heap
-  vocabulary — `UntypedResourceHandle` and `UntypedSamplerHandle`,
-  together with the `__ResourceDescriptorHeapType` /
-  `__SamplerDescriptorHeapType` types whose `__subscript` turns an index
-  into a handle — each gated by
+  wave intrinsics). Two kinds of "wave builtin" live here and they are
+  not interchangeable. `WaveGetWaveIndex()` is an ordinary core-module
+  function: it carries
+  `[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_workgroup_index)]`
+  and a `__target_switch` body with an arm per target, so its
+  availability is stated in the module itself. `SV_WaveIndex` and
+  `SV_GroupIndex` are not functions but system-value semantics, written
+  after a `:` on the hidden `in` globals `__builtinWaveIndex` and
+  `__builtinGroupIndex` near the top of the file; the module attaches no
+  capability requirement to them, and which targets accept one is
+  decided by entry-point varying-parameter legalization
+  ([../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md)), not
+  here. `WaveGetWaveIndex()` is therefore the portable spelling.
+- The same file declares the descriptor-heap vocabulary —
+  `UntypedResourceHandle` and `UntypedSamplerHandle`, together with the
+  `__ResourceDescriptorHeapType` / `__SamplerDescriptorHeapType` types
+  whose `__subscript` turns an index into a handle — each gated by
   `[require(glsl_hlsl_spirv_wgsl, descriptor_handle)]` so unsupported
-  targets are diagnosed at the indexing site.
+  targets are diagnosed at the indexing site. The user-level spelling of
+  those two types is the pair of `static const` globals
+  `ResourceDescriptorHeap` and `SamplerDescriptorHeap`, so the surface
+  form is `ResourceDescriptorHeap[i]`. The untyped handle it yields is
+  not written down: every heap-castable resource type declares an
+  `__implicit_conversion` constructor taking the handle, so the
+  concrete type is recovered from the assignment target, as in
+  `RWStructuredBuffer<uint> buf = ResourceDescriptorHeap[0];`.
 - [glsl.meta.slang](../../../../source/slang/glsl.meta.slang) provides
   GLSL-flavored names (`vec3`, `mat4`, `gl_Position`, ...).
 - [diff.meta.slang](../../../../source/slang/diff.meta.slang)
@@ -309,11 +468,32 @@ By convention:
   `__subscript`, and `__include` have no underscore-free spelling in
   `g_parseSyntaxEntries[]`.
 - Names beginning with `gl_` come from the GLSL meta-module and stand
-  for shader-stage built-ins.
+  for shader-stage built-ins. They are ordinary global declarations —
+  `public out float4 gl_Position : SV_Position;` — not a lexical class.
 - Names beginning with `SV_` (HLSL system-value semantics) appear as
   semantic strings rather than keywords; they are recognized during
   semantic checking
   ([../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md)).
 
 The forbidden / reserved set is not enforced lexically; it is policy
-encoded by the meta-modules.
+encoded by the meta-modules. Both prefixes are advisory: no diagnostic
+stands behind either, so a user declaration whose name begins with one
+is an ordinary declaration. The parser inspects the `gl_` prefix in
+exactly one place — a GLSL interface block whose name starts with `gl_`
+is taken as a redeclaration of a built-in block and replaced with an
+`EmptyDecl` — and never inspects `SV_` at all. The parser's only
+reserved-name check is `isReservedKeywordName`, which warns
+(`KeywordUsedAsName`) when a declarator is named `struct`, `class`,
+`enum`, `typealias`, or `typedef` — the five spellings that open a type
+specifier, so a name that collides with one cannot be referenced at
+statement head. Its comment states the rule the rest of the vocabulary
+obeys: almost every keyword is contextual and may be shadowed by a
+user-defined name, including declaration keywords such as `func`,
+`let`, `var`, `interface`, `extension`, and `import`.
+
+The `__` prefix is the one that is really load-bearing, and it is
+load-bearing only for the exact spellings the tables above list. Only
+the `__`-prefixed forms of `__init`, `__subscript`, and `__include` are
+registered in `g_parseSyntaxEntries[]`; the bare `init`, `subscript`,
+and `include` are ordinary identifiers, usable as function names and
+callable at statement head.

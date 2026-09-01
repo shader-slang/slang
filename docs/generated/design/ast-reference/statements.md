@@ -143,6 +143,10 @@ statement finds them. Only four parser routines fill it in:
 through `BreakableStmt` but leave `scopeDecl` null — a `switch` takes
 its lexical scope from the `BlockStmt` the parser builds for its body
 — and `WhileStmt` / `DoWhileStmt` introduce no scope of their own.
+The whole `switch` body is therefore a single scope, which is visible
+to a user: a variable declared under `case 1:` is still in scope under
+`case 2:` and `default:`, and it shadows a same-named variable
+declared outside the `switch` for the rest of the body.
 
 `BlockStmt` is the simplest `ScopeStmt` — a `{ ... }` block whose
 `body` is a *single* `Stmt`. `SeqStmt`, by contrast, is a flat container
@@ -214,7 +218,10 @@ a `ScopeDecl` of its own.
 statement (not an expression) so that a `DeclStmt` can introduce loop
 variables, and `Parser::ParseForStatement` (line 7392) diagnoses anything
 that is not a `DeclStmt` or `ExpressionStmt` there, keeping the
-constructed loop node so that parsing can recover.
+constructed loop node so that parsing can recover. A block written in
+that position — `for ({ int i = 0; } n < 3; n = n + 1)` — is the shape
+that trips it, and what the user sees is `E20001`, "unexpected
+statement, expected expression", reported on the offending statement.
 `UnscopedForStmt` is the HLSL-compatibility form: the same function
 creates it instead of a `ForStmt` when `getSourceLanguage()` is
 `SourceLanguage::HLSL`, and in that case it fills in `scopeDecl` but
@@ -240,10 +247,15 @@ A range-based for whose bounds must be compile-time constants
 checking). The parser produces it from the `$for (name in Range(...))`
 syntax: `parseCompileTimeStmt` (line 6900) consumes the `$` and
 `parseCompileTimeForStmt` (line 6854) the rest. `Range` is a required
-literal keyword there, and the one-argument form `Range(end)` leaves
-`rangeBeginExpr` null. The loop variable is a `VarDecl` created by the
-parser and added to the statement's own `ScopeDecl`, so the body can
-refer to it.
+literal keyword there — the parser reads it with `ReadToken("Range")`,
+so any other identifier in that position is the parse error `E20004`,
+"unexpected identifier, expected 'Range'". The one-argument form
+`$for (i in Range(4))` leaves `rangeBeginExpr` null and iterates 0
+through 3; a comma moves the first argument into `rangeBeginExpr`, so
+`$for (i in Range(2, 5))` iterates 2 through 4 — the range is
+half-open in both spellings. The loop variable is a `VarDecl` created
+by the parser and added to the statement's own `ScopeDecl`, so the
+body can refer to it.
 
 ### TargetSwitchStmt, StageSwitchStmt, TargetCaseStmt
 
@@ -260,7 +272,11 @@ table. First, the capability name is resolved during parsing:
 `findCapabilityName` maps the token to a `CapabilityName`, which is
 stored in `TargetCaseStmt::capability` as an `int32_t`, and an
 unrecognized name is diagnosed immediately as
-`Diagnostics::UnknownTargetName`. A `default:` label is recorded as a
+`Diagnostics::UnknownTargetName` — `E29110`,
+`unknown target name '<name>'`. The case is still recorded, with
+`capability` left at `CapabilityName::Invalid`, so semantic checking
+reports a second error on the same label: `E36109`, "'Invalid' cannot
+be used as a target_switch case." A `default:` label is recorded as a
 `TargetCaseStmt` whose `capabilityToken` content has been emptied.
 Second, labels stacked in front of one body (`case a: case b: ...`)
 produce one `TargetCaseStmt` per label, all pointing at the *same*
@@ -273,7 +289,9 @@ more than once.
 then a single `Stmt` — so a deferred block needs no trailing semicolon —
 and stores it in `DeferStmt::statement`. The node carries no other
 state; when the deferred statement actually runs is decided by IR
-lowering, not by the AST. See
+lowering, not by the AST. Observably, it runs when the enclosing scope
+exits — at the end of the block that contains the `defer`, and also
+when the function leaves that scope early through a `return`. See
 [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md).
 
 ### ThrowStmt and CatchStmt
@@ -311,7 +329,10 @@ and re-parses the whole thing as a declaration through
 `Parser::parseVarDeclrStatement` (line 7237); otherwise it rewinds and
 calls `ParseExpressionStatement`. A `;` immediately after an `if` is
 suspicious rather than illegal, so that case still yields an `EmptyStmt`
-but also reports `Diagnostics::UnintendedEmptyStatement`.
+but also reports `Diagnostics::UnintendedEmptyStatement` — the warning
+`E20101`, "potentially unintended empty statement at this location; use
+{} instead." Being a warning and not an error, it leaves the program
+compiling.
 
 ### LabelStmt, BreakStmt, ContinueStmt, and DiscardStmt
 
@@ -333,7 +354,11 @@ Asserts that the surrounding function requires the listed capability
 atoms. `Parser::ParseRequireCapabilityStatement` (line 7601) recognizes
 the `__requireCapability` keyword and validates each name as it is read,
 via `findCapabilityName`; a name that does not resolve is dropped and
-diagnosed as `Diagnostics::UnknownCapability`. Only the accepted tokens
+diagnosed as `Diagnostics::UnknownCapability` — `E36105`,
+`unknown capability name '<name>'.` The accepted spelling inside a
+function body is `__requireCapability(hlsl);`: the names are read as a
+comma-separated list, so several atoms may be listed in one statement,
+and the closing `)` must be followed by a `;`. Only the accepted tokens
 are stored, still as raw `Token`s in `requiredCaps`, for the capability
 system documented in
 [../cross-cutting/targets.md](../cross-cutting/targets.md) to interpret.

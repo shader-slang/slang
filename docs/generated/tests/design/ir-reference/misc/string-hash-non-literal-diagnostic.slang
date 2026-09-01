@@ -1,7 +1,7 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: generated_at=2026-08-10T21:26:16+00:00
+//META: source_commit=1ca1aa50e5dbbd12ad65b64a60b3428f23c32d45
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#getstringhash
 //META: doc_section_digest=93e0a40b474b2be04ad15bdfb24b3f96cd0a29df6e929ab8f254fcc5f2c7154c
 //META: purpose=A `getStringHash` argument that does not fold to a string literal is rejected with the documented "must be on a string literal" diagnostic (E41023).
@@ -26,4 +26,5 @@ void main()
     String s = sel > 0 ? "aaa" : "bbb";
     outputBuffer[0] = getStringHash(s);
 //CHECK: E41023
+//CHECK:                           ^ span E41023
 }

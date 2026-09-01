@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#size-and-offset
-//META: doc_section_digest=43c0f4ec58392bc558dea4e760d5be974187198677d818ffcac504b279a89de3
+//META: doc_section_digest=4c5526c573a01002c5664c82dafecd90b68ec6487726865d6f3eb388eabf2bf3
 //META: purpose=An offset attribute gains a third operand holding the register space when that space is non-zero.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
@@ -14,7 +14,7 @@
 // `offset` attributes must carry the third operand with the value 2 -- the
 // case the two-operand encoding cannot express.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 Texture2D gTex : register(t0, space2);
 SamplerState gSamp : register(s0, space2);

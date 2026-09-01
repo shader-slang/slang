@@ -18,8 +18,8 @@ Your PR needs to be formatted according to our coding style.
 
 The formatting script requires these tools:
 
-- **clang-format** 17-18 (for C++ files)
-- **gersemi** 0.21-0.22 (for CMake files)
+- **clang-format** 17.x only (>= 17, < 18) (for C++ files)
+- **gersemi** 0.21.x only (>= 0.21, < 0.22) (for CMake files)
 - **prettier** 3+ (for YAML/JSON/Markdown files)
 - **shfmt** 3+ (for shell scripts)
 
@@ -39,9 +39,17 @@ Note: If pip install fails with externally-managed-environment error, use `--bre
 
 **macOS (Homebrew):**
 
+Homebrew's default `clang-format` and `gersemi` formulas track upstream latest, which is usually newer than the pinned versions above. Install the pinned versions explicitly:
+
 ```bash
-brew install clang-format gersemi prettier shfmt
+brew install llvm@17 python3 prettier shfmt
+export PATH="$(brew --prefix llvm@17)/bin:$PATH"
+python3 -m pip install gersemi==0.21.0
 ```
+
+Note: `llvm@17` is keg-only, so its `clang-format` binary is not symlinked onto your default `PATH` — prepend `$(brew --prefix llvm@17)/bin` as shown above (or add it to your shell profile) before running `./extras/formatting.sh`.
+
+Note: If pip install fails with externally-managed-environment error, use `--break-system-packages` flag or create a virtual environment.
 
 You can also use `./extras/formatting.sh --check-only` to verify formatting without modifying files.
 

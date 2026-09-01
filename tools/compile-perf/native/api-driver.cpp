@@ -18,9 +18,14 @@
 //     api-driver <libslang> session-create    --iters N
 //     api-driver <libslang> many-kernels      --dir DIR [--reflect]
 //     api-driver <libslang> module-graph      --dir DIR --root MODULENAME [--reflect]
-//     api-driver <libslang> module-graph-bin  --dir DIR --root MODULENAME
+//     api-driver <libslang> module-graph-bin  --dir DIR --root MODULENAME [--out-dir DIR]
 //     api-driver <libslang> specialize        --dir DIR --root MODULENAME [--impl-prefix P]
 //     api-driver <libslang> rt-composite      --dir DIR --root MODULENAME
+//
+// Plus one mode that takes no libslang, because it measures this file's own
+// RSS reader rather than Slang (bench.py runs it right after building):
+//
+//     api-driver --selfcheck-mem
 //
 // Exit code 0 on success; on any Slang failure, diagnostics are printed to
 // stdout (bench.py's real_error() recognizes "error" lines) and the exit code
@@ -54,22 +59,40 @@
 #include <vector>
 
 #ifdef _WIN32
+// clang-format off
+// windows.h MUST precede psapi.h: psapi.h uses DWORD/HANDLE/BOOL without
+// including their definitions itself, and this repo's clang-format include
+// sorting would alphabetize them into that broken order.
 #include <windows.h>
+#include <psapi.h>
+// clang-format on
 #else
 #include <dirent.h>
 #include <dlfcn.h>
+#include <unistd.h>
+#endif
+#ifdef __APPLE__
+#include <mach/mach.h>
 #endif
 
 using Clock = std::chrono::steady_clock;
 
-// Accumulates total milliseconds and an op count per phase, and prints the
-// slangc-compatible "[*] name count total" report at the end of a run.
+// Accumulates a running total and an op count per name, and prints the
+// slangc-compatible "[*] name count total" timer report at the end of a run.
+//
+// `total` is deliberately unit-less: the UNIT belongs to the caller, not to
+// the accumulator. Timing (Scope, and report() below) feeds it milliseconds
+// and prints an "ms" suffix; g_memDeltas feeds it kilobytes and prints a "kb"
+// suffix from reportMemDeltas(). Naming the field totalMs would be a comment
+// that only one of its two callers can honour — and the wrong one would be
+// silently wrong about units, which is the failure this suite works hardest
+// to prevent. Each printf spells out the unit it is publishing instead.
 struct Timers
 {
     struct Entry
     {
         std::string name;
-        double totalMs = 0.0;
+        double total = 0.0;
         long count = 0;
     };
     std::vector<Entry> entries;
@@ -83,19 +106,254 @@ struct Timers
         return entries.back();
     }
 
-    void add(const char* name, double ms)
+    void add(const char* name, double value)
     {
         auto& e = get(name);
-        e.totalMs += ms;
+        e.total += value;
         e.count += 1;
     }
 
+    // The milliseconds consumer: every caller reaching report() is a timing
+    // caller, so the "ms" suffix is this function's to assert.
     void report() const
     {
         for (const auto& e : entries)
-            printf("[*] %s\t%ld\t%.4fms\n", e.name.c_str(), e.count, e.totalMs);
+            printf("[*] %s\t%ld\t%.4fms\n", e.name.c_str(), e.count, e.total);
     }
 };
+
+// Current resident set size of this process in KB (working set on Windows),
+// or -1 if unavailable. Point-in-time, not peak: the caller differences two
+// readings around a phase, so what matters is that both use the same measure.
+static long currentRssKb()
+{
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS pmc;
+    pmc.cb = sizeof(pmc);
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        return (long)(pmc.WorkingSetSize / 1024);
+    return -1;
+#elif defined(__APPLE__)
+    mach_task_basic_info info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) ==
+        KERN_SUCCESS)
+        return (long)(info.resident_size / 1024);
+    return -1;
+#else
+    FILE* f = fopen("/proc/self/statm", "r");
+    if (!f)
+        return -1;
+    long pages = 0, resident = 0;
+    int n = fscanf(f, "%ld %ld", &pages, &resident);
+    fclose(f);
+    if (n != 2)
+        return -1;
+    return resident * sysconf(_SC_PAGESIZE) / 1024;
+#endif
+}
+
+// Self-test for currentRssKb, invoked as `api-driver --selfcheck-mem` and run
+// by bench.py right after it builds this file. currentRssKb is the sole
+// producer of every memory number in the suite and had no coverage of its
+// VALUE anywhere: this file is compiled ad hoc by bench.py so it never enters
+// the tests/ harness, and check-python-core is Python-only and Linux-only,
+// which leaves all three platform branches unexercised on the machines that
+// actually run them.
+//
+// The failures worth catching are silent SCALINGS, not crashes — a dropped
+// sysconf(_SC_PAGESIZE) multiply, a bytes-vs-KB divide on the wrong side —
+// and every one of them returns a positive number that sails through
+// reportMemDeltas' `rssNow <= 0` floor and charts a believable curve.
+//
+// Measuring a KNOWN allocation is what keeps this independent of Slang: a
+// plausibility band on the cold-session delta ("is it more than 1 MiB?") would
+// hardcode a guess about libslang's footprint that a real memory optimization
+// could falsify, turning a success into a failed nightly. The tolerance is
+// deliberately loose because the errors it catches are factors of 1024 and
+// 4096; anything tighter only buys false failures from allocator slack, page
+// granularity, or a Windows working-set trim.
+//
+// NOT covered: a field-order slip in the /proc/self/statm fscanf (reading the
+// first column, total program size, instead of `resident`). A touched
+// allocation grows both by the same amount, so no delta test can separate
+// them — that one needs the untouched phase below, which is why there are two.
+static int runSelfCheckMem()
+{
+    const long expectKb = 64 * 1024; // 64 MiB, touched
+    long before = currentRssKb();
+    if (before <= 0)
+    {
+        printf(
+            "error: --selfcheck-mem: currentRssKb() returned %ld in a live "
+            "process; the RSS reader is broken or unavailable here\n",
+            before);
+        return 1;
+    }
+
+    // VOLATILE, and this is load-bearing rather than defensive: bench.py builds
+    // this file with -O2, where the whole allocate/touch/free sequence is dead
+    // code the optimizer is entitled to delete outright. It does — measured,
+    // not assumed: the plain version reads a 0 KB delta at -O2 and the correct
+    // 65568 KB at -O0. Volatile stores may not be elided, which pins the malloc
+    // down with them.
+    const size_t bytes = (size_t)expectKb * 1024;
+    volatile unsigned char* buf = (volatile unsigned char*)malloc(bytes);
+    if (!buf)
+    {
+        printf("error: --selfcheck-mem: cannot allocate %ld KB to measure against\n", expectKb);
+        return 1;
+    }
+    // Touch every page — RSS counts RESIDENT pages, and a fresh large malloc
+    // is typically an untouched mmap that has never been faulted in. The 4096
+    // stride is the smallest page size in play, so it touches every page on
+    // 16 KB-page hosts (Apple silicon) too.
+    for (size_t i = 0; i < bytes; i += 4096)
+        buf[i] = (unsigned char)(i & 0xff);
+    long touchedDelta = currentRssKb() - before;
+    free((void*)buf);
+
+    if (touchedDelta < expectKb / 4 || touchedDelta > expectKb * 4)
+    {
+        printf(
+            "error: --selfcheck-mem: touching %ld KB moved currentRssKb() by "
+            "%ld KB. A ~1024x or ~4096x miss is a unit error in the reader "
+            "(a dropped page-size multiply or a bytes/KB divide on the wrong "
+            "side); every [MEM] value would be scaled by the same factor\n",
+            expectKb,
+            touchedDelta);
+        return 1;
+    }
+
+    // Phase two, for the field-order slip the phase above cannot see. A large
+    // UNTOUCHED mapping grows the process's address space but not its resident
+    // set, so a reader returning total program size moves by ~reserveKb while a
+    // correct one barely moves. A failed allocation is not a failure of the
+    // reader, so it skips rather than reports.
+    const long reserveKb = 512 * 1024; // 512 MiB, deliberately 8x the band above
+    long beforeReserve = currentRssKb();
+    volatile unsigned char* reserved = (volatile unsigned char*)malloc((size_t)reserveKb * 1024);
+    if (reserved && beforeReserve > 0)
+    {
+        // One volatile byte: enough to stop -O2 deleting the mapping (nothing
+        // else here reads it), and one page of residency is noise against a
+        // quarter-of-512-MiB threshold.
+        reserved[0] = 1;
+        long reserveDelta = currentRssKb() - beforeReserve;
+        free((void*)reserved);
+        if (reserveDelta > reserveKb / 4)
+        {
+            printf(
+                "error: --selfcheck-mem: reserving %ld KB without touching it "
+                "moved currentRssKb() by %ld KB. An untouched mapping is not "
+                "resident, so the reader is reporting address space rather "
+                "than resident memory (on Linux, /proc/self/statm's first "
+                "column instead of the second)\n",
+                reserveKb,
+                reserveDelta);
+            return 1;
+        }
+    }
+    else if (reserved)
+    {
+        free((void*)reserved);
+    }
+
+    printf("currentRssKb self-check ok: %ld KB touched read as %ld KB\n", expectKb, touchedDelta);
+    return 0;
+}
+
+// Memory deltas recorded around selected phases, reported next to the timers
+// as "[MEM] name\tNNNkb" lines that bench.py parses into the record's
+// `memory` dict. The RSS growth across createGlobalSession is the metric of
+// shader-slang/slang#9817. Reuses Timers purely as a named (total, count)
+// accumulator — the KILOBYTES unit is this file's to state, and it is stated
+// at the publish printf in reportMemDeltas(), which runs wherever
+// timers.report() does.
+// Each g_memDeltas counter is written AT MOST ONCE per process; entries are
+// only inserted after both RSS readings succeed, so a failed reading yields
+// no data point rather than a real-looking 0kb sample.
+static Timers g_memDeltas;
+static bool g_sessionRssRecorded = false;
+
+static void recordSessionCreateRss(long rssBefore)
+{
+    // Only the FIRST createGlobalSession of the process is recorded: that is
+    // the cold-session footprint of shader-slang/slang#9817. Workloads that
+    // create many sessions (api_session_create) warm the allocator and core
+    // module on the first call, so summing or averaging later deltas would
+    // dilute the number the issue is about. The flag (not a Timers::get()
+    // lookup) tracks this: get() would INSERT a phantom zero entry that
+    // reportMemDeltas() would print as a genuine 0kb delta.
+    if (g_sessionRssRecorded)
+        return;
+    g_sessionRssRecorded = true;
+    long rssAfter = currentRssKb();
+    if (rssBefore >= 0 && rssAfter >= 0)
+        g_memDeltas.add("apiCreateGlobalSessionRssDeltaKb", (double)(rssAfter - rssBefore));
+}
+
+static void reportMemDeltas()
+{
+    // Sanity-floor the RSS reader itself before publishing anything it fed.
+    // currentRssKb is the C++ producer of every memory number in this suite,
+    // and unlike the Python side it has no import-time coverage: it is
+    // compiled ad hoc by bench.py and never enters the Slang tests/ harness.
+    // Its plausible failures are all silent scalings rather than crashes — a
+    // field-order slip in the /proc/self/statm fscanf (reading `pages` rather
+    // than `resident`), a dropped sysconf(_SC_PAGESIZE) multiply, a wrong
+    // Win32 field — and every one of them charts a believable curve.
+    //
+    // A process that has already dlopened libslang and created a session
+    // cannot have zero resident memory, so anything <= 0 here is the reader
+    // being broken or unavailable, not a real measurement. Reported through
+    // the same "error: " channel as the count guard below, which fails the
+    // workload in bench.py rather than letting a wrong number reach a chart.
+    long rssNow = currentRssKb();
+    if (rssNow <= 0)
+    {
+        printf(
+            "error: currentRssKb() returned %ld after libslang was loaded — a "
+            "live process cannot have zero resident memory, so the RSS reader "
+            "is broken or unavailable on this platform and every [MEM] value "
+            "below is untrustworthy\n",
+            rssNow);
+        return;
+    }
+    for (const auto& e : g_memDeltas.entries)
+    {
+        // Enforce the "written AT MOST ONCE per process" contract at the point
+        // the number is published. Timers::add ACCUMULATES (total += value), so
+        // a regressed g_sessionRssRecorded guard would not produce a duplicate
+        // line that a reader could notice — it would produce one line holding
+        // the SUM of every session's delta, which for api_session_create
+        // (--iters 10) is a plausible-looking number roughly 10x too large,
+        // silently destroying the cold-session figure the metric exists to
+        // isolate. count is the only surviving evidence, and it is dropped by
+        // the printf below, so it has to be checked here.
+        //
+        // An "error: " line fails the workload in bench.py (real_error ->
+        // sample_ok), which is the loudest channel available from here and the
+        // same one the driver's other failures use. It is a run-time check
+        // rather than a test because this file is built ad hoc by bench.py and
+        // never enters the Slang tests/ harness; api_session_create exercises
+        // it on every nightly.
+        if (e.count != 1)
+        {
+            printf(
+                "error: memory counter '%s' was recorded %ld times, expected "
+                "exactly 1 — the record-once guard in recordSessionCreateRss "
+                "has regressed and this value is a sum, not a cold-session "
+                "delta\n",
+                e.name.c_str(),
+                e.count);
+            continue;
+        }
+        // The unit is asserted here, where it is known: e.total holds the
+        // kilobyte delta recordSessionCreateRss() put in it.
+        printf("[MEM] %s\t%.0fkb\n", e.name.c_str(), e.total);
+    }
+}
 
 // Times one phase: construct to start, call stop() (or destruct) to record.
 struct Scope
@@ -286,11 +544,18 @@ static std::vector<std::string> listSlangFiles(const std::string& dir, const cha
     return files;
 }
 
-// Creates a session targeting SPIR-V with `dir` (when non-empty) as the import
-// search path — the shape every workload here shares.
+// Creates a session targeting SPIR-V with `searchDirs` (the non-empty ones, in
+// order) as the import search path — the shape every workload here shares.
+//
+// A LIST rather than one directory because module-graph-bin separates the two
+// roles a directory can play: the corpus it reads sources from may be
+// caller-owned and must not be written to, so the .slang-module binaries it
+// produces land in a scratch directory instead. The timed session then has to
+// search both, binaries first, or import resolution would find the .slang
+// source next to it and defeat the workload's entire purpose.
 static SlangResult createSession(
     slang::IGlobalSession* globalSession,
-    const std::string& dir,
+    const std::vector<std::string>& searchDirs,
     slang::ISession** outSession)
 {
     slang::TargetDesc target = {};
@@ -300,11 +565,14 @@ static SlangResult createSession(
     slang::SessionDesc desc = {};
     desc.targets = &target;
     desc.targetCount = 1;
-    const char* searchPaths[] = {dir.c_str()};
-    if (!dir.empty())
+    std::vector<const char*> searchPaths;
+    for (const auto& d : searchDirs)
+        if (!d.empty())
+            searchPaths.push_back(d.c_str());
+    if (!searchPaths.empty())
     {
-        desc.searchPaths = searchPaths;
-        desc.searchPathCount = 1;
+        desc.searchPaths = searchPaths.data();
+        desc.searchPathCount = (SlangInt)searchPaths.size();
     }
     return globalSession->createSession(desc, outSession);
 }
@@ -454,6 +722,7 @@ static int runSessionCreate(CreateGlobalSessionFn createGlobalSession, int iters
     for (int i = 0; i < iters; i++)
     {
         Slang::ComPtr<slang::IGlobalSession> globalSession;
+        long rssBeforeSession = currentRssKb();
         {
             Scope s(timers, "apiCreateGlobalSession");
             if (SLANG_FAILED(createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -462,10 +731,11 @@ static int runSessionCreate(CreateGlobalSessionFn createGlobalSession, int iters
                 return 1;
             }
         }
+        recordSessionCreateRss(rssBeforeSession);
         Slang::ComPtr<slang::ISession> session;
         {
             Scope s(timers, "apiCreateSession");
-            if (SLANG_FAILED(createSession(globalSession, "", session.writeRef())))
+            if (SLANG_FAILED(createSession(globalSession, {}, session.writeRef())))
             {
                 printf("error: createSession failed\n");
                 return 1;
@@ -474,6 +744,7 @@ static int runSessionCreate(CreateGlobalSessionFn createGlobalSession, int iters
     }
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -488,6 +759,7 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
     Scope total(timers, "apiTotal");
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -496,10 +768,11 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -539,6 +812,7 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -557,6 +831,7 @@ static int runModuleGraph(
     Scope total(timers, "apiTotal");
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -565,10 +840,11 @@ static int runModuleGraph(
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -589,11 +865,16 @@ static int runModuleGraph(
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
-// module-graph-bin: like module-graph, but the timed load resolves the DAG
-// from serialized .slang-module binaries instead of source — the import path
+// Serializes every module of the graph rooted at `root` into `outDir`, then
+// measures how long a fresh session takes to load that graph back from the
+// serialized binaries.
+//
+// It is like module-graph, but the timed load resolves the DAG from
+// .slang-module binaries instead of source — the import path
 // where the 2026-07-03 module-loading regression (#11952) lives, which
 // source-based loads do not exercise. Setup runs before the apiTotal scope
 // opens, so it does not count toward apiTotal, but its phases are still timed
@@ -601,11 +882,24 @@ static int runModuleGraph(
 // graph from source once and write every loaded module out with
 // IModule::writeToFile; then a FRESH session re-loads the root, letting
 // import resolution pick the binaries.
-static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const std::string& root)
+//
+// This is the only mode that WRITES, so it is the only one that takes an
+// `outDir`: the binaries go there rather than beside the sources, because
+// `dir` may be a corpus prepared elsewhere and handed to this run read-only
+// (bench.py --corpus). The timed session searches outDir BEFORE dir so an
+// import resolves to the binary; were the order reversed it would find the
+// .slang source sitting next to it and quietly measure a source load, which is
+// the one thing this workload exists to avoid measuring.
+static int runModuleGraphBin(
+    const LibSlang& lib,
+    const std::string& dir,
+    const std::string& outDir,
+    const std::string& root)
 {
     Timers timers;
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -614,11 +908,12 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
 
     // Setup pass: source load + serialize every module in the graph.
     {
         Slang::ComPtr<slang::ISession> setupSession;
-        if (SLANG_FAILED(createSession(globalSession, dir, setupSession.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, setupSession.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -650,7 +945,7 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
                         (int)i);
                     return 1;
                 }
-                std::string path = dir + "/" + name + ".slang-module";
+                std::string path = outDir + "/" + name + ".slang-module";
                 if (SLANG_FAILED(m->writeToFile(path.c_str())))
                 {
                     printf("error: writeToFile failed for %s\n", path.c_str());
@@ -661,11 +956,12 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
     }
 
     // Timed pass: fresh session; imports must now resolve to the binaries.
+    // outDir first — see this function's comment for why the order is load-bearing.
     Scope total(timers, "apiTotal");
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {outDir, dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -707,6 +1003,7 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -731,6 +1028,7 @@ static int runSpecialize(
     Scope total(timers, "apiTotal");
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -739,10 +1037,11 @@ static int runSpecialize(
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -838,6 +1137,7 @@ static int runSpecialize(
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -853,6 +1153,7 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
     Scope total(timers, "apiTotal");
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -861,10 +1162,11 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -934,6 +1236,7 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -955,15 +1258,25 @@ static bool hasFlag(int argc, char** argv, const char* flag)
 
 int main(int argc, char** argv)
 {
+    // Ahead of the argc check and the libslang load, both deliberately: the
+    // RSS reader is plain platform code with no Slang dependency, so bench.py
+    // can run this straight after building the driver, before it has resolved
+    // any library. A unit error then fails the build step rather than shipping
+    // a scaled chart.
+    if (argc == 2 && strcmp(argv[1], "--selfcheck-mem") == 0)
+        return runSelfCheckMem();
+
     if (argc < 3)
     {
         printf("usage: api-driver <libslang> session-create    --iters N\n"
                "       api-driver <libslang> many-kernels      --dir DIR [--reflect]\n"
                "       api-driver <libslang> module-graph      --dir DIR --root NAME [--reflect]\n"
-               "       api-driver <libslang> module-graph-bin  --dir DIR --root NAME\n"
+               "       api-driver <libslang> module-graph-bin  --dir DIR --root NAME "
+               "[--out-dir DIR]\n"
                "       api-driver <libslang> specialize        --dir DIR --root NAME "
                "[--impl-prefix P]\n"
-               "       api-driver <libslang> rt-composite      --dir DIR --root NAME\n");
+               "       api-driver <libslang> rt-composite      --dir DIR --root NAME\n"
+               "       api-driver --selfcheck-mem   (no libslang; checks the RSS reader)\n");
         return 2;
     }
     LibSlang lib;
@@ -1009,7 +1322,13 @@ int main(int argc, char** argv)
     if (mode == "module-graph")
         return runModuleGraph(lib, dir, root, reflect);
     if (mode == "module-graph-bin")
-        return runModuleGraphBin(lib, dir, root);
+    {
+        // Defaults to --dir so the flag is optional for a hand-run driver;
+        // bench.py always passes it, and points it at scratch so a corpus
+        // handed to --corpus is never written into.
+        const char* outDir = argValue(argc, argv, "--out-dir");
+        return runModuleGraphBin(lib, dir, outDir ? outDir : dir, root);
+    }
     if (mode == "rt-composite")
         return runRtComposite(lib, dir, root);
     if (mode == "specialize")

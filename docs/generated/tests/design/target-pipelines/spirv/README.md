@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: bfc67af60d730c94cef6d2a1aea898e7923d91fb15bf8ac7c0e2a04f6f5baaa2
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 8e9d8dd20570e98a16b60ab5d6667cb7a6fcc73debc6a2df857d72989c894d6a
 source_doc: docs/generated/design/target-pipelines/spirv.md
-source_doc_digest: 99959f85dae03aef2bc41fbe7e8f466b0866f7007ac0d4d252308ad70bcc95ec
+source_doc_digest: dd9454c1dde7f0688e9c7f4e125cbe094d0269bc28353dbb505e4b06bc75c08e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -47,6 +47,222 @@ explicit `[[vk::binding]]`, every storage-buffer element width from `int8_t` to 
 integer / float constant extremes that flow through the emit path. Downstream-tool steps
 (spirv-link, spirv-val, spirv-opt), bindless descriptor-heap lowering, and pass-ordering claims
 are recorded under `## Untested claims` rather than approximated with a weakened CHECK.
+
+## Claims
+
+Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md), grouped by
+the document's own headings.
+
+**`#spir-v-target-pipeline`** (page preamble)
+
+1. `emitSPIRVForEntryPointsDirectly` is invoked only from the `CodeGenTarget::SPIRV` arm of `_emitEntryPoints`, and only when `shouldEmitSPIRVDirectly()` holds.
+2. `CodeGenTarget::SPIRVAssembly` reuses the same pipeline indirectly: an intermediate `CodeGenTarget::SPIRV` artifact is compiled first and then disassembled.
+3. The backend pipeline is not an unconditional ordered list: `calcRequiredLoweringPassSet` walks the linked module and most passes are guarded by the matching `RequiredLoweringPassSet` flag.
+4. The walk runs twice — after `linkIR` and again mid-Phase-B — and the flags accumulate rather than being cleared, so a flag can be stale-true but never false-negative.
+
+**`#phase-a-link-and-entry-point-prep`**
+
+5. SPIR-V reaches Phase A through the `default` arm of every per-target switch.
+6. `stripDebugInfo` runs when `reqSet.debugInfo` holds and the debug level is `None`.
+7. `instrumentCoverage` and `finalizeCoverageInstrumentationMetadata` are both gated on `reqSet.coverageTracing`, and the counter byte width is re-validated to 4 or 8 on the API path with `CoverageCounterWidthBytesInvalid`.
+8. `finalizeCoverageInstrumentationMetadata` runs after entry-point uniform packing so the post-packing `globalScopeVarLayout` can fill the CPU/CUDA marshaling fields; it is effectively a no-op on SPIR-V.
+9. `lowerLValueCast` is gated on `reqSet.lValueCast`, a flag only the front end's `InOutImplicitCast` / `OutImplicitCast` opcodes set.
+10. `lowerEnumType` runs early so enum casts do not block specialization, and its flag is set by the three surviving-cast opcodes as well as by `kIROp_EnumType`.
+11. The `!isKhronosTarget && reqSet.glslSSBO` branch and the CUDA entry-point-param arm are filtered out for SPIR-V.
+
+**`#phase-b-specialization-and-type-legalization`**
+
+12. `specializeModule` runs unless specialization is disabled, with `lowerWitnessLookups = true`.
+13. `finalizeAutoDiffPass` and `stripAutoDiffDecorations` are mutually exclusive arms of the `reqSet.autodiff` gate.
+14. `lowerResultType` runs after `lowerOptionalType` because it depends on accurate `getAnyValueSize()` results.
+15. `checkForRecursiveTypes` never sees source-level recursion: a `struct` that contains itself is rejected during IR generation with error 41001, before `linkAndOptimizeIR` is reached.
+16. `checkForRecursiveFunctions` rejects a self-recursive call under `shouldRunNonEssentialValidation()`.
+17. `checkForOutOfBoundAccess` rejects a static array indexed past its declared bound.
+18. `checkForMissingReturns` fires for a non-void function that does not return on every path.
+19. `lowerTaggedUnionTypes` sets `reqSet.reinterpret` when it reports a change.
+20. `lowerAppendConsumeStructuredBuffers` is gated on `target != HLSL && reqSet.appendConsumeStructuredBuffer`.
+21. `legalizeEmptyRayPayloadsForHLSL` runs for SPIR-V despite its name, adding dummy fields to empty ray payloads.
+22. `legalizeVectorTypes` splits oversized / non-power-of-two vectors.
+23. `legalizeMatrixTypes` runs unconditionally and matrix types survive into `OpTypeMatrix`.
+24. `specializeFuncsForBufferLoadArgs` runs unconditionally as its first invocation in Phase B.
+25. The HLSL `legalizeNonVectorCompositeSelect` arm, the CUDA / PyTorch derivative-wrapper arm, the CPP / Host COM-DLL arms, `lowerCooperativeVectors`, and `legalizeNonStructParameterToStructForHLSL` are filtered out for SPIR-V.
+
+**`#phase-c-spir-v-legalization-lowering-phi-elimination`**
+
+26. `legalizeByteAddressBufferOps` runs for SPIR-V with `scalarizeVectorLoadStore=false` and `translateToStructuredBufferOps=true`.
+27. `resolveTextureFormat` runs for SPIR-V, matching the `GLSL` / `SPIRV` / `WGSL` arm.
+28. `legalizeEntryPointsForGLSL` runs for SPIR-V, sharing the entry-point shape with the via-GLSL path.
+29. `legalizeBoolSwitchForTargetsRequiringIntSwitch` rewrites a `switch` on a `bool` into an integer switch, and also a `switch` on an enum whose tag type is `bool`; the HLSL / Metal / CUDA / CPU arms do not run it.
+30. `legalizeLogicalAndOr` runs for SPIR-V through the `isKhronosTarget` disjunct.
+31. `legalizeImageSubscript` runs on the Khronos / Metal arm.
+32. `legalizeConstantBufferLoadForGLSL` runs on the `GLSL` / `SPIRV` / `SPIRVAssembly` arm.
+33. `moveGlobalVarInitializationToEntryPoints` runs on the SPIR-V arm.
+34. `introduceExplicitGlobalContext` runs for SPIR-V only under `getBoolOption(EnableExperimentalPasses)`.
+35. `transformParamsToConstRef` runs unconditionally on the SPIR-V arm so struct-typed parameters are passed by const reference.
+36. `removeRawDefaultConstructors` runs under `shouldEmitSPIRVDirectly()`.
+37. `performGLSLResourceReturnFunctionInlining` runs for every Khronos target as a fallback inliner for resource returns.
+38. `legalizeMeshOutputTypes` is gated on `reqSet.meshOutput`, and `legalizeDispatchMeshPayloadForGLSL` runs on the `GLSL` / `SPIRV` arm.
+39. `lowerBitCast` is gated on `reqSet.bitcast`.
+40. `legalizeUniformBufferLoad` runs when the target is Khronos or HLSL.
+41. `lowerBufferElementTypeToStorageType` runs unconditionally with `loweringPolicyKind = KhronosTarget`.
+42. The second `specializeFuncsForBufferLoadArgs` runs only when `isKhronosTarget && emitSpirvDirectly`.
+43. `performIntrinsicFunctionInlining` is SPIR-V-only, gated on `emitSpirvDirectly`.
+44. `eliminateMultiLevelBreak`'s call site is unconditional, but `(always)` describes the call and not the outcome: it only rewrites an exit leaving more than one enclosing region, and later simplification can erase what it introduced.
+45. `applyGLSLLiveness` runs on every Khronos target when liveness tracking is on.
+46. `replaceLocationIntrinsicsWithRaytracingObject` runs when `isKhronosTarget && emitSpirvDirectly`.
+47. `collectCooperativeMetadata` runs when the target capabilities imply `cooperative_matrix` or `cooperative_vector`.
+48. `targetProgram->getOrCreateLayout` is forced on the SPIR-V path because its capability set implies `descriptor_handle`.
+49. `collectMetadata` reads `getExistingLayout()` to set `usesBindlessResourceHeap`, and no longer asserts the layout exists.
+50. `applyVariableScopeCorrection`, `floatNonUniformResourceIndex`, `legalizeArrayReturnType`, `specializeAddressSpace`, and the CUDA `__ldg` lowering are filtered out for SPIR-V.
+51. `validateAtomicOperations` is not called here for SPIR-V; it runs inside `legalizeIRForSPIRV`.
+
+**`#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`**
+
+52. `emitFrontMatter` emits exactly two instructions unconditionally: `OpCapability Shader` and `OpMemoryModel`.
+53. The addressing model printed in `OpMemoryModel` is `Logical` unless `requirePhysicalStorageAddressing` moved it, and the memory model is `GLSL450`.
+54. Nothing else is unconditional front matter: `OpSource` comes from `emitSource`, and an extension such as `SPV_KHR_storage_buffer_storage_class` is requested on demand by the type that needs it.
+55. The `; SPIR-V` and `; Version:` lines are the disassembler rendering the module-header words, not instructions.
+56. A compute entry point emits `OpEntryPoint GLCompute %<func> "main"`, and `[numthreads(X,Y,Z)]` emits `OpExecutionMode %<func> LocalSize X Y Z`.
+57. Word emission orders its sources: debug instructions first, then optional `IRGlobalParam`s under `PreserveParameters`, then optional exported `IRFunc`s under `GenerateWholeProgram`, then `OpSource`, then every entry point.
+58. `kIROp_Abort` emits via `emitAbort`, which declares `SPV_KHR_abort` and `SpvCapabilityAbortKHR` and emits `OpAbortKHR` with the packed message struct as its single operand, treated as a block terminator.
+59. `removeUnreachableCodeAfterDiscardForOpKill` runs when `shouldEmitDiscardAsDemote()` is false, i.e. for SPIR-V below 1.6 without the demote extension.
+60. `insertFragmentShaderInterlock` acts only on raster-ordered resources in fragment entry points.
+61. `optimizeSPIRV` sits inside a `#if 0` block and never executes.
+62. Resource variables carry `Block`, `Offset`, `Binding` and `DescriptorSet` decorations; read-only buffers additionally carry `NonWritable`; the runtime array inside the block carries `ArrayStride`.
+63. `groupshared` lowers to the `Workgroup` storage class, `StructuredBuffer` / `RWStructuredBuffer` to `StorageBuffer`, `cbuffer` / `ConstantBuffer<T>` to `Uniform`, and textures / samplers to `UniformConstant`.
+64. Buffer-element indexing lowers to `OpAccessChain` through the runtime array inside the wrapping struct.
+65. Structured control flow survives as `OpLoopMerge` / `OpBranchConditional` / `OpSelectionMerge`.
+66. Per-element-width storage-buffer types each drag in their capability: `Int8`, `Int16` / `UniformAndStorageBuffer16BitAccess`, `Int64`, `Float16`, `Float64`.
+
+**`#requiredloweringpassset-flags`**
+
+67. Only the flags listed gate a pass on the SPIR-V path; `glslSSBO`, `nonVectorCompositeSelect`, `derivativePyBindWrapper`, `combinedTextureSamplers` and `barrierFlagValidation` never gate a SPIR-V pass.
+68. The struct declares 34 flags in total, and the listed table plus that paragraph account for every one that appears in a gate expression.
+
+**`#option-set-toggles`**
+
+69. `getDebugInfoLevel()` selects the debug shape: `None` carries no debug instructions, `Minimal` produces `OpString` / `OpLine` / `OpSource`, and `Standard` / `Maximal` switch to the NonSemantic extension.
+70. `shouldIncludeSourceInDebugInfo()` conjoined with `Minimal` selects the per-file `OpSource` form in `emitSource`.
+71. `getMatrixLayoutMode()` supplies the default layout `specializeMatrixLayout` fills into unspecified matrix types.
+72. The emitted SPIR-V member decoration is the transpose of the source layout: a row-major source matrix emits `ColMajor` and a column-major one emits `RowMajor`.
+73. `getDownstreamArgs("spirv-opt")` being non-empty forces `needsOptimization`, so spirv-opt runs even at `-O0`.
+74. `getBoolOption(PreserveParameters)` makes Phase D emit unreferenced `IRGlobalParam`s complete with `Binding` / `DescriptorSet` decorations but without listing them in the `OpEntryPoint` interface, and they survive only at `-O0` because spirv-opt's aggressive DCE deletes them again.
+75. `getBoolOption(GenerateWholeProgram)` makes Phase D emit every `IRFunc` carrying `IRDownstreamModuleExportDecoration`.
+76. `getBoolOption(VulkanInvertY)` gates `invertYOfPositionOutput` and `getBoolOption(VulkanUseDxPositionW)` gates `rcpWOfPositionInput`.
+77. `shouldRunSPIRVValidation` requires the `SLANG_RUN_SPIRV_VALIDATION` environment variable to equal exactly `"1"` with `SkipSPIRVValidation` and `IncompleteLibrary` off; there is no `-validate-spirv` flag.
+
+**`#spir-v-specific-runtime-predicates`**
+
+78. `shouldEmitDiscardAsDemote()` returns true for SPIR-V ≥ 1.6 or when `SPV_EXT_demote_to_helper_invocation` is in use, in which case `discard` lowers to `OpDemoteToHelperInvocation` rather than `OpKill`.
+79. `isSpirv16OrLater()` selects which terminator opcodes trigger the inserted `OpEndInvocationInterlockEXT`.
+
+**`#loops-in-the-pipeline`**
+
+80. Exactly two iterative passes execute in the SPIR-V pipeline; no other `SLANG_PASS` is iterated to a fixed point.
+81. `simplifyIRForSpirvLegalization`'s outer and inner loops carry `kMaxIterations = 8` / `kMaxFuncIterations = 16` guards whose counters are never incremented, so both terminate only at a fixed point (the outer loop additionally on a raised error count).
+82. The forward-declared-pointer fixup loop drains `m_forwardDeclaredPointers` until empty, with no explicit bound, relying on the type graph being finite.
+
+**`#legalizeirforspirv`**
+
+83. `legalizeIRForSPIRV` is not a single pass: it sequences `legalizeSPIRV`, `simplifyIRForSpirvLegalization`, `removeUnreachableCodeAfterDiscardForOpKill`, `eliminateDeadCode`, `buildEntryPointReferenceGraph`, and `insertFragmentShaderInterlock`.
+
+**`#eliminatephis-with-spir-v-specific-options`**
+
+84. SPIR-V is the only backend that sets both `eliminateCompositeTypedPhiOnly = false` and `useRegisterAllocation = true`.
+85. In the emitted module that shows up as an `OpVariable` in the `Function` storage class with an `OpStore` on each incoming edge, where the default mode would have left an `OpPhi` in the merge block.
+
+**`#specializefuncsforbufferloadargs-invoked-twice`**
+
+86. The second invocation runs after `lowerBufferElementTypeToStorageType` to eliminate access-chain arguments, which SPIR-V rule 2.16.1 disallows without the `VariablePointer` capability.
+
+**`#deferred-address-space-propagation`**
+
+87. Address-space specialization runs for GLSL, Metal and WGSL but not SPIR-V; SPIR-V defers it to `legalizeIRForSPIRV` so the legalizer can produce `Storage*` pointer types directly.
+
+**`#legalizeentrypointsforglsl-despite-the-name`**
+
+88. Every `SV_*` semantic is resolved by `getGLSLSystemValueInfo`, a name-match chain giving each recognized semantic a `gl_*` builtin identity and a required type — `SV_DispatchThreadID` to `gl_GlobalInvocationID`, `SV_IsFrontFace` to `gl_FrontFacing`, and so on.
+89. A semantic the chain does not recognize falls through to `UnknownSystemValueSemantic`, error 49999, so an unrecognized `SV_*` fails the SPIR-V compile inside this pass rather than at emit.
+90. The `gl_*` name is not itself emitted: `maybeEmitSystemVal` re-derives a `BuiltIn` decoration from the same semantic name.
+91. `legalizeTargetBuiltinVar` replaces each load of an `SV_VertexID` parameter with `gl_VertexIndex - gl_BaseVertex`, emitted as an `OpISub` of two builtin loads.
+92. It replaces each `SV_InstanceID` load with `gl_InstanceIndex - gl_BaseInstance`, for the same zero-based-per-draw reason.
+93. The `BaseVertex` / `BaseInstance` operands pull in `SpvCapabilityDrawParameters`.
+94. `SV_VulkanVertexID` / `SV_VulkanInstanceID` map straight to the bare index and are not rebased.
+
+**`#transformparamstoconstref-on-the-spir-v-arm`**
+
+95. The SPIR-V arm runs `transformParamsToConstRef` unconditionally, while the CUDA / Metal / CPU arm runs it only for those targets.
+
+**`#abort-lowering-processabort--emitabort`**
+
+96. `processAbort` packs the format string into a `uint` array with an explicit stride, widens `bool` arguments to `uint`, and builds an explicitly-laid-out `AbortMessage` struct cached per payload signature.
+97. It rewrites the inst to `Abort(message)`, strips trailing unreachable code, and terminates the block with `unreachable`.
+
+**`#descriptor-heap-constantbuffer-and-the-second-work-list-drain`**
+
+98. `processConstantBufferDescriptorHeapLoads` rewrites a descriptor-heap `ConstantBuffer` load so the fetched pointer becomes an `IRSPIRVUntypedPtrType` in `AddressSpace::Uniform`.
+99. It runs after `wrapRemainingConstantBufferElementTypes`, and a second `processWorkList()` follows so the untyped-Uniform flavor propagates down derived pointers.
+100. The element- and field-address handlers compare the pointer opcode as well as the address space, because the typed-to-untyped transition happens at the same `Uniform` address space.
+
+**`#descriptor-heap-array-stride-and-the-unified-stride-option`**
+
+101. `getDescriptorRuntimeArrayType` keys its cache on (element type, stride) rather than element type alone.
+102. `-spirv-unified-descriptor-heap-stride` makes every resource descriptor-heap runtime array share one fixed stride emitted as an `OpSpecConstantOp` chain.
+103. `diagnoseConflictingDescriptorHeapStrideOptions` re-checks the compile-API path for the conflict the CLI parser already rejects.
+
+**`#capabilities-and-extensions-decided-at-emit-time`**
+
+104. `ImageGatherExtended` is requested only for a non-constant `Gather` offset; a constant offset uses the `ConstOffset` image operand and needs no extra capability.
+105. `requireShaderInvocationReorderExtension` picks the NVIDIA variant when the target implies `spvShaderInvocationReorderNV` and the cross-vendor `SPV_EXT_shader_invocation_reorder` otherwise.
+106. The physical-storage-buffer dependency of shader-invocation reorder is a plain `OpExtension` that does not switch the addressing model, in contrast to `requirePhysicalStorageAddressing`.
+107. `[Shader64BitIndexing]` emits the `SPV_EXT_shader_64bit_indexing` extension, the `Shader64BitIndexingEXT` capability, and the matching execution mode on the entry point.
+108. `NoContraction` under `-fp-mode precise` decorates the result only when the emitted opcode is one of `OpFAdd`, `OpFSub`, `OpFMul`, `OpFDiv`, `OpFRem`, `OpFNegate`, or `OpVectorTimesScalar` — so integer, bitwise, logical and comparison opcodes stay undecorated.
+109. For a matrix operation the per-row results are decorated individually and the reassembling `OpCompositeConstruct` is left undecorated.
+
+**`#flat-decoration-for-integral-fragment-inputs`**
+
+110. `needFlatDecorationForBuiltinVar` applies the `Flat` decoration when the value type is an integral scalar or composite used in `Stage::Fragment`.
+111. It accepts the `spirv_asm` built-in-var shape as well as `GlobalVar` / `GlobalParam`, which is what restores the decoration for wave built-ins such as `SubgroupLocalInvocationId`.
+
+**`#opswitch-case-literals-follow-the-selector-width`**
+
+112. A SPIR-V `OpSwitch` case literal must occupy the same number of words as the selector's type, so a selector wider than 32 bits emits 64-bit literals.
+113. The loop-lowering `OpSwitch` used as a breakable region always uses a 32-bit zero selector.
+
+**`#emitting-untyped-pointers-for-descriptor-heap-access`**
+
+114. `kIROp_SPIRVUntypedPtrType` is release-asserted to map to either `Uniform` or `StorageBuffer`, and a descriptor-heap `ConstantBuffer` must land on `Uniform`.
+115. The emitter still calls `requireCapabilitiesForType` so the same 8-/16-bit storage capabilities a typed pointer would need are declared, and passes the struct being indexed as an explicit Base Type operand to `OpUntypedAccessChainKHR`.
+
+**`#float-to-bool-casts`**
+
+116. The float-to-bool cast builds its comparison against a zero constant of the *source* floating-point type.
+
+**`#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements`**
+
+117. `SV_DepthGreaterEqual` / `SV_DepthLessEqual` are recorded as `FragDepthGreater` / `FragDepthLess` system-value kinds and the decorations are attached to the entry point rather than the `gl_FragDepth` var.
+118. For SPIR-V direct emit those decorations are inert: the emitter derives the mode independently from the var layout's `IRSystemValueSemanticAttr`.
+119. `getDepthOutputExecutionMode` maps `SV_DepthGreaterEqual` to `DepthGreater` and `SV_DepthLessEqual` to `DepthLess`.
+120. The emitted module carries `OpExecutionMode <entry> DepthReplacing` alongside the conservative mode, because Vulkan demands `DepthReplacing` for any write to `FragDepth`.
+121. An entry point mixing two depth semantics collapses to `DepthReplacing` alone.
+122. The geometry-shader default-input-primitive (`triangle`) fallback runs at the end of `legalizeEntryPointForGLSL`, only after all parameters are processed, so it cannot clash with a real primitive qualifier.
+
+**`#debug-levels-and--debug-info-include-source`**
+
+123. At `-g2` / `-g3` the NonSemantic `DebugEntryPoint` instruction records the command line that produced the entry point, with the producer string `"slangc"`.
+124. That command line is built from the entry point's own `IREntryPointDecoration` — `-target spirv`, the option set's rendering, `-stage <stage>`, and `-entry <name>` — so it is correct per entry point in a multi-entry-point module.
+
+**`#downstream-spirv-link--spirv-val--spirv-opt-chain`**
+
+125. All three downstream tools share one `IDownstreamCompiler` loaded from `PassThroughMode::SpirvOpt`, and that load is itself conditional on `needsDownstreamCompiler`.
+126. spirv-link runs only when there is more than one input SPIR-V module — the freshly emitted one plus any `IREmbeddedDownstreamIR` targeting `CodeGenTarget::SPIRV`.
+127. spirv-val validates the freshly emitted `spirv` buffer rather than the linked artifact, and on failure emits `SpirvValidationFailed` while still returning the artifact.
+128. spirv-opt is invoked through the generic downstream-compile path with `targetType = SLANG_SPIRV`.
+
+**`#-xspirv-opt-passthrough`**
+
+129. `-Xspirv-opt <flag>` folds into `needsOptimization`, so the optimizer runs even at `-O0` where the preset pass list would be empty.
+130. Computing that predicate keeps a plain `-O0` compile from loading the `slang-glslang` downstream library at all.
 
 ## Functional coverage
 
@@ -166,6 +382,17 @@ are recorded under `## Untested claims` rather than approximated with a weakened
 | float4x4 lowers to OpTypeMatrix %v4float 4 and matrix-vector multiplication emits an OpVectorTimesMatrix / OpMatrixTimesVector depending on HLSL row/column-major convention.                                                                                                                  | boundary   | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../../design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                   | [`matrix-4x4-emit.slang`](matrix-4x4-emit.slang)                                                                 |
 | Compiling with -profile spirv_1_6 takes the shouldEmitDiscardAsDemote=true branch — discard lowers to OpDemoteToHelperInvocation (not a terminator), and the OpKill fix-up pass is skipped.                                                                                                    | boundary   | [#spir-v-specific-runtime-predicates](../../../../design/target-pipelines/spirv.md#spir-v-specific-runtime-predicates)                                                                           | [`discard-spirv-16-demote.slang`](discard-spirv-16-demote.slang)                                                 |
 | Under SPIR-V 1.5 (the Slang default) discard lowers to OpKill — the documented "shouldEmitDiscardAsDemote returns false" branch where removeUnreachableCodeAfterDiscardForOpKill is active.                                                                                                    | boundary   | [#spir-v-specific-runtime-predicates](../../../../design/target-pipelines/spirv.md#spir-v-specific-runtime-predicates)                                                                           | [`discard-fragment-opkill.slang`](discard-fragment-opkill.slang)                                                 |
+| For a matrix operation under precise mode the per-row results are decorated with NoContraction individually and the OpCompositeConstruct that reassembles the matrix is left undecorated. | boundary | [#capabilities-and-extensions-decided-at-emit-time](../../../../design/target-pipelines/spirv.md#capabilities-and-extensions-decided-at-emit-time) | [`nocontraction-matrix-per-row-decorated.slang`](nocontraction-matrix-per-row-decorated.slang) |
+| A load of an `SV_VertexID` parameter is rewritten arithmetically to `gl_VertexIndex - gl_BaseVertex`, emitting an `OpISub` of two builtin loads and pulling in the `DrawParameters` capability. | functional | [#legalizeentrypointsforglsl-despite-the-name](../../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name) | [`sv-vertex-id-rebased-to-base-vertex.slang`](sv-vertex-id-rebased-to-base-vertex.slang) |
+| A load of an `SV_InstanceID` parameter is rewritten to `gl_InstanceIndex - gl_BaseInstance`, the instance-side companion of the vertex rebasing. | expansion | [#legalizeentrypointsforglsl-despite-the-name](../../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name) | [`sv-instance-id-rebased-to-base-instance.slang`](sv-instance-id-rebased-to-base-instance.slang) |
+| Boundary: `SV_VulkanVertexID` maps straight to the bare `gl_VertexIndex` and is not rebased, so neither the subtraction nor the `DrawParameters` capability appears. | boundary | [#legalizeentrypointsforglsl-despite-the-name](../../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name) | [`sv-vulkan-vertex-id-not-rebased.slang`](sv-vulkan-vertex-id-not-rebased.slang) |
+| `SV_IsFrontFace` is resolved by the semantic name-match chain to the `gl_FrontFacing` builtin identity and emits a `BuiltIn FrontFacing` decoration. | expansion | [#legalizeentrypointsforglsl-despite-the-name](../../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name) | [`sv-is-front-face-builtin.slang`](sv-is-front-face-builtin.slang) |
+| Negative: a semantic the `SV_*` name-match chain does not recognize falls through to error E49999, so an unrecognized system-value semantic fails the SPIR-V compile inside the entry-point legalization rather than at emit. | negative | [#legalizeentrypointsforglsl-despite-the-name](../../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name) | [`unknown-system-value-semantic-rejected.slang`](unknown-system-value-semantic-rejected.slang) |
+| A conservative-depth output carries `OpExecutionMode ... DepthReplacing` alongside the `DepthGreater` mode, because Vulkan demands DepthReplacing for any write to `FragDepth`. | functional | [#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements](../../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements) | [`fragment-depth-replacing-execution-mode.slang`](fragment-depth-replacing-execution-mode.slang) |
+| A row-major source matrix layout emits the transposed SPIR-V member decoration `ColMajor`, because what SPIR-V calls columns are what Slang calls rows. | functional | [#option-set-toggles](../../../../design/target-pipelines/spirv.md#option-set-toggles) | [`matrix-layout-row-major-emits-colmajor.slang`](matrix-layout-row-major-emits-colmajor.slang) |
+| A column-major source matrix layout emits the transposed SPIR-V member decoration `RowMajor`, the opposite pole of the same transposition rule. | boundary | [#option-set-toggles](../../../../design/target-pipelines/spirv.md#option-set-toggles) | [`matrix-layout-column-major-emits-rowmajor.slang`](matrix-layout-column-major-emits-rowmajor.slang) |
+| Negative: `SPV_KHR_storage_buffer_storage_class` is requested on demand by the type that needs it, so a shader with no storage-buffer pointer declares no such extension while still emitting the unconditional front matter. | negative | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../../design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools) | [`storage-buffer-extension-absent-without-buffer.slang`](storage-buffer-extension-absent-without-buffer.slang) |
+| The addressing model in the emitted `OpMemoryModel` is `Logical` unless `requirePhysicalStorageAddressing` moved it, which a buffer-pointer parameter does. | boundary | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../../design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools) | [`physical-storage-buffer-addressing-model.slang`](physical-storage-buffer-addressing-model.slang) |
 
 ## Untested claims
 
@@ -192,14 +419,15 @@ are recorded under `## Untested claims` rather than approximated with a weakened
 | SPIR-V skips `specializeAddressSpace` and defers address-space propagation to `legalizeIRForSPIRV`, letting the legalizer produce `Storage*` pointer types directly.                                                                                              | implementation-detail | [#deferred-address-space-propagation](../../../../design/target-pipelines/spirv.md#deferred-address-space-propagation)                                                         | The claim is about which pass computes the storage class, not about the resulting text; the storage classes themselves are already pinned by the storage-class tests in this bundle.                                         |
 | `-preserve-params` makes Phase D emit unreferenced `IRGlobalParam`s into the SPIR-V module.                                                                                                                                                                       | implementation-detail | [#option-set-toggles](../../../../design/target-pipelines/spirv.md#option-set-toggles)                                                                                         | Not reproducible from the CLI: an unreferenced `RWStructuredBuffer` global emits no `OpVariable` with `-preserve-params`, with or without an explicit binding. Recorded as a doc gap rather than shipped as a failing test.  |
 
+| An entry point mixing two depth semantics collapses to `DepthReplacing` alone. | implementation-detail | [#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements](../../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements) | Unreachable from Slang source: declaring both `SV_DepthGreaterEqual` and `SV_DepthLessEqual` on one fragment entry point is rejected at check time with E30705 (`a fragment entry point can declare at most one depth output`), so the collapse branch never runs. Recorded as a `cascading-only-mention` doc gap below. |
+| `getBoolOption(GenerateWholeProgram)` makes Phase D emit every `IRFunc` carrying `IRDownstreamModuleExportDecoration`. | needs-unit-test | [#option-set-toggles](../../../../design/target-pipelines/spirv.md#option-set-toggles) | `slangc -h` lists no whole-program flag, so the option is only reachable through the compile API; a C++ test setting `CompilerOptionName::GenerateWholeProgram` is what would observe the extra `OpFunction`s. |
+| `isSpirv16OrLater()` selects which terminator opcodes trigger the inserted `OpEndInvocationInterlockEXT`. | implementation-detail | [#spir-v-specific-runtime-predicates](../../../../design/target-pipelines/spirv.md#spir-v-specific-runtime-predicates) | Which terminator the insertion keys on is not distinguishable in the emitted module — both versions place the same `OpEndInvocationInterlockEXT` before the exit; only the internal choice differs. |
+| `optimizeSPIRV` sits inside a `#if 0` block and never executes, and word emission orders its instruction sources (debug, preserved params, exported funcs, `OpSource`, entry points). | implementation-detail | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../../design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools) | A never-compiled call emits nothing to observe, and the physical-layout pass reorders the module afterwards, so the source-emission order is not recoverable from the disassembly. |
+| The `RequiredLoweringPassSet` struct declares 34 flags in total, and the documented table plus the never-gating list account for every one appearing in a gate expression. | internal-source-fact | [#requiredloweringpassset-flags](../../../../design/target-pipelines/spirv.md#requiredloweringpassset-flags) | A count of fields in a C++ struct; no compile observes it. The individual flags that do gate a SPIR-V pass are covered by the tests for the passes they select. |
+| `processAbort` caches the `AbortMessage` struct per payload signature so identical signatures share one nominal struct type, and widens `bool` arguments to `uint`. | implementation-detail | [#abort-lowering-processabort--emitabort](../../../../design/target-pipelines/spirv.md#abort-lowering-processabort--emitabort) | Type-caching is only visible as the absence of a duplicate `OpTypeStruct`, which the emitter's general type deduplication would produce anyway; `abort-opabortkhr-message-struct.slang` covers the observable half of the lowering. |
 ## Doc gaps observed
 
 | Anchor                                                                                                                                                                                           | Kind                   | Gap                                                                                                                                                                                                                                                                                                                                                                                    | Suggested addition                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#option-set-toggles](../../../../design/target-pipelines/spirv.md#option-set-toggles)                                                                                                           | drift-from-source      | The doc says `getBoolOption(PreserveParameters)` makes Phase D "emit unreferenced `IRGlobalParam`s into the SPIR-V module". Compiling a shader whose second `RWStructuredBuffer` global is never referenced with `-preserve-params` emits no `OpVariable` for it, with or without an explicit `[[vk::binding(3, 0)]]`.                                                                 | State the additional condition the option needs (an explicit layout/reflection request, a whole-program compile, or an entry-point parameter rather than a global), or drop the "unreferenced" wording.                                |
-| [#phase-b-specialization-and-type-legalization](../../../../design/target-pipelines/spirv.md#phase-b-specialization-and-type-legalization)                                                       | cascading-only-mention | Row 21 lists `checkForRecursiveTypes` as a Phase B validator, but a struct that contains itself is rejected by the front end with E41001 before `linkAndOptimizeIR` runs, so no source-level recursion reaches the Phase B pass.                                                                                                                                                       | Add a note on row 21 saying the front-end cyclic-reference check shadows it for source-level recursion, and name the input shape (linked IR from an imported module, generated IR) that can still reach the validator.                 |
-| [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../../design/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                       | ambiguous-claim        | Row 33 lists `eliminateMultiLevelBreak` as `(always)`, which reads as "always has an effect". A `return` out of two nested loops only materializes the break flag at `-O1`; at the default `-O0` the early exit stays an in-loop `OpReturn` and at `-O2` the flag is optimized away again.                                                                                             | Say what the pass emits when it does act (a `Function`-storage `bool` flag plus per-level structured exits) and note that later simplification can remove the flag, so `(always)` refers to the pass running, not to a visible change. |
-| [#eliminatephis-with-spir-v-specific-options](../../../../design/target-pipelines/spirv.md#eliminatephis-with-spir-v-specific-options)                                                           | missing-surface        | The section says `useRegisterAllocation` "coalesce[s] SSA values into named temporaries" but never names what that looks like in the emitted module, so a reader cannot tell which token distinguishes it from the default mode.                                                                                                                                                       | Add one sentence: in this mode a merged value emits as a `Function`-storage `OpVariable` with an `OpStore` per predecessor and an `OpLoad` at the merge, instead of an `OpPhi`.                                                        |
-| [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../../design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                   | missing-surface        | The phase table names the word-emission step and its instruction sources but never lists the front matter every SPIR-V emit produces (`; SPIR-V` banner, `; Version:` line, `OpCapability Shader`, `OpExtension "SPV_KHR_storage_buffer_storage_class"`, `OpMemoryModel Logical GLSL450`, `OpSource Slang 1`). Those tokens are the only stable observation point for the whole phase. | Add an "always-emitted front matter" list under `emitFrontMatter` naming those tokens in emission order.                                                                                                                               |
-| [#capabilities-and-extensions-decided-at-emit-time](../../../../design/target-pipelines/spirv.md#capabilities-and-extensions-decided-at-emit-time)                                               | missing-example        | The `NoContraction` bullet explains which emitted opcodes are valid decoration targets but never names the user-visible switch that turns precise mode on, so the claim cannot be exercised from the doc alone.                                                                                                                                                                        | Name the `-fp-mode precise` CLI spelling in the bullet, and state that integer / bitwise / comparison opcodes stay undecorated even in precise mode.                                                                                   |
-| [#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements](../../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements) | missing-example        | The section says the conservative-depth decorations are "inert" for SPIR-V direct emit because "the SPIR-V emitter derives the mode independently", without naming the mode, so a reader cannot tell what SPIR-V is actually produced for `SV_DepthGreaterEqual` / `SV_DepthLessEqual`.                                                                                                | Name the emitted `OpExecutionMode ... DepthGreater` / `DepthLess` tokens (and the `DepthReplacing` companion) next to the decoration names.                                                                                            |
+| [#option-set-toggles](../../../../design/target-pipelines/spirv.md#option-set-toggles) | drift-from-source | The doc says `getBoolOption(PreserveParameters)` makes Phase D emit unreferenced `IRGlobalParam`s "complete with their `Binding` / `DescriptorSet` decorations", surviving at `-O0` because the optimizer is never loaded. Re-checked at the harness default `-O0`: a shader whose second `RWStructuredBuffer` global is never referenced emits no `OpVariable` for it under `-preserve-params`, with or without an explicit `[[vk::binding(3, 0)]]`, and an unreferenced `Texture2D` / `SamplerState` pair behaves the same. | The `-O0` caveat that was added does not explain the observation. State the additional condition the option needs (an explicit layout / reflection request, an entry-point uniform parameter rather than a module-scope global, or the compile-API `PreserveParameters` rather than the CLI `-preserve-params`), or drop the "unreferenced" wording. |
+| [#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements](../../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements) | cascading-only-mention | The section states that "an entry point mixing two depth semantics collapses to `DepthReplacing` alone". No Slang source can reach that branch: declaring both `SV_DepthGreaterEqual` and `SV_DepthLessEqual` on one fragment entry point is rejected at check time with `error[E30705]: a fragment entry point can declare at most one depth output`. | Note on that sentence that the mixed case is unreachable from source because the front end rejects a second depth output with E30705, and name the IR shape (a linked or generated module) that can still reach the collapse. |

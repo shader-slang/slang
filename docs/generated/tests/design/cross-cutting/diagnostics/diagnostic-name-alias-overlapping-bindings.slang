@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#diagnostic-definitions
-//META: doc_section_digest=0473f305932b4092c256ac645c07d6e955501097e2069c789894f420435331fe
+//META: doc_section_digest=aae910a03531ed9a85894147bb971dcd8f630d7bac4d557a7292c733abcf23ca
 //META: purpose=The lookup table carries the single alias `overlappingBindings` for `parameterBindingsOverlap`, so both spellings resolve by name.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -128,7 +128,7 @@ flowchart TD
 | `CastToSuperTypeExpr` | `Expr` | `valueArg: Expr*`, `witnessArg: Val*` | (none) | Cast to a super-type (interface), carrying the conformance witness. |
 | `IsTypeExpr` | `Expr` | `value: Expr*`, `typeExpr: TypeExp`, `witnessArg: Val*`, `constantVal: BoolLiteralExpr*` | [is](../syntax-reference/grammar.md#expressions) | `value is Type` runtime/compile-time type test. |
 | `AsTypeExpr` | `Expr` | `value: Expr*`, `typeExpr: Expr*`, `witnessArg: Val*` | [as](../syntax-reference/grammar.md#expressions) | `value as Type` subtype cast. |
-| `SizeOfExpr` | `SizeOfLikeExpr` | `value: Expr*`, `sizedType: Type*`, `dataLayout: Expr*` | [sizeof](../syntax-reference/grammar.md#expressions) | `sizeof(e)`; the operand is an expression (a type name parses as one) and an optional second argument selects the data layout. |
+| `SizeOfExpr` | `SizeOfLikeExpr` | `value: Expr*`, `sizedType: Type*`, `dataLayout: Expr*` | [sizeof](../syntax-reference/grammar.md#expressions) | `sizeof(e)`; the operand is an expression (a type name parses as one) and an optional second argument selects the data layout (see the note below the table). |
 | `AlignOfExpr` | `SizeOfLikeExpr` | (inherits) | [alignof](../syntax-reference/grammar.md#expressions) | `alignof(e)`, same operand shape as `sizeof`. |
 | `CountOfExpr` | `SizeOfLikeExpr` | (inherits) | [countof](../syntax-reference/grammar.md#expressions) | `countof(e)` (element count of an array or pack); takes a single operand, no data-layout argument. |
 | `FirstExpr` | `PackQueryExpr` | `value: Expr*` | [pack query](../syntax-reference/grammar.md#expressions) | First element of a pack. |
@@ -150,7 +150,7 @@ flowchart TD
 | `SharedTypeExpr` | `Expr` | `base: TypeExp` | [declarator list](../syntax-reference/grammar.md#variable--binding-declarations) | One type-expression node shared by several declarations, e.g. the `int` of `int a, b;`. |
 | `AssignExpr` | `Expr` | `left: Expr*`, `right: Expr*` | [assignment](../syntax-reference/grammar.md#expressions) | `a = b`. |
 | `ParenExpr` | `Expr` | `base: Expr*` | [parenthesized](../syntax-reference/grammar.md#expressions) | `(e)` preserved explicitly to keep rewriter output stable. |
-| `TupleExpr` | `Expr` | `elements: List<Expr*>` | [tuple](../syntax-reference/grammar.md#expressions) | `()` or `(a, b, ...)` tuple construction (Slang 2026 and later). |
+| `TupleExpr` | `Expr` | `elements: List<Expr*>` | [tuple](../syntax-reference/grammar.md#expressions) | `()` or `(a, b, ...)` tuple construction; parsed only at language version 2026 or later (`-std 2026`), below which a `,` inside parentheses stays the comma operator. |
 | `ThisExpr` | `Expr` | `scope: Scope*` | [this](../syntax-reference/grammar.md#expressions) | `this` of the enclosing aggregate type. |
 | `ReturnValExpr` | `Expr` | `scope: Scope*` | [`__return_val`](../syntax-reference/grammar.md#expressions) | Reference to the implicit `__return_val` for non-copyable return types. |
 | `LetExpr` | `Expr` | `decl: VarDecl*`, `body: Expr*` | (none) | Synthesized `let x = ...` binding wrapping a sub-expression; there is no surface let-expression syntax. |
@@ -171,8 +171,8 @@ flowchart TD
 | `AndTypeExpr` | `Expr` | `left: TypeExp`, `right: TypeExp` | [conjunction type](../syntax-reference/grammar.md#types) | `T & U` conjunction-of-conformances type expression. |
 | `ModifiedTypeExpr` | `Expr` | `modifiers: Modifiers`, `base: TypeExp` | [type modifier](../syntax-reference/grammar.md#types) | Type expression with modifier prefixes. |
 | `PointerTypeExpr` | `Expr` | `base: TypeExp` | [pointer type](../syntax-reference/grammar.md#types) | `T*`. |
-| `FuncTypeExpr` | `Expr` | `parameters: List<TypeExp>`, `result: TypeExp` | [function type](../syntax-reference/grammar.md#types) | `(T1, T2) -> R` function-type expression. |
-| `TupleTypeExpr` | `Expr` | `members: List<TypeExp>` | [tuple type](../syntax-reference/grammar.md#types) | `(T1, T2, ...)` tuple-type expression. |
+| `FuncTypeExpr` | `Expr` | `parameters: List<TypeExp>`, `result: TypeExp` | [function type](../syntax-reference/grammar.md#types) | `functype(T1, T2) -> R` function-type expression; the `functype` keyword is part of the spelling. |
+| `TupleTypeExpr` | `Expr` | `members: List<TypeExp>` | (none) | `(T1, T2, ...)` tuple-type expression; no type position spells it at this commit (see the type-expression callout). |
 | `PackBranchTypeExpr` | `Expr` | `packOperand: TypeExp`, `emptyType: TypeExp`, `nonEmptyType: TypeExp` | [`__packBranch`](../syntax-reference/grammar.md#expressions) | Pack-conditional type expression; parsed from the `__packBranch` keyword expression. |
 | `PartiallyAppliedGenericExpr` | `Expr` | `baseGenericDeclRef: DeclRef<GenericDecl>`, `providedOrdinaryArgs: List<Val*>` | (none) | A generic applied to some but not all parameters; resolved by overload resolution. |
 | `PackExpr` | `Expr` | `args: List<Expr*>` | (none) | Bundle of argument exprs matched to a pack parameter during overload resolution. |
@@ -189,6 +189,17 @@ checker/visitor entries, but nothing under `source/` constructs one at
 this commit. They are listed for completeness; treat their descriptions
 as the intent recorded in the header rather than as behavior a reader
 can observe in a compile.
+
+The optional second argument that `sizeof` and `alignof` accept after a
+comma names a type implementing `IBufferDataLayout`; the implementations
+declared in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) are
+`DefaultDataLayout`, `DefaultPushConstantDataLayout`,
+`Std140DataLayout`, `Std430DataLayout`, `ScalarDataLayout`, and
+`CDataLayout`. Omitting the argument selects the scalar layout, so
+`sizeof(S)` and `sizeof(S, ScalarDataLayout)` report the same size while
+`sizeof(S, Std140DataLayout)` need not. `countof` parses no such
+argument.
 
 ## Notable nodes
 
@@ -280,10 +291,15 @@ Two details of numeric literals are easy to get wrong. First, a
 `parseFloatingPointLiteralExpr` asks `getFloatingPointLiteralValue` for
 a `FloatingPointLiteralType` classification of the suffix (`Half`,
 `Float`, `Double`, or the error kinds `BadSignificand` / `BadSuffix`),
-maps it to `suffixType`, and stores the returned value unchanged — it
-no longer rounds or clamps the value to the range of the suffix type,
-so a range or hex-precision problem is reported as a diagnostic rather
-than silently folded into `value`. Second, a leading `-` or `+` is a
+maps it to `suffixType`, and stores the returned value unchanged — the
+parser itself no longer rounds or clamps. When that helper reports
+`isOutOfRange` or `precisionLost` the parser diagnoses it:
+`float-literal-unrepresentable` (40009) for an over-range magnitude,
+`float-literal-too-small` (40010) for an under-range one, and
+`float-hex-literal-precision-lost` (40019) for a truncated hex
+significand. All three are *warnings*, so the compile continues and the
+already-converted value is what lands in `value` — `1e50f` warns and
+stores `inf`. Second, a leading `-` or `+` is a
 prefix operator, not part of the literal token, so `parsePrefixExpr`
 folds the sign into a *copy* of the literal node; the
 `signedMinimumIntException` flag on `IntegerLiteralExpr` exists so that
@@ -338,6 +354,14 @@ synthetic `VarDecl` of type `T` that stands for the unwrapped value,
 and `innerCoercedExpr` is the ordinary `T`-to-`U` coercion expression
 built against that placeholder. How that shape is turned into code is
 described in [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md).
+Any assignment or argument passing that puts an `Optional<T>` value
+where an `Optional<U>` is wanted synthesizes it, provided the checker
+would accept the bare `T`-to-`U` conversion on its own: it probes that
+inner conversion with the ordinary coercion machinery and builds the
+node only if the probe succeeds. Both a numeric conversion
+(`Optional<int>` to `Optional<float>`) and an up-cast to an interface
+(`Optional<Square>` to `Optional<IShape>`, for `Square : IShape`)
+qualify.
 
 ### LambdaExpr and LambdaDecl
 
@@ -345,8 +369,12 @@ described in [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md).
 into a fresh `ScopeDecl` (`paramScopeDecl`) parsed with the ordinary
 `ParseParameter` syntax, and `bodyStmt` holds either the `{ ... }`
 block or, for the single-expression form `(x) => x + 1`, a synthesized
-`ReturnStmt` wrapping that expression. There is no bare-identifier
-parameter form — the parameter list always has parentheses. The
+`ReturnStmt` wrapping that expression, so `(int x) => { return x + 1; }`
+and `(int x) => x + 1` build the same shape. There is no bare-identifier
+parameter form — the parameter list always has parentheses, and the
+lambda is recognized only when a balanced parenthesized group is
+followed by `=>`, so in `x => x + 1` the bare `x` parses as an ordinary
+expression and the `=>` after it is a parse error. The
 closure struct `LambdaDecl` (see [declarations.md](declarations.md)),
 which carries the captured environment, is created later by the
 checker, not by the parser.
@@ -363,6 +391,20 @@ canonical type identity. Not every type keyword gets its own node: a
 written `This` is parsed as a plain `VarExpr` whose name is `This` and
 resolved by lookup, so the `ThisTypeExpr` class in the header is not
 what a `This` in source becomes.
+
+The surface spellings differ per node. `PointerTypeExpr` comes from a
+`*` suffix on a type and `AndTypeExpr` from an infix `&`, both parsed as
+type suffixes; `ModifiedTypeExpr` wraps a type written with modifier
+prefixes; `PackBranchTypeExpr` is parsed from the `__packBranch` keyword
+expression; and `FuncTypeExpr` requires the `functype` keyword —
+`functype(T1, T2) -> R`, the form the callback parameters in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) use (e.g.
+`functype(T, T) -> T combineOp`). `TupleTypeExpr` is the exception: its
+parser function and the type-specifier branch that would call it are
+both compiled out in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp), so a
+`(T1, T2)` tuple type has no accepted spelling at this commit and
+nothing constructs the node.
 
 ## See also
 

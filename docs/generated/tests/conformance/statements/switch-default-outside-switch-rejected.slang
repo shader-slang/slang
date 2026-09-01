@@ -21,6 +21,7 @@ void main()
 default:
 /*CHECK:
 ^^^^^^^ E39999
+^^^^^^^ 'default' is only allowed in a 'switch' body
 */
     x = 1;
 }

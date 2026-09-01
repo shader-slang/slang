@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#lowerbuiltintypesforkernelentrypoints-removetorchkernels-handleautobindnames
-//META: doc_section_digest=22ae3a9d8d0573a5bab2a7b0dba12f8756373b78d95c5fbbfe9c23531d9b27b3
+//META: doc_section_digest=246bf07ed71d14a356c41520656ee728c1a0baf7965fc4757d0ec6a3ff4a4a0c
 //META: purpose=removeTorchKernels runs on the CUDA arm and deletes the host-side [TorchEntryPoint] function, so only the kernel side survives into the emitted CUDA C++.
 //META: intent=functional
 //META: pipeline_stage=emit

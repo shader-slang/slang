@@ -4222,10 +4222,6 @@ internal T __frem<T>(T left, T right);
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
 
-__generic<T>
-__intrinsic_op( $(kIROp_GetLegalizedSPIRVGlobalParamAddr))
-__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
-
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
 
@@ -5600,7 +5596,7 @@ semantic sv_waveindex
 
 semantic sv_barycentrics
 {
-    [require(fragment)]
+    [require(fragment, fragmentshaderbarycentric)]
     get : float3;
 }
 

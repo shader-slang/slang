@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-switches
-//META: doc_section_digest=4820552ad726706a9ebecdf715453f85eb93c80c7a2decca221f929866c46c78
+//META: doc_section_digest=93e3e0077c420a8fd04038823472fc8368e454763e1fd6cc905f959fe8e07ee8
 //META: purpose=A switch statement lowers to switch(value, breakLabel, defaultLabel, caseVal1, caseBlock1, ...) — scrutinee, break label, default label, then (caseValue, caseBlock) pairs.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // the switch terminator with the documented operand layout. Case
 // values appear as inline `<N> : Int` literal operands.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int sel;
 uniform RWStructuredBuffer<int> buf;

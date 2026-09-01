@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#parameter-binding-producing-the-programlayout
-//META: doc_section_digest=7da97e6272e7230be6aa860fcb219926e5ecf2fe260c372906e4be02b8c61abb
+//META: doc_section_digest=ba2ce52ee3140a9f243e5fb99b8f2c9379dfa7db6e7567a4e73f5fca0723c7b2
 //META: purpose=When the requested bindless space is already occupied the binding pass warns with E39012 and scans upward for the first unused space.
 //META: intent=negative
 //META: pipeline_stage=layout

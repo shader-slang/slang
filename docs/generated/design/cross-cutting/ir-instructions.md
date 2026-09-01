@@ -173,7 +173,7 @@ declarations live in
 | `Int`, `Float`, `Bool`, ... | `IntType`, `FloatType`, `BoolType`, ... | — | Basic scalar types; see [../ir-reference/types.md](../ir-reference/types.md). |
 | `Vec` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
 | `Mat` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
-| `MetalPackedVec` | `MetalPackedVectorType` | `elementType, elementCount` | Element-aligned, unpadded vector storage type for Metal device buffers; emitted as MSL `packed_T<N>`; hoistable. |
+| `MetalPackedVec` | `MetalPackedVectorType` | `elementType, elementCount` | Element-aligned, unpadded vector storage type for Metal device buffers; emitted as MSL `packed_T<N>`; hoistable. What selects it is the *buffer element type*, not the source spelling of the vector: the elements of a `StructuredBuffer<float3>` are emitted as `packed_float3` on Metal, while the same declaration on every other target keeps the padded vector (`float3` in HLSL, `vec3` in GLSL, and a SPIR-V runtime array with `ArrayStride 16` rather than the 12 bytes three floats occupy). |
 | `Array` | `ArrayType` | `elementType, elementCount` | Fixed-size array; hoistable. |
 | `Ptr` | `PtrType` | `valueType, accessQualifierOperand?, addressSpaceOperand?, dataLayout?` | Pointer type; hoistable. |
 | `TextureType` | — | `elementType, shape, isArray, isMS, sampleCount, accessOperand, isShadow, isCombined, format` | Texture types; hoistable. |
@@ -188,8 +188,9 @@ declarations live in
 | `integer_constant`, `float_constant`, `string_constant`, ... | `IntLit`, `FloatLit`, `StringLit`, ... | (payload stored inline on the inst) | Literal constants; hoistable. |
 | `add`, `sub`, `mul`, `div` | `Add`, `Sub`, `Mul`, `Div` | `left, right` | Arithmetic. |
 | `cmpEQ`, `cmpLT`, ... | `Eql`, `Less`, ... | `left, right` | Comparisons. |
-| `bitCast`, `intCast`, `floatCast`, ... | — | `val` | Conversion ops. |
-| `constexprAdd` ... `constexprEnumCast` | — | 1-3 fixed operands; see Lua entries | Compile-time-folded arithmetic / cast variants; hoistable. |
+| `bitCast`, `intCast`, `floatCast`, ... | — | `val` | Conversion ops. `bit_cast<T>(x)` is the surface for `bitCast`; the value-preserving casts come from the built-in conversion constructors, so `int64_t(a)` lowers to `intCast` and `float(d)` to `floatCast`. |
+| `constexprAdd` ... `constexprEnumCast` | — | 1-3 fixed operands; see Lua entries | Compile-time-folded arithmetic / cast variants; hoistable, which the runtime `add` family is not. They carry *type-level* values: arithmetic on a generic value parameter, as in `int b[N + 1]` inside `f<let N : int>`, has to produce a value usable as an array bound, so it lowers to `constexprAdd` rather than `add`. |
+| `makeVector`, `makeArray`, `makeStruct` | — | (variadic; one operand per element / field) | Aggregate constructors. The `vector<T,N>` component constructors are declared `__intrinsic_op(kIROp_MakeVector)`, so `float3(a, b, c)` lowers to `makeVector`. |
 | (...see [../ir-reference/values.md](../ir-reference/values.md) for the full list) | | | |
 
 ### Memory instructions
@@ -197,7 +198,7 @@ declarations live in
 | Opcode | `struct_name` | Operands | Notes |
 | --- | --- | --- | --- |
 | `var` | `IRVar` | — | Local variable allocation; result is `Ptr<T>`. |
-| `alloca` | — | `allocSize` | Dynamically-sized stack allocation. |
+| `alloca` | — | `allocSize` | Dynamically-sized stack allocation. No Slang construct reaches it: every local declaration — scalar, struct, or fixed-size array — lowers to `var` instead. Its only producer is `IRBuilder::emitAlloca` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4046), whose size argument is an RTTI object pointer rather than an integer, and nothing in the tree calls it at `source_commit`. |
 | `load` / `store` | — | `ptr` / `ptr, val` | Pointer load and store. |
 | `get_field` / `get_field_addr` | `FieldExtract` / `FieldAddress` | `base, key` | Struct member access (rvalue / lvalue). |
 | `getElement` / `getElementPtr` | — | `base, index` | Indexed access. |
@@ -211,7 +212,7 @@ declarations live in
 | `param` | `IRParam` | (variadic) | Block or function parameter; replaces SSA `phi`. |
 | `unconditionalBranch` / `conditionalBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
 | `return_val` / `unreachable` / `discard` | — | (terminator-specific) | Return and exit terminators. |
-| `RequirePrelude`, `RequireTargetExtension`, `Printf`, `Abort`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes (`Abort` carries a `format` operand, like `Printf`). |
+| `RequirePrelude`, `RequireTargetExtension`, `Printf`, `Abort`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes (`Abort` carries a `format` operand, like `Printf`). None of the five is compiler-internal: each is the `__intrinsic_op` of a core-module function a user can call — `__requirePrelude("...")`, `__requireTargetExtension("...")`, `printf(fmt, args...)`, `abort(fmt, args...)`, and `static_assert(cond, "message")`. |
 | (...see [../ir-reference/control-flow.md](../ir-reference/control-flow.md) for the full list) | | | |
 
 ### Function and module structure

@@ -223,6 +223,19 @@ flowchart TD
 | `getRegisterIndex` | **`IRGetRegisterIndex`** | `[resource]` | | `__intrinsic_op` on `__getRegisterIndex`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 26386-26387 | Register index the resource is bound to. Child of the `BindingQuery` group. |
 | `getRegisterSpace` | **`IRGetRegisterSpace`** | `[resource]` | | `__intrinsic_op` on `__getRegisterSpace`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 26383-26384 | Register space the resource is bound to. Child of the `BindingQuery` group. |
 
+Five of these rows have **no public wrapper**: the underscore-prefixed
+declarations `__getEquivalentStructuredBuffer`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+10213-10219), `__getStructuredBufferPtr`, `__getUntypedBufferPtr`, and
+`__getRegisterIndex` / `__getRegisterSpace` (lines 26389-26393) are the
+whole surface. Unlike `InterlockedAdd` or `WaveGetActiveMask`, no
+ordinary Slang function calls them on the user's behalf, so reaching
+these opcodes from source means calling the underscore intrinsic
+directly and accepting that it is not a stable public API. That also
+means they *do* appear at the lowering snapshot, with no inlining step
+in between — the opposite of the wrapper cases collected under
+[`Interlocked*` is a wrapper, not an opcode](#interlocked-is-a-wrapper-not-an-opcode).
+
 ### Shader IO
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
@@ -232,6 +245,18 @@ flowchart TD
 | `GetCurrentStage` | `IRGetCurrentStage` | — | | `IRBuilder::emitGetCurrentStage`, called from [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 9340 when lowering `__target_switch`-style stage dispatch | Pipeline stage of the calling entry point; folded away by `slang-ir-specialize-stage-switch.cpp`. |
 | `GetPerVertexInputArray` | `IRGetPerVertexInputArray` | `[attribute]` | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11700 | Array view of a `nointerpolation` input across the primitive's vertices. |
 | `ResolveVaryingInputRef` | `IRResolveVaryingInputRef` | `[attribute]` | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11697 | Placeholder reference to a varying input, rewritten to the real parameter by varying-param legalization. |
+
+The last two rows share one user surface:
+`GetAttributeAtVertex(attribute, vertexIndex)`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11733),
+called from a `fragment` entry point on an input declared
+`nointerpolation`. Which of the two opcodes you get is a target
+decision, not a source one: the function's `__target_switch` produces
+`ResolveVaryingInputRef` on its own for `hlsl` (which has its own
+`GetAttributeAtVertex` to emit), and wraps that reference in
+`GetPerVertexInputArray` before subscripting it for `glsl` / `spirv`.
+The `fragment` requirement is enforced by capability checking — the
+same call in a `vertex` entry point is rejected with `E36107`.
 
 ### Mesh-shader outputs
 
@@ -268,6 +293,14 @@ enum IRMemoryOrder
     kIRMemoryOrder_SeqCst = 4,
 };
 ```
+
+The Slang-level spelling a user writes is the `MemoryOrder` enum in
+[core.meta.slang](../../../../source/slang/core.meta.slang) (lines
+4052-4063), whose enumerators are `Relaxed`, `Acquire`, `Release`,
+`AcquireRelease` and `SeqCst` — so `MemoryOrder.AcquireRelease` is what
+produces `kIRMemoryOrder_AcquireRelease = 3`. The two cannot drift: each
+Slang enumerator is defined by a `$(kIRMemoryOrder_*)` splice of the C++
+constant above.
 
 There is no memory-*scope* operand. The SPIR-V backend hard-codes
 `SpvScopeDevice` in every atomic case
@@ -333,6 +366,19 @@ instrumentation pass runs:
 | `BeginFragmentShaderInterlock` | `IRBeginFragmentShaderInterlock` | — | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3537 | Opens a rasterizer-ordered critical section. |
 | `EndFragmentShaderInterlock` | `IREndFragmentShaderInterlock` | — | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3542 | Closes the section opened above. |
 
+The Slang a user writes to reach these: the two interlock opcodes are
+`beginInvocationInterlock()` and `endInvocationInterlock()`
+([core.meta.slang](../../../../source/slang/core.meta.slang) lines
+3538 and 3543), and they require a `fragment` entry point — the
+rasterizer ordering they request has no meaning in another stage.
+`ControlBarrier` has no direct spelling at all; it is synthesized by
+GLSL legalization. The HLSL barrier family a user does call —
+`AllMemoryBarrier`, `GroupMemoryBarrier`, `DeviceMemoryBarrier`, each
+also in a `WithGroupSync` form, plus the `WithWaveMaskSync` variants
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+7797, 9943, 11835, 15678, 15713) — does not lower to these opcodes; see
+[`ControlBarrier` vs `GroupMemoryBarrierWithGroupSync`](#controlbarrier-vs-groupmemorybarrierwithgroupsync).
+
 The general-purpose `Barrier(memoryType, semantics)` intrinsic is not on
 this page: its flag arguments are carried by the
 `getEnumBarrierMemoryTypeFlags` / `getEnumBarrierSemanticFlags` opcodes,
@@ -371,6 +417,32 @@ stay as core-module calls until backend emit.
 | `setOptiXPayloadRegister` | `IRSetOptiXPayloadRegister` | `[registerIndex]`, `[value]` | | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) lines 1547-1624 | Writes one 32-bit OptiX payload register. |
 | `GetVulkanRayTracingPayloadLocation` | `IRGetVulkanRayTracingPayloadLocation` | `[payload]` | | `__intrinsic_op` on `__callablePayloadLocation`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 19599 | Location index assigned to a Vulkan raytracing / callable payload. |
 
+What produces `getOptiXSbtDataPointer` is *where* a uniform is
+declared, not how large it is. Only an entry-point `uniform`
+**parameter**, on a stage other than compute, is collected into the SBT
+record; one scalar is enough:
+
+```slang
+struct Payload { float3 color; };
+
+[shader("closesthit")]
+void ch(inout Payload p, uniform float scale)
+{
+    p.color = float3(scale, scale, scale);
+}
+```
+
+With `-target cuda -stage closesthit -entry ch`, the opcode first
+appears in the dump after `collectOptiXEntryPointUniformParams`, as
+`getOptiXSbtDataPointer` typed
+`ConstantBuffer(%ShaderRecordParams, DefaultLayout)`, and the emitted
+CUDA reads
+`((ShaderRecordParams_0*)optixGetSbtDataPointer())->scale_0`. Two
+nearby shapes do *not* produce it: a module-scope `uniform` global
+becomes an ordinary `global_param` read out of the CUDA global
+parameter block, and a `compute` entry point is skipped by the pass —
+its `uniform` parameter becomes a kernel launch argument.
+
 ### Descriptor heaps
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
@@ -381,6 +453,32 @@ stay as core-module calls until backend emit.
 | `SPIRVLoadTexelPointerFromHeap` | `IRSPIRVLoadTexelPointerFromHeap` | `heap, index, textureType, coord, sampleIndex` | | `IRBuilder::emitSPIRVLoadTexelPointerFromHeap` from [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 1482 | Forms a texel pointer directly from a heap descriptor so an atomic can target a bindless image. |
 | `SPIRVResourceHeap` | `IRSPIRVResourceHeap` | — | H | `IRBuilder::emitSPIRVResourceDescriptorHeap` from [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 1854 | The implicit SPIR-V resource-descriptor array. Note the builder helper is named `emitSPIRVResourceDescriptorHeap`, not `emitSPIRVResourceHeap`. |
 | `SPIRVSamplerHeap` | `IRSPIRVSamplerHeap` | — | H | `IRBuilder::emitSPIRVSamplerDescriptorHeap` from the same site, line 1858 | The implicit SPIR-V sampler-descriptor array. |
+
+The surface behind every row here is `DescriptorHandle<T>`: each
+dereference of one goes through `defaultGetDescriptorFromHandle`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+27708-27807), whose `__target_switch` chooses the heap form. On SPIR-V
+the choice is made by a capability, not by the shader text. Compiled
+with `-capability spvDescriptorHeapEXT`, the `spvDescriptorHeapEXT`
+case (line 27797) returns
+`__spirvLoadDescriptorFromHeap(__spirvResourceHeap(), i)`, or
+`__spirvSamplerHeap()` for `DescriptorKind.Sampler` — so the two heap
+opcodes are *core-module* intrinsics (lines 27685 and 27688) that are
+in the IR from linking onward, not things SPIR-V legalization invents.
+Without that capability the same shader falls to the plain `spirv`
+case and uses `GetDynamicResourceHeap` instead; the emitted binary
+names `slang_resourceHeap` / `slang_samplerHeap` and requests
+`SPV_EXT_descriptor_heap` in the first case, and `__slang_resource_heap`
+in the second.
+
+SPIR-V legalization is the second producer, reached only from the
+combined-texture-sampler arm of that same branch:
+`processMakeCombinedTextureSamplerFromHandle` expands
+`MakeCombinedTextureSamplerFromHandle` into one load from each of the
+two heaps. `SPIRVLoadTexelPointerFromHeap` has no other producer at
+all. Neither is visible under `-dump-ir`: `legalizeIRForSPIRV` runs
+from [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
+line 12131, inside emit, after the last dump point.
 
 The conversions between descriptor handles and integers
 (`CastUInt2ToDescriptorHandle`, `CastDescriptorHandleToUInt64`,
@@ -557,6 +655,26 @@ straight to the opcode, use `Atomic<T>` — `counter.add(1)` becomes an
 Note also that one `atomicAdd` in the IR corresponds to one *statement*,
 not one thread. Contention across a dispatch is implicit in the launch;
 the IR carries no fan-out.
+
+#### The same pattern, elsewhere on this page
+
+`Interlocked*` is the clearest case but not the only one. Whenever the
+`__intrinsic_op` sits on an underscore-prefixed declaration and the
+public name is an ordinary Slang function that calls it, the opcode is
+absent from the lowering snapshot and appears only after inlining. A
+reader searching `func %main` in a fresh `-dump-ir` for any of these
+will not find them:
+
+| Opcode | Public surface | Where the `__intrinsic_op` actually sits |
+| --- | --- | --- |
+| `waveGetActiveMask` | `WaveGetActiveMask()` | `__WaveGetActiveMask()`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 15532-15533, called from the wrapper at 15538-15556 |
+| `imageSubscript` | `rwtex[coord]` | the core-module `__ref` subscript accessor, so the subscript is still a call until that accessor is inlined |
+| `StructuredBufferGetDimensions` | `sBuf.GetDimensions(count, stride)` | inside the core-module `GetDimensions` body, never at the call site |
+| `atomicAdd` and friends, from `atomic_reduce` | the `[ForceInline]` `__target_switch` body | the switch body is still a call immediately after lowering; the unused-result `atomicAdd` the section describes appears once inlining has run |
+
+The general rule is worth carrying to the rest of this page: an
+`AST origin` cell naming an `__intrinsic_op` line tells you where the
+opcode is *declared*, not the earliest IR in which you can observe it.
 
 ### `getNaturalStride` and `getNaturalAlignment`
 

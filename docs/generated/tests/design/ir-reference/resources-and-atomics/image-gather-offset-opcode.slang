@@ -16,7 +16,7 @@
 // the user call specializes; the operand names in that body (`location`,
 // `component`, `offset`) are what the CHECK pins.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture2D<float4> tex;
 uniform SamplerState samp;

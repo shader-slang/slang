@@ -111,13 +111,89 @@ def find_slangc(root):
     return None
 
 
+def _tar_filter_supported():
+    """Whether this interpreter's tarfile offers the "data" extraction filter.
+
+    A function rather than an inline hasattr so the self-check can simulate an
+    interpreter without it, which is the only way to exercise the refusal
+    branch in _safe_extract: from Python 3.14 the filter is the default and
+    that branch is unreachable. Patching this is surgical, where deleting
+    tarfile.data_filter would break tarfile's own default-filter lookup."""
+    return hasattr(tarfile, "data_filter")
+
+
 def _safe_extract(archive, names, dest):
-    """extractall, but reject any member that would escape `dest` (zip/tar-slip)."""
+    """extractall, but reject any member that would escape `dest` (zip/tar-slip).
+
+    Zip members that are SYMLINKS (macOS release zips ship
+    lib/libslang-compiler.dylib -> libslang-compiler.<ver>.dylib) are
+    recreated as symlinks: zipfile.extractall writes them as small text files
+    holding the target path, which dlopen then rejects with "slice is not
+    valid mach-o file". Link targets must stay inside `dest` too."""
     base = os.path.realpath(dest)
     for name in names:
         target = os.path.realpath(os.path.join(dest, name))
         if target != base and not target.startswith(base + os.sep):
             raise SystemExit(f"refusing unsafe archive member '{name}' (escapes {dest})")
+    if isinstance(archive, zipfile.ZipFile):
+        if os.name == "nt":
+            # Both release zips (windows-x86_64, macos-*) can land here, but a
+            # Windows HOST cannot recreate the macOS dylib symlinks anyway:
+            # os.symlink needs SeCreateSymbolicLinkPrivilege, which the perf
+            # runner does not have. The Windows asset carries none, and a
+            # macOS asset is never run from Windows, so extract plainly — the
+            # member-name check above is the whole guard. This branch must
+            # exist: zipfile.extractall takes no filter= kwarg and ZipFile has
+            # no getmembers(), so falling through to the tar path below is a
+            # TypeError on every Windows release fetch.
+            archive.extractall(dest)
+            return
+        links, regular = [], []
+        for i in archive.infolist():
+            (links if (i.external_attr >> 16) & 0o170000 == 0o120000
+             else regular).append(i)
+        archive.extractall(dest, members=regular)
+        for i in links:
+            linkto = archive.read(i).decode("utf-8")
+            path = os.path.join(dest, i.filename)
+            resolved = os.path.realpath(os.path.join(os.path.dirname(path), linkto))
+            if not resolved.startswith(base + os.sep):
+                raise SystemExit(
+                    f"refusing unsafe symlink '{i.filename}' -> '{linkto}'")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            if os.path.lexists(path):
+                os.unlink(path)
+            os.symlink(linkto, path)
+        return
+    # Tar (the Linux release assets — Windows and macOS both ship zips, which
+    # returned above). The member-NAME check is not sufficient on its own: a
+    # tar can carry a symlink `link -> ../outside` followed by a regular
+    # member `link/evil`, and at validation time `dest/link` does not exist
+    # yet, so realpath resolves it lexically and the name passes. Extraction
+    # then creates the symlink and writes through it, landing the file
+    # outside dest.
+    #
+    # tarfile's "data" filter rejects exactly that (absolute and escaping link
+    # targets). It became the DEFAULT in 3.14, but this suite runs on whatever
+    # system Python the runner has, so it is requested explicitly — guarded on
+    # the feature rather than a version number, because `filter=` did not exist
+    # before its backport (3.9.17 / 3.10.12 / 3.11.4 / 3.12) and passing it to
+    # an older tarfile raises TypeError. hasattr(tarfile, "data_filter") is the
+    # documented probe for that backport.
+    if _tar_filter_supported():
+        archive.extractall(dest, filter="data")
+        return
+    # Pre-backport interpreter: there is no filter to ask for, so refuse link
+    # members rather than extract them unchecked. Release tarballs have not
+    # carried any (the macOS zip is where the symlinks live), so this fails
+    # loudly on a genuinely new archive shape instead of guessing.
+    risky = [m.name for m in archive.getmembers() if m.issym() or m.islnk()]
+    if risky:
+        raise SystemExit(
+            f"refusing tar with link members {risky} on Python "
+            f"{sys.version_info.major}.{sys.version_info.minor}, which predates "
+            f"tarfile's 'data' extraction filter; upgrade Python to extract "
+            f"this archive safely")
     archive.extractall(dest)
 
 
@@ -212,6 +288,147 @@ def main():
     print(f"\n{ok}/{len(index)} releases ready. wrote {ipath}")
     if ok != len(index):
         sys.exit(1)
+
+
+# Import-time self-check for the zip-symlink extraction and its escape
+# guard (POSIX only, matching the branch in _safe_extract): a symlink member
+# must be recreated as a real symlink — zipfile's default text-file
+# placeholder is exactly the dlopen-breaking bug this fixed — and a link
+# target escaping the destination must be rejected.
+if os.name != "nt":
+    import io
+    import shutil
+    import tempfile
+
+    def _mkzip(linkto):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("lib/real.dylib", b"x")
+            info = zipfile.ZipInfo("lib/link.dylib")
+            info.external_attr = (0o120777 << 16)
+            z.writestr(info, linkto)
+        buf.seek(0)
+        return zipfile.ZipFile(buf)
+
+    _d = tempfile.mkdtemp(prefix="fetch_selfcheck_")
+    try:
+        with _mkzip("real.dylib") as _z:
+            _safe_extract(_z, _z.namelist(), _d)
+        assert os.path.islink(os.path.join(_d, "lib/link.dylib")), \
+            "zip symlink member must extract as a real symlink"
+        try:
+            with _mkzip("../../outside") as _z:
+                _safe_extract(_z, _z.namelist(), _d)
+            raise AssertionError("escaping symlink target must be rejected")
+        except SystemExit:
+            pass
+    finally:
+        shutil.rmtree(_d, ignore_errors=True)
+    del _d, _mkzip
+
+    # The same escape, through the TAR branch — the one the Linux release
+    # assets take. This shape defeats the member-name check on its own:
+    # `dest/link` does not exist when the names are validated, so
+    # realpath resolves `link/evil` lexically inside dest and it passes. Only
+    # the extraction filter stops the write.
+    def _mktar(linkto):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as t:
+            li = tarfile.TarInfo("link")
+            li.type = tarfile.SYMTYPE
+            li.linkname = linkto
+            t.addfile(li)
+            payload = b"pwned"
+            fi = tarfile.TarInfo("link/evil")
+            fi.size = len(payload)
+            t.addfile(fi, io.BytesIO(payload))
+        buf.seek(0)
+        return tarfile.open(fileobj=buf)
+
+    def _try_extract_slip(dest, outside):
+        """Extract the malicious tar into `dest`; return True if it escaped."""
+        try:
+            with _mktar(os.path.join("..", "outside")) as _t:
+                _safe_extract(_t, _t.getnames(), dest)
+        except (SystemExit, tarfile.TarError, OSError):
+            pass  # rejected — by whichever of the two guards applies
+        return os.path.exists(os.path.join(outside, "evil"))
+
+    _d = tempfile.mkdtemp(prefix="fetch_selfcheck_tar_")
+    try:
+        _outside = os.path.join(_d, "outside")
+        _dest = os.path.join(_d, "dest")
+        os.makedirs(_outside)
+        os.makedirs(_dest)
+        assert not _try_extract_slip(_dest, _outside), \
+            ("tar symlink-slip escaped the destination: a link member plus a "
+             "regular member written through it must not land outside dest")
+
+        # The branch above is only load-bearing on interpreters whose default
+        # extraction filter is NOT already "data" — from 3.14 the default
+        # protects regardless, which would make the check above pass even with
+        # every guard here deleted. So pin the part this module actually owns:
+        # with the backport probe hidden, _safe_extract must refuse the link
+        # members itself rather than fall through to an unfiltered extractall.
+        # That fallback is dead code on a modern interpreter and would
+        # otherwise never be executed anywhere.
+        _saved_probe = _tar_filter_supported
+        try:
+            globals()["_tar_filter_supported"] = lambda: False
+            _refused = False
+            try:
+                with _mktar(os.path.join("..", "outside")) as _t:
+                    _safe_extract(_t, _t.getnames(), _dest)
+            except SystemExit:
+                _refused = True          # our refusal — the contract
+            except (tarfile.TarError, OSError):
+                pass                     # extraction was ATTEMPTED and the
+                                         # interpreter stopped it; that is the
+                                         # reliance this check exists to reject
+            assert _refused, \
+                ("without tarfile's data filter available, _safe_extract must "
+                 "refuse link members itself rather than attempt an unfiltered "
+                 "extractall and rely on the interpreter to stop it")
+        finally:
+            globals()["_tar_filter_supported"] = _saved_probe
+        del _saved_probe, _refused
+    finally:
+        shutil.rmtree(_d, ignore_errors=True)
+    del _d, _dest, _outside, _mktar, _try_extract_slip
+
+
+# The Windows-HOST zip path, checked from every platform by faking os.name.
+# ASSET_SUFFIXES["windows"] is a .zip, so this IS the branch the release sweep
+# takes on its Windows runner, and nothing else reaches it: check-python-core
+# runs on Linux, and the sweep itself only reports the failure a whole run
+# later. Faking the attribute is the same surgical patching
+# _tar_filter_supported exists for — os.name is read at call time, and on
+# POSIX os.path stays bound to posixpath, so only the branch under test moves.
+# Without its own return a ZipFile falls into the tar code, whose `filter=`
+# kwarg and getmembers() call ZipFile does not have.
+#
+# Imported again here rather than relied on from the block above: that one is
+# guarded on POSIX, and on a real Windows host these names would be unbound.
+import io
+import shutil
+import tempfile
+
+_saved_os_name = os.name
+_zbuf = io.BytesIO()
+with zipfile.ZipFile(_zbuf, "w") as _z:
+    _z.writestr("bin/slangc.exe", b"x")
+_zbuf.seek(0)
+_d = tempfile.mkdtemp(prefix="fetch_selfcheck_nt_")
+try:
+    os.name = "nt"
+    with zipfile.ZipFile(_zbuf) as _z:
+        _safe_extract(_z, _z.namelist(), _d)
+    assert os.path.isfile(os.path.join(_d, "bin", "slangc.exe")), \
+        "a zip on a Windows host must extract, not fall through to the tar path"
+finally:
+    os.name = _saved_os_name
+    shutil.rmtree(_d, ignore_errors=True)
+del _saved_os_name, _zbuf, _z, _d
 
 
 if __name__ == "__main__":

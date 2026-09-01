@@ -164,3 +164,30 @@ jobs:
             exit 1
           fi
           echo "All CMake option builds completed successfully!"
+
+      - name: success notification
+        id: slack-notify-success
+        if: ${{ github.event_name == 'schedule' && success() }}
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "CMake-Options-Weekly": ":green-check-mark: CMake options weekly status: ${{ job.status }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      # TODO: Re-enable the failure notification once this weekly workflow has
+      # proven stable enough that a failure means a real regression. Until
+      # then we only post the success message, so an infrastructure hiccup
+      # does not advertise a false failure to the channel.
+      # - name: failure notification
+      #   id: slack-notify-failure
+      #   if: ${{ github.event_name == 'schedule' && !success() }}
+      #   uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+      #   with:
+      #     payload: |
+      #       {
+      #         "CMake-Options-Weekly": ":alert: :alert: :alert: :alert: :alert: :alert:\nCMake options weekly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      #       }
+      #   env:
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

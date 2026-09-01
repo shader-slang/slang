@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#capability--target-attributes
-//META: doc_section_digest=3a5e5ccd3c56586ff535ba4ba12aa25b1d20542d755d9561cb4e0be92dc6ca73
+//META: doc_section_digest=ce8106cbb762f8a84c2c1448718332b6001d57168b92318fbbf9d952624061de
 //META: purpose=`[require(capability)]` makes a call from an entry point that lacks the capability a checking error.
 //META: intent=negative
 //META: pipeline_stage=check

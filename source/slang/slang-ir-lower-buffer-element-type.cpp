@@ -2582,7 +2582,13 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
         }
     }
     auto rules = getTypeLayoutRuleNameForBuffer(target, bufferType);
-    return TypeLoweringConfig{addrSpace, rules};
+
+    // Consider an `out bool values[3]`: the Khronos policy must lower `bool` to `int`,
+    // but the resulting wrapper is a stage interface type rather than a memory buffer.
+    // Keep the lowered interface wrapper logical so the SPIR-V emitter does not synthesize
+    // block-style member `Offset` decorations, which Vulkan forbids on stage Input and Output.
+    bool lowerToPhysicalType = addrSpace != AddressSpace::Input;
+    return TypeLoweringConfig{addrSpace, rules, lowerToPhysicalType};
 }
 
 struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy

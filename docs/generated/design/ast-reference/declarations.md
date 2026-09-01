@@ -103,14 +103,14 @@ though nothing constructs it directly. Concrete leaves below.
 | `LetDecl` | `VarDecl` | (inherits) | [variable declaration](../syntax-reference/grammar.md#declarations) | `let` variable; immutable. |
 | `ParamDecl` | `VarDeclBase` | (inherits) | [parameter](../syntax-reference/grammar.md#function-style-declarations) | Function / initializer / subscript parameter. |
 | `ModernParamDecl` | `ParamDecl` | (inherits) | [parameter](../syntax-reference/grammar.md#function-style-declarations) | Modern-syntax (name-first) parameter; immutable unless `out`/`inout`. |
-| `GlobalGenericValueParamDecl` | `VarDeclBase` | (inherits) | [`__generic_value_param`](../syntax-reference/grammar.md#declarations) | Module-level existential value parameter (not a type parameter). |
+| `GlobalGenericValueParamDecl` | `VarDeclBase` | (inherits) | [`__generic_value_param`](../syntax-reference/grammar.md#declarations) | Module-level existential value parameter (not a type parameter); bound by an external specialization argument — see `## Notable nodes`. |
 | `GenericValueParamDecl` | `VarDeclBase` | `parameterIndex: int` | [generic-value param](../syntax-reference/grammar.md#generics-and-where-clauses) | A value parameter of a `GenericDecl`. |
 | `GenericValuePackParamDecl` | `VarDeclBase` | `parameterIndex: int` | [generic-value-pack param](../syntax-reference/grammar.md#generics-and-where-clauses) | A value-pack parameter of a `GenericDecl` (`let each N`). |
 | `ExtensionDecl` | `AggTypeDeclBase` | `targetType: TypeExp` | [extension](../syntax-reference/grammar.md#type-defining-declarations) | `extension T { ... }`; attaches new members to an existing type. |
 | `StructDecl` | `AggTypeDecl` | `m_membersVisibleInCtor: HashSet<VarDeclBase*>` | [struct](../syntax-reference/grammar.md#type-defining-declarations) | User-defined struct. |
 | `SynthesizedStructDecl` | `AggTypeDecl` | `operands: List<Val*>`, `irOp: uint32_t` | (none) | Struct synthesized during checking (e.g. for tuples). |
 | `ClassDecl` | `AggTypeDecl` | (inherits) | [class](../syntax-reference/grammar.md#type-defining-declarations) | User-defined class (reference type). |
-| `GLSLInterfaceBlockDecl` | `AggTypeDecl` | (inherits) | [interface block](../syntax-reference/grammar.md#declarations) | GLSL-style interface block (uniform/buffer/in/out). |
+| `GLSLInterfaceBlockDecl` | `AggTypeDecl` | (inherits) | (none) | GLSL-style interface block (uniform/buffer/in/out); no parser production reaches it — see `## Notable nodes`. |
 | `EnumDecl` | `AggTypeDecl` | `tagType: Type*` | [enum](../syntax-reference/grammar.md#type-defining-declarations) | `enum` declaration. |
 | `EnumCaseDecl` | `Decl` | `type: TypeExp`, `tagExpr: Expr*`, `tagVal: IntVal*` | [enum case](../syntax-reference/grammar.md#type-defining-declarations) | A single case inside an `enum`. |
 | `ThisTypeDecl` | `AggTypeDecl` | (inherits) | (none) | Synthetic member of `InterfaceDecl` representing the abstract `This` type. |
@@ -120,7 +120,7 @@ though nothing constructs it directly. Concrete leaves below.
 | `TypeDefDecl` | `SimpleTypeDecl` | `type: TypeExp` | [typedef](../syntax-reference/grammar.md#type-defining-declarations) | `typedef X Y;`. |
 | `TypeAliasDecl` | `TypeDefDecl` | (inherits) | [typealias](../syntax-reference/grammar.md#type-defining-declarations) | `typealias Y = X;` (modern alias syntax). |
 | `AssocTypeDecl` | `AggTypeDecl` | (inherits) | [associatedtype](../syntax-reference/grammar.md#type-defining-declarations) | `associatedtype T` inside an interface. |
-| `GlobalGenericParamDecl` | `AggTypeDecl` | (inherits) | [`type_param`](../syntax-reference/grammar.md#declarations) | Module-level type parameter (`type_param`). |
+| `GlobalGenericParamDecl` | `AggTypeDecl` | (inherits) | [`type_param`](../syntax-reference/grammar.md#declarations) | Module-level type parameter (`type_param`); bound by an external specialization argument — see `## Notable nodes`. |
 | `ScopeDecl` | `ContainerDecl` | (inherits) | [block scope](../syntax-reference/grammar.md#statements) | Anonymous scope created by the parser for block statements, loop headers, and lambda parameter lists. |
 | `FuncAliasDecl` | `CallableDecl` | `targetDeclRef: DeclRef<CallableDecl>` | (none) | Alias member naming an existing callable; synthesized during checking (e.g. the `fwd_diff` member of a derivative extension), not parsed. |
 | `ConstructorDecl` | `FunctionDeclBase` | `m_flavor: int` (UserDefined / SynthesizedDefault / SynthesizedMemberInit) | [constructor](../syntax-reference/grammar.md#function-style-declarations) | `__init` / synthesized constructor. |
@@ -158,7 +158,7 @@ though nothing constructs it directly. Concrete leaves below.
 | `HasDiffTypeInfoConstraintDecl` | `Decl` | `type: TypeExp` | [where clause](../syntax-reference/grammar.md#generics-and-where-clauses) | Differentiable-type constraint (`where __hasDiffTypeInfo(T)`). |
 | `EmptyDecl` | `Decl` | (no additional state) | [`__ignored_block`](../syntax-reference/grammar.md#declarations) | An empty declaration that exists only to carry modifiers (e.g. GLSL `layout(...) in;`), and the result of `__ignored_block` / `__transparent_block`. |
 | `SyntaxDecl` | `Decl` | `syntaxClass: SyntaxClass<NodeBase>`, `parseCallback: SyntaxParseCallback` | [`syntax`](../syntax-reference/grammar.md#user-defined-syntax) | Binds a keyword to a parser callback; see `## Notable nodes` and [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md). |
-| `AttributeDecl` | `ContainerDecl` | `syntaxClass: SyntaxClass<NodeBase>` | [`attribute_syntax`](../syntax-reference/grammar.md#user-defined-syntax) | Declares an attribute usable as `[name(args)]`; its body is the parameter list. |
+| `AttributeDecl` | `ContainerDecl` | `syntaxClass: SyntaxClass<NodeBase>` | [`attribute_syntax`](../syntax-reference/grammar.md#user-defined-syntax) | Binds the spelling `[name(args)]` to an AST attribute class the compiler already knows; its body is the parameter list. |
 
 ## Notable nodes
 
@@ -250,6 +250,21 @@ bindings — it is used there for modifier keywords like `constexpr` and
 [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md)
 for the full mechanism.
 
+`attribute_syntax`, which produces an `AttributeDecl`, is the parallel
+facility for attributes, and it binds a spelling rather than defining
+one. `parseAttributeSyntaxDecl` resolves the `: <class>` clause with
+`ASTBuilder::findSyntaxClass`, so the right-hand side must name an AST
+node class the compiler was built with; the parser then runs no
+attribute-specific logic at all, and the attribute's checking —
+including which declarations it may be placed on — comes from that C++
+class. A user module can therefore add a new *spelling* for an
+existing attribute class, but not a genuinely new attribute. All 126
+`attribute_syntax` declarations in the tree ship with the compiler:
+108 in [core.meta.slang](../../../../source/slang/core.meta.slang),
+8 in [diff.meta.slang](../../../../source/slang/diff.meta.slang),
+8 in [workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang),
+and 2 in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang).
+
 ### NamespaceDecl, ModuleDecl, FileDecl
 
 The three layers of the module / file / namespace nesting:
@@ -257,9 +272,18 @@ The three layers of the module / file / namespace nesting:
 transparent per-source-file scope underneath the module (used so that
 several `.slang` files can compose into one module while still
 attributing diagnostics to a file); `NamespaceDecl` is the
-user-declared `namespace { ... }`. Multiple textual namespace
-declarations with the same name in one module are collapsed into one
-`NamespaceDecl` during parsing. `ModuleDecl` also carries the two
+user-declared `namespace { ... }`. That transparency belongs to the
+file scopes the compiler builds, not to the node itself:
+`parseFileDecl` gives a hand-written `__file_decl { ... }` the same
+private scope any other container gets, so its members are not visible
+to the rest of the file. The `FileDecl` an `__include` or
+`implementing` produces is the one recorded in
+`IncludeDeclBase::fileDecl`, and it is that decl whose scope gets
+spliced into the module's lookup chain by
+`addSiblingScopeForContainerDecl`, declared alongside the node classes
+in [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h).
+Multiple textual namespace declarations with the same name in one
+module are collapsed into one `NamespaceDecl` during parsing. `ModuleDecl` also carries the two
 fields that decide default visibility for everything inside it:
 `languageVersion: SlangLanguageVersion` (which stays at
 `SLANG_LANGUAGE_VERSION_DEFAULT` — the legacy language — unless the
@@ -276,17 +300,48 @@ An `EnumDecl` is treated as an `AggTypeDecl` so that enum types can
 have conformances and member functions like any other type.
 `EnumCaseDecl` is *not* an `AggTypeDecl`; each case is a regular
 `Decl` carrying its tag value and (after checking) the type of the
-enclosing enum.
+enclosing enum. The tag type is written where a base list would go —
+`enum E : uint8_t { A, B }` — and `parseEnumDecl` does not treat it
+specially: it calls the same `parseOptionalInheritanceClause` a struct
+uses, so the tag type and any interface conformances arrive side by
+side as `InheritanceDecl` children. `EnumDecl::tagType` is never set
+by the parser; checking is what picks the tag type out of that
+inheritance list and fills the field in.
 
 ### AccessorDecl family
 
 `GetterDecl`, `SetterDecl`, and `RefAccessorDecl` model the accessors
 on a `PropertyDecl` or `SubscriptDecl`. The parser only creates an
-accessor when an explicit `get`/`set`/`ref` keyword is present; an
-empty property or subscript body is recorded as a case to be treated
-like `{ get; }`, and semantic checking later materializes the implicit
-`GetterDecl`. The body of each accessor is parsed
+accessor when an explicit `get`/`set`/`ref` keyword is present:
+`parseStorageDeclBody` takes either a braced list of accessor
+declarations or a bare `;`, and `parseAccessorDecl` rejects any member
+of that braced list that does not begin with one of the three
+keywords, so a body made of statements —
+`property int p { return v; }` — is a parse error rather than an
+implicit getter. The two forms that write *no* accessor, the empty
+body `{ }` and the semicolon form `property int p;`, both leave the
+declaration with no accessor member at all; that is the case recorded
+to be treated like `{ get; }`, and semantic checking later
+materializes the implicit `GetterDecl`. It is what makes
+`property int p { }` a well-formed get-only interface requirement.
+The body of each accessor is parsed
 lazily, like any other function body, by the two-stage parser.
+
+### SemanticDecl
+
+A `semantic` declaration introduces a name usable in the `: Name`
+position of a field or parameter, and unlike a property its accessors
+carry a type instead of a body. `parseSemanticDecl` reads
+`semantic <name>` and then requires a braced body, and
+`parseSemanticAccessorDecl` accepts only `get : <type>;` and
+`set : <type>;` inside it, producing a `SemanticGetterDecl` or a
+`SemanticSetterDecl`. Both halves of the surface are needed for the
+declaration to have an effect:
+
+```slang
+semantic MySem { get : int; }
+struct S { int v : MySem; }
+```
 
 ### RequirementDecl-style nodes inside InterfaceDecl
 
@@ -390,6 +445,47 @@ through the same sibling subtype-constraint representation already used
 for associated-type constraints. For when and why the front end creates
 these nodes, see
 [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md).
+
+### GlobalGenericParamDecl and GlobalGenericValueParamDecl
+
+`type_param T;` and `__generic_value_param N : int;` are module-scope
+declarations, not members of a `GenericDecl`:
+`parseGlobalGenericTypeParamDecl` reads a name plus optional generic
+constraints (`type_param T : IFoo;`), and
+`parseGlobalGenericValueParamDecl` a name plus an optional `: <type>`
+and `= <init>`. Neither takes an argument where it is written. Each
+instead becomes a specialization parameter of the enclosing module —
+flavor `GenericType` for the type form, `GenericValue` for the value
+form — in `Module::_collectShaderParams`
+([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp)),
+and the binding arrives from outside, validated against those
+parameters by `Module::_validateSpecializationArgsImpl` in the same
+file.
+
+Because the binding is external, compiling the module on its own
+succeeds even when the parameter is used, and so does a target compile
+of a file that declares one and never uses it. What needs the binding
+is generating target code from a *use*: without one the compiler
+reports `error[E38207]: global generic parameter used in code without a
+concrete binding`, located at the declaration. The command-line
+`-specialize` option does not supply it — that option feeds the last
+entry point rather than the module — so using it for a module-level
+parameter reports `error[E38025]: wrong number of specialization
+arguments`.
+
+### GLSLInterfaceBlockDecl
+
+`GLSLInterfaceBlockDecl` has a parse function of its own,
+`Parser::ParseGLSLInterfaceBlock`, but nothing calls it, so no source
+spelling produces the node at this commit — hence the `(none)` in its
+`Grammar` cell. The GLSL block spellings that `options.allowGLSLInput`
+enables are desugared to other nodes instead: `uniform { ... }` goes
+to `parseHLSLCBufferDeclWithLayout`, `buffer { ... }` to
+`parseGLSLShaderStorageBufferDecl`, and a plain `in` / `out` block to
+`ParseBufferBlockDecl` with an empty wrapper type name. Each of those
+produces a `StructDecl` holding the members plus a `VarDecl` of that
+type, marked with a `TransparentModifier` when the block declares no
+instance name.
 
 ### UnresolvedDecl
 

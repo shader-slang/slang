@@ -171,7 +171,24 @@ comes from lowering a call to a core-module declaration carrying
 | `allocTorchTensor` | `IRAllocateTorchTensor` | (variadic) | | core-module `TorchTensor<T>::alloc` / `emptyLike` | Allocates a Torch tensor host-side; operands are the extents (or the tensor to imitate). |
 | `TorchGetCudaStream` | `IRTorchGetCudaStream` | — | | `generateCppBindingForFunc` in the PyTorch binding pass ([slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) line 465) | Returns the current Torch CUDA stream, typed `Ptr<void>`. |
 | `TorchTensorGetView` | `IRTorchTensorGetView`‡ | (variadic) | | core-module `TorchTensor<T>::getView`, `TensorView<T>` converting `__init` | Produces a `TensorView` over the Torch tensor in its single operand. |
-| `allocateOpaqueHandle` | `IRAllocateOpaqueHandle` | — | | core-module `RayQuery::__init` / `HitObject::__init` | Materializes a fresh opaque handle for a type with no constructor expression. |
+| `allocateOpaqueHandle` | `IRAllocateOpaqueHandle` | — | | core-module `RayQuery::__init` / `HitObject::__init` | Materializes a fresh opaque handle; the Lua entry names no operand, and the call site passes exactly one, the destination the handle is materialized into. |
+
+`allocateOpaqueHandle` is emitted by lowering but never reaches a
+`-dump-ir` snapshot. Because `RayQuery` and `HitObject` are
+`[__NonCopyableType]`, `maybeAddReturnDestinationParam`
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+lines 4238-4251) gives their `__init` a trailing return-destination
+parameter, which sets `returnViaLastRefParam` (line 4784); the call
+site then passes that destination as the inst's single operand and
+retypes the result `void` (lines 5714-5741). A `void` result can have
+no users, and `kIROp_AllocateOpaqueHandle` is on the no-side-effects
+list in `IRInst::mightHaveSideEffects`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9670), so
+the mandatory `eliminateDeadCode` that `generateIRForTranslationUnit`
+runs over every function (lines 15621-15625) — ahead of the
+`LOWER-TO-IR` dump at line 15797 — always deletes it. Both
+`RayQuery<0> q;` and `RayQuery<0> q = RayQuery<0>();` build the inst
+during lowering, and neither shows it in any dumped pass.
 
 ### Pack and expansion
 
@@ -189,7 +206,7 @@ Almost all come from AST lowering: the `Val` visitors in
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `Expand` | `IRExpand`‡ | `value` | | `ExpandExpr`, `ExpandType`, `ExpandIntValPack` | Expands a pattern over its captured-pack operands; the Lua entry names one operand while the builder supplies a variadic capture list (see the callout below), and the pattern body lives in child blocks. |
-| `Each` | `IREach`‡ | `value` | H | `EachType`, `EachIntVal`, per-element witness (line 2318) | Projects one slot of a value pack; the dual of `Expand`. |
+| `Each` | `IREach`‡ | `value` | H | `EachType`, `EachIntVal`, per-element witness (line 2318) | Projects one slot of a pack; only these `Val`-level forms produce it, never an `each` written in a value position (see the callout below). |
 | `MakeWitnessPack` | `IRMakeWitnessPack` | (variadic) | H | `TypePackSubtypeWitness` | Bundles witness tables into one witness-pack value typed as the matching `TypePack`. |
 | `PackBranch` | `IRPackBranch` | `pack, emptyValue, nonEmptyValue` | H | `PackBranchType` (line 2226), `PackBranchSubtypeWitness` (2363) | Selects between two values by whether the pack is statically empty, so no run-time length test survives. |
 | `ExtractFirstFromPack` | `IRExtractFirstFromPack` | `pack, witness` | H | `FirstExpr`, `FirstIntVal` | Returns the first slot of a non-empty pack. |
@@ -241,6 +258,24 @@ inst only when the AST-side natural-layout computation cannot already
 produce a constant; otherwise it folds to an integer literal during
 lowering.
 
+The `dataLayout` operand is optional in the Lua entry but not in the
+dump: when the surface call names only a type, the checker fills the
+operand in with `ScalarDataLayout`
+([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
+line 6652), so `sizeof(T)` on a still-generic `T` prints as
+`sizeOf(%T, ScalarLayout)` — and the same choice is what lets the
+natural-layout fold above apply to the one-argument form, since the
+test at the top of `visitSizeOfLikeExpr` treats a null layout and
+`ScalarDataLayoutType` alike. The two-argument `sizeof(T, L)` form
+takes any implementation of `IBufferDataLayout`:
+`DefaultDataLayout`, `DefaultPushConstantDataLayout`,
+`Std140DataLayout`, `Std430DataLayout`, `ScalarDataLayout`, and
+`CDataLayout`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+28-71, several of them `[require]`-gated). Each is `__intrinsic_type`d
+to the matching layout *type* opcode, so `sizeof(T, Std140DataLayout)`
+prints as `sizeOf(%T, Std140Layout)`.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `sizeOf` | `IRSizeOf` | `type, dataLayout?` | H | `SizeOfExpr` | Compile-time byte size of the operand type under the given data layout. |
@@ -289,10 +324,23 @@ base type is already a `StructType`, or materializes a temporary
 single-field struct and copies the value back for `out`/`inout`
 parameters.
 
+Both opcodes come from core-module helpers written for the core
+module's own use:
+`Ref<T> __forceVarIntoStructTemporarily(inout T maybeStruct)` and
+`Ref<T> __forceVarIntoRayPayloadStructTemporarily(inout T maybeStruct)`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+19654-19663). Every call site is the payload argument of an HLSL
+ray-tracing intrinsic — `__traceRayHLSL` (line 19749) and the
+`HitObject` trace / invoke wrappers (22802, 23739, 23815) — and that
+argument position is also the only one the legalizer rewrites, since
+it walks the arguments of each `Call`
+(`slang-ir-hlsl-legalize.cpp` line 150). A wrapper reached any other
+way is left in place and survives to emit.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `ForceVarIntoStructTemporarily` | `IRForceVarIntoStructTemporarily` | `var` | | core-module `__forceVarIntoStructTemporarily` | Forces a variable to be passed as a struct temporary. |
-| `ForceVarIntoRayPayloadStructTemporarily` | `IRForceVarIntoRayPayloadStructTemporarily` | `var` | | core-module ray-payload intrinsic | As above, also giving the wrapper struct the `RayPayload` decoration and default payload access qualifiers. |
+| `ForceVarIntoRayPayloadStructTemporarily` | `IRForceVarIntoRayPayloadStructTemporarily` | `var` | | core-module `__forceVarIntoRayPayloadStructTemporarily` | As above, also giving the wrapper struct the `RayPayload` decoration and default payload access qualifiers. |
 
 ### Annotations
 
@@ -407,6 +455,15 @@ an optional explicit index as a second operand and passes one operand
 when that index is null. Both come out of lowering and are consumed by
 [slang-ir-lower-expand-type.cpp](../../../../source/slang/slang-ir-lower-expand-type.cpp),
 which re-emits the pattern once per slot once the pack length is known.
+
+`Each` is that dual at the `Val` level only. Its three producers are
+`visitEachIntVal` (`slang-lower-to-ir.cpp` line 2198), `visitEachType`
+(2206), and `visitEachSubtypeWitness` (2316); an `each` written in a
+*value* position reaches none of them. `visitExpandExpr` (line 6571)
+gives the `Expand` region's block an `int` parameter and records it as
+the current expansion index, and `visitEachExpr` (line 6560) then
+projects the captured pack with `getTupleElement(pack, index)` against
+that parameter — which is the form a dump of an expansion body shows.
 
 ### `PackBranch`
 

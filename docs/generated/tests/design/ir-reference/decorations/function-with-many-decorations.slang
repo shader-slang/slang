@@ -15,14 +15,14 @@
 // `noSideEffect`, `readNone` and `unsafeForceInlineEarly` all appear
 // alongside the helper's `nameHint`, which anchors the match at user code.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 
 [ForceInline]
 [__NoSideEffect]
 [__readNone]
-[__unsafe_force_inline_early]
+[__unsafeForceInlineEarly]
 int superHelper(int x) { return x + 1; }
 
 [numthreads(1, 1, 1)]

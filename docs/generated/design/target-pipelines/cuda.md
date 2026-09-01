@@ -15,7 +15,10 @@ It is written for compiler developers who need to locate the CUDA
 pass order, the gate that selects a given pass, and the OptiX
 handling within it.
 The corresponding `CodeGenTarget` values are `CUDASource`,
-`CUDAHeader`, and `PTX`. A final `PTX` request does **not** drive
+`CUDAHeader`, and `PTX` — spelled `-target cuda` (or `cu`),
+`-target cuh`, and `-target ptx` on the `slangc` command line
+([slang-type-text-util.cpp line 82-84](../../../../source/core/slang-type-text-util.cpp)).
+A final `PTX` request does **not** drive
 `linkAndOptimizeIR` or the emit pipeline with `CodeGenTarget::PTX`
 directly: `emitWithDownstreamForEntryPoints` first maps `PTX` to
 its source target via `_getDefaultSourceForTarget`, which returns
@@ -171,7 +174,7 @@ flowchart TD
 | 10 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/slang-ir-entry-point-decorations.cpp) | (always) | |
 | 11 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper. |
 | 12 | `collectOptiXEntryPointUniformParams` | [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-optix-entry-point-uniforms.cpp) | `case CUDASource / CUDAHeader` (line 1264) | All CUDA targets (incl. final `PTX`, which runs as `CUDASource`). Replaces `collectEntryPointUniformParams`; `moveEntryPointUniformParamsToGlobalScope` and `removeTorchAndCUDAEntryPoints` are both skipped for these arms. |
-| 13 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | **Material on CUDA.** Runs after entry-point uniform packing (where the coverage buffer is folded into `GlobalParams`) to fill the `uniformOffset` / `uniformStride` fields of the coverage buffer's synthetic-resource record on the post-emit metadata, which the host runtime reads to bind the buffer at dispatch time. CUDA is one of only two targets that *diagnose* a failure here: when `tryGetCoverageUniformBindingInfo` finds no uniform layout and `isCPUTarget \|\| isCUDATarget`, the pass emits `Diagnostics::CoverageUniformLayoutUnavailable` instead of silently leaving the record unset. |
+| 13 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | **Material on CUDA.** Runs after entry-point uniform packing (where the coverage buffer is folded into `GlobalParams`) to fill the `uniformOffset` / `uniformStride` fields of the coverage buffer's synthetic-resource record on the post-emit metadata, which the host runtime reads to bind the buffer at dispatch time. CUDA is one of only two targets that *diagnose* a failure here: when `tryGetCoverageUniformBindingInfo` finds no uniform layout and `isCPUTarget \|\| isCUDATarget`, the pass emits `Diagnostics::CoverageUniformLayoutUnavailable` — **`E45105`** — instead of silently leaving the record unset. Coverage instrumentation is enabled by `CompilerOptionName::TraceCoverage` / `TraceFunctionCoverage` / `TraceBranchCoverage` (slangc `-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`), which `CodeGenContext::shouldTraceAnyCoverage` reads ([slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) line 1440-1446); `reqSet.coverageTracing` itself is set by the `kIROp_Increment*CoverageCounter` opcodes those options introduce (slang-emit.cpp line 598-601). |
 | 14 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../../source/slang/slang-ir-lower-l-value-cast.cpp) | `reqSet.lValueCast` (line 1337) | Newly gated. `kIROp_InOutImplicitCast` / `kIROp_OutImplicitCast` are front-end-only, so the flag cannot be a false negative. |
 | 15 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` (line 1343) | The flag is now also set by `kIROp_CastEnumToInt` / `kIROp_CastIntToEnum` / `kIROp_EnumCast`, so the pass still runs when constant folding removed the last live `IREnumType` but left a cast behind. |
 
@@ -389,7 +392,7 @@ see the conditional-gates table.)
 | 30 | `inferAnyValueSizeWhereNecessary` | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | (always) | |
 | 31 | `unpinWitnessTables` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | |
 | 32 | `lowerSumVectorMatrixInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `reqSet.sumVectorMatrix` (line 1586) | Static helper. **Newly gated**; `kIROp_SumVectorElements` / `kIROp_SumMatrixElements` are produced only by the autodiff transpose pass, which runs before the line-1520 scan. |
-| 33a | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!fastIRSimplificationOptions.minimalOptimization` (line 1589) | |
+| 33a | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!fastIRSimplificationOptions.minimalOptimization` (line 1589) | `minimalOptimization` comes from `CompilerOptionName::MinimumSlangOptimization`, read through `CompilerOptionSet::shouldPerformMinimumOptimizations()` ([slang-compiler-options.h](../../../../source/slang/slang-compiler-options.h) line 363) and copied onto `fastIRSimplificationOptions` at line 1350; the `slangc` spelling is `-minimum-slang-optimization`. The same flag selects rows 49 / 49a / 49b and 57a / 57b below, and row 26 of Phase C. |
 | 33b | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `else if (requiredLoweringPassSet.generics)` (lines 1593-1595) | Runs *instead of* row 33a in minimal-optimization mode, and only when the module had generics to specialize; otherwise neither row runs. |
 | 34 | `lowerTaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.taggedUnion` (line 1606) | **Newly gated.** When it returns `true` it sets `reqSet.reinterpret`, which selects row 36; skipping the pass therefore also correctly leaves `reinterpret` untouched. |
 | 35 | `lowerUntaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
@@ -630,6 +633,12 @@ worth knowing when reading emitted CUDA:
   `PreciseQualifierUnsupportedOnTarget`
   ([slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)),
   because C/C++ — and therefore CUDA — has no `precise` keyword.
+  The diagnostic is a **warning**, `E56005` (`'precise' qualifier
+  is not supported on target 'cuda'`): `emitTempModifiers`
+  diagnoses and returns without writing anything
+  ([slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp)
+  line 1305-1314), so the qualifier is dropped, the temporary and
+  its value are still emitted, and the compile continues.
   Only the HLSL and GLSL C-like emitters emit the qualifier.
 
 ```mermaid
@@ -690,7 +699,34 @@ their own emit arms and are **out of scope** for this page:
   emitter never sees that opcode; its own kernel-launch syntax
   (`fn<<<grid, block>>>(args)`) comes from `kIROp_DispatchKernel`
   in [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp)
-  line 1389.
+  line 1389. Two things produce that opcode: the
+  `__dispatch_kernel` expression keyword — the kernel function and
+  two launch sizes in parentheses, then the call argument list
+  (see [../ast-reference/expressions.md](../ast-reference/expressions.md))
+  — and `generateCUDAWrapperForFunc` (line 1009), which emits one
+  into the host wrapper it generates for each `[AutoPyBindCUDA]`
+  kernel (line 1064). On the PyTorch arm neither survives to text:
+  `generateCppBindingForFunc` rewrites every `IRDispatchKernel`
+  into `kIROp_CudaKernelLaunch` before emit (lines 438-462), so
+  `-target torch` emits `AT_CUDA_CHECK(cudaLaunchKernel(...))` and
+  no `<<<`.
+
+  On the `CUDASource` / `CUDAHeader` arm it does survive. A
+  hand-written `__dispatch_kernel` in an ordinary
+  `[shader("compute")]` entry point is not a `[TorchEntryPoint]`,
+  so `removeTorchKernels` never sees it, and `-target cuda` emits
+  the launch verbatim:
+
+  ```
+  myKernel_0<<<make_uint3 (1U, 1U, 1U), make_uint3 (32U, 1U, 1U)>>>()
+  ```
+
+  Note the operand order inverts. The surface is
+  `__dispatch_kernel(fn, dispatchSize, threadGroupSize)`
+  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp)
+  lines 3225-3227), while `<<<...>>>` takes CUDA's grid-then-block
+  pair — so the call above was written with `dispatchSize` of
+  `uint3(32,1,1)` and `threadGroupSize` of `uint3(1,1,1)`.
 - **OptiX** — OptiX never has its own `CodeGenTarget` value: it
   runs through `CUDASource` / `CUDAHeader` / `PTX` and is selected
   by *stage*, not by a target switch. The `raytracing` capability
@@ -802,12 +838,12 @@ Flags that exist but **never gate a CUDA pass**:
 | Gate | Passes it controls |
 | --- | --- |
 | `shouldEmitSeparateDebugInfo()` | Emit `IRBuildIdentifier`. |
-| `getBoolOption(ValidateUniformity)` | `validateUniformity`. |
+| `getBoolOption(ValidateUniformity)` | `validateUniformity`. slangc `-validate-uniformity`. |
 | `getBoolOption(PreserveParameters)` | DCE keep-alive option. |
-| `getBoolOption(EmbedDownstreamIR)` | `unexportNonEmbeddableIR`. |
-| `getBoolOption(VulkanEmitReflection)` | `addUserTypeHintDecorations` (Phase B, line 1777; no CUDA-excluding gate). |
-| `TraceCoverageCounterByteWidth` | Per-counter byte width forwarded to `instrumentCoverage`; defaults to `kDefaultCoverageCounterByteWidth = 8`. Must be 4 or 8, else `linkAndOptimizeIR` diagnoses `CoverageCounterWidthBytesInvalid` and fails. |
-| `TraceCoverageBoolean` | Boolean coverage flag forwarded to `instrumentCoverage` (off by default): record whether each entry executed (non-atomic store of 1) instead of an exact count. |
+| `getBoolOption(EmbedDownstreamIR)` | `unexportNonEmbeddableIR`. slangc `-embed-downstream-ir`. |
+| `getBoolOption(VulkanEmitReflection)` | `addUserTypeHintDecorations` (Phase B, line 1777; no CUDA-excluding gate). slangc `-fspv-reflect`. |
+| `TraceCoverageCounterByteWidth` | Per-counter byte width forwarded to `instrumentCoverage`; defaults to `kDefaultCoverageCounterByteWidth = 8`. Must be 4 or 8, else `linkAndOptimizeIR` diagnoses `CoverageCounterWidthBytesInvalid` (**`E45114`**) and fails. The slangc spelling is `-trace-coverage-counter-width <bits>`, which accepts only 32 or 64 and stores the corresponding byte width, rejecting anything else as `E45113` before this check; `E45114` is therefore reachable only from a host that sets the API option directly (comment at slang-emit.cpp line 1171-1179). |
+| `TraceCoverageBoolean` | Boolean coverage flag forwarded to `instrumentCoverage` (off by default): record whether each entry executed (non-atomic store of 1) instead of an exact count. slangc `-trace-coverage-boolean`. |
 | `shouldRunNonEssentialValidation()` | `checkForOptionalNoneUsage`, `checkForRecursive*`, `checkForOutOfBoundAccess`, `checkForInvalidShaderParameterType`. |
 | `shouldPerformMinimumOptimizations()` | Gates `fuseCallsToSaturatedCooperation` and `checkUnsupportedInst`. |
 | `fastIRSimplificationOptions.minimalOptimization` | Selects between full `simplifyIR` and minimal SCCP+DCE. |
@@ -977,7 +1013,14 @@ produced. When a terminate-reaching callee cannot be flattened
 pass reports
 `Diagnostics::ShaderTerminatingIntrinsicInNoninlinableCallee`
 ([slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua))
-rather than miscompiling silently.
+at line 1995 rather than miscompiling silently. The recursive arm
+is shadowed in practice: a recursive callee is rejected far
+earlier by `checkForRecursiveFunctions` (Phase B, row 26) with
+`E55201`, so the cycle check at line 1917 is there to guarantee
+this pass terminates, not to produce a user-visible diagnostic
+(the comment at lines 1912-1916 says so). The shape that does
+reach the diagnostic is a terminate-reaching call `inlineCall`
+declines to flatten.
 
 The shared base class `EntryPointVaryingParamLegalizeContext`,
 which the CUDA context derives from, also legalizes the
@@ -1024,6 +1067,21 @@ rewrites the function's `ExternCpp` name to `__kernel__<name>`,
 freeing the original name for the generated host wrapper, then
 removes the autobind decoration.
 
+The rewrite touches the `ExternCpp` linkage name only, and only
+when the kernel already carries one (line 1342). That name reaches
+emitted text through the `IRExternCppDecoration` branch of
+`CLikeSourceEmitter::generateName`
+([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+line 1251), which an entry point never reaches: the
+`IREntryPointDecoration` branch above it (line 1219) returns
+first. An `[AutoPyBindCUDA] [CudaKernel]` function compiled as the
+selected entry point for `-target cuda` therefore still emits as
+`extern "C" __global__ void myKernel(...)`, with no prefix — the
+rename is not observable in CUDA source text. It matters on the
+`PyTorchCppBinding` arm, where `generateCUDAWrapperForFunc` (line
+1009) hands the *original* `ExternCpp` name to the generated host
+wrapper (lines 1090-1093) and dispatches the renamed kernel.
+
 ### `lowerImmutableBufferLoadForCUDA`
 
 Phase C, line 2514, gated only on `isCUDATarget(targetRequest)` —
@@ -1044,9 +1102,21 @@ corresponding CUDA vector type; otherwise the pass emits one
 `kIROp_CUDALDG` per element and reassembles the vector. Anything
 larger gets a generated per-type load function, name-hinted
 `slang_ldg`, which the emitter renders as an ordinary function
-call. When no leaf of a type is `__ldg`-able the pass leaves the
-original load alone, so this is a best-effort optimization rather
-than a legalization: correctness does not depend on it.
+call.
+
+The types `createLoadFuncForType` recognizes are exactly those:
+the scalars listed above, `kIROp_VectorType`, `kIROp_MatrixType`,
+`kIROp_ArrayType`, and `kIROp_StructType` (lines 85-266). Any
+other type op falls off the end of the switch and yields an empty
+`LoadMethod` (line 269), and an array or struct whose element or
+field walk hits one discards the half-built load function and
+returns empty as well (lines 231-235 and 257-261). So the
+unrewritten arm belongs to a load of an opaque leaf — a resource
+handle or a pointer, say — not to any composite built out of the
+five recognized ops. In that case `processInst` leaves the
+original `kIROp_Load` / `kIROp_StructuredBufferLoad` exactly as it
+found it (lines 292-330), so this is a best-effort optimization
+rather than a legalization: correctness does not depend on it.
 
 ### `undoParameterCopy` and `transformParamsToConstRef`
 

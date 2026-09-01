@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#operator-precedence-and-parenthesization
-//META: doc_section_digest=ebbc1fbf276a26d7c6caf4f51c9ba3ba143103b1107f9217e594e9044a25d6d2
+//META: doc_section_digest=ac5209f47969a57048460bb2059320973fc1da4f9fbf7670b21dda1072978507
 //META: purpose=The precedence comparison that `maybeEmitParens` starts from keeps the parentheses an expression needs to preserve semantics: an addition used as a multiplication operand emits as `(a + b) * c` on every C-like target.
 //META: intent=functional
 //META: pipeline_stage=emit
