@@ -14,7 +14,7 @@
 // from loads so nothing folds, and the CHECK finds the opcode in the
 // user body.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 using namespace linalg;
 

@@ -13,7 +13,7 @@
 // function the operand is `void_constant`, a distinguished constant
 // inst. Observable for the entry-point `void main(...)` directly.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

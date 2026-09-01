@@ -162,6 +162,14 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     {
         return calcSize(namedType->getCanonicalType());
     }
+    else if (auto modifiedType = as<ModifiedType>(type))
+    {
+        // `unorm`/`snorm`/`no_diff` are layout-transparent, so the size is the base's.
+        // Required here and not only in IR layout: this is what folds `sizeof` at the AST
+        // level, and an unfolded `sizeof` makes `G<sizeof(unorm float4)>` a different type
+        // from `G<16>` -- generic unification happens long before IR layout runs.
+        return calcSize(modifiedType->getBase());
+    }
     else if (const auto tupleType = as<TupleType>(type))
     {
         // Initialize empty

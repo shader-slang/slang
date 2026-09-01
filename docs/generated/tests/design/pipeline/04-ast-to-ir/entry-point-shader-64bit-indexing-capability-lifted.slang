@@ -17,7 +17,7 @@
 // lowered first with no such decoration ahead of it, and the decoration then
 // appears in the block of decorations directly above `func %main`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main -capability spvShader64BitIndexingEXT
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main -capability spvShader64BitIndexingEXT
 
 uniform RWStructuredBuffer<int> buf;
 

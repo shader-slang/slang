@@ -11,7 +11,7 @@
 
 // `RWTexture3D<T>` combines 3D shape with the RW flag.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWTexture3D<float4> rwtex;
 uniform RWStructuredBuffer<int> outbuf;

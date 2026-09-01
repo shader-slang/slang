@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "g_TextureHeap",
@@ -69,10 +70,99 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "g_TextureHeap",
+                "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 0},
+                "type": {
+                    "kind": "array",
+                    "elementCount": 0,
+                    "elementType": {
+                        "kind": "DynamicResource",
+                        "sizes": [
+                            {"kind": "descriptorTableSlot", "value": 1}
+                        ]
+                    },
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "g_SamplerHeap",
+                "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 2},
+                "type": {
+                    "kind": "array",
+                    "elementCount": 0,
+                    "elementType": {
+                        "kind": "DynamicResource",
+                        "sizes": [
+                            {"kind": "descriptorTableSlot", "value": 1}
+                        ]
+                    },
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "g_SingleDynamicResourceA",
+                "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 0},
+                "type": {
+                    "kind": "DynamicResource",
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "g_SingleDynamicResourceB",
+                "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1},
+                "type": {
+                    "kind": "DynamicResource",
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "g_SingleDynamicResourceC",
+                "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 2},
+                "type": {
+                    "kind": "DynamicResource",
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "computeMain",
             "stage": "compute",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+                    {
+                        "name": "tid",
+                        "semanticName": "SV_DISPATCHTHREADID",
+                        "type": {
+                            "kind": "vector",
+                            "elementCount": 2,
+                            "elementType": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "sizes": [
+
+                            ]
+                        }
+                    }
+                ]
+            },
             "parameters": [
                 {
                     "name": "tid",

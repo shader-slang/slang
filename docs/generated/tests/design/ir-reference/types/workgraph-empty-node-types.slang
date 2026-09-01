@@ -17,7 +17,7 @@
 // parenthesised operand list is exactly what "nullary" means here, and
 // the closing parenthesis in the pattern pins that nothing follows them.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -dump-ir -o -
 
 import experimental.workgraph;
 

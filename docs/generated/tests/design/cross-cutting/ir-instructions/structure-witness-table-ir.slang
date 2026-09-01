@@ -15,7 +15,7 @@
 // whose `witness_table_entry` rows map each requirement key to its
 // satisfying method.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IFoo { int getVal(); }
 struct A : IFoo { int x; int getVal() { return x; } }
