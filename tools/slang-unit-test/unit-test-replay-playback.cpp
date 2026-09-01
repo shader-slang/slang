@@ -777,9 +777,11 @@ SLANG_UNIT_TEST(replayContextOrphanSweepKeepsEntryPointRetention)
 
 // A minimal user-supplied ISlangFileSystem, used to drive createSession down the
 // custom-file-system arms of GlobalSessionProxy::createSession that the default
-// tests never reach. It only needs COM identity plus a loadFile that never gets
-// called (these tests create a session but compile nothing), so loadFile and
-// castAs are stubbed out. s_liveCount lets a test observe that every reference the
+// tests never reach. loadFile is stubbed because these tests create a session but
+// compile nothing; castAs returns null to report that this double implements no
+// extended or mutable file-system interface -- the wrapper probes for those via
+// castAs while wrapping, and a null result means it is treated as a plain
+// read-only file system. s_liveCount lets a test observe that every reference the
 // createSession record/playback paths take on a user file system is also released:
 // a residual reference leaves the count above zero after teardown, which a leak
 // sanitizer would flag but a Debug run would otherwise miss.
@@ -818,6 +820,9 @@ public:
 
     SLANG_NO_THROW void* SLANG_MCALL castAs(SlangUUID const& uuid) override
     {
+        // Returning null reports that this double implements no extended or mutable
+        // file-system interface; the createSession wrapper probes for those via
+        // castAs while wrapping and treats null as a plain read-only file system.
         SLANG_UNUSED(uuid);
         return nullptr;
     }
@@ -840,20 +845,25 @@ private:
 std::atomic<int> TestFileSystem::s_liveCount{0};
 
 // Record and play back a single createSession that supplies a custom
-// ISlangFileSystem on SessionDesc::fileSystem. This is the arm the default tests
-// never hit: on writing it records kCustomFileSystemHandle and wraps the user file
-// system, and on playback it takes the kCustomFileSystemHandle branch that does
-// `new NULLFileSystem(); addRef(); wrapObject(nfs)` and the guarded owning-reference
-// release() in GlobalSessionProxy::createSession. The final s_liveCount check pins
-// that no reference is leaked onto the user file system, and the orphan-count check
-// pins that the recreated session was noted as an orphaned playback proxy, so a
-// regression that stopped the dispatcher noting orphans fails here rather than only
-// surfacing as a sanitizer leak.
+// ISlangFileSystem on SessionDesc::fileSystem. This drives the not-yet-registered
+// write arm (records kCustomFileSystemHandle) and, on playback, the matching
+// kCustomFileSystemHandle branch that does `new NULLFileSystem(); addRef();
+// wrapObject(nfs)` and the guarded owning-reference release() in
+// GlobalSessionProxy::createSession -- an arm no default-file-system test reaches.
+// This arm balances its file-system reference independently of where the addRef
+// sits on the registered arm, so the final s_liveCount == 0 check here verifies
+// this arm's own balance; replayContextCustomFileSystemRegisteredSessionPlayback
+// below is the regression check for the registered-reuse leak. The
+// orphan-count check pins that the recreated session was noted as an orphaned
+// playback proxy, so a regression that stopped the dispatcher noting orphans fails
+// here rather than only surfacing as a sanitizer leak.
 SLANG_UNIT_TEST(replayContextCustomFileSystemSessionPlayback)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
+    // Deliberate reset for test isolation: TestFileSystem is used only by these two
+    // tests and each asserts the count back to 0 at teardown, so start from a known 0.
     TestFileSystem::s_liveCount = 0;
 
     // The constructor starts the refcount at 1; adopt that reference rather than
@@ -928,6 +938,8 @@ SLANG_UNIT_TEST(replayContextCustomFileSystemRegisteredSessionPlayback)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
+    // Deliberate reset for test isolation: TestFileSystem is used only by these two
+    // tests and each asserts the count back to 0 at teardown, so start from a known 0.
     TestFileSystem::s_liveCount = 0;
 
     TestFileSystem* fileSystem = new TestFileSystem();

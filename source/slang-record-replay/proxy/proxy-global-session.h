@@ -84,7 +84,9 @@ public:
                 {
                     // Already wrapped once: wrapObject() returns the existing proxy
                     // and only adds a reference to that proxy, leaving the user's
-                    // file system untouched, so no reference is owed on it here.
+                    // file system untouched, so no reference is owed on it here. That
+                    // proxy reference is owning, and is balanced by the shared
+                    // ownsFileSystemWrapper release() after the real createSession below.
                     desc2.fileSystem = wrapObject(desc.fileSystem);
                     handle = _ctx.getProxyHandle(desc2.fileSystem);
                 }
