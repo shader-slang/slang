@@ -1327,6 +1327,13 @@ typedef uint32_t SlangSizeT;
                  //   at pipeline creation instead would remove that constraint;
                  //   see issue #12541. SPIR-V and GLSL only.
 
+        // CLI-only query option `-get-<compiler>-path`: prints the resolved on-disk path of the
+        // downstream <compiler> Slang would load for that pass-through (via
+        // IGlobalSession::getDownstreamCompilerPath), then continues. It takes no value and is
+        // never stored on an option set; it only drives the print-and-continue handler in the
+        // command-line parser.
+        GetCompilerPath = 159,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,

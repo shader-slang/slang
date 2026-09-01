@@ -1043,6 +1043,28 @@ void initCommandOptions(CommandOptions& options)
             "-<compiler>-path");
     }
 
+    {
+        auto namesList = NameValueUtil::getNames(
+            NameValueUtil::NameKind::First,
+            TypeTextUtil::getCompilerInfos());
+        StringBuilder names;
+        for (auto name : namesList)
+        {
+            names << "-get-" << name << "-path,";
+        }
+        // remove last ,
+        names.reduceLength(names.getLength() - 1);
+
+        options.add(
+            names.getBuffer(),
+            "-get-<compiler>-path",
+            "Print the on-disk path of the downstream <compiler> that Slang would load for that "
+            "pass-through, then continue. Reports \"not found\" if the compiler cannot be located, "
+            "or \"not available\" if it has no recoverable shared-library path. Takes no value.\n",
+            UserValue(OptionKind::GetCompilerPath),
+            "-get-<compiler>-path");
+    }
+
     const Option downstreamOpts[] = {
         {OptionKind::DefaultDownstreamCompiler,
          "-default-downstream-compiler",
@@ -3789,6 +3811,59 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         return SLANG_FAIL;
                     }
                 }
+                break;
+            }
+        case OptionKind::GetCompilerPath:
+            {
+                // `-get-<compiler>-path` is a print-and-continue query option: it prints the
+                // resolved on-disk path of the downstream compiler Slang would load for that
+                // pass-through, then lets parsing continue (like -version). Recover <compiler> by
+                // stripping the fixed "-get-" prefix and "-path" suffix, which -- unlike a
+                // lastIndexOf('-') scan -- also handles compiler names that contain '-' (e.g.
+                // spirv-dis).
+                const UnownedStringSlice getPrefix = UnownedStringSlice("-get-");
+                const UnownedStringSlice pathSuffix = UnownedStringSlice("-path");
+                const UnownedStringSlice argSlice = argValue.getUnownedSlice();
+                const UnownedStringSlice passThroughSlice =
+                    argSlice.tail(getPrefix.getLength())
+                        .head(
+                            argSlice.getLength() - getPrefix.getLength() - pathSuffix.getLength());
+
+                SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+                if (SLANG_FAILED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
+                {
+                    m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
+                        .compiler = passThroughSlice,
+                        .location = arg.loc});
+                    return SLANG_FAIL;
+                }
+
+                // getDownstreamCompilerPath shares the same lazy-discovery funnel used during
+                // compilation, so the reported path is the library that would actually be used for
+                // this pass-through (it honors -<compiler>-path and the standard search order). It
+                // returns SLANG_OK with the resolved shared-library path, SLANG_E_NOT_AVAILABLE
+                // when the compiler is loaded but has no recoverable on-disk path (an
+                // executable-backed command-line compiler, or a target without shared-library
+                // introspection), and SLANG_E_NOT_FOUND when it cannot be located or loaded.
+                ComPtr<ISlangBlob> pathBlob;
+                const SlangResult pathResult =
+                    m_session->getDownstreamCompilerPath(passThrough, pathBlob.writeRef());
+                StringBuilder pathStr;
+                pathStr << passThroughSlice << " path: ";
+                if (SLANG_SUCCEEDED(pathResult) && pathBlob)
+                {
+                    pathStr << (const char*)pathBlob->getBufferPointer();
+                }
+                else if (pathResult == SLANG_E_NOT_AVAILABLE)
+                {
+                    pathStr << "not available";
+                }
+                else
+                {
+                    pathStr << "not found";
+                }
+                pathStr << "\n";
+                m_sink->diagnoseRaw(Severity::Note, pathStr.getUnownedSlice());
                 break;
             }
         case OptionKind::InputFilesRemain:

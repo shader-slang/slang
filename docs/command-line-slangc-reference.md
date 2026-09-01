@@ -735,6 +735,16 @@ Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library
 
 
 
+<a id="get-none-path"></a>
+### -get-&lt;compiler&gt;-path
+
+**-get-&lt;[compiler](#compiler)&gt;-path**
+
+Print the on-disk path of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located, or "not available" if it has no recoverable shared-library path. Takes no value. 
+
+
+
+
 <a id="default-downstream-compiler"></a>
 ### -default-downstream-compiler
 
