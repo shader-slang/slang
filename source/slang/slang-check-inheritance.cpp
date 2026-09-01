@@ -1105,41 +1105,36 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         return;
                     }
 
-                    // A subtype constraint can contribute a base only when its subject matches
-                    // `selfType`. Check that subject before fully checking the constraint: its
-                    // super-type may contain a generic application whose constraints query the
-                    // inheritance currently being computed. An unrelated sibling must not trigger
-                    // that re-entrant query. Equality constraints are excluded because either
-                    // endpoint can match and full checking may normalize their direction.
-                    if (!constraintDecl->isEqualityConstraint)
-                    {
-                        DeclRef<GenericTypeConstraintDecl> lookedUpConstraint = constraintDeclRef;
-                        if (!SubstitutionSet(lookedUpConstraint).findLookupDeclRef())
-                        {
-                            lookedUpConstraint =
-                                astBuilder->getLookupDeclRef(conformingWitness, constraintDecl)
-                                    .as<GenericTypeConstraintDecl>();
-                            if (!lookedUpConstraint)
-                                return;
-                        }
-
-                        Type* lookedUpSub = getSub(astBuilder, lookedUpConstraint);
-                        if (lookedUpSub &&
-                            !lookedUpSub->getCanonicalType()->equals(selfType->getCanonicalType()))
-                        {
-                            return;
-                        }
-                    }
-
-                    ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
-
+                    // Consider this example:
+                    //
+                    //     interface IContext {}
+                    //     interface IConsumer<T> where T : IContext {}
+                    //     interface ILayout
+                    //     {
+                    //         associatedtype Context : IContext;
+                    //         associatedtype First : IConsumer<Context>;
+                    //         associatedtype Second : IConsumer<Context>;
+                    //     }
+                    //
+                    // `parseAssocType` stores the three bounds as sibling constraint requirements
+                    // of `ILayout`. While checking `First : IConsumer<Context>`, validating
+                    // `IConsumer`'s generic argument asks for the inheritance of `Context`. This
+                    // loop consequently sees all three siblings. Fully checking the unrelated
+                    // `Second` constraint at that point would validate the same generic argument
+                    // and re-enter the still-in-progress inheritance query for `Context`, before
+                    // its `Context : IContext` facet has been published.
+                    //
+                    // A directed constraint can only add its super-type as a base of its subject.
+                    // Re-express the constraint through `conformingWitness` so that the
+                    // interface's `This` refers to the concrete lookup source, then compare that
+                    // subject with `selfType` before `ensureDecl` resolves the potentially
+                    // recursive super-type. In the example, this keeps `Context : IContext` and
+                    // rejects `Second : IConsumer<Context>` while computing `Context`. Equality
+                    // constraints stay on the checked path below because either endpoint can be
+                    // the type whose inheritance is being computed.
                     DeclRef<GenericTypeConstraintDecl> lookedUpConstraint = constraintDeclRef;
                     if (!SubstitutionSet(lookedUpConstraint).findLookupDeclRef())
                     {
-                        // Re-express the constraint as a lookup through the witness
-                        // that the conforming type conforms to this interface; this
-                        // substitutes the interface's `This` with the conforming type, so both
-                        // endpoints are expressed as concrete accesses rooted at that type.
                         lookedUpConstraint =
                             astBuilder->getLookupDeclRef(conformingWitness, constraintDecl)
                                 .as<GenericTypeConstraintDecl>();
@@ -1147,7 +1142,29 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                             return;
                     }
 
-                    Type* lookedUpSub = getSub(astBuilder, lookedUpConstraint);
+                    Type* selfCanonical = selfType->getCanonicalType();
+                    Type* lookedUpSub = nullptr;
+                    if (!constraintDecl->isEqualityConstraint)
+                    {
+                        lookedUpSub = getSub(astBuilder, lookedUpConstraint);
+
+                        // `tryResolveConstraintTypes` returned true, so the subject type exists;
+                        // applying lookup substitutions to that type cannot turn it into null.
+                        SLANG_RELEASE_ASSERT(lookedUpSub);
+
+                        if (!lookedUpSub->getCanonicalType()->equals(selfCanonical))
+                            return;
+                    }
+
+                    ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
+
+                    // Equality constraints first resolve both endpoints above and may normalize
+                    // their direction, so read their subject only after `ensureDecl`.
+                    if (constraintDecl->isEqualityConstraint)
+                    {
+                        lookedUpSub = getSub(astBuilder, lookedUpConstraint);
+                        SLANG_RELEASE_ASSERT(lookedUpSub);
+                    }
                     Type* lookedUpSup = getSup(astBuilder, lookedUpConstraint);
 
                     // A constraint applies to `selfType` when one of its endpoints,
@@ -1162,7 +1179,6 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     // being canonical -- including that defaulted generic arguments
                     // have had their witnesses re-rooted; see
                     // `TryCheckOverloadCandidateConstraints`.
-                    Type* selfCanonical = selfType->getCanonicalType();
                     auto doesEndpointMatchSelfType = [&](Type* endpointType) -> bool
                     {
                         if (!endpointType)
