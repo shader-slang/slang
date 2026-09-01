@@ -7254,6 +7254,33 @@ SM70/SM80/SM90 PTX and cubins through CUDA 12.9. At SM70, direct O3 PTX sizes ar
 and 3,013 bytes for the array, dispatch, and multi-handle workloads respectively, versus 11,385,
 10,784, and 11,405 bytes from NVRTC. Timings remain exploratory.
 
+### Slice 173: Recursive helper-pointer transport
+
+The helper-value algebra now treats an exact CUDA
+`Ptr<T, ReadWrite, UserPointer, DefaultLayout>` as a recursive leaf when `T` is itself a finite
+helper value. This supports canonical pointer chains such as the `Ptr<Ptr<Tuple>>` produced by
+dynamic-dispatch lowering for `IFoo**`, while active-type detection still rejects cycles.
+Copyable values remain a separate algebra, so aggregate storage and launch ABI admission do not
+expand with helper-only pointer transport.
+
+Generic locals, `out`/`inout` parameters, call relations, signature lowering, pointer validation,
+and local layout validation now consume that same recursive representation. A local
+`OutParam<Tuple>` uses the complete existing local-copyable classifier, and `__getAddress` of an
+interface-pointer local relates to a device helper parameter only when their exact pointee types
+match. Existing generic provider operations express all loads, stores, calls, and pointer types;
+provider ABI revision 32 is unchanged.
+
+Frozen `return-interface-from-dispatch` and discovery `ptr-to-interface-double-indirect` become
+correct at O0 and O3 and gain four permanent direct lanes. Frozen v1 remains exactly 452/427 and
+advances from 412/412/412 to 413/413/413; discovery remains exactly 82/72 and advances from
+69/69/69 to 70/70/70. Both have exactly one gain and no old-correct loss. The selected prefix
+passes 433/433 and the permanent NVVM category passes 76/76.
+
+Both measurement gates produce accepted native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90 PTX and cubins through CUDA 12.9. Direct O3 SM70 PTX is 3,235 bytes versus 10,378
+native for interface out/inout transport and 537 bytes versus 8,510 native for double indirection.
+Timings remain exploratory.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

@@ -553,16 +553,52 @@ IRPtrTypeBase* asNVVMSupportedDeviceCopyableValuePointerType(IRInst* type, IRTyp
     return pointerType;
 }
 
+static bool _isNVVMSupportedHelperValueType(IRInst* type, HashSet<IRInst*>& activeTypes);
+
+// Recognizes one canonical CUDA user-pointer leaf while proving its complete finite pointee. For
+// example, dynamic-dispatch lowering turns `IFoo**` into `Ptr<Ptr<Tuple>>`: the outer pointer is a
+// helper value only because the inner pointer and its existential tuple are helper values too.
+// Keeping the active set here rejects recursive pointee graphs instead of assigning them a
+// provider type that cannot have finite size.
+static IRPtrTypeBase* _asNVVMSupportedDeviceHelperValuePointerType(
+    IRInst* type,
+    IRType** outValueType,
+    HashSet<IRInst*>& activeTypes)
+{
+    if (outValueType)
+        *outValueType = nullptr;
+    auto pointerType = as<IRPtrTypeBase>(type);
+    IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
+    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
+    if (!pointerType || pointerType->getOp() != kIROp_PtrType ||
+        pointerType->getOperandCount() != 4 ||
+        pointerType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        pointerType->getAddressSpace() != AddressSpace::UserPointer || !dataLayout ||
+        dataLayout->getOp() != kIROp_DefaultBufferLayoutType || activeTypes.contains(type))
+    {
+        return nullptr;
+    }
+
+    activeTypes.add(type);
+    const bool isSupported = _isNVVMSupportedHelperValueType(valueType, activeTypes);
+    activeTypes.remove(type);
+    if (!isSupported)
+        return nullptr;
+    if (outValueType)
+        *outValueType = valueType;
+    return pointerType;
+}
+
 static bool _isNVVMSupportedHelperValueType(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
-    if (isNVVMSupportedCopyableValueType(type) ||
-        asNVVMSupportedDeviceCopyableValuePointerType(type) ||
-        asNVVMSupportedDescriptorHandleType(type))
+    if (isNVVMSupportedCopyableValueType(type) || asNVVMSupportedDescriptorHandleType(type))
     {
         return true;
     }
     if (!type || activeTypes.contains(type))
         return false;
+    if (_asNVVMSupportedDeviceHelperValuePointerType(type, nullptr, activeTypes))
+        return true;
 
     if (auto arrayType = as<IRArrayType>(type))
     {
@@ -601,11 +637,19 @@ bool isNVVMSupportedHelperValueType(IRInst* type)
     return _isNVVMSupportedHelperValueType(type, activeTypes);
 }
 
+IRPtrTypeBase* asNVVMSupportedDeviceHelperValuePointerType(
+    IRInst* type,
+    IRType** outValueType)
+{
+    HashSet<IRInst*> activeTypes;
+    return _asNVVMSupportedDeviceHelperValuePointerType(type, outValueType, activeTypes);
+}
+
 static uint32_t _getNVVMHelperValueAlignment(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
     if (const uint32_t copyableAlignment = getNVVMCopyableValueAlignment(type))
         return copyableAlignment;
-    if (asNVVMSupportedDeviceCopyableValuePointerType(type))
+    if (asNVVMSupportedDeviceHelperValuePointerType(type))
         return 8;
     if (asNVVMSupportedDescriptorHandleType(type))
         return getNVVMResourceValueAlignment(type);
@@ -2139,6 +2183,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRType* deviceCopyablePointerValueType = nullptr;
     IRPtrTypeBase* deviceCopyablePointer =
         asNVVMSupportedDeviceCopyableValuePointerType(type, &deviceCopyablePointerValueType);
+    IRType* deviceHelperPointerValueType = nullptr;
+    IRPtrTypeBase* deviceHelperPointer =
+        asNVVMSupportedDeviceHelperValuePointerType(type, &deviceHelperPointerValueType);
     const bool isHelperValue = isNVVMSupportedHelperValueType(type);
     const bool isPointerBearingHelperValue =
         isHelperValue && !isNVVMSupportedCopyableValueType(type);
@@ -2301,13 +2348,14 @@ SlangResult NVVMTypeLoweringContext::lowerType(
 
     if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
          use == NVVMTypeUse::HelperValue || use == NVVMTypeUse::Value) &&
-        deviceCopyablePointer)
+        deviceHelperPointer)
     {
         return _lowerPointerType(
             type,
-            deviceCopyablePointerValueType,
+            deviceHelperPointerValueType,
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
-            outType);
+            outType,
+            deviceCopyablePointer ? NVVMTypeUse::Value : NVVMTypeUse::HelperValue);
     }
 
     // Keep canonical Half values in LLVM's `half` type inside helper bodies, but transport a Half

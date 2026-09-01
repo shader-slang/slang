@@ -2470,3 +2470,17 @@ with exactly three gains and no old-correct loss. Discovery remains 69/69/69 ove
 changed row. The selected prefix passes 433/433, the permanent NVVM category passes 72/72, and all
 three measurement gates produce accepted PTX/cubins for native NVRTC, direct O0 SM70, and direct
 O3 SM70/SM80/SM90 configurations.
+
+Slice 173 makes exact CUDA user pointers recursive leaves of the finite helper-value algebra.
+`Ptr<Ptr<Tuple>>` is therefore supported when dynamic-dispatch lowering produces both pointer
+levels with the canonical read-write `UserPointer`/`DefaultLayout` spelling, while active-type
+detection rejects cycles. Generic locals, output parameters, helper call relations, pointer
+validation, and local layout proof share the same complete pointee representation. Copyable
+storage and launch ABI admission remain separate. Provider ABI revision 32 is unchanged.
+
+Frozen `return-interface-from-dispatch` and discovery `ptr-to-interface-double-indirect` gain four
+permanent direct lanes. Frozen v1 advances from 412/412/412 to 413/413/413 over its unchanged 427
+healthy denominator; discovery advances from 69/69/69 to 70/70/70 over its unchanged 72 healthy
+references. Both have exactly one gain and no old-correct loss. The selected prefix passes
+433/433, the permanent NVVM category passes 76/76, and both measurement gates produce accepted
+PTX/cubins for native NVRTC, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.

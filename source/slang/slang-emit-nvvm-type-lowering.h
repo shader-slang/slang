@@ -111,7 +111,13 @@ IRPtrTypeBase* asNVVMSupportedDeviceCopyableValuePointerType(
     IRInst* type,
     IRType** outValueType = nullptr);
 
-/// Returns whether a finite helper value is composed from copyable values and device pointers.
+/// Returns the complete CUDA device pointer spelling for a finite helper value.
+IRPtrTypeBase* asNVVMSupportedDeviceHelperValuePointerType(
+    IRInst* type,
+    IRType** outValueType = nullptr);
+
+/// Returns whether a finite helper value is recursively composed from copyable values and device
+/// pointers.
 bool isNVVMSupportedHelperValueType(IRInst* type);
 
 /// Returns the natural alignment of a finite helper value, including device-pointer leaves.

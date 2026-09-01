@@ -1039,7 +1039,7 @@ bool _getNVVMByValueParameterAlignment(
     return true;
 }
 
-bool _hasNVVMCompatibleCopyableValueLayout(CodeGenContext* codeGenContext, IRType* type);
+bool _hasNVVMCompatibleHelperValueLayout(CodeGenContext* codeGenContext, IRType* type);
 
 // Verifies that a selected copyable struct can use unpadded LLVM structs for storage. Consider
 // `Thing { uint pos; float radius; half4 color; }`: CUDA and LLVM give its fields offsets 0, 4, and
@@ -1090,16 +1090,16 @@ bool _hasNVVMCompatibleStructLayout(CodeGenContext* codeGenContext, IRStructType
         if ((asNVVMSupportedResourceStructType(fieldType) ||
              asNVVMSupportedHelperStructType(fieldType) ||
              asNVVMSupportedHelperArrayType(fieldType)) &&
-            !_hasNVVMCompatibleCopyableValueLayout(codeGenContext, fieldType))
+            !_hasNVVMCompatibleHelperValueLayout(codeGenContext, fieldType))
             return false;
     }
     return true;
 }
 
-// Verifies every aggregate node in one recursive copyable value. Matching the complete array size
-// proves that an explicit canonical stride, when present, agrees with LLVM's element stride; the
-// struct check above additionally proves every CUDA field offset.
-bool _hasNVVMCompatibleCopyableValueLayout(CodeGenContext* codeGenContext, IRType* type)
+// Verifies every node in one recursive helper value. A typed user pointer is the fixed-size leaf;
+// matching the complete array size proves that an explicit canonical stride, when present, agrees
+// with LLVM's element stride, and the struct check above proves every CUDA field offset.
+bool _hasNVVMCompatibleHelperValueLayout(CodeGenContext* codeGenContext, IRType* type)
 {
     if (!codeGenContext || !type)
         return false;
@@ -1122,9 +1122,9 @@ bool _hasNVVMCompatibleCopyableValueLayout(CodeGenContext* codeGenContext, IRTyp
                    arrayType,
                    &llvmLayout)) &&
                cudaLayout.size > 0 && cudaLayout.size == llvmLayout.size &&
-               _hasNVVMCompatibleCopyableValueLayout(codeGenContext, arrayType->getElementType());
+               _hasNVVMCompatibleHelperValueLayout(codeGenContext, arrayType->getElementType());
     }
-    if (asNVVMSupportedDeviceCopyableValuePointerType(type))
+    if (asNVVMSupportedDeviceHelperValuePointerType(type))
         return true;
     if (!isNVVMSupportedNumericValueType(type) && !asNVVMSupportedDescriptorHandleType(type))
         return false;
@@ -1278,7 +1278,7 @@ bool _hasNVVMCompatibleRawBufferElementLayout(CodeGenContext* codeGenContext, IR
     // established CUDA/LLVM value-layout contract.
     if (!isNVVMSupportedStructuredBufferStorageType(rawBufferType.structuredElementType))
     {
-        return _hasNVVMCompatibleCopyableValueLayout(
+        return _hasNVVMCompatibleHelperValueLayout(
             codeGenContext,
             rawBufferType.structuredElementType);
     }
@@ -6872,6 +6872,8 @@ SlangResult _validatePointerValue(
         value ? asNVVMSupportedDeviceNumericPointerType(value->getDataType()) : nullptr;
     auto deviceCopyablePtrType =
         value ? asNVVMSupportedDeviceCopyableValuePointerType(value->getDataType()) : nullptr;
+    auto deviceHelperPtrType =
+        value ? asNVVMSupportedDeviceHelperValuePointerType(value->getDataType()) : nullptr;
     NVVMRawBufferElementPointer rawBufferElementPointer;
     NVVMStructuredBufferElementPointer structuredBufferElementPointer;
     const bool hasStructuredBufferElementProducer =
@@ -6894,24 +6896,18 @@ SlangResult _validatePointerValue(
         value ? asNVVMSupportedLocalResourceStructPointerType(value->getDataType()) : nullptr;
     auto localHelperPtrType =
         value ? asNVVMSupportedLocalHelperValuePointerType(value->getDataType()) : nullptr;
+    // A local `var T` and module-scope groupshared storage can both expose `Ptr<T>`. Only a local
+    // variable or helper parameter proves the generic local-copyable role at this boundary.
+    auto localCopyablePtrType =
+        value && (value->getOp() == kIROp_Var || as<IRParam>(value))
+            ? asNVVMSupportedLocalCopyableValuePointerType(value->getDataType())
+            : nullptr;
     auto helperReferencePtrType =
         value && as<IRParam>(value)
             ? asNVVMSupportedHelperReferencePointerType(value->getDataType())
             : nullptr;
     auto sharedHelperPtrType =
         value ? asNVVMSupportedSharedHelperPointerType(value->getDataType()) : nullptr;
-    // A local `var T` and a module-scope groupshared value can both expose the canonical
-    // `Ptr<T>` spelling here. The value producer, rather than that shared type, owns the local
-    // storage role. Helper parameters are the only other producer admitted by this slice.
-    auto localNumericPtrType = value && (value->getOp() == kIROp_Var || as<IRParam>(value))
-                                   ? asNVVMSupportedLocalNumericPointerType(value->getDataType())
-                                   : nullptr;
-    auto localArrayPtrType =
-        value && (value->getOp() == kIROp_Var || as<IRParam>(value))
-            ? asNVVMSupportedLocalCopyableArrayPointerType(value->getDataType())
-            : nullptr;
-    if (!localArrayPtrType && value && (value->getOp() == kIROp_Var || as<IRParam>(value)))
-        localArrayPtrType = asNVVMSupportedLocalNumericArrayPointerType(value->getDataType());
     NVVMSequentialElementPointer sequentialElement;
     auto sequentialElementPtrType =
         value && _getNVVMSequentialElementPointer(value, sequentialElement)
@@ -6924,13 +6920,16 @@ SlangResult _validatePointerValue(
     {
         fieldPtrType = nullptr;
     }
-    IRPtrTypeBase* devicePtrType = numericPtrType ? numericPtrType : deviceCopyablePtrType;
+    IRPtrTypeBase* devicePtrType = numericPtrType;
+    if (!devicePtrType)
+        devicePtrType = deviceCopyablePtrType;
+    if (!devicePtrType)
+        devicePtrType = deviceHelperPtrType;
     IRPtrTypeBase* acceptedPtrType = devicePtrType              ? devicePtrType
                                      : sharedElementPtrType     ? sharedElementPtrType
                                      : sharedGlobalPtrType      ? sharedGlobalPtrType
                                      : resourceElementPtrType   ? resourceElementPtrType
-                                     : localNumericPtrType      ? localNumericPtrType
-                                     : localArrayPtrType        ? localArrayPtrType
+                                     : localCopyablePtrType     ? localCopyablePtrType
                                      : sequentialElementPtrType ? sequentialElementPtrType
                                      : localStructPtrType       ? localStructPtrType
                                      : localHelperPtrType       ? localHelperPtrType
@@ -7097,7 +7096,7 @@ bool _isSupportedNVVMHelperResultType(IRInst* type)
            asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
-           asNVVMSupportedDeviceCopyableValuePointerType(type) ||
+           asNVVMSupportedDeviceHelperValuePointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType);
 }
@@ -7114,7 +7113,7 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
            asNVVMSupportedLocalHelperValuePointerType(type) ||
            asNVVMSupportedHelperReferencePointerType(type) ||
            asNVVMSupportedSharedHelperPointerType(type) ||
-           asNVVMSupportedDeviceCopyableValuePointerType(type) ||
+           asNVVMSupportedDeviceHelperValuePointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
            getNVVMSupportedSurfaceType(type, surfaceType) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
@@ -7249,10 +7248,14 @@ bool _isSupportedNVVMHelperArgument(IRInst* argument, IRType* parameterType)
 
     IRType* parameterDeviceValueType = nullptr;
     auto parameterDevicePointer =
-        asNVVMSupportedDeviceCopyableValuePointerType(parameterType, &parameterDeviceValueType);
-    return argumentCopyablePointer && argumentCopyablePointer->getOp() == kIROp_PtrType &&
-           argumentCopyablePointer->getOperandCount() == 1 && parameterDevicePointer &&
-           isTypeEqual(argumentCopyableType, parameterDeviceValueType);
+        asNVVMSupportedDeviceHelperValuePointerType(parameterType, &parameterDeviceValueType);
+    IRPtrTypeBase* argumentLocalPointer =
+        argumentCopyablePointer ? argumentCopyablePointer : argumentHelperPointer;
+    IRType* argumentLocalValueType =
+        argumentCopyablePointer ? argumentCopyableType : argumentHelperType;
+    return argumentLocalPointer && argumentLocalPointer->getOp() == kIROp_PtrType &&
+           argumentLocalPointer->getOperandCount() == 1 && parameterDevicePointer &&
+           isTypeEqual(argumentLocalValueType, parameterDeviceValueType);
 }
 
 // Returns whether a canonical helper-reference argument is physically produced in CUDA global
@@ -7262,7 +7265,7 @@ bool _isNVVMGlobalHelperReferenceArgument(IRInst* argument)
 {
     if (!argument)
         return false;
-    if (asNVVMSupportedDeviceCopyableValuePointerType(argument->getDataType()))
+    if (asNVVMSupportedDeviceHelperValuePointerType(argument->getDataType()))
         return true;
     NVVMRawBufferElementPointer rawElement;
     return argument->getOp() == kIROp_RWStructuredBufferGetElementPtr ||
@@ -7678,9 +7681,9 @@ SlangResult _validateNVVMFunction(
                             inst->getDataType(),
                             &helperValueType))
                     {
-                        auto helperStructType = asNVVMSupportedHelperStructType(helperValueType);
-                        if (!helperStructType ||
-                            !_hasNVVMCompatibleStructLayout(codeGenContext, helperStructType))
+                        if (!_hasNVVMCompatibleHelperValueLayout(
+                                codeGenContext,
+                                helperValueType))
                         {
                             return _diagnoseUnsupportedIR(
                                 codeGenContext,
@@ -8739,7 +8742,7 @@ SlangResult _validateNVVMFunction(
                                 argument->getDataType()) ||
                             asNVVMSupportedLocalCopyableValuePointerType(argument->getDataType()) ||
                             asNVVMSupportedLocalHelperValuePointerType(argument->getDataType()) ||
-                            asNVVMSupportedDeviceCopyableValuePointerType(
+                            asNVVMSupportedDeviceHelperValuePointerType(
                                 argument->getDataType()) ||
                             asNVVMSupportedRWStructuredBufferElementPointerType(
                                 argument->getDataType()) ||
@@ -9203,7 +9206,7 @@ SlangResult _validateNVVMFunction(
                                     function->getResultType()) ||
                                 asNVVMSupportedLocalHelperValuePointerType(
                                     function->getResultType()) ||
-                                asNVVMSupportedDeviceCopyableValuePointerType(
+                                asNVVMSupportedDeviceHelperValuePointerType(
                                     function->getResultType()))
                             {
                                 SLANG_RETURN_ON_FAIL(_validatePointerValue(
@@ -12728,7 +12731,7 @@ SlangResult validateNVVMSupportedIR(
             NVVMSharedGlobal sharedGlobal;
             if (getNVVMSupportedSharedGlobal(globalInst, &sharedGlobal))
             {
-                if (!_hasNVVMCompatibleCopyableValueLayout(
+                if (!_hasNVVMCompatibleHelperValueLayout(
                         codeGenContext,
                         sharedGlobal.alignmentType))
                 {

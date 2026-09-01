@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "dynamic-interface-out-inout",
+      "source": "tests/language-feature/dynamic-dispatch/return-interface-from-dispatch.slang",
+      "census_id": "language-feature/dynamic-dispatch/return-interface-from-dispatch.slang#cuda-1",
+      "compiler_args": [
+        "-conformance",
+        "FactoryA:IFactory=0",
+        "-conformance",
+        "FactoryB:IFactory=1",
+        "-conformance",
+        "FooA:IFoo=0",
+        "-conformance",
+        "FooB:IFoo=1"
+      ]
+    },
+    {
+      "name": "dynamic-interface-double-pointer",
+      "source": "tests/language-feature/dynamic-dispatch/ptr-to-interface-double-indirect.slang",
+      "census_id": "language-feature/dynamic-dispatch/ptr-to-interface-double-indirect.slang#discovery-1",
+      "compiler_args": ["-conformance", "Foo:IFoo=1"]
+    }
+  ]
+}

@@ -103,6 +103,11 @@ def _load_workloads(path: Path) -> list[dict[str, str]]:
     for workload in workloads:
         if not isinstance(workload, dict) or not required_fields.issubset(workload):
             raise SystemExit(f"invalid workload record in {path}: {workload!r}")
+        compiler_args = workload.get("compiler_args", [])
+        if not isinstance(compiler_args, list) or not all(
+            isinstance(argument, str) for argument in compiler_args
+        ):
+            raise SystemExit(f"invalid compiler_args in {path}: {workload!r}")
     return workloads
 
 
@@ -172,6 +177,7 @@ def main() -> int:
                 "-o",
                 str(ptx_path),
             ]
+            command.extend(str(argument) for argument in workload.get("compiler_args", []))
             command.append(
                 "-emit-cuda-via-nvvm" if configuration["nvvm"] else "-emit-cuda-via-nvrtc"
             )
