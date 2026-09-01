@@ -7470,6 +7470,18 @@ handles, CUDA storage layouts, and LLVM 14 typed pointees prove that these are d
 roles. No ABI or supported shape changes. Provider revision 34, frozen 418/418/418, and discovery
 72/72/72 remain unchanged.
 
+### Slice 184: A plan-producing preflight boundary
+
+Preflight now returns an `NVVMEmissionPlan` alongside deduplicated provider requirements. The plan
+owns the reachable function order, collision-checked physical names, and a source-keyed owned
+descriptor for each ordinary value operation. Operand validation checks for that record, and
+emission consumes it without repeating function/name walks or `_resolveNVVMValueOperation`.
+
+Capability requirements remain deduplicated per overload and are queried before module creation;
+emission records remain one per canonical instruction. Rich resource, atomic, pointer, aggregate,
+and compound-recipe families need typed plan variants and remain future inventory. Provider ABI 34
+and frozen/discovery correctness are unchanged at 418/418/418 and 72/72/72.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

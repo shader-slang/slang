@@ -6169,6 +6169,43 @@ void _requireValueOperation(
     requirements.add(requirement);
 }
 
+// Records the exact provider descriptor selected for one canonical ordinary value instruction.
+// Capability requirements remain deduplicated by overload, while the emission plan retains one
+// source-keyed record so emission never has to classify the instruction again.
+void _planNVVMValueOperation(
+    NVVMOperationRequirements& requirements,
+    IRInst* source,
+    const NVVMResolvedValueOperation& operation)
+{
+    SLANG_ASSERT(source);
+    _requireValueOperation(
+        requirements.valueOperations,
+        operation.desc,
+        operation.diagnosticName);
+
+    NVVMPlannedValueOperation planned;
+    planned.source = source;
+    planned.operation.operation = operation.desc.operation;
+    planned.operation.resultType = operation.desc.resultType;
+    planned.operation.operandCount = uint32_t(operation.desc.operandCount);
+    planned.operation.diagnosticName = operation.diagnosticName;
+    for (uint32_t i = 0; i < planned.operation.operandCount; ++i)
+        planned.operation.operandTypes[i] = operation.desc.operandTypes[i];
+    requirements.emissionPlan.valueOperations.add(planned);
+}
+
+const NVVMPlannedValueOperation* _findPlannedNVVMValueOperation(
+    const NVVMOperationRequirements& requirements,
+    IRInst* source)
+{
+    for (const auto& operation : requirements.emissionPlan.valueOperations)
+    {
+        if (operation.source == source)
+            return &operation;
+    }
+    return nullptr;
+}
+
 void _requireNVVMAtomicOperations(
     NVVMOperationRequirements& requirements,
     const NVVMResolvedAtomicOperation& operation)
@@ -8217,10 +8254,7 @@ SlangResult _validateNVVMFunction(
                                    : _diagnoseUnsupportedIR(
                                          codeGenContext,
                                          UnownedStringSlice(getIROpInfo(inst->getOp()).name));
-                    _requireValueOperation(
-                        requirements.valueOperations,
-                        operation.desc,
-                        operation.diagnosticName);
+                    _planNVVMValueOperation(requirements, inst, operation);
                 }
                 break;
 
@@ -8290,10 +8324,7 @@ SlangResult _validateNVVMFunction(
                             "bitCast type",
                             inst->getOperand(0)->getDataType(),
                             inst->getDataType());
-                    _requireValueOperation(
-                        requirements.valueOperations,
-                        operation.desc,
-                        operation.diagnosticName);
+                    _planNVVMValueOperation(requirements, inst, operation);
                 }
                 break;
 
@@ -8332,10 +8363,7 @@ SlangResult _validateNVVMFunction(
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
                             UnownedStringSlice(getIROpInfo(inst->getOp()).name));
-                    _requireValueOperation(
-                        requirements.valueOperations,
-                        operation.desc,
-                        operation.diagnosticName);
+                    _planNVVMValueOperation(requirements, inst, operation);
                 }
                 break;
 
@@ -8590,10 +8618,7 @@ SlangResult _validateNVVMFunction(
                             inst->getOp() == kIROp_WaveMaskBallot ? toSlice("wave-mask ballot")
                                                                   : toSlice("wave-mask match"));
                     }
-                    _requireValueOperation(
-                        requirements.valueOperations,
-                        operation.desc,
-                        operation.diagnosticName);
+                    _planNVVMValueOperation(requirements, inst, operation);
                 }
                 break;
 
@@ -8939,8 +8964,8 @@ SlangResult _validateNVVMFunction(
                         NVVMResolvedNumericTruthiness truthiness;
                         if (!_resolveNVVMNumericTruthiness(inst, truthiness))
                         {
-                            NVVMResolvedValueOperation operation;
-                            SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                            SLANG_RELEASE_ASSERT(
+                                _findPlannedNVVMValueOperation(requirements, inst));
                         }
                     }
                     for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
@@ -9032,8 +9057,7 @@ SlangResult _validateNVVMFunction(
                         break;
                     }
 
-                    NVVMResolvedValueOperation operation;
-                    SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                    SLANG_RELEASE_ASSERT(_findPlannedNVVMValueOperation(requirements, inst));
                     SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                         codeGenContext,
                         inst->getOperand(0),
@@ -13068,17 +13092,16 @@ SlangResult validateNVVMSupportedIR(
     if (!as<IRVoidType>(entryPoint->getResultType()))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point result type"));
 
-    List<IRFunc*> functions;
+    List<IRFunc*>& functions = outRequirements.emissionPlan.functions;
     HashSet<IRFunc*> functionSet;
     SLANG_RETURN_ON_FAIL(
         _collectNVVMFunctions(codeGenContext, linkedIR, entryPoint, functions, functionSet));
-    List<String> functionNames;
     SLANG_RETURN_ON_FAIL(_collectNVVMFunctionNames(
         codeGenContext,
         linkedIR.module,
         entryPoint,
         functions,
-        functionNames));
+        outRequirements.emissionPlan.functionNames));
     SLANG_RETURN_ON_FAIL(_validateNVVMFunctionUses(codeGenContext, functions));
 
     for (auto function : functions)
@@ -13389,18 +13412,10 @@ SlangResult emitNVVMIRFromLinkedIR(
     auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>();
     SLANG_RELEASE_ASSERT(entryPointDecoration);
 
-    // Reuse preflight's exact closure walk so the accepted and emitted function sets cannot drift.
-    List<IRFunc*> functions;
-    HashSet<IRFunc*> functionSet;
-    SLANG_RETURN_ON_FAIL(
-        _collectNVVMFunctions(codeGenContext, linkedIR, entryPoint, functions, functionSet));
-    List<String> functionNames;
-    SLANG_RETURN_ON_FAIL(_collectNVVMFunctionNames(
-        codeGenContext,
-        linkedIR.module,
-        entryPoint,
-        functions,
-        functionNames));
+    const List<IRFunc*>& functions = requirements.emissionPlan.functions;
+    const List<String>& functionNames = requirements.emissionPlan.functionNames;
+    SLANG_RELEASE_ASSERT(functions.getCount() && functions[0] == entryPoint);
+    SLANG_RELEASE_ASSERT(functionNames.getCount() == functions.getCount());
 
     ScopedNVVMModule moduleScope;
     moduleScope.builder = &builder;
@@ -13416,6 +13431,14 @@ SlangResult emitNVVMIRFromLinkedIR(
     NVVMValueMap entryAggregatePointerMap;
     NVVMGlobalUserPointerSet globalUserPointers;
     Dictionary<IRBlock*, SlangNVVMBlockHandle> blockMap;
+    Dictionary<IRInst*, Index> plannedValueOperationIndices;
+    for (Index i = 0; i < requirements.emissionPlan.valueOperations.getCount(); ++i)
+    {
+        const auto& operation = requirements.emissionPlan.valueOperations[i];
+        SLANG_RELEASE_ASSERT(operation.source);
+        SLANG_RELEASE_ASSERT(!plannedValueOperationIndices.containsKey(operation.source));
+        plannedValueOperationIndices[operation.source] = i;
+    }
 
     // The canonical global owns storage class, value type, extent, and name. Lower those facts once
     // before any function declaration; ordinary body uses then resolve through the shared value
@@ -14283,8 +14306,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap[inst] = loweredValue;
                             break;
                         }
-                        NVVMResolvedValueOperation operation;
-                        SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                        const Index* operationIndex =
+                            plannedValueOperationIndices.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(operationIndex);
+                        const NVVMValueOperationRequirement& operation =
+                            requirements.emissionPlan.valueOperations[*operationIndex].operation;
                         SlangNVVMValueHandle loweredOperands[3] = {};
                         for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
                              ++operandIndex)
@@ -14305,7 +14331,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             operation.diagnosticName,
                             builder.emitValueOperation(
                                 moduleScope.module,
-                                operation.desc,
+                                operation.getDesc(),
                                 inst->getOperandCount() ? loweredOperands : nullptr,
                                 inst->getOperandCount(),
                                 loweredValue)));
@@ -14387,8 +14413,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                         NVVMPointerBitCast pointerCast;
                         if (!_getNVVMPointerBitCast(inst, pointerCast))
                         {
-                            NVVMResolvedValueOperation operation;
-                            SLANG_RELEASE_ASSERT(_resolveNVVMValueOperation(inst, operation));
+                            const Index* operationIndex =
+                                plannedValueOperationIndices.tryGetValue(inst);
+                            SLANG_RELEASE_ASSERT(operationIndex);
+                            const NVVMValueOperationRequirement& operation =
+                                requirements.emissionPlan.valueOperations[*operationIndex].operation;
                             SlangNVVMValueHandle loweredOperand = nullptr;
                             SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                 codeGenContext,
@@ -14404,7 +14433,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 operation.diagnosticName,
                                 builder.emitValueOperation(
                                     moduleScope.module,
-                                    operation.desc,
+                                    operation.getDesc(),
                                     &loweredOperand,
                                     1,
                                     loweredValue)));

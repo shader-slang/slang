@@ -26,6 +26,21 @@ struct NVVMValueOperationRequirement
 
 using NVVMValueOperationRequirements = List<NVVMValueOperationRequirement>;
 
+/// Owns the resolved direct provider operation for one canonical value-producing instruction.
+struct NVVMPlannedValueOperation
+{
+    IRInst* source = nullptr;
+    NVVMValueOperationRequirement operation;
+};
+
+/// Owns stable module decisions produced by preflight and consumed without reclassification.
+struct NVVMEmissionPlan
+{
+    List<IRFunc*> functions;
+    List<String> functionNames;
+    List<NVVMPlannedValueOperation> valueOperations;
+};
+
 /// Owns one exact typed atomic-operation overload required by accepted linked IR.
 struct NVVMAtomicOperationRequirement
 {
@@ -60,6 +75,7 @@ struct NVVMOperationRequirements
     List<NVVMSurfaceOperationRequirement> surfaceOperations;
     List<NVVMTextureOperationRequirement> textureOperations;
     bool requiresCUDADeviceLibrary = false;
+    NVVMEmissionPlan emissionPlan;
 };
 
 /// Checks whether linked Slang IR is in the exact direct-NVVM subset.

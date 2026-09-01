@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "canonical-ordinary-texture2d-gather",
+      "source": "tests/hlsl-intrinsic/texture-2d-gather.slang",
+      "census_id": "hlsl-intrinsic/texture-2d-gather.slang#cuda-1"
+    }
+  ]
+}

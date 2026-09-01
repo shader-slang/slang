@@ -2590,3 +2590,14 @@ The aggregate-memory prototype was not promoted because copyable values, resourc
 parameter-group/structured-buffer layouts, and typed pointees have distinct canonical contracts.
 No type or ABI was widened. Provider ABI revision 34 is unchanged; frozen corpus v1 remains
 418/418/418, discovery remains 72/72/72, and the regression gates remain 437/437 and 92/92.
+
+Slice 184 introduces `NVVMEmissionPlan`. Direct preflight records reachable function order,
+physical names, and source-keyed owned descriptors for ordinary arithmetic, comparison,
+conversion, select, fixed-wave, and bit-reinterpret operations. The later operand pass and emitter
+consume those records; emission no longer repeats the closure/name walk or invokes
+`_resolveNVVMValueOperation`.
+
+Deduplicated capability requirements remain separate so every typed provider overload is queried
+once before module creation. Rich recipes/resources/atomics retain typed resolver paths pending
+dedicated plan variants. Provider ABI revision 34 is unchanged; frozen corpus v1 remains
+418/418/418, discovery remains 72/72/72, and the regression gates remain 437/437 and 92/92.
