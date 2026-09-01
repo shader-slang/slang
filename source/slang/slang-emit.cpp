@@ -643,6 +643,16 @@ void calcRequiredLoweringPassSet(
     case kIROp_LateRequireCapability:
         result.lateRequireCapability = true;
         break;
+    case kIROp_MatrixType:
+        // A layout that is `Unknown` needs resolving. A non-literal layout is a generic
+        // parameter, which specialization may later fill with `Unknown`, so flag that too.
+        if (auto matrixType = as<IRMatrixType>(inst))
+        {
+            auto layout = as<IRIntLit>(matrixType->getLayout());
+            if (!layout || layout->getValue() == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+                result.unresolvedMatrixLayout = true;
+        }
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -1448,9 +1458,11 @@ Result linkAndOptimizeIR(
         SLANG_PASS(lowerLValueCast, targetProgram);
 
     // Fill in default matrix layout into matrix types that left layout unspecified. Must run
-    // before specialization, so `row_major float4x4` and `float4x4` match as one type, and
+    // before specialization, so `row_major float4x4` and `float4x4` match as one type (and so
+    // an `Unknown` generic argument is resolved before it is substituted into a clone), and
     // before `lowerEnumType`, which erases the `MatrixLayoutMode` type this pass looks for.
-    SLANG_PASS(specializeMatrixLayout, targetProgram);
+    if (requiredLoweringPassSet.unresolvedMatrixLayout)
+        SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // Lower enum types early since enums and enum casts may appear in
     // specialization & not resolving them here would block specialization.
