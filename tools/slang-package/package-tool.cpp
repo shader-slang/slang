@@ -2047,14 +2047,8 @@ static SlangResult _openPathWithRegisteredApplication(const String& path, String
         outError = String("Cannot launch the registered application for '") + path + "'.";
         return SLANG_FAIL;
     }
-    // `open` and `cmd /c start` return once the handler is launched. `xdg-open` sometimes keeps
-    // running for as long as the viewer does; treat a still-running launcher as success rather
-    // than blocking the package command on the editor.
-    if (process->waitForTermination(5000) && process->getReturnValue() != 0)
-    {
-        outError = String("Opening '") + path + "' with the registered application failed.";
-        return SLANG_FAIL;
-    }
+    // Do not wait. `open` and `cmd /c start` return at once; some `xdg-open` implementations keep
+    // running for as long as the viewer does, and blocking on that would stall `docs`.
     return SLANG_OK;
 }
 

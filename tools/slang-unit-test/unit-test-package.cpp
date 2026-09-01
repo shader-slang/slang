@@ -1106,7 +1106,7 @@ SLANG_UNIT_TEST(PackageToolConfirmationAnswers)
 SLANG_UNIT_TEST(PackageToolDocsOpensIndex)
 {
     CommandLine commandLine;
-    getRegisteredApplicationOpenCommand("/tmp/index.md", commandLine);
+    getRegisteredApplicationOpenCommand("dummy.md", commandLine);
     String rendered = commandLine.toString();
 #if SLANG_WINDOWS_FAMILY
     SLANG_CHECK(rendered.getUnownedSlice().indexOf(UnownedStringSlice("cmd.exe")) >= 0);
@@ -1116,7 +1116,7 @@ SLANG_UNIT_TEST(PackageToolDocsOpensIndex)
 #else
     SLANG_CHECK(rendered.getUnownedSlice().indexOf(UnownedStringSlice("xdg-open")) >= 0);
 #endif
-    SLANG_CHECK(rendered.getUnownedSlice().indexOf(UnownedStringSlice("/tmp/index.md")) >= 0);
+    SLANG_CHECK(rendered.getUnownedSlice().indexOf(UnownedStringSlice("dummy.md")) >= 0);
 
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
