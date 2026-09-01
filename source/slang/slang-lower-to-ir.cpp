@@ -6642,16 +6642,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return innerType;
     }
 
-    // True when `aggTypeDeclRef`'s concrete instance fields already exist at this point in
-    // lowering, so its default value can be a field-wise IRMakeStruct. A
-    // struct/class/GLSL-interface-block qualifies only with a body and no link-time alias: a
-    // bodyless `extern struct X;` (`!hasBody`) or an alias `export struct Foo : IFoo = Bar;`
-    // (`aliasedType`) gains its fields only during linking, so — like the associated-type / `This`
-    // / global-generic-parameter kinds — it must defer to `emitDefaultConstruct`, else the
-    // MakeStruct is built over an empty field list and reads out of bounds once specialization
-    // resolves the real fields (shader-slang/slang#12708). `SynthesizedStructDecl` is excluded for
-    // the same reason: it lowers to an autodiff-context type (resolved later in
-    // `slang-ir-translate.cpp`), not `VarDecl` fields.
+    // True when this aggregate's concrete fields already exist at this point in lowering. Fields
+    // that only materialize during linking — a bodyless `extern struct X;` (`!hasBody`) or a
+    // link-time alias `export struct Foo : IFoo = Bar;` (`aliasedType`) — must not build a
+    // field-wise IRMakeStruct here, or it is emitted over an empty field list and reads out of
+    // bounds once specialization resolves the real fields (shader-slang/slang#12708).
+    // `SynthesizedStructDecl` is excluded for the same reason: it lowers to an autodiff-context
+    // type, not `VarDecl` fields.
     static bool isConcreteFieldOwningAggregate(DeclRef<AggTypeDecl> aggTypeDeclRef)
     {
         auto decl = aggTypeDeclRef.getDecl();
