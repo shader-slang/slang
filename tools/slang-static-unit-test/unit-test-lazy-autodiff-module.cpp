@@ -1,11 +1,29 @@
 // unit-test-lazy-autodiff-module.cpp
+//
+// Tests that the autodiff builtin supplement loads on demand: that ordinary code
+// leaves it unloaded, that the semantic nodes which need derivative
+// implementations load it, and that it loads at most once per global session.
+//
+// The observable being asserted on is `Session::coreModules`, which is internal
+// compiler state. That is what places these tests here rather than in
+// `slang-unit-test`: a plugin test can reach only exported symbols, so observing
+// the count from there previously required adding a `SLANG_API` accessor to
+// libslang that existed for no other reason. Linking statically reads the field
+// directly and keeps the test-only surface out of the shipped library.
 
-// slang-compiler-api.h transitively includes slang-global-session.h (which declares
-// getLoadedBuiltinModuleCountForUnitTest) along with the full definitions it depends on.
-#include "slang/slang-compiler-api.h"
+// `slang-global-session.h` returns `RefPtr<ASTBuilder>` by value, so it needs that type
+// complete; include its definition rather than relying on a transitive include.
+#include "slang/slang-ast-builder.h"
+#include "slang/slang-global-session.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
+
+/// Returns how many builtin/core modules `globalSession` currently has loaded.
+static Index _loadedBuiltinModuleCount(slang::IGlobalSession* globalSession)
+{
+    return static_cast<Session*>(globalSession)->coreModules.getCount();
+}
 
 /// Loads a source module and aborts the current test if semantic checking fails.
 static ComPtr<slang::IModule> _loadModule(
@@ -23,15 +41,15 @@ static ComPtr<slang::IModule> _loadModule(
 
 SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
 {
+    // Deliberately not `StaticUnitTestEnv`, which shares one global session across the whole
+    // suite. This test asserts on the loaded-module count of a session whose history it knows,
+    // so it must own that session: any other test in the process that triggered a supplement
+    // load would otherwise decide this one's result, making the suite order-dependent.
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
-    // Observe lazy builtin-module loading through the libslang accessor rather than dereferencing
-    // an internal Session* here: that dereference would make this object file reference `typeinfo
-    // for Slang::Session` under -fsanitize=vptr, which is not exported to this separately linked
-    // tool and fails to link on ELF.
-    const Index baseCoreModuleCount = getLoadedBuiltinModuleCountForUnitTest(globalSession.get());
+    const Index baseCoreModuleCount = _loadedBuiltinModuleCount(globalSession);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_HLSL;
@@ -45,7 +63,7 @@ SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
         globalSession->createSession(sessionDesc, firstSession.writeRef()) == SLANG_OK);
 
     _loadModule(firstSession, "plainModule", "float identity(float value) { return value; }");
-    SLANG_CHECK(getLoadedBuiltinModuleCountForUnitTest(globalSession.get()) == baseCoreModuleCount);
+    SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount);
 
     // The base-surface autodiff symbols (diffPair, the update helpers, detach, and the tensor-view
     // types) live in the eager `autodiff-base` segment folded into the core module, so ordinary
@@ -59,7 +77,7 @@ SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
         "float useBase(float v) {"
         "  var p = diffPair(v, 1.0); updateDiff(p, 2.0);"
         "  DiffTensorView<float> dv; return detach(p.p); }");
-    SLANG_CHECK(getLoadedBuiltinModuleCountForUnitTest(globalSession.get()) == baseCoreModuleCount);
+    SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount);
 
     // A `[PrimalSubstituteOf]` attribute is not a differentiability header modifier, so it does not
     // load the supplement through `checkDifferentiableCallableCommon`. With no `[Differentiable]`
@@ -74,15 +92,13 @@ SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
         "float original(float x) { return x * x; }\n"
         "[PrimalSubstituteOf(original)]\n"
         "float primalSubst(float x) { return 2.0f * x * x; }\n");
-    SLANG_CHECK(
-        getLoadedBuiltinModuleCountForUnitTest(globalSession.get()) == baseCoreModuleCount + 1);
+    SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
 
     _loadModule(
         firstSession,
         "differentiableModule",
         "[ForwardDifferentiable] float f(float value) { return sin(value); }");
-    SLANG_CHECK(
-        getLoadedBuiltinModuleCountForUnitTest(globalSession.get()) == baseCoreModuleCount + 1);
+    SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
 
     // A new linkage reuses the same global session after its supplement has been loaded. Its first
     // cache construction therefore includes the supplement through Session::coreModules. A later
@@ -120,6 +136,5 @@ SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
                 return fwd_diff(sin)(diffPair(value, 1.0)).d;
             }
         )");
-    SLANG_CHECK(
-        getLoadedBuiltinModuleCountForUnitTest(globalSession.get()) == baseCoreModuleCount + 1);
+    SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
 }
