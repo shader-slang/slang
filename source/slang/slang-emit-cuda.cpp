@@ -449,12 +449,21 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
     else
     {
+        // A function carrying the user-force-inline marker is deferred to NVRTC on CUDA (issue
+        // #12623): it survives as a real `__device__` function, so emit `__forceinline__` to ask
+        // NVRTC to inline it. The marker is present only for a user hint, so compiler-mandated
+        // inlines are unaffected. `__forceinline__` suppresses a co-occurring `__noinline__`:
+        // `__forceinline__ __device__ __noinline__` is a contradictory specifier sequence NVRTC
+        // rejects, and the request to inline takes precedence.
+        bool userForceInline = inst->findDecoration<IRUserForceInlineDecoration>() != nullptr;
+        if (userForceInline)
+            m_writer->emit("__forceinline__ ");
         m_writer->emit("__device__ ");
 
         // `__noinline__` is a declaration specifier, so it belongs in this specifier
         // sequence. Kernels are call-graph roots with no caller to be inlined into, so the
         // request is honoured for ordinary device functions only.
-        if (inst->findDecoration<IRNoInlineDecoration>())
+        if (!userForceInline && inst->findDecoration<IRNoInlineDecoration>())
         {
             m_writer->emit("__noinline__ ");
         }

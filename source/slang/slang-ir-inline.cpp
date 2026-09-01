@@ -5,6 +5,7 @@
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
+#include "slang-target.h"
 
 // This file provides general facilities for inlining function calls.
 
@@ -1144,32 +1145,157 @@ struct ForceInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
-    ForceInliningPass(IRModule* module)
-        : Super(module)
+    ForceInliningPass(IRModule* module, CodeGenTarget target)
+        : Super(module), m_target(target)
     {
+    }
+
+    CodeGenTarget m_target;
+
+    // Functions that must be inlined by this pass because they are (transitively) called from a
+    // `static_assert` condition, computed lazily the first time it is needed. See
+    // `funcIsRequiredByStaticAssert` for why this exists.
+    HashSet<IRFunc*> m_staticAssertReachableFuncs;
+    bool m_computedStaticAssertReachable = false;
+
+    // Collect every `IRFunc` transitively reachable as a callee from any `static_assert` condition
+    // in the module, into `m_staticAssertReachableFuncs`.
+    //
+    // `checkStaticAssert` (slang-emit.cpp) is a pure checker that runs *after* this pass and the
+    // subsequent `simplifyIR` fold: it requires each `static_assert` condition to already be an
+    // `IRBoolLit`, and there is no compile-time call interpreter. So a `static_assert(f(K))`
+    // becomes constant only if `f` (and everything `f` calls) is inlined here first. Deferring such
+    // a callee on CUDA (see `shouldInline`) would leave a `call` in the condition and produce a
+    // spurious "static assertion condition is not compile-time constant" error. We therefore never
+    // defer a function reachable from a `static_assert` condition.
+    void computeStaticAssertReachableFuncs()
+    {
+        List<IRFunc*> workList;
+
+        struct Walker
+        {
+            List<IRFunc*>& workList;
+            HashSet<IRFunc*>& reached;
+            void seedFromValue(IRInst* value)
+            {
+                // Walk the operand graph feeding `value`, collecting any function that is called.
+                List<IRInst*> stack;
+                HashSet<IRInst*> seen;
+                stack.add(value);
+                while (stack.getCount())
+                {
+                    auto cur = stack.getLast();
+                    stack.removeLast();
+                    if (!cur || !seen.add(cur))
+                        continue;
+                    if (auto call = as<IRCall>(cur))
+                        addFunc(as<IRFunc>(getResolvedInstForDecorations(call->getCallee())));
+                    for (UInt i = 0; i < cur->getOperandCount(); i++)
+                        stack.add(cur->getOperand(i));
+                }
+            }
+            void addFunc(IRFunc* func)
+            {
+                if (func && reached.add(func))
+                    workList.add(func);
+            }
+        } walker{workList, m_staticAssertReachableFuncs};
+
+        // An `IRStaticAssert` can be nested to any depth (e.g. inside an `IRFunc` that is itself
+        // under an `IRGeneric`), so scan the whole IR tree, the same traversal `checkStaticAssert`
+        // uses. A shallower scan would miss a generic that static-asserts on a user helper.
+        List<IRInst*> scan;
+        scan.add(m_module->getModuleInst());
+        while (scan.getCount())
+        {
+            auto inst = scan.getLast();
+            scan.removeLast();
+            if (auto staticAssert = as<IRStaticAssert>(inst))
+                walker.seedFromValue(staticAssert->getOperand(0));
+            for (auto child : inst->getChildren())
+                scan.add(child);
+        }
+
+        // Transitively close over the bodies of the reached functions: a static_assert helper may
+        // call further helpers (e.g. `__isPackedInputInterpretation` calls
+        // `__componentPackingFactor`), and those must inline too.
+        while (workList.getCount())
+        {
+            auto func = workList.getLast();
+            workList.removeLast();
+            List<IRInst*> body;
+            body.add(func);
+            while (body.getCount())
+            {
+                auto inst = body.getLast();
+                body.removeLast();
+                if (auto call = as<IRCall>(inst))
+                    walker.addFunc(as<IRFunc>(getResolvedInstForDecorations(call->getCallee())));
+                for (auto child : inst->getChildren())
+                    body.add(child);
+            }
+        }
+    }
+
+    // Return true if `func` must be inlined by this pass because a `static_assert` condition
+    // depends on it being resolved to a compile-time constant (see above).
+    bool funcIsRequiredByStaticAssert(IRFunc* func)
+    {
+        if (!m_computedStaticAssertReachable)
+        {
+            computeStaticAssertReachableFuncs();
+            m_computedStaticAssertReachable = true;
+        }
+        return m_staticAssertReachableFuncs.contains(func);
     }
 
     bool shouldInline(CallSiteInfo const& info)
     {
-        if (info.callee->findDecoration<IRForceInlineDecoration>() ||
-            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>() ||
-            info.callee->findDecoration<IRIntrinsicOpDecoration>())
-            return true;
-        return false;
+        auto callee = info.callee;
+        bool hasUserForceInline = callee->findDecoration<IRUserForceInlineDecoration>() != nullptr;
+        bool hasForceInline = callee->findDecoration<IRForceInlineDecoration>() != nullptr;
+        bool hasUnsafeEarly =
+            callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>() != nullptr;
+        bool hasIntrinsic = callee->findDecoration<IRIntrinsicOpDecoration>() != nullptr;
+        bool hasTargetIntrinsic = callee->findDecoration<IRTargetIntrinsicDecoration>() != nullptr;
+
+        // On CUDA, a user-written `[ForceInline]` is deferred to NVRTC: the callee is kept as a
+        // separate `__forceinline__ __device__` function rather than having its body duplicated at
+        // every call site, which is what makes NVRTC's front-end time blow up (issue #12623).
+        //
+        // Deferring is a *performance* choice — emitting the callee in-Slang is always a correct
+        // lowering — so we only defer when provably safe, and inline (do not defer) whenever
+        // a consumer requires the callee resolved first. The vetoes: a generic
+        // `ForceInlineDecoration` means a compiler pass requires the inline for correctness
+        // (constexpr-parameter, setter, buffer-element pack/unpack, etc.);
+        // `Unsafe`/`__intrinsic_op` must inline regardless; a
+        // `[__target_intrinsic]` builtin has no ordinary body to emit as a `__device__` function;
+        // and a function reachable from a `static_assert` condition must be inlined so the
+        // condition folds to a constant before `checkStaticAssert` runs.
+        if (isCUDATarget(m_target) && hasUserForceInline && !hasForceInline && !hasUnsafeEarly &&
+            !hasIntrinsic && !hasTargetIntrinsic && !funcIsRequiredByStaticAssert(callee))
+            return false;
+
+        return hasUserForceInline || hasForceInline || hasUnsafeEarly || hasIntrinsic;
     }
 };
 
 void performForceInlining(IRModule* module)
 {
+    performForceInlining(module, CodeGenTarget::Unknown);
+}
+
+void performForceInlining(IRModule* module, CodeGenTarget target)
+{
     SLANG_PROFILE;
 
-    ForceInliningPass pass(module);
+    ForceInliningPass pass(module, target);
     pass.considerAllCallSites();
 }
 
 bool performForceInlining(IRGlobalValueWithCode* func)
 {
-    ForceInliningPass pass(func->getModule());
+    ForceInliningPass pass(func->getModule(), CodeGenTarget::Unknown);
     return pass.considerAllCallSitesRec(func);
 }
 
@@ -1224,8 +1350,8 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             case kIROp_IntrinsicOpDecoration:
                 return true;
             case kIROp_ForceInlineDecoration:
+            case kIROp_UserForceInlineDecoration:
                 hasForceInline = true;
-                break;
                 break;
             }
         }

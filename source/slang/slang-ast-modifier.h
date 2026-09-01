@@ -150,6 +150,17 @@ class ConstExprModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks a `[ForceInline]` attribute that the compiler synthesized (e.g. on the property accessor
+// generated for interface conformance in `slang-check-decl.cpp`) rather than one the user wrote.
+// Such an inline is required for correctness, so lowering must resolve it in Slang's own inliner;
+// only a genuine user `[ForceInline]` is recorded as `IRUserForceInlineDecoration` and eligible for
+// deferral to NVRTC on CUDA. See shader-slang/slang#12623.
+FIDDLE()
+class CompilerGeneratedForceInlineModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class ExternCppModifier : public Modifier
 {

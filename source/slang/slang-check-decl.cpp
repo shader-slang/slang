@@ -8538,6 +8538,10 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
 
         // TODO: This a slight workaround for accessor differentiability being tricky to handle
         addModifier(synAccessorDecl, m_astBuilder->create<ForceInlineAttribute>());
+        // Mark this `[ForceInline]` as compiler-synthesized so lowering resolves it in Slang's own
+        // inliner rather than treating it as a user hint eligible for deferral to NVRTC on CUDA
+        // (shader-slang/slang#12623).
+        addModifier(synAccessorDecl, m_astBuilder->create<CompilerGeneratedForceInlineModifier>());
 
         synAccesorContainer->addMember(synAccessorDecl);
 
