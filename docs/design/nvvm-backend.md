@@ -7123,6 +7123,28 @@ correctness (94.1%), with exactly two gains and no old-correct loss. Discovery r
 82/72 at 66/66/66 with no change. The selected prefix passes 433/433. All 32 representative gates
 compile, and their five configurations assemble with CUDA 12.9 for SM70, SM80, and SM90.
 
+### Slice 168: Finite aggregate-array values
+
+Direct NVVM now lowers an exact naturally laid-out fixed array as an ordinary value when every
+recursive leaf already has a selected resource-value representation. The classifier requires the
+canonical two-operand `ArrayType(element, count)`, a positive bounded literal count, and no explicit
+stride. This admits a synthesized `Texture2D[2]` value without claiming that arbitrary
+resource-containing source aggregates have compatible CUDA launch or storage layouts.
+
+Finite module-owned constant trees made from selected scalar literals, `makeVector`, and value
+aggregate constructors are also executable values. The emitter recreates each constructor tree in
+the using function with existing generic operations. Aggregate and vector instructions are not
+cached in the cross-function value map, because doing so could make one function reference SSA
+owned by another. Mutable globals and arbitrary module operations remain unsupported.
+
+Basic-block parameters now use the established executable-value classification, so a conditional
+selection of supported texture handles becomes an ordinary typed LLVM phi. Provider ABI revision
+32 is unchanged. `static-const-matrix-array` and `func-resource-result-complex` gain four permanent
+direct lanes. Frozen v1 remains exactly 452/427 and 402/402/402 O0/O3/both with no changed row;
+discovery remains exactly 82/72 and advances from 66/66/66 to 68/68/68 with exactly those two gains
+and no loss. The selected prefix passes 433/433, the permanent NVVM category passes 50/50, and both
+new gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

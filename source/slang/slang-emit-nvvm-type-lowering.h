@@ -120,6 +120,9 @@ uint32_t getNVVMHelperValueAlignment(IRInst* type);
 /// Returns a finite helper array composed from copyable values and device pointers.
 IRArrayType* asNVVMSupportedHelperArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
 
+/// Returns a naturally laid-out fixed array whose leaves have resource-value representations.
+IRArrayType* asNVVMSupportedResourceArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
+
 /// Returns a finite helper struct composed from copyable values and device pointers.
 IRStructType* asNVVMSupportedHelperStructType(IRInst* type);
 

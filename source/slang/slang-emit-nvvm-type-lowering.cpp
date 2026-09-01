@@ -1136,6 +1136,27 @@ static uint32_t _getNVVMResourceValueAlignment(IRInst* type, HashSet<IRInst*>& a
         return 8;
     }
 
+    // Consider `Texture2D textures[2]` in the synthesized CUDA parameter block. Uniform lowering
+    // retains a fixed ArrayType, then ordinary IR loads the complete value before selecting one
+    // texture. Each texture is already the canonical i64 CUDA handle, so the array has the same
+    // natural LLVM and CUDA stride. Require the exact two-operand fixed-array producer here; an
+    // explicit stride belongs to a physical-storage representation and must be proved separately.
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        auto elementCount = as<IRIntLit>(arrayType->getElementCount());
+        if (arrayType->getOp() != kIROp_ArrayType || arrayType->getOperandCount() != 2 ||
+            !elementCount || elementCount->getValue() <= 0 ||
+            elementCount->getValue() > UINT32_MAX || activeTypes.contains(type))
+        {
+            return 0;
+        }
+        activeTypes.add(type);
+        const uint32_t alignment =
+            _getNVVMResourceValueAlignment(arrayType->getElementType(), activeTypes);
+        activeTypes.remove(type);
+        return alignment;
+    }
+
     auto structType = as<IRStructType>(type);
     if (!structType || activeTypes.contains(type))
         return 0;
@@ -1172,6 +1193,20 @@ uint32_t getNVVMResourceValueAlignment(IRInst* type)
 {
     HashSet<IRInst*> activeTypes;
     return _getNVVMResourceValueAlignment(type, activeTypes);
+}
+
+IRArrayType* asNVVMSupportedResourceArrayType(IRInst* type, uint32_t* outElementCount)
+{
+    if (outElementCount)
+        *outElementCount = 0;
+    auto arrayType = as<IRArrayType>(type);
+    auto elementCount = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
+    if (!arrayType || !elementCount || isNVVMSupportedHelperValueType(arrayType) ||
+        !getNVVMResourceValueAlignment(arrayType))
+        return nullptr;
+    if (outElementCount)
+        *outElementCount = uint32_t(elementCount->getValue());
+    return arrayType;
 }
 
 static bool _isNVVMSupportedResourceElementType(IRInst* type, HashSet<IRInst*>& activeTypes)
@@ -1820,6 +1855,8 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
         supportedType = use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage
                             ? asNVVMSupportedAggregateStorageArrayType(type, &elementCount)
                             : asNVVMSupportedHelperArrayType(type, &elementCount);
+        if (!supportedType && use == NVVMTypeUse::Value)
+            supportedType = asNVVMSupportedResourceArrayType(type, &elementCount);
     }
     SLANG_RELEASE_ASSERT(supportedType);
     SlangNVVMTypeHandle elementType = nullptr;
@@ -2084,6 +2121,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRArrayType* fixedNumericArrayType = asNVVMSupportedNumericArrayType(type);
     IRArrayType* fixedCopyableArrayType = asNVVMSupportedCopyableArrayType(type);
     IRArrayType* fixedHelperArrayType = asNVVMSupportedHelperArrayType(type);
+    IRArrayType* fixedResourceArrayType = asNVVMSupportedResourceArrayType(type);
     IRArrayType* aggregateStorageArrayType = asNVVMSupportedAggregateStorageArrayType(type);
     IRVectorType* compactParameterGroupVectorType =
         asNVVMSupportedCompactParameterGroupVectorType(type);
@@ -2135,10 +2173,10 @@ SlangResult NVVMTypeLoweringContext::lowerType(
           sharedHelperPointer || isRawBuffer || isSurface || isSampledTexture || samplerValue)) ||
         (use == NVVMTypeUse::HelperValue && isHelperValue) ||
         (use == NVVMTypeUse::Value &&
-         (isHelperValue || resourceStructType || physicalArrayStructType || deviceNumericPointer ||
-          deviceArrayPointer || isRawBuffer || isBufferDataPointer || parameterGroup || isSurface ||
-          isSampledTexture || samplerValue || resourceElementPointer || sharedElementPointer ||
-          sharedHelperPointer || atomicType)) ||
+         (isHelperValue || resourceStructType || fixedResourceArrayType ||
+          physicalArrayStructType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
+          isBufferDataPointer || parameterGroup || isSurface || isSampledTexture || samplerValue ||
+          resourceElementPointer || sharedElementPointer || sharedHelperPointer || atomicType)) ||
         (use == NVVMTypeUse::Storage &&
          (isInteger || isFloat32 || asNVVMSupported32BitNumericVectorType(type) || structType ||
           aggregateStorageArrayType || deviceCopyablePointer || isRawBuffer || parameterGroup ||
@@ -2421,7 +2459,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                       .getVectorType(m_module, elementType, valueVectorElementCount, outType)));
     }
     else if (
-        fixedCopyableArrayType || fixedHelperArrayType ||
+        fixedCopyableArrayType || fixedHelperArrayType || fixedResourceArrayType ||
         (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage &&
          as<IRArrayType>(type)) ||
         ((use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage) &&

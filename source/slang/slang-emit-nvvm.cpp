@@ -1447,6 +1447,7 @@ void _addNVVMReachableStructTypes(IRType* type, HashSet<IRInst*>& reachableTypes
     while (auto arrayType = as<IRArrayType>(type))
     {
         if (!asNVVMSupportedHelperArrayType(arrayType) &&
+            !asNVVMSupportedResourceArrayType(arrayType) &&
             !asNVVMSupportedAggregateStorageArrayType(arrayType) &&
             !isNVVMSupportedStructuredBufferStorageType(arrayType))
             return;
@@ -1563,9 +1564,15 @@ bool _getNVVMSequentialElement(IRInst* inst, NVVMSequentialElement& outElement)
     }
     else if (!as<IRSwizzle>(inst))
     {
-        if (auto baseArrayType = asNVVMSupportedHelperArrayType(
+        auto baseArrayType =
+            asNVVMSupportedHelperArrayType(base ? base->getDataType() : nullptr, &baseElementCount);
+        if (!baseArrayType)
+        {
+            baseArrayType = asNVVMSupportedResourceArrayType(
                 base ? base->getDataType() : nullptr,
-                &baseElementCount))
+                &baseElementCount);
+        }
+        if (baseArrayType)
         {
             baseElementType = baseArrayType->getElementType();
         }
@@ -1796,6 +1803,8 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
         uint32_t elementCount = 0;
         auto resultType = asNVVMSupportedHelperArrayType(inst->getDataType(), &elementCount);
         if (!resultType)
+            resultType = asNVVMSupportedResourceArrayType(inst->getDataType(), &elementCount);
+        if (!resultType)
         {
             resultType =
                 asNVVMSupportedAggregateStorageArrayType(inst->getDataType(), &elementCount);
@@ -1818,6 +1827,8 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     {
         uint32_t elementCount = 0;
         auto resultType = asNVVMSupportedHelperArrayType(inst->getDataType(), &elementCount);
+        if (!resultType)
+            resultType = asNVVMSupportedResourceArrayType(inst->getDataType(), &elementCount);
         if (!resultType)
         {
             resultType =
@@ -1927,6 +1938,11 @@ bool _getNVVMAggregateElement(IRInst* inst, NVVMAggregateElement& outElement)
     uint32_t elementCount = 0;
     auto baseType =
         asNVVMSupportedHelperArrayType(base ? base->getDataType() : nullptr, &elementCount);
+    if (!baseType)
+    {
+        baseType =
+            asNVVMSupportedResourceArrayType(base ? base->getDataType() : nullptr, &elementCount);
+    }
     auto index = getElement ? _asExecutableInteger32Constant(getElement->getIndex()) : nullptr;
     if (!baseType || !isTypeEqual(inst->getDataType(), baseType->getElementType()) || !index ||
         index->getValue() < 0 || index->getValue() >= elementCount)
@@ -2291,6 +2307,73 @@ IRFloatLit* _asExecutableFloatingPointConstant(IRInst* value)
     auto floatLit = as<IRFloatLit>(value);
     return floatLit && isNVVMSupportedFloatingPointScalarType(floatLit->getDataType()) ? floatLit
                                                                                        : nullptr;
+}
+
+// Recognizes one finite module-owned constant value tree. Consider this example:
+//
+//     static const float3x2 values[2] = { ... };
+//
+// Matrix legalization retains module-scope `makeVector` leaves, `makeArray` matrix rows, and one
+// outer `makeArray`. These are immutable SSA values rather than storage declarations. Prove the
+// complete literal/construction tree here so a function can materialize it with the same generic
+// operations used for an equivalent local expression. Arbitrary module operations and cyclic
+// graphs remain outside the contract.
+bool _isNVVMSupportedModuleConstantValue(IRInst* value, HashSet<IRInst*>& activeValues)
+{
+    if (!value || !value->getModule() || value->getParent() != value->getModule()->getModuleInst())
+    {
+        return false;
+    }
+    if (_asExecutableSelectedIntegerConstant(value) || _asExecutableBoolConstant(value) ||
+        _asExecutableFloatingPointConstant(value) || _asExecutableNullDevicePointer(value))
+    {
+        return true;
+    }
+    if (activeValues.contains(value))
+        return false;
+
+    activeValues.add(value);
+    NVVMVectorConstruction vectorConstruction;
+    if (_getNVVMVectorConstruction(value, vectorConstruction))
+    {
+        for (uint32_t i = 0; i < vectorConstruction.elementCount; ++i)
+        {
+            IRInst* element = vectorConstruction.elements[i].value;
+            if (!element || !_isNVVMSupportedModuleConstantValue(element, activeValues))
+            {
+                activeValues.remove(value);
+                return false;
+            }
+        }
+        activeValues.remove(value);
+        return true;
+    }
+
+    NVVMAggregateConstruction aggregateConstruction;
+    if (_getNVVMAggregateConstruction(value, aggregateConstruction) &&
+        aggregateConstruction.resultUse == NVVMTypeUse::Value)
+    {
+        for (uint32_t i = 0; i < aggregateConstruction.elementCount; ++i)
+        {
+            IRInst* element = value->getOperand(aggregateConstruction.repeatsSingleElement ? 0 : i);
+            if (!_isNVVMSupportedModuleConstantValue(element, activeValues))
+            {
+                activeValues.remove(value);
+                return false;
+            }
+        }
+        activeValues.remove(value);
+        return true;
+    }
+
+    activeValues.remove(value);
+    return false;
+}
+
+bool _isNVVMSupportedModuleConstantValue(IRInst* value)
+{
+    HashSet<IRInst*> activeValues;
+    return _isNVVMSupportedModuleConstantValue(value, activeValues);
 }
 
 enum class NVVMEphemeralValueKind
@@ -6140,7 +6223,8 @@ SlangResult _validateAvailableValue(
     if (value && consumer && value->getModule() == consumer->getModule() &&
         (getNVVMSupportedSharedGlobal(value) ||
          _getNVVMConventionalGlobalParams(value, globalParams) ||
-         _getNVVMCUDAExecutionGlobalOperation(value, executionOperation)))
+         _getNVVMCUDAExecutionGlobalOperation(value, executionOperation) ||
+         _isNVVMSupportedModuleConstantValue(value)))
     {
         return SLANG_OK;
     }
@@ -7187,7 +7271,12 @@ SlangResult _validateNVVMFunction(
         {
             for (auto param : block->getParams())
             {
-                if (!isNVVMSupportedCopyableValueType(param->getDataType()))
+                // A conditional resource selection produces the same canonical block parameter as
+                // any scalar join. For example, choosing between two elements of
+                // `Texture2D textures[2]` passes one texture handle to the merge block. Admit the
+                // complete established executable-value algebra here; generic LLVM phi emission
+                // already preserves each selected provider representation.
+                if (!_getNVVMExecutableValueAlignment(param->getDataType()))
                 {
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("basic-block parameter"));
                 }
@@ -9138,6 +9227,80 @@ SlangResult _getLoweredNVVMValue(
     {
         outValue = *mappedValue;
         return SLANG_OK;
+    }
+
+    // Module aggregate constants are immutable value trees, not storage. Materialize each tree at
+    // its use so every instruction remains owned by the current function. The shared value map may
+    // still cache provider scalar constants, but caching an aggregate instruction there could make
+    // a later function refer to SSA emitted in an earlier function.
+    if (_isNVVMSupportedModuleConstantValue(irValue))
+    {
+        NVVMVectorConstruction vectorConstruction;
+        if (_getNVVMVectorConstruction(irValue, vectorConstruction))
+        {
+            SlangNVVMValueHandle loweredElements[4] = {};
+            for (uint32_t i = 0; i < vectorConstruction.elementCount; ++i)
+            {
+                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                    codeGenContext,
+                    builder,
+                    module,
+                    vectorConstruction.elements[i].value,
+                    valueMap,
+                    typeContext,
+                    loweredElements[i]));
+            }
+            SlangNVVMTypeHandle loweredType = nullptr;
+            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                vectorConstruction.resultType,
+                NVVMTypeUse::Value,
+                loweredType));
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "module constant vector construction",
+                builder.emitVectorConstruct(
+                    module,
+                    loweredType,
+                    loweredElements,
+                    vectorConstruction.elementCount,
+                    outValue)));
+            return SLANG_OK;
+        }
+
+        NVVMAggregateConstruction aggregateConstruction;
+        if (_getNVVMAggregateConstruction(irValue, aggregateConstruction))
+        {
+            SLANG_RELEASE_ASSERT(aggregateConstruction.resultUse == NVVMTypeUse::Value);
+            List<SlangNVVMValueHandle> loweredElements;
+            for (uint32_t i = 0; i < aggregateConstruction.elementCount; ++i)
+            {
+                SlangNVVMValueHandle loweredElement = nullptr;
+                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                    codeGenContext,
+                    builder,
+                    module,
+                    irValue->getOperand(aggregateConstruction.repeatsSingleElement ? 0 : i),
+                    valueMap,
+                    typeContext,
+                    loweredElement));
+                loweredElements.add(loweredElement);
+            }
+            SlangNVVMTypeHandle loweredType = nullptr;
+            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                aggregateConstruction.resultType,
+                NVVMTypeUse::Value,
+                loweredType));
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "module constant aggregate construction",
+                builder.emitAggregateConstruct(
+                    module,
+                    loweredType,
+                    loweredElements.getBuffer(),
+                    size_t(loweredElements.getCount()),
+                    outValue)));
+            return SLANG_OK;
+        }
     }
 
     SlangNVVMValueOperation executionOperation = 0;
@@ -11895,7 +12058,8 @@ SlangResult validateNVVMSupportedIR(
         }
         // Hashed string literals are module reflection metadata. Like the C-family emitters, direct
         // NVVM preserves them in the linked module but emits no executable or storage declaration.
-        if (as<IRGlobalHashedStringLiterals>(globalInst) || as<IRDecoration>(globalInst) ||
+        if (_isNVVMSupportedModuleConstantValue(globalInst) ||
+            as<IRGlobalHashedStringLiterals>(globalInst) || as<IRDecoration>(globalInst) ||
             as<IRConstant>(globalInst) || as<IRStructKey>(globalInst) ||
             getIROpInfo(globalInst->getOp()).isHoistable())
         {

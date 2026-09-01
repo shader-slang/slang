@@ -2392,3 +2392,21 @@ denominator, with exactly two gains and no old-correct loss. Discovery remains 6
 with no change. The selected prefix passes 433/433, the promoted fixtures pass 4/4, and all 32
 measurement gates produce 160 assembled cubins across the five NVRTC/direct configurations and
 SM70, SM80, and SM90.
+
+Slice 168 admits exact two-operand natural fixed arrays whose recursive leaves already have
+resource-value representations. Value type lowering, aggregate construction and extraction,
+ordinary loads, reachable-type discovery, and typed phi transport all share the existing generic
+builder operations. The helper ABI is not widened merely because an array is a valid ordinary
+value.
+
+The slice also recognizes finite immutable module-owned trees of selected scalar literals,
+`makeVector`, and value aggregate constructors. Each tree is rematerialized in its using function;
+function-owned aggregate instructions are deliberately not cached in the cross-function value map.
+Provider ABI revision 32 is unchanged.
+
+Discovery `static-const-matrix-array` and `func-resource-result-complex` gain four permanent direct
+lanes. Discovery advances from 66/66/66 to 68/68/68 over its unchanged 72 healthy references, with
+exactly two gains and no loss. Frozen v1 remains 402/402/402 over its unchanged 427 healthy
+denominator with no changed row or old-correct loss. The selected prefix passes 433/433, the
+permanent NVVM category passes 50/50, and both new measurement gates produce accepted PTX/cubins
+for the NVRTC reference, direct O0 SM70, and direct O3 SM70/SM80/SM90 configurations.

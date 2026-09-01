@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "module-constant-matrix-array",
+      "source": "tests/compute/static-const-matrix-array.slang",
+      "census_id": "compute/static-const-matrix-array.slang#discovery-1"
+    },
+    {
+      "name": "resource-array-helper-result",
+      "source": "tests/optimization/func-resource-result/func-resource-result-complex.slang",
+      "census_id": "optimization/func-resource-result/func-resource-result-complex.slang#discovery-1"
+    }
+  ]
+}
