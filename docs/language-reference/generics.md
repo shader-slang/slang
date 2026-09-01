@@ -27,49 +27,49 @@ function, but this does not specialize the generic.
 
 Generic [structure](types-struct.md) declaration syntax:
 
-> **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
+> **`'struct'`** [_`identifier`_] [_`generic-params-decl`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`bases-clause`_]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
 > **`'{'`** _`member-list`_ **`'}'`**
 
 Generic [interface](types-interface.md) declaration syntax:
 
-> **`'interface'`** _`identifier`_ [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
+> **`'interface'`** _`identifier`_ [_`generic-params-decl`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`bases-clause`_]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
 > **`'{'`** _`member-list`_ **`'}'`**
 
 Generic type alias syntax:
 
-> **`'typealias'`** _`identifier`_ [*`generic-params-decl`*]<br>
+> **`'typealias'`** _`identifier`_ [_`generic-params-decl`_]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'='`** _`simple-type-spec`_<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\* **`';'`**
 
 Generic function and member function declaration (traditional syntax):
 
-> _`simple-type-spec`_ _`identifier`_ [*`generic-params-decl`*]<br>
+> _`simple-type-spec`_ _`identifier`_ [_`generic-params-decl`_]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'('`** _`param-list`_ **`')'`**<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** _`body-stmt`_\* **`'}'`**)
 
 Generic function and member function declaration (modern syntax):
 
-> **`'func'`** _`identifier`_ [*`generic-params-decl`*]<br>
+> **`'func'`** _`identifier`_ [_`generic-params-decl`_]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'('`** _`param-list`_ **`')'`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`'throws'`** *`simple-type-spec`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`'->'`** *`simple-type-spec`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`'throws'`** _`simple-type-spec`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`'->'`** _`simple-type-spec`_]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** _`body-stmt`_\* **`'}'`**)
 
 Generic [constructor](types-struct.md#constructor) declaration:
 
-> **`'__init'`** [*`generic-params-decl`*] **`'('`** _`param-list`_ **`')'`**<br>
+> **`'__init'`** [_`generic-params-decl`_] **`'('`** _`param-list`_ **`')'`**<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** _`body-stmt`_\* **`'}'`**)
 
 Generic [subscript operator](types-struct.md#subscript-op) declaration:
 
-> **`'__subscript'`** [*`generic-params-decl`*] **`'('`** _`param-list`_ **`')'`**<br>
+> **`'__subscript'`** [_`generic-params-decl`_] **`'('`** _`param-list`_ **`')'`**<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'->'`** _`simple-type-spec`_<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** _`body-stmt`_\* **`'}'`**)
@@ -77,7 +77,7 @@ Generic [subscript operator](types-struct.md#subscript-op) declaration:
 Generic parameters declaration:
 
 > _`generic-params-decl`_ =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'<'`** [*`generic-param-decl`* (**`','`** *`generic-param-decl`*)\* ] **`'>'`**
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'<'`** [_`generic-param-decl`_ (**`','`** _`generic-param-decl`_)\* ] **`'>'`**
 >
 > _`generic-param-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;_`generic-value-param-decl`_ |<br>
@@ -89,17 +89,17 @@ Generic parameters declaration:
 >
 > _`generic-value-param-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'let'`** _`identifier`_<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** *`init-expr`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`simple-type-spec`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** _`init-expr`_]<br>
 >
 > _`generic-value-param-pack-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'let'`** **`'each'`** _`identifier`_<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`simple-type-spec`_]<br>
 >
 > _`generic-value-param-trad-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;_`simple-type-spec`_ <br>
 > &nbsp;&nbsp;&nbsp;&nbsp;_`identifier`_<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** *`init-expr`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** _`init-expr`_]<br>
 >
 > _`generic-value-param-pack-trad-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'each'`** _`simple-type-spec`_<br>
@@ -107,12 +107,12 @@ Generic parameters declaration:
 >
 > _`generic-type-param-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'typename'`**] _`identifier`_<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** *`simple-type-spec`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`simple-type-spec`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** _`simple-type-spec`_]<br>
 >
 > _`generic-type-param-pack-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'each'`** _`identifier`_<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`simple-type-spec`_]<br>
 
 Generic parameter constraint clause:
 

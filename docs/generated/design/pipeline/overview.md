@@ -131,7 +131,7 @@ transformations between lowering and emit. The
 160 `slang-ir-*.cpp` files implementing analyses, validations,
 specializations, legalizations, and target-specific lowerings.
 
-*Target-sensitive* means the pass list itself branches, not merely
+_Target-sensitive_ means the pass list itself branches, not merely
 that emit spells one neutral shape differently: whole passes are
 guarded by target predicates inside `linkAndOptimizeIR` — a Khronos
 target routed through GLSL text runs

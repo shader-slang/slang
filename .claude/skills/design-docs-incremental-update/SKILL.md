@@ -39,11 +39,11 @@ All driver commands run from the repository root.
 Run the stages in order. Pause between stages and confirm with the
 user where indicated.
 
-| # | Stage                   | Performed by                       | Confirm first |
-| - | ----------------------- | ---------------------------------- | ------------- |
-| 1 | Incremental regenerate  | This agent (Claude)                | **Yes**       |
-| 2 | Review                  | User, with a non-Claude model      | n/a (direct)  |
-| 3 | Remediation             | This agent (Claude)                | **Yes**       |
+| #   | Stage                  | Performed by                  | Confirm first |
+| --- | ---------------------- | ----------------------------- | ------------- |
+| 1   | Incremental regenerate | This agent (Claude)           | **Yes**       |
+| 2   | Review                 | User, with a non-Claude model | n/a (direct)  |
+| 3   | Remediation            | This agent (Claude)           | **Yes**       |
 
 If you are not a Claude model, refuse stages 1 and 3 - both belong to
 the Claude family per the workflow's soft-refusal contract. The
@@ -149,7 +149,7 @@ prompt and the driver's `mark-reviewed` gate enforce this softly.
 Emit the following hand-off block to the user verbatim (substituting
 the actual list of docs needing review), then stop and wait.
 
-````
+```
 Stage 2 (Review) is yours to drive. The driver does not call any
 agent; you run the non-Claude reviewer agent out of band.
 
@@ -197,7 +197,7 @@ agent; you run the non-Claude reviewer agent out of band.
 4. When `review-status` shows every relevant doc as
    `reviewed-pending-remediation`, come back and ask me to run
    stage 3 (Remediation).
-````
+```
 
 ## Stage 3 - Remediation
 
@@ -213,7 +213,7 @@ Identify every row with `reviewed-pending-remediation`. Show that
 list to the user and **wait for confirmation** before remediating.
 
 Special case: if a row is still `review-stale`, the doc was
-regenerated *after* its last review. Flag this - the user must
+regenerated _after_ its last review. Flag this - the user must
 re-run the review on that doc before remediation can happen. Skip
 the row.
 

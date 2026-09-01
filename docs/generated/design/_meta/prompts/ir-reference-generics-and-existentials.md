@@ -15,7 +15,7 @@ Relevant Lua entries are scattered: `specialize`, `lookupWitness` /
 `LookupWitnessMethod` (around line 932-933), `MakeExistential`,
 `ExtractExistentialValue` / `Type` / `WitnessTable` (around lines
 2477-...), `BindExistentialsType` / `BoundInterface` (handled as
-*types* in [types.md](types.md) but cross-linked here), `RTTIObject`
+_types_ in [types.md](types.md) but cross-linked here), `RTTIObject`
 / `getSequentialID`, `bind_global_generic_param`, `thisTypeWitness`,
 `TypeEqualityWitness`.
 

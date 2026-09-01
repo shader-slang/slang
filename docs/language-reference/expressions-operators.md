@@ -22,24 +22,23 @@ Slang operators come in the following forms:
   right to left.
 - **Other operators** — Function call, generic application, subscript, member access, scope
 
-
 ## Built-in Operators
 
 ### Arithmetic Operators (scalar)
 
-| Operator  | Operator function                       | Description                                       |
-|-----------|-----------------------------------------|---------------------------------------------------|
-| `+`       | `__prefix T operator + (T val)`         | identity (unary plus)                             |
-| `-`       | `__prefix T operator - (T val)`         | arithmetic negation (unary minus)                 |
-| `++`      | `__prefix T operator ++ (inout T val)`  | increment in place, return incremented value      |
-| `++`      | `__postfix T operator ++ (inout T val)` | increment in place, return value before increment |
-| `--`      | `__prefix T operator -- (inout T val)`  | decrement in place, return decremented value      |
-| `--`      | `__postfix T operator -- (inout T val)` | decrement in place, return value before decrement |
-| `*`       | `T operator * (T lhs, T rhs)`           | multiplication                                    |
-| `/`       | `T operator / (T lhs, T rhs)`           | division                                          |
-| `%`       | `T operator % (T lhs, T rhs)`           | remainder                                         |
-| `+`       | `T operator + (T lhs, T rhs)`           | addition                                          |
-| `-`       | `T operator - (T lhs, T rhs)`           | subtraction                                       |
+| Operator | Operator function                       | Description                                       |
+| -------- | --------------------------------------- | ------------------------------------------------- |
+| `+`      | `__prefix T operator + (T val)`         | identity (unary plus)                             |
+| `-`      | `__prefix T operator - (T val)`         | arithmetic negation (unary minus)                 |
+| `++`     | `__prefix T operator ++ (inout T val)`  | increment in place, return incremented value      |
+| `++`     | `__postfix T operator ++ (inout T val)` | increment in place, return value before increment |
+| `--`     | `__prefix T operator -- (inout T val)`  | decrement in place, return decremented value      |
+| `--`     | `__postfix T operator -- (inout T val)` | decrement in place, return value before decrement |
+| `*`      | `T operator * (T lhs, T rhs)`           | multiplication                                    |
+| `/`      | `T operator / (T lhs, T rhs)`           | division                                          |
+| `%`      | `T operator % (T lhs, T rhs)`           | remainder                                         |
+| `+`      | `T operator + (T lhs, T rhs)`           | addition                                          |
+| `-`      | `T operator - (T lhs, T rhs)`           | subtraction                                       |
 
 The arithmetic operators are defined for
 [IArithmetic](../../../core-module-reference/interfaces/iarithmetic-01/index.html) types. This includes
@@ -69,17 +68,17 @@ Description:
 
 ### Logical Operators (scalar)
 
-| Operator  | Operator function                   | Description                                  |
-|-----------|-------------------------------------|----------------------------------------------|
-| `!`       | `__prefix T operator ! (T val)`     | logical NOT                                  |
-| `&&`      | `T operator && (T lhs, T rhs)`      | logical AND                                  |
-| `\|\|`    | `T operator \|\| (T lhs, T rhs)`    | logical OR                                   |
-| `~`       | `__prefix T operator ~ (T val)`     | bitwise NOT                                  |
-| `&`       | `T operator & (T lhs, T rhs)`       | bitwise AND                                  |
-| `^`       | `T operator ^ (T lhs, T rhs)`       | bitwise XOR                                  |
-| `\|`      | `T operator \| (T lhs, T rhs)`      | bitwise OR                                   |
-| `<<`      | `T operator << (T lhs, int amount)` | bitwise left shift                           |
-| `>>`      | `T operator >> (T lhs, int amount)` | bitwise right shift                          |
+| Operator | Operator function                   | Description         |
+| -------- | ----------------------------------- | ------------------- |
+| `!`      | `__prefix T operator ! (T val)`     | logical NOT         |
+| `&&`     | `T operator && (T lhs, T rhs)`      | logical AND         |
+| `\|\|`   | `T operator \|\| (T lhs, T rhs)`    | logical OR          |
+| `~`      | `__prefix T operator ~ (T val)`     | bitwise NOT         |
+| `&`      | `T operator & (T lhs, T rhs)`       | bitwise AND         |
+| `^`      | `T operator ^ (T lhs, T rhs)`       | bitwise XOR         |
+| `\|`     | `T operator \| (T lhs, T rhs)`      | bitwise OR          |
+| `<<`     | `T operator << (T lhs, int amount)` | bitwise left shift  |
+| `>>`     | `T operator >> (T lhs, int amount)` | bitwise right shift |
 
 The logical operators are defined for
 [ILogical](../../../core-module-reference/interfaces/ilogical-01/index.html) types. This includes
@@ -118,17 +117,16 @@ only when it can affect the result. That is, in `lhs && rhs`, `rhs` is evaluated
 and `||` do not short-circuit and evaluate both operands element-wise. Short-circuiting can be disabled
 globally with the `-disable-short-circuit` compiler option.
 
-
 ### Comparison Operators (scalar)
 
-| Operator  | Operator function                   | Description                                  |
-|-----------|-------------------------------------|----------------------------------------------|
-| `<`       | `bool operator < (T lhs, T rhs)`    | less-than comparison                         |
-| `<=`      | `bool operator <= (T lhs, T rhs)`   | less-than-or-equal-to comparison             |
-| `>`       | `bool operator > (T lhs, T rhs)`    | greater-than comparison                      |
-| `>=`      | `bool operator >= (T lhs, T rhs)`   | greater-than-or-equal-to comparison          |
-| `==`      | `bool operator == (T lhs, T rhs)`   | equal-to comparison                          |
-| `!=`      | `bool operator != (T lhs, T rhs)`   | not-equal-to comparison                      |
+| Operator | Operator function                 | Description                         |
+| -------- | --------------------------------- | ----------------------------------- |
+| `<`      | `bool operator < (T lhs, T rhs)`  | less-than comparison                |
+| `<=`     | `bool operator <= (T lhs, T rhs)` | less-than-or-equal-to comparison    |
+| `>`      | `bool operator > (T lhs, T rhs)`  | greater-than comparison             |
+| `>=`     | `bool operator >= (T lhs, T rhs)` | greater-than-or-equal-to comparison |
+| `==`     | `bool operator == (T lhs, T rhs)` | equal-to comparison                 |
+| `!=`     | `bool operator != (T lhs, T rhs)` | not-equal-to comparison             |
 
 The comparison operators are defined for
 [IComparable](../../../core-module-reference/interfaces/icomparable-01/index.html) types. This includes
@@ -152,22 +150,21 @@ Description:
 - The **not-equal-to** comparison operator returns `true` if `lhs` is not equal to `rhs`. Otherwise, it
   returns `false`. Implemented using `IComparable.equals` with the comparison result negated (logical NOT).
 
-
 ### Assignment Operators (scalar)
 
-| Operator  | Operator function                          | Description                                  |
-|-----------|--------------------------------------------|----------------------------------------------|
-| `=`       | `T operator = (inout T lhs, T rhs)`        | assignment (non-overloadable built-in type)  |
-| `+=`      | `T operator += (inout T lhs, T rhs)`       | compound addition and assignment             |
-| `-=`      | `T operator -= (inout T lhs, T rhs)`       | compound subtraction and assignment          |
-| `*=`      | `T operator *= (inout T lhs, T rhs)`       | compound multiplication and assignment       |
-| `/=`      | `T operator /= (inout T lhs, T rhs)`       | compound division and assignment             |
-| `%=`      | `T operator %= (inout T lhs, T rhs)`       | compound remainder and assignment            |
-| `&=`      | `T operator &= (inout T lhs, T rhs)`       | compound bitwise AND and assignment          |
-| `\|=`     | `T operator \|= (inout T lhs, T rhs)`      | compound bitwise OR and assignment           |
-| `^=`      | `T operator ^= (inout T lhs, T rhs)`       | compound bitwise XOR and assignment          |
-| `<<=`     | `T operator <<= (inout T lhs, int amount)` | compound bitwise left shift and assignment   |
-| `>>=`     | `T operator >>= (inout T lhs, int amount)` | compound bitwise right shift and assignment  |
+| Operator | Operator function                          | Description                                 |
+| -------- | ------------------------------------------ | ------------------------------------------- |
+| `=`      | `T operator = (inout T lhs, T rhs)`        | assignment (non-overloadable built-in type) |
+| `+=`     | `T operator += (inout T lhs, T rhs)`       | compound addition and assignment            |
+| `-=`     | `T operator -= (inout T lhs, T rhs)`       | compound subtraction and assignment         |
+| `*=`     | `T operator *= (inout T lhs, T rhs)`       | compound multiplication and assignment      |
+| `/=`     | `T operator /= (inout T lhs, T rhs)`       | compound division and assignment            |
+| `%=`     | `T operator %= (inout T lhs, T rhs)`       | compound remainder and assignment           |
+| `&=`     | `T operator &= (inout T lhs, T rhs)`       | compound bitwise AND and assignment         |
+| `\|=`    | `T operator \|= (inout T lhs, T rhs)`      | compound bitwise OR and assignment          |
+| `^=`     | `T operator ^= (inout T lhs, T rhs)`       | compound bitwise XOR and assignment         |
+| `<<=`    | `T operator <<= (inout T lhs, int amount)` | compound bitwise left shift and assignment  |
+| `>>=`    | `T operator >>= (inout T lhs, int amount)` | compound bitwise right shift and assignment |
 
 The assignment operator is a built-in definition available for all copyable types. The assignment operator is
 not overloadable. See [Special Types](types-special.md) for a discussion on non-copyable types.
@@ -189,18 +186,15 @@ assignment.
 The compound assignment operator is defined for the same types as `OP`. For example, `+=` is defined for
 [IArithmetic](../../../core-module-reference/interfaces/iarithmetic-01/index.html) types.
 
-
 > 📝 **Remark:** Unlike in C/C++, the assignment operators return an R-value.
-
-
 
 ### Miscellaneous Operators (scalar)
 
-| Operator  | Operator function                                                                 | Description                             |
-|---------------|-----------------------------------------------------------------------------------|-----------------------------------------|
-| `*`           | `__prefix Ref<T, a, s> operator * (Ptr<T, a, s, L>)`                              | pointer dereference (experimental)      |
-| `&`           | `__prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator & (__ref T v)` | address of (experimental)               |
-| `,`           | `T2 operator , (T1 lhs, T2 rhs)`                                                  | comma operator (Slang 2025 and earlier) |
+| Operator | Operator function                                                                 | Description                             |
+| -------- | --------------------------------------------------------------------------------- | --------------------------------------- |
+| `*`      | `__prefix Ref<T, a, s> operator * (Ptr<T, a, s, L>)`                              | pointer dereference (experimental)      |
+| `&`      | `__prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator & (__ref T v)` | address of (experimental)               |
+| `,`      | `T2 operator , (T1 lhs, T2 rhs)`                                                  | comma operator (Slang 2025 and earlier) |
 
 Canonical semantics:
 
@@ -219,11 +213,10 @@ Canonical semantics:
 > in call expressions, [initializer expressions](expressions-initializer.md),
 > [tuple expressions](types-tuple.md), and various [declarations](declarations.md).
 
-
 ### Ternary Conditional Operator
 
 | Operator | Operator function                                  | Description           |
-|----------|----------------------------------------------------|-----------------------|
+| -------- | -------------------------------------------------- | --------------------- |
 | `?:`     | `T operator ?: (bool cond, T trueVal, T falseVal)` | Conditional selection |
 
 Description:
@@ -246,10 +239,10 @@ The ternary conditional operator is short-circuiting for a scalar condition.
 
 **Grammar:**
 
-> *`callable-expr`* **`'('`** [ *`arg-expr`* (**`','`** *`arg-expr`*)\* ] **`')'`**
+> _`callable-expr`_ **`'('`** [ _`arg-expr`_ (**`','`** _`arg-expr`_)\* ] **`')'`**
 
-A _call expression_ consists of a base expression *`callable-expr`* and a list of argument expressions
-*`arg-expr`*.
+A _call expression_ consists of a base expression _`callable-expr`_ and a list of argument expressions
+_`arg-expr`_.
 
 The base expression must be a [function](declarations-functions.md), a [member function](types-struct.md), an
 invocable object (a [struct](types-struct.md) with the function call operator defined), or a constructible
@@ -273,13 +266,11 @@ error to omit an argument for a parameter that does not have a default.
 If the callable expression is an invocable object or an object member and the function declaration is not
 static, then the object is passed as the argument to the implicit `this` parameter.
 
-
-
 ### Subscript Expression
 
 **Grammar:**
 
-> *`base-expr`* **`'['`** [ *`arg-expr`* (**`','`** *`arg-expr`*)\* ] **`']'`**
+> _`base-expr`_ **`'['`** [ _`arg-expr`_ (**`','`** _`arg-expr`_)\* ] **`']'`**
 
 A _subscript expression_ consists of a base expression and a list of argument expressions.
 
@@ -291,7 +282,7 @@ For array, vector, and matrix types, the built-in subscript operator semantics a
 [IArray](../../../core-module-reference/interfaces/iarray-01/subscript.html) (for R-value base expressions)
 and [IRWArray](../../../core-module-reference/interfaces/irwarray-0123/subscript.html) (for L-value base
 expressions). The subscript operator has a single argument, which returns the element of an array or a vector,
-or the row vector of a matrix. The returned value is an L-value if *`base-expr`* is an L-value. Otherwise, it
+or the row vector of a matrix. The returned value is an L-value if _`base-expr`_ is an L-value. Otherwise, it
 is an R-value.
 
 For [struct types](types-struct.md), the subscript expression is translated to a call to the subscript member
@@ -300,26 +291,25 @@ to the `set` accessor call of the subscript declaration. Otherwise, the call is 
 accessor call. The arguments are passed as is. In case there are multiple `__subscript` declarations,
 [overload resolution](expressions-overload-resolution.md) selects the most appropriate one.
 
-
 ### Member Expression
 
 **Grammar:**
 
-> *`namespace-identifier`* (**`'.'`** | **`'::'`**) *`member-identifier`*
+> _`namespace-identifier`_ (**`'.'`** | **`'::'`**) _`member-identifier`_
 >
-> *`type-expr`* (**`'.'`** | **`'::'`**) *`member-identifier`*
+> _`type-expr`_ (**`'.'`** | **`'::'`**) _`member-identifier`_
 >
-> *`value-expr`* **`'.'`** *`member-identifier`*
+> _`value-expr`_ **`'.'`** _`member-identifier`_
 >
-> *`pointer-value-expr`* (**`'.'`** | **`'->'`**) *`member-identifier`*
+> _`pointer-value-expr`_ (**`'.'`** | **`'->'`**) _`member-identifier`_
 
 A _member access expression_ selects a member of a namespace, a type, or a value expression.
 
-For namespace base expressions, *`member-identifier`* is an identifier within the namespace. For type
-expressions, *`member-identifier`* is a member identifier.
+For namespace base expressions, _`member-identifier`_ is an identifier within the namespace. For type
+expressions, _`member-identifier`_ is a member identifier.
 
-For value expressions, *`member-identifier`* is a member of the value, such as a component, field, member
-function, or a property. For scalars, vectors, matrices, and tuples, the *`member-identifier`* may also be a
+For value expressions, _`member-identifier`_ is a member of the value, such as a component, field, member
+function, or a property. For scalars, vectors, matrices, and tuples, the _`member-identifier`_ may also be a
 sequence of components, resulting in a _swizzle expression_.
 
 For pointer-typed and pointer-like values, members can be selected using either the `.` or `->` operator. When
@@ -335,11 +325,10 @@ Member expressions are discussed in more detail in [Member Expression](expressio
 
 **Grammar:**
 
-> **`'('`** *`type-expr`* **`')'`** *`base-expr`*
+> **`'('`** _`type-expr`_ **`')'`** _`base-expr`_
 
-A _cast expression_ converts a value (*`base-expr`*) to the desired type (*`type-expr`*). This is also known
+A _cast expression_ converts a value (_`base-expr`_) to the desired type (_`type-expr`_). This is also known
 as an explicit type conversion. See [Expression Type Conversions](expressions-conversions.md) for details.
-
 
 ### Operators with Vector and Matrix Operands
 
@@ -366,14 +355,13 @@ An expression wrapped in parentheses `()` is a _parenthesized expression_. It ev
 the wrapped expression. Parenthesized expressions can be used to control the evaluation order of
 subexpressions.
 
-
 ### Generic Specialization
 
 **Grammar:**
 
-> *`gen-expr`* **`'<'`** [*`gen-arg-expr`* (**`','`** *`gen-arg-expr`*)\* ] **`'>'`**
+> _`gen-expr`_ **`'<'`** [_`gen-arg-expr`_ (**`','`** _`gen-arg-expr`_)\* ] **`'>'`**
 >
-> *`gen-arg-expr`* = *`type-expr`* | *`value-expr`*
+> _`gen-arg-expr`_ = _`type-expr`_ | _`value-expr`_
 
 A generic type or an invocable (e.g., function) can be explicitly specialized by supplying the arguments to
 the generic parameters. When the arguments are not supplied, they are inferred as required. For details, see

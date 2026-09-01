@@ -35,10 +35,20 @@ on:
         required: true
         type: string
       save-sccache:
-        description: "Save sccache to GitHub Actions cache (for populate-sccache on the default branch)"
+        description: "Save sccache to GitHub Actions cache (for sccache-populate on the default branch)"
         required: false
         type: boolean
         default: false
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   static-unit-test:
@@ -64,6 +74,8 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
           submodules: "recursive"
           fetch-depth: "250"
           fetch-tags: true
@@ -247,7 +259,7 @@ jobs:
       # ci-slang-build.yml. Pull-request runs restore but never save, so a PR
       # cannot poison the cache for everyone else.
       - name: Save sccache cache
-        if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && inputs.ref == '' && inputs.repository == ''
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}

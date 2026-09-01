@@ -59,7 +59,7 @@ the document's own headings.
 11. `CharLiteral`'s one-character rule is enforced at decode time, not by the lexer, which only finds the closing quote.
 12. Neither numeric rule validates its suffix: any run of ASCII letters, digits and underscores after the numeric body is folded into the token's raw text, so there is no fixed suffix set at lex time.
 13. Integer digits that do not fit in 64 bits are `E10012`, `integerLiteralTooLargeForAnyType`.
-14. The accepted integer suffixes are `u`/`U`, `l`/`L`, `ll`/`LL` and `z`/`Z` in any order, with the two letters of `ll` matching in case; anything else is *invalid suffix '...' on integer literal*.
+14. The accepted integer suffixes are `u`/`U`, `l`/`L`, `ll`/`LL` and `z`/`Z` in any order, with the two letters of `ll` matching in case; anything else is _invalid suffix '...' on integer literal_.
 15. The accepted float suffixes are empty or `f`/`F` for `float`, `h`/`H`/`hf`/`HF`/`fh`/`FH` for `half`, and `l`/`L`/`lf`/`LF`/`fl`/`FL` for `double`.
 16. A one-letter float suffix is case-insensitive; a two-letter one must have both letters in the same case, so `hf` and `HF` are accepted while `Hf` is not.
 
@@ -76,7 +76,7 @@ the document's own headings.
 
 20. `DotDot` and `At` are lexed as distinct kinds but have no parser consumer at this commit.
 21. `DoubleRightArrow` (`=>`) has lambda syntax as its only parser consumer.
-22. `Dollar` prefixes a Slang value operand inside a `spirv_asm` block and introduces the compile-time `$for`; `DollarDollar` prefixes a *type* operand.
+22. `Dollar` prefixes a Slang value operand inside a `spirv_asm` block and introduces the compile-time `$for`; `DollarDollar` prefixes a _type_ operand.
 23. `Scope` (`::`) is the namespace / qualified-name separator.
 
 **`#operators`**
@@ -88,7 +88,7 @@ the document's own headings.
 **`#token-data-layout` / `#token-flags`**
 
 27. `charsNameUnion` is a tagged union: with the `Name` flag set the text is interned as a `Name*`, otherwise the token holds a raw pointer plus length into the source buffer.
-28. `AtStartOfLine` marks the first token on a *logical* line and is preserved across intervening whitespace and comments, so an escaped newline — which emits no `NewLine` token — does not start a new one.
+28. `AtStartOfLine` marks the first token on a _logical_ line and is preserved across intervening whitespace and comments, so an escaped newline — which emits no `NewLine` token — does not start a new one.
 29. A preprocessor directive body may therefore be continued onto the next physical line: `#define BUMP(x) \` followed by `((x) + 1)` defines a macro whose body is `((x) + 1)`.
 30. A `Pound` token starts a directive only when it carries `AtStartOfLine`.
 31. `AfterWhitespace` records that a token was preceded by whitespace, and the preprocessor reads it both to preserve spacing when stringizing and to tell a function-like macro definition (`NAME(` with no gap) from an object-like one.

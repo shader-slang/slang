@@ -28,6 +28,6 @@ are retained. No other section and no front-matter field was touched.
 
 ## Actions
 
-| Finding ID | Action | Rationale | Fix summary |
-| --- | --- | --- | --- |
-| F-001 | fixed | Confirmed at HEAD: the section held seven sentences (two per paragraph in the first two paragraphs, three in the third), while `docs/generated/design/_meta/prompts/ast-reference-index.md:51` specifies "3-4 sentence guidance". | Condensed `## How to navigate` from seven sentences to four, folding the abstract-intermediate and `Grammar`-column paragraphs into one and dropping the sub-table parenthetical |
+| Finding ID | Action | Rationale                                                                                                                                                                                                                         | Fix summary                                                                                                                                                                      |
+| ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F-001      | fixed  | Confirmed at HEAD: the section held seven sentences (two per paragraph in the first two paragraphs, three in the third), while `docs/generated/design/_meta/prompts/ast-reference-index.md:51` specifies "3-4 sentence guidance". | Condensed `## How to navigate` from seven sentences to four, folding the abstract-intermediate and `Grammar`-column paragraphs into one and dropping the sub-table parenthetical |

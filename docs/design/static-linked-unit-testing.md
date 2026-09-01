@@ -10,7 +10,7 @@ add tests to it.
 Slang has three kinds of test. Two of them cannot reach compiler internals.
 
 `.slang` tests run by `slang-test` cover language behaviour and target codegen
-well, but they can only assert on what the compiler *reports or emits* —
+well, but they can only assert on what the compiler _reports or emits_ —
 diagnostics and generated code. They cannot look at compiler state.
 
 `slang-unit-test` tests are C++ and can call into the library directly, but they
@@ -116,7 +116,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
 }
 ```
 
-Prefer asserting on names over counts. A failure then reports *which* function
+Prefer asserting on names over counts. A failure then reports _which_ function
 behaved unexpectedly rather than only that a number was wrong.
 `IRFixtureBuilder::dump()` exists for diagnosing a failure interactively; do not
 write assertions against the dump text, as its format is not a stable contract.
@@ -124,16 +124,16 @@ write assertions against the dump text, as its format is not a stable contract.
 The builder covers the shapes the existing tests needed. Each exists to make one
 contract observable, so the list doubles as a map of what is already testable:
 
-| Method | Shape it builds |
-| --- | --- |
-| `addVoidFunction` | a top-level `void()` function, optionally `[KeepAlive]` |
-| `addVoidFunctionCalling` | the same, with a call to a given callee, for reachability |
-| `addVoidFunctionWithUnusedBlockParam` | two blocks, the second taking a parameter nothing reads |
-| `addExportedVoidFunction` | a function carrying `[Export]` and nothing else |
-| `addVoidFunctionWithLayout` | a function carrying an empty layout decoration |
-| `addGlobalParam` | an unreferenced `GlobalParam` |
-| `addLiveWeakUseOf` | a `[KeepAlive]` `WeakUse` whose operand is a given function |
-| `addOptimizableStructWithUnusedField` | an `[OptimizableType]` struct with one unread field |
+| Method                                | Shape it builds                                             |
+| ------------------------------------- | ----------------------------------------------------------- |
+| `addVoidFunction`                     | a top-level `void()` function, optionally `[KeepAlive]`     |
+| `addVoidFunctionCalling`              | the same, with a call to a given callee, for reachability   |
+| `addVoidFunctionWithUnusedBlockParam` | two blocks, the second taking a parameter nothing reads     |
+| `addExportedVoidFunction`             | a function carrying `[Export]` and nothing else             |
+| `addVoidFunctionWithLayout`           | a function carrying an empty layout decoration              |
+| `addGlobalParam`                      | an unreferenced `GlobalParam`                               |
+| `addLiveWeakUseOf`                    | a `[KeepAlive]` `WeakUse` whose operand is a given function |
+| `addOptimizableStructWithUnusedField` | an `[OptimizableType]` struct with one unread field         |
 
 `keepAlive` is a parameter only where both settings are meaningful. The export,
 layout and global-parameter fixtures exist precisely to be unreferenced and
@@ -167,11 +167,11 @@ assertions.
 
 ## Choosing a test kind
 
-| Testing | Use |
-| --- | --- |
-| Language behaviour, target codegen, diagnostics | `.slang` test under `tests/` |
-| Public API behaviour, reflection, compilation requests | `slang-unit-test` |
-| An IR pass contract, AST invariants, mangling, checker output | `slang-static-unit-test` |
+| Testing                                                       | Use                          |
+| ------------------------------------------------------------- | ---------------------------- |
+| Language behaviour, target codegen, diagnostics               | `.slang` test under `tests/` |
+| Public API behaviour, reflection, compilation requests        | `slang-unit-test`            |
+| An IR pass contract, AST invariants, mangling, checker output | `slang-static-unit-test`     |
 
 `slang-static-unit-test` covers what the other two cannot reach. It complements
 them rather than replacing either: a test that can be written against the public

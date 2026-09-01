@@ -1,22 +1,23 @@
 # Types
 
 Slang types:
-* [Fundamental Types](types-fundamental.md)
-* [Vector and Matrix Types](types-vector-and-matrix.md)
-* [Structures](types-struct.md) and [Classes](types-class.md)
-* [Enumerations](types-enum.md)
-* [Extensions](types-extension.md)
-* [Array Types](types-array.md)
-* [Tuple Types](types-tuple.md) (Slang 2026)
-* [Optional Types](types-optional.md)
-* [Pointers](types-pointer.md)
-* [Interfaces](types-interface.md)
-* [Special Types](types-special.md)
+
+- [Fundamental Types](types-fundamental.md)
+- [Vector and Matrix Types](types-vector-and-matrix.md)
+- [Structures](types-struct.md) and [Classes](types-class.md)
+- [Enumerations](types-enum.md)
+- [Extensions](types-extension.md)
+- [Array Types](types-array.md)
+- [Tuple Types](types-tuple.md) (Slang 2026)
+- [Optional Types](types-optional.md)
+- [Pointers](types-pointer.md)
+- [Interfaces](types-interface.md)
+- [Special Types](types-special.md)
 
 Other topics:
-* [Type Traits](types-traits.md)
-* [Type Attributes](types-attributes.md)
 
+- [Type Traits](types-traits.md)
+- [Type Attributes](types-attributes.md)
 
 ## Type Specifiers {#specifier}
 
@@ -28,9 +29,9 @@ into two categories:
   specifiers are used in function parameter and return type declarations, modern variable declarations, type
   constraints, and other places where the ability to declare new types is not expected. Two main forms
   exist:
-  - *Simple type identifier specifier* based on a previously declared type, optionally with an array
+  - _Simple type identifier specifier_ based on a previously declared type, optionally with an array
     declaration and generic parameters.
-  - *Simple function type specifier* specifying a function type.
+  - _Simple function type specifier_ specifying a function type.
 - A **type specifier** is a type expression that names a type, possibly by declaring it. A simple type
   specifier is a subset of the full type specifier. A type specifier is a part of the
   [variable declaration](declarations.md) syntax, which is used to declare variables, as the name suggests.
@@ -38,57 +39,61 @@ into two categories:
 ### Syntax {#syntax}
 
 Simple type specifier:
-> *`simple-type-spec`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(*`simple-type-id-spec`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;|*`simple-type-func-spec`*)
+
+> _`simple-type-spec`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(_`simple-type-id-spec`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;|_`simple-type-func-spec`_)
 
 Type specifier for named non-array, array, non-pointer, and pointer types:
-> *`simple-type-id-spec`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`type-identifier`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [*`constant-index-expr`*] **`']'`** | **`'*'`** )*
+
+> _`simple-type-id-spec`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[_`modifier-list`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`type-identifier`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[_`generic-params-decl`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [_`constant-index-expr`_] **`']'`** | **`'*'`** )*
 
 Type specifier for function types:
-> *`simple-type-func-spec`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'functype'`** **`'('`** *`param-list`* **`')'`** **`'->'`** *`simple-type-id-spec`*
+
+> _`simple-type-func-spec`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[_`modifier-list`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'functype'`** **`'('`** _`param-list`_ **`')'`** **`'->'`** _`simple-type-id-spec`_
 
 Full type specifier, possibly declaring a new type:
+
 > Simple type specifier:<br>
-> *`type-spec`* = *`simple-type-spec`*
+> _`type-spec`_ = _`simple-type-spec`_
 > <br><br>
 > struct/class/enum type specifier:<br>
-> *`type-spec`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(*`struct-decl`* | *`class-decl`* | *`enum-decl`*)<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [*`constant-index-expr`*] **`']'`** | **`'*'`** )*<br>
+> _`type-spec`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(_`struct-decl`_ | _`class-decl`_ | _`enum-decl`_)<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[_`generic-params-decl`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [_`constant-index-expr`_] **`']'`** | **`'*'`** )*<br>
 
 #### Parameters
 
-- *`modifier-list`* is an optional list of modifiers (TODO: link)
-- *`type-identifier`* is an identifier that names an existing type or a generic type. For example, this may be
+- _`modifier-list`_ is an optional list of modifiers (TODO: link)
+- _`type-identifier`_ is an identifier that names an existing type or a generic type. For example, this may be
   a [fundamental type](types-fundamental.md), [vector/matrix generic type](types-vector-and-matrix.md),
   user-defined type such as a named [structure type](types-struct.md), [interface type](types-interface.md),
   [enumeration type](types-enum.md), type alias, or a type provided by a module.
-- *`generic-params-decl`* is a [generic parameters declaration](generics.md).
-- **`'['`** [*`constant-index-expr`*] **`']'`** is an [array dimension declaration](types-array.md) with an
+- _`generic-params-decl`_ is a [generic parameters declaration](generics.md).
+- **`'['`** [_`constant-index-expr`_] **`']'`** is an [array dimension declaration](types-array.md) with an
   optional constant integral expression specifying the dimension length.
 - **`'*'`** is a [pointer declaration](types-pointer.md).
-- *`param-list`* is a function parameter list. See [function parameter list (TODO)](TODO).
-- *`struct-decl`* is a [structure](types-struct.md) type declaration, possibly also defining the type.
-- *`class-decl`* is a [class (TODO)](types-class.md) type declaration, possibly also defining the type.
-- *`enum-decl`* is an [enumeration](types-enum.md) type declaration, possibly also defining the type.
-
+- _`param-list`_ is a function parameter list. See [function parameter list (TODO)](TODO).
+- _`struct-decl`_ is a [structure](types-struct.md) type declaration, possibly also defining the type.
+- _`class-decl`_ is a [class (TODO)](types-class.md) type declaration, possibly also defining the type.
+- _`enum-decl`_ is an [enumeration](types-enum.md) type declaration, possibly also defining the type.
 
 ### Description
 
 A type specifier names a type and possibly also declares a new type. The named type is always a non-generic
-type. If *`type-identifier`* specifies a generic type, generic parameters *`generic-params-decl`* must be
+type. If _`type-identifier`_ specifies a generic type, generic parameters _`generic-params-decl`_ must be
 provided to fully specialize the type.
 
-Simple type specifiers *`simple-type-spec`* only name types but never declare new types. Simple type
+Simple type specifiers _`simple-type-spec`_ only name types but never declare new types. Simple type
 specifiers are used in:
+
 - [modern variable (TODO)](TODO) declarations
 - [function parameter (TODO)](TODO) declarations
 - [function return value type (TODO)](TODO) declarations
@@ -98,6 +103,7 @@ specifiers are used in:
 - [typealias](#alias) declarations
 
 Declaration of new types is allowed in:
+
 - Global declaration statements (TODO: link)
 - Function body declaration statements (TODO: link)
 - Traditional variable declarations (TODO: link)
@@ -105,7 +111,7 @@ Declaration of new types is allowed in:
 - [extension](types-extension.md) members declaring nested types
 - [typedef](#alias) declarations
 
-> 📝 **Remark 1:** *`simple-type-spec`* is a syntactic subset of the full *`type-expr`*. The subset only names
+> 📝 **Remark 1:** _`simple-type-spec`_ is a syntactic subset of the full _`type-expr`_. The subset only names
 > a type but never declares one.
 
 > 📝 **Remark 2:** The dual nature of type expressions---naming and possibly declaring a type---is a side
@@ -119,7 +125,6 @@ Declaration of new types is allowed in:
 > 📝 **Remark 4:** Modifier `volatile` has been deprecated in Slang 2025 and removed in Slang 2026.
 > [Atomic\<T\>](../../../core-module-reference/types/atomic-0/index.html) should be used instead.
 
-
 ## Type Alias Declarations {#alias}
 
 A [type alias](#alias) is a name that refers to a previously declared type.
@@ -127,15 +132,18 @@ A [type alias](#alias) is a name that refers to a previously declared type.
 ### Syntax
 
 Type alias declaration:
-> **`'typealias'`** *`identifier`* **`'='`** *`simple-type-spec`* **`';'`**
+
+> **`'typealias'`** _`identifier`_ **`'='`** _`simple-type-spec`_ **`';'`**
 
 Typedef declaration:
-> **`'typedef'`** *`type-spec`* *`identifier`* **`';'`**
+
+> **`'typedef'`** _`type-spec`_ _`identifier`_ **`';'`**
 
 Generic type alias declaration:
-> **`'typealias'`** *`identifier`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp; *`generic-params-decl`* (**`'where'`** *`where-clause`*)\* **`'='`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`simple-type-spec`* [*`generic-params-decl`*] **`';'`**
+
+> **`'typealias'`** _`identifier`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp; _`generic-params-decl`_ (**`'where'`** _`where-clause`_)\* **`'='`**<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`simple-type-spec`_ [_`generic-params-decl`_] **`';'`**
 
 ### Description
 
@@ -145,13 +153,11 @@ also allows declaring a new type.
 A generic type alias declaration declares a parameterized alias for a generic type. This is described in
 [Generics](generics.md).
 
-
 ## Complete and Incomplete Types {#incomplete}
 
 A type is incomplete when it is declared but not defined. An incomplete type cannot be used to declare
 variables. An incomplete type other than `void` may be completed with a subsequent definition. For further
 information, see [declarations](declarations.md).
-
 
 ## Memory Layout
 
@@ -159,21 +165,22 @@ Types in Slang do not generally have identical memory layouts in different targe
 layout may depend on the target language, the target device, the declared extensions, the compiler options,
 and the context in which a type is used.
 
-
 ## Known and Unknown Size
 
 Every type has either a known or an unknown size. Types with unknown size generally stem from unknown-length
 arrays:
-* An unknown-length array type has an unknown size.
-* The size of a structure type is unknown if it has a non-static data member with unknown size.
+
+- An unknown-length array type has an unknown size.
+- The size of a structure type is unknown if it has a non-static data member with unknown size.
 
 The use of types with unknown size is restricted as follows:
-* A type with unknown size cannot be used as the element type of an array.
-* A type with unknown size can only be used as the last field of a structure type.
-* A type with unknown size cannot be used as a generic argument to specialize a user-defined type, function,
+
+- A type with unknown size cannot be used as the element type of an array.
+- A type with unknown size can only be used as the last field of a structure type.
+- A type with unknown size cannot be used as a generic argument to specialize a user-defined type, function,
   etc. Specific built-in generic types/functions may support unknown-size types, and this will be documented
   on the specific type/function.
-* A type with unknown size cannot be instantiated as a variable.
+- A type with unknown size cannot be instantiated as a variable.
 
 > 📝 **Remark:** Unknown size is different from unspecified or target-specified size. Many
 > [special types](types-special.md) have target-specified sizes; sizes of [structures](types-struct.md) and

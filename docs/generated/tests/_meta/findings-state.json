@@ -8,31 +8,16 @@
       "Status": "Todo"
     },
     "labels": {
-      "always": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "always": ["Test Agent Finding", "bug"],
       "by_scope": {
-        "cuda": [
-          "cuda"
-        ],
-        "diagnostics": [
-          "Diagnostics"
-        ],
-        "metal": [
-          "Metal"
-        ]
+        "cuda": ["cuda"],
+        "diagnostics": ["Diagnostics"],
+        "metal": ["Metal"]
       },
       "by_suspected_kind": {
-        "catalog-drift": [
-          "Diagnostics"
-        ],
-        "regression": [
-          "regression"
-        ],
-        "wrong-diagnostic": [
-          "Diagnostics"
-        ]
+        "catalog-drift": ["Diagnostics"],
+        "regression": ["regression"],
+        "wrong-diagnostic": ["Diagnostics"]
       }
     },
     "project": {
@@ -44,10 +29,7 @@
   "findings": {
     "cast-enum-to-int-spirv-unimplemented": {
       "issue": 11315,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "failed: Command '['gh', 'project', 'item-edit', '--id', 'PVTI_lADOAb2kZs4AcYVszguCAXE', '--project-id', 'PVT_kwDOAb2kZs4AcYVs', '--field-id', 'PVTF_lADOAb2kZs4AcYVszgSVcrA', '--text', '1']' returned non-zero exit status 1.",
         "Priority": "ok",
@@ -66,10 +48,7 @@
     },
     "constrained-type-param-segv": {
       "issue": 11316,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -83,10 +62,7 @@
     },
     "countof-local-array-returns-bytewidth": {
       "issue": 11317,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -105,10 +81,7 @@
     },
     "dead-diagnostic-codes-umbrella": {
       "issue": 11320,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -122,11 +95,7 @@
     },
     "declarations-refaccessor-metal-unknown-addressspace-abort": {
       "issue": 12487,
-      "labels": [
-        "Test Agent Finding",
-        "bug",
-        "Metal"
-      ],
+      "labels": ["Test Agent Finding", "bug", "Metal"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -140,10 +109,7 @@
     },
     "diag-code-29104-double-defined": {
       "issue": 11318,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -157,10 +123,7 @@
     },
     "diag-code-30900-retired": {
       "issue": 11319,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -184,11 +147,7 @@
     },
     "getlegalizedspirvglobalparamaddr-reaches-emit-ice": {
       "issue": 12493,
-      "labels": [
-        "Test Agent Finding",
-        "bug",
-        "Diagnostics"
-      ],
+      "labels": ["Test Agent Finding", "bug", "Diagnostics"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -202,19 +161,13 @@
     },
     "getstringhash-nonliteral-argument-sigsegv": {
       "issue": 12440,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "title": "getStringHash on a non-literal String segfaults instead of E41023",
       "url": "https://github.com/shader-slang/slang/issues/12440"
     },
     "grammar-do-catch-cpu-execution-sigsegv": {
       "issue": 12499,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -238,10 +191,7 @@
     },
     "new-expr-with-constructor-args-internal-error": {
       "issue": 12485,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -255,10 +205,7 @@
     },
     "pack-query-first-last-compiler-crash": {
       "issue": 12494,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -272,10 +219,7 @@
     },
     "parser-magic-type-modifier-on-user-struct-sigsegv": {
       "issue": 12484,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -289,10 +233,7 @@
     },
     "slangi-as-operator-struct-upcast-segfault": {
       "issue": 12495,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -306,10 +247,7 @@
     },
     "slangi-bwd-diff-working-set-oob": {
       "issue": 12496,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -323,10 +261,7 @@
     },
     "slangi-vm-bool-false-arg-evaluates-as-true": {
       "issue": 11402,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -340,10 +275,7 @@
     },
     "slangi-vm-constants-oob-after-short-circuit-printf": {
       "issue": 11375,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -357,10 +289,7 @@
     },
     "slangi-vm-ternary-short-circuits-against-spec": {
       "issue": 11403,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -374,10 +303,7 @@
     },
     "specialize-interface-defaults-init-spirv-emit-ice": {
       "issue": 12486,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -391,10 +317,7 @@
     },
     "spirv-asm-extra-operand-on-zero-operand-op-internal-error": {
       "issue": 12497,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -408,10 +331,7 @@
     },
     "spirv-optional-pointer-return-hangs": {
       "issue": 12498,
-      "labels": [
-        "Test Agent Finding",
-        "bug"
-      ],
+      "labels": ["Test Agent Finding", "bug"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",
@@ -435,11 +355,7 @@
     },
     "torch-autobind-unmappable-param-sigsegv": {
       "issue": 12483,
-      "labels": [
-        "Test Agent Finding",
-        "bug",
-        "cuda"
-      ],
+      "labels": ["Test Agent Finding", "bug", "cuda"],
       "project_fields": {
         "Estimate": "ok",
         "Priority": "ok",

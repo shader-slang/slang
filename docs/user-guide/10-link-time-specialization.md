@@ -7,6 +7,7 @@ permalink: /user-guide/link-time-specialization
 
 Traditionally, graphics developers have been relying on preprocessor defines to specialize their shader code for high-performance GPU execution.
 While functioning systems can be built around preprocessor macros, overusing them leads to many problems:
+
 - Long compilation time. With preprocessor defines, specialization happens before parsing, which is a very early stage in the compilation flow.
   This means that the compiler must redo almost all work from scratch with every specialized variant, including parsing, type checking, IR generation
   and optimization, even when two specialized variants only differ in one constant value. The lack of reuse of compiler front-end work between
@@ -32,6 +33,7 @@ a much later stage of compilation, reusing all the work done during module preco
 ## Link-time Constants
 
 The simplest form of link-time specialization is done through link-time constants. See the following code for an example.
+
 ```c++
 // main.slang
 
@@ -48,9 +50,11 @@ void main(uint tid : SV_DispatchThreadID)
         output[tid] += sample(i);
 }
 ```
+
 This code defines a compute shader that can be specialized with different constant values of `kSampleCount`. The `extern` modifier means that
 `kSampleCount` is a constant whose value is not provided within the current module, but will be resolved during the linking step.
 The `main.slang` file can be compiled offline into a binary IR module with the `slangc` tool:
+
 ```
 slangc main.slang -o main.slang-module
 ```
@@ -63,11 +67,13 @@ export static const int kSampleCount = 2;
 ```
 
 This file can also be compiled separately:
+
 ```
 slangc sample-count.slang -o sample-count.slang-module
 ```
 
 With these two modules precompiled, we can link them together to get our specialized code:
+
 ```
 slangc sample-count.slang-module main.slang-module -target hlsl -entry main -profile cs_6_0 -o main.hlsl
 ```
@@ -175,12 +181,13 @@ When defining an `extern` symbol as a link-time constant or type, it is allowed 
 When no other module exists to `export` the same-named symbol, the default value will be used in the linked program.
 
 For example, the following code is considered complete at linking and can proceed to code generation without any issues:
+
 ```c++
 // main.slang
 
 // Provide a default value when no other modules are exporting the symbol.
 extern static const int kSampleCount = 2;
-// ... 
+// ...
 void main(uint tid : SV_DispatchThreadID)
 {
     [ForceUnroll]
@@ -232,11 +239,10 @@ from source if it is not up-to-date.
 >
 > When a `.slang-module` file is distributed without its original `.slang` source on the search paths, `UseUpToDateBinaryModule` will
 > still allow the binary to load: if the module's primary source file cannot be found, the freshness check accepts the binary as
-> up-to-date instead of treating it as stale. A missing *secondary* dependency (a transitively included file) still marks the module
+> up-to-date instead of treating it as stale. A missing _secondary_ dependency (a transitively included file) still marks the module
 > stale, since the source-backed cache layout in that case is incomplete. Note that with the primary source absent, the compiler
 > cannot validate that the binary was produced with a matching Slang version and option set — the stored content hash is not
 > compared in that path. Callers who need that validation should keep the original sources reachable via the configured search paths.
-
 
 ## Additional Remarks
 

@@ -15,24 +15,24 @@ Goals
 
 The main goals of the fossil format are:
 
-* Data can be read from memory as-is.
+- Data can be read from memory as-is.
 
-  * Basic types are stored at offsets that are naturally aligned (e.g., a 4-byte integer is 4-byte aligned)
+  - Basic types are stored at offsets that are naturally aligned (e.g., a 4-byte integer is 4-byte aligned)
 
-  * Pointers are encoded as relative offsets, and can be traversed without any "relocation" step after data is loaded.
+  - Pointers are encoded as relative offsets, and can be traversed without any "relocation" step after data is loaded.
 
-* Supports general-purpose data, including complicated object graphs.
+- Supports general-purpose data, including complicated object graphs.
 
-* Data can include embedded layout information, allowing code to traverse it without statically knowing the structure.
+- Data can include embedded layout information, allowing code to traverse it without statically knowing the structure.
 
-  * Embedded layout information should support versioning; new code should be able to load old data by notcing what has/hasn't been encoded.
+  - Embedded layout information should support versioning; new code should be able to load old data by notcing what has/hasn't been encoded.
 
-* Layout information is *optional*, and data can be traversed with minimal overhead by code that knows/assumes the layout
+- Layout information is _optional_, and data can be traversed with minimal overhead by code that knows/assumes the layout
 
 Top-Level Structure
 -------------------
 
-A serialized blob in fossil format starts with a header (see `Slang::Fossil::Header`), which in turn points to the *root value*.
+A serialized blob in fossil format starts with a header (see `Slang::Fossil::Header`), which in turn points to the _root value_.
 All other data in the blob should be reachable from the root value, and an application can choose to make the root value whatever type they want (an array, structure, etc.).
 
 Encoding
@@ -68,19 +68,19 @@ Note that when encoding a pointer to an optional (`std::optional<T> *`) or an op
 
 #### Records
 
-Things that are conceptually like a `struct` or tuple are encoded as *records*, which are simply a sequence of *fields*.
+Things that are conceptually like a `struct` or tuple are encoded as _records_, which are simply a sequence of _fields_.
 
 The alignment of a record is the maximum alignment of its fields.
 
 Fields in a record are laid out sequentially, where each field gets the next suitably-aligned offset after the preceding field.
 No effort is made to fill in "gaps" left by preceding fields.
 
-Note: currently the size of a record is *not* rounded up to be a multiple of its alignment, so it is possible for one field to be laid out in the "tail padding" of the field before it.
+Note: currently the size of a record is _not_ rounded up to be a multiple of its alignment, so it is possible for one field to be laid out in the "tail padding" of the field before it.
 This behavior should probably be changed, so that the fossilized layout better matches what C/C++ compilers tend to do.
 
 ### Variable-Size Types
 
-Types where different instances may consume a different number of bytes may be encoded either *inline* or *indirectly*.
+Types where different instances may consume a different number of bytes may be encoded either _inline_ or _indirectly_.
 
 If a variable-size type `V` is being referred to by a pointer or optional (e.g., `V*` or `std::optional<V>`), then it will be encoded inline as the target address of that pointer/optional.
 
@@ -89,15 +89,15 @@ When a variable-size type is encoded indirectly, a null pointer should be interp
 
 #### Arrays
 
-An array of `T` is encoded as a sequence of `T` values, separated by the *stride* of `T` (the size of `T` rounded up to the alignment of `T`).
+An array of `T` is encoded as a sequence of `T` values, separated by the _stride_ of `T` (the size of `T` rounded up to the alignment of `T`).
 The offset of the array is the offset of its first element.
 
-The number of elements in the array is encoded as a 4-byte unsigned integer stored immediately *before* the offset of the array itself.
+The number of elements in the array is encoded as a 4-byte unsigned integer stored immediately _before_ the offset of the array itself.
 
 #### Strings
 
 A string is encoded in the same way that an array of 8-bit bytes would be (including the count stored before the first element).
-The only additional detail is that the serialized data *must* include an additional nul byte after the last element of the string.
+The only additional detail is that the serialized data _must_ include an additional nul byte after the last element of the string.
 
 The data of a string is assumed to be in UTF-8 encoding, but there is nothing about the format that validates or enforces this.
 
@@ -109,7 +109,7 @@ There is currently no provision made for efficient lookup of elements of a fossi
 
 #### Variants
 
-A *variant* is a fossilized value that can describe its own layout.
+A _variant_ is a fossilized value that can describe its own layout.
 
 The content of variant holding a value of type `T` is encoded exactly as a record with one field of type `T` would be, starting at the offset of the variant itself.
 
@@ -130,21 +130,21 @@ For pointers (`T*`) and optionals (`Optional<T>`), the tag is followed by a rela
 
 For arrays and dictionaries, the tag is followed by:
 
-* A relative pointer to a layout for the element type
+- A relative pointer to a layout for the element type
 
-* A 4-byte unsigned integer holding the stride between elements
+- A 4-byte unsigned integer holding the stride between elements
 
 #### Record Types
 
 For records, the tag is followed by:
 
-* A 4-byte unsigned integer holding the number of fields, `N`
+- A 4-byte unsigned integer holding the number of fields, `N`
 
-* `N` 8-byte values representing the fields, each comprising:
+- `N` 8-byte values representing the fields, each comprising:
 
-    * A relative pointer to the type of the field
+  - A relative pointer to the type of the field
 
-    * A 4-byte unsigned integer holding the offset of that field within the record
+  - A 4-byte unsigned integer holding the offset of that field within the record
 
 The RIFF Support Code
 =====================
@@ -158,15 +158,15 @@ RIFF is a simple chunk-based file format that is used by things like WAV files, 
 
 The RIFF structures are currently being used for a few things:
 
-* The top-level structure of serialized files for slang modules, "module libraries". This design choice is being utilized so that the compiler can navigate the relevant structures and extract the parts it needs (e.g., just the digest of a module, but not the AST or IR).
+- The top-level structure of serialized files for slang modules, "module libraries". This design choice is being utilized so that the compiler can navigate the relevant structures and extract the parts it needs (e.g., just the digest of a module, but not the AST or IR).
 
-* Repro files are using a top-level RIFF container, but it is just to encapsulate a single blob of raw data (with internal offset-based pointers)
+- Repro files are using a top-level RIFF container, but it is just to encapsulate a single blob of raw data (with internal offset-based pointers)
 
-* The structure of the IR and `SourceLoc` serialization formats uses RIFF chunks for their top-level structure, but doesn't really make use of the ability to navigate them in memory or perform random access.
+- The structure of the IR and `SourceLoc` serialization formats uses RIFF chunks for their top-level structure, but doesn't really make use of the ability to navigate them in memory or perform random access.
 
-* The actual serialized AST format is currently a deep hierarchy of RIFF chunks.
+- The actual serialized AST format is currently a deep hierarchy of RIFF chunks.
 
-* There is also code for a RIFF-based hierarchical virtual file-system format, and that format is being used for the serialized core module (seemingly just because it includes support for LZ4; the actual "file system" that gets serialized seems to only have a single file in it).
+- There is also code for a RIFF-based hierarchical virtual file-system format, and that format is being used for the serialized core module (seemingly just because it includes support for LZ4; the actual "file system" that gets serialized seems to only have a single file in it).
 
 General-Purpose Hierarchical Data Serialization
 ===============================================
@@ -228,26 +228,26 @@ The following sections are older text that describes some of the formats that ha
 IR Serialization
 ----------------
 
-This mechanism is *much* simpler than generali serialization, because by design the IR types are very homogeneous in style. There are a few special cases, but in general an instruction consists of
+This mechanism is _much_ simpler than generali serialization, because by design the IR types are very homogeneous in style. There are a few special cases, but in general an instruction consists of
 
-* Its type
-* A SourceLoc
-* 0 or more operands.
-* 0 or more children. 
+- Its type
+- A SourceLoc
+- 0 or more operands.
+- 0 or more children.
 
-Within the IR instructions are pointers to IRInst derived types. As previously discussed serializing pointers directly is generally not a good idea. To work around this the pointers are turned into 32 bit indices. Additionally we know that an instruction can belong to at most one other instruction. 
+Within the IR instructions are pointers to IRInst derived types. As previously discussed serializing pointers directly is generally not a good idea. To work around this the pointers are turned into 32 bit indices. Additionally we know that an instruction can belong to at most one other instruction.
 
-When serializing out special handling is made for child instructions - their indices are made to be a contiguous range of indices for all instructions that belong to each parent. The indices are ordered into the same order as the children are held in the parent. By using this mechanism it is not necessary to directly save off the indices that belong to a parent, only the range of indices. 
+When serializing out special handling is made for child instructions - their indices are made to be a contiguous range of indices for all instructions that belong to each parent. The indices are ordered into the same order as the children are held in the parent. By using this mechanism it is not necessary to directly save off the indices that belong to a parent, only the range of indices.
 
-The actual serialization mechanism is similar to the generalized mechanism - referenced objects are saved off in order of their indices. What is different is that the encoding fixes the size of the Inst to `IRSerialData`. That this can hold up to two operands, if the instruction has more than two operands then one of the UInt32 is the operand count and the other is an offset to a list of operands. It probably makes sense to alter this in the future to stream the instructions payload directly. 
+The actual serialization mechanism is similar to the generalized mechanism - referenced objects are saved off in order of their indices. What is different is that the encoding fixes the size of the Inst to `IRSerialData`. That this can hold up to two operands, if the instruction has more than two operands then one of the UInt32 is the operand count and the other is an offset to a list of operands. It probably makes sense to alter this in the future to stream the instructions payload directly.
 
 IR serialization allows a simple compression mechanism, that works because much of the IR serialized data is UInt32 data, that can use a variable byte encoding.
 
 SourceLoc Serialization
 -----------------------
 
-SourceLoc serialization presents several problems. Firstly we have two distinct serialization mechanisms that need to use it - IR serialization and generalized serialization. That being the case it cannot be saved directly in either, even though it may be referenced by either. 
+SourceLoc serialization presents several problems. Firstly we have two distinct serialization mechanisms that need to use it - IR serialization and generalized serialization. That being the case it cannot be saved directly in either, even though it may be referenced by either.
 
-To keep things simple for now we build up SourceLoc information for both IR and general serialization via their writers adding their information into a SerialSourceLocWriter. Then we can save this information into a RIFF section, that can be loaded before either general or IR deserialization is used.  
+To keep things simple for now we build up SourceLoc information for both IR and general serialization via their writers adding their information into a SerialSourceLocWriter. Then we can save this information into a RIFF section, that can be loaded before either general or IR deserialization is used.
 
 When reading the SourceLoc information has to be located and deserialized before any AST or IR deserialization. The SourceLoc data can then be turned into a SerialSourceLocReader, which is then either set on the `SerialReaders` `SerialExtraObjects`. Or passed to the `IRSerialReader`.

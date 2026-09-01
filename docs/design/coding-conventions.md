@@ -30,34 +30,34 @@ We currently assume support for some C++11 idioms, but have explicitly avoided a
 As a general rule, be skeptical of "modern C++" ideas unless they are clearly better to simpler alternatives.
 We are not quite in the realm of "Orthodox C++", but some of the same guidelines apply:
 
-* Don't use exceptions for non-fatal errors (and even then support a build flag to opt out of exceptions)
-* Don't use the built-in C++ RTTI system (home-grown is okay)
-* Don't use the C++ variants of C headers (e.g., `<cstdio>` instead of `<stdio.h>`)
-* Don't use the STL containers
-* Don't use iostreams
+- Don't use exceptions for non-fatal errors (and even then support a build flag to opt out of exceptions)
+- Don't use the built-in C++ RTTI system (home-grown is okay)
+- Don't use the C++ variants of C headers (e.g., `<cstdio>` instead of `<stdio.h>`)
+- Don't use the STL containers
+- Don't use iostreams
 
 The compiler implementation does not follow some of these guidelines at present; that should not be taken as an excuse to further the proliferation of stuff like `dynamic_cast`.
 Do as we say, not as we do.
 
 Some relatively recent C++ features that are okay to use:
 
-* Rvalue references for "move semantics," but only if you are implementing performance-critical containers or other code where this really matters.
+- Rvalue references for "move semantics," but only if you are implementing performance-critical containers or other code where this really matters.
 
-* `auto` on local variables, if the expected type is clear in context
+- `auto` on local variables, if the expected type is clear in context
 
-* Lambdas are allowed, but think carefully about whether just declaring a subroutine would also work.
+- Lambdas are allowed, but think carefully about whether just declaring a subroutine would also work.
 
-* Using `>>` to close multiple levels of templates, instead of `> >` (but did you really need all those templates?)
+- Using `>>` to close multiple levels of templates, instead of `> >` (but did you really need all those templates?)
 
-* `nullptr`
+- `nullptr`
 
-* `enum class`
+- `enum class`
 
-* Range-based `for` loops
+- Range-based `for` loops
 
-* `override`
+- `override`
 
-* Default member initializers in `class`/`struct` bodies
+- Default member initializers in `class`/`struct` bodies
 
 Templates are suitable in cases where they improve clarity and type safety.
 As a general rule, it is best when templated code is kept minimal, and forwards to a non-templated function that does the real work, to avoid code bloat.
@@ -104,7 +104,7 @@ Every header file should have an include guard.
 Within the implementation we can use `#pragma once`, but exported API headers (`slang.h`) should use traditional `#ifdef` style guards (and they should be consumable as both C and C++).
 
 A header should include or forward-declare everything it needs in order to compile.
-It is *not* up to the programmer who `#include`s a header to sort out the dependencies.
+It is _not_ up to the programmer who `#include`s a header to sort out the dependencies.
 
 Avoid umbrella or "catch-all" headers.
 
@@ -131,10 +131,10 @@ root. Prefer a private include directory unless it is part of the target's publi
 
 In general, includes should be grouped as follows:
 
-* First, the correspodning feature/module header, if we are in a source file
-* Next, any `<>`-enlosed includes for system/OS headers
-* Next, any `""`-enclosed includes for external/third-part code that is stored in the project repository
-* Finally, any includes for other features in the project
+- First, the correspodning feature/module header, if we are in a source file
+- Next, any `<>`-enlosed includes for system/OS headers
+- Next, any `""`-enclosed includes for external/third-part code that is stored in the project repository
+- Finally, any includes for other features in the project
 
 Within each group, includes should be sorted alphabetically.
 If this breaks because of ordering issues for system/OS/third-party headers (e.g., `<windows.h>` must be included before `<GL/GL.h>`), then ideally those includes should be mediated by a Slang-project-internal header that features can include.
@@ -147,7 +147,6 @@ Small programs may not need any.
 
 All standard module code that a Slang user might link against should go in the `Slang` namespace for now, to avoid any possibility of clashes in a static linking scenario.
 The public C API is obviously an exception to this.
-
 
 Code Formatting
 ------------------------------

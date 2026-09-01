@@ -76,12 +76,13 @@ script with a single Mermaid flowchart and two reference tables.
    describing what the global-parameters loop does for each
    variable layout:
 
-   | # | Step | Function | Notes |
-   |---|------|----------|-------|
-   | 1 | Materialize stub `IRGlobalVar` | `materialize(context, ensureDecl(context, varDecl.getDecl())).val` | Produces an `[import(...)]` stub if no definition is present |
-   | 2 | Lower the variable layout | `lowerVarLayout(context, varLayout)` | Produces an `IRVarLayout` instruction |
-   | 3 | Attach `IRLayoutDecoration` | `builder->addLayoutDecoration(irVar, irLayout)` | The layout becomes queryable on the stub |
-   | 4 | Record in the global type-layout builder | `globalStructTypeLayoutBuilder.addField(irVar, irLayout)` | Feeds the module-level `IRStructTypeLayout` |
+   | #   | Step                                     | Function                                                           | Notes                                                        |
+   | --- | ---------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------ |
+   | 1   | Materialize stub `IRGlobalVar`           | `materialize(context, ensureDecl(context, varDecl.getDecl())).val` | Produces an `[import(...)]` stub if no definition is present |
+   | 2   | Lower the variable layout                | `lowerVarLayout(context, varLayout)`                               | Produces an `IRVarLayout` instruction                        |
+   | 3   | Attach `IRLayoutDecoration`              | `builder->addLayoutDecoration(irVar, irLayout)`                    | The layout becomes queryable on the stub                     |
+   | 4   | Record in the global type-layout builder | `globalStructTypeLayoutBuilder.addField(irVar, irLayout)`          | Feeds the module-level `IRStructTypeLayout`                  |
+
 8. `## Global-scope type layout` — short paragraph + reference
    to the `ParameterGroupTypeLayout` branch. Explain that when
    the global scope is wrapped in a parameter group (a constant
@@ -91,16 +92,17 @@ script with a single Mermaid flowchart and two reference tables.
    `setElementVarLayout`, `setOffsetElementTypeLayout`.
 9. `## Per-entry-point steps` — small numbered table:
 
-   | # | Step | Function | Notes |
-   |---|------|----------|-------|
-   | 1 | Skip if no AST | `if (!funcDeclRef) continue;` | Deserialized entry points have no AST |
-   | 2 | Skip unspecialized generics | `isUnspecializedGenericFuncDeclRef(funcDeclRef)` | Cannot produce a layout yet |
-   | 3 | Lower the function type | `lowerType(context, getFuncType(astBuilder, funcDeclRef))` | Produces an `IRFuncType` |
-   | 4 | Materialize the stub function | `emitDeclRef(context, funcDeclRef, irFuncType)` via `getSimpleVal` | Produces an `IRFunc` skeleton; usually `[import(...)]` |
-   | 5 | Attach import linkage if missing | `builder->addImportDecoration(irFunc, mangledName)` | Wires the stub to its real implementation by mangled name |
-   | 6 | Forward capability atoms | iterate `inferredCapabilityRequirements` and call `builder->addRequireCapabilityAtomDecoration` for SPIR-V (`_spirv_1_0..latestSpirvAtom`) and Metal (`metallib_2_3..latestMetalAtom`) atoms | Lets the layout module advertise the SPIR-V / Metal capability set per entry point |
-   | 7 | Lower the entry-point layout | `lowerEntryPointLayout(context, entryPointLayout)` | Produces an `IREntryPointLayout` |
-   | 8 | Attach `IRLayoutDecoration` | `builder->addLayoutDecoration(irFunc, irEntryPointLayout)` | The decoration the reflection API and the linker query. |
+   | #   | Step                             | Function                                                                                                                                                                                     | Notes                                                                              |
+   | --- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+   | 1   | Skip if no AST                   | `if (!funcDeclRef) continue;`                                                                                                                                                                | Deserialized entry points have no AST                                              |
+   | 2   | Skip unspecialized generics      | `isUnspecializedGenericFuncDeclRef(funcDeclRef)`                                                                                                                                             | Cannot produce a layout yet                                                        |
+   | 3   | Lower the function type          | `lowerType(context, getFuncType(astBuilder, funcDeclRef))`                                                                                                                                   | Produces an `IRFuncType`                                                           |
+   | 4   | Materialize the stub function    | `emitDeclRef(context, funcDeclRef, irFuncType)` via `getSimpleVal`                                                                                                                           | Produces an `IRFunc` skeleton; usually `[import(...)]`                             |
+   | 5   | Attach import linkage if missing | `builder->addImportDecoration(irFunc, mangledName)`                                                                                                                                          | Wires the stub to its real implementation by mangled name                          |
+   | 6   | Forward capability atoms         | iterate `inferredCapabilityRequirements` and call `builder->addRequireCapabilityAtomDecoration` for SPIR-V (`_spirv_1_0..latestSpirvAtom`) and Metal (`metallib_2_3..latestMetalAtom`) atoms | Lets the layout module advertise the SPIR-V / Metal capability set per entry point |
+   | 7   | Lower the entry-point layout     | `lowerEntryPointLayout(context, entryPointLayout)`                                                                                                                                           | Produces an `IREntryPointLayout`                                                   |
+   | 8   | Attach `IRLayoutDecoration`      | `builder->addLayoutDecoration(irFunc, irEntryPointLayout)`                                                                                                                                   | The decoration the reflection API and the linker query.                            |
+
 10. `## Optional obfuscation pass` — short subsection covering
     the `if (linkage->m_optionSet.shouldObfuscateCode())` block
     near line 16502:
@@ -167,7 +169,7 @@ script with a single Mermaid flowchart and two reference tables.
 
 ## Quality checklist (in addition to the universal one)
 
-- [ ] The page covers `createIRModuleForLayout` *and* the parameter
+- [ ] The page covers `createIRModuleForLayout` _and_ the parameter
       binding that produces the `ProgramLayout` it transcribes — the
       latter is why `slang-parameter-binding.cpp` is one of this page's
       `watched_paths`. It does **not** slip into discussing

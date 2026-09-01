@@ -18,8 +18,8 @@ audience is a contributor reading or writing parser, checker, or
 IR-lowering code who needs to know what a given node carries and where it
 comes from.
 
-The pages here describe *shape* — parent class, key fields, whether the
-node is parsed or synthesized — rather than *behavior*. For how the AST
+The pages here describe _shape_ — parent class, key fields, whether the
+node is parsed or synthesized — rather than _behavior_. For how the AST
 is built, see [../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md);
 for what the checker does to it, see
 [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md); for
@@ -58,11 +58,11 @@ reading a family page:
   `Decl`, `Expr`, `Stmt`, `Type`, `Modifier`, and `Val`. No family page
   owns its own root class; the per-family header declares only the
   descendants. `Decl` itself is `FIDDLE(abstract)`, and the abstract
-  intermediates *below* these roots (`ContainerDecl`, `OperatorExpr`,
+  intermediates _below_ these roots (`ContainerDecl`, `OperatorExpr`,
   `ScopeStmt`, ...) do live in the per-family headers.
 - **`SyntaxNodeBase` is where source locations enter**, and `SyntaxNode`
   is its only direct subclass. The modifiable / non-modifiable split
-  happens one level lower: `ModifiableSyntaxNode` derives *from*
+  happens one level lower: `ModifiableSyntaxNode` derives _from_
   `SyntaxNode` and adds modifier storage, so `Stmt` and `DeclBase` can
   carry modifiers while `Expr` and `Modifier` cannot.
 - **`Type` is a `Val`, not a direct `NodeBase` child**, which is why
@@ -99,15 +99,15 @@ Where each root is documented:
 
 ## Pages
 
-| Page | Family root | Owning header | Approx. concrete classes |
-| --- | --- | --- | --- |
-| [base.md](base.md) | the abstract roots above | [slang-ast-base.h](../../../../source/slang/slang-ast-base.h) | (roots and support types only) |
-| [declarations.md](declarations.md) | `Decl`, `DeclBase` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) | ~65 |
-| [expressions.md](expressions.md) | `Expr` | [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h) | ~95 |
-| [statements.md](statements.md) | `Stmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) | ~30 |
-| [types.md](types.md) | `Type` (itself a `Val`) | [slang-ast-type.h](../../../../source/slang/slang-ast-type.h) | ~120 |
-| [values.md](values.md) | `Val` (non-`Type`) | [slang-ast-val.h](../../../../source/slang/slang-ast-val.h) | ~65 |
-| [modifiers.md](modifiers.md) | `Modifier` (incl. `AttributeBase`) | [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h) | ~265 |
+| Page                               | Family root                        | Owning header                                                         | Approx. concrete classes       |
+| ---------------------------------- | ---------------------------------- | --------------------------------------------------------------------- | ------------------------------ |
+| [base.md](base.md)                 | the abstract roots above           | [slang-ast-base.h](../../../../source/slang/slang-ast-base.h)         | (roots and support types only) |
+| [declarations.md](declarations.md) | `Decl`, `DeclBase`                 | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)         | ~65                            |
+| [expressions.md](expressions.md)   | `Expr`                             | [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h)         | ~95                            |
+| [statements.md](statements.md)     | `Stmt`                             | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h)         | ~30                            |
+| [types.md](types.md)               | `Type` (itself a `Val`)            | [slang-ast-type.h](../../../../source/slang/slang-ast-type.h)         | ~120                           |
+| [values.md](values.md)             | `Val` (non-`Type`)                 | [slang-ast-val.h](../../../../source/slang/slang-ast-val.h)           | ~65                            |
+| [modifiers.md](modifiers.md)       | `Modifier` (incl. `AttributeBase`) | [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h) | ~265                           |
 
 Each count is the number of `FIDDLE()`-declared concrete classes in that
 owning header at the `source_commit` in this file's front-matter, rounded
@@ -115,7 +115,7 @@ to the nearest five. Classes declared `FIDDLE(abstract)`
 are excluded from those counts; they appear only in
 the hierarchy diagrams. The `declarations.md` count includes `DeclGroup`,
 the only concrete `DeclBase` that is not a `Decl`. Note that the
-FIDDLE-generated `ASTNodeType` enum is *not* a count of these classes: it
+FIDDLE-generated `ASTNodeType` enum is _not_ a count of these classes: it
 carries a tag for every `NodeBase` subclass, abstract bases included.
 
 The rounded figures give a sense of scale only; a header's class count
@@ -132,7 +132,7 @@ expected?" surprises:
   (`NodeOutputArray` and friends) fall on the `__intrinsic_type` side and
   are documented in
   [../ir-reference/types.md](../ir-reference/types.md) instead.
-- The *surface spelling* of an attribute or modifier is not in the C++
+- The _surface spelling_ of an attribute or modifier is not in the C++
   header either: it comes from `attribute_syntax` declarations in
   [core.meta.slang](../../../../source/slang/core.meta.slang) and, for the
   work-graph attributes, in
@@ -154,7 +154,7 @@ companions of this subtree:
 - [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md) —
   how the checker resolves names, fills in `QualType`, builds witnesses,
   and rewrites unresolved nodes (`OverloadedExpr`, `UncheckedAttribute`)
-  into their resolved forms. This is also the phase that *creates* many
+  into their resolved forms. This is also the phase that _creates_ many
   of the nodes marked `(none)` in the `Grammar` columns — though not all
   of them: `UnparsedStmt`, for instance, is a parser-built helper, and
   some `(none)` classes are declared with no live construction site at

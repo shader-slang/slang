@@ -52,12 +52,12 @@ keyword or operator) or short aliases for token kinds from
 [tokens.md](tokens.md):
 
 | Alias used here | `TokenType` in tokens.md |
-| --- | --- |
-| `IDENT` | `Identifier` |
-| `INT_LIT` | `IntegerLiteral` |
-| `FLOAT_LIT` | `FloatingPointLiteral` |
-| `STRING_LIT` | `StringLiteral` |
-| `CHAR_LIT` | `CharLiteral` |
+| --------------- | ------------------------ |
+| `IDENT`         | `Identifier`             |
+| `INT_LIT`       | `IntegerLiteral`         |
+| `FLOAT_LIT`     | `FloatingPointLiteral`   |
+| `STRING_LIT`    | `StringLiteral`          |
+| `CHAR_LIT`      | `CharLiteral`            |
 
 The aliases are used purely to keep the grammar tables readable; the
 canonical names are the `TokenType` enumerators.
@@ -111,7 +111,7 @@ QualifiedName   ::= '::'? IDENT ('::' NameOrSubscript)*       -- parsed via the 
 NameOrSubscript ::= IDENT | '__subscript'                     -- ParseStaticMemberName
 ```
 
-A string-literal module name or import path is *not* unescaped: both
+A string-literal module name or import path is _not_ unescaped: both
 `parseModuleDeclarationDecl` and `parseFileReferenceDeclBase` decode it
 with `getFileNameTokenValue`
 ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)),
@@ -220,7 +220,7 @@ TypeList        ::= Type (',' Type)*
 ```
 
 `struct`, `class`, and `enum` are the three declaration keywords that
-are *not* registered in `g_parseSyntaxEntries[]`; the type-specifier
+are _not_ registered in `g_parseSyntaxEntries[]`; the type-specifier
 parser recognizes them by identifier lookahead and calls
 `Parser::ParseStruct`, `Parser::ParseClass`, or `parseEnumDecl`
 directly (see [keywords-and-builtins.md](keywords-and-builtins.md)).
@@ -229,7 +229,7 @@ generated name — and why the declaration can be followed by a
 declarator, as in `struct Foo { int x; } foo;`.
 
 The `Attribute*` slot inside `'struct'` is a legacy placement, with the
-bracket *after* the keyword. `Parser::ParseStruct` still parses it to
+bracket _after_ the keyword. `Parser::ParseStruct` still parses it to
 keep diagnostics sensible, but reports
 `DeprecatedBracketAttributesPlacement` from language version 2025 and
 `InvalidBracketAttributesPlacement` from 2026.
@@ -237,7 +237,7 @@ keep diagnostics sensible, but reports
 An associated type's constraints have two surface forms — the
 inheritance bound `associatedtype A : IBar` and the where-clause
 `associatedtype A where A : IBar`. Both are parsed by `parseAssocType`
-and lowered to the *same* representation: a `GenericTypeConstraintDecl`
+and lowered to the _same_ representation: a `GenericTypeConstraintDecl`
 added as a sibling requirement of the enclosing `InterfaceDecl`, not a
 member of the associated type itself (see `parseOptionalGenericConstraints`,
 which takes a separate `constraintTarget`). This is the identical
@@ -432,7 +432,7 @@ loop therefore always stops after the first atom, and
 `__require_capability a + b;` fails at the following mandatory `';'`.
 
 The statement-level spelling is different: `__requireCapability` inside
-a function body *does* take parentheses and only allows commas —
+a function body _does_ take parentheses and only allows commas —
 `'__requireCapability' '(' CapabilityName (',' CapabilityName)* ')' ';'`
 (`Parser::ParseRequireCapabilityStatement`). It is the only spelling
 that can name several atoms at once.
@@ -526,31 +526,31 @@ family of `parse...Expr` functions in
 numbers in the table below bind tighter (atom-level), higher numbers
 bind looser (assignment).
 
-| Level | Operators | Associativity |
-| --- | --- | --- |
-| 0 | atoms (literals, names, parenthesized, builtin keyword expressions) | — |
-| 1 | postfix `()` `[]` `.` `++` `--` `<...>` (generic specialization, context-sensitive) | left |
-| 2 | unary `+` `-` `!` `~` `++` `--` `*` `&` | right |
-| 3 | `*` `/` `%` | left |
-| 4 | `+` `-` | left |
-| 5 | `<<` `>>` | left |
-| 6 | `<` `<=` `>` `>=` `is` `as` (right operand is a Type) | left |
-| 7 | `==` `!=` | left |
-| 8 | `&` | left |
-| 9 | `^` | left |
-| 10 | `\|` | left |
-| 11 | `&&` | left |
-| 12 | `\|\|` | left |
-| 13 | `?:` ternary | right |
-| 14 | `=` `+=` `-=` `*=` `/=` `%=` `<<=` `>>=` `&=` `\|=` `^=` | right |
-| 15 | `,` (comma operator; the loosest level, and the default for `ParseExpression`) | left |
+| Level | Operators                                                                           | Associativity |
+| ----- | ----------------------------------------------------------------------------------- | ------------- |
+| 0     | atoms (literals, names, parenthesized, builtin keyword expressions)                 | —             |
+| 1     | postfix `()` `[]` `.` `++` `--` `<...>` (generic specialization, context-sensitive) | left          |
+| 2     | unary `+` `-` `!` `~` `++` `--` `*` `&`                                             | right         |
+| 3     | `*` `/` `%`                                                                         | left          |
+| 4     | `+` `-`                                                                             | left          |
+| 5     | `<<` `>>`                                                                           | left          |
+| 6     | `<` `<=` `>` `>=` `is` `as` (right operand is a Type)                               | left          |
+| 7     | `==` `!=`                                                                           | left          |
+| 8     | `&`                                                                                 | left          |
+| 9     | `^`                                                                                 | left          |
+| 10    | `\|`                                                                                | left          |
+| 11    | `&&`                                                                                | left          |
+| 12    | `\|\|`                                                                              | left          |
+| 13    | `?:` ternary                                                                        | right         |
+| 14    | `=` `+=` `-=` `*=` `/=` `%=` `<<=` `>>=` `&=` `\|=` `^=`                            | right         |
+| 15    | `,` (comma operator; the loosest level, and the default for `ParseExpression`)      | left          |
 
 The `Precedence` enum ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp))
 runs in the opposite direction from the table: `Comma` is its lowest
 enumerator and `Postfix` its highest, and `GetOpLevel` maps an operator
 token to one of them. `Parser::ParseExpression` takes the level to stop
 at, which is how the two comma contexts are distinguished: it defaults
-to `Precedence::Comma`, so a full expression *does* admit the comma
+to `Precedence::Comma`, so a full expression _does_ admit the comma
 operator, while `ParseArgExpr` and `ParseInitExpr` pass
 `Precedence::Assignment` so a `,` terminates the operand instead of
 being consumed. That is why the `ArgList` and `InitList` productions
@@ -689,7 +689,7 @@ In body-parse mode (function bodies) a semantic visitor is available,
 and it becomes the primary signal: `tryParseGenericApp` checks the base
 expression with `CheckTerm` and skips the speculative parse entirely.
 A base that resolves to a `GenericDecl` is a generic application; so is
-one that resolves to a function or a type even when it is *not* generic,
+one that resolves to a function or a type even when it is _not_ generic,
 because a function or type name can never legally precede `<`, and
 committing to the generic reading produces a better diagnostic.
 Anything else is treated as a comparison.
@@ -778,7 +778,7 @@ comma is optional, so `[a b]` and `[a, b]` parse the same way.
 
 A `::`-qualified attribute name is not kept as a qualified name.
 `parseAttributeName` flattens it into a single synthetic `Identifier`
-token by replacing each `::` with `_`, and a *leading* `::` also becomes
+token by replacing each `::` with `_`, and a _leading_ `::` also becomes
 a leading `_` — so `[vk::binding(0)]` looks up the name `vk_binding`,
 and `[::foo]` looks up `_foo`. Attribute lookup is therefore always a
 single-identifier lookup, regardless of how the attribute was spelled.
@@ -817,7 +817,7 @@ anything else is parsed as a type-first value parameter, so `<T>` and
 `typename` forces the type reading. The same lookahead (minus `=`)
 decides whether `each` introduces a type pack (`each T`) or a
 traditional value pack (`each int D`). Note that the `:` constraint on
-a generic parameter takes a *single* supertype, unlike the where-clause
+a generic parameter takes a _single_ supertype, unlike the where-clause
 `:` form, which accepts a comma-separated list.
 
 Each `where` keyword introduces exactly one `WhereTerm`
@@ -825,7 +825,7 @@ Each `where` keyword introduces exactly one `WhereTerm`
 to state several constraints, repeat the keyword. A leading
 `optional` modifier (parsed as `OptionalConstraintModifier`) is
 accepted on every term except `__hasDiffTypeInfo`. The
-`countof(Pack) == IntExpr` form is *oriented*: the reversed spelling
+`countof(Pack) == IntExpr` form is _oriented_: the reversed spelling
 `N == countof(Pack)` is recognized only to emit
 `VariadicPackCountConstraintRequiresCountofOnLeft`, which asks for the
 constraint to be rewritten with `countof` on the left, and the rest of

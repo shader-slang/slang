@@ -1,4 +1,12 @@
-example(cpu-shader-llvm TARGET_NAME cpu-shader-llvm-jit EXPLICIT_SOURCE jit.cpp LINK_WITH_PRIVATE stb)
+example(
+    cpu-shader-llvm
+    TARGET_NAME
+    cpu-shader-llvm-jit
+    EXPLICIT_SOURCE
+    jit.cpp
+    LINK_WITH_PRIVATE
+    stb
+)
 
 if(SLANG_ENABLE_SLANGC)
     # This example does not set a CMake toolchain for Slang, hence just running
@@ -6,18 +14,26 @@ if(SLANG_ENABLE_SLANGC)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/shader.o
         COMMAND
-            slangc -load-core-module ${core_module_archive_without_timestamp} -target
-            shader-object-code -emit-cpu-via-llvm -O3 -g0
+            slangc -load-core-module ${core_module_archive_without_timestamp}
+            -target shader-object-code -emit-cpu-via-llvm -O3 -g0
             ${CMAKE_CURRENT_SOURCE_DIR}/shader.slang -o
             ${CMAKE_CURRENT_BINARY_DIR}/shader.o
         COMMAND_EXPAND_LISTS
         MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/shader.slang
         VERBATIM
     )
-    add_custom_target(cpu-shader-llvm-link-shader DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/shader.o)
+    add_custom_target(
+        cpu-shader-llvm-link-shader
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/shader.o
+    )
     # This dependency is added so that the custom command above is able to use
     # slangc, slang-llvm, and the generated core module archive.
-    add_dependencies(cpu-shader-llvm-link-shader slangc slang-llvm generate_core_module)
+    add_dependencies(
+        cpu-shader-llvm-link-shader
+        slangc
+        slang-llvm
+        generate_core_module
+    )
 
     # Mark shader.o as a generated file before `slang_add_target` consumes it
     # via `EXPLICIT_SOURCE` below. `slang_add_target` is a function (separate

@@ -209,7 +209,7 @@ declarations are spread across
   interface ([include/slang.h](../../../../include/slang.h)) actually
   implements — see
   [slang-session.h](../../../../source/slang/slang-session.h). In this
-  codebase "session" therefore means *two different things*:
+  codebase "session" therefore means _two different things_:
   `IGlobalSession` holds the global-session-scoped state that
   applications usually create once and reuse to amortize startup cost
   (though distinct global sessions may coexist), and `ISession` is what
@@ -269,7 +269,7 @@ Anything under [source/](../../../../source) is implementation. The
 public-header rules in [CLAUDE.md](../../../../CLAUDE.md) (no enum
 re-ordering, no virtual-method changes mid-vtable, no removal) reflect
 the fact that this surface must keep ABI compatibility with older
-callers. New API is therefore added by *appending*: methods are
+callers. New API is therefore added by _appending_: methods are
 appended to the end of an interface (e.g.
 `IGlobalSession::getDownstreamCompilerVersion`), new capabilities arrive
 as fresh UUID'd interfaces obtained via `castAs` /

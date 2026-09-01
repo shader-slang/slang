@@ -71,7 +71,7 @@ begins, in
 - **Entry points.** Four functions declared in
   [slang-lookup.h](../../../../source/slang/slang-lookup.h):
   - `lookUp` (lines 17-25) — unqualified name lookup starting from a
-    `Scope*`. Note that it does *not* take a `LookupOptions`; it takes
+    `Scope*`. Note that it does _not_ take a `LookupOptions`; it takes
     two `bool` parameters, `considerAllLocalNamesInScope` and
     `ignoreTransparentMembers`, and folds them into the corresponding
     `LookupOptions` bits itself
@@ -94,6 +94,7 @@ begins, in
   item-at-a-time and a merge-a-whole-result overload, because callers
   that build results outside `slang-lookup.cpp` (the visibility and
   optional-constraint filters) need to accumulate items the same way.
+
 - `LookupRequest`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
   lines 1562-1582) — the parameter bundle threaded through the lookup
@@ -138,15 +139,14 @@ begins, in
     7655](../../../../source/slang/slang-parser.cpp)).
   - `Semantic = 0x20` — `SemanticDecl`, the
     `semantic sv_position { ... }` declarations in
-    [core.meta.slang](../../../../source/slang/core.meta.slang) (line
-    5001) that record which types and stages a `: SV_*` annotation on a
+    [core.meta.slang](../../../../source/slang/core.meta.slang) (line 5001) that record which types and stages a `: SV_*` annotation on a
     shader parameter is valid for
     ([slang-ast-decl.h line
     729](../../../../source/slang/slang-ast-decl.h)).
   - `Default = type | Function | Value | SyntaxDecl` — the mask the
     parser and most checker entry points use.
 
-  `Attribute` and `Semantic` are the two bits *outside* `Default`, so
+  `Attribute` and `Semantic` are the two bits _outside_ `Default`, so
   only a caller that names them can reach those decls: an ordinary
   identifier spelled like an attribute neither hides the attribute nor
   is hidden by it. `type`, `Function`, and `Value` are already inside
@@ -162,6 +162,7 @@ begins, in
   41-93). The mask test is not the first thing that function does: the
   `extern`-related rejections at lines 43-54 run before any bit is
   consulted, and `FileDecl` is hard-coded never to pass (lines 79-83).
+
 - `LookupOptions`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
   lines 1319-1334) — a `uint8_t` bitset of behavior flags. Besides
@@ -205,12 +206,13 @@ begins, in
   `RefPtr<LookupResultItem_Breadcrumb> next` and carry a
   `ThisParameterMode` (lines 1378-1385) describing whether `this` is
   `ImmutableValue`, `MutableValue`, or the `This` `Type`.
+
 - `LookupResult`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
   lines 1509-1556) — single-or-multi container for found items. A
-  result is *valid* when `item.declRef.getDecl()` is non-null, and
-  *overloaded* when `items.getCount() > 1`. The invariant documented
-  at lines 1518-1520 is that when `items` is in use it holds *all* the
+  result is _valid_ when `item.declRef.getDecl()` is non-null, and
+  _overloaded_ when `items.getCount() > 1`. The invariant documented
+  at lines 1518-1520 is that when `items` is in use it holds _all_ the
   items and `item` duplicates one of them (in practice the first);
   `items` is left entirely empty in the single-result case so that no
   heap allocation happens. `begin()`/`end()` hide the distinction from
@@ -219,7 +221,7 @@ begins, in
   ([slang-check-impl.h](../../../../source/slang/slang-check-impl.h)
   lines 525-763) — the linearized inheritance information member
   lookup iterates. A facet is a `(kind, directness, origin,
-  subtypeWitness, declRefForMemberLookup)` record; `origin` is the
+subtypeWitness, declRefForMemberLookup)` record; `origin` is the
   type and/or `DeclRef` whose members the facet contributes. `kind`
   is `Type` or `Extension`; `directness` is `Self` (0), `Direct` (1),
   or a larger indirection count. The list is singly linked through
@@ -275,7 +277,7 @@ builds a `LookupRequest`, and calls `_lookUpInScopes`
 3. **Skip dummy and re-visited file scopes.** A null
    `containerDecl` is a sentinel that links siblings; it is
    skipped (lines 816-817). The first `FileDecl` encountered is
-   remembered, and a later re-encounter of that *same* `FileDecl` is
+   remembered, and a later re-encounter of that _same_ `FileDecl` is
    skipped so that a file whose scope appears twice on the chain is
    not searched twice
    ([slang-lookup.cpp lines
@@ -283,7 +285,7 @@ builds a `LookupRequest`, and calls `_lookUpInScopes`
 4. **Dispatch on container kind.** Each `containerDecl` is first
    turned into a `DeclRef` by `createDefaultSubstitutionsIfNeeded`
    (lines 836-840). If the result is an `AggTypeDeclBase` — for
-   example lookup happening *inside* a `struct`, `class`, `interface`,
+   example lookup happening _inside_ a `struct`, `class`, `interface`,
    `enum`, or `extension` — the request is rewritten to perform member lookup
    against the corresponding `Type*`, with a
    `Breadcrumb::Kind::This` breadcrumb that records the implicit
@@ -321,7 +323,7 @@ builds a `LookupRequest`, and calls `_lookUpInScopes`
 ([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp) lines
 189-283) does the per-container work for the non-type branch:
 
-- In completion mode it iterates *every* direct member via
+- In completion mode it iterates _every_ direct member via
   `getDirectMemberDecls` (lines 198-214); otherwise it iterates only
   members whose name matches `request.name`, using
   `ContainerDecl::getDirectMemberDeclsOfName` (declared at
@@ -412,6 +414,7 @@ That function is where the dispatch on type shape happens:
   ICounter c = S();   // `c` has existential type
   int n = c.val();    // member lookup takes this arm
   ```
+
 - **`AndType`.** Unexpected at lookup time;
   `visitGenericTypeConstraintDecl` is supposed to have flattened it
   earlier, so the arm is a `SLANG_UNEXPECTED`.
@@ -452,7 +455,7 @@ the facet walk.
   a `ThisTypeDecl` and the name is `This`, an inherited candidate is
   suppressed entirely if the self type is an interface (an
   interface's own `This` must not be made ambiguous by its bases),
-  and otherwise the facet's decl-ref *is* the result
+  and otherwise the facet's decl-ref _is_ the result
   ([slang-lookup.cpp lines
   473-489](../../../../source/slang/slang-lookup.cpp)).
 - For a non-`Self` facet of `Facet::Kind::Type`, prepends a
@@ -624,7 +627,7 @@ on a `catch` clause's error variable.
 Lookup honors the flag via `_isUncheckedLocalVar`
 ([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp) lines
 175-181), which treats a decl as not-yet-declared when it is
-`Unchecked`, currently being checked, *or* `hiddenFromLookup`, and
+`Unchecked`, currently being checked, _or_ `hiddenFromLookup`, and
 when `isLocalVar` holds for it.
 
 `LookupOptions::ConsiderAllLocalNamesInScope` lets a caller bypass
@@ -676,7 +679,7 @@ other layers:
 - **Across lookup paths**, nothing dedupes. The same `DeclRef` reached
   both directly from an enclosing scope and through a transparent
   member appears twice, with different breadcrumb chains. Separately,
-  lookup can return competing items for *different* declarations, such
+  lookup can return competing items for _different_ declarations, such
   as an interface requirement alongside the concrete member that
   satisfies it. Narrowing is the caller's job:
   `SemanticsVisitor::_resolveOverloadedExprImpl`
@@ -718,7 +721,7 @@ declaration advances past it — the state loop at
 completes before any signature is checked, so lookups performed while
 resolving declaration headers already see the complete sibling chain.
 That ordering is intentional and user-visible: a `using` declaration
-may appear *after* the declaration whose header depends on it, and the
+may appear _after_ the declaration whose header depends on it, and the
 header still resolves.
 
 ```
@@ -772,7 +775,7 @@ Two parser helpers use lookup in opposite directions:
   and is not a `SyntaxDecl`.
 - `isKeywordAvailable`
   ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
-  9652-9665) treats a *contextual* keyword as available only when
+  9652-9665) treats a _contextual_ keyword as available only when
   plain lookup of that identifier finds nothing at all, so any user
   declaration of the name disables the keyword.
 

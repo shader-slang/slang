@@ -8,7 +8,6 @@ Modules and Access Control
 
 While the preprocessor `#include` is still supported, Slang provides a _module_ system for software engineering benefits such as clean expression of subcomponent boundaries and dependencies, hiding implementation details, and providing a path towards true separate compilation.
 
-
 ## Defining a Module
 
 A module in Slang comprises one or more files. A module must have one and only one primary file that is used as the source-of-truth to uniquely identify the module. The primary file must start with a `module` declaration. For example, the following code defines a module named `scene`:
@@ -31,6 +30,7 @@ module scene;
 __include "scene-helpers";
 
 ```
+
 ```
 // scene-helpers.slang
 
@@ -79,6 +79,7 @@ void test() { f_a(); f_b(); f_c(); }
 
 Note that `module`, `implementing`, and `__include` all support two flavors of syntax to refer to a module or a file: either via
 normal identifier tokens or via string literals. For example, the following flavors are equivalent and will resolve to the same file:
+
 ```
 __include dir.file_name; // `file_name` is translated to "file-name".
 __include "dir/file-name.slang";
@@ -91,7 +92,8 @@ file with the `implementing` declaration that is not `__include`'d by any other 
 the module. Such dangling files will not be considered as part of the module and will not
 be compiled. The `implementing` declaration is for the purpose of verification and language server code assistance, and does not carry any other semantics that affect compilation.
 
-> #### Note ####
+> #### Note
+>
 > When using the identifier token syntax, Slang will translate any underscores (`_`) to hyphens (`-`) to obtain the file name.
 
 ## Importing a Module
@@ -107,6 +109,7 @@ import YourLibrary;
 This `import` declaration will cause the compiler to look for a module named `YourLibrary` and make its declarations visible in the current scope. Similar to `__include`, `import` also supports both the identifier-token and the file-name string syntax.
 
 You can only `import` a primary source file of a module. For example, given:
+
 ```
 // m.slang
 module m;
@@ -116,6 +119,7 @@ __include helper;
 implementing m;
 // ...
 ```
+
 It is only valid for the user code to `import m`. Attempting to `import helper` will result in a compile-time error.
 
 Multiple `import`s of the same module from different input files will only cause the module to be loaded once (there is no need for "include guards" or `#pragma once`).
@@ -199,6 +203,7 @@ A member of an `internal` or `private` nested type likewise inherits that lower 
 ### Additional Validation Rules
 
 The Slang compiler enforces the following rules regarding access control:
+
 - A more visible entity should not expose less visible entities through its signature. For example, a `public` function cannot have a return type that is `internal`.
 - A member of a `struct`, `interface`, or other aggregate type cannot have a higher visibility than its parent.
 - If a `struct` type has visibility `Vs`, and one of its members has visibility `Vm`, and the member is used to satisfy an interface requirement that has visibility `Vr`, then `Vm` must not be lower (less visible) than `min(Vs, Vr)`.
@@ -244,6 +249,7 @@ Here, all the public symbols defined in `accumulator.slang`, `tonemap.slang`, an
 Slang used to not have support for access control, and all symbols were treated as having `public` visibility. To provide compatibility with existing code, the Slang compiler will detect if the module is written in the legacy language, and treat all symbols as `public` if so.
 
 A module is determined to be written in legacy language if all the following conditions are met:
+
 - The module lacks a `module` declaration at the beginning.
 - There is no use of `__include`.
 - There is no use of any visibility modifiers -- `public`, `private`, or `internal`.

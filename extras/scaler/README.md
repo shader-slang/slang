@@ -183,17 +183,18 @@ GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler
 ```
 
 **Files:**
-| File | Purpose |
-|------|---------|
-| `deploy/setup-scaler-host.sh` | One-command deploy: creates VM, uploads binary, installs services |
-| `deploy/update-scaler.sh` | Update binary on existing host |
-| `deploy/scaler-windows.service` | systemd unit for Windows GPU scaler |
-| `deploy/scaler-windows-build.service` | systemd unit for Windows build scaler (no GPU) |
-| `deploy/scaler-linux.service` | systemd unit for Linux GPU scaler |
-| `deploy/scaler-linux-sm80plus.service` | systemd unit for Linux SM80Plus scaler |
-| `deploy/scaler-linux-build.service` | systemd unit for Linux build scaler (no GPU) |
-| `deploy/scaler-linux-analytics.service` | systemd unit for Linux analytics scaler (no GPU, tiny VM) |
-| `deploy/scaler.env.example` | Template for GitHub credentials |
+
+| File                                    | Purpose                                                           |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| `deploy/setup-scaler-host.sh`           | One-command deploy: creates VM, uploads binary, installs services |
+| `deploy/update-scaler.sh`               | Update binary on existing host                                    |
+| `deploy/scaler-windows.service`         | systemd unit for Windows GPU scaler                               |
+| `deploy/scaler-windows-build.service`   | systemd unit for Windows build scaler (no GPU)                    |
+| `deploy/scaler-linux.service`           | systemd unit for Linux GPU scaler                                 |
+| `deploy/scaler-linux-sm80plus.service`  | systemd unit for Linux SM80Plus scaler                            |
+| `deploy/scaler-linux-build.service`     | systemd unit for Linux build scaler (no GPU)                      |
+| `deploy/scaler-linux-analytics.service` | systemd unit for Linux analytics scaler (no GPU, tiny VM)         |
+| `deploy/scaler.env.example`             | Template for GitHub credentials                                   |
 
 ## How It Works
 

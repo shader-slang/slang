@@ -28,13 +28,14 @@ You operate **autonomously and proactively**. Read CLAUDE.md first. When changes
 ## What to SKIP
 
 - Documentation style preferences
-- Suggesting new docs that don't exist yet (only flag *inaccurate* existing docs)
+- Suggesting new docs that don't exist yet (only flag _inaccurate_ existing docs)
 - Test files, build system files
 - Pre-existing stale docs not touched by this PR
 
 ## Output Format
 
 For each finding (confidence ≥80), provide:
+
 - **Severity**: Bug / Gap / Question
 - **File and line**: exact path and line number
 - **Title**: short one-line description

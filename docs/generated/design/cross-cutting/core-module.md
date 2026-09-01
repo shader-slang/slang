@@ -67,12 +67,12 @@ where no case matches — that body is emitted as a generated helper
 function. `mul` is the sharpest case; for `mul(m, v)` on a `float4x4`
 and a `float4`:
 
-| Target | Emitted form |
-| --- | --- |
-| HLSL | `mul(m, v)` |
-| GLSL, Metal, WGSL | `(v * m)` — the `*` operator, not a call |
-| SPIR-V | `OpVectorTimesMatrix` |
-| CUDA, C++ | a generated `mul_<n>` helper from the `default` body |
+| Target            | Emitted form                                         |
+| ----------------- | ---------------------------------------------------- |
+| HLSL              | `mul(m, v)`                                          |
+| GLSL, Metal, WGSL | `(v * m)` — the `*` operator, not a call             |
+| SPIR-V            | `OpVectorTimesMatrix`                                |
+| CUDA, C++         | a generated `mul_<n>` helper from the `default` body |
 
 `dot` and `length` keep their names on HLSL, GLSL, Metal and WGSL, and
 become `OpDot` and the `GLSL.std.450` `Length` extended instruction on
@@ -185,9 +185,9 @@ own `CMakeLists.txt`, is pulled in by an `add_subdirectory` call in
 [standard-modules/CMakeLists.txt](../../../../source/standard-modules/CMakeLists.txt),
 and produces one `.slang-module` artifact. Two exist today:
 
-| Directory | Entry point | Module file name variable | Import path |
-| --- | --- | --- | --- |
-| [neural/](../../../../source/standard-modules/neural) | `neural.slang` | `SLANG_NEURAL_MODULE_FILE_NAME` (`neural.slang-module`) | `import slang.neural` |
+| Directory                                                         | Entry point       | Module file name variable                                     | Import path                     |
+| ----------------------------------------------------------------- | ----------------- | ------------------------------------------------------------- | ------------------------------- |
+| [neural/](../../../../source/standard-modules/neural)             | `neural.slang`    | `SLANG_NEURAL_MODULE_FILE_NAME` (`neural.slang-module`)       | `import slang.neural`           |
 | [experimental/](../../../../source/standard-modules/experimental) | `workgraph.slang` | `SLANG_WORKGRAPH_MODULE_FILE_NAME` (`workgraph.slang-module`) | `import experimental.workgraph` |
 
 - The **neural** module declares `[ExperimentalModule] module neural;`
@@ -300,17 +300,17 @@ header defines, `SLANG_PRELUDE_EXPORT`. `-target cuda` is the same
 shape with
 [slang-cuda-prelude.h](../../../../prelude/slang-cuda-prelude.h).
 
-| Prelude | Target |
-| --- | --- |
-| [slang-cpp-prelude.h](../../../../prelude/slang-cpp-prelude.h) | C++ shader output |
-| [slang-cpp-types-core.h](../../../../prelude/slang-cpp-types-core.h) | C++ shared core types |
-| [slang-cpp-types.h](../../../../prelude/slang-cpp-types.h) | C++ extended types |
+| Prelude                                                                            | Target                               |
+| ---------------------------------------------------------------------------------- | ------------------------------------ |
+| [slang-cpp-prelude.h](../../../../prelude/slang-cpp-prelude.h)                     | C++ shader output                    |
+| [slang-cpp-types-core.h](../../../../prelude/slang-cpp-types-core.h)               | C++ shared core types                |
+| [slang-cpp-types.h](../../../../prelude/slang-cpp-types.h)                         | C++ extended types                   |
 | [slang-cpp-scalar-intrinsics.h](../../../../prelude/slang-cpp-scalar-intrinsics.h) | C++ scalar intrinsic implementations |
-| [slang-cpp-host-prelude.h](../../../../prelude/slang-cpp-host-prelude.h) | Host-side C++ runtime |
-| [slang-cuda-prelude.h](../../../../prelude/slang-cuda-prelude.h) | CUDA |
-| [slang-hlsl-prelude.h](../../../../prelude/slang-hlsl-prelude.h) | HLSL |
-| [slang-llvm.h](../../../../prelude/slang-llvm.h) | `slang-llvm` integration |
-| [slang-torch-prelude.h](../../../../prelude/slang-torch-prelude.h) | PyTorch glue |
+| [slang-cpp-host-prelude.h](../../../../prelude/slang-cpp-host-prelude.h)           | Host-side C++ runtime                |
+| [slang-cuda-prelude.h](../../../../prelude/slang-cuda-prelude.h)                   | CUDA                                 |
+| [slang-hlsl-prelude.h](../../../../prelude/slang-hlsl-prelude.h)                   | HLSL                                 |
+| [slang-llvm.h](../../../../prelude/slang-llvm.h)                                   | `slang-llvm` integration             |
+| [slang-torch-prelude.h](../../../../prelude/slang-torch-prelude.h)                 | PyTorch glue                         |
 
 GLSL, Metal, WGSL, and SPIR-V do not use a `prelude/` header in the
 same way; their built-in vocabularies are emitted directly from the
@@ -357,7 +357,7 @@ produces three build products with one `-compile-core-module` run:
 These outputs are wired through the custom targets
 `generate_core_module`, `generate_glsl_module_header`, and the umbrella
 `generate_core_module_headers`. Downstream targets depend on the
-custom *targets* rather than on the generated files directly: with the
+custom _targets_ rather than on the generated files directly: with the
 Visual Studio generator a file-level dependency on a byproduct copies
 the producer command into each dependent project, which would run the
 core generation more than once.

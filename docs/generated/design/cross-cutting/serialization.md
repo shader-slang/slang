@@ -110,7 +110,7 @@ A backend is described by the `ISerializerImpl` interface declared in
 interface lists the `handleBool` / `handleInt32` / `handleString` /
 structural-scope operations a backend must provide, but its own comment
 is explicit that it is a specification rather than a required base
-class: implementations "do *not* need to inherit from this type; it
+class: implementations "do _not_ need to inherit from this type; it
 currently serves only to define the requirements". Callers pair a
 concrete backend with a context type through the `Serializer<Backend,
 Context>` template, so the common case dispatches statically.
@@ -214,7 +214,7 @@ The RIFF wrapping is what allows tools to inspect partial structure
 of a `.slang-module` file (chunk types, sizes) without parsing the
 inner serialized content — useful for sanity checks and recovery.
 
-A separate *RIFF serializer backend* — an `ISerializerImpl` that wrote
+A separate _RIFF serializer backend_ — an `ISerializerImpl` that wrote
 each value as its own chunk, in files named `slang-serialize-riff.h` /
 `slang-serialize-riff.cpp` — used to sit alongside the Fossil backend.
 It was deleted (commit `52cb4e12e`) because its only remaining callers
@@ -249,18 +249,18 @@ Preorder traversal numbers the module instruction 0 and its children
 after it — literals are moved to the end of the module's child list by
 `kReorderInstructionsForSerialization` — giving:
 
-| index | `instAllocInfo`            | `childCounts` | `operandIndices` slice |
-| ----- | -------------------------- | ------------- | ---------------------- |
-| 0     | `ModuleInst`, 0 operands   | 2             | `-1`                   |
-| 1     | `IntType`, 0 operands      | 0             | `-1`                   |
-| 2     | `IntLit`, 0 operands       | 0             | `1`                    |
+| index | `instAllocInfo`          | `childCounts` | `operandIndices` slice |
+| ----- | ------------------------ | ------------- | ---------------------- |
+| 0     | `ModuleInst`, 0 operands | 2             | `-1`                   |
+| 1     | `IntType`, 0 operands    | 0             | `-1`                   |
+| 2     | `IntLit`, 0 operands     | 0             | `1`                    |
 
 `operandIndices` is the concatenation of those slices, `[-1, -1, 1]`.
 Every instruction contributes its type-use slot whether or not it has a
 type, followed by its operands; nothing marks where one instruction's
 run ends, so the reader recovers that from
 `instAllocInfo[i].operandCount`. The two `-1` entries here are not
-missing operands but missing *types* — of the module instruction and of
+missing operands but missing _types_ — of the module instruction and of
 `IntType` itself — since `instMap` maps `nullptr` to `-1` once and the
 same encoding then covers a null type and a null operand. The
 constant's value is not in this table at all: `42` is the single entry
@@ -318,7 +318,7 @@ adds a plain `LineInfo` (physical line index plus its start offset)
 when the view has no entry covering the location, and an
 `AdjustedLineInfo` — that same physical `LineInfo`, plus the remapped
 line index and the overridden path — when it does. Neither list is a
-substitute for the other on load. The reader takes the *physical*
+substitute for the other on load. The reader takes the _physical_
 `LineInfo` out of both lists to rebuild the line-break array, and then
 turns each `AdjustedLineInfo` back into a `SourceView::Entry` whose
 `m_lineAdjust` is the remapped index minus the physical one. That is
@@ -364,8 +364,8 @@ described in
 [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md).
 
 Two different version numbers are in play, and only one of them can
-fail a load. `IRModuleInfo::serializationVersion` versions the *fossil
-schema* of the payload; it is the value `readSerializedModuleIR_`
+fail a load. `IRModuleInfo::serializationVersion` versions the _fossil
+schema_ of the payload; it is the value `readSerializedModuleIR_`
 compares, and that comparison is the only version check on the read
 path. The module carries a second, unrelated number: `IRModule::m_version`
 is serialized next to the module's name in `handleIRModule` and handed
@@ -375,7 +375,7 @@ encoding, and it is what `-get-module-info` prints as `Module Version`;
 the inclusive window `-get-supported-module-versions` prints
 (`IRModule::k_minSupportedModuleVersion` and
 `k_maxSupportedModuleVersion`, declared in `slang-ir.h`, which is
-outside this page's watched paths) bounds *that* number. The two are
+outside this page's watched paths) bounds _that_ number. The two are
 therefore separate namespaces: a module whose `Module Version` sits
 inside the published window still fails to load if its
 `serializationVersion` is not the single value this reader accepts, and

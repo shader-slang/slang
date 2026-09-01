@@ -36,23 +36,23 @@ Follow the **Target-pipeline index contract** in
    page link and a one-clause description.
 4. `## Shared shape` — short paragraph explaining the four phases
    once (Phase A: link + entry-point prep; Phase B: specialization
-   + type legalization; Phase C: target legalization, lowering,
-   phi elimination; Phase D: emit + downstream tools). Reference
-   the contract section in `_common.md`. Identify the shared
-   orchestrator (`linkAndOptimizeIR`).
+   - type legalization; Phase C: target legalization, lowering,
+     phi elimination; Phase D: emit + downstream tools). Reference
+     the contract section in `_common.md`. Identify the shared
+     orchestrator (`linkAndOptimizeIR`).
 5. `## Cross-target comparison` — a single table with columns
    **Target**, **CodeGenTarget enum values**, **Phase C entry**,
    **Phase D emitter**, **Downstream tools**, **Loops**.
    The names below are a starting point, not a transcript — verify each
    against the fresh child page and the source before publishing it.
 
-   | Target | Enum values | Phase C entry | Phase D emitter | Downstream | Loops |
-   | --- | --- | --- | --- | --- | --- |
-   | SPIR-V | `SPIRV`, `SPIRVAssembly` | none in Phase C — `legalizeIRForSPIRV` is deferred into the emit step, so it belongs to **Phase D** | `emitSPIRVForEntryPointsDirectly` (defined in `slang-emit.cpp`, not `slang-emit-spirv.cpp`; the function in the latter is `emitSPIRVFromIR`) | spirv-link, spirv-val, spirv-opt | `simplifyIRForSpirvLegalization` runs to convergence — its `kMaxIterations`/`kMaxFuncIterations` counters are never incremented, so do **not** describe it as "8 x 16"; plus the forward-declared-pointer fixup |
-   | HLSL | `HLSL` (plus downstream `DXIL`, `DXBytecode`) | (no single entry; per-pass HLSL arms) | `HLSLSourceEmitter` | DXC, fxc | none in `linkAndOptimizeIR` |
-   | Metal | `Metal`, `MetalLib`, `MetalLibAssembly` | `legalizeIRForMetal` | `MetalSourceEmitter` | Apple `metal` compiler (for `MetalLib*`) | none in `linkAndOptimizeIR` |
-   | WGSL | `WGSL`, `WGSLSPIRV`, `WGSLSPIRVAssembly` | `legalizeIRForWGSL` | `WGSLSourceEmitter` | Tint (for `WGSLSPIRV*`) | none in `linkAndOptimizeIR` |
-   | CUDA | `CUDASource`, `CUDAHeader`, `PTX` | (no single entry; per-pass CUDA arms) | `CUDASourceEmitter` | nvrtc (for `PTX`) | none in `linkAndOptimizeIR` |
+   | Target | Enum values                                   | Phase C entry                                                                                       | Phase D emitter                                                                                                                              | Downstream                               | Loops                                                                                                                                                                                                           |
+   | ------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | SPIR-V | `SPIRV`, `SPIRVAssembly`                      | none in Phase C — `legalizeIRForSPIRV` is deferred into the emit step, so it belongs to **Phase D** | `emitSPIRVForEntryPointsDirectly` (defined in `slang-emit.cpp`, not `slang-emit-spirv.cpp`; the function in the latter is `emitSPIRVFromIR`) | spirv-link, spirv-val, spirv-opt         | `simplifyIRForSpirvLegalization` runs to convergence — its `kMaxIterations`/`kMaxFuncIterations` counters are never incremented, so do **not** describe it as "8 x 16"; plus the forward-declared-pointer fixup |
+   | HLSL   | `HLSL` (plus downstream `DXIL`, `DXBytecode`) | (no single entry; per-pass HLSL arms)                                                               | `HLSLSourceEmitter`                                                                                                                          | DXC, fxc                                 | none in `linkAndOptimizeIR`                                                                                                                                                                                     |
+   | Metal  | `Metal`, `MetalLib`, `MetalLibAssembly`       | `legalizeIRForMetal`                                                                                | `MetalSourceEmitter`                                                                                                                         | Apple `metal` compiler (for `MetalLib*`) | none in `linkAndOptimizeIR`                                                                                                                                                                                     |
+   | WGSL   | `WGSL`, `WGSLSPIRV`, `WGSLSPIRVAssembly`      | `legalizeIRForWGSL`                                                                                 | `WGSLSourceEmitter`                                                                                                                          | Tint (for `WGSLSPIRV*`)                  | none in `linkAndOptimizeIR`                                                                                                                                                                                     |
+   | CUDA   | `CUDASource`, `CUDAHeader`, `PTX`             | (no single entry; per-pass CUDA arms)                                                               | `CUDASourceEmitter`                                                                                                                          | nvrtc (for `PTX`)                        | none in `linkAndOptimizeIR`                                                                                                                                                                                     |
 
 6. `## Filtering rules` — a short paragraph reminding the reader
    that each target page filters out switch arms gated on a

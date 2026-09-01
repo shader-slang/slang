@@ -41,7 +41,7 @@ related autodiff helpers.
   [_common.md](_common.md)). Where nothing in `source/` constructs an
   opcode, write **no producer at HEAD**. Never guess an AST node.
 - Cross-link to:
-  - [types.md](types.md) for the differential-pair *types*.
+  - [types.md](types.md) for the differential-pair _types_.
   - [values.md](values.md) for ordinary make/extract patterns
     that this family mirrors.
   - [../../design/autodiff.md](../../design/autodiff.md) for the

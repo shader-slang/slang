@@ -14,7 +14,7 @@ multiple candidates to a single best candidate (or to a structured
 ambiguity error). It covers the candidate filter pipeline, the
 conversion-cost ranking, partial generic application, operator
 overloading, and how failures are reported. It also covers the one
-large *bypass* of that machinery: builtin operators on the numeric
+large _bypass_ of that machinery: builtin operators on the numeric
 scalar, vector, and matrix operand shapes that
 `convertToBuiltinArithmeticOp` accepts are rewritten during checking and
 never enter overload resolution at all. Operand shapes the fast path
@@ -73,7 +73,7 @@ rather than in `slang-check-overload.cpp`: the builtin-operator fast path
     `FixityChecked`, `TypeChecked`, `DirectionChecked`,
     `VisibilityChecked`, `Applicable` (lines 395-405).
   - `Flags flags` — bitset; today only `IsPartiallyAppliedGeneric =
-    1 << 0` (lines 408-413).
+1 << 0` (lines 408-413).
   - `LookupResultItem item` — the underlying `DeclRef` + breadcrumb
     chain returned from lookup (line 416).
   - `Expr* exprVal` — for `Flavor::Expr` candidates (e.g. a function
@@ -108,7 +108,7 @@ rather than in `slang-check-overload.cpp`: the builtin-operator fast path
 - `GenericArgumentInferenceFailure`
   ([slang-check-impl.h line
   216](../../../../source/slang/slang-check-impl.h)) — a tagged union
-  recording *why* generic-argument inference failed for one
+  recording _why_ generic-argument inference failed for one
   candidate, so the diagnostic can be specific instead of a blanket
   "could not specialize". `Kind` is one of `None`,
   `VariadicPackCountMismatch`, `GenericArityMismatch`,
@@ -147,7 +147,7 @@ rather than in `slang-check-overload.cpp`: the builtin-operator fast path
 - `ConversionCost`
   ([slang-ast-support-types.h line
   90](../../../../source/slang/slang-ast-support-types.h)) — `unsigned
-  int`. Specific levels are defined as `kConversionCost_*`
+int`. Specific levels are defined as `kConversionCost_*`
   enumerators (lines 94-192), summing across arguments. Threshold
   `kConversionCost_GeneralConversion` (900) is the implicit-
   conversion ceiling: anything at or above is rejected for implicit
@@ -183,8 +183,8 @@ rather than in `slang-check-overload.cpp`: the builtin-operator fast path
 
 ## Algorithm
 
-The resolver runs in two phases: a *probe* phase that scores every
-candidate in `JustTrying` mode, and a *finalize* phase that re-runs
+The resolver runs in two phases: a _probe_ phase that scores every
+candidate in `JustTrying` mode, and a _finalize_ phase that re-runs
 the pipeline on the winning candidate in `ForReal` mode and produces
 the AST node for the call.
 
@@ -261,10 +261,10 @@ The individual steps:
      specialization failure gets `Diagnostics::CannotSpecializeGeneric`
      ([slang-check-overload.cpp lines
      406-426](../../../../source/slang/slang-check-overload.cpp)).
-     Only a *too short* list actually reaches that arity diagnostic:
+     Only a _too short_ list actually reaches that arity diagnostic:
      step 1 forces `paramCounts.required` to 0 for a `Flavor::Generic`
      candidate but leaves `allowed` at the declared parameter count
-     (line 166), so a list with too *many* arguments has already been
+     (line 166), so a list with too _many_ arguments has already been
      rejected there with `Diagnostics::TooManyArguments` (line 199) —
      `g<int, float, int>` on `int g<T, U>(T, U)` reports "too many
      arguments to call (got 3, expected 2)", not the generic-argument
@@ -276,7 +276,7 @@ The individual steps:
      These are distinct from the `UnspecializedGeneric` failure
      diagnostics selected later by the reporting path.
    - For every argument, the step calls `canCoerce(paramType,
-     argType, arg.argExpr, &cost)`
+argType, arg.argExpr, &cost)`
      ([slang-check-overload.cpp line
      907](../../../../source/slang/slang-check-overload.cpp)) and
      accumulates the reported `cost` into
@@ -312,7 +312,7 @@ The individual steps:
    explicit generic application `G<A, B>`, this step validates the
    `where`-clauses on `G`'s parameters against the inferred
    substitutions and fills in any generic arguments left to defaults.
-   For an *outermost* generic (no enclosing `GenericDecl` parent), it
+   For an _outermost_ generic (no enclosing `GenericDecl` parent), it
    resolves defaults and witness arguments through the generic
    constraint solver `trySolveGenericArguments`
    ([slang-check-impl.h line
@@ -326,7 +326,7 @@ The individual steps:
    `CallerProvidedOrdinaryArg` so a user-written self-reference
    argument is not overridden by a parameter's default; the solver
    then fills the remaining defaults. The solved substitution replaces
-   `candidate.subst`. The solver's `solveCost` is deliberately *not*
+   `candidate.subst`. The solver's `solveCost` is deliberately _not_
    folded into `conversionCostSum` (doing so would shift overload
    ranking and break ties that should stay ambiguous). On solver
    failure the step falls through to the legacy per-constraint loop —
@@ -358,14 +358,14 @@ The individual steps:
    the pairing between `new` and `class`: a `NewExpr` whose candidate
    does not construct a `ClassDecl` type gets
    `Diagnostics::NewCanOnlyBeUsedToInitializeAClass`, and a plain
-   constructor call that *does* construct a class gets
+   constructor call that _does_ construct a class gets
    `Diagnostics::ClassCanOnlyBeInitializedWithNew`. See
    "Finalize phase" below for the full sequencing.
 
 A candidate that survives every probe-phase step is tagged
 `Status::Applicable` with its total `conversionCostSum` populated,
 ready for ranking. `TryCheckOverloadCandidateClassNewMatchUp` is
-*not* part of probe-phase filtering; it gates only the
+_not_ part of probe-phase filtering; it gates only the
 finalize-phase AST construction.
 
 `AddOverloadCandidateInner`
@@ -390,7 +390,7 @@ whatever is currently held using `CompareOverloadCandidates`:
   converts a unique `bestCandidate` into a two-element
   `bestCandidates` list when it ties (lines 2505-2522).
 
-Note that this runs for *every* candidate, applicable or not: a
+Note that this runs for _every_ candidate, applicable or not: a
 non-applicable candidate is still kept when nothing better exists,
 which is what lets the failure paths in
 [Edge cases](#edge-cases-and-failure-modes) report the least-bad
@@ -458,7 +458,7 @@ The `ForReal` re-check is what produces user-visible diagnostics for
 the chosen candidate. If even the best candidate fails because its
 `Status` is `GenericArgumentInferenceFailed`, the switch at the top of
 `CompleteOverloadCandidate` (lines 1510-1610) turns the recorded
-`candidate.genericInferenceFailure` into a *focused* diagnostic —
+`candidate.genericInferenceFailure` into a _focused_ diagnostic —
 see [Edge cases](#edge-cases-and-failure-modes) for the per-`Kind`
 mapping — and only a `Kind::None` (nothing recorded) falls through to
 the blanket `Diagnostics::GenericArgumentInferenceFailed`
@@ -504,16 +504,16 @@ int`. Overload candidate probing computes each per-argument cost via
 `canCoerce` ([slang-check-conversion.cpp line
 3092](../../../../source/slang/slang-check-conversion.cpp)) and
 accumulates the reported cost into the candidate's ranking sum (see the
-type-check step above). An *ambiguous* conversion — several
+type-check step above). An _ambiguous_ conversion — several
 user-declared initializers on the target type tie for cheapest — is
-deliberately reported as *possible* while probing, so that an overload
+deliberately reported as _possible_ while probing, so that an overload
 requiring it can still be ranked; it only fails when the checker asks
 for the coerced expression, at which point
 `Diagnostics::AmbiguousConversion` plus one `SeeDeclarationOf` note per
 tied initializer is emitted ([slang-check-conversion.cpp lines
 2677-2699](../../../../source/slang/slang-check-conversion.cpp)).
 
-Two initializers with *different* parameter types can only tie at an
+Two initializers with _different_ parameter types can only tie at an
 explicit coercion site. `_coerce` sets `disallowNestedConversions` for
 every site other than `CoercionSite::ExplicitCoercion`
 ([slang-check-conversion.cpp line
@@ -541,48 +541,48 @@ writing `T t = x;` instead is an implicit site, where neither
 initializer matches `float` exactly and the failure is an ordinary
 type mismatch. The full enum, in source-declaration order:
 
-| Constant | Numeric | Meaning |
-| --- | --- | --- |
-| `kConversionCost_None` | 0 | identity |
-| `kConversionCost_GenericParamUpcast` | 1 | up-cast through a generic parameter |
-| `kConversionCost_LambdaToFunc` | 1 | lambda used where a `Func` value is expected |
-| `kConversionCost_UnconstraintGenericParam` | 20 | binding to an unconstrained generic parameter |
-| `kConversionCost_SizedArrayToUnsizedArray` | 30 | sized -> unsized array |
-| `kConversionCost_MatrixLayout` | 5 | matrix layout adapter |
-| `kConversionCost_GetRef` | 5 | extracting a reference from a buffer-like type |
-| `kConversionCost_ImplicitDereference` | 10 | dereferencing a pointer-like value |
-| `kConversionCost_InRangeIntLitConversion` | 23 | int literal fits in target integer type |
-| `kConversionCost_InRangeIntLitSignedToUnsignedConversion` | 32 | signed lit -> unsigned target |
-| `kConversionCost_InRangeIntLitUnsignedToSignedConversion` | 81 | unsigned lit -> signed target |
-| `kConversionCost_MutablePtrToConstPtr` | 20 | mutable ptr -> const ptr |
-| `kConversionCost_CastToInterface` | 50 | concrete type -> conforming interface |
-| `kConversionCost_BoolToInt` | 120 | `bool` -> int (deliberately cheaper to break ties) |
-| `kConversionCost_RankPromotion` | 150 | lossless promotion to a higher rank within the same conversion kind |
-| `kConversionCost_NoneToOptional` | 150 | none -> Optional |
-| `kConversionCost_ValToOptional` | 150 | T -> Optional |
-| `kConversionCost_NullPtrToPtr` | 150 | nullptr -> ptr |
-| `kConversionCost_PtrToVoidPtr` | 150 | T* -> void* |
-| `kConversionCost_FailedOptionalConstraint` | 150 | optional constraint did not match |
-| `kConversionCost_UnsignedToSignedPromotion` | 200 | promoting unsigned to wider signed |
-| `kConversionCost_SameSizeUnsignedToSignedConversion` | 300 | same-size unsigned -> signed |
-| `kConversionCost_SignedToUnsignedConversion` | 250 | signed -> unsigned of same/greater size |
-| `kConversionCost_IntegerToFloatConversion` | 400 | int -> float |
-| `kConversionCost_PtrToBool` | 400 | pointer -> bool |
-| `kConversionCost_IntegerTruncate` | 450 | int -> narrower int |
-| `kConversionCost_IntegerToHalfConversion` | 500 | int -> half |
-| `kConversionCost_ParameterPack` | 500 | binding to a parameter pack |
-| `kConversionCost_Default` | 500 | user-defined conversion default |
-| `kConversionCost_GeneralConversion` | 900 | implicit ceiling (anything `>=` rejected by `canConvertImplicitly`) |
-| `kConversionCost_Explicit` | 90000 | explicit cast only; never accepted implicitly |
-| `kConversionCost_OneVectorToScalar` | 1 | additive when downcasting a 1-vector to a scalar |
-| `kConversionCost_ScalarToVector` | 2 | additive when promoting a scalar to a vector |
-| `kConversionCost_ScalarToMatrix` | 10 | additive when promoting a scalar to a matrix |
-| `kConversionCost_ScalarIntegerToFloatMatrix` | 410 | `kConversionCost_IntegerToFloatConversion + kConversionCost_ScalarToMatrix`. |
-| `kConversionCost_ScalarToCoopVector` | 1 | additive when promoting a scalar to a cooperative vector |
-| `kConversionCost_LValueCast` | 800 | additive when casting an l-value |
-| `kConversionCost_TypeCoercionConstraint` | 1000 | cost contributed by a type-coercion constraint |
-| `kConversionCost_TypeCoercionConstraintPlusScalarToVector` | 1002 | `kConversionCost_TypeCoercionConstraint + kConversionCost_ScalarToVector`. |
-| `kConversionCost_Impossible` | `0xFFFFFFFF` | "no conversion exists"; never summed because the candidate is rejected before reaching ranking |
+| Constant                                                   | Numeric      | Meaning                                                                                        |
+| ---------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
+| `kConversionCost_None`                                     | 0            | identity                                                                                       |
+| `kConversionCost_GenericParamUpcast`                       | 1            | up-cast through a generic parameter                                                            |
+| `kConversionCost_LambdaToFunc`                             | 1            | lambda used where a `Func` value is expected                                                   |
+| `kConversionCost_UnconstraintGenericParam`                 | 20           | binding to an unconstrained generic parameter                                                  |
+| `kConversionCost_SizedArrayToUnsizedArray`                 | 30           | sized -> unsized array                                                                         |
+| `kConversionCost_MatrixLayout`                             | 5            | matrix layout adapter                                                                          |
+| `kConversionCost_GetRef`                                   | 5            | extracting a reference from a buffer-like type                                                 |
+| `kConversionCost_ImplicitDereference`                      | 10           | dereferencing a pointer-like value                                                             |
+| `kConversionCost_InRangeIntLitConversion`                  | 23           | int literal fits in target integer type                                                        |
+| `kConversionCost_InRangeIntLitSignedToUnsignedConversion`  | 32           | signed lit -> unsigned target                                                                  |
+| `kConversionCost_InRangeIntLitUnsignedToSignedConversion`  | 81           | unsigned lit -> signed target                                                                  |
+| `kConversionCost_MutablePtrToConstPtr`                     | 20           | mutable ptr -> const ptr                                                                       |
+| `kConversionCost_CastToInterface`                          | 50           | concrete type -> conforming interface                                                          |
+| `kConversionCost_BoolToInt`                                | 120          | `bool` -> int (deliberately cheaper to break ties)                                             |
+| `kConversionCost_RankPromotion`                            | 150          | lossless promotion to a higher rank within the same conversion kind                            |
+| `kConversionCost_NoneToOptional`                           | 150          | none -> Optional                                                                               |
+| `kConversionCost_ValToOptional`                            | 150          | T -> Optional                                                                                  |
+| `kConversionCost_NullPtrToPtr`                             | 150          | nullptr -> ptr                                                                                 |
+| `kConversionCost_PtrToVoidPtr`                             | 150          | T* -> void*                                                                                    |
+| `kConversionCost_FailedOptionalConstraint`                 | 150          | optional constraint did not match                                                              |
+| `kConversionCost_UnsignedToSignedPromotion`                | 200          | promoting unsigned to wider signed                                                             |
+| `kConversionCost_SameSizeUnsignedToSignedConversion`       | 300          | same-size unsigned -> signed                                                                   |
+| `kConversionCost_SignedToUnsignedConversion`               | 250          | signed -> unsigned of same/greater size                                                        |
+| `kConversionCost_IntegerToFloatConversion`                 | 400          | int -> float                                                                                   |
+| `kConversionCost_PtrToBool`                                | 400          | pointer -> bool                                                                                |
+| `kConversionCost_IntegerTruncate`                          | 450          | int -> narrower int                                                                            |
+| `kConversionCost_IntegerToHalfConversion`                  | 500          | int -> half                                                                                    |
+| `kConversionCost_ParameterPack`                            | 500          | binding to a parameter pack                                                                    |
+| `kConversionCost_Default`                                  | 500          | user-defined conversion default                                                                |
+| `kConversionCost_GeneralConversion`                        | 900          | implicit ceiling (anything `>=` rejected by `canConvertImplicitly`)                            |
+| `kConversionCost_Explicit`                                 | 90000        | explicit cast only; never accepted implicitly                                                  |
+| `kConversionCost_OneVectorToScalar`                        | 1            | additive when downcasting a 1-vector to a scalar                                               |
+| `kConversionCost_ScalarToVector`                           | 2            | additive when promoting a scalar to a vector                                                   |
+| `kConversionCost_ScalarToMatrix`                           | 10           | additive when promoting a scalar to a matrix                                                   |
+| `kConversionCost_ScalarIntegerToFloatMatrix`               | 410          | `kConversionCost_IntegerToFloatConversion + kConversionCost_ScalarToMatrix`.                   |
+| `kConversionCost_ScalarToCoopVector`                       | 1            | additive when promoting a scalar to a cooperative vector                                       |
+| `kConversionCost_LValueCast`                               | 800          | additive when casting an l-value                                                               |
+| `kConversionCost_TypeCoercionConstraint`                   | 1000         | cost contributed by a type-coercion constraint                                                 |
+| `kConversionCost_TypeCoercionConstraintPlusScalarToVector` | 1002         | `kConversionCost_TypeCoercionConstraint + kConversionCost_ScalarToVector`.                     |
+| `kConversionCost_Impossible`                               | `0xFFFFFFFF` | "no conversion exists"; never summed because the candidate is rejected before reaching ranking |
 
 `canConvertImplicitly`
 ([slang-check-conversion.cpp line
@@ -618,15 +618,15 @@ candidate wins:
   `ConstantBuffer<Foo>` still beats one on `Foo`. A `TODO` at lines
   2364-2373 records the consequence: because this branch funnels all
   parameter-group coercion into the dereference path, a user-declared
-  initializer that *takes* a parameter-group type (the
+  initializer that _takes_ a parameter-group type (the
   `DescriptorHandle` case) is never considered by the conversion
   search — such a conversion has to be reached some other way.
 - **Deliberately rejected initializer forms.** The cost model can pick
-  a *surprising* winner when a cheap scalar-to-vector promotion makes an
+  a _surprising_ winner when a cheap scalar-to-vector promotion makes an
   unintended overload viable: `float4(f2, f)` used to resolve by
   promoting the scalar `f` to a `float2` (cost
   `kConversionCost_ScalarToVector`), silently duplicating it. The fix
-  is not a cost change but an explicit *declaration*: `vector<T,4>` in
+  is not a cost change but an explicit _declaration_: `vector<T,4>` in
   `core.meta.slang` now declares the `(vector<T,2>, T)` and
   `(T, vector<T,2>)` forms outright, so overload resolution binds to
   them instead of promoting, and marks them `[deprecated]` (Slang
@@ -634,7 +634,7 @@ candidate wins:
   declared at `source_commit` ([core.meta.slang lines
   2806-2826](../../../../source/slang/core.meta.slang)), so under the
   default language version — which is earlier than 2026 — `float4(f2,
-  f)` written today still resolves to one of them, gets the legacy
+f)` written today still resolves to one of them, gets the legacy
   duplicate-the-scalar semantics, and reports the `[deprecated]`
   warning. Compiling the module with language version 2026 or later
   turns the same call into an error instead, because `[RemovedSince]`
@@ -659,7 +659,7 @@ The last resort inside `_coerce` is to run a nested overload
 resolution over the target type's initializers via
 `AddTypeOverloadCandidates` ([slang-check-conversion.cpp line
 2634](../../../../source/slang/slang-check-conversion.cpp)). Because
-overload ranking coerces each argument against *every* candidate's
+overload ranking coerces each argument against _every_ candidate's
 parameter type, ranking an operator on a constrained generic `T`
 against the many concrete builtin `operator OP(float, float)`-style
 overloads would drive one full recursive search per rejected
@@ -709,7 +709,7 @@ candidates are `Status::Applicable`:
    interface when both candidates are interface requirements. It returns "equal" outright when either
    candidate is a generic callable. This is the step that
    collapses the multiple `LookupResult` items that
-   [lookup.md](lookup.md) deliberately does *not* deduplicate; see
+   [lookup.md](lookup.md) deliberately does _not_ deduplicate; see
    [Relationship to lookup](#relationship-to-lookup) below.
 4. **Implicit conversion preference.** If exactly one candidate is
    marked `ImplicitConversionModifier`, that one wins (lines
@@ -725,13 +725,13 @@ candidates are `Status::Applicable`:
    decl-ref is the inner declaration of a generic, in which case it is
    that generic's required parameter count (line 1839), so a
    non-generic candidate beats a specialized generic one. Variadicness
-   and default-parameter counts are *not* consulted; the long comment
+   and default-parameter counts are _not_ consulted; the long comment
    above the function describes a more general "A applicable implies B
    applicable" rule that is not implemented, and states the
-   simplification backwards (it says *more* generic parameters win).
+   simplification backwards (it says _more_ generic parameters win).
 6. **`getExportRank`** (line 2231, called at line 2390) — the source
    comment says an `export` decl is preferred to an `extern` one, but
-   as implemented the helper only fires when the *left* candidate
+   as implemented the helper only fires when the _left_ candidate
    carries `ExternModifier` and the right carries
    `HLSLExportModifier`, and then returns `-1`, which this comparator
    reads as "prefer the left candidate" — the `extern` one. Every
@@ -754,8 +754,7 @@ candidates are `Status::Applicable`:
    2222-2228](../../../../source/slang/slang-check-overload.cpp)); a
    declaration without it ranks 0, and the higher rank wins. The
    attribute is declared `@internal` in
-   [core.meta.slang](../../../../source/slang/core.meta.slang) (line
-   4783) as a stop-gap for breaking ambiguity between core-module
+   [core.meta.slang](../../../../source/slang/core.meta.slang) (line 4783) as a stop-gap for breaking ambiguity between core-module
    overloads, and `core.meta.slang` / `hlsl.meta.slang` are its only
    users in the tree.
 
@@ -766,7 +765,7 @@ diagnostic.
 ### Relationship to lookup
 
 The two systems divide the work of collapsing duplicates as follows.
-Lookup deduplicates the *facet list* by origin when a type's
+Lookup deduplicates the _facet list_ by origin when a type's
 inheritance graph is built, so a base reached through several
 inheritance paths contributes only one facet (see
 [lookup.md#deduplication](lookup.md#deduplication)). It does **not**
@@ -789,7 +788,7 @@ not all of a generic's parameters,
 `TryCheckGenericOverloadCandidateTypes`
 ([slang-check-overload.cpp lines
 299+](../../../../source/slang/slang-check-overload.cpp)) may produce a
-candidate that is *partially specialized*. In that case the helpers
+candidate that is _partially specialized_. In that case the helpers
 set `candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric`
 at four sites in [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)
 (lines 457, 534, 622, 709), and `CompleteOverloadCandidate`
@@ -804,7 +803,7 @@ supplies the information constraint checking still needs.
 A `PartiallyAppliedGenericExpr` carries `baseGenericDeclRef` (the
 generic being applied) plus `providedOrdinaryArgs`, the already-
 provided ordinary-argument prefix; witness arguments are
-deliberately *not* stored on the node and are formed later, after the
+deliberately _not_ stored on the node and are formed later, after the
 remaining ordinary arguments are inferred
 ([slang-ast-expr.h lines
 996-1001](../../../../source/slang/slang-ast-expr.h)). The one path
@@ -836,7 +835,7 @@ bitwise, shift, or unary ops on numeric scalars, vectors, and matrices,
 and routing each one through full `operator OP` overload resolution
 (candidate collection, inference, coercion) is a large front-end cost.
 `SemanticsExprVisitor::visitInvokeExpr` therefore tries two rewrites
-*before* collecting any candidates: `convertToLogicOperatorExpr` for
+_before_ collecting any candidates: `convertToLogicOperatorExpr` for
 the short-circuiting `&&` / `||`, then `convertToBuiltinArithmeticOp`.
 When the latter succeeds, the expression is replaced by a fully checked
 `BuiltinOperatorExpr` and overload resolution never runs for it.
@@ -862,7 +861,7 @@ and unary `- ! ~` on builtin integer / floating-point / bool scalars,
 vectors, and matrices. `BuiltinOperationKind` also has `Conditional`,
 `And`, and `Or` members, but those are never produced by the fast path
 (`?:` is not infix and `&&` / `||` short-circuit); they exist so a
-*resolved* call on them can still fold to a compile-time constant, for
+_resolved_ call on them can still fold to a compile-time constant, for
 example `cond ? N : M` in an array size
 ([slang-ast-support-types.h lines
 1930-1940](../../../../source/slang/slang-ast-support-types.h)).
@@ -874,7 +873,7 @@ Operands of different builtin types are reconciled first.
 resolution would have converged on (the usual arithmetic conversions:
 float beats int; among ints the larger size wins, and on a size tie the
 unsigned type wins), and `coerceOperandsOfBuiltinBinaryExpr` coerces
-each operand to *its own shape* with that common element base — so a
+each operand to _its own shape_ with that common element base — so a
 `vector * scalar` stays a two-shape operation the backend can lower to
 a vector-times-scalar instruction rather than being broadened to
 vector-times-vector
@@ -900,7 +899,7 @@ general path below — for:
   `glsl` module is in scope, since its `operator*` overloads make
   `mat * mat` an algebraic matrix product.
 
-Two operand shapes are *diagnosed* by the fast path rather than handed
+Two operand shapes are _diagnosed_ by the fast path rather than handed
 back: a bitwise or shift operator with a builtin floating-point operand,
 and unary `~` on a builtin floating-point operand, both emit
 `Diagnostics::BitwiseOperatorRequiresIntegerOperands`
@@ -916,7 +915,7 @@ The fast path and its helpers are declared in
 (`convertToBuiltinArithmeticOp` at line 4670, the `visitInvokeExpr`
 call site at line 5072).
 
-There is no operator-resolution *cache*. Earlier revisions memoized
+There is no operator-resolution _cache_. Earlier revisions memoized
 operator overload resolution in
 `TypeCheckingCache::resolvedOperatorOverloadCache`, keyed on the
 operand types; that cache has been removed, and at `source_commit`
@@ -943,7 +942,7 @@ it as documentation of current behavior.
 
 Operators that the fast path declines reach overload resolution through
 the same `OverloadResolveContext` machinery as named calls. The
-candidate set is collected via *ordinary* lookup of the operator-keyed
+candidate set is collected via _ordinary_ lookup of the operator-keyed
 `Name` in the call site's scope chain — `visitInvokeExpr` hands the
 operator's `functionExpr` to `CheckTerm` exactly like any other callee
 ([slang-check-expr.cpp line
@@ -958,7 +957,7 @@ not match the call form, emitting
 ([slang-check-overload.cpp lines
 241 and 254](../../../../source/slang/slang-check-overload.cpp)).
 
-The operand types therefore play no part in *finding* the candidates:
+The operand types therefore play no part in _finding_ the candidates:
 there is no member lookup on the left operand's type and no
 argument-dependent lookup. A user-declared infix, prefix, or postfix
 operator has to be a free function that is in scope at the call site —
@@ -968,11 +967,11 @@ site outside the type can see, and `v1 + v2` there reports no
 applicable overload. A non-static member form could not match anyway:
 the implicit `this` is not one of the call's arguments, so
 `TryCheckOverloadCandidateArity` weighs the two operands against a
-*declared* parameter list of one
+_declared_ parameter list of one
 ([slang-check-overload.cpp lines
 145-183](../../../../source/slang/slang-check-overload.cpp)).
 
-The operators that *are* resolved by member lookup keep the implicit
+The operators that _are_ resolved by member lookup keep the implicit
 `this`. `visitInvokeExpr` looks `operator()` up on the callee's type
 when the callee is a value of `DeclRefType`
 ([slang-check-expr.cpp lines
@@ -1038,7 +1037,7 @@ says mutates (lines 1101-1113).
   Three details of this reporting path are load-bearing: candidates
   are sorted by `status` with the declaration's source location as a
   deterministic tie-breaker, so output does not vary across builds;
-  duplicates are removed by *rendered signature string* rather than by
+  duplicates are removed by _rendered signature string_ rather than by
   `Decl*`, because `declRef.getDecl()` strips substitutions and two
   specializations of one generic (`foo<float>` versus `foo<int>`) would
   otherwise collapse into a single note and hide a genuinely different
@@ -1052,21 +1051,22 @@ says mutates (lines 1101-1113).
   ([slang-check-overload.cpp lines
   1510-1625](../../../../source/slang/slang-check-overload.cpp)):
 
-  | `GenericArgumentInferenceFailure::Kind` | Diagnostic |
-  | --- | --- |
-  | `VariadicPackCountMismatch` | `Diagnostics::VariadicPackCountDoesNotMatch` — "expected N elements, but pack argument has M" |
-  | `GenericArityMismatch` | `Diagnostics::GenericSpecializationArityMismatch` — "wrong number of arguments in call to generic function" |
-  | `OrdinaryGenericParamNotInferred` | `Diagnostics::GenericParameterCouldNotBeInferred` — names the parameter that stayed undetermined |
-  | `GenericConstraintNotSatisfied` | `Diagnostics::GenericArgumentDoesNotSatisfyConstraint`, plus a `SeeGenericConstraintDeclaration` note. The fallback for every witness-solver constraint kind *except* interface conformance — equality (`where T == X`), type coercion (`where U(T)`), non-empty pack (`where nonempty(P)`) — because an unsatisfied `T : IFoo` is recorded as `InterfaceConformanceNotSatisfied` instead ([slang-check-impl.h lines 270-283](../../../../source/slang/slang-check-impl.h)) |
-  | `GenericParamUnificationConflict` | `Diagnostics::GenericParameterUnificationConflict` — reports both conflicting deductions |
-  | `InterfaceConformanceNotSatisfied` | `Diagnostics::TypeArgumentDoesNotConformToInterface` |
-  | `None` (nothing recorded) | fallback `Diagnostics::GenericArgumentInferenceFailed` — "could not specialize generic for arguments of type ..." |
+  | `GenericArgumentInferenceFailure::Kind` | Diagnostic                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+  | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `VariadicPackCountMismatch`             | `Diagnostics::VariadicPackCountDoesNotMatch` — "expected N elements, but pack argument has M"                                                                                                                                                                                                                                                                                                                                                                               |
+  | `GenericArityMismatch`                  | `Diagnostics::GenericSpecializationArityMismatch` — "wrong number of arguments in call to generic function"                                                                                                                                                                                                                                                                                                                                                                 |
+  | `OrdinaryGenericParamNotInferred`       | `Diagnostics::GenericParameterCouldNotBeInferred` — names the parameter that stayed undetermined                                                                                                                                                                                                                                                                                                                                                                            |
+  | `GenericConstraintNotSatisfied`         | `Diagnostics::GenericArgumentDoesNotSatisfyConstraint`, plus a `SeeGenericConstraintDeclaration` note. The fallback for every witness-solver constraint kind _except_ interface conformance — equality (`where T == X`), type coercion (`where U(T)`), non-empty pack (`where nonempty(P)`) — because an unsatisfied `T : IFoo` is recorded as `InterfaceConformanceNotSatisfied` instead ([slang-check-impl.h lines 270-283](../../../../source/slang/slang-check-impl.h)) |
+  | `GenericParamUnificationConflict`       | `Diagnostics::GenericParameterUnificationConflict` — reports both conflicting deductions                                                                                                                                                                                                                                                                                                                                                                                    |
+  | `InterfaceConformanceNotSatisfied`      | `Diagnostics::TypeArgumentDoesNotConformToInterface`                                                                                                                                                                                                                                                                                                                                                                                                                        |
+  | `None` (nothing recorded)               | fallback `Diagnostics::GenericArgumentInferenceFailed` — "could not specialize generic for arguments of type ..."                                                                                                                                                                                                                                                                                                                                                           |
 
   Every arm additionally emits a `Diagnostics::GenericSignatureTried`
   note printing the signature via
   `ASTPrinter::getDeclSignatureString`. Formatting happens only on
   this selected-candidate path, so a candidate that is probed and
   discarded never pays for it.
+
 - **A pack argument whose length violates a `countof` constraint.**
   This is the `VariadicPackCountMismatch` row above: the pack-count
   constraint is solved as part of generic-argument inference, so a
@@ -1076,7 +1076,7 @@ says mutates (lines 1101-1113).
   site and formatted later.
 - **A candidate matches but is hidden by visibility.** In
   `JustTrying` it is silently dropped; in `ForReal` it emits
-  `Diagnostics::DeclIsNotVisible`. When *no* candidate applies and
+  `Diagnostics::DeclIsNotVisible`. When _no_ candidate applies and
   some were invisible, the reporting path calls them out explicitly
   with `Diagnostics::InvisibleOverloadCandidate` rather than listing
   them as ordinary candidates
@@ -1084,7 +1084,7 @@ says mutates (lines 1101-1113).
   3676-3680](../../../../source/slang/slang-check-overload.cpp)).
 - **Argument that needs a chain of conversions.** Probing applies no
   per-argument cost ceiling. It calls `canCoerce(paramType, argType,
-  arg.argExpr, &cost)` and adds the reported `cost` directly into the
+arg.argExpr, &cost)` and adds the reported `cost` directly into the
   candidate's `conversionCostSum` for ranking
   ([slang-check-overload.cpp lines
   907-912](../../../../source/slang/slang-check-overload.cpp)); the
@@ -1098,7 +1098,7 @@ says mutates (lines 1101-1113).
   called from `slang-check-overload.cpp`. Stacking two user-defined
   conversions is prevented separately, by `disallowNestedConversions`.
 - **Generic candidate plus non-generic candidate.** Scope-distance and
-  overload-rank tie-breaking are *skipped* when at least one candidate
+  overload-rank tie-breaking are _skipped_ when at least one candidate
   is `Generic` or `UnspecializedGeneric`
   ([slang-check-overload.cpp lines
   2420-2426](../../../../source/slang/slang-check-overload.cpp)). Other
@@ -1135,7 +1135,7 @@ says mutates (lines 1101-1113).
 - [lookup.md](lookup.md) — the lookup that produces the candidate
   set the resolver narrows; see
   [lookup.md#deduplication](lookup.md#deduplication) for the facet-level
-  dedup that happens *before* this page's comparator runs.
+  dedup that happens _before_ this page's comparator runs.
 - [visibility.md](visibility.md) — the visibility filter integrated
   with `TryCheckOverloadCandidateVisibility`.
 - [scopes.md](scopes.md) — the scope chain that determines the

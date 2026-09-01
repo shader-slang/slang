@@ -12,7 +12,7 @@ anchored to
 [`docs/generated/design/ir-reference/metadata.md`](../../../../design/ir-reference/metadata.md).
 
 Audience: nightly CI. The bundle exercises the four IR families whose
-instructions carry metadata *about* other instructions rather than computing a
+instructions carry metadata _about_ other instructions rather than computing a
 value: the `Layout` opcodes, the `Attr` opcodes, the `Debug*` opcodes, and the
 `SPIRVAsmOperand` opcodes.
 
@@ -60,14 +60,14 @@ record it needs while leaving the source-text operand empty.
 ### Boundary pairs for optional operands
 
 The doc names three optional operands. An optional operand is only
-distinguishable from a fixed one by the *pair* of observations, so each gets one
+distinguishable from a fixed one by the _pair_ of observations, so each gets one
 test for the present form and one for the absent form:
 
-| Optional operand | Present form | Absent form |
-| --- | --- | --- |
-| `offset`'s register space | non-zero space | space zero |
-| `TypeAlignment`'s layout unit | non-byte unit | byte default |
-| `DebugVar`'s argument index | entry-point parameter | ordinary local |
+| Optional operand              | Present form          | Absent form    |
+| ----------------------------- | --------------------- | -------------- |
+| `offset`'s register space     | non-zero space        | space zero     |
+| `TypeAlignment`'s layout unit | non-byte unit         | byte default   |
+| `DebugVar`'s argument index   | entry-point parameter | ordinary local |
 
 ### Observable claims (write tests for these)
 
@@ -205,7 +205,7 @@ Grouped by the anchor each `doc_ref` must resolve to.
 
 - **`nonuniform`** — built only as part of a specialization cache key and never
   present in a dumped module. `NonUniformResourceIndex(i)` over a bindless array
-  yields a `nonUniformResourceIndex` *instruction*, not the attribute.
+  yields a `nonUniformResourceIndex` _instruction_, not the attribute.
 - **`FuncThrowType`** — a `throws` function already shows a `Result(T, E)` return
   type in the first available dump section, so the attribute is consumed before
   any observable snapshot.
@@ -273,15 +273,15 @@ Default:
 
 Variants this bundle legitimately needs:
 
-| Need | Directive suffix |
-| --- | --- |
-| Debug records without the source-text echo | `-g1` |
-| Full debug records (`DebugVar`, `DebugValue`, compilation unit) | `-g` |
-| `DebugBuildIdentifier` | `-g -separate-debug-info` |
-| Records created by inlining | `-dump-ir-after performForceInlining` |
-| Matrix layout mode | `-matrix-layout-row-major` / `-matrix-layout-column-major` |
-| Stream-output layout | `-stage geometry` |
-| Semantics on a rasterizer stage | `-stage fragment` |
+| Need                                                            | Directive suffix                                           |
+| --------------------------------------------------------------- | ---------------------------------------------------------- |
+| Debug records without the source-text echo                      | `-g1`                                                      |
+| Full debug records (`DebugVar`, `DebugValue`, compilation unit) | `-g`                                                       |
+| `DebugBuildIdentifier`                                          | `-g -separate-debug-info`                                  |
+| Records created by inlining                                     | `-dump-ir-after performForceInlining`                      |
+| Matrix layout mode                                              | `-matrix-layout-row-major` / `-matrix-layout-column-major` |
+| Stream-output layout                                            | `-stage geometry`                                          |
+| Semantics on a rasterizer stage                                 | `-stage fragment`                                          |
 
 ## Lessons captured for this bundle
 
@@ -295,7 +295,7 @@ Variants this bundle legitimately needs:
   reads `size(3 : Int, -1 : Int)`; that is the encoding, not a negative count.
 - **`matrixTypeLayout` mode is 1 for row-major, 2 for column-major.**
 - **Inline-asm operands print inline.** `SPIRVAsmInst(132 : UInt, Int, result,
-  param, param)` — the operand instructions are not separately numbered, so a
+param, param)` — the operand instructions are not separately numbered, so a
   literal and an enumerator are indistinguishable in dump text.
 - **A named id prints as `%"name"`** inside an asm block.
 - **Reach `Aligned` / `MemoryScope` through the public wrappers**

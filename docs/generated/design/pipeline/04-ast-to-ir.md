@@ -28,7 +28,7 @@ opcode that the lowering step must produce.
   clones their bodies into this module before it is returned, so the
   mandatory optimization passes can see them (see
   [04b-pre-link-passes.md](04b-pre-link-passes.md)). That clone and the
-  whole mandatory pass block run *before* the `LOWER-TO-IR` snapshot
+  whole mandatory pass block run _before_ the `LOWER-TO-IR` snapshot
   `-dump-ir` prints (line 15797), so the first dump is not the raw
   output of the lowering walk: a prelinked body is already there,
   normally inlined into its caller.
@@ -73,14 +73,14 @@ returns a `LoweredValInfo` (line 120). Its `Flavor` enum distinguishes
 lowering must keep symbolic until a use site decides how to read or
 write them:
 
-| Compound flavor | Slang surface that produces it | Use site emits |
-| --- | --- | --- |
-| `BoundMember` | `obj.method` as a value before the call (line 6394), or a field whose base is itself deferred | `get_field` / `get_field_addr` for a field (line 1265); the resolved function value for a method |
-| `BoundStorage` | a `property` / `__subscript` access whose accessor set is more than a lone `get` (line 1124) — `c.doubled`, `buf[i]` | a `call` to the `get` accessor on a read and to `set` on a write; a `ref` accessor instead collapses the value to a `Ptr` |
-| `SwizzledLValue` | a vector swizzle in l-value position — `v.xy = ...` (line 7880) | `swizzle` on a read (line 1288); on a write, `swizzledStore` when the base is a `Ptr` (line 10370) and otherwise `swizzleSet` plus a store back (line 10327) |
-| `SwizzledMatrixLValue` | a matrix swizzle in l-value position — `m._m00_m11 = ...` (line 7795) | on a read, two nested `getElement`s per component plus a `makeVector` when more than one is selected; `matrixSwizzleStore` on a write (line 10404) |
-| `ExtractedExistential` | an interface-typed value opened in l-value position (line 7739) | the extracted value as it stands; a write re-wraps the source with `makeExistential` first (line 10583) |
-| `ImplicitCastedLValue` | an implicit conversion on an `out` / `inout` argument (line 7768) | whichever conversion inst `emitCast` picks, on a read; on a write, that cast applied to the source followed by a store into the base (line 10597) |
+| Compound flavor        | Slang surface that produces it                                                                                       | Use site emits                                                                                                                                               |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BoundMember`          | `obj.method` as a value before the call (line 6394), or a field whose base is itself deferred                        | `get_field` / `get_field_addr` for a field (line 1265); the resolved function value for a method                                                             |
+| `BoundStorage`         | a `property` / `__subscript` access whose accessor set is more than a lone `get` (line 1124) — `c.doubled`, `buf[i]` | a `call` to the `get` accessor on a read and to `set` on a write; a `ref` accessor instead collapses the value to a `Ptr`                                    |
+| `SwizzledLValue`       | a vector swizzle in l-value position — `v.xy = ...` (line 7880)                                                      | `swizzle` on a read (line 1288); on a write, `swizzledStore` when the base is a `Ptr` (line 10370) and otherwise `swizzleSet` plus a store back (line 10327) |
+| `SwizzledMatrixLValue` | a matrix swizzle in l-value position — `m._m00_m11 = ...` (line 7795)                                                | on a read, two nested `getElement`s per component plus a `makeVector` when more than one is selected; `matrixSwizzleStore` on a write (line 10404)           |
+| `ExtractedExistential` | an interface-typed value opened in l-value position (line 7739)                                                      | the extracted value as it stands; a write re-wraps the source with `makeExistential` first (line 10583)                                                      |
+| `ImplicitCastedLValue` | an implicit conversion on an `out` / `inout` argument (line 7768)                                                    | whichever conversion inst `emitCast` picks, on a read; on a write, that cast applied to the source followed by a store into the base (line 10597)            |
 
 `Subscript` is declared but has no construction site. The right-hand
 column is what `materialize` (line 1184) and `getSimpleVal` (line 1342)
@@ -95,8 +95,7 @@ results so recursive `Val` graphs are not disturbed by an in-progress
 entry. The cache is per environment rather than global because a nested
 generic environment can bind the same `Val` (for example a type
 parameter `T` reachable both as a generic argument and through its
-conformance witness) to a different IR parameter. `lowerType` (line
-3081) still runs `lowerAssociatedVals` and `lowerRelatedTypes` after a
+conformance witness) to a different IR parameter. `lowerType` (line 3081) still runs `lowerAssociatedVals` and `lowerRelatedTypes` after a
 cache hit, because those are contextual side effects on the current
 module rather than part of the `Val`-to-IR mapping.
 
@@ -110,7 +109,7 @@ to create IR instructions:
 
 - It owns the current insertion point inside a block / function /
   module.
-- It hash-conses *hoistable* values (types, constants, certain pure
+- It hash-conses _hoistable_ values (types, constants, certain pure
   operators) so that two structurally equal values share one `IRInst*`.
   The flag bit `kIROpFlag_Hoistable` declared in
   [slang-ir.h](../../../../source/slang/slang-ir.h) tags opcodes that are
@@ -140,29 +139,29 @@ constructs. This table is illustrative, not exhaustive — the code in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
 is authoritative.
 
-| AST | Resulting IR |
-| --- | --- |
-| `ModuleDecl` | An `IRModule` (top-level container) |
-| `FuncDecl` | An `IRFunc` containing one or more `IRBlock`s |
-| `VarDecl` (global) | An `IRGlobalVar` |
-| `VarDecl` (local) | An `IRVar` allocated inside a block |
-| `StructDecl` | An `IRStructType` with `IRStructField` children |
-| `InterfaceDecl` | An `IRInterfaceType` whose requirement-key entries are `IRStructKey`s or hoistable `IRBuiltinRequirementKey`s (see [Generics and existentials](#generics-and-existentials)) |
-| `GenericDecl` | An `IRGeneric` (a function-shaped instruction whose body computes type-level values) |
-| `BlockStmt` | A sequence of basic blocks; locals turn into `IRVar` |
-| `IfStmt`, `ForStmt`, `WhileStmt`, `SwitchStmt` | Structured branches whose join point is an explicit operand on the terminator (see [../../../design/ir.md](../../../design/ir.md) for the structured-CFG encoding) |
-| `ReturnStmt` | An `IRReturn` terminator |
-| `BuiltinOperatorExpr` (checker fast-path arithmetic / comparison / bitwise / unary) | A single pure value inst (`kIROp_Add`, `kIROp_Mul`, `kIROp_Eql`, `kIROp_BitAnd`, `kIROp_Neg`, ...) emitted directly by `lowerBuiltinOperatorExpr` |
-| `InvokeExpr` (general operator / function call) | An `IRCall` (after callable resolution) |
-| `MemberExpr` | A `IRFieldAddress` / `IRFieldExtract` (lvalue vs rvalue) |
-| `IndexExpr` | `subscriptValue` (line 7481) emits `getElement` for a value base, `getElementPtr` for a pointer base; a `__subscript` arrives as an `InvokeExpr`, routed through `lowerStorageReference` |
-| `AssignExpr` | `assignExpr` writes through the left side's `LoweredValInfo` — `store` for a `Ptr`, `swizzledStore` for a swizzle, a setter `call` for `BoundStorage` |
-| `BuiltinCastExpr` (checked form of `T(x)` and of implicit numeric conversion) | The one conversion inst picked by `IRBuilder::emitCast`'s style table: `intCast`, `floatCast`, `castIntToFloat`, `castFloatToInt`, ... |
-| `BreakStmt`, `ContinueStmt` | An `unconditionalBranch` to the enclosing statement's break / continue label block |
-| `Optional<T>`, `Tuple<...>`, `ParameterBlock<T>` | The matching hoistable type inst — `Optional(...)`, `tuple_type(...)`, `ParameterBlock(...)`; scalar / vector / matrix / array spellings are catalogued in [../ir-reference/types.md](../ir-reference/types.md) |
-| `LiteralExpr` | A constant inst (`IRIntLit`, `IRFloatLit`, ...) |
-| `CastOptionalExpr` | An `if`/`else` diamond around a temporary: `visitCastOptionalExpr` tests `emitOptionalHasValue`, coerces the unwrapped value on the true side, and propagates `emitMakeOptionalNone` on the false side |
-| `WitnessTable` (synthesized in checking) | An `IRWitnessTable`, or — for a `SynthesizedModifier`-tagged conformance — a single intrinsic inst (see [Generics and existentials](#generics-and-existentials)) |
+| AST                                                                                 | Resulting IR                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModuleDecl`                                                                        | An `IRModule` (top-level container)                                                                                                                                                                             |
+| `FuncDecl`                                                                          | An `IRFunc` containing one or more `IRBlock`s                                                                                                                                                                   |
+| `VarDecl` (global)                                                                  | An `IRGlobalVar`                                                                                                                                                                                                |
+| `VarDecl` (local)                                                                   | An `IRVar` allocated inside a block                                                                                                                                                                             |
+| `StructDecl`                                                                        | An `IRStructType` with `IRStructField` children                                                                                                                                                                 |
+| `InterfaceDecl`                                                                     | An `IRInterfaceType` whose requirement-key entries are `IRStructKey`s or hoistable `IRBuiltinRequirementKey`s (see [Generics and existentials](#generics-and-existentials))                                     |
+| `GenericDecl`                                                                       | An `IRGeneric` (a function-shaped instruction whose body computes type-level values)                                                                                                                            |
+| `BlockStmt`                                                                         | A sequence of basic blocks; locals turn into `IRVar`                                                                                                                                                            |
+| `IfStmt`, `ForStmt`, `WhileStmt`, `SwitchStmt`                                      | Structured branches whose join point is an explicit operand on the terminator (see [../../../design/ir.md](../../../design/ir.md) for the structured-CFG encoding)                                              |
+| `ReturnStmt`                                                                        | An `IRReturn` terminator                                                                                                                                                                                        |
+| `BuiltinOperatorExpr` (checker fast-path arithmetic / comparison / bitwise / unary) | A single pure value inst (`kIROp_Add`, `kIROp_Mul`, `kIROp_Eql`, `kIROp_BitAnd`, `kIROp_Neg`, ...) emitted directly by `lowerBuiltinOperatorExpr`                                                               |
+| `InvokeExpr` (general operator / function call)                                     | An `IRCall` (after callable resolution)                                                                                                                                                                         |
+| `MemberExpr`                                                                        | A `IRFieldAddress` / `IRFieldExtract` (lvalue vs rvalue)                                                                                                                                                        |
+| `IndexExpr`                                                                         | `subscriptValue` (line 7481) emits `getElement` for a value base, `getElementPtr` for a pointer base; a `__subscript` arrives as an `InvokeExpr`, routed through `lowerStorageReference`                        |
+| `AssignExpr`                                                                        | `assignExpr` writes through the left side's `LoweredValInfo` — `store` for a `Ptr`, `swizzledStore` for a swizzle, a setter `call` for `BoundStorage`                                                           |
+| `BuiltinCastExpr` (checked form of `T(x)` and of implicit numeric conversion)       | The one conversion inst picked by `IRBuilder::emitCast`'s style table: `intCast`, `floatCast`, `castIntToFloat`, `castFloatToInt`, ...                                                                          |
+| `BreakStmt`, `ContinueStmt`                                                         | An `unconditionalBranch` to the enclosing statement's break / continue label block                                                                                                                              |
+| `Optional<T>`, `Tuple<...>`, `ParameterBlock<T>`                                    | The matching hoistable type inst — `Optional(...)`, `tuple_type(...)`, `ParameterBlock(...)`; scalar / vector / matrix / array spellings are catalogued in [../ir-reference/types.md](../ir-reference/types.md) |
+| `LiteralExpr`                                                                       | A constant inst (`IRIntLit`, `IRFloatLit`, ...)                                                                                                                                                                 |
+| `CastOptionalExpr`                                                                  | An `if`/`else` diamond around a temporary: `visitCastOptionalExpr` tests `emitOptionalHasValue`, coerces the unwrapped value on the true side, and propagates `emitMakeOptionalNone` on the false side          |
+| `WitnessTable` (synthesized in checking)                                            | An `IRWitnessTable`, or — for a `SynthesizedModifier`-tagged conformance — a single intrinsic inst (see [Generics and existentials](#generics-and-existentials))                                                |
 
 A few intrinsic-op call sites are special-cased in
 `emitCallToDeclRef` (line 949) rather than emitted verbatim. Notably a `(void)expr`
@@ -206,8 +205,8 @@ on its `BuiltinOperationKind` (`emitConstexprAdd`, `emitConstexprDiv`,
 that matched the operator's source name string; the `constexpr*` ops are
 hoistable so equal compile-time expressions deduplicate to one inst.
 
-The surface that reaches these opcodes is arithmetic on a *generic value
-parameter*, whose result is needed as a type-level value. Inside
+The surface that reaches these opcodes is arithmetic on a _generic value
+parameter_, whose result is needed as a type-level value. Inside
 `int f<let N : int>()`, the two array extents
 
 ```slang
@@ -251,7 +250,7 @@ void lowerWitnessTable(
     DeclRefBase* witnessTableBaseDeclRef)
 ```
 
-The last parameter is the decl-ref of the *base* (interface) side of the
+The last parameter is the decl-ref of the _base_ (interface) side of the
 conformance, obtained from `getWitnessTableBaseDeclRef` (lines 10904 and
 10915). When it is non-null, every requirement witness taken out of the
 AST requirement dictionary is `specialize`d through it before being
@@ -290,7 +289,7 @@ a nested `IRWitnessTable` (with its own conformance mangled name and,
 for an exported type, `HLSLExport` / `KeepAlive` decorations). The
 already-materialized nested tables are memoized in
 `IRGenContext::mapASTWitnessTableToIRWitnessTable` (line 676), a
-*non-owning* pointer: the dictionary is owned by the lowering scope, so
+_non-owning_ pointer: the dictionary is owned by the lowering scope, so
 copied contexts can share the cache for the current insertion / generic
 environment without a single global cache keyed only on the front-end
 `WitnessTable*` (which would be too coarse, since an `IRWitnessTable` is
@@ -324,7 +323,7 @@ witness lookup that has dropped the method's generic arguments.
 side: a `GenericTypeConstraintDecl` lowers to a generic exactly when it
 is the `inner` of a `GenericDecl`.
 
-Which constraint decls become *generic parameters* at all is decided by
+Which constraint decls become _generic parameters_ at all is decided by
 `isGenericConstraintParameterDecl` (declared in
 [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) line 1186);
 `emitGenericDecl` consults it before emitting a
@@ -337,7 +336,7 @@ requirements are skipped there and lowered as requirement keys.
 
 A bound on an associated type — `associatedtype A : IBar`,
 `associatedtype A where A : IBar`, or `__constraint A : IBar` — is a
-requirement of the *enclosing interface*, a sibling of `A`, not something
+requirement of the _enclosing interface_, a sibling of `A`, not something
 nested under it (see
 [03-semantic-check.md](03-semantic-check.md)). Lowering follows that
 representation:
@@ -361,7 +360,7 @@ representation:
 
 ### Requirement keys
 
-Each interface requirement is identified by a *requirement key*.
+Each interface requirement is identified by a _requirement key_.
 `getInterfaceRequirementKey` (line 1713) in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
 returns an `IRInst*` (cached per requirement `Decl` in
@@ -370,7 +369,7 @@ returns an `IRInst*` (cached per requirement `Decl` in
 - For an ordinary requirement (most methods, associated types), a
   per-decl `IRStructKey` that is a distinct `global` symbol unified
   across modules by its `key_<mangled>` linkage name.
-- For a *recognized built-in* requirement — one tagged with
+- For a _recognized built-in_ requirement — one tagged with
   `BuiltinRequirementModifier` (e.g. `IDifferentiable.Differential`,
   `.dzero`, `.dadd`), or the conformance constraint of such a built-in
   associated type — a hoistable `IRBuiltinRequirementKey` whose identity
@@ -386,8 +385,8 @@ returns an `IRInst*` (cached per requirement `Decl` in
 ### Differentiability arrives as a conformance
 
 Differentiability is not a modifier that lowering re-derives. The checker
-represents it as an interface conformance of the *function viewed as a
-type*: a `[Differentiable]` function `f` gets a synthesized
+represents it as an interface conformance of the _function viewed as a
+type_: a `[Differentiable]` function `f` gets a synthesized
 `extension __func_as_type(f) : IForwardDifferentiable<__func_as_type(f)>`
 (and the backward analogue), where
 `IForwardDifferentiable<FType>` / `IBackwardDifferentiable<FType>` are
@@ -408,8 +407,8 @@ places:
   passes reconstruct a table from those operands if one is needed. Because
   the subtype here is a callable rather than an aggregate type, lowering
   also has to reorder its own recursion guard: the placeholder
-  `LoweredValInfo` normally installed *before* `lowerType(subType)` is,
-  for a callable subtype, installed *after* it (lines 11334-11350), so
+  `LoweredValInfo` normally installed _before_ `lowerType(subType)` is,
+  for a callable subtype, installed _after_ it (lines 11334-11350), so
   that lowering the callable decl-ref sees the real callable and can
   attach its autodiff-associated values instead of recording the
   placeholder as the callable's differentiability witness.
@@ -440,7 +439,7 @@ this-type.
 A `countof(Pack) == Count` constraint on a variadic generic — spelled
 `void f<let N : int, each T>(T x) where countof(T) == N` — is recorded
 during checking as a `GenericVariadicPackCountConstraintDecl` whose
-satisfaction is a *proof-only* witness — the front end has already
+satisfaction is a _proof-only_ witness — the front end has already
 verified the relationship, and the witness carries no runtime data.
 Lowering models this with the same hidden-parameter / proof-only
 witness-table representation as other data-free generic witnesses:
@@ -449,7 +448,7 @@ witness-table representation as other data-free generic witnesses:
   `GenericVariadicPackCountConstraintDecl` emits a hidden `IRParam` of
   `WitnessTableType(void)` on the enclosing `IRGeneric`, registered as
   the lowered value of the constraint.
-- `visitDeclaredVariadicPackCountWitness` lowers the *use* of that
+- `visitDeclaredVariadicPackCountWitness` lowers the _use_ of that
   constraint as an `emitDeclRef` to the same `void` witness-table type.
 - `visitConcreteVariadicPackCountWitness` lowers an already-satisfied
   (concrete) instance through the `emitConcreteVariadicPackCountWitness`
@@ -547,7 +546,7 @@ an entry point:
 - The entry-point IR functions and their decorations are children of
   that module — the loop at line 15467 lowers each registered entry
   point into it.
-- Layout intent on global parameters is *not* materialized here: no
+- Layout intent on global parameters is _not_ materialized here: no
   `IRLayoutDecoration` is attached during translation-unit lowering.
   Layout assignment happens later, in IR passes (`slang-ir-layout`,
   `slang-ir-collect-global-uniforms`, ...) and in the separate module of
@@ -558,7 +557,7 @@ The caller in
 installs the returned module on the AST-level `Module` with
 `setIRModule` (line 570); that is the whole hand-off.
 
-Two adjacent generation paths build their own modules and are *not*
+Two adjacent generation paths build their own modules and are _not_
 outputs of translation-unit lowering: `generateIRForTypeConformance`
 (line 15982) and `TargetProgram::createIRModuleForLayout` (line 16353).
 The latter uses the type-layout lowering helper `_lowerTypeLayoutCommon`
@@ -582,14 +581,14 @@ Work-graph node attributes take the same route in the general function
 path (line 14485), each source spelling lowering to its matching
 decoration:
 
-| Source attribute | Decoration |
-| --- | --- |
-| `[NodeLaunch(mode)]` | `nodeLaunch` |
-| `[NodeID(name, arrayIndex)]` | `nodeID` |
+| Source attribute                 | Decoration            |
+| -------------------------------- | --------------------- |
+| `[NodeLaunch(mode)]`             | `nodeLaunch`          |
+| `[NodeID(name, arrayIndex)]`     | `nodeID`              |
 | `[NodeMaxDispatchGrid(x, y, z)]` | `nodeMaxDispatchGrid` |
-| `[NodeDispatchGrid(x, y, z)]` | `nodeDispatchGrid` |
-| `[MaxRecords(count)]` | `maxRecords` |
-| `[NodeIsProgramEntry]` | `nodeIsProgramEntry` |
+| `[NodeDispatchGrid(x, y, z)]`    | `nodeDispatchGrid`    |
+| `[MaxRecords(count)]`            | `maxRecords`          |
+| `[NodeIsProgramEntry]`           | `nodeIsProgramEntry`  |
 
 The launch mode is kept as an `IRStringLit` rather than an integer, so
 the dump reads `[nodeLaunch("broadcasting")]` and HLSL emit can re-emit
@@ -611,7 +610,7 @@ skip a Slang-synthesized initializer (a `ConstructorDecl` with the
 has no user-authored body, so emitting a `DebugLine` / `IRDebugLocationDecoration`
 for it would let a debugger step into compiler-generated code and walk
 the struct/member declaration lines. The discrimination is by
-constructor *flavor*, not by the mangled `$init` name, because a
+constructor _flavor_, not by the mangled `$init` name, because a
 user-written `__init` mangles the same way but must keep its debug
 info.
 
@@ -624,13 +623,13 @@ being initialized. That call site checks the predicate itself because
 `IRDebugLocationDecoration` to the by-value local so
 `slang-ir-insert-debug-value-store` surfaces it.
 
-Debug *source* records also need care, because they are hoistable and only
+Debug _source_ records also need care, because they are hoistable and only
 collapse across modules when their operands match byte-for-byte.
 `getOrEmitDebugSource` (line 9658) therefore spells the emitted filename
 with `PathInfo::getMostUniqueIdentity()` — the same spelling the
 per-source-file loop in `generateIRForTranslationUnit` uses — while still
 looking the `SourceFile` up by the `getName()`-based path. It embeds source
-text when the debug level is `Standard` or above *or* when
+text when the debug level is `Standard` or above _or_ when
 `shouldIncludeSourceInDebugInfo()` is set, falling back to reading the
 found path off disk (decoded through `SourceFile::decodeContentBlob`, so
 the embedded text is BOM-free and stays aligned with the line/column data)

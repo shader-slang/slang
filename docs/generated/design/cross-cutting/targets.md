@@ -17,7 +17,7 @@ why a feature is rejected under a particular profile.
 
 ## Targets
 
-A *target* is a (format, profile) pair. The set of formats Slang can
+A _target_ is a (format, profile) pair. The set of formats Slang can
 emit is determined by the emit backends linked into the compiler —
 see [../pipeline/06-emit.md](../pipeline/06-emit.md) for the per-
 backend details.
@@ -29,20 +29,20 @@ produces them. Several enumerators correspond to format variations
 same emit file and are dispatched by `CodeGenTarget` further down
 the pipeline.
 
-| Target group | Public `SlangCompileTarget` values | Output | Emit file(s) |
-| --- | --- | --- | --- |
-| HLSL | `SLANG_HLSL`, `SLANG_DXBC`, `SLANG_DXBC_ASM`, `SLANG_DXIL`, `SLANG_DXIL_ASM` | HLSL text plus downstream DXBC/DXIL produced via FXC / DXC | [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) (DXBC/DXIL are downstream-compiled) |
-| GLSL | `SLANG_GLSL`, plus the retained-but-removed `SLANG_GLSL_VULKAN_DEPRECATED` and `SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED` enumerators | GLSL text (typically forwarded to glslang for SPIR-V) | [slang-emit-glsl.cpp](../../../../source/slang/slang-emit-glsl.cpp) |
-| SPIR-V (direct) | `SLANG_SPIRV`, `SLANG_SPIRV_ASM` | SPIR-V binary or assembly | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) |
-| Metal Shading Language | `SLANG_METAL`, `SLANG_METAL_LIB`, `SLANG_METAL_LIB_ASM` | MSL text, Metal library, Metal library assembly | [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) (`*_LIB`/`*_LIB_ASM` go through Metal's downstream tools) |
-| WGSL | `SLANG_WGSL`, `SLANG_WGSL_SPIRV`, `SLANG_WGSL_SPIRV_ASM` | WGSL text, plus SPIR-V binary/assembly produced via WGSL | [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp) |
-| C++ shader | `SLANG_CPP_SOURCE`, `SLANG_C_SOURCE`, `SLANG_CPP_HEADER` | C/C++ text linked against `slang-rt`; header variant emits a declarations-only file | [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp) |
-| C++ host | `SLANG_HOST_CPP_SOURCE` | Host-side C++ source | [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp) |
-| CUDA | `SLANG_CUDA_SOURCE`, `SLANG_PTX`, `SLANG_CUDA_OBJECT_CODE`, `SLANG_CUDA_HEADER` | CUDA text, PTX, object code, header | [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) (PTX and object code via NVRTC / nvcc) |
-| Torch glue | `SLANG_CPP_PYTORCH_BINDING` | C++ PyTorch binding | [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp) |
-| CPU binaries / host-callable | `SLANG_HOST_HOST_CALLABLE`, `SLANG_SHADER_HOST_CALLABLE`, `SLANG_HOST_OBJECT_CODE`, `SLANG_OBJECT_CODE`, `SLANG_HOST_SHARED_LIBRARY`, `SLANG_SHADER_SHARED_LIBRARY`, `SLANG_HOST_EXECUTABLE`, `SLANG_HOST_LLVM_IR`, `SLANG_SHADER_LLVM_IR` | LLVM-IR, object code, JIT-callable code, shared libraries, executables | [slang-emit-llvm.cpp](../../../../source/slang/slang-emit-llvm.cpp) via `emitLLVMForEntryPoints` when `isCPUTargetViaLLVM`; otherwise routed to a downstream C++ compiler from [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) |
-| VM | `SLANG_HOST_VM` | Slang interpreter bytecode | [slang-emit-vm.cpp](../../../../source/slang/slang-emit-vm.cpp) |
-| Slang round-trip | (no public target and no `CodeGenTarget` value) | Unimplemented stub: `emitSlangDeclarationsForEntryPoints` ignores its inputs and writes no source | [slang-emit-slang.cpp](../../../../source/slang/slang-emit-slang.cpp) |
+| Target group                 | Public `SlangCompileTarget` values                                                                                                                                                                                                         | Output                                                                                            | Emit file(s)                                                                                                                                                                                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| HLSL                         | `SLANG_HLSL`, `SLANG_DXBC`, `SLANG_DXBC_ASM`, `SLANG_DXIL`, `SLANG_DXIL_ASM`                                                                                                                                                               | HLSL text plus downstream DXBC/DXIL produced via FXC / DXC                                        | [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) (DXBC/DXIL are downstream-compiled)                                                                                                                                          |
+| GLSL                         | `SLANG_GLSL`, plus the retained-but-removed `SLANG_GLSL_VULKAN_DEPRECATED` and `SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED` enumerators                                                                                                         | GLSL text (typically forwarded to glslang for SPIR-V)                                             | [slang-emit-glsl.cpp](../../../../source/slang/slang-emit-glsl.cpp)                                                                                                                                                                              |
+| SPIR-V (direct)              | `SLANG_SPIRV`, `SLANG_SPIRV_ASM`                                                                                                                                                                                                           | SPIR-V binary or assembly                                                                         | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)                                                                                                                                                                            |
+| Metal Shading Language       | `SLANG_METAL`, `SLANG_METAL_LIB`, `SLANG_METAL_LIB_ASM`                                                                                                                                                                                    | MSL text, Metal library, Metal library assembly                                                   | [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) (`*_LIB`/`*_LIB_ASM` go through Metal's downstream tools)                                                                                                                  |
+| WGSL                         | `SLANG_WGSL`, `SLANG_WGSL_SPIRV`, `SLANG_WGSL_SPIRV_ASM`                                                                                                                                                                                   | WGSL text, plus SPIR-V binary/assembly produced via WGSL                                          | [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp)                                                                                                                                                                              |
+| C++ shader                   | `SLANG_CPP_SOURCE`, `SLANG_C_SOURCE`, `SLANG_CPP_HEADER`                                                                                                                                                                                   | C/C++ text linked against `slang-rt`; header variant emits a declarations-only file               | [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp)                                                                                                                                                                                |
+| C++ host                     | `SLANG_HOST_CPP_SOURCE`                                                                                                                                                                                                                    | Host-side C++ source                                                                              | [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp)                                                                                                                                                                                |
+| CUDA                         | `SLANG_CUDA_SOURCE`, `SLANG_PTX`, `SLANG_CUDA_OBJECT_CODE`, `SLANG_CUDA_HEADER`                                                                                                                                                            | CUDA text, PTX, object code, header                                                               | [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) (PTX and object code via NVRTC / nvcc)                                                                                                                                       |
+| Torch glue                   | `SLANG_CPP_PYTORCH_BINDING`                                                                                                                                                                                                                | C++ PyTorch binding                                                                               | [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp)                                                                                                                                                                            |
+| CPU binaries / host-callable | `SLANG_HOST_HOST_CALLABLE`, `SLANG_SHADER_HOST_CALLABLE`, `SLANG_HOST_OBJECT_CODE`, `SLANG_OBJECT_CODE`, `SLANG_HOST_SHARED_LIBRARY`, `SLANG_SHADER_SHARED_LIBRARY`, `SLANG_HOST_EXECUTABLE`, `SLANG_HOST_LLVM_IR`, `SLANG_SHADER_LLVM_IR` | LLVM-IR, object code, JIT-callable code, shared libraries, executables                            | [slang-emit-llvm.cpp](../../../../source/slang/slang-emit-llvm.cpp) via `emitLLVMForEntryPoints` when `isCPUTargetViaLLVM`; otherwise routed to a downstream C++ compiler from [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) |
+| VM                           | `SLANG_HOST_VM`                                                                                                                                                                                                                            | Slang interpreter bytecode                                                                        | [slang-emit-vm.cpp](../../../../source/slang/slang-emit-vm.cpp)                                                                                                                                                                                  |
+| Slang round-trip             | (no public target and no `CodeGenTarget` value)                                                                                                                                                                                            | Unimplemented stub: `emitSlangDeclarationsForEntryPoints` ignores its inputs and writes no source | [slang-emit-slang.cpp](../../../../source/slang/slang-emit-slang.cpp)                                                                                                                                                                            |
 
 `SLANG_TARGET_UNKNOWN` and `SLANG_TARGET_NONE` are sentinel values
 that do not select an emit backend. `SLANG_TARGET_COUNT_OF` is the
@@ -85,25 +85,25 @@ emits `slang-generated-capability-defs.h` and
 From the comments at the top of
 [slang-capabilities.capdef](../../../../source/slang/slang-capabilities.capdef):
 
-- A *capability atom* is the smallest unit; it represents one
+- A _capability atom_ is the smallest unit; it represents one
   target / extension / hardware feature. Examples (paraphrased from
   the file): `_GL_EXT_ray_tracing` is a GLSL extension atom;
   `glsl` is a code-gen-target atom.
-- A *capability name* is a Boolean expression — a disjunction of
+- A _capability name_ is a Boolean expression — a disjunction of
   conjunctions of atoms. Example: `raytracing` expands to
   `GL_EXT_ray_tracing | _sm_6_3 | cuda`.
-- An *abstract* capability does not introduce an atom; it defines a
+- An _abstract_ capability does not introduce an atom; it defines a
   "keyhole" that other atoms populate. `target` and `stage` are
   distinct keyholes; an atom derived directly from an abstract
   capability is a "key atom" for that keyhole.
-- A *version family* is a chain of atoms ordered by inheritance that
+- A _version family_ is a chain of atoms ordered by inheritance that
   express successive versions of one target — the Shader Model chain
   (`_sm_4_0` ... `_sm_6_10`), the GLSL chain (`_GLSL_130` ...
   `_GLSL_460`), the SPIR-V chain, and the MetalLib chain. Membership
   is tested by `isTargetVersionAtom` (any family) and the per-family
   `isSpirvVersionAtom` in
   [slang-capability.h](../../../../source/slang/slang-capability.h).
-- A name whose spelling begins with `_` is *internal*: it is a
+- A name whose spelling begins with `_` is _internal_: it is a
   building block that user code is not expected to name directly.
   `isInternalCapabilityName` in
   [slang-capability.cpp](../../../../source/slang/slang-capability.cpp)
@@ -152,7 +152,7 @@ The arithmetic of compatibility:
   key atom of that keyhole (e.g. `vertex + glsl` works because
   `vertex` does not populate `target`).
 
-Inheritance is also how an extension records its *version floor*, and
+Inheritance is also how an extension records its _version floor_, and
 the SPIR-V atoms show the layering. An extension atom derives from
 the earliest target version that can host it
 (`def SPV_EXT_shader_64bit_indexing : _spirv_1_0;`), and the SPIR-V
@@ -214,7 +214,7 @@ document does not duplicate it.
 
 ### Auto-generated reference
 
-Every `def` and `alias` is a *documentable atom*. A run of `///`
+Every `def` and `alias` is a _documentable atom_. A run of `///`
 lines immediately preceding one is harvested into
 [a4-02-reference-capability-atoms.md](../../../user-guide/a4-02-reference-capability-atoms.md);
 a plain `//` line in the middle of the run truncates it. A line of
@@ -319,7 +319,7 @@ work-graph entry points; the alias is `_node + _sm_6_8`, so naming
 the stage in capability terms also asserts the Shader Model floor
 the stage needs. That floor arrives through the profile's own set —
 `Profile::getCapabilityName` adds `CapabilityName::node` for
-`Stage::Node` — so it raises what a node entry point *promises*
+`Stage::Node` — so it raises what a node entry point _promises_
 rather than being something the `-profile` version is checked
 against: a `[shader("node")]` entry point at `-profile lib_6_6` is
 not diagnosed for a missing `sm_6_8`.
@@ -328,7 +328,7 @@ not diagnosed for a missing `sm_6_8`.
 
 `-profile` pins a version within a version family; `-capability`
 adds atoms on top of it. Because many capability atoms inherit from
-a version atom, an added capability can silently *raise* the emitted
+a version atom, an added capability can silently _raise_ the emitted
 target version above what the profile asked for. The option parser
 detects that case rather than letting the two options disagree
 quietly:
@@ -413,6 +413,7 @@ shows through:
    With no matching arm and no `default:`, the function has no body
    for the active target, and what is rejected is the entry point
    that reaches it rather than the switch.
+
 2. **Target-specific lowering passes** named by target acronym:
    - HLSL: [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp)
    - GLSL: [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp), [slang-ir-glsl-liveness.cpp](../../../../source/slang/slang-ir-glsl-liveness.cpp)
@@ -449,10 +450,10 @@ downstream tools), see the per-target pages under
 - [../target-pipelines/cuda.md](../target-pipelines/cuda.md) —
   CUDA plus nvrtc downstream.
 
-The division of labor is: this page owns the *model* — what a target
+The division of labor is: this page owns the _model_ — what a target
 is, how capability atoms and profiles are declared and combined, and
 which knobs the front-end consults before any backend runs. The
-`target-pipelines/` pages own the *per-target behavior* — the ordered
+`target-pipelines/` pages own the _per-target behavior_ — the ordered
 pass sequence, the gates that select each pass, the downstream tool
 chain, and any emitter-level decision specific to one target. A
 statement of the form "on SPIR-V, construct X is emitted as Y"

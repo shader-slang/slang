@@ -214,13 +214,13 @@ The `severity_breakdown` counts must sum to `finding_count`.
    `slang-emit.cpp`", "resolved all 17 relative links", etc.
 4. `## Findings` — a Markdown table with exactly these columns:
 
-   | Column | Content |
-   | --- | --- |
-   | ID | Sequential `F-001`, `F-002`, ...; unique within the report. |
-   | Severity | One of `critical`, `major`, `minor`, `nit`. |
-   | Location | A heading anchor or line range inside the target doc (e.g. `## Phase B`, lines 110-115). |
-   | Description | One short paragraph. Be precise; quote the offending text in backticks. |
-   | Evidence | The source file (with line number) that proves the finding, or a peer doc reference. |
+   | Column         | Content                                                                                                              |
+   | -------------- | -------------------------------------------------------------------------------------------------------------------- |
+   | ID             | Sequential `F-001`, `F-002`, ...; unique within the report.                                                          |
+   | Severity       | One of `critical`, `major`, `minor`, `nit`.                                                                          |
+   | Location       | A heading anchor or line range inside the target doc (e.g. `## Phase B`, lines 110-115).                             |
+   | Description    | One short paragraph. Be precise; quote the offending text in backticks.                                              |
+   | Evidence       | The source file (with line number) that proves the finding, or a peer doc reference.                                 |
    | Recommendation | A specific, actionable fix (e.g. "change line N from X to Y", "delete the row about Z", "add the section `## Foo`"). |
 
    If there are no findings, write `(no findings)` on a single line

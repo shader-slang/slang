@@ -14,6 +14,30 @@ on:
         required: false
         type: number
         default: 120
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
+      is-fork-pr:
+        description: "Force fork-PR secret gating. Set true by /ci when the PR is from a fork."
+        required: false
+        type: boolean
+        default: false
+      base-sha:
+        description: >-
+          PR base SHA to diff against for PR-vs-preexisting finding
+          classification. Empty under pull_request/merge_group, which derive
+          it from the event payload directly; set by /ci (repository_dispatch),
+          which has no event payload to derive it from.
+        required: false
+        type: string
+        default: ""
       upload-binaries:
         # Publish the ASan-instrumented build as a `sanitizer-binaries`
         # artifact so downstream projects can run their own ASan suites
@@ -36,7 +60,9 @@ jobs:
       options: --user root
 
     env:
-      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+      IS_FORK_PR: >-
+        ${{ inputs.is-fork-pr
+            || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true) }}
 
     defaults:
       run:
@@ -48,6 +74,9 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          persist-credentials: false
           submodules: "recursive"
           # Need full history to diff PR changes against the base branch
           # for classifying sanitizer findings as PR-related vs pre-existing.
@@ -56,12 +85,23 @@ jobs:
       - name: Compute PR changed files
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          # repository_dispatch (the /ci slash command) has no pull_request or
+          # merge_group event payload to derive a base SHA from, so ci-command.yml
+          # threads it through explicitly via inputs.base-sha instead.
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || inputs.base-sha }}
         run: |
-          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "merge_group" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "merge_group" ] || [ "$EVENT_NAME" = "repository_dispatch" ]; then
             if [ -z "$BASE_SHA" ]; then
               echo "::error::The $EVENT_NAME event did not provide a base SHA"
               exit 1
+            fi
+            # Under /ci on a fork PR, checkout above pulled history from the
+            # fork (inputs.repository), which may never have fetched this SHA
+            # from the base repo. Fetch it explicitly if the checkout's history
+            # doesn't already contain it.
+            if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+              echo "Base SHA not in checkout history; fetching from shader-slang/slang"
+              git fetch --depth=1 https://github.com/shader-slang/slang.git "$BASE_SHA"
             fi
             echo "Computing diff against PR base: $BASE_SHA"
             git diff --name-only "$BASE_SHA"...HEAD > /tmp/pr-changed-files.txt
@@ -168,8 +208,13 @@ jobs:
             sccache --show-stats || true
           fi
 
+      # Three guards: master ref + not-a-fork-PR + default checkout path.
+      # The (inputs.ref == '' && inputs.repository == '') clause prevents a
+      # same-repo /ci on a draft branch from writing the master cache key —
+      # under repository_dispatch github.ref is still the default branch
+      # even though the checked-out code is a PR branch.
       - name: Save sccache cache
-        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.IS_FORK_PR != 'true' && inputs.ref == '' && inputs.repository == ''
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache

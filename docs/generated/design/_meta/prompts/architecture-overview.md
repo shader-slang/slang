@@ -43,8 +43,8 @@ tree before.
    - `source/slang-llvm/`, `source/slang-glslang/`,
      `source/slang-dispatcher/` — downstream-compiler shims.
    - `tools/`, `tests/`, `extras/`, `external/` — auxiliary trees.
-   Each layer gets a one- to three-sentence description anchored to a
-   specific representative file.
+     Each layer gets a one- to three-sentence description anchored to a
+     specific representative file.
 4. `## Compilation request lifecycle` — describe (without becoming a
    pipeline document) the high-level objects that flow through
    compilation: `CompileRequest`, `TranslationUnitRequest`,

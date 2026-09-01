@@ -133,13 +133,13 @@ the following sections, in order:
 4. `## Nodes` — a single table with one row per concrete (FIDDLE-declared)
    class in the family, columns:
 
-   | Column | Content |
-   | --- | --- |
-   | Class | Backtick-wrapped exact class name as declared in the header. |
-   | Parent | Closest ancestor a reader needs to know — not always the immediate C++ base. Use the most semantically informative one (e.g. `BinaryExpr` rather than `OperatorExpr`). |
-   | Key fields | 1-4 fields that define the node's data shape, in `name: Type` form. Long field lists are summarized as "...plus N more; see header". |
-   | Grammar | Markdown link to the most specific anchor in [syntax-reference/grammar.md](../syntax-reference/grammar.md), or the literal text `(none)` for nodes that are synthesized rather than parsed (e.g. synthetic conformance decls). |
-   | Summary | One short clause; no markup beyond inline code. |
+   | Column     | Content                                                                                                                                                                                                                        |
+   | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | Class      | Backtick-wrapped exact class name as declared in the header.                                                                                                                                                                   |
+   | Parent     | Closest ancestor a reader needs to know — not always the immediate C++ base. Use the most semantically informative one (e.g. `BinaryExpr` rather than `OperatorExpr`).                                                         |
+   | Key fields | 1-4 fields that define the node's data shape, in `name: Type` form. Long field lists are summarized as "...plus N more; see header".                                                                                           |
+   | Grammar    | Markdown link to the most specific anchor in [syntax-reference/grammar.md](../syntax-reference/grammar.md), or the literal text `(none)` for nodes that are synthesized rather than parsed (e.g. synthetic conformance decls). |
+   | Summary    | One short clause; no markup beyond inline code.                                                                                                                                                                                |
 
 5. `## Notable nodes` — short prose callouts (2-5 sentences each) for the
    half-dozen or so nodes per family where the table form leaves out
@@ -171,13 +171,13 @@ and tutorial-style explanations of compiler theory (use the
 ## Name-resolution family contract
 
 The pages under `docs/generated/design/name-resolution/` document the
-*algorithmic* rules of identifier scopes, lookup, shadowing, visibility,
+_algorithmic_ rules of identifier scopes, lookup, shadowing, visibility,
 and overload resolution. They sit between the parsing overview in
 [../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md) and the
 semantic-checking overview in
 [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md):
-the pipeline pages explain *where* in the compile flow name resolution
-happens; the name-resolution pages explain *what rules* are applied.
+the pipeline pages explain _where_ in the compile flow name resolution
+happens; the name-resolution pages explain _what rules_ are applied.
 
 A prompt that targets one of those pages (other than `index.md`) must
 produce a document with the following sections, in order:
@@ -239,8 +239,8 @@ They sit between the narrative survey in
 (which covers schema, flag bits, module versioning, and the "add an
 opcode" workflow) and the lowering pipeline page in
 [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md) (which
-covers *when* AST nodes turn into IR). The IR-reference pages explain
-*which* opcodes exist, *what shape* they have, and *which AST node*
+covers _when_ AST nodes turn into IR). The IR-reference pages explain
+_which_ opcodes exist, _what shape_ they have, and _which AST node_
 (if any) lowers to each.
 
 A prompt that targets one of those pages (other than `index.md`) must
@@ -265,14 +265,14 @@ produce a document with the following sections, in order:
    the family. Sub-tables (split by sub-group) are encouraged when the
    family is large. Every table has the following columns, in order:
 
-   | Column | Content |
-   | --- | --- |
-   | Opcode | Backtick-wrapped Lua entry name; this is also the `kIROp_<name>` enum tag. |
-   | C++ wrapper | The `IRFoo` struct name, written **with** the `IR` prefix (`IRNameHintDecoration`, not `NameHintDecoration`). Do **not** use an em-dash here: no opcode is wrapper-less, so an em-dash column carries no information. One page in a past round had an em-dash in all 64 rows. Every opcode ends up with a wrapper, but fiddle does not generate all of them — `getAllOtherInstStructsData()` in [../../../../source/slang/slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) (near line 152) opens with `if not Slang["IR" .. struct_name] then`, so it *skips* any opcode whose struct is already hand-written in `slang-ir-insts.h` and emits a struct only for the remainder. Mark which are hand-written (a footnote marker such as `‡` works) and state the count in the prose. |
-   | Operands | Compact comma-separated operand names from the Lua entry, e.g. `elementType, count`. Use `(variadic)` for variadic ops and `—` for nullary. A Lua entry that declares `min_operands = N` but gives **no** operand names is common; write `(N unnamed)` for it — do not invent names, and do not fall back to `(variadic)`, which means something different. Where the C++ accessor in `slang-ir-insts.h` reveals what an unnamed operand actually is, you may name it and mark the cell with `†`, explaining the marker in a legend; that is strictly more useful than `(N unnamed)` and is allowed. Pages previously invented `(variadic, min=N)` and other spellings for this case, which produced avoidable review findings. |
-   | Flags | One-letter codes joined without separators: `H` hoistable, `P` parent, `G` global. Blank when none apply. |
-   | AST origin | **Name the actual producer.** For an opcode lowered from the AST, that is the AST class plus the `visit*` in `slang-lower-to-ir.cpp` that produces it (`VarDecl`, `BinaryExpr` (`+`), ...). For an opcode introduced by a pass, name the pass or function (e.g. `lowerTypeLayout`, the forward-mode autodiff pass, the PyTorch binding pass). For an opcode that **nothing in `source/` constructs**, write **no producer at HEAD** and say so in the summary. The old catch-alls `(synthesized)` and a bare `—` are retired: they hid real distinctions and made unproduced opcodes indistinguishable from pass-produced ones. Verify a producer exists before naming one — an intrinsic-declared opcode (`__intrinsic_op`) has no `visit*` at all. |
-   | Summary | One short clause; no markup beyond inline code. |
+   | Column      | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+   | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | Opcode      | Backtick-wrapped Lua entry name; this is also the `kIROp_<name>` enum tag.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+   | C++ wrapper | The `IRFoo` struct name, written **with** the `IR` prefix (`IRNameHintDecoration`, not `NameHintDecoration`). Do **not** use an em-dash here: no opcode is wrapper-less, so an em-dash column carries no information. One page in a past round had an em-dash in all 64 rows. Every opcode ends up with a wrapper, but fiddle does not generate all of them — `getAllOtherInstStructsData()` in [../../../../source/slang/slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) (near line 152) opens with `if not Slang["IR" .. struct_name] then`, so it _skips_ any opcode whose struct is already hand-written in `slang-ir-insts.h` and emits a struct only for the remainder. Mark which are hand-written (a footnote marker such as `‡` works) and state the count in the prose. |
+   | Operands    | Compact comma-separated operand names from the Lua entry, e.g. `elementType, count`. Use `(variadic)` for variadic ops and `—` for nullary. A Lua entry that declares `min_operands = N` but gives **no** operand names is common; write `(N unnamed)` for it — do not invent names, and do not fall back to `(variadic)`, which means something different. Where the C++ accessor in `slang-ir-insts.h` reveals what an unnamed operand actually is, you may name it and mark the cell with `†`, explaining the marker in a legend; that is strictly more useful than `(N unnamed)` and is allowed. Pages previously invented `(variadic, min=N)` and other spellings for this case, which produced avoidable review findings.                                                            |
+   | Flags       | One-letter codes joined without separators: `H` hoistable, `P` parent, `G` global. Blank when none apply.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+   | AST origin  | **Name the actual producer.** For an opcode lowered from the AST, that is the AST class plus the `visit*` in `slang-lower-to-ir.cpp` that produces it (`VarDecl`, `BinaryExpr` (`+`), ...). For an opcode introduced by a pass, name the pass or function (e.g. `lowerTypeLayout`, the forward-mode autodiff pass, the PyTorch binding pass). For an opcode that **nothing in `source/` constructs**, write **no producer at HEAD** and say so in the summary. The old catch-alls `(synthesized)` and a bare `—` are retired: they hid real distinctions and made unproduced opcodes indistinguishable from pass-produced ones. Verify a producer exists before naming one — an intrinsic-declared opcode (`__intrinsic_op`) has no `visit*` at all.                                       |
+   | Summary     | One short clause; no markup beyond inline code.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 5. `## Notable opcodes` — short prose callouts (2-5 sentences each)
    for the half-dozen or so opcodes per family where the table form
@@ -317,9 +317,9 @@ artifact. They sit between the unordered per-pass catalog in
 [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) and the
 backend-emit overview in
 [../pipeline/06-emit.md](../pipeline/06-emit.md): the catalog page
-explains *what* every pass is and groups them by topic; the
-target-pipeline pages explain *when* each pass runs for one target,
-*which gate selects it*, and *what loops* iterate it.
+explains _what_ every pass is and groups them by topic; the
+target-pipeline pages explain _when_ each pass runs for one target,
+_which gate selects it_, and _what loops_ iterate it.
 
 A prompt that targets one of those pages must produce a document
 with the following sections, in order:
@@ -363,13 +363,13 @@ with the following sections, in order:
    - A companion ordered table with one row per pass node in the
      diagram, columns:
 
-   | Column | Content |
-   | --- | --- |
-   | # | 1-based order within the phase. |
-   | Pass | Backtick-wrapped pass function name. |
-   | File | Markdown link to the `.cpp` file that defines the pass. |
-   | Gate | The condition (if any) that selects this pass; backtick-wrap the C++ expression. Use `(always)` when unconditional. |
-   | Notes | Optional one-clause clarification (e.g. flag values passed, second invocation, etc.); blank when none needed. |
+   | Column | Content                                                                                                             |
+   | ------ | ------------------------------------------------------------------------------------------------------------------- |
+   | #      | 1-based order within the phase.                                                                                     |
+   | Pass   | Backtick-wrapped pass function name.                                                                                |
+   | File   | Markdown link to the `.cpp` file that defines the pass.                                                             |
+   | Gate   | The condition (if any) that selects this pass; backtick-wrap the C++ expression. Use `(always)` when unconditional. |
+   | Notes  | Optional one-clause clarification (e.g. flag values passed, second invocation, etc.); blank when none needed.       |
 
 6. `## Conditional gates` — a single table consolidating every gate
    expression the phase diagrams reference, with the passes it
@@ -575,7 +575,7 @@ Before considering the document done, verify:
 - [ ] No emojis, no editorial commentary, no copied prose.
 - [ ] **Identifier sweep run.** Extract every backticked identifier and
       bracketed attribute from the page and grep each one against `source/`.
-      Lint validates markdown link *targets* but never checks identifiers or
+      Lint validates markdown link _targets_ but never checks identifiers or
       file paths named in prose, so a fabricated symbol survives it silently.
       One page in a past round asserted `[OptixSbt]`, `[AutoBindEntry]`,
       `coverageBufferUniformOffset`, `coverageBufferUniformSize`, and a
@@ -585,7 +585,7 @@ Before considering the document done, verify:
 - [ ] **File-name sweep run**, as a second pass. A tokenizing identifier sweep
       splits on `-` and `.`, so `slang-ir-lower-untyped-resource-handle.cpp`
       decomposes into fragments that each exist while the file does not.
-      Extract whole `*.{h,cpp,lua,capdef,slang}` names from links *and* prose
+      Extract whole `*.{h,cpp,lua,capdef,slang}` names from links _and_ prose
       and confirm each resolves. Real examples of non-existent files that
       reached published pages: `slang-ir-autodiff-transcribe.cpp` (the
       forward-mode code is in `slang-ir-autodiff-fwd.cpp`) and

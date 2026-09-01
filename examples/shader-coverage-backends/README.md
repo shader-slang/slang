@@ -10,12 +10,12 @@ workflow — compile, discover the hidden counter buffer through
 through `ICoverageTracingMetadata` — is identical everywhere, and that
 only the binding step's shape changes per backend:
 
-| Backend  | Binding model exercised                                                                              |
-| -------- | ---------------------------------------------------------------------------------------------------- |
-| `cpu`    | host-callable kernel; `(pointer, count)` pair written into the parameter payload at `uniformOffset`  |
-| `cuda`   | same marshaling contract with a device pointer; payload copied to the `SLANG_globalParams` symbol    |
-| `vulkan` | storage buffer at the descriptor `(space, binding)`; auto-allocation adds one descriptor set         |
-| `metal`  | `[[buffer(N)]]` index from `binding`; MSL compiled at runtime, counters always 32-bit                |
+| Backend  | Binding model exercised                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------- |
+| `cpu`    | host-callable kernel; `(pointer, count)` pair written into the parameter payload at `uniformOffset` |
+| `cuda`   | same marshaling contract with a device pointer; payload copied to the `SLANG_globalParams` symbol   |
+| `vulkan` | storage buffer at the descriptor `(space, binding)`; auto-allocation adds one descriptor set        |
+| `metal`  | `[[buffer(N)]]` index from `binding`; MSL compiled at runtime, counters always 32-bit               |
 
 Each path is a compact implementation of the corresponding recipe in
 [`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).

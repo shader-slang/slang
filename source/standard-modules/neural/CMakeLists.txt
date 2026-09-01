@@ -50,7 +50,10 @@ else()
     set(SLANG_COMPILER slang-bootstrap)
     set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
 endif()
-set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive_without_timestamp})
+set(SLANG_COMPILER_CORE_MODULE_ARGS
+    -load-core-module
+    ${core_module_archive_without_timestamp}
+)
 set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
 # Determine compiler flags based on build type
@@ -65,8 +68,9 @@ endif()
 add_custom_command(
     OUTPUT ${neural_module_file}
     COMMAND
-        ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS} ${NEURAL_MODULE_DEFINES} -I
-        ${CMAKE_CURRENT_SOURCE_DIR} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
+        ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS}
+        ${NEURAL_MODULE_DEFINES} -I ${CMAKE_CURRENT_SOURCE_DIR} neural.slang -o
+        ${SLANG_NEURAL_MODULE_FILE_NAME}
     DEPENDS
         ${neural_copied_files}
         ${neural_unittest_sources}

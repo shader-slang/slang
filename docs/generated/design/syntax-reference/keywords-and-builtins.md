@@ -47,7 +47,7 @@ Three sources contribute keywords:
 
 ## Lexer-recognized keywords
 
-The lexer does *not* recognize alphabetic keywords. The only tokens
+The lexer does _not_ recognize alphabetic keywords. The only tokens
 spelled out in the lexer / token catalog are punctuation and operators
 — see [tokens.md](tokens.md) for the full list (`Semicolon`,
 `Scope (::)`, `RightArrow (->)`, `DoubleRightArrow (=>)`, all the
@@ -86,31 +86,31 @@ Cited line numbers refer to
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) at
 `source_commit`.
 
-| Keyword | Where parsed |
-| --- | --- |
-| `if` | line 6921 (`LookAheadToken("if")`) in `Parser::ParseStatement` (line 6914). A second lookahead for `let` two tokens ahead (line 6923) routes the `if let` binding form to `parseIfLetStatement` (line 7284) instead of `parseIfStatement` (line 7373); `else` is consumed inside the latter at line 7382 |
-| `for` | line 6932 (statement entry). The compile-time form is reached from `parseCompileTimeStmt` (line 6900), which reads a `$` and then checks for `for` at line 6903 before calling `parseCompileTimeForStmt` (line 6854). Its header is not the ordinary `(init; cond; update)` triple but `$for(i in Range(N))`: `parseCompileTimeForStmt` reads the loop variable, then the literal tokens `in` and `Range`, then one or two range expressions — `Range(end)` or `Range(begin, end)` |
-| `while` | line 6934 |
-| `do` | line 6936 |
-| `break` | line 6938 |
-| `continue` | line 6940 |
-| `return` | line 6942 |
-| `switch` | line 6951 |
-| `__target_switch` | line 6953 (`parseTargetSwitchStmt`); compiler-internal |
-| `__stage_switch` | line 6955 (`parseStageSwitchStmt`); compiler-internal |
-| `__intrinsic_asm` | line 6957 (`parseIntrinsicAsmStmt`); compiler-internal |
-| `case` | line 6959 (and in the switch body at lines 6619, 6649) |
-| `default` | line 6961 (and in the switch body at lines 6625, 6649) |
-| `__GPU_FOREACH` | line 6963 (`ParseGpuForeachStmt`); compiler-internal |
-| `discard` | line 6944 |
-| `defer` | line 6969 |
-| `throw` | line 6977 |
-| `__requireCapability` | line 6981 (`Parser::ParseRequireCapabilityStatement`, line 7601); compiler-internal |
-| `catch` | `Parser::ParseDoCatchStatement` (line 7482), reached from `ParseDoStatement` at line 7527. `catch` does **not** pair with `try` at statement level |
+| Keyword               | Where parsed                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `if`                  | line 6921 (`LookAheadToken("if")`) in `Parser::ParseStatement` (line 6914). A second lookahead for `let` two tokens ahead (line 6923) routes the `if let` binding form to `parseIfLetStatement` (line 7284) instead of `parseIfStatement` (line 7373); `else` is consumed inside the latter at line 7382                                                                                                                                                                           |
+| `for`                 | line 6932 (statement entry). The compile-time form is reached from `parseCompileTimeStmt` (line 6900), which reads a `$` and then checks for `for` at line 6903 before calling `parseCompileTimeForStmt` (line 6854). Its header is not the ordinary `(init; cond; update)` triple but `$for(i in Range(N))`: `parseCompileTimeForStmt` reads the loop variable, then the literal tokens `in` and `Range`, then one or two range expressions — `Range(end)` or `Range(begin, end)` |
+| `while`               | line 6934                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `do`                  | line 6936                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `break`               | line 6938                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `continue`            | line 6940                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `return`              | line 6942                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `switch`              | line 6951                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `__target_switch`     | line 6953 (`parseTargetSwitchStmt`); compiler-internal                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `__stage_switch`      | line 6955 (`parseStageSwitchStmt`); compiler-internal                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `__intrinsic_asm`     | line 6957 (`parseIntrinsicAsmStmt`); compiler-internal                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `case`                | line 6959 (and in the switch body at lines 6619, 6649)                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `default`             | line 6961 (and in the switch body at lines 6625, 6649)                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `__GPU_FOREACH`       | line 6963 (`ParseGpuForeachStmt`); compiler-internal                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `discard`             | line 6944                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `defer`               | line 6969                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `throw`               | line 6977                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `__requireCapability` | line 6981 (`Parser::ParseRequireCapabilityStatement`, line 7601); compiler-internal                                                                                                                                                                                                                                                                                                                                                                                                |
+| `catch`               | `Parser::ParseDoCatchStatement` (line 7482), reached from `ParseDoStatement` at line 7527. `catch` does **not** pair with `try` at statement level                                                                                                                                                                                                                                                                                                                                 |
 
 These keywords are not in the syntax-decl table because Slang treats
 control-flow as a closed grammar; they cannot be redefined by user
-code. Note that `try` is an *expression* keyword (see
+code. Note that `try` is an _expression_ keyword (see
 `## Expression keywords` below); the statement-level exception
 handler is `do { ... } catch ( ... ) { ... }`, parsed at
 [slang-parser.cpp lines
@@ -144,40 +144,40 @@ through `_makeParseDecl(...)` (defined at line 10671). Identifiers that begin wi
 underscore (`__`) are intentionally namespaced as compiler-internal /
 non-stable.
 
-| Keyword | Parses |
-| --- | --- |
-| `typedef` | C-style type alias (`parseTypeDef`) |
-| `typealias` | Slang-style type alias (`parseTypeAliasDecl`) |
-| `associatedtype` | Interface associated type (`parseAssocType`, line 4293) |
-| `__constraint` | Interface-level constraint requirement (`parseInterfaceConstraintDecl`, line 4335) |
-| `__associatedfunc` | Interface associated function (`parseAssocFunc`) |
-| `type_param` | Module-level generic type parameter (`parseGlobalGenericTypeParamDecl`) |
-| `__generic` | Generic-parameter list head (`parseGenericDecl`) |
-| `__generic_value_param` | Module-level generic value parameter (`parseGlobalGenericValueParamDecl`) |
-| `extension`, `__extension` | Type extension (`parseExtensionDecl`) |
-| `__func_extension` | Function extension shorthand for custom derivatives (`parseFuncExtensionDecl`); experimental (gated by `-experimental-feature`) |
-| `interface` | Interface (`parseInterfaceDecl`) |
-| `__init` | Constructor (`parseConstructorDecl`) |
-| `__subscript` | Subscript (`parseSubscriptDecl`) |
-| `property` | Property (`parsePropertyDecl`) |
-| `semantic` | HLSL-style semantic decl (`parseSemanticDecl`) |
-| `cbuffer` | HLSL constant-buffer decl (`parseHLSLCBufferDecl`) |
-| `tbuffer` | HLSL texture-buffer decl (`parseHLSLTBufferDecl`) |
-| `syntax` | User-defined syntax (`parseSyntaxDecl`) |
-| `attribute_syntax` | Attribute syntax (`parseAttributeSyntaxDecl`) |
-| `import`, `__import` | Module import (`parseImportDecl`) |
-| `__include` | Include directive (`parseIncludeDecl`) |
-| `module` | Module declaration (`parseModuleDeclarationDecl`) |
-| `implementing` | Module implementation declaration (`parseImplementingDecl`) |
-| `let` | Immutable binding (`parseLetDecl`) |
-| `var` | Mutable binding (`parseVarDecl`) |
-| `func` | Function declaration (`parseFuncDecl`) |
-| `namespace` | Namespace block (`parseNamespaceDecl`) |
-| `using` | Using directive (`parseUsingDecl`) |
-| `__ignored_block` | Compiler-internal ignored block |
-| `__transparent_block` | Compiler-internal transparent block |
-| `__file_decl` | Compiler-internal per-file decl group |
-| `__require_capability` | Capability requirement (`parseRequireCapabilityDecl`) |
+| Keyword                    | Parses                                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `typedef`                  | C-style type alias (`parseTypeDef`)                                                                                             |
+| `typealias`                | Slang-style type alias (`parseTypeAliasDecl`)                                                                                   |
+| `associatedtype`           | Interface associated type (`parseAssocType`, line 4293)                                                                         |
+| `__constraint`             | Interface-level constraint requirement (`parseInterfaceConstraintDecl`, line 4335)                                              |
+| `__associatedfunc`         | Interface associated function (`parseAssocFunc`)                                                                                |
+| `type_param`               | Module-level generic type parameter (`parseGlobalGenericTypeParamDecl`)                                                         |
+| `__generic`                | Generic-parameter list head (`parseGenericDecl`)                                                                                |
+| `__generic_value_param`    | Module-level generic value parameter (`parseGlobalGenericValueParamDecl`)                                                       |
+| `extension`, `__extension` | Type extension (`parseExtensionDecl`)                                                                                           |
+| `__func_extension`         | Function extension shorthand for custom derivatives (`parseFuncExtensionDecl`); experimental (gated by `-experimental-feature`) |
+| `interface`                | Interface (`parseInterfaceDecl`)                                                                                                |
+| `__init`                   | Constructor (`parseConstructorDecl`)                                                                                            |
+| `__subscript`              | Subscript (`parseSubscriptDecl`)                                                                                                |
+| `property`                 | Property (`parsePropertyDecl`)                                                                                                  |
+| `semantic`                 | HLSL-style semantic decl (`parseSemanticDecl`)                                                                                  |
+| `cbuffer`                  | HLSL constant-buffer decl (`parseHLSLCBufferDecl`)                                                                              |
+| `tbuffer`                  | HLSL texture-buffer decl (`parseHLSLTBufferDecl`)                                                                               |
+| `syntax`                   | User-defined syntax (`parseSyntaxDecl`)                                                                                         |
+| `attribute_syntax`         | Attribute syntax (`parseAttributeSyntaxDecl`)                                                                                   |
+| `import`, `__import`       | Module import (`parseImportDecl`)                                                                                               |
+| `__include`                | Include directive (`parseIncludeDecl`)                                                                                          |
+| `module`                   | Module declaration (`parseModuleDeclarationDecl`)                                                                               |
+| `implementing`             | Module implementation declaration (`parseImplementingDecl`)                                                                     |
+| `let`                      | Immutable binding (`parseLetDecl`)                                                                                              |
+| `var`                      | Mutable binding (`parseVarDecl`)                                                                                                |
+| `func`                     | Function declaration (`parseFuncDecl`)                                                                                          |
+| `namespace`                | Namespace block (`parseNamespaceDecl`)                                                                                          |
+| `using`                    | Using directive (`parseUsingDecl`)                                                                                              |
+| `__ignored_block`          | Compiler-internal ignored block                                                                                                 |
+| `__transparent_block`      | Compiler-internal transparent block                                                                                             |
+| `__file_decl`              | Compiler-internal per-file decl group                                                                                           |
+| `__require_capability`     | Capability requirement (`parseRequireCapabilityDecl`)                                                                           |
 
 Three of the `__` rows have a form worth spelling out, because the
 callback name alone does not imply one:
@@ -257,35 +257,35 @@ arguments (e.g. `layout`, `__target_intrinsic`).
 
 #### Simple modifiers
 
-| Keyword | AST node |
-| --- | --- |
-| `in` | `InModifier` |
-| `out` | `OutModifier` |
-| `inout` | `InOutModifier` |
-| `__ref` | `RefModifier` |
-| `__constref` | `BorrowModifier` |
-| `const` | `ConstModifier` |
-| `__builtin` | `BuiltinModifier` |
-| `highp`, `lowp`, `mediump` | `GLSLPrecisionModifier` |
-| `__global` | `ActualGlobalModifier` |
-| `inline` | `InlineModifier` |
-| `public`, `private`, `internal` | `PublicModifier`, `PrivateModifier`, `InternalModifier` |
-| `require` | `RequireModifier` |
-| `param` | `ParamModifier` |
-| `extern` | `ExternModifier` |
-| `dyn` | `DynModifier` |
-| `row_major`, `column_major` | `HLSLRowMajorLayoutModifier`, `HLSLColumnMajorLayoutModifier` |
-| `nointerpolation`, `noperspective`, `linear`, `sample`, `centroid`, `precise` | Interpolation modifiers |
-| `groupshared` | `HLSLGroupSharedModifier` |
-| `static` | `HLSLStaticModifier` |
-| `uniform` | `HLSLUniformModifier` |
-| `export` | `HLSLExportModifier` |
-| `dynamic_uniform` | `DynamicUniformModifier` |
-| `override` | `OverrideModifier` |
-| `point`, `line`, `triangle`, `lineadj`, `triangleadj` | Geometry-shader input modifiers |
-| `vertices`, `indices`, `primitives`, `payload` | Mesh-shader output modifiers |
-| `__prefix`, `__postfix` | Unary-operator placement modifiers |
-| `__exported` | Re-export `import` modifier |
+| Keyword                                                                       | AST node                                                      |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `in`                                                                          | `InModifier`                                                  |
+| `out`                                                                         | `OutModifier`                                                 |
+| `inout`                                                                       | `InOutModifier`                                               |
+| `__ref`                                                                       | `RefModifier`                                                 |
+| `__constref`                                                                  | `BorrowModifier`                                              |
+| `const`                                                                       | `ConstModifier`                                               |
+| `__builtin`                                                                   | `BuiltinModifier`                                             |
+| `highp`, `lowp`, `mediump`                                                    | `GLSLPrecisionModifier`                                       |
+| `__global`                                                                    | `ActualGlobalModifier`                                        |
+| `inline`                                                                      | `InlineModifier`                                              |
+| `public`, `private`, `internal`                                               | `PublicModifier`, `PrivateModifier`, `InternalModifier`       |
+| `require`                                                                     | `RequireModifier`                                             |
+| `param`                                                                       | `ParamModifier`                                               |
+| `extern`                                                                      | `ExternModifier`                                              |
+| `dyn`                                                                         | `DynModifier`                                                 |
+| `row_major`, `column_major`                                                   | `HLSLRowMajorLayoutModifier`, `HLSLColumnMajorLayoutModifier` |
+| `nointerpolation`, `noperspective`, `linear`, `sample`, `centroid`, `precise` | Interpolation modifiers                                       |
+| `groupshared`                                                                 | `HLSLGroupSharedModifier`                                     |
+| `static`                                                                      | `HLSLStaticModifier`                                          |
+| `uniform`                                                                     | `HLSLUniformModifier`                                         |
+| `export`                                                                      | `HLSLExportModifier`                                          |
+| `dynamic_uniform`                                                             | `DynamicUniformModifier`                                      |
+| `override`                                                                    | `OverrideModifier`                                            |
+| `point`, `line`, `triangle`, `lineadj`, `triangleadj`                         | Geometry-shader input modifiers                               |
+| `vertices`, `indices`, `primitives`, `payload`                                | Mesh-shader output modifiers                                  |
+| `__prefix`, `__postfix`                                                       | Unary-operator placement modifiers                            |
+| `__exported`                                                                  | Re-export `import` modifier                                   |
 
 Every row above is registered with the `_makeParseModifier(keyword,
 getSyntaxClass<...>())` overload, whose callback is
@@ -300,31 +300,31 @@ effect of a modifier such as `row_major` or `nointerpolation`.
 
 #### Callback-parsed modifiers (some take arguments)
 
-| Keyword | Parses |
-| --- | --- |
-| `shared` | `parseSharedModifier` (sets HLSL groupshared / shared on context) |
-| `volatile` | `parseVolatileModifier` |
-| `coherent` | `parseCoherentModifier` |
-| `restrict` | `parseRestrictModifier` |
-| `readonly` | `parseReadonlyModifier` |
-| `writeonly` | `parseWriteonlyModifier` |
-| `layout` | `parseLayoutModifier` (GLSL-style layout block) |
-| `hitAttributeEXT` | `parseHitAttributeEXTModifier` (raytracing) |
-| `__intrinsic_op` | `parseIntrinsicOpModifier` |
-| `__target_intrinsic` | `parseTargetIntrinsicModifier` |
-| `__specialized_for_target` | `parseSpecializedForTargetModifier` |
-| `__glsl_extension` | `parseGLSLExtensionModifier` |
-| `__glsl_version` | `parseGLSLVersionModifier` |
-| `__spirv_version` | `parseSPIRVVersionModifier` |
-| `__wgsl_extension` | `parseWGSLExtensionModifier` |
-| `__cuda_sm_version` | `parseCUDASMVersionModifier` |
-| `__builtin_type` | `parseBuiltinTypeModifier` |
-| `__builtin_requirement` | `parseBuiltinRequirementModifier` |
-| `__magic_type` | `parseMagicTypeModifier` |
-| `__magic_enum` | `parseMagicEnumModifier` |
-| `__intrinsic_type` | `parseIntrinsicTypeModifier` |
-| `__implicit_conversion` | `parseImplicitConversionModifier` |
-| `__attributeTarget` | `parseAttributeTargetModifier` |
+| Keyword                    | Parses                                                            |
+| -------------------------- | ----------------------------------------------------------------- |
+| `shared`                   | `parseSharedModifier` (sets HLSL groupshared / shared on context) |
+| `volatile`                 | `parseVolatileModifier`                                           |
+| `coherent`                 | `parseCoherentModifier`                                           |
+| `restrict`                 | `parseRestrictModifier`                                           |
+| `readonly`                 | `parseReadonlyModifier`                                           |
+| `writeonly`                | `parseWriteonlyModifier`                                          |
+| `layout`                   | `parseLayoutModifier` (GLSL-style layout block)                   |
+| `hitAttributeEXT`          | `parseHitAttributeEXTModifier` (raytracing)                       |
+| `__intrinsic_op`           | `parseIntrinsicOpModifier`                                        |
+| `__target_intrinsic`       | `parseTargetIntrinsicModifier`                                    |
+| `__specialized_for_target` | `parseSpecializedForTargetModifier`                               |
+| `__glsl_extension`         | `parseGLSLExtensionModifier`                                      |
+| `__glsl_version`           | `parseGLSLVersionModifier`                                        |
+| `__spirv_version`          | `parseSPIRVVersionModifier`                                       |
+| `__wgsl_extension`         | `parseWGSLExtensionModifier`                                      |
+| `__cuda_sm_version`        | `parseCUDASMVersionModifier`                                      |
+| `__builtin_type`           | `parseBuiltinTypeModifier`                                        |
+| `__builtin_requirement`    | `parseBuiltinRequirementModifier`                                 |
+| `__magic_type`             | `parseMagicTypeModifier`                                          |
+| `__magic_enum`             | `parseMagicEnumModifier`                                          |
+| `__intrinsic_type`         | `parseIntrinsicTypeModifier`                                      |
+| `__implicit_conversion`    | `parseImplicitConversionModifier`                                 |
+| `__attributeTarget`        | `parseAttributeTargetModifier`                                    |
 
 Which of these actually take arguments is decided by the callback, not
 by the heading. Six of them read no tokens at all: `shared`,
@@ -362,25 +362,25 @@ instead of taking the integer or identifier it otherwise accepts, and
 Registered through `_makeParseExpr` in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp).
 
-| Keyword | Parses |
-| --- | --- |
-| `this` | Self-reference (`parseThisExpr`) |
-| `true`, `false` | Boolean literals |
-| `nullptr` | Null pointer literal |
-| `none` | `Optional`'s none literal |
-| `try` | Error-handling expression (`parseTryExpr`) |
-| `no_diff` | Non-differentiable wrapper (`parseTreatAsDifferentiableExpr`) |
-| `__fwd_diff`, `fwd_diff` | Forward-mode differentiation (`parseForwardDifferentiate`) |
-| `__bwd_diff`, `bwd_diff` | Reverse-mode differentiation (`parseBackwardDifferentiate`) |
-| `__apply` | Apply-for-backward higher-order expression (`parseApplyForBwd`); used inside `__func_extension` to expose the primal-with-context companion to a custom `bwd_diff`; experimental |
-| `new` | Heap-style allocation expression; parsed specially by the `AdvanceIf(parser, "new")` branch of `parsePrefixExpr` at [slang-parser.cpp line 9686](../../../../source/slang/slang-parser.cpp) (`parsePrefixExpr` defined at line 9678; not via `_makeParseExpr`) |
-| `__return_val` | Compiler-internal return-value reference |
-| `__func_as_type` | Function-as-type reflection |
-| `__dispatch_kernel` | Kernel-dispatch primitive |
-| `sizeof`, `alignof`, `countof` | Size / alignment / element-count queries |
-| `__first`, `__last`, `__trimFirst`, `__trimLast`, `__shapeConcat`, `__shapePermute`, `__shapeSwap`, `__shapeReduce`, `__packBranch` | Shape / pack utility expressions |
-| `__getAddress` | Compiler-internal address-of |
-| `__floatAsInt` | Compiler-internal bit reinterpretation |
+| Keyword                                                                                                                             | Parses                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `this`                                                                                                                              | Self-reference (`parseThisExpr`)                                                                                                                                                                                                                               |
+| `true`, `false`                                                                                                                     | Boolean literals                                                                                                                                                                                                                                               |
+| `nullptr`                                                                                                                           | Null pointer literal                                                                                                                                                                                                                                           |
+| `none`                                                                                                                              | `Optional`'s none literal                                                                                                                                                                                                                                      |
+| `try`                                                                                                                               | Error-handling expression (`parseTryExpr`)                                                                                                                                                                                                                     |
+| `no_diff`                                                                                                                           | Non-differentiable wrapper (`parseTreatAsDifferentiableExpr`)                                                                                                                                                                                                  |
+| `__fwd_diff`, `fwd_diff`                                                                                                            | Forward-mode differentiation (`parseForwardDifferentiate`)                                                                                                                                                                                                     |
+| `__bwd_diff`, `bwd_diff`                                                                                                            | Reverse-mode differentiation (`parseBackwardDifferentiate`)                                                                                                                                                                                                    |
+| `__apply`                                                                                                                           | Apply-for-backward higher-order expression (`parseApplyForBwd`); used inside `__func_extension` to expose the primal-with-context companion to a custom `bwd_diff`; experimental                                                                               |
+| `new`                                                                                                                               | Heap-style allocation expression; parsed specially by the `AdvanceIf(parser, "new")` branch of `parsePrefixExpr` at [slang-parser.cpp line 9686](../../../../source/slang/slang-parser.cpp) (`parsePrefixExpr` defined at line 9678; not via `_makeParseExpr`) |
+| `__return_val`                                                                                                                      | Compiler-internal return-value reference                                                                                                                                                                                                                       |
+| `__func_as_type`                                                                                                                    | Function-as-type reflection                                                                                                                                                                                                                                    |
+| `__dispatch_kernel`                                                                                                                 | Kernel-dispatch primitive                                                                                                                                                                                                                                      |
+| `sizeof`, `alignof`, `countof`                                                                                                      | Size / alignment / element-count queries                                                                                                                                                                                                                       |
+| `__first`, `__last`, `__trimFirst`, `__trimLast`, `__shapeConcat`, `__shapePermute`, `__shapeSwap`, `__shapeReduce`, `__packBranch` | Shape / pack utility expressions                                                                                                                                                                                                                               |
+| `__getAddress`                                                                                                                      | Compiler-internal address-of                                                                                                                                                                                                                                   |
+| `__floatAsInt`                                                                                                                      | Compiler-internal bit reinterpretation                                                                                                                                                                                                                         |
 
 The operand shape of each row is fixed by its callback, and most but
 not all of the rows are parenthesized:

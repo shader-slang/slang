@@ -44,18 +44,22 @@ source/standard-modules/
 ## Files Involved
 
 ### Configuration Template
+
 - `source/standard-modules/slang-standard-module-config.h.in` - Template header file with CMake variables
 
 ### Generated Files
+
 - `build/source/standard-modules/slang-standard-module-config-header/slang-standard-module-config.h` - Generated configuration header (internal only)
 
 ### CMake Files
+
 - `source/standard-modules/CMakeLists.txt` - Defines configuration variables for all standard modules and generates the header
 - `source/standard-modules/neural/CMakeLists.txt` - Neural module specific build logic
 - `source/standard-modules/experimental/CMakeLists.txt` - Experimental module specific build logic
 - `source/slang/CMakeLists.txt` - Uses the standard module config header internally for the slang library
 
 ### C++ Code
+
 - `source/slang/slang-session.cpp` - Uses the configuration constants to locate standard modules at runtime
 
 ## How to Modify
@@ -104,6 +108,7 @@ When cross-compiling (e.g., building ARM64 binaries on an x86_64 host), the stan
 The build system automatically uses `SLANG_GENERATORS_PATH` to locate `slang-bootstrap`, a standalone Slang compiler with no external dependencies:
 
 1. First, build the generators for the host platform and install them:
+
    ```bash
    cmake --workflow --preset generators --fresh
    cmake --install build --config Release --component generators --prefix build-platform-generators
@@ -112,6 +117,7 @@ The build system automatically uses `SLANG_GENERATORS_PATH` to locate `slang-boo
    This installs `slang-bootstrap` along with other generator tools.
 
 2. Then, configure the cross-compilation build with `SLANG_GENERATORS_PATH`:
+
    ```bash
    cmake --preset default --fresh \
      -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
@@ -125,6 +131,7 @@ The build system automatically uses `SLANG_GENERATORS_PATH` to locate `slang-boo
    ```
 
 The build system automatically:
+
 - Detects when `SLANG_GENERATORS_PATH` is set
 - Uses `slang-bootstrap` from that path (a standalone tool with no dependencies)
 - Falls back to `slangc` for normal (non-cross-compilation) builds

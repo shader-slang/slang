@@ -31,9 +31,9 @@ Audience: a developer who just opened
 4. `## Pages` — a table:
 
    ```markdown
-   | Page | Family | Lua entry root | Approx. opcodes |
-   | --- | --- | --- | --- |
-   | [types.md](types.md) | Type instructions | `Type` (line ~20) | ~200 |
+   | Page                 | Family            | Lua entry root    | Approx. opcodes |
+   | -------------------- | ----------------- | ----------------- | --------------- |
+   | [types.md](types.md) | Type instructions | `Type` (line ~20) | ~200            |
    ```
 
    Counts are approximate: count `struct_name = "..."` entries plus

@@ -38,7 +38,7 @@ three Lua intermediate groups at lines 1015-1046 of
 `MakeDifferentialPairBase` (1016-1027),
 `DifferentialPairGetDifferentialBase` (1029-1038), and
 `DifferentialPairGetPrimalBase` (1040-1046). Every opcode that
-*translates* a function value into some differentiated form lives
+_translates_ a function value into some differentiated form lives
 under the hoistable `TranslateBase` group at lines 2816-2855. The
 checkpointing opcodes `checkpointObj`, `loopExitValue`, and
 `ReportCheckpointStore` are at lines 1608-1625; `detachDerivative` is
@@ -66,15 +66,13 @@ its `__init` with `__intrinsic_op($(kIROp_MakeDifferentialPair))`
 (lines 791, 797, 803); `DifferentialPtrPair<T>` declares the
 corresponding pointer-flavored four (lines 877-894). The free
 function `diffPair(primal, diff)` in
-[diff.meta.slang](../../../../source/slang/diff.meta.slang) (line
-1329) is a second spelling of `MakeDiffPair`, and `detach<T>(T x)`
+[diff.meta.slang](../../../../source/slang/diff.meta.slang) (line 1329) is a second spelling of `MakeDiffPair`, and `detach<T>(T x)`
 (line 2081) is the origin of `detachDerivative`.
 
 **Semantic checking** is the origin of most `TranslateBase` opcodes,
 via a mechanism that is easy to miss because it does not appear as a
 `visit*` method. `SynthesizedFuncDecl`
-([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) line
-760) carries a `uint32_t irOp` field plus a `List<Val*> operands`;
+([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) line 760) carries a `uint32_t irOp` field plus a `List<Val*> operands`;
 [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp) synthesizes such decls while checking a
 differentiable callable and stores the intended opcode in `irOp`.
 Lowering then reads that field at line 13847 of
@@ -82,7 +80,7 @@ Lowering then reads that field at line 13847 of
 lowers each `Val` operand, calls `emitIntrinsicInst` with
 `(IROp)synFuncDecl->irOp`, and replaces the placeholder `IRFunc` with
 the resulting inst. The sibling `SynthesizedStructDecl` path at line
-12454 does the same thing for the reverse-mode *context types*, which
+12454 does the same thing for the reverse-mode _context types_, which
 [types.md](types.md#differentiation-types) owns. The `AST origin`
 column below names the checking function that sets `irOp`; all of
 them go through this one lowering site.
@@ -121,7 +119,7 @@ global, and `ensureGlobalInst` in
 (line 5287) skips it explicitly as metadata that produces no code.
 
 Related opcodes documented elsewhere: the differential-pair and
-reverse-mode-context *types* are in
+reverse-mode-context _types_ are in
 [types.md](types.md#differentiation-types); the
 `DifferentiableTypeAnnotation` and `DifferentiableTypeDictionaryItem`
 annotation opcodes are in [misc.md](misc.md#annotations).
@@ -162,10 +160,10 @@ pointer flavors at once — `calcRequiredLoweringPassSet` and
 
 ### Differential-pair construction
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `MakeDiffPair` | `IRMakeDifferentialPair` | `primal, differential` | | `DifferentialPair<T>.__init` and `diffPair(...)`, both `__intrinsic_op($(kIROp_MakeDifferentialPair))` | Bundles a value-typed primal with its differential. |
-| `MakeDiffRefPair` | `IRMakeDifferentialPtrPair` | `primal, differential` | | `DifferentialPtrPair<T>.__init`, `__intrinsic_op($(kIROp_MakeDifferentialPtrPair))` | Bundles a pointer-typed primal with its differential pointer. |
+| Opcode            | C++ wrapper                 | Operands               | Flags | AST origin                                                                                             | Summary                                                       |
+| ----------------- | --------------------------- | ---------------------- | ----- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `MakeDiffPair`    | `IRMakeDifferentialPair`    | `primal, differential` |       | `DifferentialPair<T>.__init` and `diffPair(...)`, both `__intrinsic_op($(kIROp_MakeDifferentialPair))` | Bundles a value-typed primal with its differential.           |
+| `MakeDiffRefPair` | `IRMakeDifferentialPtrPair` | `primal, differential` |       | `DifferentialPtrPair<T>.__init`, `__intrinsic_op($(kIROp_MakeDifferentialPtrPair))`                    | Bundles a pointer-typed primal with its differential pointer. |
 
 ### Differential-pair projection
 
@@ -175,12 +173,12 @@ abstract bases supply a `getBase()` accessor for operand 0, so the
 per-leaf operand name is only relevant to the generated leaf
 accessors.
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `GetDifferential` | `IRDifferentialPairGetDifferential` | `pair` | | `DifferentialPair<T>.d` getter | Reads the differential component of a `DifferentialPair`. |
-| `GetDifferentialPtr` | `IRDifferentialPtrPairGetDifferential` | † `min=1` | | `DifferentialPtrPair<T>.d` getter | Reads the differential pointer of a `DifferentialPtrPair`. |
-| `GetPrimal` | `IRDifferentialPairGetPrimal` | `pair` | | `DifferentialPair<T>.p` / `.v` getters | Reads the primal component of a `DifferentialPair`. |
-| `GetPrimalRef` | `IRDifferentialPtrPairGetPrimal` ‡ | `ptrPair` | | `DifferentialPtrPair<T>.p` / `.v` getters | Reads the primal pointer of a `DifferentialPtrPair`. |
+| Opcode               | C++ wrapper                            | Operands  | Flags | AST origin                                | Summary                                                    |
+| -------------------- | -------------------------------------- | --------- | ----- | ----------------------------------------- | ---------------------------------------------------------- |
+| `GetDifferential`    | `IRDifferentialPairGetDifferential`    | `pair`    |       | `DifferentialPair<T>.d` getter            | Reads the differential component of a `DifferentialPair`.  |
+| `GetDifferentialPtr` | `IRDifferentialPtrPairGetDifferential` | † `min=1` |       | `DifferentialPtrPair<T>.d` getter         | Reads the differential pointer of a `DifferentialPtrPair`. |
+| `GetPrimal`          | `IRDifferentialPairGetPrimal`          | `pair`    |       | `DifferentialPair<T>.p` / `.v` getters    | Reads the primal component of a `DifferentialPair`.        |
+| `GetPrimalRef`       | `IRDifferentialPtrPairGetPrimal` ‡     | `ptrPair` |       | `DifferentialPtrPair<T>.p` / `.v` getters | Reads the primal pointer of a `DifferentialPtrPair`.       |
 
 The four operand spellings are inconsistent for one logical role:
 `GetDifferential` and `GetPrimal` name their single operand `pair`,
@@ -194,7 +192,7 @@ Everything in this section is a child of the hoistable
 `TranslateBase` group, so identical translation requests dedupe to a
 single IR value before the translation pass ever sees them. The dedupe
 is keyed on the request itself — opcode plus operands — so it is the
-*base function* that decides identity, not the call site:
+_base function_ that decides identity, not the call site:
 
 ```slang
 buf[0] = __fwd_diff(f)(DifferentialPair<float>(a, d)).d;
@@ -210,31 +208,30 @@ which also names `baseFn`.
 
 #### Forward-mode
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `ForwardDifferentiate` | `IRForwardDifferentiate` ‡ | `baseFn` | H | `ForwardDifferentiateExpr` (`__fwd_diff(...)`) via `visitForwardDifferentiateExpr`; also `ForwardDifferentiateVal` via `visitForwardDifferentiateVal` | Asks for the forward-mode (JVP) derivative of a function value. |
-| `TrivialForwardDifferentiate` | `IRTrivialForwardDifferentiate` | † `min=1` | H | `SynthesizedFuncDecl` `fwd_diff` created by `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]` / `[HasTrivialForwardDerivative]` | Asks for a derivative that runs the primal and returns zero output differentials, ignoring incoming tangents. |
-| `ForwardDifferentiatePropagate` | `IRForwardDifferentiatePropagate` ‡ | † `min=1` | H | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) line 419 | Forward-mode propagate function used while unzipping a reverse-mode body. |
+| Opcode                          | C++ wrapper                         | Operands  | Flags | AST origin                                                                                                                                            | Summary                                                                                                       |
+| ------------------------------- | ----------------------------------- | --------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ForwardDifferentiate`          | `IRForwardDifferentiate` ‡          | `baseFn`  | H     | `ForwardDifferentiateExpr` (`__fwd_diff(...)`) via `visitForwardDifferentiateExpr`; also `ForwardDifferentiateVal` via `visitForwardDifferentiateVal` | Asks for the forward-mode (JVP) derivative of a function value.                                               |
+| `TrivialForwardDifferentiate`   | `IRTrivialForwardDifferentiate`     | † `min=1` | H     | `SynthesizedFuncDecl` `fwd_diff` created by `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]` / `[HasTrivialForwardDerivative]`       | Asks for a derivative that runs the primal and returns zero output differentials, ignoring incoming tangents. |
+| `ForwardDifferentiatePropagate` | `IRForwardDifferentiatePropagate` ‡ | † `min=1` | H     | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) line 419                               | Forward-mode propagate function used while unzipping a reverse-mode body.                                     |
 
 #### Reverse-mode
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `BackwardDifferentiate` | `IRBackwardDifferentiate` ‡ | † `min=3` | H | `BackwardDifferentiateVal` via `visitBackwardDifferentiateVal`; also created internally by the translation pass | Asks for the whole reverse-mode bundle for a function value. |
-| `BackwardDifferentiatePrimal` | `IRBackwardDifferentiatePrimal` ‡ | † `min=1` | H | `SynthesizedFuncDecl` `apply_bwd` from `checkDifferentiableCallableCommon`, `trySynthesizeDiffFuncRequirementWitness`, `checkDerivativeAttribute`; also `BackwardDifferentiatePrimalVal` | Primal-only phase: computes and returns the values the propagate phase will need. |
-| `BackwardDifferentiatePropagate` | `IRBackwardDifferentiatePropagate` ‡ | † `min=1` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness`; also `BackwardDifferentiatePropagateVal` | Propagate phase: consumes the recorded context and an output adjoint, produces input adjoints. |
-| `BackwardRemat` | `IRBackwardRemat` | † `min=1` | H | `SynthesizedFuncDecl` `remat` from `checkDifferentiableCallableCommon`, `trySynthesizeDiffFuncRequirementWitness`, `checkDerivativeAttribute` | Rematerialization phase: recomputes primal values from the minimal context instead of reading a full checkpoint. |
-| `TrivialBackwardDifferentiate` | `IRTrivialBackwardDifferentiate` | † `min=1` | H | no AST origin — built by the translation pass as the root of the trivial five-tuple | Trivial-adjoint counterpart of `BackwardDifferentiate`. |
-| `TrivialBackwardDifferentiatePrimal` | `IRTrivialBackwardDifferentiatePrimal` | † `min=1` | H | `SynthesizedFuncDecl` from `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]` | Trivial primal phase. |
-| `TrivialBackwardDifferentiatePropagate` | `IRTrivialBackwardDifferentiatePropagate` | † `min=1` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Trivial propagate phase. |
-| `TrivialBackwardRemat` | `IRTrivialBackwardRemat` | † `min=1` | H | `SynthesizedFuncDecl` `remat` from `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]` | Trivial remat phase. |
+| Opcode                                  | C++ wrapper                               | Operands  | Flags | AST origin                                                                                                                                                                               | Summary                                                                                                          |
+| --------------------------------------- | ----------------------------------------- | --------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `BackwardDifferentiate`                 | `IRBackwardDifferentiate` ‡               | † `min=3` | H     | `BackwardDifferentiateVal` via `visitBackwardDifferentiateVal`; also created internally by the translation pass                                                                          | Asks for the whole reverse-mode bundle for a function value.                                                     |
+| `BackwardDifferentiatePrimal`           | `IRBackwardDifferentiatePrimal` ‡         | † `min=1` | H     | `SynthesizedFuncDecl` `apply_bwd` from `checkDifferentiableCallableCommon`, `trySynthesizeDiffFuncRequirementWitness`, `checkDerivativeAttribute`; also `BackwardDifferentiatePrimalVal` | Primal-only phase: computes and returns the values the propagate phase will need.                                |
+| `BackwardDifferentiatePropagate`        | `IRBackwardDifferentiatePropagate` ‡      | † `min=1` | H     | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness`; also `BackwardDifferentiatePropagateVal`                                                                           | Propagate phase: consumes the recorded context and an output adjoint, produces input adjoints.                   |
+| `BackwardRemat`                         | `IRBackwardRemat`                         | † `min=1` | H     | `SynthesizedFuncDecl` `remat` from `checkDifferentiableCallableCommon`, `trySynthesizeDiffFuncRequirementWitness`, `checkDerivativeAttribute`                                            | Rematerialization phase: recomputes primal values from the minimal context instead of reading a full checkpoint. |
+| `TrivialBackwardDifferentiate`          | `IRTrivialBackwardDifferentiate`          | † `min=1` | H     | no AST origin — built by the translation pass as the root of the trivial five-tuple                                                                                                      | Trivial-adjoint counterpart of `BackwardDifferentiate`.                                                          |
+| `TrivialBackwardDifferentiatePrimal`    | `IRTrivialBackwardDifferentiatePrimal`    | † `min=1` | H     | `SynthesizedFuncDecl` from `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]`                                                                                             | Trivial primal phase.                                                                                            |
+| `TrivialBackwardDifferentiatePropagate` | `IRTrivialBackwardDifferentiatePropagate` | † `min=1` | H     | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness`                                                                                                                     | Trivial propagate phase.                                                                                         |
+| `TrivialBackwardRemat`                  | `IRTrivialBackwardRemat`                  | † `min=1` | H     | `SynthesizedFuncDecl` `remat` from `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]`                                                                                     | Trivial remat phase.                                                                                             |
 
 None of these opcodes reaches target code, but the functions and types
 the reverse-mode passes build from them do, under generated names a
 reader will meet in emitted HLSL or CUDA. `generateName` in
 [slang-ir-autodiff-rev.cpp](../../../../source/slang/slang-ir-autodiff-rev.cpp)
-gives the propagate function the prefix `s_bwdProp_` (lines 405 and
-726) and the full intermediate-context struct the prefix
+gives the propagate function the prefix `s_bwdProp_` (lines 405 and 726) and the full intermediate-context struct the prefix
 `s_bwdCallableCtx_` (lines 314 and 727), so `f` yields `s_bwdProp_f`
 alongside a `s_bwdCallableCtx_f` struct carrying the hoisted primal
 state. Forward mode is the same shape one prefix over:
@@ -255,24 +252,24 @@ three functions — `apply_bwd`, `remat`, and propagate — which
 [slang-ir-autodiff-rev.cpp](../../../../source/slang/slang-ir-autodiff-rev.cpp)
 (lines 759-761) reads as operands 0, 1, and 2.
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `LegacyBackwardDifferentiate` | `IRLegacyBackwardDifferentiate` | † `min=3` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Old-style combined reverse-mode request. |
-| `BackwardFromLegacyBwdDiffFunc` | `IRBackwardFromLegacyBwdDiffFunc` | † `min=2` | H | no AST origin — built by the translation pass to root the legacy five-tuple | Reinterprets a legacy combined reverse function as the current bundle. |
-| `BackwardPrimalFromLegacyBwdDiffFunc` | `IRBackwardPrimalFromLegacyBwdDiffFunc` ‡ | † `min=2` | H | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff` and `translateBwdDerivativeAttributeToAD2` | Projects the primal phase out of a legacy combined function. |
-| `BackwardRematFromLegacyBwdDiffFunc` | `IRBackwardRematFromLegacyBwdDiffFunc` | † `min=2` | H | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff` and `translateBwdDerivativeAttributeToAD2` | Projects the remat phase. |
-| `BackwardPropagateFromLegacyBwdDiffFunc` | `IRBackwardPropagateFromLegacyBwdDiffFunc` ‡ | † `min=2` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Projects the propagate phase. |
+| Opcode                                   | C++ wrapper                                  | Operands  | Flags | AST origin                                                                                         | Summary                                                                |
+| ---------------------------------------- | -------------------------------------------- | --------- | ----- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `LegacyBackwardDifferentiate`            | `IRLegacyBackwardDifferentiate`              | † `min=3` | H     | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness`                               | Old-style combined reverse-mode request.                               |
+| `BackwardFromLegacyBwdDiffFunc`          | `IRBackwardFromLegacyBwdDiffFunc`            | † `min=2` | H     | no AST origin — built by the translation pass to root the legacy five-tuple                        | Reinterprets a legacy combined reverse function as the current bundle. |
+| `BackwardPrimalFromLegacyBwdDiffFunc`    | `IRBackwardPrimalFromLegacyBwdDiffFunc` ‡    | † `min=2` | H     | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff` and `translateBwdDerivativeAttributeToAD2` | Projects the primal phase out of a legacy combined function.           |
+| `BackwardRematFromLegacyBwdDiffFunc`     | `IRBackwardRematFromLegacyBwdDiffFunc`       | † `min=2` | H     | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff` and `translateBwdDerivativeAttributeToAD2` | Projects the remat phase.                                              |
+| `BackwardPropagateFromLegacyBwdDiffFunc` | `IRBackwardPropagateFromLegacyBwdDiffFunc` ‡ | † `min=2` | H     | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness`                               | Projects the propagate phase.                                          |
 
 #### Synthesized derivative witnesses
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `FunctionCopy` | `IRFunctionCopy` | † `min=1` | H | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff`, `_funcExtensionApply`, `translateBwdDerivativeAttributeToAD2` | Names an existing function as the body of a synthesized derivative member; translated to its own operand. |
-| `SynthesizedForwardDerivativeWitnessTable` | `IRSynthesizedForwardDerivativeWitnessTable` | † `min=1` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` and `checkDifferentiableCallableCommon`; also emitted by [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 3646 | Stands for an `IForwardDifferentiable` witness table that has to be built for a higher-order derivative. |
-| `SynthesizedBackwardDerivativeWitnessTable` | `IRSynthesizedBackwardDerivativeWitnessTable` | † `min=1` | H | as above, plus [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 3659 | Same, for `IBackwardDifferentiable`. |
-| `MakeIDifferentiableWitness` | `IRMakeIDifferentiableWitness` | † `min=1` | H | no AST origin — emitted by [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 101 | Requests an `IDifferentiable` witness for a `DifferentialPair` / `DifferentialPtrPair` type. |
-| `SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | `IRSynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | † `min=2` | H | none at this commit — see [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head) | Would bridge a legacy combined reverse function into the modern witness form. |
-| `IdentityRemat` | `IRIdentityRemat` | † `min=1` | H | `SynthesizedFuncDecl` `remat` from `_funcExtensionApply` | Marks the remat phase as the identity, for a user-provided `__apply` whose `MinimalContext` is its `BwdCallable`. |
+| Opcode                                                           | C++ wrapper                                                        | Operands  | Flags | AST origin                                                                                                                                                                                                              | Summary                                                                                                           |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------ | --------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `FunctionCopy`                                                   | `IRFunctionCopy`                                                   | † `min=1` | H     | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff`, `_funcExtensionApply`, `translateBwdDerivativeAttributeToAD2`                                                                                                  | Names an existing function as the body of a synthesized derivative member; translated to its own operand.         |
+| `SynthesizedForwardDerivativeWitnessTable`                       | `IRSynthesizedForwardDerivativeWitnessTable`                       | † `min=1` | H     | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` and `checkDifferentiableCallableCommon`; also emitted by [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 3646 | Stands for an `IForwardDifferentiable` witness table that has to be built for a higher-order derivative.          |
+| `SynthesizedBackwardDerivativeWitnessTable`                      | `IRSynthesizedBackwardDerivativeWitnessTable`                      | † `min=1` | H     | as above, plus [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 3659                                                                                                                | Same, for `IBackwardDifferentiable`.                                                                              |
+| `MakeIDifferentiableWitness`                                     | `IRMakeIDifferentiableWitness`                                     | † `min=1` | H     | no AST origin — emitted by [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 101                                                                                                     | Requests an `IDifferentiable` witness for a `DifferentialPair` / `DifferentialPtrPair` type.                      |
+| `SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | `IRSynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | † `min=2` | H     | none at this commit — see [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head)                                                                                                                         | Would bridge a legacy combined reverse function into the modern witness form.                                     |
+| `IdentityRemat`                                                  | `IRIdentityRemat`                                                  | † `min=1` | H     | `SynthesizedFuncDecl` `remat` from `_funcExtensionApply`                                                                                                                                                                | Marks the remat phase as the identity, for a user-provided `__apply` whose `MinimalContext` is its `BwdCallable`. |
 
 The `__func_extension` surface behind the `_funcExtensionApply` and
 `_funcExtensionBackwardDiff` origins above is experimental and is
@@ -292,24 +289,24 @@ mark values that stand in for a gradient or for one half of an
 `inout` parameter. None of them has a producer at this commit; see
 [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head).
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `LoadReverseGradient` | `IRLoadReverseGradient` ‡ | `value` | | no producer at HEAD | Placeholder for the accumulated derivative to pass as a nested call's `dOut` argument. |
-| `ReverseGradientDiffPairRef` | `IRReverseGradientDiffPairRef` ‡ | `primal, diff` | | no producer at HEAD | Placeholder pair carrying the primal and accumulated derivative of an `inout` argument. |
-| `PrimalParamRef` | `IRPrimalParamRef` ‡ | `referencedParam` | | no producer at HEAD | Reference to an `inout` parameter for use in the primal half of a split function. |
-| `DiffParamRef` | `IRDiffParamRef` ‡ | `referencedParam` | | no producer at HEAD | Reference to an `inout` parameter for use in the back-prop half. |
+| Opcode                       | C++ wrapper                      | Operands          | Flags | AST origin          | Summary                                                                                 |
+| ---------------------------- | -------------------------------- | ----------------- | ----- | ------------------- | --------------------------------------------------------------------------------------- |
+| `LoadReverseGradient`        | `IRLoadReverseGradient` ‡        | `value`           |       | no producer at HEAD | Placeholder for the accumulated derivative to pass as a nested call's `dOut` argument.  |
+| `ReverseGradientDiffPairRef` | `IRReverseGradientDiffPairRef` ‡ | `primal, diff`    |       | no producer at HEAD | Placeholder pair carrying the primal and accumulated derivative of an `inout` argument. |
+| `PrimalParamRef`             | `IRPrimalParamRef` ‡             | `referencedParam` |       | no producer at HEAD | Reference to an `inout` parameter for use in the primal half of a split function.       |
+| `DiffParamRef`               | `IRDiffParamRef` ‡               | `referencedParam` |       | no producer at HEAD | Reference to an `inout` parameter for use in the back-prop half.                        |
 
 ### Differential type info
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `DiffTypeInfo` | `IRDiffTypeInfo` | — | H | none at this commit — see [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head) | Would hold the witness tables describing a function's differentiable types; `lowerDiffTypeInfoInsts` rewrites it to a `makeTuple`. |
+| Opcode         | C++ wrapper      | Operands | Flags | AST origin                                                                                      | Summary                                                                                                                            |
+| -------------- | ---------------- | -------- | ----- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `DiffTypeInfo` | `IRDiffTypeInfo` | —        | H     | none at this commit — see [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head) | Would hold the witness tables describing a function's differentiable types; `lowerDiffTypeInfoInsts` rewrites it to a `makeTuple`. |
 
 ### Built-in requirement keys
 
 The `IDifferentiable` / `IBackwardDifferentiable` / `IBwdCallable`
 interfaces are recognized by the compiler, and the autodiff passes
-need to look their requirements up by *role*
+need to look their requirements up by _role_
 (`BuiltinRequirementKind::DifferentialType`, `DAddFunc`,
 `DifferentialWitness`, ...) rather than by entry position, which is
 not part of the representation. `builtinRequirementKey` is the
@@ -321,10 +318,10 @@ enumerators come from `struct_name`:
 `kIROp_BuiltinRequirementKey` and
 `kIROp_BuiltinRequirementDecoration`.
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `builtinRequirementKey` | `IRBuiltinRequirementKey` ‡ | `kindOperand: IRIntLit` | H | any requirement decl carrying `BuiltinRequirementModifier`, via `getInterfaceRequirementKey` | Requirement key for a recognized built-in interface requirement, deduplicated by construction from its kind. |
-| `BuiltinRequirementDecoration` | `IRBuiltinRequirementDecoration` ‡ | `kindOperand: IRIntLit` | | attached alongside the key by `getInterfaceRequirementKey` | Records which `BuiltinRequirementKind` a requirement key represents. |
+| Opcode                         | C++ wrapper                        | Operands                | Flags | AST origin                                                                                   | Summary                                                                                                      |
+| ------------------------------ | ---------------------------------- | ----------------------- | ----- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `builtinRequirementKey`        | `IRBuiltinRequirementKey` ‡        | `kindOperand: IRIntLit` | H     | any requirement decl carrying `BuiltinRequirementModifier`, via `getInterfaceRequirementKey` | Requirement key for a recognized built-in interface requirement, deduplicated by construction from its kind. |
+| `BuiltinRequirementDecoration` | `IRBuiltinRequirementDecoration` ‡ | `kindOperand: IRIntLit` |       | attached alongside the key by `getInterfaceRequirementKey`                                   | Records which `BuiltinRequirementKind` a requirement key represents.                                         |
 
 ### Checkpointing and rematerialization
 
@@ -333,12 +330,12 @@ where it no longer naturally lives. These opcodes mark the
 candidates so the primal-hoisting pass can decide between keeping a
 value live and recomputing it.
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `checkpointObj` | `IRCheckpointObject` ‡ | † `min=1` (`getVal()`) | | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) lines 285-288 | Marks a value as a distinct copy for checkpointing, so hoisting can keep in-loop and out-of-loop uses apart. |
-| `loopExitValue` | `IRLoopExitValue` ‡ | † `min=1` (`getVal()`) | | no AST origin — emitted by [slang-ir-autodiff-primal-hoist.cpp](../../../../source/slang/slang-ir-autodiff-primal-hoist.cpp) line 393 | Records the value of an SSA variable at a loop exit so reverse mode can read it. |
-| `ReportCheckpointStore` | `IRReportCheckpointStore` | `storedType, originalFunc, storeRef` | | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) lines 994 and 1146 | Marker that a checkpoint store was inserted, consumed by the checkpoint-report emitter. |
-| `detachDerivative` | `IRDetachDerivative` ‡ | `value` | | `detach<T>(T x)`, `__intrinsic_op($(kIROp_DetachDerivative))`; also `visitDetachExpr` and `visitTreatAsDifferentiableExpr` | Returns its operand unchanged but blocks derivative propagation through it. |
+| Opcode                  | C++ wrapper               | Operands                             | Flags | AST origin                                                                                                                            | Summary                                                                                                      |
+| ----------------------- | ------------------------- | ------------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `checkpointObj`         | `IRCheckpointObject` ‡    | † `min=1` (`getVal()`)               |       | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) lines 285-288          | Marks a value as a distinct copy for checkpointing, so hoisting can keep in-loop and out-of-loop uses apart. |
+| `loopExitValue`         | `IRLoopExitValue` ‡       | † `min=1` (`getVal()`)               |       | no AST origin — emitted by [slang-ir-autodiff-primal-hoist.cpp](../../../../source/slang/slang-ir-autodiff-primal-hoist.cpp) line 393 | Records the value of an SSA variable at a loop exit so reverse mode can read it.                             |
+| `ReportCheckpointStore` | `IRReportCheckpointStore` | `storedType, originalFunc, storeRef` |       | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) lines 994 and 1146     | Marker that a checkpoint store was inserted, consumed by the checkpoint-report emitter.                      |
+| `detachDerivative`      | `IRDetachDerivative` ‡    | `value`                              |       | `detach<T>(T x)`, `__intrinsic_op($(kIROp_DetachDerivative))`; also `visitDetachExpr` and `visitTreatAsDifferentiableExpr`            | Returns its operand unchanged but blocks derivative propagation through it.                                  |
 
 ## Notable opcodes
 
@@ -390,7 +387,7 @@ full intermediate-context type, and the minimal-context type. The
 individual opcodes `BackwardDifferentiatePrimal`, `BackwardRemat`,
 `BackwardDifferentiatePropagate`,
 `BackwardDiffIntermediateContextType`, and
-`BackwardDiffMinimalContextType` are each resolved by *synthesizing* a
+`BackwardDiffMinimalContextType` are each resolved by _synthesizing_ a
 one-operand `BackwardDifferentiate` for the same base function,
 translating that, and returning tuple element 0 through 4
 respectively (lines 164-198 of
@@ -458,7 +455,7 @@ extension it creates for a `[Differentiable]` callable: `apply_bwd`
 gets `irOp = kIROp_BackwardDifferentiatePrimal`, `remat` gets
 `kIROp_BackwardRemat`, and the propagate member comes from
 requirement-witness synthesis. Differentiability therefore reaches
-lowering as a *conformance* rather than as a flag on the function —
+lowering as a _conformance_ rather than as a flag on the function —
 [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md) owns that
 framing. When such a conformance is looked up later, the entry must
 be found by requirement key (`findWitnessTableEntry` in
@@ -469,7 +466,7 @@ built-in role, never by position.
 
 There is no opcode spelled `BackwardDiffPrimalContext` or
 `BackwardDiffPropagateContext`. The reverse-mode context is carried
-entirely by *type* opcodes —
+entirely by _type_ opcodes —
 `BackwardDiffIntermediateContextType`,
 `BackwardDiffMinimalContextType`, and their trivial and legacy
 variants under `TranslatedTypeBase` — which
@@ -484,7 +481,7 @@ elements 3 and 4 of the translation five-tuple.
 recognized built-in requirement is stored in and fetched from a
 witness table. Unlike an ordinary `key` / `StructKey` — a distinct
 global symbol per requirement decl, unified across modules by its
-`key_<mangled>` linkage name — the built-in key is *hoistable*, so it
+`key_<mangled>` linkage name — the built-in key is _hoistable_, so it
 is deduplicated by construction from its `kind` operand. The same
 logical requirement therefore resolves to one key inst whether it is
 referenced from the canonical interface constraint, from a constraint
@@ -497,7 +494,7 @@ because identity comes from the operand.
 line 1713) computes the role from the requirement's
 `BuiltinRequirementModifier` — promoting, for example,
 `DifferentialType` to `DifferentialWitness` when the requirement
-being keyed is the associated *conformance* rather than the
+being keyed is the associated _conformance_ rather than the
 associated type — then calls `getBuiltinRequirementKey` and attaches
 `BuiltinRequirementDecoration` (lines 1801-1807).
 `getInterfaceEntryByBuiltinRequirement`
@@ -511,7 +508,7 @@ rather than `IRStructKey` (see the comment at lines 3218-3221 of
 ### `checkpointObj` and `ReportCheckpointStore`
 
 `checkpointObj(value)` does not itself store anything; it makes a
-*distinct copy* of a value so that uses inside a loop body and uses
+_distinct copy_ of a value so that uses inside a loop body and uses
 outside it can be hoisted independently, which is what the primal
 value it wraps needs before the primal-hoisting pass can decide
 whether to checkpoint or recompute it. The unzip pass wraps the
@@ -546,7 +543,7 @@ applied to an expression — `visitTreatAsDifferentiableExpr` (line
 indexing as on resource indexing. `removeDetachInsts`, called from
 `finalizeAutoDiffPass`, deletes them once differentiation is done.
 
-`no_diff` on a *parameter declaration* is a different construct and
+`no_diff` on a _parameter declaration_ is a different construct and
 produces no `detachDerivative` inst at all. There it is a modifier, not
 an expression: checking moves a `NoDiffModifierVal` off the parameter's
 type onto the `ParamDecl` as a `NoDiffModifier` (lines 6736-6751 of
@@ -666,4 +663,4 @@ stable-name table. It has neither a producer nor a consumer.
   rationale for the split into primal / propagate / remat phases and
   for the checkpointing model.
 - [../glossary.md](../glossary.md) — definitions of `differential
-  pair`, `hoistable instruction`, `witness table`.
+pair`, `hoistable instruction`, `witness table`.
