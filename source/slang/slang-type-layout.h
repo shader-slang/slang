@@ -645,8 +645,8 @@ struct ParameterCategoryFlag
 typedef ParameterCategoryFlags LayoutResourceKindFlags;
 typedef ParameterCategoryFlag LayoutResourceKindFlag;
 
-// Layout information for a value that only consumes
-// a single resource kind.
+// Layout information for a value that consumes one primary resource kind, and may also carry
+// a second unit in another kind.
 struct SimpleLayoutInfo
 {
     // What kind of resource should we consume?
@@ -662,6 +662,10 @@ struct SimpleLayoutInfo
 
     // only useful in the uniform case
     LayoutOffset alignment;
+
+    // The second unit is never uniform, so it needs no alignment.
+    LayoutResourceKind secondKind = LayoutResourceKind::None;
+    LayoutSize secondSize = LayoutSize(0);
 
     SimpleLayoutInfo()
         : kind(LayoutResourceKind::None), size(0), alignment(1)
@@ -683,6 +687,17 @@ struct SimpleLayoutInfo
     SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, LayoutOffset alignment)
         : kind(kind), size(size), alignment(alignment)
     {
+    }
+
+    bool hasSecondUnit() const { return secondKind != LayoutResourceKind::None; }
+
+    // The layout must not already have a second unit, and the new unit must not be uniform.
+    void setSecondUnit(LayoutResourceKind unitKind, LayoutSize unitSize)
+    {
+        SLANG_ASSERT(!hasSecondUnit());
+        SLANG_ASSERT(unitKind != LayoutResourceKind::Uniform);
+        secondKind = unitKind;
+        secondSize = unitSize;
     }
 
     // Convert to layout for uniform data
@@ -728,19 +743,6 @@ struct ObjectLayoutInfo
     {
         SLANG_ASSERT(layoutInfos.getCount() == 1);
         return layoutInfos[0];
-    }
-    // Return the Uniform entry from this layout if one is present, otherwise fall back to
-    // the single entry (via getSimple). The layout must have a Uniform entry or exactly one
-    // entry. A layout with two or more entries and no Uniform entry falls through to
-    // getSimple and asserts. Metal argument buffer element layouts carry both a Uniform
-    // entry (byte size) and a MetalArgumentBufferElement entry (slot count), so callers that
-    // want only the byte layout use this method instead of getSimple.
-    SimpleLayoutInfo getUniformOrSimple()
-    {
-        for (auto layoutInfo : layoutInfos)
-            if (layoutInfo.kind == LayoutResourceKind::Uniform)
-                return layoutInfo;
-        return getSimple();
     }
 };
 
@@ -1336,10 +1338,8 @@ enum class ShaderParameterKind
 
 struct SimpleLayoutRulesImpl
 {
-    // Get the layout for a single scalar value of the base type. The result holds the size and
-    // alignment in one entry, and the Metal argument buffer rules add a MetalArgumentBufferElement
-    // slot as a second entry.
-    virtual ObjectLayoutInfo GetScalarLayout(
+    // Get the layout of a scalar of the base type.
+    virtual SimpleLayoutInfo GetScalarLayout(
         BaseType baseType,
         const TypeLayoutContext& context) = 0;
 
@@ -1351,10 +1351,8 @@ struct SimpleLayoutRulesImpl
     /// Get pointer layout, which can depend on the target.
     virtual SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context) = 0;
 
-    // Get the layout for a vector or matrix type. The result holds the size and alignment in one
-    // entry, and the Metal argument buffer rules add a MetalArgumentBufferElement slot as a second
-    // entry.
-    virtual ObjectLayoutInfo GetVectorLayout(
+    // Get the layout of a vector or matrix type.
+    virtual SimpleLayoutInfo GetVectorLayout(
         BaseType elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) = 0;
@@ -1405,7 +1403,7 @@ struct LayoutRulesImpl
 
     // Forward `SimpleLayoutRulesImpl` interface
 
-    ObjectLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context)
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context)
     {
         return simpleRules->GetScalarLayout(baseType, context);
     }
@@ -1418,7 +1416,7 @@ struct LayoutRulesImpl
         return simpleRules->GetArrayLayout(elementInfo, elementCount);
     }
 
-    ObjectLayoutInfo GetVectorLayout(
+    SimpleLayoutInfo GetVectorLayout(
         BaseType elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount)
