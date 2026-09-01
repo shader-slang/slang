@@ -76,6 +76,20 @@ static const SlangNVVMValueOperationDesc kNVVMPhysicalToHalfOperation = {
     kNVVMPhysicalToHalfOperands,
     SLANG_COUNT_OF(kNVVMPhysicalToHalfOperands),
 };
+static const SlangNVVMValueTypeDesc kNVVMRawBufferCountConversionOperands[] = {
+    NVVMSemantics::kUnsignedI64,
+};
+static const SlangNVVMValueOperationDesc kNVVMRawBufferCountConversion = {
+    SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+    NVVMSemantics::kUnsignedI32,
+    kNVVMRawBufferCountConversionOperands,
+    SLANG_COUNT_OF(kNVVMRawBufferCountConversionOperands),
+};
+
+bool _getNVVMStructuredBufferStorageLayout(
+    CodeGenContext* codeGenContext,
+    IRType* type,
+    IRSizeAndAlignment& outLayout);
 
 struct NVVMConventionalGlobalParams
 {
@@ -508,6 +522,51 @@ struct NVVMStructuredBufferLoad
     IRType* resultType = nullptr;
     SlangNVVMLoadFlags flags = SLANG_NVVM_LOAD_FLAG_NONE;
 };
+
+struct NVVMStructuredBufferDimensions
+{
+    IRInst* buffer = nullptr;
+    NVVMRawBufferType bufferType;
+    IRVectorType* resultType = nullptr;
+    uint32_t elementStride = 0;
+};
+
+// Resolves the canonical structured-buffer query against the existing `{data, count}` raw view.
+// The count is runtime data carried by the view; the CUDA element stride is a compile-time fact of
+// the exact selected storage type and never needs to be recovered from source syntax.
+bool _getNVVMStructuredBufferDimensions(
+    CodeGenContext* codeGenContext,
+    IRInst* inst,
+    NVVMStructuredBufferDimensions& outDimensions)
+{
+    outDimensions = {};
+    auto query = as<IRStructuredBufferGetDimensions>(inst);
+    IRInst* buffer = query ? query->getBuffer() : nullptr;
+    NVVMRawBufferType bufferType;
+    bool isSigned = false;
+    uint32_t elementCount = 0;
+    auto resultType =
+        query ? asNVVMSupportedI32VectorType(query->getDataType(), &isSigned, &elementCount)
+              : nullptr;
+    IRSizeAndAlignment elementLayout;
+    if (!query || query->getOperandCount() != 1 || !buffer || !resultType || isSigned ||
+        elementCount != 2 || !getNVVMSupportedRawBufferType(buffer->getDataType(), bufferType) ||
+        bufferType.kind != NVVMRawBufferKind::Structured ||
+        !_getNVVMStructuredBufferStorageLayout(
+            codeGenContext,
+            bufferType.structuredElementType,
+            elementLayout) ||
+        elementLayout.size <= 0 || elementLayout.size > kNVVMUInt32Max)
+    {
+        return false;
+    }
+
+    outDimensions.buffer = buffer;
+    outDimensions.bufferType = bufferType;
+    outDimensions.resultType = resultType;
+    outDimensions.elementStride = uint32_t(elementLayout.size);
+    return true;
+}
 
 struct NVVMStructuredBufferElementPointer
 {
@@ -7745,6 +7804,22 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_StructuredBufferGetDimensions:
+                {
+                    NVVMStructuredBufferDimensions dimensions;
+                    if (!_getNVVMStructuredBufferDimensions(codeGenContext, inst, dimensions))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("structured-buffer dimensions"));
+                    }
+                    _requireValueOperation(
+                        requirements.valueOperations,
+                        kNVVMRawBufferCountConversion,
+                        "structured-buffer count conversion");
+                }
+                break;
+
             case kIROp_ByteAddressBufferLoad:
             case kIROp_ByteAddressBufferStore:
                 {
@@ -8504,6 +8579,25 @@ SlangResult _validateNVVMFunction(
                     SLANG_RETURN_ON_FAIL(_validateInteger32Value(
                         codeGenContext,
                         load.elementIndex,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    availableValues.add(inst);
+                }
+                break;
+
+            case kIROp_StructuredBufferGetDimensions:
+                {
+                    NVVMStructuredBufferDimensions dimensions;
+                    if (!_getNVVMStructuredBufferDimensions(codeGenContext, inst, dimensions))
+                    {
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("structured-buffer dimensions relation"));
+                    }
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        dimensions.buffer,
                         inst,
                         availableValues,
                         dominatorTree));
@@ -14031,6 +14125,73 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 semanticValue));
                             loweredValue = semanticValue;
                         }
+                        valueMap[inst] = loweredValue;
+                    }
+                    break;
+
+                case kIROp_StructuredBufferGetDimensions:
+                    {
+                        NVVMStructuredBufferDimensions dimensions;
+                        SLANG_RELEASE_ASSERT(
+                            _getNVVMStructuredBufferDimensions(codeGenContext, inst, dimensions));
+                        SlangNVVMValueHandle loweredBuffer = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            dimensions.buffer,
+                            valueMap,
+                            typeContext,
+                            loweredBuffer));
+                        SlangNVVMValueHandle loweredCount64 = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "raw structured-buffer element count",
+                            builder.emitAggregateElementExtract(
+                                moduleScope.module,
+                                loweredBuffer,
+                                1,
+                                loweredCount64)));
+                        SlangNVVMValueHandle loweredCount = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "structured-buffer count conversion",
+                            builder.emitValueOperation(
+                                moduleScope.module,
+                                kNVVMRawBufferCountConversion,
+                                &loweredCount64,
+                                1,
+                                loweredCount)));
+                        SlangNVVMTypeHandle loweredElementType = nullptr;
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            dimensions.resultType->getElementType(),
+                            NVVMTypeUse::Value,
+                            loweredElementType));
+                        SlangNVVMValueHandle loweredStride = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "structured-buffer element stride",
+                            builder.getIntegerConstant(
+                                moduleScope.module,
+                                loweredElementType,
+                                dimensions.elementStride,
+                                loweredStride)));
+                        const SlangNVVMValueHandle elements[] = {loweredCount, loweredStride};
+                        SlangNVVMTypeHandle loweredResultType = nullptr;
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            dimensions.resultType,
+                            NVVMTypeUse::Value,
+                            loweredResultType));
+                        SlangNVVMValueHandle loweredValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "structured-buffer dimensions",
+                            builder.emitVectorConstruct(
+                                moduleScope.module,
+                                loweredResultType,
+                                elements,
+                                SLANG_COUNT_OF(elements),
+                                loweredValue)));
                         valueMap[inst] = loweredValue;
                     }
                     break;

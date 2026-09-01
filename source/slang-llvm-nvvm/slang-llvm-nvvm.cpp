@@ -3431,6 +3431,8 @@ static SlangResult _emitCatalogOperation(
         return _emitBarrier(module, llvm::Intrinsic::nvvm_barrier0, outValue);
     case SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER:
         return _emitBarrier(module, llvm::Intrinsic::nvvm_membar_gl, outValue);
+    case SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER:
+        return _emitBarrier(module, llvm::Intrinsic::nvvm_membar_cta, outValue);
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT:
     case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT:

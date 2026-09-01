@@ -7099,6 +7099,30 @@ references and reaches 400/400/400 O0/O3/both-mode correctness (93.7%), with zer
 Discovery remains exactly 82/72 at 66/66/66. The selected prefix passes 433/433, and all 30
 representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
 
+### Slice 167: Counter-backed structured-buffer views
+
+Append and Consume legalization replaces each source resource with a two-field aggregate containing
+an element view and an atomic-counter view. `lowerStructuredBufferType` intentionally constructs
+those `RWStructuredBuffer` fields from the element and explicit data-layout operands. The direct
+classifier now accepts that canonical two-operand form as well as the established three-operand
+form, while retaining exact opcode, element, layout, and operand-count validation.
+
+`IRStructuredBufferGetDimensions` uses the established raw view `{data, count}`: field one supplies
+the runtime element count, and the selected CUDA storage layout supplies the constant element
+stride. The result remains the canonical unsigned `uint2`. No source syntax, resource name, or
+missing operand is reconstructed.
+
+Canonical `GroupMemoryBarrier()` contributes exact GenericAsm `__threadfence_block`. This is a CTA-
+scope memory fence, not the synchronizing `barrier0` used by `GroupMemoryBarrierWithGroupSync` and
+not device-scope `membar.gl`. Forward-only provider ABI revision 32 therefore appends one typed
+`WORKGROUP_MEMORY_BARRIER` operation and maps it to `llvm.nvvm.membar.cta`; no callback is added.
+
+Append and Consume become correct at O0 and O3 and gain four permanent direct lanes. Frozen corpus
+v1 remains exactly 452 workloads/427 healthy references and reaches 402/402/402 O0/O3/both-mode
+correctness (94.1%), with exactly two gains and no old-correct loss. Discovery remains exactly
+82/72 at 66/66/66 with no change. The selected prefix passes 433/433. All 32 representative gates
+compile, and their five configurations assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

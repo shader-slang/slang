@@ -2373,3 +2373,22 @@ O0 and gain five permanent direct lanes. Frozen v1 advances from 396/400/396 to 
 unchanged 427 healthy denominator, with exactly four gains and no loss. Discovery remains 66/66/66
 over 72 with no change. The selected prefix passes 433/433, the focused fixtures pass 10/10, and all
 30 representative direct-O3 gates assemble with CUDA 12.9 for SM70, SM80, and SM90.
+
+Slice 167 admits the exact two-operand structured-buffer type produced by
+`lowerStructuredBufferType` for the element and counter fields of Append/Consume aggregates. The
+same classifier continues to admit the established three-operand form and rejects every other
+operand count, unsupported element, and unsupported explicit layout. Generated helpers then reuse
+generic aggregate extraction, raw-buffer element pointers, relaxed global atomics, and calls.
+
+The slice also lowers exact `IRStructuredBufferGetDimensions` from the existing `{data, count}`
+view plus the selected CUDA storage stride. Forward-only provider ABI revision 32 adds only the
+typed CTA memory-fence operation required for canonical `__threadfence_block`; the LLVM provider
+emits `llvm.nvvm.membar.cta`, while synchronizing and device-scope barriers retain their distinct
+operations.
+
+`append-structured-buffer.slang` and `consume-structured-buffer.slang` gain four permanent direct
+lanes. Frozen v1 advances from 400/400/400 to 402/402/402 over its unchanged 427 healthy
+denominator, with exactly two gains and no old-correct loss. Discovery remains 66/66/66 over 72
+with no change. The selected prefix passes 433/433, the promoted fixtures pass 4/4, and all 32
+measurement gates produce 160 assembled cubins across the five NVRTC/direct configurations and
+SM70, SM80, and SM90.

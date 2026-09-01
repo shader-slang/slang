@@ -657,6 +657,14 @@ inline constexpr CatalogEntry kCatalog[] = {
         "CUDA device memory barrier",
         "__threadfence()",
     },
+    {
+        SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER,
+        kVoid,
+        {kNoType, kNoType, kNoType},
+        0,
+        "CUDA workgroup memory fence",
+        "__threadfence_block",
+    },
 };
 
 inline constexpr size_t getCatalogCount()

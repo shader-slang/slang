@@ -1192,11 +1192,15 @@ static bool _getNVVMSupportedRawBufferType(
 {
     outType = {};
 
+    // The ordinary buffer-element legalization may append a layout-conformance operand, while
+    // `lowerStructuredBufferType` deliberately constructs the element and atomic-counter views of
+    // an Append/Consume aggregate from only the semantic element and explicit data layout. Both
+    // are canonical structured-buffer types; the required layout is checked below in either form.
     auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
     if (bufferType &&
         (bufferType->getOp() == kIROp_HLSLStructuredBufferType ||
          bufferType->getOp() == kIROp_HLSLRWStructuredBufferType) &&
-        bufferType->getOperandCount() == 3 &&
+        (bufferType->getOperandCount() == 2 || bufferType->getOperandCount() == 3) &&
         _isNVVMSupportedResourceElementType(bufferType->getElementType(), activeTypes))
     {
         IRType* dataLayout = bufferType->getDataLayout();

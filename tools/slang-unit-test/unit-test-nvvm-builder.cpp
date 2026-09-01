@@ -1542,6 +1542,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         getOperation(SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER);
     const SlangNVVMValueOperationDesc deviceBarrierOperation =
         getOperation(SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER);
+    const SlangNVVMValueOperationDesc workgroupMemoryBarrierOperation =
+        getOperation(SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER);
 
     SlangNVVMValueHandle rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
@@ -1635,6 +1637,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
         builder
             .emitValueOperation(scope.module, deviceBarrierOperation, nullptr, 0, barrierValue)));
     SLANG_CHECK(barrierValue == nullptr);
+    barrierValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueOperation(
+        scope.module,
+        workgroupMemoryBarrierOperation,
+        nullptr,
+        0,
+        barrierValue)));
+    SLANG_CHECK(barrierValue == nullptr);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
 
@@ -1654,6 +1664,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     SLANG_CHECK(
         builder.emitValueOperation(scope.module, barrierOperation, nullptr, 0, barrierValue) ==
         SLANG_E_INVALID_ARG);
+    SLANG_CHECK(barrierValue == nullptr);
+    barrierValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitValueOperation(
+            scope.module,
+            workgroupMemoryBarrierOperation,
+            nullptr,
+            0,
+            barrierValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(barrierValue == nullptr);
 
     const SlangNVVMSerializationFormat formats[] = {
@@ -1684,6 +1703,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
             _countOccurrences(
                 text.getUnownedSlice(),
                 toSlice("call void @llvm.nvvm.membar.gl()")) == 1);
+        SLANG_CHECK(
+            _countOccurrences(
+                text.getUnownedSlice(),
+                toSlice("call void @llvm.nvvm.membar.cta()")) == 1);
         SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("extractelement")) == 12);
         SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("ret void")) == 1);
         if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)

@@ -1,0 +1,490 @@
+{
+  "schema": 1,
+  "corpus": "rolling discovery corpus",
+  "metrics": {
+    "selected_workloads": 82,
+    "healthy_reference_denominator": 72,
+    "o0_correct": 66,
+    "o3_correct": 66,
+    "both_correct": 66
+  },
+  "classification_totals": {
+    "nvrtc-o3": {
+      "correct": 72,
+      "infrastructure": 8,
+      "runtime-mismatch": 2
+    },
+    "nvvm-o0": {
+      "correct": 66,
+      "infrastructure": 7,
+      "preflight": 8,
+      "runtime-mismatch": 1
+    },
+    "nvvm-o3": {
+      "correct": 66,
+      "infrastructure": 7,
+      "preflight": 8,
+      "runtime-mismatch": 1
+    }
+  },
+  "pareto": {
+    "nvrtc-o3": [
+      {
+        "cluster": "infrastructure-cuda-capability",
+        "count": 7,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "infrastructure"
+        ],
+        "exact_shapes": [
+          "target capability requirement"
+        ],
+        "producer": "entry-point target-requirement checking -> E36107",
+        "diagnostics": [
+          "E36107: target capability requirements make the entry point unavailable to CUDA"
+        ],
+        "examples": [
+          "bugs/gh-6657-nonbindless-uniform.slang",
+          "compute/atomics-buffer.slang",
+          "compute/constexpr.slang",
+          "language-feature/pointer/coherent-load-store-groupshared.slang"
+        ]
+      },
+      {
+        "cluster": "infrastructure-nvrtc-resource-compilation",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "infrastructure"
+        ],
+        "exact_shapes": [
+          "NVRTC CUDA C++ compilation"
+        ],
+        "producer": "Slang CUDA C++ resource emission -> NVRTC 12.9",
+        "diagnostics": [
+          "nvrtc 12.9: build/nvvm-census/slice167-discovery-full/mirror/compute/nvvm-census-texture-subscript-multisample-a4beb992b6.slang(17): error : this declaration has no storage class or type specifier"
+        ],
+        "examples": [
+          "compute/texture-subscript-multisample.slang"
+        ]
+      },
+      {
+        "cluster": "runtime-matrix-layout",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "runtime-mismatch"
+        ],
+        "exact_shapes": [
+          "runtime result buffer (no unsupported canonical IR shape)"
+        ],
+        "producer": "NVRTC/direct-LLVM PTX execution -> compare-compute result buffer",
+        "diagnostics": [
+          "expected [type: float | 11.000000 | 22.000000], actual [type: float | 11.000000 | 1.000000]"
+        ],
+        "examples": [
+          "compute/non-square-column-major.slang"
+        ]
+      },
+      {
+        "cluster": "runtime-resource-query",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "runtime-mismatch"
+        ],
+        "exact_shapes": [
+          "runtime result buffer (no unsupported canonical IR shape)"
+        ],
+        "producer": "NVRTC/direct-LLVM PTX resource execution -> compare-compute result buffer",
+        "diagnostics": [
+          "expected [4C800000 | 4D008000 | 4C008080 | 4D808000 | 4C000080 | 4C808060 | 4D808008 | 3F800000], actual [4C800000 | 4D008000 | 4C008080 | 4D808000 | 4C000000 | 4C808000 | 4D808000 | 3F800000]"
+        ],
+        "examples": [
+          "compute/texture-get-dimensions.slang"
+        ]
+      }
+    ],
+    "nvvm-o0": [
+      {
+        "cluster": "aggregate-struct-field-pointer",
+        "count": 2,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "struct field address result: Ptr<RWStructuredBuffer<int>, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>",
+          "struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>"
+        ],
+        "producer": "IRBuilder::emitFieldAddress -> IRFieldAddress; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<RWStructuredBuffer<int>, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'",
+          "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'"
+        ],
+        "examples": [
+          "bugs/type-legalize-bug-1.slang",
+          "compute/texture-subscript-multisample.slang"
+        ]
+      },
+      {
+        "cluster": "aggregate-storage-layout",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "aggregate storage layout"
+        ],
+        "producer": "entry-point/buffer type lowering -> conventional global aggregate; _hasNVVMCompatibleAggregateStorageLayout",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'"
+        ],
+        "examples": [
+          "compute/buffer-type-splitting.slang"
+        ]
+      },
+      {
+        "cluster": "fixed-array-value-construction",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "makeArray"
+        ],
+        "producer": "legalizeMatrixTypes -> IRBuilder::emitMakeArray; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'makeArray'"
+        ],
+        "examples": [
+          "compute/static-const-matrix-array.slang"
+        ]
+      },
+      {
+        "cluster": "helper-aggregate-parameter-abi",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "helper function parameter: BorrowInParam<Params_natural, addressSpace=2147483647, access=1, operands=4, layout=DefaultLayout>"
+        ],
+        "producer": "post-specialization linked IRFunc aggregate signature; _validateNVVMHelperTarget",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: BorrowInParam<Params_natural, addressSpace=2147483647, access=1, operands=4, layout=DefaultLayout>'"
+        ],
+        "examples": [
+          "optimization/arrray-storage-lowering.slang"
+        ]
+      },
+      {
+        "cluster": "helper-pointer-parameter-abi",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "helper function parameter: Ptr<Ptr<Tuple, addressSpace=4294967297, access=0, operands=4, layout=DefaultLayout>, addressSpace=4294967297, access=0, operands=4, layout=DefaultLayout>"
+        ],
+        "producer": "post-specialization linked IRFunc pointer signature; _validateNVVMHelperTarget",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<Ptr<Tuple, addressSpace=4294967297, access=0, operands=4, layout=DefaultLayout>, addressSpace=4294967297, access=0, operands=4, layout=DefaultLayout>'"
+        ],
+        "examples": [
+          "language-feature/dynamic-dispatch/ptr-to-interface-double-indirect.slang"
+        ]
+      },
+      {
+        "cluster": "resource-array-value-load",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "load result type: Array<Texture2D, 2>"
+        ],
+        "producer": "collectEntryPointUniforms -> synthesized GlobalParams resource-array field -> IRLoad; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'load result type: Array<Texture2D, 2>'"
+        ],
+        "examples": [
+          "optimization/func-resource-result/func-resource-result-complex.slang"
+        ]
+      },
+      {
+        "cluster": "infrastructure-cuda-capability",
+        "count": 7,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "infrastructure"
+        ],
+        "exact_shapes": [
+          "target capability requirement"
+        ],
+        "producer": "entry-point target-requirement checking -> E36107",
+        "diagnostics": [
+          "E36107: target capability requirements make the entry point unavailable to CUDA"
+        ],
+        "examples": [
+          "bugs/gh-6657-nonbindless-uniform.slang",
+          "compute/atomics-buffer.slang",
+          "compute/constexpr.slang",
+          "language-feature/pointer/coherent-load-store-groupshared.slang"
+        ]
+      },
+      {
+        "cluster": "generic-asm-texture-query",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)"
+        ],
+        "producer": "CUDA prelude texture dimensions -> StmtLoweringVisitor::visitIntrinsicAsmStmt -> IRGenericAsm; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'"
+        ],
+        "examples": [
+          "compute/texture-get-dimensions.slang"
+        ]
+      },
+      {
+        "cluster": "runtime-matrix-layout",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "runtime-mismatch"
+        ],
+        "exact_shapes": [
+          "runtime result buffer (no unsupported canonical IR shape)"
+        ],
+        "producer": "NVRTC/direct-LLVM PTX execution -> compare-compute result buffer",
+        "diagnostics": [
+          "expected [type: float | 11.000000 | 22.000000], actual [type: float | 11.000000 | 1.000000]"
+        ],
+        "examples": [
+          "compute/non-square-column-major.slang"
+        ]
+      }
+    ],
+    "nvvm-o3": [
+      {
+        "cluster": "aggregate-struct-field-pointer",
+        "count": 2,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "struct field address result: Ptr<RWStructuredBuffer<int>, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>",
+          "struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>"
+        ],
+        "producer": "IRBuilder::emitFieldAddress -> IRFieldAddress; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<RWStructuredBuffer<int>, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'",
+          "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture2DMS, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'"
+        ],
+        "examples": [
+          "bugs/type-legalize-bug-1.slang",
+          "compute/texture-subscript-multisample.slang"
+        ]
+      },
+      {
+        "cluster": "aggregate-storage-layout",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "aggregate storage layout"
+        ],
+        "producer": "entry-point/buffer type lowering -> conventional global aggregate; _hasNVVMCompatibleAggregateStorageLayout",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'"
+        ],
+        "examples": [
+          "compute/buffer-type-splitting.slang"
+        ]
+      },
+      {
+        "cluster": "fixed-array-value-construction",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "makeArray"
+        ],
+        "producer": "legalizeMatrixTypes -> IRBuilder::emitMakeArray; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'makeArray'"
+        ],
+        "examples": [
+          "compute/static-const-matrix-array.slang"
+        ]
+      },
+      {
+        "cluster": "helper-aggregate-parameter-abi",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "helper function parameter: BorrowInParam<Params_natural, addressSpace=2147483647, access=1, operands=4, layout=DefaultLayout>"
+        ],
+        "producer": "post-specialization linked IRFunc aggregate signature; _validateNVVMHelperTarget",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: BorrowInParam<Params_natural, addressSpace=2147483647, access=1, operands=4, layout=DefaultLayout>'"
+        ],
+        "examples": [
+          "optimization/arrray-storage-lowering.slang"
+        ]
+      },
+      {
+        "cluster": "helper-pointer-parameter-abi",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "helper function parameter: Ptr<Ptr<Tuple, addressSpace=4294967297, access=0, operands=4, layout=DefaultLayout>, addressSpace=4294967297, access=0, operands=4, layout=DefaultLayout>"
+        ],
+        "producer": "post-specialization linked IRFunc pointer signature; _validateNVVMHelperTarget",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<Ptr<Tuple, addressSpace=4294967297, access=0, operands=4, layout=DefaultLayout>, addressSpace=4294967297, access=0, operands=4, layout=DefaultLayout>'"
+        ],
+        "examples": [
+          "language-feature/dynamic-dispatch/ptr-to-interface-double-indirect.slang"
+        ]
+      },
+      {
+        "cluster": "resource-array-value-load",
+        "count": 1,
+        "healthy_reference_count": 1,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "load result type: Array<Texture2D, 2>"
+        ],
+        "producer": "collectEntryPointUniforms -> synthesized GlobalParams resource-array field -> IRLoad; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'load result type: Array<Texture2D, 2>'"
+        ],
+        "examples": [
+          "optimization/func-resource-result/func-resource-result-complex.slang"
+        ]
+      },
+      {
+        "cluster": "infrastructure-cuda-capability",
+        "count": 7,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "infrastructure"
+        ],
+        "exact_shapes": [
+          "target capability requirement"
+        ],
+        "producer": "entry-point target-requirement checking -> E36107",
+        "diagnostics": [
+          "E36107: target capability requirements make the entry point unavailable to CUDA"
+        ],
+        "examples": [
+          "bugs/gh-6657-nonbindless-uniform.slang",
+          "compute/atomics-buffer.slang",
+          "compute/constexpr.slang",
+          "language-feature/pointer/coherent-load-store-groupshared.slang"
+        ]
+      },
+      {
+        "cluster": "generic-asm-texture-query",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "preflight"
+        ],
+        "exact_shapes": [
+          "GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)"
+        ],
+        "producer": "CUDA prelude texture dimensions -> StmtLoweringVisitor::visitIntrinsicAsmStmt -> IRGenericAsm; _validateNVVMFunction",
+        "diagnostics": [
+          "direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly={uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : \"l\"($0)); *($2) = width;/* txq.num_mipmap_levels not available in CUDA */ *($3) = 0;}, signature=Void(Texture1D, uint, OutParam<uint>, OutParam<uint>)'"
+        ],
+        "examples": [
+          "compute/texture-get-dimensions.slang"
+        ]
+      },
+      {
+        "cluster": "runtime-matrix-layout",
+        "count": 1,
+        "healthy_reference_count": 0,
+        "classifications": [
+          "runtime-mismatch"
+        ],
+        "exact_shapes": [
+          "runtime result buffer (no unsupported canonical IR shape)"
+        ],
+        "producer": "NVRTC/direct-LLVM PTX execution -> compare-compute result buffer",
+        "diagnostics": [
+          "expected [type: float | 11.000000 | 22.000000], actual [type: float | 11.000000 | 1.000000]"
+        ],
+        "examples": [
+          "compute/non-square-column-major.slang"
+        ]
+      }
+    ]
+  },
+  "frozen_corpus_v1_slice_146_clusters": {
+    "nvrtc-o3": {
+      "infrastructure-native-reference": 3
+    },
+    "nvvm-o0": {
+      "runtime-bounds-zero-index": 1,
+      "runtime-sm90-mixed-width-atomic": 1,
+      "helper-abi-type-contract": 5,
+      "preflight-other": 4,
+      "residual-target-marker-or-undefined-value": 3,
+      "generic-asm-atomic": 3,
+      "raw-buffer-view-access": 3,
+      "runtime-other": 1,
+      "generic-asm-ordinary-intrinsic": 1,
+      "generic-asm-texture": 1,
+      "generic-asm-wave-reconvergence": 6,
+      "runtime-constant-buffer-layout": 1,
+      "aggregate-pointer-layout-transport": 1,
+      "runtime-anyvalue-layout": 1,
+      "runtime-descriptor-handle-layout": 3,
+      "generic-asm-device-clock": 1
+    },
+    "nvvm-o3": {
+      "runtime-bounds-zero-index": 1,
+      "runtime-sm90-mixed-width-atomic": 1,
+      "helper-abi-type-contract": 5,
+      "preflight-other": 4,
+      "residual-target-marker-or-undefined-value": 3,
+      "generic-asm-atomic": 3,
+      "raw-buffer-view-access": 3,
+      "runtime-other": 1,
+      "generic-asm-ordinary-intrinsic": 1,
+      "generic-asm-texture": 1,
+      "generic-asm-wave-reconvergence": 6,
+      "runtime-constant-buffer-layout": 1,
+      "aggregate-pointer-layout-transport": 1,
+      "runtime-anyvalue-layout": 1,
+      "runtime-descriptor-handle-layout": 3,
+      "generic-asm-device-clock": 1
+    }
+  }
+}

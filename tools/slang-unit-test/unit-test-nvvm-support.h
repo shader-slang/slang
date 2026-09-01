@@ -477,6 +477,7 @@ struct FakeNVVMBuilderState
         emitSequentialElementExtractCallCount = 0;
         workgroupBarrierCallCount = 0;
         deviceMemoryBarrierCallCount = 0;
+        workgroupMemoryBarrierCallCount = 0;
         for (Index family = 0; family < Index(FakeNVVMBuilderScalarFamily::Count); ++family)
         {
             scalarFamilyCallCounts[family] = 0;
@@ -829,6 +830,7 @@ struct FakeNVVMBuilderState
     int emitSequentialElementExtractCallCount = 0;
     int workgroupBarrierCallCount = 0;
     int deviceMemoryBarrierCallCount = 0;
+    int workgroupMemoryBarrierCallCount = 0;
     int scalarFamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::Count)] = {};
     int valueOperationFamilyCallCounts[Index(FakeNVVMBuilderScalarFamily::Count)] = {};
     int scalarOperationCallCounts[Index(FakeNVVMBuilderScalarFamily::Count)]
@@ -5619,6 +5621,8 @@ static SlangResult _fakeNVVMBuilderEmitBarrier(
         ++gFakeNVVMBuilder.workgroupBarrierCallCount;
     else if (operation == SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER)
         ++gFakeNVVMBuilder.deviceMemoryBarrierCallCount;
+    else if (operation == SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER)
+        ++gFakeNVVMBuilder.workgroupMemoryBarrierCallCount;
     else
         return SLANG_E_INVALID_ARG;
     *outValue = nullptr;
@@ -5711,6 +5715,7 @@ static SlangResult _fakeNVVMBuilderEmitCatalogOperation(
         return _fakeNVVMBuilderEmitExecutionOperation(module, entry.operation, outValue);
     case SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER:
     case SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER:
+    case SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER:
         return _fakeNVVMBuilderEmitBarrier(module, entry.operation, outValue);
     default:
         return _fakeNVVMBuilderEmitIntrinsic(
