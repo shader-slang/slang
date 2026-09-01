@@ -2697,6 +2697,20 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
+// Returns true if the current JSON-RPC response's `result` is JSON `null`.
+//
+// Inspects the raw result kind instead of deserializing with getMessage(): getMessage() into a
+// zero-field struct succeeds on `{}` and fails on real `null`, so it cannot tell the two apart —
+// and distinguishing them is exactly what the null-result LANG_SERVER tests assert (see #12869,
+// where an empty hover must serialize as `null`, not `{}`). Folding this back to a typed
+// getMessage() check would silently reinstate that bug.
+static bool receivedNullResult(JSONRPCConnection* connection)
+{
+    JSONResultResponse resultResponse;
+    return SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
+           resultResponse.result.getKind() == JSONValue::Kind::Null;
+}
+
 TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 {
     // We don't support running language server tests in parallel yet.
@@ -2818,10 +2832,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            JSONResultResponse resultResponse;
             List<LanguageServerProtocol::CompletionItem> completionItems;
-            if (SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
-                resultResponse.result.getKind() == JSONValue::Kind::Null)
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2858,10 +2870,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            JSONResultResponse resultResponse;
             LanguageServerProtocol::SignatureHelp sigInfo;
-            if (SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
-                resultResponse.result.getKind() == JSONValue::Kind::Null)
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2906,10 +2916,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            JSONResultResponse resultResponse;
             LanguageServerProtocol::Hover hover;
-            if (SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
-                resultResponse.result.getKind() == JSONValue::Kind::Null)
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }

@@ -163,7 +163,7 @@ public:
     }
     SlangResult sendResult(const RttiInfo* rttiInfo, const void* result, const JSONValue& id);
 
-    /// Answer a request that has no result, as JSON `null`.
+    /// Send JSON `null` as a request's `result`.
     ///
     /// Cannot reuse the RTTI `sendResult` path: an empty native struct serializes to the object
     /// `{}`, never `null`, which is invalid for LSP methods whose result is nullable.
