@@ -5,6 +5,9 @@
 #include "compiler-core/slang-json-parser.h"
 #include "core/slang-dictionary.h"
 #include "core/slang-io.h"
+#if __has_include("slang-package-compiler-commit.h")
+#include "slang-package-compiler-commit.h"
+#endif
 
 namespace Slang
 {
@@ -13,6 +16,14 @@ namespace PackageTool
 
 #ifndef SLANG_PACKAGE_COMPILER_VERSION
 #define SLANG_PACKAGE_COMPILER_VERSION "unknown"
+#endif
+
+#ifndef SLANG_PACKAGE_COMPILER_COMMIT
+#define SLANG_PACKAGE_COMPILER_COMMIT "unknown"
+#endif
+
+#ifndef SLANG_PACKAGE_COMPILER_DIRTY
+#define SLANG_PACKAGE_COMPILER_DIRTY 0
 #endif
 
 SlangResult resetDirectory(const String& path, String& outError)
@@ -48,12 +59,20 @@ SlangResult writeModuleProvenance(
     writer.addIntegerValue(kSchemaVersion, SourceLoc());
     writer.addUnquotedKey(UnownedStringSlice("kind"), SourceLoc());
     writer.addStringValue(UnownedStringSlice("slang-modules"), SourceLoc());
+    writer.addUnquotedKey(UnownedStringSlice("experimental"), SourceLoc());
+    writer.addBoolValue(true, SourceLoc());
+    writer.addUnquotedKey(UnownedStringSlice("format_stability"), SourceLoc());
+    writer.addStringValue(UnownedStringSlice("unstable"), SourceLoc());
     writer.addUnquotedKey(UnownedStringSlice("compiler"), SourceLoc());
     writer.startObject(SourceLoc());
     writer.addUnquotedKey(UnownedStringSlice("name"), SourceLoc());
     writer.addStringValue(UnownedStringSlice("slangc"), SourceLoc());
     writer.addUnquotedKey(UnownedStringSlice("version"), SourceLoc());
     writer.addStringValue(UnownedStringSlice(SLANG_PACKAGE_COMPILER_VERSION), SourceLoc());
+    writer.addUnquotedKey(UnownedStringSlice("commit"), SourceLoc());
+    writer.addStringValue(UnownedStringSlice(SLANG_PACKAGE_COMPILER_COMMIT), SourceLoc());
+    writer.addUnquotedKey(UnownedStringSlice("dirty"), SourceLoc());
+    writer.addBoolValue(SLANG_PACKAGE_COMPILER_DIRTY != 0, SourceLoc());
     writer.addUnquotedKey(UnownedStringSlice("path"), SourceLoc());
     writer.addStringValue(canonicalSlangcPath.getUnownedSlice(), SourceLoc());
     writer.endObject(SourceLoc());
@@ -64,6 +83,23 @@ SlangResult writeModuleProvenance(
     if (SLANG_FAILED(File::writeAllText(provenancePath, writer.getBuilder())))
     {
         outError = String("Cannot write module provenance: ") + provenancePath;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+SlangResult writeExperimentalHostMarker(const String& hostRoot, String& outError)
+{
+    static const char kContents[] =
+        "EXPERIMENTAL SLANG PACKAGE HOST OUTPUT\n"
+        "\n"
+        "The host executable package workflow is experimental and may change without\n"
+        "compatibility guarantees. Rebuild these artifacts with the Slang toolchain\n"
+        "that will run them; do not treat this directory as a stable distribution format.\n";
+    String markerPath = Path::combine(hostRoot, "EXPERIMENTAL.txt");
+    if (SLANG_FAILED(File::writeAllText(markerPath, kContents)))
+    {
+        outError = String("Cannot write experimental host marker: ") + markerPath;
         return SLANG_FAIL;
     }
     return SLANG_OK;
@@ -112,10 +148,8 @@ SlangResult copyBundleSource(
         }
         List<unsigned char> contents;
         if (SLANG_FAILED(File::readAllBytes(file.sourcePath, contents)) ||
-            SLANG_FAILED(File::writeAllBytes(
-                destinationPath,
-                contents.getBuffer(),
-                contents.getCount())))
+            SLANG_FAILED(
+                File::writeAllBytes(destinationPath, contents.getBuffer(), contents.getCount())))
         {
             outError = String("Cannot copy bundle source to: ") + destinationPath;
             return SLANG_FAIL;

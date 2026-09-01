@@ -13,8 +13,9 @@ same application when an upstream package changes its graph and when you extract
 application into a package.
 
 Journeys 1 through 7 use only stable commands, so they describe what the tool supports today
-without any opt-in. Host executable compilation and `run` are experimental, and everything about
-them is collected in Journey 8, the last journey, so it can be read or ignored on its own.
+without any opt-in. Binary module generation, host executable compilation, and `run` are
+experimental, and everything about them is collected in Journey 8, the last journey, so it can be
+read or ignored on its own.
 
 This is also a behavioral contract for the package tool. The maintainer appendix turns the
 journeys into must/must-not checks for future command changes.
@@ -47,7 +48,7 @@ Assume you are starting an application named `image-viewer` and no package exist
 
 ### Goal
 
-Create a valid package, produce its source and module bundles, and make the first source control
+Create a valid package, produce its distributable source bundle, and make the first source control
 commit.
 
 ### Human does
@@ -116,7 +117,7 @@ or `slang-workspace.json`.
 - `init` creates the manifest, conventional directories, license placeholder, and ignore rules.
 - `validate` checks the closed manifest schema, license, export directories, module declarations,
   and installed toolchain. A package with no dependencies does not need a lock.
-- `build` repeats full validation, emits source and module bundles under `build/bundle/`, collects
+- `build` repeats full validation, emits the source bundle under `build/bundle/source`, collects
   Markdown under `build/docs/`, and regenerates `build/search-paths`.
 
 ### Current gaps and pitfalls
@@ -129,8 +130,8 @@ or `slang-workspace.json`.
 - `docs` does not regenerate documentation. Run `build` first.
 - An application that invokes `slangc` itself must consume the export paths written to
   `build/search-paths`; the package state is not injected into arbitrary compiler sessions.
-- Adding a `host` section changes which commands work. Plain `build` then fails and names the
-  experimental command to re-run; Journey 8 covers that path.
+- A `host` section has no effect on plain `build`; Journey 8 covers the explicit opt-in that
+  produces its binary output.
 
 ### First checkpoint
 
@@ -764,8 +765,8 @@ application can consume it.
 - Root `update` resolves the path, override, or Git identity into one application graph.
 - Graph validation catches duplicate imports if the old file was not removed from the root export,
   and catches case-only collisions on case-insensitive filesystems.
-- `build` compiles primaries from both root and dependencies and preserves export-relative import
-  paths in the generated bundle.
+- `build` copies source from both root and dependencies and preserves export-relative import paths
+  in the generated bundle.
 
 ### Current gaps and pitfalls
 
@@ -785,21 +786,31 @@ application can consume it.
 - Moving a module can expose accidental dependency direction or visibility problems. The package
   tool detects graph and layout errors, not architectural cycles in your intended API.
 
-## Journey 8: build and run a host executable (experimental)
+## Journey 8: build binary artifacts (experimental)
 
-Everything before this point uses stable commands. Host executable compilation and `run` are
-experimental, so they are separated here: the journeys above stay valid whether or not this
-feature ships in its current form.
+Everything before this point uses stable commands. `.slang-module` generation, host executable
+compilation, and `run` are experimental, so they are separated here: the journeys above stay valid
+whether or not these features ship in their current form.
 
 ### Goal
 
-Compile a package module into a native executable and run it, accepting that the command spelling
-and the feature itself may change.
+Generate unstable `.slang-module` binaries or compile a package module into a native executable,
+accepting that the artifacts, command spelling, and features may change.
 
 ### Human does
 
-Starting from the `image-viewer` package of Journey 1, give the entry module a C++-visible entry
-point:
+Starting from the `image-viewer` package of Journey 1, opt in to module generation:
+
+```sh
+slang package --experimental build
+```
+
+When `workspace.bundle.modules` is enabled, this writes `.slang-module` files under
+`build/bundle/modules`. The command emits a warning every time because their binary format is not
+stable. The adjacent `provenance.json` records that the format is experimental and unstable,
+along with the compiler version, source commit, tracked-source dirty state, and path.
+
+To build a host executable too, give the entry module a C++-visible entry point:
 
 ```slang
 // src/image-viewer.slang
@@ -820,9 +831,8 @@ Declare the executable in the root-level `host` section of `slang-package.json`:
 }
 ```
 
-At this point plain `slang package build` fails on purpose, because the manifest now asks for
-output that only the experimental path produces. Opt in with the global flag, which must appear
-before the subcommand:
+Plain `slang package build` still produces the stable source bundle and skips host and module
+binaries. Opt in to those outputs with the global flag, which must appear before the subcommand:
 
 ```sh
 slang package --experimental build
@@ -841,10 +851,15 @@ application flag in that position is still forwarded.
 
 ### Tool does
 
-- `build` performs the same validation and bundle work as the stable path, and additionally
-  compiles each configured host executable.
-- `build` without `--experimental` fails with the exact command to re-run, rather than silently
-  skipping host output. A package with no `host` section is unaffected.
+- `build` performs the same validation, source-bundle, and documentation work as the stable path.
+  When enabled in the manifest, it additionally compiles `.slang-module` files and emits a warning
+  about their unstable binary format.
+- Module provenance records `experimental: true`, `format_stability: "unstable"`, and the
+  compiler source commit and dirty state so copied artifacts retain their compatibility boundary.
+- Host executables and runtime libraries are written under `build/host`, which contains
+  `EXPERIMENTAL.txt` even when copied separately from the rest of the build tree.
+- `build` without `--experimental` produces source and documentation only, regardless of module or
+  host settings, and removes stale module and host directories from an earlier experimental build.
 - `run` executes the already-built artifact selected by the optional name, otherwise
   `host.default` or the only configured executable. It never builds and never resolves packages.
 - `slang package --experimental help` lists the experimental commands; stable help omits them.
@@ -858,9 +873,8 @@ application flag in that position is still forwarded.
   first.
 - If the artifact does not exist, `run` reports the missing path and the build command instead of
   attempting a compile.
-- Adding `host.executables` makes the stable build path unusable for that package, so a repository
-  that must build without the experimental opt-in should keep host configuration out of its
-  manifest.
+- A stable build intentionally does not diagnose missing host toolchains or invalid executable
+  entry points because it does not attempt those outputs.
 
 ## Lessons from established package workflows
 
@@ -1064,12 +1078,12 @@ run `update`.
 
 ### `--experimental`
 
-**Use it when:** you are working on host executables, which is the only experimental feature
-today. Journey 8 covers that workflow.
+**Use it when:** you need `.slang-module` binaries or host executables. Journey 8 covers both
+workflows.
 
-**It changes:** `build` also compiles configured host executables, and `run` becomes available.
-The flag is global and must appear before the subcommand. Every other journey in this chapter is
-unaffected by it.
+**It changes:** `build` also compiles enabled `.slang-module` output and configured host
+executables, and `run` becomes available. The flag is global and must appear before the
+subcommand. Every other journey in this chapter is unaffected by it.
 
 **It does not change:** validation, resolution, bundle output, or documentation collection.
 
@@ -1269,14 +1283,19 @@ them or update this chapter and its regression tests in the same change.
 - `test` reports that package testing is not implemented.
 - A command failure must not claim that an update, fetch, or build succeeded.
 
-### Experimental host contract
+### Experimental binary-artifact contract
 
-Keep this separable from the contracts above, so the stable journeys hold whether or not host
-executables ship in their current form.
+Keep this separable from the contracts above, so the stable journeys hold whether or not binary
+artifacts ship in their current form.
 
-- Host executable build and `run` require the global `--experimental` flag before the subcommand.
-- `build` without the flag fails only when the manifest configures host executables, and names the
-  command to re-run instead of skipping host output.
+- `.slang-module` and host executable builds require the global `--experimental` flag before the
+  subcommand.
+- Stable build distributes source and removes stale module and host output.
+- Every module build warns that the binary format is unstable. Module provenance records the
+  experimental status, compiler source commit, and tracked-source dirty state.
+- Host output lives under `build/host` with an `EXPERIMENTAL.txt` marker.
+- `build` without the flag still emits source and docs, skips binary outputs, and removes stale
+  module and host directories.
 - Stable help omits experimental commands; `--experimental help` lists them.
 - `run` executes an existing artifact and never silently builds or resolves.
 
@@ -1300,7 +1319,7 @@ Start with these unit tests when changing a journey:
   `PackageToolFetchRejectsWorkspaceExclusion`, `PackageResolverUsesLatestReleaseRetractions`.
 - Toolchain selection: `PackageToolSlangToolchain`, `PackageResolverSlangToolchain`.
 - Dependency editing and graph inspection: `PackageToolDependencyCommandsAndInitialFetch`.
-- Build and experimental run: `PackageToolBuild`, `PackageToolRun`,
+- Stable source build and experimental binary artifacts: `PackageToolBuild`, `PackageToolRun`,
   `PackageToolExecutableRequiresWorkspaceSource`.
 
 The upstream-add and upstream-split journeys do not yet have end-to-end command tests named after

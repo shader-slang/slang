@@ -162,24 +162,29 @@ package-specific update mode yet.
 slang package --experimental build
 ```
 
-This example needs the experimental opt-in only because its manifest configures
-`host.executables`. A package without a `host` section builds its bundles and docs with plain
-`slang package build`; host executable compilation and `run` are the experimental part.
+This example uses experimental build because its manifest configures `host.executables` and the
+walkthrough demonstrates `.slang-module` output. A stable `slang package build` distributes the
+source bundle and docs only; binary module generation, host executable compilation, and `run` are
+experimental.
 
 Build validates the materialized graph, then:
 
 - When `workspace.bundle.modules` is enabled (the default), emits a `.slang-module` for every
   primary in the workspace and its dependencies under `build/bundle/modules/`, preserving
   import-relative paths (`video-preview`, `video/display`, `color/convert`, `color/encoding`), and
-  writes `build/bundle/modules/provenance.json` naming the Slang toolchain that produced them.
+  writes `build/bundle/modules/provenance.json` naming the Slang version, source commit, and
+  tracked-source dirty state that produced them. Build warns that this binary format is unstable
+  and experimental.
 - When `workspace.bundle.source` is enabled (the default), copies exported `.slang` files into
   `build/bundle/source/` at those same import-relative paths so the directory is one search path.
-- Compiles each name in `host.executables` to `build/<name>` and copies `slang-rt` beside it.
+- Compiles each name in `host.executables` to `build/host/<name>`, copies `slang-rt` beside it, and
+  writes `build/host/EXPERIMENTAL.txt`.
 - Copies Markdown from each package's `docs/` into `build/docs/<package>/` and writes
   `build/docs/index.md`.
 
-The `build/bundle/modules` tree is enough for a consumer that should not receive `deps/` source:
-put that directory on the search path. The matching source layout is `build/bundle/source/`.
+The `build/bundle/modules` tree can serve a consumer that should not receive `deps/` source only
+when it uses the exact toolchain recorded in provenance; the binary format has no stability
+guarantee. The stable distribution layout is `build/bundle/source/`.
 
 ```sh
 slang package --experimental run
@@ -258,7 +263,8 @@ slang package status
 slang package --experimental build
 ```
 
-Drop `--experimental` for a package that configures no host executables.
+Drop `--experimental` when CI only needs the stable source bundle and documentation. Keep it only
+when CI deliberately tests unstable module or host outputs.
 
 CI should not run `update`. Update is a deliberate choice to take newer tags and rewrite the
 committed lock. After you have reviewed `update --dry-run` locally, commit the new lock and let

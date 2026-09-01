@@ -5,7 +5,6 @@
 
 #include "core/slang-list.h"
 #include "core/slang-string.h"
-#include "package-types.h"
 #include "package-validate.h"
 
 namespace Slang
@@ -17,11 +16,15 @@ namespace PackageTool
 SlangResult resetDirectory(const String& path, String& outError);
 
 /// Write `build/bundle/modules/provenance.json` so a consumer can require the same unversioned
-/// `.slang-module` toolchain that produced the files beside it.
+/// `.slang-module` toolchain that produced the experimental files beside it.
 SlangResult writeModuleProvenance(
     const String& modulesRoot,
     const String& slangcPath,
     String& outError);
+
+/// Write `build/host/EXPERIMENTAL.txt` so copied or archived host artifacts retain an explicit
+/// warning that their package workflow is not stable.
+SlangResult writeExperimentalHostMarker(const String& hostRoot, String& outError);
 
 /// Copy every exported `.slang` file into `build/bundle/source` using import-relative paths, so
 /// that directory is a single compiler search path. Two files that would occupy the same name on a

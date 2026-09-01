@@ -138,6 +138,19 @@ if(SLANG_ENABLE_SLANGI)
     )
 endif()
 
+set(SLANG_PACKAGE_COMPILER_COMMIT_HEADER
+    "${CMAKE_CURRENT_BINARY_DIR}/slang-package-compiler-commit.h"
+)
+add_custom_target(
+    slang-package-compiler-commit-header
+    COMMAND
+        ${CMAKE_COMMAND} "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+        "-DSOURCE_DIR=${slang_SOURCE_DIR}"
+        "-DOUTPUT_FILE=${SLANG_PACKAGE_COMPILER_COMMIT_HEADER}" -P
+        "${slang_SOURCE_DIR}/cmake/GeneratePackageCompilerCommit.cmake"
+    BYPRODUCTS "${SLANG_PACKAGE_COMPILER_COMMIT_HEADER}"
+)
+
 slang_add_target(
     slang-package
     EXECUTABLE
@@ -148,6 +161,8 @@ slang_add_target(
     EXPORT_SET_NAME SlangTargets
     PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
 )
+add_dependencies(slang-package slang-package-compiler-commit-header)
+target_include_directories(slang-package PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 if(SLANG_ENABLE_GFX)
     #
@@ -422,6 +437,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
+    )
+    add_dependencies(slang-unit-test slang-package-compiler-commit-header)
+    target_include_directories(
+        slang-unit-test
+        PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
     )
     # slang-repro-validator.cpp is part of the slang DLL's normal source set, but
     # isReproStateValid() is a free function in namespace Slang with no SLANG_API

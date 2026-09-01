@@ -47,7 +47,7 @@ static void _printHelp(bool experimental = false)
         "                   --yes applies without an interactive confirmation.\n"
         "                   --skip-validate skips source, license, and module-layout checks.\n"
         "  build [--skip-validate]\n"
-        "                   Compile optional bundle modules/source and docs.\n"
+        "                   Build the distributable source bundle and docs.\n"
         "  test             Reserved. Package testing is not implemented yet.\n"
         "  docs             Print the location of generated documentation (build/docs).\n"
         "  status           Check lock, local state, materialized packages, and checkouts.\n"
@@ -72,6 +72,8 @@ static void _printHelp(bool experimental = false)
     {
         fprintf(
             stdout,
+            "\nExperimental commands and build features:\n"
+            "  build            Also generate enabled modules and host executables.\n"
             "  run [name] [args...]  Run an experimental host executable produced by the last "
             "build.\n");
     }
@@ -1666,8 +1668,8 @@ static String _getExecutableOutputPath(
     const String& executableName)
 {
     return Path::combine(
-        projectRoot,
-        getWorkspaceBuildDirectory(manifest),
+        Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest)),
+        "host",
         executableName + Process::getExecutableSuffix());
 }
 
@@ -1756,11 +1758,8 @@ static SlangResult _deployExecutableRuntime(
     return SLANG_FAIL;
 }
 
-/// Compile every primary in the resolved package graph to a front-end `.slang-module` under
-/// `build/bundle/modules`, preserving its import-relative path, and copy exported source under
-/// `build/bundle/source` when those workspace.bundle outputs are enabled. When requested by the
-/// workspace `host` section, also compile each listed executable primary to a native artifact at
-/// the build root.
+/// Copy exported source under `build/bundle/source`. With the experimental opt-in, also compile
+/// enabled `.slang-module` output and host executables into explicitly marked directories.
 static SlangResult _build(
     const String& projectRoot,
     bool experimental,
@@ -1769,12 +1768,6 @@ static SlangResult _build(
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    if (hasHostExecutables(manifest) && !experimental)
-    {
-        outError = "Host executable build is experimental. Re-run as "
-                   "'slang package --experimental build'.";
-        return SLANG_FAIL;
-    }
 
     List<PrimaryModule> primaryModules;
     List<ExportedSourceFile> sourceFiles;
@@ -1791,29 +1784,30 @@ static SlangResult _build(
     if (skipValidate)
         _warnSkippedSourceValidation();
 
-    List<String> searchPaths;
-    SLANG_RETURN_ON_FAIL(
-        _collectCompilationSearchPaths(projectRoot, manifest, searchPaths, outError));
-    String slangcPath;
-    SLANG_RETURN_ON_FAIL(_findSiblingTool("slangc", slangcPath, outError));
+    const bool buildModules = experimental && manifest.workspace.bundle.modules;
+    const bool buildHost = experimental && hasHostExecutables(manifest);
 
     List<String> executableSources;
-    for (const auto& executableName : manifest.host.executables)
+    if (buildHost)
     {
-        String sourcePath;
-        SLANG_RETURN_ON_FAIL(_findHostExecutableSource(
-            manifest,
-            primaryModules,
-            executableName,
-            sourcePath,
-            outError));
-        executableSources.add(sourcePath);
+        for (const auto& executableName : manifest.host.executables)
+        {
+            String sourcePath;
+            SLANG_RETURN_ON_FAIL(_findHostExecutableSource(
+                manifest,
+                primaryModules,
+                executableName,
+                sourcePath,
+                outError));
+            executableSources.add(sourcePath);
+        }
     }
 
     String buildRoot = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest));
     String bundleRoot = Path::combine(buildRoot, "bundle");
     String modulesRoot = Path::combine(bundleRoot, "modules");
     String sourceRoot = Path::combine(bundleRoot, "source");
+    String hostRoot = Path::combine(buildRoot, "host");
     if (manifest.workspace.bundle.source)
     {
         SLANG_RETURN_ON_FAIL(copyBundleSource(sourceRoot, sourceFiles, outError));
@@ -1823,8 +1817,21 @@ static SlangResult _build(
     {
         Path::removeNonEmpty(sourceRoot);
     }
-    if (manifest.workspace.bundle.modules)
+    String slangcPath;
+    List<String> searchPaths;
+    if (buildModules || buildHost)
     {
+        SLANG_RETURN_ON_FAIL(
+            _collectCompilationSearchPaths(projectRoot, manifest, searchPaths, outError));
+        SLANG_RETURN_ON_FAIL(_findSiblingTool("slangc", slangcPath, outError));
+    }
+    if (buildModules)
+    {
+        fprintf(
+            stderr,
+            "slang-package: warning: Generating experimental .slang-module files; their binary "
+            "format is not stable. See %s.\n",
+            Path::combine(modulesRoot, "provenance.json").getBuffer());
         SLANG_RETURN_ON_FAIL(resetDirectory(modulesRoot, outError));
         for (const auto& module : primaryModules)
         {
@@ -1858,8 +1865,10 @@ static SlangResult _build(
     {
         Path::removeNonEmpty(modulesRoot);
     }
-    if (manifest.host.executables.getCount())
+    if (buildHost)
     {
+        SLANG_RETURN_ON_FAIL(resetDirectory(hostRoot, outError));
+        SLANG_RETURN_ON_FAIL(writeExperimentalHostMarker(hostRoot, outError));
         for (Index i = 0; i < manifest.host.executables.getCount(); ++i)
         {
             String executablePath =
@@ -1889,7 +1898,11 @@ static SlangResult _build(
                 return SLANG_FAIL;
             }
         }
-        SLANG_RETURN_ON_FAIL(_deployExecutableRuntime(slangcPath, buildRoot, outError));
+        SLANG_RETURN_ON_FAIL(_deployExecutableRuntime(slangcPath, hostRoot, outError));
+    }
+    else
+    {
+        Path::removeNonEmpty(hostRoot);
     }
     SLANG_RETURN_ON_FAIL(buildDocumentation(projectRoot, outError));
     return SLANG_OK;
