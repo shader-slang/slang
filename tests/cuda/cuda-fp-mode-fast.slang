@@ -5,9 +5,13 @@
 //TEST:SIMPLE(filecheck=DEFAULT): -stage compute -entry computeMain -target cuda
 // The define is CUDA-only: it must never leak into the shared C++ base emitter's output.
 //TEST:SIMPLE(filecheck=CPP): -stage compute -entry computeMain -target cpp -fp-mode fast
-// Behavioral lanes: compile the emitted CUDA through NVRTC to PTX and confirm the redirect
-// is actually *selected* (fast -> approximate SFU ops; default -> none of them). These
-// auto-skip on tiers without NVRTC, like the -target ptx arm in tests/cuda/noinline.slang.
+// Integration lanes: compile the emitted CUDA through NVRTC to PTX and check the expected
+// characteristics (fast -> approximate SFU ops present; default -> none). Note the fast lane
+// is a smoke check: on -target ptx, fast mode also passes NVRTC --use_fast_math, which maps
+// sinf/cosf itself, so its approx ops are not solely from the prelude redirect. The default
+// lane has teeth: with no --use_fast_math, approx ops there mean the redirect fired when it
+// should not (an inverted gate, or the define leaking into non-fast output). These auto-skip
+// on tiers without NVRTC, like the -target ptx arm in tests/cuda/noinline.slang.
 //TEST:SIMPLE(filecheck=PTX_FAST): -stage compute -entry computeMain -target ptx -fp-mode fast
 //TEST:SIMPLE(filecheck=PTX_PRECISE): -stage compute -entry computeMain -target ptx
 
