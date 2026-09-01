@@ -1159,7 +1159,8 @@ dependencies therefore appear only in each consumer's root lock.
 
 ### Run, docs, and test do less than their names may imply
 
-Experimental `run` does not build, `docs` only prints the generated location, and `test` is
+Experimental `run` does not build, `docs` opens `build/docs/index.md` (or prints the path with
+`--print`), and `test` is
 unimplemented. Narrow side effects make commands predictable, but missing `build --run`,
 documentation generation, and package testing leave common loops manual.
 
@@ -1281,7 +1282,8 @@ them or update this chapter and its regression tests in the same change.
 - Dependency add/remove changes only the manifest; tree and why read only the current graph.
 - Materialization prints per-package source/checkout progress. A failure explains that the prior
   lock remains authoritative and how to recover potentially partial derived state.
-- `docs` prints the generated documentation location but does not regenerate it.
+- `docs` opens `build/docs/index.md` with the registered application. `--print` writes the path
+  instead. It does not regenerate documentation.
 - `test` reports that package testing is not implemented.
 - A command failure must not claim that an update, fetch, or build succeeded.
 

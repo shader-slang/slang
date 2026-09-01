@@ -196,10 +196,10 @@ executable name selects that artifact; remaining arguments are forwarded.
 
 ```sh
 slang package docs
-less build/docs/index.md
 ```
 
-`docs` prints the generated directory; it does not copy or regenerate files. Run `build` when the
+`docs` opens `build/docs/index.md` with the registered Markdown application. Pass `--print` to
+write the path instead of launching. It does not copy or regenerate files; run `build` when the
 documentation should change. `slang package test` is reserved and not implemented yet.
 
 ## Develop against a local tree

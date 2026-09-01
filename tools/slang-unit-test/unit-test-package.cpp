@@ -1103,6 +1103,44 @@ SLANG_UNIT_TEST(PackageToolConfirmationAnswers)
     SLANG_CHECK(!isAffirmativeConfirmationAnswer(UnownedStringSlice("yep\n")));
 }
 
+SLANG_UNIT_TEST(PackageToolDocsOpensIndex)
+{
+    CommandLine commandLine;
+    getRegisteredApplicationOpenCommand("/tmp/index.md", commandLine);
+    String rendered = commandLine.toString();
+#if SLANG_WINDOWS_FAMILY
+    SLANG_CHECK(rendered.getUnownedSlice().indexOf(UnownedStringSlice("cmd.exe")) >= 0);
+    SLANG_CHECK(rendered.getUnownedSlice().indexOf(UnownedStringSlice("start")) >= 0);
+#elif defined(__APPLE__)
+    SLANG_CHECK(rendered.getUnownedSlice().indexOf(UnownedStringSlice("open")) >= 0);
+#else
+    SLANG_CHECK(rendered.getUnownedSlice().indexOf(UnownedStringSlice("xdg-open")) >= 0);
+#endif
+    SLANG_CHECK(rendered.getUnownedSlice().indexOf(UnownedStringSlice("/tmp/index.md")) >= 0);
+
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    const char* docsArguments[] = {"slang-package", "docs"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(docsArguments), docsArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("index.md")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("build")) >= 0);
+
+    const char* buildArguments[] = {"slang-package", "build"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+    const char* printArguments[] = {"slang-package", "docs", "--print"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(printArguments), printArguments, error)));
+}
+
 SLANG_UNIT_TEST(PackageToolUpdateRequiresConfirmation)
 {
     TemporaryDirectory temp;
@@ -1709,9 +1747,15 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
         0);
     String rootGuideLink = String("[guide.md](") + root.name + "/guide.md)";
     SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(rootGuideLink.getUnownedSlice()) >= 0);
-    const char* docsArguments[] = {"slang-package", "docs"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(docsArguments), docsArguments, error)));
+    const char* docsPrintArguments[] = {"slang-package", "docs", "--print"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(docsPrintArguments),
+        docsPrintArguments,
+        error)));
+    const char* docsMissingFlag[] = {"slang-package", "docs", "--unknown"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(docsMissingFlag), docsMissingFlag, error)));
 
     List<String> warnings;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(validateProject(temp.path, error, &warnings)));

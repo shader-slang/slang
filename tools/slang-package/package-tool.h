@@ -4,6 +4,7 @@
 #define SLANG_PACKAGE_TOOL_H
 
 #include "core/slang-basic.h"
+#include "core/slang-command-line.h"
 
 namespace Slang
 {
@@ -22,6 +23,10 @@ SlangResult executeInDirectory(
 /// surrounding spaces. Only an explicit "y" or "yes", in any casing, approves; every other answer,
 /// including an empty line, declines.
 bool isAffirmativeConfirmationAnswer(const UnownedStringSlice& answer);
+
+/// Fill `outCommand` with the host command that opens `path` in the registered application for
+/// its file type: `open` on macOS, `xdg-open` on other Unix, and `cmd /c start` on Windows.
+void getRegisteredApplicationOpenCommand(const String& path, CommandLine& outCommand);
 
 int execute(int argc, const char* const* argv);
 

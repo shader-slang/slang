@@ -5,6 +5,7 @@
 #include "core/slang-io.h"
 #include "core/slang-platform.h"
 #include "core/slang-process-util.h"
+#include "core/slang-process.h"
 #include "core/slang-string-util.h"
 #include "core/slang-writer.h"
 #include "package-bundle.h"
@@ -49,7 +50,8 @@ static void _printHelp(bool experimental = false)
         "  build [--skip-validate]\n"
         "                   Build the distributable source bundle and docs.\n"
         "  test             Reserved. Package testing is not implemented yet.\n"
-        "  docs             Print the location of generated documentation (build/docs).\n"
+        "  docs [--print]   Open build/docs/index.md with the registered application.\n"
+        "                   --print writes the path instead of launching.\n"
         "  status           Check lock, local state, materialized packages, and checkouts.\n"
         "  validate         Validate package structure and the locked dependency closure.\n"
         "  tree             Print the selected dependency graph.\n"
@@ -2011,13 +2013,74 @@ static SlangResult _test(const String& projectRoot, String& outError)
     return SLANG_FAIL;
 }
 
-/// Print the workspace documentation directory so the user can open `build/docs/index.md`.
-static SlangResult _printDocumentationLocation(const String& projectRoot, String& outError)
+void getRegisteredApplicationOpenCommand(const String& path, CommandLine& outCommand)
+{
+    outCommand = CommandLine();
+#if SLANG_WINDOWS_FAMILY
+    // `start` is a cmd built-in. The empty argument is the window title; without it a quoted path
+    // is taken as the title and the file is never opened.
+    outCommand.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Name, "cmd.exe"));
+    outCommand.addArg("/c");
+    outCommand.addArg("start");
+    outCommand.addArg("");
+    outCommand.addArg(path);
+#elif defined(__APPLE__)
+    outCommand.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Name, "open"));
+    outCommand.addArg(path);
+#else
+    outCommand.setExecutableLocation(
+        ExecutableLocation(ExecutableLocation::Type::Name, "xdg-open"));
+    outCommand.addArg(path);
+#endif
+}
+
+static SlangResult _openPathWithRegisteredApplication(const String& path, String& outError)
+{
+    CommandLine commandLine;
+    getRegisteredApplicationOpenCommand(path, commandLine);
+    RefPtr<Process> process;
+    if (SLANG_FAILED(Process::create(
+            commandLine,
+            Process::Flag::DisableStdErrRedirection | Process::Flag::UnreadableStdin,
+            process)))
+    {
+        outError = String("Cannot launch the registered application for '") + path + "'.";
+        return SLANG_FAIL;
+    }
+    // `open` and `cmd /c start` return once the handler is launched. `xdg-open` sometimes keeps
+    // running for as long as the viewer does; treat a still-running launcher as success rather
+    // than blocking the package command on the editor.
+    if (process->waitForTermination(5000) && process->getReturnValue() != 0)
+    {
+        outError = String("Opening '") + path + "' with the registered application failed.";
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+/// Open `build/docs/index.md` with the host's registered Markdown handler, or print its path.
+static SlangResult _docs(const String& projectRoot, bool printOnly, String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    String docsDirectory = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest), "docs");
-    fprintf(stdout, "Open the generated documentation in '%s'.\n", docsDirectory.getBuffer());
+    String indexPath = Path::combine(
+        Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest), "docs"),
+        "index.md");
+    if (!File::exists(indexPath))
+    {
+        outError = String("Generated documentation index is missing: ") + indexPath +
+                   ". Run 'slang package build' first.";
+        return SLANG_FAIL;
+    }
+    String canonicalPath = indexPath;
+    Path::getCanonical(indexPath, canonicalPath);
+    if (printOnly)
+    {
+        fprintf(stdout, "%s\n", canonicalPath.getBuffer());
+        return SLANG_OK;
+    }
+    SLANG_RETURN_ON_FAIL(_openPathWithRegisteredApplication(canonicalPath, outError));
+    fprintf(stdout, "Opened '%s'.\n", canonicalPath.getBuffer());
     return SLANG_OK;
 }
 
@@ -2456,8 +2519,22 @@ SlangResult executeInDirectory(
     }
     if (command == "test" && argc == 2)
         return _test(projectRoot, outError);
-    if (command == "docs" && argc == 2)
-        return _printDocumentationLocation(projectRoot, outError);
+    if (command == "docs")
+    {
+        bool printOnly = false;
+        for (int i = 2; i < argc; ++i)
+        {
+            String flag = argv[i];
+            if (flag == "--print")
+                printOnly = true;
+            else
+            {
+                outError = String("Unknown docs option: ") + flag;
+                return SLANG_FAIL;
+            }
+        }
+        return _docs(projectRoot, printOnly, outError);
+    }
     if (command == "status" && argc == 2)
         return _status(projectRoot, outError);
     if (command == "tree" && argc == 2)

@@ -428,10 +428,10 @@ host build behavior.
 invoke `slang-test`. Package testing will get a dedicated model; `slang-test` remains an internal
 compiler harness and is not part of the package command surface.
 
-`slang package docs` prints the path of the generated `build/docs/` directory so you can open
-`index.md` and the copied package files. It does not copy or regenerate documentation; run
-`slang package build` for that, or `slang package --experimental build` when the manifest configures
-host executables.
+`slang package docs` opens `build/docs/index.md` with the application registered for Markdown
+on this machine. `--print` writes that path instead of launching, which is what scripts should
+use. The command does not copy or regenerate documentation; run `slang package build` for that,
+or `slang package --experimental build` when the manifest configures host executables.
 
 ## Possible future enhancements
 
