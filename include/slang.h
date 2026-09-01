@@ -2989,6 +2989,15 @@ struct TypeLayoutReflection
         return spReflectionTypeLayout_GetMatrixLayoutMode((SlangReflectionTypeLayout*)this);
     }
 
+    /// Return the global ordering index of this layout's generic type parameter, or -1.
+    ///
+    /// -1 is returned in two distinct cases that this function alone cannot
+    /// distinguish: (1) this layout is not a generic-type-parameter layout at all, or
+    /// (2) it is one, but no global ordering was available when the layout was
+    /// computed (this happens when a type is laid out without a linked `ProgramLayout`,
+    /// e.g. via `ISession::getTypeLayout` on a type that references a global generic
+    /// parameter). Callers that need to tell these apart must first check
+    /// `getKind() == SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER`.
     int getGenericParamIndex()
     {
         return spReflectionTypeLayout_getGenericParamIndex((SlangReflectionTypeLayout*)this);

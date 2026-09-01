@@ -1372,3 +1372,96 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerProgramCache)
     SLANG_CHECK(fieldsA == 1);
     SLANG_CHECK(fieldsB == 2);
 }
+
+// Test for issue #10749 (per-target cache correctness): the same linked program is
+// reflected via `programLayout->getTypeLayout` against two different targets in the
+// same session. `TargetProgram::getProgramScopedTypeLayouts` is a member of
+// `TargetProgram`, which is scoped per `(program, target)` -- a distinct `TargetProgram`
+// instance backs each target's `ProgramLayout`, even though both `ProgramLayout`s
+// reflect the same underlying `Type*` for `Scene`. This pins the remaining scoping
+// dimension the per-program test above does not exercise: a regression that folded the
+// per-target `TargetProgram` instances back onto a single shared cache would alias
+// target A's cached `TypeLayout*` for target B's identical `{type, rules}` query, and
+// this test would catch it by observing the same pointer come back for both targets.
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerTargetCache)
+{
+    const char* sourceBody = R"(
+        interface IAccelerationStructure { int getType(); }
+        struct HWAccelerationStructure : IAccelerationStructure {
+            uint handle;
+            int getType() { return 1; }
+        }
+        export struct AccelerationStructure : IAccelerationStructure = HWAccelerationStructure;
+
+        struct Scene {
+            AccelerationStructure accelStruct;
+        }
+
+        ParameterBlock<Scene> gScene;
+
+        [numthreads(1,1,1)]
+        [shader("compute")]
+        void computeMain() {
+            int x = gScene.accelStruct.getType();
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    // Two distinct SPIRV targets (different SPIR-V versions) in the same session, so
+    // both `TargetProgram`s for the linked program hang off the same session-long
+    // `Linkage`, and the same `Type*` for `Scene` is shared across both targets'
+    // reflection queries.
+    slang::TargetDesc targetDescs[2] = {};
+    targetDescs[0].format = SLANG_SPIRV_ASM;
+    targetDescs[0].profile = globalSession->findProfile("spirv_1_3");
+    targetDescs[1].format = SLANG_SPIRV_ASM;
+    targetDescs[1].profile = globalSession->findProfile("spirv_1_5");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 2;
+    sessionDesc.targets = targetDescs;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "perTargetCache",
+        "perTargetCache.slang",
+        sourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    module->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    // Reflect `Scene` through each target's `ProgramLayout`. Each call reaches
+    // `TargetRequest::getTypeLayout` for a different `TargetRequest`/`TargetProgram`
+    // pair, but with the identical `Type*` (the same linked program, the same `Scene`
+    // declaration) and the identical `LayoutRules::Default`.
+    auto programLayoutTarget0 = linkedProgram->getLayout(0, diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(programLayoutTarget0 != nullptr);
+    auto sceneTypeTarget0 = programLayoutTarget0->findTypeByName("Scene");
+    SLANG_CHECK_ABORT(sceneTypeTarget0 != nullptr);
+    auto sceneLayoutTarget0 = programLayoutTarget0->getTypeLayout(sceneTypeTarget0);
+    SLANG_CHECK_ABORT(sceneLayoutTarget0 != nullptr);
+
+    auto programLayoutTarget1 = linkedProgram->getLayout(1, diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(programLayoutTarget1 != nullptr);
+    auto sceneTypeTarget1 = programLayoutTarget1->findTypeByName("Scene");
+    SLANG_CHECK_ABORT(sceneTypeTarget1 != nullptr);
+    auto sceneLayoutTarget1 = programLayoutTarget1->getTypeLayout(sceneTypeTarget1);
+    SLANG_CHECK_ABORT(sceneLayoutTarget1 != nullptr);
+
+    // If the per-program cache were keyed only by {type, rules} and accidentally shared
+    // across `TargetProgram` instances for the same program, the second target's query
+    // would alias the first target's cache entry and return the same `TypeLayout*`.
+    SLANG_CHECK(sceneLayoutTarget0 != sceneLayoutTarget1);
+
+    // Each target's own cache is still memoized: a repeated query on the same target
+    // returns the same pointer.
+    SLANG_CHECK(programLayoutTarget0->getTypeLayout(sceneTypeTarget0) == sceneLayoutTarget0);
+    SLANG_CHECK(programLayoutTarget1->getTypeLayout(sceneTypeTarget1) == sceneLayoutTarget1);
+}

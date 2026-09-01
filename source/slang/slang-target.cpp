@@ -251,9 +251,12 @@ TypeLayout* TargetRequest::getTypeLayout(
     // The per-program cache below is selected via `programLayout->getTargetProgram()`,
     // so its correctness depends on that `TargetProgram` belonging to `this`
     // `TargetRequest` -- otherwise a layout computed with this target's rules would be
-    // cached against, and later returned for, a different target's program. Assert the
-    // invariant at the boundary rather than let a mismatched caller silently cache
-    // against the wrong program.
+    // cached against, and later returned for, a different target's program. This holds
+    // by construction for the sole caller: `spReflection_GetTypeLayout` calls
+    // `context->getTargetReq()->getTypeLayout(type, rules, context)`, so `programLayout`
+    // (== `context`) and `this` always come from the same `ProgramLayout`. A debug-only
+    // `SLANG_ASSERT` is therefore enough to catch a future caller that breaks this
+    // by construction guarantee, rather than a release-mode guard against untrusted input.
     SLANG_ASSERT(!programLayout || programLayout->getTargetReq() == this);
 
     // When a `ProgramLayout` is supplied, the layout context can resolve
