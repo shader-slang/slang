@@ -1085,6 +1085,24 @@ SLANG_UNIT_TEST(PackageToolFetchRequiresLock)
         error.getUnownedSlice().indexOf(UnownedStringSlice("slang-package-lock.json")) >= 0);
 }
 
+// A prompt answer arrives from `fgets` with its newline attached, and `trim` removes only
+// horizontal whitespace, so the affirmative check has to strip the line ending itself. Without
+// that, typing "y" at 'Apply this update?' cancelled the update.
+SLANG_UNIT_TEST(PackageToolConfirmationAnswers)
+{
+    SLANG_CHECK(isAffirmativeConfirmationAnswer(UnownedStringSlice("y\n")));
+    SLANG_CHECK(isAffirmativeConfirmationAnswer(UnownedStringSlice("Y\n")));
+    SLANG_CHECK(isAffirmativeConfirmationAnswer(UnownedStringSlice("yes\r\n")));
+    SLANG_CHECK(isAffirmativeConfirmationAnswer(UnownedStringSlice("  YES  \n")));
+    SLANG_CHECK(isAffirmativeConfirmationAnswer(UnownedStringSlice("y")));
+
+    SLANG_CHECK(!isAffirmativeConfirmationAnswer(UnownedStringSlice("\n")));
+    SLANG_CHECK(!isAffirmativeConfirmationAnswer(UnownedStringSlice("")));
+    SLANG_CHECK(!isAffirmativeConfirmationAnswer(UnownedStringSlice("n\n")));
+    SLANG_CHECK(!isAffirmativeConfirmationAnswer(UnownedStringSlice("no\n")));
+    SLANG_CHECK(!isAffirmativeConfirmationAnswer(UnownedStringSlice("yep\n")));
+}
+
 SLANG_UNIT_TEST(PackageToolUpdateRequiresConfirmation)
 {
     TemporaryDirectory temp;

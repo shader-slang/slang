@@ -85,6 +85,16 @@ static void _printHelp(bool experimental = false)
         "  --experimental   Enable experimental commands and build features.\n");
 }
 
+bool isAffirmativeConfirmationAnswer(const UnownedStringSlice& answer)
+{
+    // `fgets` keeps the terminating newline, and `UnownedStringSlice::trim` removes only horizontal
+    // whitespace, so the line ending has to come off separately. Without that, a bare "y" arrives
+    // here as "y\n" and reads as a decline.
+    UnownedStringSlice trimmed = StringUtil::trimEndOfLine(answer).trim();
+    return trimmed.caseInsensitiveEquals(UnownedStringSlice("y")) ||
+           trimmed.caseInsensitiveEquals(UnownedStringSlice("yes"));
+}
+
 /// Ask the user to approve an operation after its effects have been printed.
 ///
 /// Non-interactive callers must pass `--yes`; treating end-of-file as approval would let CI or a
@@ -107,13 +117,8 @@ static SlangResult _confirmApply(bool assumeYes, const char* prompt, String& out
         outError = "Confirmation was not received; no changes were applied.";
         return SLANG_FAIL;
     }
-    UnownedStringSlice answer(response);
-    answer = answer.trim();
-    if (answer.caseInsensitiveEquals(UnownedStringSlice("y")) ||
-        answer.caseInsensitiveEquals(UnownedStringSlice("yes")))
-    {
+    if (isAffirmativeConfirmationAnswer(UnownedStringSlice(response)))
         return SLANG_OK;
-    }
     outError = "Operation cancelled; no changes were applied.";
     return SLANG_FAIL;
 }
