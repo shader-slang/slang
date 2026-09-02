@@ -40,7 +40,8 @@ tests added here fall into four groups:
   `-emit-spirv-via-glsl`, `-trace-coverage-binding`,
   `-trace-coverage-reserved-space`, `-source-embed-name`, `-no-codegen`.
 - **Flags whose only observable is a report on stderr** — `-dump-module`,
-  `-dump-warning-diagnostics`, `-get-supported-module-versions`, `-v`.
+  `-dump-warning-diagnostics`, `-get-supported-module-versions`, `-v`,
+  `-get-<compiler>-path`.
 - **Operand-validation error paths** — `-default-downstream-compiler`,
   `-source-embed-language`, `-file-system`, `-get-module-info`,
   `-diagnostic-color`.
@@ -82,6 +83,7 @@ pinned by error code and message text instead.
 | [`diagnostic-color-ansi-escapes.slang`](diagnostic-color-ansi-escapes.slang)                         | `-diagnostic-color always` wraps diagnostics in ANSI SGR escapes off a tty; `never` keeps the plain form; an unknown value gives E00062.                                                      | source/slang/slang-options.cpp |
 | [`file-system-option-values.slang`](file-system-option-values.slang)                                 | `-file-system` accepts `default`, `load-file` and `os` and compiles unchanged through each; an unknown value gives E00062 listing exactly those three.                                        | source/slang/slang-options.cpp |
 | [`default-downstream-compiler-diagnostics.slang`](default-downstream-compiler-diagnostics.slang)     | `-default-downstream-compiler` rejects an unknown language with E00019 and an unknown compiler with E00016, and accepts `c gcc`.                                                              | source/slang/slang-options.cpp |
+| [`downstream-compiler-path-query.slang`](downstream-compiler-path-query.slang)                       | `-get-<compiler>-path` prints `<compiler> path: <text>` (`not available` when the compiler has no shared-library path, `not found` when absent) and lets the compile continue; a hyphenated name like `spirv-dis` exercises the `-get-`/`-path` affix-stripping. | source/slang/slang-options.cpp |
 | [`dump-module-ir-disassembly.slang`](dump-module-ir-disassembly.slang)                               | `-dump-module <path>` loads the file as a module and prints its IR disassembly (entryPoint/numThreads decorations, function body).                                                            | source/slang/slang-options.cpp |
 | [`get-module-info-missing-file.slang`](get-module-info-missing-file.slang)                           | `-get-module-info` on a path that does not exist reports E00001 and fails the run.                                                                                                            | source/slang/slang-options.cpp |
 | [`dump-warning-diagnostics-listing.slang`](dump-warning-diagnostics-listing.slang)                   | `-dump-warning-diagnostics` prints the warning table as `<id> : <name>` lines, then compiles normally.                                                                                        | source/slang/slang-options.cpp |
