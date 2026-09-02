@@ -4498,10 +4498,10 @@ static void HandleExtensionDirective(PreprocessorDirectiveContext* context)
     SkipToEndOfLine(context);
 }
 
-/// Record the first language directive in this preprocessing unit and diagnose later conflicts.
+/// Record the first language directive in this source segment and diagnose later conflicts.
 ///
 /// Preserving the first location lets the translation-unit layer combine independently
-/// preprocessed primary files while still reporting both sides of a conflict.
+/// preprocessed source segments while still reporting both sides of a conflict.
 /// `_applySourceLanguageDirective` diagnoses the same conflict across primary files, while
 /// `Linkage::findAndIncludeFile` handles directives discovered by a semantic `__include`.
 static void _handleSourceLanguageDirective(

@@ -60,7 +60,7 @@ struct PreprocessorDesc
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 };
 
-/// The first source-language selection discovered while preprocessing one source unit.
+/// The first source-language selection discovered while preprocessing one source segment.
 ///
 /// The preprocessor diagnoses later conflicting directives and preserves this first selection so
 /// the translation unit can choose one parser mode before any source file is parsed.
@@ -75,7 +75,7 @@ struct SourceLanguageDirective
 
 /// Preprocess `file` and return its tokens and first source-language directive, if any.
 ///
-/// Conflicting directives in the same preprocessing unit are diagnosed and do not replace the
+/// Conflicting directives in the same source segment are diagnosed and do not replace the
 /// first selection. `outLanguageVersion` changes only when a valid Slang `#language` directive is
 /// present.
 TokenList preprocessSource(

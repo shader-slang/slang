@@ -388,7 +388,7 @@ struct PreprocessedSegment
     SourceLanguageDirective sourceLanguageDirective;
 };
 
-/// Split a physical source file into the source units represented by a literate input.
+/// Split a physical source file into the source segments represented by a literate input.
 List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* sourceManager);
 
 /// Preprocess every segment while preserving their source-language directives and language version.
