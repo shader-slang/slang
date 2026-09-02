@@ -1333,6 +1333,14 @@ typedef uint32_t SlangSizeT;
                  //   at pipeline creation instead would remove that constraint;
                  //   see issue #12541. SPIR-V and GLSL only.
 
+        CudaNoInlineThreshold =
+            159, // int: opt-in heuristic for the CUDA target family (CUDA, CUDA header, and PTX).
+                 //   When set to a positive value N, ordinary `__device__` functions whose IR
+                 //   body exceeds N instructions are marked `__noinline__` in the emitted CUDA.
+                 //   This requests that large functions not be duplicated into every call site,
+                 //   which can cut ptxas compile time. Defaults to 0 (off), leaving emitted output
+                 //   unchanged.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
