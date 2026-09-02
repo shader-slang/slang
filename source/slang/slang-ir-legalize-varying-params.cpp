@@ -4258,6 +4258,16 @@ protected:
                 break;
             }
         case SystemValueSemanticName::InstanceID:
+            {
+                // [[instance_id]] includes the base instance; SV_InstanceID does not. Unlike the
+                // other special values, the normal path still runs after the special handler:
+                // it decorates and converts the parameter, and the handler only adds the
+                // subtraction.
+                result.isSpecial = true;
+                result.systemValueName = toSlice("instance_id");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
         case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_id");
@@ -4324,6 +4334,8 @@ protected:
         case SystemValueSemanticName::VertexID:
         case SystemValueSemanticName::VulkanVertexID:
             {
+                // SV_VertexID still includes [[base_vertex]], the same mismatch SV_InstanceID
+                // corrects above.
                 result.systemValueName = toSlice("vertex_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
                 break;
@@ -4468,6 +4480,21 @@ protected:
         return elementVarLayoutBuilder.build();
     }
 
+    // Find the entry point's parameter carrying the given system value semantic, if any. At most
+    // one parameter carries a given semantic, so the first match is the only one.
+    IRInst* findSystemValueParam(const EntryPointInfo& entryPoint, SystemValueSemanticName name)
+        const
+    {
+        for (auto item : collectSystemValFromEntryPoint(entryPoint))
+        {
+            auto indexAsString = String(item.attrIndex);
+            if (getSystemValueInfo(item.attrName, &indexAsString, item.var).systemValueNameEnum ==
+                name)
+                return item.var;
+        }
+        return nullptr;
+    }
+
     void handleSpecialSystemValue(
         const EntryPointInfo& entryPoint,
         SystemValLegalizationWorkItem& workItem,
@@ -4483,21 +4510,50 @@ protected:
             var->replaceUsesWith(val);
             var->removeAndDeallocate();
         }
+        else if (info.systemValueNameEnum == SystemValueSemanticName::InstanceID)
+        {
+            // `var` stays the [[instance_id]] parameter; its uses read `var - base_instance`.
+            // Snapshot the uses first so the subtraction's own operand is not redirected.
+            List<IRUse*> uses;
+            for (auto use = var->firstUse; use; use = use->nextUse)
+                uses.add(use);
+
+            // Reuse a declared SV_StartInstanceLocation: Metal rejects a second [[base_instance]].
+            IRInst* baseInstance =
+                findSystemValueParam(entryPoint, SystemValueSemanticName::StartInstanceLocation);
+
+            IRBuilder svBuilder(builder.getModule());
+            svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
+            if (!baseInstance)
+            {
+                // Already the permitted uint, and the emitter reads the attribute from the
+                // decoration, so it needs neither a layout nor its own legalization;
+                // legalizeSystemValueParameters collected its work list before this loop, so
+                // the new parameter is never revisited either.
+                baseInstance = svBuilder.emitParam(svBuilder.getUIntType());
+                svBuilder.addTargetSystemValueDecoration(baseInstance, toSlice("base_instance"));
+                svBuilder.addNameHintDecoration(baseInstance, toSlice("base_instance"));
+            }
+            if (baseInstance->getFullType() != var->getFullType())
+            {
+                // The front end only admits scalar integers for SV_InstanceID, so this converts.
+                baseInstance = tryConvertValue(svBuilder, baseInstance, var->getFullType());
+                SLANG_ASSERT(baseInstance);
+            }
+            // The normal path still legalizes `var` (and a reused base declared after it) and
+            // redirects their uses here to the converted values.
+            auto baseRelativeInstanceId = svBuilder.emitSub(var->getFullType(), var, baseInstance);
+            for (auto use : uses)
+                svBuilder.replaceOperand(use, baseRelativeInstanceId);
+        }
         else if (info.systemValueNameEnum == SystemValueSemanticName::GroupIndex)
         {
             // Ensure we have a cached "sv_groupthreadid" in our entry point
             if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
             {
-                auto systemValWorkItems = collectSystemValFromEntryPoint(entryPoint);
-                for (auto i : systemValWorkItems)
-                {
-                    auto indexAsStringGroupThreadId = String(i.attrIndex);
-                    if (getSystemValueInfo(i.attrName, &indexAsStringGroupThreadId, i.var)
-                            .systemValueNameEnum == SystemValueSemanticName::GroupThreadID)
-                    {
-                        entryPointToGroupThreadId[entryPoint.entryPointFunc] = i.var;
-                    }
-                }
+                if (auto groupThreadId =
+                        findSystemValueParam(entryPoint, SystemValueSemanticName::GroupThreadID))
+                    entryPointToGroupThreadId[entryPoint.entryPointFunc] = groupThreadId;
                 if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
                 {
                     // Add the missing groupthreadid needed to compute sv_groupindex
@@ -4943,6 +4999,8 @@ protected:
         case SystemValueSemanticName::InstanceID:
         case SystemValueSemanticName::VulkanInstanceID:
             {
+                // instance_index includes firstInstance, and WGSL has no base_instance builtin
+                // to subtract, so SV_InstanceID cannot be made HLSL-accurate here.
                 result.systemValueName = toSlice("instance_index");
                 result.permittedTypes.add(builder.getUIntType());
             }
