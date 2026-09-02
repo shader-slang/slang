@@ -5240,6 +5240,11 @@ $(type_info.return_type) $(type_info.method_name)(
 
     void addKeepAliveDecoration(IRInst* value) { addDecoration(value, kIROp_KeepAliveDecoration); }
 
+    void addAnyValueMarshalCastDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_AnyValueMarshalCastDecoration);
+    }
+
     void addPublicDecoration(IRInst* value) { addDecoration(value, kIROp_PublicDecoration); }
     void addHLSLExportDecoration(IRInst* value)
     {

@@ -3399,6 +3399,27 @@ bool isWorkGraphRecordType(IRType* type)
     }
 }
 
+bool typeHasAbiSignificantDecoration(IRType* type)
+{
+    for (auto decor : type->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_LayoutDecoration:
+        case kIROp_PublicDecoration:
+        case kIROp_ExternCppDecoration:
+        case kIROp_DllImportDecoration:
+        case kIROp_DllExportDecoration:
+        case kIROp_HLSLExportDecoration:
+        case kIROp_BinaryInterfaceTypeDecoration:
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
+}
+
 IRType* getWorkGraphRecordElementType(IRType* type)
 {
     SLANG_ASSERT(type);

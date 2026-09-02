@@ -617,6 +617,15 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
 /// These types are opaque ABI objects that must survive type legalization unchanged.
 bool isWorkGraphRecordType(IRType* type);
 
+/// Returns true if `type` carries a decoration that empty-type legalization treats as
+/// ABI/layout-significant. On non-Metal targets such a decoration causes the type to be preserved
+/// unchanged instead of removed; Metal removes empty types regardless, so callers must apply the
+/// Metal exception themselves (as `IREmptyTypeLegalizationContext::isSimpleType` does). This is the
+/// single source of truth for that decoration set: `isSimpleType` consults it to decide
+/// preservation, and AnyValue bulk-copy eligibility consults it to reject a zero-leaf member that
+/// would survive emission with a nonzero footprint.
+bool typeHasAbiSignificantDecoration(IRType* type);
+
 /// Returns the element type operand for generic work-graph record types, or null
 /// for non-generic record types. Empty record types such as `EmptyNodeOutput`
 /// intentionally return null because they carry no payload element type.

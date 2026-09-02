@@ -9,8 +9,10 @@
 // dead payload collapses to an empty value that legalizes through `legalizeBitCast`. The `-cpu` run
 // dispatches both conformers (thread 0 → Foo1, thread 1 → Foo2) and checks each backward derivative
 // — d/dv(sum v) = 1 and d/dv(sum 2*v) = 2 — so the bulk-copied `Foo2` path is covered numerically.
-// The `-target cpp` run (`CPP` buffer) checks that no backward context is marshalled field-wise
-// (no `packAnyValue...(s_bwdCallableCtx...)` pack that takes the context by pointer).
+// The `-target cpp` run (`CPP` buffer) checks that no backward context is marshalled field-wise:
+// a bulk-copied (or empty-collapsed) context emits no per-field pack at all, so there must be no
+// `packAnyValue...(s_bwdCallableCtx...)` function definition — the negative check below keys on the
+// absence of that definition, not on how the parameter is passed.
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 // The positive anchor line below (`struct AnyValue`) doubles as a "compilation produced output"
