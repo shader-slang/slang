@@ -243,6 +243,16 @@ void setDownstreamCompilerPrelude(SlangPassThrough passThrough, const char* prel
 
 The code that sets up the prelude for the test infrastructure and command line usage can be found in `TestToolUtil::setSessionDefaultPrelude`. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
 
+### Precompiled headers for repeated NVRTC compilation
+
+NVRTC re-parses the prelude on every compilation. NVRTC 12.8 and later can precompile it once per compatible set of compile options and leading directives within a process and reuse it across later compilations via automatic precompiled headers (the `-pch` compile option), which cuts the per-shader compile time for the second and later compilations in a process. This works because the prelude reaches NVRTC as a leading `#include` (see above), so the whole prelude falls before NVRTC's precompiled-header "stop point" — the first token that is not part of a preprocessing directive.
+
+On the `-target ptx` path Slang drives NVRTC itself and passes `-pch` automatically on NVRTC 12.8+, but only when the prelude is presented as a leading `#include` — which is the case for the command-line tools and test infrastructure (they install the include-form prelude, as described above). A host application using the library API with the default embedded prelude, or a custom prelude whose trimmed text does not begin with `#include`, does not get `-pch` on this path, because with a verbatim-text prelude NVRTC's stop point falls near the top of the prelude rather than after it, so the precompiled header captures too little to help; such an application should install an include-form prelude (via `setLanguagePrelude`) if it wants the speedup.
+
+On the `-target cuda` path the application drives NVRTC, so it must opt in. Present the prelude to NVRTC as a leading `#include` (as above, not inlined text), pass `-pch`, and rely on the process-global precompiled-header heap, whose default already covers the prelude. Grow the heap only reactively: if `nvrtcGetPCHCreateStatus(prog)` returns `NVRTC_ERROR_PCH_CREATE_HEAP_EXHAUSTED`, read the needed size with `nvrtcGetPCHHeapSizeRequired(prog, &size)`, set it with `nvrtcSetPCHHeapSize(size)`, and recompile with a fresh `nvrtcProgram` so the enlarged heap is used. Do not call `nvrtcSetPCHHeapSize` before every compilation, because it frees any existing precompiled header and defeats reuse.
+
+Per NVRTC's documented PCH semantics, NVRTC keys the precompiled header on the compilation options and the translation unit's leading directive text, and rebuilds it when either changes. It does not track the contents of `#include`d files, so an application that keeps the same `#include` line while changing the prelude header's contents on disk within one process must invalidate reuse itself (for example by changing the prelude text passed to NVRTC) rather than relying on same-path header edits being noticed.
+
 Half Support
 ============
 
