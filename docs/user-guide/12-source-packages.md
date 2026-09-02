@@ -37,9 +37,9 @@ docs/
 ```
 
 `src/` contains importable Slang modules. Host executables are workspace primaries whose filename
-stem matches a name in `host.executables`. For example, `src/video-preview.slang` is the source for
+stem matches a name in `build.host.executables`. For example, `src/video-preview.slang` is the source for
 the `video-preview` executable and must declare `module video_preview;`.
-`slang package --experimental run` uses `host.default`, or the only listed executable when
+`slang package --experimental run` uses `build.host.default`, or the only listed executable when
 `default` is omitted.
 
 `tests/` and `docs/` are reserved for package tests and documentation. The initial package tool
@@ -68,9 +68,11 @@ The manifest declares the package and its source dependencies:
       }
     ]
   },
-  "host": {
-    "executables": ["my-shaders"],
-    "default": "my-shaders"
+  "build": {
+    "host": {
+      "executables": ["my-shaders"],
+      "default": "my-shaders"
+    }
   },
   "dependencies": {
     "noise": {
@@ -93,7 +95,7 @@ The manifest declares the package and its source dependencies:
 ```
 
 `schema_version` is the file format version and is currently `1`. `name`, `exports`, and
-`license_files` are also required. `dependencies`, `tools`, `workspace`, and `host` are optional.
+`license_files` are also required. `dependencies`, `tools`, `workspace`, and `build` are optional.
 Package manifests allow JSON comments.
 
 `name` identifies the package throughout the dependency graph. `exports` lists relative source
@@ -105,7 +107,8 @@ contents must be replaced before validation succeeds.
 The `workspace` object is read only from the manifest that starts the solve. `deps` is where Git
 dependency source is materialized, and `build` contains generated workspace output. Their defaults
 are `deps/` and `build/`; `slang package init` writes those defaults explicitly. The same fields in
-a dependency's manifest do not affect the enclosing workspace.
+a dependency's manifest do not affect the enclosing workspace. `workspace.build` is a directory
+name; it is not the top-level `build` object that configures compilation.
 
 `workspace.bundle` selects optional distribution outputs under `build/bundle/`. `modules` (default
 true) requests that experimental builds compile every primary to `build/bundle/modules/` and write
@@ -115,14 +118,16 @@ using the same import-relative layout, so that directory is one compiler search 
 that would occupy the same name on a case-insensitive filesystem are an error. Set either flag to
 `false` to skip that output when its build mode is active.
 
-The optional root `host` object requests native host executables. `executables` lists output
-filenames without directory separators; the package tool adds the platform executable suffix and
-writes each result under `workspace.build/host`. Each name must match an exported workspace
-primary whose source filename is `<name>.slang`. When more than one executable is listed,
-`default` names the artifact `slang package --experimental run` executes if you do not pass an
-executable name.
+The optional top-level `build` object is how the package is compiled. Schema 1 only understands
+`build.host`, which requests native host executables. `executables` lists output filenames without
+directory separators; the package tool adds the platform executable suffix and writes each result
+under `workspace.build/host`. Each name must match an exported workspace primary whose source
+filename is `<name>.slang`. When more than one executable is listed, `default` names the artifact
+`slang package --experimental run` executes if you do not pass an executable name.
 With a single executable, `default` may be omitted and that name is used. Dependency manifests may
-declare this field, but only the workspace package controls executable generation.
+declare this field, but only the workspace package controls executable generation. A top-level
+`host` object is an error; nest it as `build.host`. Later artifact kinds belong as additional keys
+under `build`, not as new top-level siblings of `workspace`.
 
 The optional `tools` object declares required **system tools**: programs already installed on the
 machine, not source packages and not lock rows. `slang package` checks that each named tool is
@@ -406,7 +411,7 @@ source commit when available, tracked-source `dirty` state, and path. Consumers 
 same Slang toolchain that produced the files. The module tree can be used as a source-free search
 path only with that constraint; it is not a stable distribution format.
 
-When `host.executables` is present, `slang package --experimental build` also compiles each matching
+When `build.host.executables` is present, `slang package --experimental build` also compiles each matching
 workspace primary with the host executable target and writes `build/host/<executable-name>` (plus
 `.exe` on Windows). The `main` function in that file must use the native ABI, such as
 `export __extern_cpp int main()`, and a supported downstream C++ compiler must be available. Build
@@ -422,8 +427,9 @@ copied. Build also writes `build/docs/index.md`: the workspace dependency tree, 
 alphabetized list of copied Markdown files per package. Every package in the graph is listed;
 only packages that contributed Markdown link from the tree into that file list.
 
-`slang package --experimental run` executes an existing native artifact from `host.executables` and forwards
-trailing arguments. With no executable name, it runs `host.default`. It does not build first. Run
+`slang package --experimental run` executes an existing native artifact from
+`build.host.executables` and forwards trailing arguments. With no executable name, it runs
+`build.host.default`. It does not build first. Run
 fails with instructions when the manifest does not configure a host executable or when
 `slang package --experimental build` has not produced that artifact. The global
 `--experimental` option must appear immediately after `slang package`; normal help hides `run` and

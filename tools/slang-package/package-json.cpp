@@ -644,16 +644,16 @@ static SlangResult _readWorkspace(
 
 static SlangResult _readHost(
     JSONContainer* container,
-    const JSONValue& root,
+    const JSONValue& parent,
     HostSettings& outHost,
     String& outError)
 {
-    JSONValue host = _find(container, root, "host");
+    JSONValue host = _find(container, parent, "host");
     if (!host.isValid())
         return SLANG_OK;
     if (host.getKind() != JSONValue::Kind::Object)
     {
-        outError = "Field 'host' must be an object.";
+        outError = "Field 'build.host' must be an object.";
         return SLANG_FAIL;
     }
     for (auto pair : container->getObject(host))
@@ -661,7 +661,7 @@ static SlangResult _readHost(
         String key = container->getStringFromKey(pair.key);
         if (key != "executables" && key != "default")
         {
-            outError = String("Unknown field in 'host': ") + key;
+            outError = String("Unknown field in 'build.host': ") + key;
             return SLANG_FAIL;
         }
     }
@@ -669,7 +669,7 @@ static SlangResult _readHost(
     JSONValue executables = _find(container, host, "executables");
     if (executables.getKind() != JSONValue::Kind::Array)
     {
-        outError = "Host 'executables' must be a non-empty array of names.";
+        outError = "Field 'build.host.executables' must be a non-empty array of names.";
         return SLANG_FAIL;
     }
     outHost.executables.clear();
@@ -677,22 +677,22 @@ static SlangResult _readHost(
     {
         if (item.getKind() != JSONValue::Kind::String)
         {
-            outError = "Every host executable name must be a string.";
+            outError = "Every build.host executable name must be a string.";
             return SLANG_FAIL;
         }
         String name = container->getString(item);
         if (!isValidPackageName(name))
         {
-            outError =
-                String("Host executable name must be a filename without directory separators: ") +
-                name;
+            outError = String("build.host executable name must be a filename without directory "
+                              "separators: ") +
+                       name;
             return SLANG_FAIL;
         }
         for (const auto& existing : outHost.executables)
         {
             if (existing == name)
             {
-                outError = String("Duplicate host executable name: ") + name;
+                outError = String("Duplicate build.host executable name: ") + name;
                 return SLANG_FAIL;
             }
         }
@@ -700,7 +700,7 @@ static SlangResult _readHost(
     }
     if (outHost.executables.getCount() == 0)
     {
-        outError = "Host 'executables' must contain at least one name.";
+        outError = "Field 'build.host.executables' must contain at least one name.";
         return SLANG_FAIL;
     }
 
@@ -710,7 +710,8 @@ static SlangResult _readHost(
     {
         if (outHost.executables.getCount() != 1)
         {
-            outError = "Host 'default' is required when more than one executable is listed.";
+            outError = "Field 'build.host.default' is required when more than one executable is "
+                       "listed.";
             return SLANG_FAIL;
         }
         outHost.defaultExecutable = outHost.executables[0];
@@ -721,9 +722,38 @@ static SlangResult _readHost(
         if (executable == outHost.defaultExecutable)
             return SLANG_OK;
     }
-    outError =
-        String("Host 'default' is not listed in 'executables': ") + outHost.defaultExecutable;
+    outError = String("Field 'build.host.default' is not listed in 'executables': ") +
+               outHost.defaultExecutable;
     return SLANG_FAIL;
+}
+
+/// Read the optional top-level `build` object. Schema 1 only understands `host`; unknown keys are
+/// errors so later artifact kinds can be added without silently ignoring them today.
+static SlangResult _readBuild(
+    JSONContainer* container,
+    const JSONValue& root,
+    BuildSettings& outBuild,
+    String& outError)
+{
+    outBuild = BuildSettings();
+    JSONValue build = _find(container, root, "build");
+    if (!build.isValid())
+        return SLANG_OK;
+    if (build.getKind() != JSONValue::Kind::Object)
+    {
+        outError = "Field 'build' must be an object.";
+        return SLANG_FAIL;
+    }
+    for (auto pair : container->getObject(build))
+    {
+        String key = container->getStringFromKey(pair.key);
+        if (key != "host")
+        {
+            outError = String("Unknown field in 'build': ") + key;
+            return SLANG_FAIL;
+        }
+    }
+    return _readHost(container, build, outBuild.host, outError);
 }
 
 // Read the optional `tools` object. These entries name installed system programs whose presence
@@ -800,9 +830,14 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
     for (auto pair : json.container->getObject(json.root))
     {
         String key = json.container->getStringFromKey(pair.key);
+        if (key == "host")
+        {
+            outError = "Field 'host' must be nested under 'build' as 'build.host'.";
+            return SLANG_FAIL;
+        }
         if (key != "schema_version" && key != "name" && key != "exports" &&
             key != "license_files" && key != "dependencies" && key != "retractions" &&
-            key != "workspace" && key != "host" && key != "tools")
+            key != "workspace" && key != "build" && key != "tools")
         {
             outError = String("Unknown field in slang-package.json: ") + key;
             return SLANG_FAIL;
@@ -835,7 +870,7 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
         _readRetractions(json.container, json.root, outManifest.retractions, outError));
     SLANG_RETURN_ON_FAIL(
         _readWorkspace(json.container, json.root, outManifest.workspace, outError));
-    SLANG_RETURN_ON_FAIL(_readHost(json.container, json.root, outManifest.host, outError));
+    SLANG_RETURN_ON_FAIL(_readBuild(json.container, json.root, outManifest.build, outError));
     SLANG_RETURN_ON_FAIL(
         _readTools(json.container, json.root, outManifest.slangToolchainConstraint, outError));
     return SLANG_OK;
@@ -997,20 +1032,25 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
         }
         writer.endObject(SourceLoc());
     }
-    if (manifest.host.executables.getCount())
+    if (manifest.build.host.executables.getCount())
     {
-        for (const auto& executable : manifest.host.executables)
+        for (const auto& executable : manifest.build.host.executables)
             SLANG_RELEASE_ASSERT(isValidPackageName(executable));
+        _writeKey(writer, "build");
+        writer.startObject(SourceLoc());
         _writeKey(writer, "host");
         writer.startObject(SourceLoc());
         _writeKey(writer, "executables");
-        _writeStringArray(writer, manifest.host.executables);
-        if (manifest.host.defaultExecutable.getLength())
+        _writeStringArray(writer, manifest.build.host.executables);
+        if (manifest.build.host.defaultExecutable.getLength())
         {
-            SLANG_RELEASE_ASSERT(isValidPackageName(manifest.host.defaultExecutable));
+            SLANG_RELEASE_ASSERT(isValidPackageName(manifest.build.host.defaultExecutable));
             _writeKey(writer, "default");
-            writer.addStringValue(manifest.host.defaultExecutable.getUnownedSlice(), SourceLoc());
+            writer.addStringValue(
+                manifest.build.host.defaultExecutable.getUnownedSlice(),
+                SourceLoc());
         }
+        writer.endObject(SourceLoc());
         writer.endObject(SourceLoc());
     }
     writer.endObject(SourceLoc());

@@ -79,7 +79,7 @@ The last two directories are generated state and are ignored. The manifest initi
 `src`, names `LICENSE`, configures `deps` and `build`, and records the installed Slang version as
 the minimum `tools.slang-toolchain` version when the version is available.
 
-The generated package is deliberately incomplete. It does not add a `host` section. Replace the
+The generated package is deliberately incomplete. It does not add a `build.host` section. Replace the
 placeholder text in `LICENSE`, then add the first module:
 
 ```slang
@@ -130,7 +130,7 @@ or `slang-workspace.json`.
 - `docs` does not regenerate documentation. Run `build` first.
 - An application that invokes `slangc` itself must consume the export paths written to
   `build/search-paths`; the package state is not injected into arbitrary compiler sessions.
-- A `host` section has no effect on plain `build`; Journey 8 covers the explicit opt-in that
+- A `build.host` section has no effect on plain `build`; Journey 8 covers the explicit opt-in that
   produces its binary output.
 
 ### First checkpoint
@@ -283,7 +283,7 @@ cd color-encoding
 slang package init
 ```
 
-Replace the license placeholder. A library does not need `host.executables`, so do not add that
+Replace the license placeholder. A library does not need `build.host.executables`, so do not add that
 optional section. Add its primary:
 
 ```slang
@@ -676,7 +676,7 @@ cd packages/color-math
 slang package init
 ```
 
-Replace its license placeholder, do not add application-only `host` settings, and move the source:
+Replace its license placeholder, do not add application-only `build.host` settings, and move the source:
 
 ```text
 packages/color-math/
@@ -830,12 +830,14 @@ export __extern_cpp int main()
 }
 ```
 
-Declare the executable in the root-level `host` section of `slang-package.json`:
+Declare the executable in the `build.host` section of `slang-package.json`:
 
 ```json
-"host": {
-  "executables": ["image-viewer"],
-  "default": "image-viewer"
+"build": {
+  "host": {
+    "executables": ["image-viewer"],
+    "default": "image-viewer"
+  }
 }
 ```
 
@@ -869,7 +871,7 @@ application flag in that position is still forwarded.
 - `build` without `--experimental` produces source and documentation only, regardless of module or
   host settings, and removes stale module and host directories from an earlier experimental build.
 - `run` executes the already-built artifact selected by the optional name, otherwise
-  `host.default` or the only configured executable. It never builds and never resolves packages.
+  `build.host.default` or the only configured executable. It never builds and never resolves packages.
 - `slang package --experimental help` lists the experimental commands; stable help omits them.
 
 ### Current gaps and pitfalls

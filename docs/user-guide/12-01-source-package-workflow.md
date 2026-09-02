@@ -48,7 +48,7 @@ The committed lock selects `v1.0.0` for every Git dependency. The same repositor
 weights. That retraction is what makes `fetch` versus `update` interesting: fetch still uses the
 lock; update will not reselect the retracted tag.
 
-The workspace lists `video-preview` under `host.executables`. The matching primary is
+The workspace lists `video-preview` under `build.host.executables`. The matching primary is
 `src/video-preview.slang`, which declares `module video_preview;`. There is no reserved
 `main.slang` filename.
 
@@ -63,15 +63,16 @@ less slang-package-lock.json
 
 - `slang-package.json` is published intent: package name, exports, licenses, Git or path
   dependencies, optional `tools.slang-toolchain` for a minimum installed compiler (and thus its
-  builtins and standard library), optional `host` executables, optional publisher `retractions`,
+  builtins and standard library), optional `build.host` executables, optional publisher `retractions`,
   and optional root-only `workspace` settings (`deps`, `build`, `excludes`).
 - `slang-package-lock.json` is the exact graph this workspace selected. `fetch` reproduces it
   without solving again.
 - `slang-workspace.json` is gitignored machine-local state for `edit` and `override`. It should
   not be in the clone. If it is missing, that is correct for CI and for a clean checkout.
 
-`host` is a sibling of `workspace` in the manifest, not a field inside it. A dependency may declare
-`host`; only the package you run `build` and `run` in produces executables.
+`build` is a sibling of `workspace` in the manifest. `workspace.build` names the output directory;
+`build.host` configures native executables. A dependency may declare `build.host`; only the package
+you run `build` and `run` in produces executables.
 
 Most Git dependencies use `git` plus a `version` range. To follow a branch or non-release tag,
 write `git`, `ref`, and `as`; `ref` chooses the Git name while `as` supplies the exact semantic
@@ -162,7 +163,7 @@ package-specific update mode yet.
 slang package --experimental build
 ```
 
-This example uses experimental build because its manifest configures `host.executables` and the
+This example uses experimental build because its manifest configures `build.host.executables` and the
 walkthrough demonstrates `.slang-module` output. A stable `slang package build` distributes the
 source bundle and docs only; binary module generation, host executable compilation, and `run` are
 experimental.
@@ -177,7 +178,7 @@ Build validates the materialized graph, then:
   and experimental.
 - When `workspace.bundle.source` is enabled (the default), copies exported `.slang` files into
   `build/bundle/source/` at those same import-relative paths so the directory is one search path.
-- Compiles each name in `host.executables` to `build/host/<name>`, copies `slang-rt` beside it, and
+- Compiles each name in `build.host.executables` to `build/host/<name>`, copies `slang-rt` beside it, and
   writes `build/host/EXPERIMENTAL.txt`.
 - Copies Markdown from each package's `docs/` into `build/docs/<package>/` and writes
   `build/docs/index.md`.
@@ -190,7 +191,7 @@ guarantee. The stable distribution layout is `build/bundle/source/`.
 slang package --experimental run
 ```
 
-Run executes the existing `host.default` artifact (`video-preview`) and does not compile. If the
+Run executes the existing `build.host.default` artifact (`video-preview`) and does not compile. If the
 binary is missing, it tells you to build first. A leading argument that matches a listed
 executable name selects that artifact; remaining arguments are forwarded.
 

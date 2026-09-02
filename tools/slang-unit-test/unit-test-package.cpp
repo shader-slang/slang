@@ -161,7 +161,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "regression\"}\n"
         "    ]\n"
         "  },\n"
-        "  \"host\": {\"executables\": [\"root-tool\"], \"default\": \"root-tool\"}\n"
+        "  \"build\": {\"host\": {\"executables\": [\"root-tool\"], \"default\": \"root-tool\"}}\n"
         "}\n";
 
     Manifest manifest;
@@ -189,9 +189,9 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.workspace.exclusions.getCount() == 1);
     SLANG_CHECK(manifest.workspace.exclusions[0].packageName == "noise");
     SLANG_CHECK(manifest.workspace.exclusions[0].version == "1.3.0");
-    SLANG_CHECK(manifest.host.executables.getCount() == 1);
-    SLANG_CHECK(manifest.host.executables[0] == "root-tool");
-    SLANG_CHECK(manifest.host.defaultExecutable == "root-tool");
+    SLANG_CHECK(manifest.build.host.executables.getCount() == 1);
+    SLANG_CHECK(manifest.build.host.executables[0] == "root-tool");
+    SLANG_CHECK(manifest.build.host.defaultExecutable == "root-tool");
     SLANG_CHECK(manifest.workspace.bundle.modules);
     SLANG_CHECK(manifest.workspace.bundle.source);
 
@@ -396,7 +396,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
 
     const String invalidExecutableNameText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
-        "\"LICENSE\"],\"dependencies\":{},\"host\":{\"executables\":[\"bin/root\"]}}";
+        "\"LICENSE\"],\"dependencies\":{},\"build\":{\"host\":{\"executables\":[\"bin/root\"]}}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText(
         "invalid-executable-name.json",
         invalidExecutableNameText,
@@ -405,24 +405,40 @@ SLANG_UNIT_TEST(PackageManifestJSON)
 
     const String unknownHostFieldText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
-        "\"LICENSE\"],\"dependencies\":{},\"host\":{\"executables\":[\"root\"],\"source\":\"main\"}"
-        "}";
+        "\"LICENSE\"],\"dependencies\":{},\"build\":{\"host\":{\"executables\":[\"root\"],"
+        "\"source\":\"main\"}}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("unknown-host-field.json", unknownHostFieldText, manifest, error)));
 
     const String missingDefaultText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
-        "\"LICENSE\"],\"dependencies\":{},\"host\":{\"executables\":[\"one\",\"two\"]}}";
+        "\"LICENSE\"],\"dependencies\":{},\"build\":{\"host\":{\"executables\":[\"one\",\"two\"]}}"
+        "}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("missing-host-default.json", missingDefaultText, manifest, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("default")) >= 0);
 
     const String implicitDefaultText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
-        "\"LICENSE\"],\"dependencies\":{},\"host\":{\"executables\":[\"only-tool\"]}}";
+        "\"LICENSE\"],\"dependencies\":{},\"build\":{\"host\":{\"executables\":[\"only-tool\"]}}}";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readManifestText("implicit-host-default.json", implicitDefaultText, manifest, error)));
-    SLANG_CHECK(manifest.host.defaultExecutable == "only-tool");
+    SLANG_CHECK(manifest.build.host.defaultExecutable == "only-tool");
+
+    const String topLevelHostText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "\"LICENSE\"],\"dependencies\":{},\"host\":{\"executables\":[\"root-tool\"]}}";
+    SLANG_CHECK(
+        SLANG_FAILED(readManifestText("top-level-host.json", topLevelHostText, manifest, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("build.host")) >= 0);
+
+    const String unknownBuildFieldText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "\"LICENSE\"],\"dependencies\":{},\"build\":{\"cuda\":true}}";
+    SLANG_CHECK(SLANG_FAILED(
+        readManifestText("unknown-build-field.json", unknownBuildFieldText, manifest, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field in 'build'")) >= 0);
 
     const String legacyExecutableText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
@@ -902,8 +918,8 @@ SLANG_UNIT_TEST(PackageToolRun)
         executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not configure")) >= 0);
 
-    manifest.host.executables.add("package-run-test");
-    manifest.host.defaultExecutable = "package-run-test";
+    manifest.build.host.executables.add("package-run-test");
+    manifest.build.host.defaultExecutable = "package-run-test";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
@@ -953,9 +969,9 @@ SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
     Manifest manifest;
     String manifestPath = Path::combine(temp.path, "slang-package.json");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
-    manifest.host.executables.add("alpha");
-    manifest.host.executables.add("beta");
-    manifest.host.defaultExecutable = "alpha";
+    manifest.build.host.executables.add("alpha");
+    manifest.build.host.executables.add("beta");
+    manifest.build.host.defaultExecutable = "alpha";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
         Path::combine(temp.path, "src/alpha.slang"),
@@ -993,7 +1009,7 @@ SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(executeInDirectory(temp.path, SLANG_COUNT_OF(namedRun), namedRun, error)));
 
-    manifest.host = HostSettings();
+    manifest.build.host = HostSettings();
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
     const char* stableBuildArguments[] = {"slang-package", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
@@ -1034,8 +1050,8 @@ SLANG_UNIT_TEST(PackageToolExecutableRequiresWorkspaceSource)
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
     Manifest root;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
-    root.host.executables.add("root-tool");
-    root.host.defaultExecutable = "root-tool";
+    root.build.host.executables.add("root-tool");
+    root.build.host.defaultExecutable = "root-tool";
     Dependency toolDependency;
     toolDependency.name = "tool";
     toolDependency.path = "vendor/tool";

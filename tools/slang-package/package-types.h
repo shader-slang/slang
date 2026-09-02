@@ -75,7 +75,7 @@ struct WorkspaceSettings
     List<Exclusion> exclusions;
 };
 
-/// Root-only native host output from `slang-package.json`. Dependency manifests may declare
+/// Native host output from `build.host` in `slang-package.json`. Dependency manifests may declare
 /// this field, but only the workspace that starts a build produces executables.
 ///
 /// Each entry in `executables` is both the output filename (without a platform suffix) and the
@@ -86,6 +86,17 @@ struct HostSettings
 {
     List<String> executables;
     String defaultExecutable;
+};
+
+/// Root-only compilation settings from the top-level `build` object in `slang-package.json`.
+///
+/// This is not `workspace.build`, which names the output directory (`build/` by default). `build`
+/// is how the package is compiled. Schema 1 only understands `host`; later keys (additional
+/// artifact kinds, compiler flags, and so on) belong here so they are never promoted to siblings
+/// of `workspace` and `dependencies`.
+struct BuildSettings
+{
+    HostSettings host;
 };
 
 /// Graph-wide requirement from a package's `tools.slang-toolchain.version`.
@@ -109,7 +120,7 @@ struct Manifest
     List<Dependency> dependencies;
     List<Retraction> retractions;
     WorkspaceSettings workspace;
-    HostSettings host;
+    BuildSettings build;
     /// Version constraint from `tools.slang-toolchain`, or empty when omitted.
     ///
     /// This is a check against the installed compiler, not a lock row. A package uses it as a
@@ -121,12 +132,12 @@ struct Manifest
 
 inline bool hasHostExecutables(const Manifest& manifest)
 {
-    return manifest.host.executables.getCount() != 0;
+    return manifest.build.host.executables.getCount() != 0;
 }
 
 inline bool isHostExecutableName(const Manifest& manifest, const String& name)
 {
-    for (const auto& executable : manifest.host.executables)
+    for (const auto& executable : manifest.build.host.executables)
     {
         if (executable == name)
             return true;

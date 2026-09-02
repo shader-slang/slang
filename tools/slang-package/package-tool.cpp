@@ -1877,7 +1877,7 @@ static SlangResult _build(
     List<String> executableSources;
     if (buildHost)
     {
-        for (const auto& executableName : manifest.host.executables)
+        for (const auto& executableName : manifest.build.host.executables)
         {
             String sourcePath;
             SLANG_RETURN_ON_FAIL(_findHostExecutableSource(
@@ -1956,10 +1956,10 @@ static SlangResult _build(
     {
         SLANG_RETURN_ON_FAIL(resetDirectory(hostRoot, outError));
         SLANG_RETURN_ON_FAIL(writeExperimentalHostMarker(hostRoot, outError));
-        for (Index i = 0; i < manifest.host.executables.getCount(); ++i)
+        for (Index i = 0; i < manifest.build.host.executables.getCount(); ++i)
         {
             String executablePath =
-                _getExecutableOutputPath(projectRoot, manifest, manifest.host.executables[i]);
+                _getExecutableOutputPath(projectRoot, manifest, manifest.build.host.executables[i]);
             if (!Path::createDirectoryRecursive(Path::getParentDirectory(executablePath)))
             {
                 outError =
@@ -1995,7 +1995,7 @@ static SlangResult _build(
     return SLANG_OK;
 }
 
-/// Run an existing native executable configured by the workspace `host` section.
+/// Run an existing native executable configured by the workspace `build.host` section.
 static SlangResult _run(
     const String& projectRoot,
     int argumentCount,
@@ -2006,12 +2006,13 @@ static SlangResult _run(
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
     if (!hasHostExecutables(manifest))
     {
-        outError = "The workspace does not configure a host executable. Add 'host.executables' to "
-                   "slang-package.json and run 'slang package --experimental build'.";
+        outError =
+            "The workspace does not configure a host executable. Add 'build.host.executables' to "
+            "slang-package.json and run 'slang package --experimental build'.";
         return SLANG_FAIL;
     }
 
-    String executableName = manifest.host.defaultExecutable;
+    String executableName = manifest.build.host.defaultExecutable;
     int argumentIndex = 0;
     if (argumentCount > 0 && isHostExecutableName(manifest, arguments[0]))
     {
