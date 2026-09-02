@@ -7,16 +7,16 @@
 //TEST:DISPATCHER(filecheck=PKG_BAD): pkg definitely-not-a-command
 
 // PACKAGE: result code = 0
-// PACKAGE: Usage: slang-package <command>
+// PACKAGE: Usage: slang-package [--experimental] <command>
 
 // PKG: result code = 0
-// PKG: Usage: slang-package <command>
+// PKG: Usage: slang-package [--experimental] <command>
 
 // FLAG: result code = 0
-// FLAG: Usage: slang-package <command>
+// FLAG: Usage: slang-package [--experimental] <command>
 
 // PKG_FLAG: result code = 0
-// PKG_FLAG: Usage: slang-package <command>
+// PKG_FLAG: Usage: slang-package [--experimental] <command>
 
 // BAD: result code = 1
 // BAD: slang-package: error: Invalid command or arguments

@@ -1037,6 +1037,11 @@ private:
         return "does not satisfy all incoming requirements";
     }
 
+    /// Search the reachable unresolved packages depth-first, trying each package's newest eligible
+    /// candidate first and restoring a full snapshot after a rejected branch.
+    ///
+    /// `unresolved` must be copied by value: selecting a candidate can append to `packages`, which
+    /// can invalidate a reference, and restoring `snapshot` replaces the entire package list.
     SlangResult search(String& outError, ResolveFailure& outFailure)
     {
         List<bool> reachable;

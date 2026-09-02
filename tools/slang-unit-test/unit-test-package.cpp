@@ -881,6 +881,11 @@ SLANG_UNIT_TEST(PackageToolUpdateRejectsBundleCaseConflict)
 
 SLANG_UNIT_TEST(PackageToolRun)
 {
+    // Host linking currently kills slang-test's persistent test server on CI. The unit-test
+    // registry has no standalone-only mode, so keep this experimental coverage disabled until it
+    // can run in a dedicated process.
+    SLANG_IGNORE_TEST;
+
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
     const char* initArguments[] = {"slang-package", "init"};
@@ -958,6 +963,11 @@ SLANG_UNIT_TEST(PackageToolRun)
 
 SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
 {
+    // Host linking currently kills slang-test's persistent test server on CI. The unit-test
+    // registry has no standalone-only mode, so keep this experimental coverage disabled until it
+    // can run in a dedicated process.
+    SLANG_IGNORE_TEST;
+
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
     const char* initArguments[] = {"slang-package", "init"};
@@ -3348,6 +3358,138 @@ SLANG_UNIT_TEST(PackageResolverDropsConstraintNotesFromShadowedGitPackage)
     SLANG_CHECK(sharedReport->constraints.getCount() == 1);
     SLANG_CHECK(sharedReport->constraints[0].ownerName == "root");
     SLANG_CHECK(sharedReport->constraints[0].text == ">=1.0.0");
+}
+
+SLANG_UNIT_TEST(PackageResolverRejectsMultipleGitURLsForOnePackage)
+{
+    InMemoryPackageSource source;
+    Manifest a = _makeManifest("a");
+    _addDependency(a, "shared", "memory:shared-a", ">=1.0.0");
+    source.addRelease("memory:a", "1.0.0", a);
+    Manifest b = _makeManifest("b");
+    _addDependency(b, "shared", "memory:shared-b", ">=1.0.0");
+    source.addRelease("memory:b", "1.0.0", b);
+
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+    _addDependency(root, "b", "memory:b", ">=1.0.0");
+
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(root, source, lock, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(
+            UnownedStringSlice("Package 'shared' is required from more than one Git URL.")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageResolverRejectsMultiplePinsForOnePackage)
+{
+    InMemoryPackageSource source;
+    Manifest a = _makeManifest("a");
+    Dependency sharedMain;
+    sharedMain.name = "shared";
+    sharedMain.git = "memory:shared";
+    sharedMain.version = ">=1.0.0 <2.0.0";
+    sharedMain.ref = "main";
+    sharedMain.as = "1.0.0";
+    a.dependencies.add(sharedMain);
+    source.addRelease("memory:a", "1.0.0", a);
+    Manifest b = _makeManifest("b");
+    Dependency sharedStable = sharedMain;
+    sharedStable.ref = "stable";
+    b.dependencies.add(sharedStable);
+    source.addRelease("memory:b", "1.0.0", b);
+
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+    _addDependency(root, "b", "memory:b", ">=1.0.0");
+
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(root, source, lock, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice(
+            "Package 'shared' is pinned to more than one Git ref or 'as' version.")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageResolverRejectsPathVersionOutsideGitRange)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String bRoot = Path::combine(temp.path, "b");
+    String sharedRoot = Path::combine(bRoot, "vendor/shared");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(sharedRoot));
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(
+        Path::combine(sharedRoot, "slang-package.json"),
+        _makeManifest("shared"),
+        error)));
+
+    InMemoryPackageSource source;
+    Manifest a = _makeManifest("a");
+    _addDependency(a, "shared", "memory:shared", ">=2.0.0");
+    source.addRelease("memory:a", "1.0.0", a);
+    Manifest b = _makeManifest("b");
+    Dependency sharedPath;
+    sharedPath.name = "shared";
+    sharedPath.path = "vendor/shared";
+    sharedPath.as = "1.0.0";
+    b.dependencies.add(sharedPath);
+    source.addRelease("memory:b", "1.0.0", b, bRoot);
+
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+    _addDependency(root, "b", "memory:b", ">=1.0.0");
+
+    PackageTool::LockFile lock;
+    SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(temp.path, root, source, lock, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice(
+            "Path dependency 'shared' provides version 1.0.0, which conflicts with a Git version "
+            "constraint.")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageResolverRejectsPathVersionOutsideGitPin)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String bRoot = Path::combine(temp.path, "b");
+    String sharedRoot = Path::combine(bRoot, "vendor/shared");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(sharedRoot));
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(
+        Path::combine(sharedRoot, "slang-package.json"),
+        _makeManifest("shared"),
+        error)));
+
+    InMemoryPackageSource source;
+    Manifest a = _makeManifest("a");
+    Dependency sharedPin;
+    sharedPin.name = "shared";
+    sharedPin.git = "memory:shared";
+    sharedPin.version = ">=1.0.0 <3.0.0";
+    sharedPin.ref = "main";
+    sharedPin.as = "2.0.0";
+    a.dependencies.add(sharedPin);
+    source.addRelease("memory:a", "1.0.0", a);
+    Manifest b = _makeManifest("b");
+    Dependency sharedPath;
+    sharedPath.name = "shared";
+    sharedPath.path = "vendor/shared";
+    sharedPath.as = "1.0.0";
+    b.dependencies.add(sharedPath);
+    source.addRelease("memory:b", "1.0.0", b, bRoot);
+
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+    _addDependency(root, "b", "memory:b", ">=1.0.0");
+
+    PackageTool::LockFile lock;
+    SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(temp.path, root, source, lock, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice(
+            "Path dependency 'shared' provides version 1.0.0, which conflicts with pinned Git "
+            "version 2.0.0.")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageResolverCompatibleSelfCycle)
