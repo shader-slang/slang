@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -1390,16 +1391,6 @@ void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(codeGenContext);
-
-    auto isNonCopyableOpaqueType = [](IRType* type) -> bool
-    {
-        type = unwrapArray(type);
-        if (as<IRRayQueryType>(type))
-            return true;
-        if (as<IRHitObjectType>(type))
-            return true;
-        return false;
-    };
 
     for (auto globalInst : irModule->getGlobalInsts())
     {
