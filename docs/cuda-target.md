@@ -329,7 +329,9 @@ Some features are not available because they cannot be mapped with appropriate b
 - There is not complete support for all methods on 'objects' like textures etc.
 - Does not currently support combined 'TextureSampler'. A Texture behaves equivalently to a TextureSampler and Samplers are ignored.
 - Half type is not currently supported
-- GetDimensions is not available on any Texture type currently - as there doesn't appear to be a CUDA equivalent
+- `GetDimensions` supports querying texture width, height, and depth. Overloads taking a mip level
+  are only available in OptiX ray-tracing stages, where they also return the mip-level count.
+  Array-size and sample-count output parameters are currently written as zero.
 
 Language aspects
 ================
