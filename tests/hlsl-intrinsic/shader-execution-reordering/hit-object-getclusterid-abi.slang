@@ -1,0 +1,38 @@
+// GetClusterID is an NVAPI/SPIRV/CUDA extension with no native DXR 1.3 arm, so on HLSL it is
+// reachable only through the explicit nvapiHitObjects opt-in. Confirm the HLSL path emits the NVAPI
+// `.GetClusterID` accessor on an NvHitObject, and never a native dx::HitObject.
+
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile sm_6_5 -entry main -stage raygeneration -capability nvapiHitObjects
+
+// Negative: on a plain native SM 6.9 target (no nvapiHitObjects) GetClusterID has no arm — it is
+// an NVAPI/SPIRV/CUDA-only extension — so it is a clean capability error, not native DXR codegen.
+// The code is 41011 (a method with no compatible arm for the target), not the type-emitter's 55215.
+//DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE_ERR,non-exhaustive): -target hlsl -profile sm_6_9 -entry main -stage raygeneration
+
+//TEST_INPUT: set scene = AccelerationStructure
+uniform RaytracingAccelerationStructure scene;
+
+//TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+RWStructuredBuffer<uint> outputBuffer;
+
+struct MyPayload { float4 color; };
+
+[shader("raygeneration")]
+void main()
+{
+    RayDesc ray;
+    ray.Origin = float3(0, 0, 0);
+    ray.TMin = 0.01f;
+    ray.Direction = float3(0, 1, 0);
+    ray.TMax = 1e4f;
+
+    MyPayload payload = { float4(0) };
+
+    HitObject ht = HitObject::TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
+
+    // CHECK: NvHitObject
+    // CHECK: .GetClusterID
+    // CHECK-NOT: dx::HitObject
+    // NATIVE_ERR: 41011
+    outputBuffer[0] = ht.IsHit() ? (uint)ht.GetClusterID() : 0u;
+}
