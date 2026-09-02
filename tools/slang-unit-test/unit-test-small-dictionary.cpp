@@ -74,8 +74,12 @@ SLANG_UNIT_TEST(smallDictionary)
         SLANG_CHECK(dict.tryGetValue(1) && *dict.tryGetValue(1) == 100);
     }
 
-    // Same contract after promotion, where a duplicate add is a different code path (it reaches
-    // the overflow Dictionary instead of the inline linear scan).
+    // Same contract after promotion, at the same assert strength. This exercises a different code
+    // path (the explicit `m_overflow.tryGetValue` check ahead of `m_overflow.add`, not the inline
+    // linear scan) -- without that explicit check, this would instead hit `Dictionary::add`'s own
+    // debug-only-strength assert, which is skippable under `SLANG_ASSERT=release-asserts-only`
+    // while the inline path's SLANG_RELEASE_ASSERT above is not, making the two paths disagree
+    // under that mode.
     {
         SmallDictionary<int, int, 2> dict;
         dict.add(1, 100);

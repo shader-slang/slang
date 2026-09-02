@@ -10,10 +10,22 @@ namespace Slang
 ///
 /// Holds up to `kInlineCapacity` entries in a fixed inline array, looked up by linear scan, so
 /// construction and the first several inserts do no heap allocation at all. Only once the entry
-/// count exceeds `kInlineCapacity` does it promote to a real `Dictionary`, moving the inline
-/// entries across once, so later lookups on a case with many unique keys still get the same O(1)
-/// average cost a plain `Dictionary` would give (the inline scan does not keep growing past that
-/// point).
+/// count exceeds `kInlineCapacity` does it promote to a real `Dictionary`, copying the inline
+/// entries across once. After that, a lookup costs `Dictionary`'s O(1) average plus a fixed
+/// `kInlineCapacity`-comparison linear scan of the inline array (checked first) -- that scan
+/// does not keep growing past `kInlineCapacity`, but it also never goes away once the map has
+/// promoted.
+///
+/// Add-only by design: there is no `remove` or in-place update, and `add` asserts on a
+/// duplicate key. That is exactly what keeps a promoted entry's inline and `Dictionary` copies
+/// from ever diverging (see the promotion comment on `add`), and what makes the `const TValue*`
+/// `tryGetValue` returns into the inline array safe to hand out (the pointee is never mutated
+/// after being written). A future `remove`/`set`-style addition would need to account for both
+/// copies to preserve that.
+///
+/// `TKey`/`TValue` must be default-constructible: the inline arrays value-initialize
+/// `kInlineCapacity` slots of each up front, even for an empty map -- a constraint `Dictionary`
+/// itself does not impose.
 ///
 /// Intended for caches that are constructed fresh per operation and, in the common case, end up
 /// holding only a handful of entries -- e.g. a cache scoped to one substitution operation or one
@@ -36,8 +48,12 @@ public:
         return nullptr;
     }
 
-    // Asserts if `key` already exists, matching `Dictionary::add`'s contract -- callers are
-    // expected to `tryGetValue` first, the same way every current caller of this type does.
+    /// Adds `key` and `value` to this dictionary. `key` must not already be present -- call
+    /// `tryGetValue` first (this type is add-only; see the class comment).
+    ///
+    /// Asserts uniformly -- in both debug and release builds, and the same way whether or not
+    /// this map has promoted -- when `key` is already present, matching `Dictionary::add`'s
+    /// duplicate-key contract.
     void add(const TKey& key, const TValue& value)
     {
         if (!m_overflowed)
@@ -56,12 +72,20 @@ public:
             // Promote once: copy the inline entries into the real Dictionary so a case with many
             // unique keys still gets O(1) average lookups instead of an ever-growing linear scan.
             // The inline array is left populated (not cleared): later lookups still check it
-            // first, and every entry there is byte-identical to its Dictionary copy, so reading
-            // through either one gives the same answer.
+            // first, and every entry there is byte-identical to its Dictionary copy (this type is
+            // add-only, so neither copy can drift after being written), so reading through either
+            // one gives the same answer.
             for (Index i = 0; i < m_inlineCount; i++)
                 m_overflow.add(m_inlineKeys[i], m_inlineValues[i]);
             m_overflowed = true;
         }
+
+        // `Dictionary::add`'s own duplicate check is debug-only strength (skippable under
+        // `SLANG_ASSERT=release-asserts-only`), which would otherwise make a duplicate add here
+        // behave differently -- silently keeping the old value instead of asserting -- than the
+        // inline path above for the exact same misuse. Check explicitly first so both paths give
+        // the same guarantee at the same strength.
+        SLANG_RELEASE_ASSERT(!m_overflow.tryGetValue(key));
         m_overflow.add(key, value);
     }
 
