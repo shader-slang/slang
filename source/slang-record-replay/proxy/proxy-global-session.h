@@ -181,12 +181,23 @@ public:
                     // file system (unavailable at playback). It must be a distinct
                     // object per call so each replayed custom-FS session takes its
                     // own proxy registration, matching the recorded handle sequence.
-                    // wrapObject() -> tryWrap() adopts one reference by calling
-                    // release(), so hand over the single reference from `new` (do
-                    // not pre-add another, or the object would never be freed).
-                    // ReplayNullFileSystem's per-instance ref counting then deletes
-                    // it once the wrapper proxy is destroyed.
-                    desc2.fileSystem = wrapObject(new ReplayNullFileSystem());
+                    //
+                    // Bind it through an ISlangMutableFileSystem* (not the concrete
+                    // ReplayNullFileSystem*): the type-safe wrapObject<T> template QIs
+                    // the wrapped proxy back to T, which is valid only when T is a COM
+                    // interface with a getTypeGuid(). Deducing T as the concrete impl
+                    // type makes toSlangInterface<T> call release() on the proxy through
+                    // a wrong-typed pointer (undefined behaviour). Wrapping an interface
+                    // pointer mirrors the default arm's
+                    // wrapObject(OSFileSystem::getMutableSingleton()).
+                    //
+                    // wrapObject() adopts one reference (its inner tryWrap() calls
+                    // release()), so hand over the single reference from `new` -- do not
+                    // pre-add another, or the object would never be freed. The proxy's
+                    // m_actual then holds the only reference, and ReplayNullFileSystem's
+                    // per-instance ref counting deletes it once that proxy is destroyed.
+                    ISlangMutableFileSystem* standIn = new ReplayNullFileSystem();
+                    desc2.fileSystem = wrapObject(standIn);
                     ownsFileSystemWrapper = true;
                     break;
                 }
