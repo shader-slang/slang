@@ -1,17 +1,17 @@
-// unit-test-small-dictionary.cpp
+// unit-test-short-dictionary.cpp
 
 #include "core/slang-basic.h"
-#include "core/slang-small-dictionary.h"
+#include "core/slang-short-dictionary.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(smallDictionary)
+SLANG_UNIT_TEST(shortDictionary)
 {
     // Stays within the inline capacity: every entry should be findable, and a lookup for a key
     // that was never added should miss.
     {
-        SmallDictionary<int, String, 4> dict;
+        ShortDictionary<int, String, 4> dict;
         dict.add(1, "one");
         dict.add(2, "two");
         dict.add(3, "three");
@@ -25,7 +25,7 @@ SLANG_UNIT_TEST(smallDictionary)
     // Crosses the inline capacity: entries added before, at, and after the promotion boundary
     // must all remain findable, with none lost in the move to the overflow Dictionary.
     {
-        SmallDictionary<int, int, 4> dict;
+        ShortDictionary<int, int, 4> dict;
         for (int i = 0; i < 10; i++)
             dict.add(i, i * i);
 
@@ -42,7 +42,7 @@ SLANG_UNIT_TEST(smallDictionary)
     // Exactly at the inline capacity: the last inline slot and the first overflow slot must both
     // work, since that boundary is where an off-by-one in the promotion logic would show up.
     {
-        SmallDictionary<int, int, 2> dict;
+        ShortDictionary<int, int, 2> dict;
         dict.add(0, 100);
         dict.add(1, 101);
         SLANG_CHECK(dict.tryGetValue(0) && *dict.tryGetValue(0) == 100);
@@ -59,7 +59,7 @@ SLANG_UNIT_TEST(smallDictionary)
     // failure is catchable here instead of crashing the test process; the rejected add must also
     // leave the original value in place, not shadow or overwrite it.
     {
-        SmallDictionary<int, int, 4> dict;
+        ShortDictionary<int, int, 4> dict;
         dict.add(1, 100);
         bool threw = false;
         try
@@ -81,7 +81,7 @@ SLANG_UNIT_TEST(smallDictionary)
     // while the inline path's SLANG_RELEASE_ASSERT above is not, making the two paths disagree
     // under that mode.
     {
-        SmallDictionary<int, int, 2> dict;
+        ShortDictionary<int, int, 2> dict;
         dict.add(1, 100);
         dict.add(2, 200);
         dict.add(3, 300); // promotes past the inline capacity of 2

@@ -1260,7 +1260,7 @@ private:
     /// `(baseInterfaceDecl, selfIsSubtypeOfBase, baseIsSubtypeOfFacet)` triple recurs across many
     /// separate `_calcInheritanceInfo` calls -- each one otherwise re-running a full `Val`
     /// substitution from scratch. See #12139 (the `interface_depth` case left unresolved by that
-    /// issue's SmallDictionary fix).
+    /// issue's ShortDictionary fix).
     ///
     /// Unsynchronized, like every other cache on this type: front-end work including
     /// specialization is documented as non-reentrant and requiring external synchronization when

@@ -1,5 +1,5 @@
-#ifndef SLANG_CORE_SMALL_DICTIONARY_H
-#define SLANG_CORE_SMALL_DICTIONARY_H
+#ifndef SLANG_CORE_SHORT_DICTIONARY_H
+#define SLANG_CORE_SHORT_DICTIONARY_H
 
 #include "slang-dictionary.h"
 
@@ -33,7 +33,7 @@ namespace Slang
 /// plain `Dictionary` pays for a heap-allocated hash table on the very first insert even when the
 /// whole operation never needs more than one or two entries.
 template<typename TKey, typename TValue, int kInlineCapacity = 8>
-class SmallDictionary
+class ShortDictionary
 {
 public:
     const TValue* tryGetValue(const TKey& key) const

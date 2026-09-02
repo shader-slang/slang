@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/slang-dictionary.h"
-#include "core/slang-small-dictionary.h"
+#include "core/slang-short-dictionary.h"
 #include "slang-ast-support-types.h"
 
 namespace Slang
@@ -15,12 +15,12 @@ namespace Slang
 /// without this cache the shared Val DAG is traversed as if it were a tree. The cache belongs to
 /// the first substituteImpl dispatch on the stack and is propagated through SubstitutionSet copies.
 ///
-/// Backed by `SmallDictionary` rather than `Dictionary` directly: most substitution operations
+/// Backed by `ShortDictionary` rather than `Dictionary` directly: most substitution operations
 /// substitute through ordinary, shallow (non-shared) trees, where nearly every lookup misses and
 /// the cache ends up holding only a few entries. A plain `Dictionary` pays for a heap-allocated
 /// hash table on the very first `add`, even when the whole operation never revisits a single Val
 /// -- pure overhead for the common case, and the root cause of #12139's front-end regression on
-/// shallow generic code. `SmallDictionary` defers that allocation until an operation actually
+/// shallow generic code. `ShortDictionary` defers that allocation until an operation actually
 /// substitutes through more than a handful of unique Vals, which is exactly the deeply-shared-DAG
 /// case this cache exists for (see #12106 / #12100).
 struct SubstitutionCache
@@ -66,7 +66,7 @@ struct SubstitutionCache
 private:
     ASTBuilder* m_astBuilder = nullptr;
     DeclRefBase* m_substitutionDeclRef = nullptr;
-    SmallDictionary<Key, Result> m_entries;
+    ShortDictionary<Key, Result> m_entries;
 };
 
 /// Dispatches a Val substitution through the operation-local cache.
