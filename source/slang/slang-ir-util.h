@@ -622,6 +622,19 @@ bool isWorkGraphRecordType(IRType* type);
 /// intentionally return null because they carry no payload element type.
 IRType* getWorkGraphRecordElementType(IRType* type);
 
+/// Returns true if a decoration with `op` describes a property of an entry point rather than of an
+/// ordinary function, and so is meaningful only while its parent carries `IREntryPointDecoration`.
+///
+/// These are the decorations that back a SPIR-V `OpExecutionMode`, whose first operand the spec
+/// requires to be an entry point. A function carrying one of them that is not an entry point of the
+/// module being emitted has nothing valid to emit for it.
+///
+/// Two places need the same answer and must not drift apart: `fixEntryPointCallsites`, which clones
+/// a called entry point into an ordinary function and has to drop these alongside
+/// `IREntryPointDecoration`, and the SPIR-V emitter, which skips them when its target turns out not
+/// to be an entry point.
+bool isEntryPointScopedDecoration(IROp op);
+
 } // namespace Slang
 
 #endif
