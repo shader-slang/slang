@@ -4,6 +4,8 @@
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -entry ClosestHit -stage closesthit -dump-ir -no-codegen
 //TEST:SIMPLE(filecheck=DXILCH): -experimental-feature -entry ClosestHit -stage closesthit -target dxil -profile sm_6_7
 //TEST:SIMPLE(filecheck=DXILAH): -experimental-feature -entry AnyHit -stage anyhit -target dxil -profile sm_6_7
+//TEST:SIMPLE(filecheck=PTXCH): -experimental-feature -entry ClosestHit -stage closesthit -target ptx
+//TEST:SIMPLE(filecheck=PTXAH): -experimental-feature -entry AnyHit -stage anyhit -target ptx
 
 import slang.raytracing;
 
@@ -53,6 +55,7 @@ struct ClosestHit : rt::IClosestHitShader<HitContext>
 // IR: structuralRayTracingGetTriangleFrontFacing
 // DXILCH: define void
 // DXILCH: !dx.dxrPayloadAnnotations
+// PTXCH: .visible .entry __closesthit__ClosestHit()
 
 void applyAnyHitTriangleData(rt::AnyHitInput<HitContext> input)
 {
@@ -73,3 +76,4 @@ struct AnyHit : rt::IAnyHitShader<HitContext>
 // HLSLAH-DAG: [shader("anyhit")]void AnyHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
 // DXILAH: define void
 // DXILAH: !dx.dxrPayloadAnnotations
+// PTXAH: .visible .entry __anyhit__AnyHit()

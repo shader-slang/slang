@@ -1746,7 +1746,15 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.structuralRayTracingStageInput &&
         (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
          isCUDATarget(targetRequest)))
+    {
         SLANG_PASS(lowerPortableStructuralRayTracingStageInputOperations);
+
+        // Structural stage-input lowering synthesizes native varying parameters after the
+        // canonical entry-point `in`-parameter translation above. Normalize those late
+        // parameters too, so target varying legalization sees the same borrow-in form as it
+        // does for source-authored entry-point inputs.
+        SLANG_PASS(translateEntryPointInParamToBorrow, sink);
+    }
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
