@@ -15,7 +15,7 @@
 // would mean the constant lost its module-scope identity (and with it the
 // linkage that lets another module refer to it).
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 static const int gK = 42;
 

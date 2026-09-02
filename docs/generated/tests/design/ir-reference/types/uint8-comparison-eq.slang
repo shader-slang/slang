@@ -14,7 +14,7 @@
 // whose operands are typed `UInt8`, demonstrating that comparisons
 // preserve the narrow operand type at the IR level.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint8_t a;
 uniform uint8_t b;

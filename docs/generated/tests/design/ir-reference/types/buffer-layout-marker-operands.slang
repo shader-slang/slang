@@ -18,7 +18,7 @@
 // `StructuredBuffer(Float, <Marker>`, which shows the marker occupies
 // operand 1 and that the choice of marker is what varies.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -stage compute -entry main -dump-ir -o -
 
 StructuredBuffer<float, Std140DataLayout> b140;
 StructuredBuffer<float, Std430DataLayout> b430;

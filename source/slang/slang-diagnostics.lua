@@ -3199,6 +3199,13 @@ warning(
     span { loc = "modifier:Modifier", message = "constexpr modifier is ignored here" }
 )
 
+err(
+    "builtin-only-modifier-on-non-core-decl",
+    31229,
+    "builtin-only modifier on a non-core-module declaration",
+    span { loc = "modifier:Modifier", message = "'~modifier' can only be applied to declarations in the core module" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
@@ -5595,6 +5602,13 @@ err(
 )
 
 err(
+    "torch-entry-point-requires-body",
+    55103,
+    "'[TorchEntryPoint]' function requires a body",
+    span { loc = "location", message = "a '[TorchEntryPoint]' function must have a body; a forward declaration cannot be compiled for the torch target." }
+)
+
+err(
     "unsupported-builtin-type",
     55200,
     "unsupported builtin type",
@@ -5613,6 +5627,13 @@ err(
     55215,
     "multisampled texture is not supported on this target",
     span { loc = "location", message = "'~type:IRInst' is a multisampled texture, which is not supported by the current code generation target" }
+)
+
+err(
+    "func-type-not-supported-on-target",
+    55216,
+    "function-typed value is not supported on this target",
+    span { loc = "location", message = "a function-typed value cannot be represented when generating code for the current target; it is supported only where the value can be resolved at compile time, so name the function directly at the call site (or pass it as an argument that names a function directly) instead of storing it in a variable or selecting it at runtime" }
 )
 
 err(

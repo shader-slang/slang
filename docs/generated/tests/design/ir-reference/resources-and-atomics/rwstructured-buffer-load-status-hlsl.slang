@@ -15,7 +15,7 @@
 // targets HLSL at `cs_6_6`; the CHECK finds the distinct opcode in the
 // user body.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o /dev/null -stage compute -entry main -profile cs_6_6
+//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o - -stage compute -entry main -profile cs_6_6
 
 uniform RWStructuredBuffer<int> rwbuf;
 uniform RWStructuredBuffer<int> sink;

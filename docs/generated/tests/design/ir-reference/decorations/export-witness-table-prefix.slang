@@ -16,7 +16,7 @@
 // function (`_SR`), type (`_ST`) and variable (`_SV`) forms the sibling
 // tests pin.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IDoubler { int doubled(int x); }
 

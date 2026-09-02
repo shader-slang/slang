@@ -129,6 +129,7 @@ is deleted right after — so check the workflow's own run list, not the PR.
 | `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                                                                |
 | `check-actionlint.yml`            | yes    | no          | Lints the workflow YAML in this directory.                                                            |
 | `check-submodules.yml`            | yes    | no          | Verifies `external/**` submodule pins are reachable.                                                  |
+| `check-cmake-binary-dir.yml`      | yes    | no          | Rejects `CMAKE_BINARY_DIR` in first-party CMake (use `slang_BINARY_DIR`).                             |
 | `check-doc-gaps.yml`              | yes    | no          | Hard-gates the generated-doc structural lint; reports the doc-gap queue as advisory. Also runs daily. |
 | `check-pr-label.yml`              | yes    | no          | Requires exactly one `pr:` classification label.                                                      |
 | `check-toc.yml`                   | yes    | no          | Checks the user-guide TOC; `/regenerate-toc` auto-fixes.                                              |
@@ -237,11 +238,12 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 
 ## 7. Manual only
 
-| Workflow                         | Purpose                                                     |
-| -------------------------------- | ----------------------------------------------------------- |
-| `ci-retry.yml`                   | Waits for a run to finish, then reruns its failed jobs.     |
-| `perf-compile-release-sweep.yml` | Backfills compile-performance history across past releases. |
-| `check-spirv-tools.yml`          | Placeholder for a SPIRV-Tools tip-of-tree check.            |
+| Workflow                           | Purpose                                                     |
+| ---------------------------------- | ----------------------------------------------------------- |
+| `ci-falcor2-perf-bridge-smoke.yml` | Manual smoke test for the Falcor 2 perf bridge prototype.   |
+| `ci-retry.yml`                     | Waits for a run to finish, then reruns its failed jobs.     |
+| `perf-compile-release-sweep.yml`   | Backfills compile-performance history across past releases. |
+| `check-spirv-tools.yml`            | Placeholder for a SPIRV-Tools tip-of-tree check.            |
 
 ## 8. Composite actions
 

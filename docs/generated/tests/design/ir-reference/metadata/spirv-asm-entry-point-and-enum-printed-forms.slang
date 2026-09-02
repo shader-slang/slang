@@ -17,7 +17,7 @@
 // `SPIRVAsmInst` line therefore shows both rules at once, and the CHECK pins
 // the whole operand list so a kind that started naming itself would fail.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<uint> gOut;
 

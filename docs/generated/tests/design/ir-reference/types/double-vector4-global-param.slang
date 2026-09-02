@@ -17,7 +17,7 @@
 // global_param-shape parallel that matches the half/double family-
 // expansion pattern of this expansion pass.)
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double4 q;
 uniform RWStructuredBuffer<double> buf;

@@ -180,11 +180,11 @@ difference first. Three such gaps were filed against
 `ir-reference/control-flow.md` and all three were false.
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 ```
 
 Per the universal `_common.md` rule: combine `-dump-ir` with
-**`-target <text-target>`** AND **`-o /dev/null`** so the IR dump
+**`-target <text-target>`** AND **`-o -`** so the IR dump
 goes to stdout uncontaminated by target text.
 
 Anchor patterns at `func %main` (or a user-named helper such as
@@ -206,7 +206,7 @@ Do not use any GPU-only directive.
 - [ ] Every test's `doc_ref` resolves to an anchor in
       `ir-reference/control-flow.md` (or one of the listed
       secondary docs).
-- [ ] Every test uses `-target spirv-asm -dump-ir -o /dev/null
+- [ ] Every test uses `-target spirv-asm -dump-ir -o -
 -entry main -stage compute` (or `-stage fragment` for
       `discard`) per CLAUDE.md.
 - [ ] Outputs escape DCE: write to an `RWStructuredBuffer<T>` so
@@ -226,7 +226,7 @@ Do not use any GPU-only directive.
 
 These bite hard in control-flow-opcode observation tests:
 
-- `-dump-ir` requires `-target <X>` and `-o /dev/null`.
+- `-dump-ir` requires `-target <X>` and `-o -`.
 - Constant folding collapses conditions on literals. Loop
   conditions, `if` conditions, and `switch` scrutinees must be
   derived from `uniform` globals (or `SV_DispatchThreadID`) to keep

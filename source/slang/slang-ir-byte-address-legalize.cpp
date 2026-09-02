@@ -11,6 +11,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -341,29 +342,38 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    IRType* getDescriptorHandleStorageType()
+    // The storage type / cast opcode a `DescriptorHandle` field packs into must match the handle's
+    // SPIR-V representation, which is per-kind under `spvBindlessTextureNV` (uint64 for
+    // texture/sampler kinds, uint2 for buffers and acceleration structures), so each of these takes
+    // the handle type rather than deciding capability-wide.
+    bool isDescriptorHandleUInt64(IRDescriptorHandleType* handleType)
+    {
+        bool hasBindlessTextureNV =
+            m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV);
+        return isDescriptorHandleRepresentedAsUInt64(handleType, hasBindlessTextureNV);
+    }
+
+    IRType* getDescriptorHandleStorageType(IRDescriptorHandleType* handleType)
     {
         if (!m_options.translateToStructuredBufferOps)
             return nullptr;
 
-        if (m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        if (isDescriptorHandleUInt64(handleType))
             return m_builder.getUInt64Type();
 
         return m_builder.getVectorType(m_builder.getUIntType(), 2);
     }
 
-    IROp getCastDescriptorHandleToStorageOp()
+    IROp getCastDescriptorHandleToStorageOp(IRDescriptorHandleType* handleType)
     {
-        return m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV)
-                   ? kIROp_CastDescriptorHandleToUInt64
-                   : kIROp_CastDescriptorHandleToUInt2;
+        return isDescriptorHandleUInt64(handleType) ? kIROp_CastDescriptorHandleToUInt64
+                                                    : kIROp_CastDescriptorHandleToUInt2;
     }
 
-    IROp getCastStorageToDescriptorHandleOp()
+    IROp getCastStorageToDescriptorHandleOp(IRDescriptorHandleType* handleType)
     {
-        return m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV)
-                   ? kIROp_CastUInt64ToDescriptorHandle
-                   : kIROp_CastUInt2ToDescriptorHandle;
+        return isDescriptorHandleUInt64(handleType) ? kIROp_CastUInt64ToDescriptorHandle
+                                                    : kIROp_CastUInt2ToDescriptorHandle;
     }
 
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
@@ -519,7 +529,7 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto descriptorHandleType = as<IRDescriptorHandleType>(type))
         {
-            if (auto storageType = getDescriptorHandleStorageType())
+            if (auto storageType = getDescriptorHandleStorageType(descriptorHandleType))
             {
                 auto storageVal =
                     emitLegalLoad(storageType, buffer, baseOffset, immediateOffset, alignment);
@@ -528,7 +538,7 @@ struct ByteAddressBufferLegalizationContext
                 IRInst* args[] = {storageVal};
                 return m_builder.emitIntrinsicInst(
                     descriptorHandleType,
-                    getCastStorageToDescriptorHandleOp(),
+                    getCastStorageToDescriptorHandleOp(descriptorHandleType),
                     1,
                     args);
             }
@@ -1482,14 +1492,14 @@ struct ByteAddressBufferLegalizationContext
                 }
             }
         }
-        else if (as<IRDescriptorHandleType>(type))
+        else if (auto descriptorHandleType = as<IRDescriptorHandleType>(type))
         {
-            if (auto storageType = getDescriptorHandleStorageType())
+            if (auto storageType = getDescriptorHandleStorageType(descriptorHandleType))
             {
                 IRInst* args[] = {value};
                 auto storageVal = m_builder.emitIntrinsicInst(
                     storageType,
-                    getCastDescriptorHandleToStorageOp(),
+                    getCastDescriptorHandleToStorageOp(descriptorHandleType),
                     1,
                     args);
                 return emitLegalStore(
