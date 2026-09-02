@@ -614,3 +614,49 @@ SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
 
     ctx().disable();
 }
+
+// =============================================================================
+// getDownstreamCompilerPath: end-to-end record -> replay via executeAll().
+// Records a getDownstreamCompilerPath query in Record mode, switches to Playback, and lets
+// executeAll() re-dispatch the recorded call through its registered handler
+// (REPLAY_REGISTER(GlobalSessionProxy, getDownstreamCompilerPath)). On playback the recorded inputs
+// drive the call and its ISlangBlob* path output is reconstructed from the recorded content hash,
+// so the whole stream is consumed. A partial replay (the method silently skipped) would leave bytes
+// and fail the atEnd() check. glslang is used because it is a bundled shared library that loads
+// without a GPU; whether it resolves to a path (SLANG_OK, exercising the blob output) or is
+// unavailable on a given runner (SLANG_E_NOT_FOUND, no blob), the round-trip replays whatever was
+// recorded, so the test does not depend on glslang actually being present.
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextGetDownstreamCompilerPathPlayback)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc globalDesc = {};
+    globalDesc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, globalSession.writeRef())));
+
+    // Record the query. We deliberately do not assert the result code: it is SLANG_OK with a path
+    // on a runner that has glslang and SLANG_E_NOT_FOUND on one that does not, and the round-trip
+    // below holds either way.
+    Slang::ComPtr<ISlangBlob> pathBlob;
+    globalSession->getDownstreamCompilerPath(SLANG_PASS_THROUGH_GLSLANG, pathBlob.writeRef());
+
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isPlayback());
+
+    // Re-dispatch the recorded calls (slang_createGlobalSession2 then getDownstreamCompilerPath)
+    // through the registered replay handlers. On playback each recorded output slot is consumed
+    // from the stream -- the path blob is reconstructed from its recorded content hash.
+    ctx().executeAll();
+
+    // The whole recorded stream must be consumed; a silently-skipped getDownstreamCompilerPath
+    // would leave bytes here.
+    SLANG_CHECK(ctx().getStream().atEnd());
+
+    ctx().disable();
+}
