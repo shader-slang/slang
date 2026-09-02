@@ -59,15 +59,6 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
-/// Where an expression appears, for the "check an expression that must have a proper type"
-/// routines. Distinct from `CoercionSite` (which is specific to coercing to a known target type);
-/// this records roles where we require a proper type but have no target to coerce to.
-enum class ExprCheckingRole
-{
-    General,
-    ExpressionStatement,
-};
-
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -3660,20 +3651,80 @@ public:
 
     Expr* CheckExpr(Expr* expr);
 
-    /// Does the checked `expr` name a type or namespace rather than denote a runtime value? True
-    /// for a `TypeType` (a bare `MyType;`, `RWStructuredBuffer;`, or `IDifferentiable;`), a
-    /// `GenericDeclRefType`, or a `NamespaceType` — none of which can reach IR lowering. Used to
-    /// reject such expressions where a value is required (case 3 of shader-slang/slang#12428).
-    bool isExprOfNonValueType(Expr* expr);
+    /// Is the given `type` a proper type — a type permitted as the type of an expression?
+    /// Most proper types describe ordinary runtime values (`int`, `String`, `Optional<float>`);
+    /// `void` is also a proper type (the type of an expression that produces no value). Non-proper
+    /// types are the types given to an expression that names a type, a namespace, or an unapplied
+    /// generic — those expressions do not denote a value.
+    bool isProperType(Type* type);
 
-    /// Fully check `expr` and enforce that its type is either a proper type or `void`.
+    /// Is the given checked `expr` an instance of a proper type? (consistent with isProperType)
+    bool isExprOfProperType(Expr* expr);
+
+    /// Fully check `expr` and enforce that it has a proper type.
     ///
-    /// If checking leaves `expr` naming a type or namespace rather than a value (see
-    /// `isExprOfNonValueType`, e.g. a bare `MyType;` used as a statement), this diagnoses an error
-    /// (`type-name-used-as-expression-statement`) and rewrites `expr` to have an `ErrorType`, so
-    /// that downstream discarded-result checks naturally skip it via the usual cascading-error
-    /// avoidance. `role` records where the expression appears, for wording/diagnostic purposes.
-    Expr* checkExprOfProperOrVoidType(Expr* expr, ExprCheckingRole role);
+    /// If checking leaves `expr` naming a type, an unapplied generic, or a namespace rather than a
+    /// value, this diagnoses an error and rewrites `expr` to have an `ErrorType`, so that downstream
+    /// checks naturally skip it via the usual cascading-error avoidance. A `void`-typed expression
+    /// is a proper-typed value and is accepted.
+    Expr* checkExprOfProperType(Expr* expr);
+
+    /// Check an expression that appears in a statement-like context.
+    ///
+    /// A statement-like context is one where the value of the expression will be ignored, and
+    /// thus it is executed entirely for any possible side effects it produces.
+    ///
+    /// This procedure both checks the (unchecked) input `expr`, and also validates that
+    /// it satisfies all additional constraints that are expected for an expression used
+    /// entirely for its side effects.
+    Expr* checkExprInStmtLikeContext(Expr* expr);
+
+    /// Return `expr` as a traditional function/method call (`f(x)`, `obj.method()`), or null if it
+    /// is not one. This excludes operator expressions (`a + b`, `a, b`) and casts (`(int)x`), both
+    /// of which are `InvokeExpr` subtypes that are call-like but are not treated as calls here.
+    InvokeExpr* asCallExpr(Expr* expr);
+
+    /// Does the (unchecked) form of `expr` mean its result may be ignored without a diagnostic? True
+    /// for an assignment or compound assignment (`x = y`, `x += y`) and a prefix/postfix `++`/`--`,
+    /// all of which yield a value but are written for their effect.
+    bool doesExprFormAllowIgnoringResult(Expr* expr);
+
+    /// Is the (unchecked) syntactic form of `expr` one that is appropriate as a statement — i.e. a
+    /// form normally evaluated for its effect? True for a call (including a cast), an assignment or
+    /// compound assignment, a prefix/postfix `++`/`--`, an inline `spirv_asm` block, and an
+    /// `expand e` when `e`'s form is appropriate; false otherwise (a bare variable, a lambda, ...).
+    bool isExprSyntacticFormAppropriateForStmtLikeContext(Expr* expr);
+
+    /// Record the source location of each discarded leaf of the (unchecked) `uncheckedExpr` whose
+    /// form allows ignoring its result (per `doesExprFormAllowIgnoringResult`). The type pass reads
+    /// this decision by location, so the syntactic judgment is made on the unchecked form. Locations
+    /// are stored as their raw values, since a `SourceLoc` is not directly hashable.
+    void collectResultIgnoringDiscardedLeafLocs(
+        Expr* uncheckedExpr,
+        HashSet<SourceLoc::RawValue>& ioLocs);
+
+    /// Invoke `callback` on each leaf of the checked `checkedExpr` whose value becomes the whole
+    /// expression's result and is therefore discarded, peeling transparent wrappers and recursing
+    /// into the pass-through operands of a comma, ternary, short-circuit, and `expand`.
+    void forEachDiscardedLeaf(Expr* checkedExpr, const std::function<void(Expr*)>& callback);
+
+    /// Diagnose a discarded result at a single checked `leaf`, using its type and callee attributes
+    /// and the pre-check carve-out decision in `resultIgnoringLeafLocs`.
+    void maybeDiagnoseDiscardedResultAtLeaf(
+        Expr* leaf,
+        const HashSet<SourceLoc::RawValue>& resultIgnoringLeafLocs);
+
+    /// If `leaf` is a discarded `==` (a likely mistyped `=`), emit the dedicated diagnostic and
+    /// return true; otherwise return false.
+    bool maybeDiagnoseDanglingEquality(Expr* leaf);
+
+    /// If `leaf` is a discarded call to a `[NoDiscard]` function, emit its diagnostic and return
+    /// true; otherwise return false.
+    bool maybeDiagnoseDiscardedNoDiscardResult(Expr* leaf);
+
+    /// Is `leaf` a call whose callee is marked `[DiscardableResult]`, so that discarding its result
+    /// draws no diagnostic?
+    bool calleeDeclAllowsDiscardingResult(Expr* leaf);
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
     void _checkAliasedOutArguments(
@@ -4072,24 +4123,6 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void visitExpressionStmt(ExpressionStmt* stmt);
 
     void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt);
-
-    // Diagnose an expression-statement whose (parsed, pre-check) syntactic form is not one whose
-    // result is normally discarded on purpose. The allowed forms are an assignment (`=` or a
-    // compound `+=` etc.), a genuine call (including a cast), a prefix/postfix `++`/`--`, and an
-    // effect-only form (`spirv_asm { ... }`, `expand <expr>`); anything else (a bare variable, a
-    // bare member reference, a lambda, ...) is diagnosed. This is case (1) of
-    // shader-slang/slang#12428, and is purely syntactic, so it runs on the original AST before
-    // `CheckExpr` may rewrite node types, and is not suppressed by the type-based checks.
-    void diagnoseExpressionStatementForm(Expr* expr);
-
-    // If `expr`'s result is discarded and that is worth diagnosing, emit the appropriate warning or
-    // error. Always diagnoses a call to a `[NoDiscard]` function (an error). When
-    // `warnOnDiscardedValue` is true (an expression statement), also warns on a discarded
-    // non-`void` result (case (2) of shader-slang/slang#12428), skipping the carve-outs
-    // (assignment, `++`/`--`, a bare function reference, an error-typed or `void` result); when
-    // false (a `for` loop's side-effect expression, where discarding is expected) only the
-    // `[NoDiscard]` error applies.
-    void maybeDiagnoseDiscardedResult(Expr* expr, bool warnOnDiscardedValue);
 
     // Try to infer the max number of iterations the loop will run.
     void tryInferLoopMaxIterations(ForStmt* stmt);

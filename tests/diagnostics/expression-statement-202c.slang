@@ -1,9 +1,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):-std 202c
 
-// Under Slang 202c the expression-statement warnings (case 1 and case 2 of
-// shader-slang/slang#12428) are raised to errors, without any version branching in the checking
-// logic: the severity is overridden for the duration of module checking via
-// `DiagnosticSink::overrideDiagnosticSeverity`. Case 3 is already an error at every version.
+// Under Slang 202c the statement-like warnings (an inappropriate statement form, and a discarded
+// non-`void` result) are raised to errors. The severity is chosen per emission at the diagnostic
+// site by the language version, with no global override. The non-proper-type error is already an
+// error at every version.
 
 int compute() { return 1; }
 
@@ -12,20 +12,20 @@ void main()
 {
     int a = 1;
 
-    // Case (1) (disallowed statement form) is an error under 202c. Its discarded `int` result also
-    // draws the case-(2) diagnostic, itself now an error.
+    // An inappropriate statement form is an error under 202c. Its discarded `int` result also
+    // draws the discarded-result diagnostic, itself now an error.
     a;
 /*diag:
     ^ error E30073
-    ^ the result of this expression is not used; did you mean to call it with '()'?
+    ^ an expression used as a statement must be a function call (including a cast), an assignment, a compound assignment, an increment or decrement, an inline 'spirv_asm' block, or an 'expand' of one of these.
     ^ error E30074
-    ^ the result of this expression is not used; assign it to a variable or discard it explicitly with '(void)'.
+    ^ the result of this expression is not used; consider binding it to a variable with 'let'.
 */
 
-    // Case (2) (discarded non-`void` result) is an error under 202c.
+    // A discarded non-`void` result is an error under 202c.
     compute();
 /*diag:
            ^ error E30074
-           ^ the result of this expression is not used; assign it to a variable or discard it explicitly with '(void)'.
+           ^ the result of this expression is not used; consider binding it to a variable with 'let'.
 */
 }

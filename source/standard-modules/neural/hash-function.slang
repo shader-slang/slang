@@ -25,9 +25,9 @@ internal struct Pcg32
 	{
 		state = 0;
 		inc = (initseq << 1) | 1;
-		nextUint();
+		let _warmup0 = nextUint();
 		state += initstate;
-		nextUint();
+		let _warmup1 = nextUint();
 	}
 
 	[mutating]

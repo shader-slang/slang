@@ -1415,28 +1415,37 @@ err(
     span { loc = "expr:Expr", message = "the result of calling '~name:Name' is discarded; this function is marked '[NoDiscard]'." }
 )
 
--- Expression-statement diagnostics (see shader-slang/slang#12428). A default-on warning is raised
--- to an error under Slang 202c by an override installed once at the start of module checking, so no
--- language-version branching appears in the checking logic itself.
+-- Diagnostics for an expression used in a statement-like context (a position where its value is
+-- ignored and it is evaluated only for side effects). A default-on warning is raised to an error
+-- under Slang 202c by choosing the severity per emission at the diagnostic site.
 warning(
     "expression-statement-disallowed-form",
     30073,
-    "this form of expression should not be used as a statement",
-    span { loc = "expr:Expr", message = "the result of this expression is not used; did you mean to call it with '()'?" }
+    "expression cannot be used as a statement",
+    span { loc = "expr:Expr", message = "an expression used as a statement must be a function call (including a cast), an assignment, a compound assignment, an increment or decrement, an inline 'spirv_asm' block, or an 'expand' of one of these." }
 )
 
 warning(
     "discarded-expression-result",
     30074,
     "result of this expression is not used",
-    span { loc = "expr:Expr", message = "the result of this expression is not used; assign it to a variable or discard it explicitly with '(void)'." }
+    span { loc = "expr:Expr", message = "the result of this expression is not used; consider binding it to a variable with 'let'." }
+)
+
+-- Follow-up hint after a discarded-result diagnostic when the discarded value has a function type,
+-- since a bare function name is a common mistake for a call.
+warning(
+    "discarded-result-of-function-type",
+    30089,
+    "expression is of function type",
+    span { loc = "expr:Expr", message = "expression is of function type; perhaps a call was intended?" }
 )
 
 err(
-    "type-name-used-as-expression-statement",
+    "expr-does-not-have-proper-type",
     30088,
-    "this expression does not name a value",
-    span { loc = "expr:Expr", message = "this expression names a type or namespace, not a value, and cannot be used where a value is expected." }
+    "expression does not have a proper type",
+    span { loc = "expr:Expr", message = "a proper expression was expected, but the expression names a ~kind:String." }
 )
 
 err(
@@ -1444,6 +1453,13 @@ err(
     30069,
     "'[NoDiscard]' applied to a function returning 'void'",
     span { loc = "decl:Decl", message = "'[NoDiscard]' is not allowed on a function that returns 'void'; there is no result to discard." }
+)
+
+err(
+    "no-discard-and-discardable-result",
+    30124,
+    "'[NoDiscard]' and '[DiscardableResult]' cannot both be applied to a function",
+    span { loc = "decl:Decl", message = "a function cannot be both '[NoDiscard]' (its result must not be discarded) and '[DiscardableResult]' (its result may be discarded)." }
 )
 
 err(

@@ -7,20 +7,21 @@ void main(
     int a = 1;
     a == 2; // warn
 /*diag:
-      ^^ this form of expression should not be used as a statement
-      ^^ the result of this expression is not used; did you mean to call it with '()'?
+      ^^ expression cannot be used as a statement
+      ^^ an expression used as a statement must be a function call (including a cast), an assignment, a compound assignment, an increment or decrement, an inline 'spirv_asm' block, or an 'expand' of one of these.
       ^^ result of '==' not used
       ^^ result of '==' not used, did you intend '='?
 */
-    // A comparison is not one of the allowed statement forms, and (once parentheses are peeled) its
-    // `bool` result is discarded, so it now draws the syntactic (E30073) and discarded-result
-    // (E30074) diagnostics of shader-slang/slang#12428. The `did you intend '='?` heuristic (E30058)
-    // only fires on the unparenthesized form.
+    // A comparison is not an allowed statement form, and parentheses are transparent to these
+    // checks, so `(a == 2)` behaves exactly like the bare `a == 2` above: both draw the syntactic
+    // form warning (E30073) and the `==`-specific result warning (E30058, "did you intend '='?")
+    // rather than the generic discarded-result warning. They differ only in where E30073 points:
+    // the bare form underlines the `==`, the parenthesized form the whole `(a == 2)` expression.
     (a == 2);
 /*diag:
-       ^^ this form of expression should not be used as a statement
-       ^^ the result of this expression is not used; did you mean to call it with '()'?
-       ^^ result of this expression is not used
-       ^^ the result of this expression is not used; assign it to a variable or discard it explicitly with '(void)'.
+    ^ expression cannot be used as a statement
+    ^ an expression used as a statement must be a function call (including a cast), an assignment, a compound assignment, an increment or decrement, an inline 'spirv_asm' block, or an 'expand' of one of these.
+       ^^ result of '==' not used
+       ^^ result of '==' not used, did you intend '='?
 */
 }
