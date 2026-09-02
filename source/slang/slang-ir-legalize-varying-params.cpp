@@ -4576,20 +4576,62 @@ protected:
         }
     }
 
+    // Inline every helper containing a DispatchMesh call into its callers until each call sits
+    // directly in an entry point, where the Metal intrinsic's `_slang_mesh_payload` and
+    // `_slang_mgp` parameters are in scope. This is module-wide and a no-op once done, so running
+    // it once per entry point is harmless. Each pass inlines each helper's current call sites
+    // once, moving every call one caller closer, so it converges unless a helper reaches itself;
+    // that recursion is normally rejected up front, but the check can be disabled, so it is
+    // asserted here rather than assumed.
+    void inlineHelpersCallingDispatchMesh(IRGlobalValueWithCode* dispatchMeshFunc) const
+    {
+        for (bool inlined = true; inlined;)
+        {
+            inlined = false;
+
+            HashSet<IRFunc*> helpers;
+            traverseUses(
+                dispatchMeshFunc,
+                [&](const IRUse* use)
+                {
+                    auto parent = getParentFunc(use->getUser());
+                    if (as<IRCall>(use->getUser()) && parent &&
+                        !parent->findDecoration<IREntryPointDecoration>())
+                        helpers.add(parent);
+                });
+            for (auto helper : helpers)
+            {
+                // Only calls of `helper`, not uses that pass it as a value.
+                traverseUses(
+                    helper,
+                    [&](const IRUse* use)
+                    {
+                        auto call = as<IRCall>(use->getUser());
+                        if (!call || call->getCallee() != helper)
+                            return;
+                        SLANG_RELEASE_ASSERT(getParentFunc(call) != helper);
+                        inlined |= inlineCall(call);
+                    });
+            }
+        }
+    }
+
     void legalizeAmplificationStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
     {
+        auto func = entryPoint.entryPointFunc;
+
         // Find out DispatchMesh function
         IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
-        for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
+        for (const auto globalInst : func->getModule()->getGlobalInsts())
         {
-            if (const auto func = as<IRGlobalValueWithCode>(globalInst))
+            if (const auto f = as<IRGlobalValueWithCode>(globalInst))
             {
-                if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+                if (const auto dec = f->findDecoration<IRKnownBuiltinDecoration>())
                 {
                     if (dec->getName() == KnownBuiltinDeclName::DispatchMesh)
                     {
                         SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
-                        dispatchMeshFunc = func;
+                        dispatchMeshFunc = f;
                     }
                 }
             }
@@ -4598,49 +4640,44 @@ protected:
         if (!dispatchMeshFunc)
             return;
 
-        IRBuilder builder{entryPoint.entryPointFunc->getModule()};
+        inlineHelpersCallingDispatchMesh(dispatchMeshFunc);
 
-        // We'll rewrite the call to use mesh_grid_properties.set_threadgroups_per_grid
+        // A module has one DispatchMesh specialization (asserted above), so every call in an
+        // entry point writes the same [[payload]] type and any one will do.
+        IRCall* dispatchCall = nullptr;
         traverseUses(
             dispatchMeshFunc,
             [&](const IRUse* use)
             {
-                if (const auto call = as<IRCall>(use->getUser()))
-                {
-                    SLANG_ASSERT(call->getArgCount() == 4);
-                    const auto payload = call->getArg(3);
-
-                    const auto payloadPtrType =
-                        composeGetters<IRPtrType>(payload, &IRInst::getDataType);
-                    SLANG_ASSERT(payloadPtrType);
-                    const auto payloadType = payloadPtrType->getValueType();
-                    SLANG_ASSERT(payloadType);
-
-                    builder.setInsertBefore(
-                        entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
-                    const auto annotatedPayloadType = builder.getPtrType(
-                        kIROp_RefParamType,
-                        payloadPtrType->getValueType(),
-                        AddressSpace::MetalObjectData,
-                        payloadPtrType->getDataLayout());
-                    auto packedParam = builder.emitParam(annotatedPayloadType);
-                    builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
-                    IRVarLayout::Builder varLayoutBuilder(
-                        &builder,
-                        IRTypeLayout::Builder{&builder}.build());
-
-                    // Add the MetalPayload resource info, so we can emit [[payload]]
-                    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
-                    auto paramVarLayout = varLayoutBuilder.build();
-                    builder.addLayoutDecoration(packedParam, paramVarLayout);
-
-                    // Now we replace the call to DispatchMesh with a call to the mesh grid
-                    // properties But first we need to create the parameter
-                    const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
-                    auto mgp = builder.emitParam(meshGridPropertiesType);
-                    builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
-                }
+                auto call = as<IRCall>(use->getUser());
+                if (!dispatchCall && call && getParentFunc(call) == func)
+                    dispatchCall = call;
             });
+        if (!dispatchCall)
+            return; // nothing dispatches here; a helper no entry point reaches is never emitted
+
+        SLANG_ASSERT(dispatchCall->getArgCount() == 4);
+        const auto payloadPtrType = as<IRPtrTypeBase>(dispatchCall->getArg(3)->getDataType());
+        SLANG_ASSERT(payloadPtrType);
+
+        IRBuilder builder{func->getModule()};
+        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+        const auto annotatedPayloadType = builder.getPtrType(
+            kIROp_RefParamType,
+            payloadPtrType->getValueType(),
+            AddressSpace::MetalObjectData,
+            payloadPtrType->getDataLayout());
+        auto packedParam = builder.emitParam(annotatedPayloadType);
+        builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
+        IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+        // Add the MetalPayload resource info, so we can emit [[payload]]
+        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+        builder.addLayoutDecoration(packedParam, varLayoutBuilder.build());
+
+        // The intrinsic sets the grid size through mesh_grid_properties.set_threadgroups_per_grid
+        auto mgp = builder.emitParam(builder.getMetalMeshGridPropertiesType());
+        builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
     }
 
     void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
