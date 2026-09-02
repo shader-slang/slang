@@ -13910,13 +13910,13 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
 }
 
 
-// Returns true if a memory qualifier such as `globallycoherent` is meaningful on a
+// Returns true if memory qualifiers such as `globallycoherent` are meaningful on a
 // parameter of `type`: textures/images and buffer resources. Memory qualifiers describe
 // how a shader accesses the resource's backing memory, so they are only meaningful on a
 // resource the shader can load or store; `RaytracingAccelerationStructure` — opaque
 // geometry with no load/store — is excluded even though it shares the
 // `UntypedBufferResourceType` base with byte-address buffers.
-static bool isMemoryQualifierAllowedOnParamType(Type* type)
+static bool areMemoryQualifiersAllowedOnParamsOfType(Type* type)
 {
     if (!type)
         return false;
@@ -14004,7 +14004,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
-    if (!isMemoryQualifierAllowedOnParamType(paramDecl->type.type))
+    if (!areMemoryQualifiersAllowedOnParamsOfType(paramDecl->type.type))
     {
         auto MemoryQualifierSet = paramDecl->findModifier<MemoryQualifierSetModifier>();
         if (!MemoryQualifierSet)

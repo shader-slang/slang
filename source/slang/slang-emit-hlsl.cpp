@@ -2464,9 +2464,9 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 
     // A `globallycoherent` resource parameter must carry the qualifier into the
     // emitted function signature so a non-inlined callee still performs coherent
-    // accesses. Unlike a variable declaration, a parameter needs the keyword as an
+    // accesses. Unlike a variable declaration, a parameter needs the qualifier as an
     // inline prefix (space separator) rather than on its own line.
-    emitMemoryQualifierKeyword(param, " ");
+    maybeEmitMemoryQualifier(param, " ");
 
     Super::emitSimpleFuncParamImpl(param);
 }
@@ -2515,7 +2515,7 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
     }
 }
 
-bool HLSLSourceEmitter::emitMemoryQualifierKeyword(IRInst* inst, const char* separator)
+bool HLSLSourceEmitter::maybeEmitMemoryQualifier(IRInst* inst, const char* separator)
 {
     auto collection = inst->findDecoration<IRMemoryQualifierSetDecoration>();
     if (!collection)
@@ -2532,7 +2532,7 @@ bool HLSLSourceEmitter::emitMemoryQualifierKeyword(IRInst* inst, const char* sep
 
 void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
-    emitMemoryQualifierKeyword(varDecl, "\n");
+    maybeEmitMemoryQualifier(varDecl, "\n");
 }
 
 void HLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)

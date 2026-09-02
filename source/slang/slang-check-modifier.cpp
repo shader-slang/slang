@@ -1672,6 +1672,30 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     }
 }
 
+// Returns true if `decl` is a declaration that a memory qualifier
+// (`globallycoherent` / `volatile`) is allowed to sit on: a function parameter (which is
+// what lets a coherent resource be passed to a helper), or a global/struct-member
+// variable. In GLSL-input mode a global variable spelled as any `VarDeclBase`, and a
+// member of a global struct, are also accepted.
+static bool areMemoryQualifiersAllowedOnDecl(Decl* decl, bool isGLSLInput)
+{
+    if (as<ParamDecl>(decl))
+        return true;
+
+    if (as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl))))
+        return true;
+
+    if (isGLSLInput)
+    {
+        if (as<VarDeclBase>(decl) && isGlobalDecl(decl))
+            return true;
+        if (as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl)))
+            return true;
+    }
+
+    return false;
+}
+
 bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* decl)
 {
     switch (modifierType)
@@ -1730,15 +1754,7 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
 
     case ASTNodeType::GloballyCoherentModifier:
     case ASTNodeType::HLSLVolatileModifier:
-        if (isGLSLInput)
-            return as<VarDecl>(decl) &&
-                       (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) ||
-                        as<GLSLInterfaceBlockDecl>(decl)) ||
-                   as<VarDeclBase>(decl) && isGlobalDecl(decl) || as<ParamDecl>(decl) ||
-                   (as<StructDecl>(getParentDecl(decl)) && isGlobalDecl(getParentDecl(decl)));
-        return as<VarDecl>(decl) && (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)) ||
-                                     as<GLSLInterfaceBlockDecl>(decl)) ||
-               as<ParamDecl>(decl);
+        return areMemoryQualifiersAllowedOnDecl(decl, isGLSLInput);
 
         // Allowed only on parameters, struct fields and global variables.
     case ASTNodeType::InterpolationModeModifier:
