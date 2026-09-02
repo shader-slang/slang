@@ -150,7 +150,9 @@ distributions start shipping them independently. Unknown `tools` keys are errors
 Ordinary dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package
 publishers must treat as immutable. A manifest may instead pin an opaque branch or tag with `ref`
 and assign its solver identity with `as`. `schema_version` in `slang-package.json` is only the file
-format version. The lock always records the resolved ref, exact semantic version, and commit.
+format version. For a Git package the lock records the resolved ref, exact semantic version, and
+commit; a path package has no ref or commit to record, so its row carries the path and the `as`
+version.
 
 The optional top-level `retractions` array is publisher advice not to select releases matching a
 version constraint. Each entry requires `version` and a non-empty `reason`. To retract a published
@@ -233,8 +235,10 @@ lockfile is the definitive dependency graph and records both Git and path packag
 `"schema_version": 1`, the same file-format version as `slang-package.json`.
 `slang-workspace.json` currently uses schema version 2. Nested packages' lockfiles are not used for
 that solve. When a lock exists, `slang package fetch` checks that it still satisfies every recorded
-manifest and checks out every direct and transitive Git dependency under `workspace.deps` (`deps/`
-by default). Path dependencies remain at their locked relative locations. When dependencies exist
+manifest and ensures every direct and transitive Git dependency is at its locked commit under
+`workspace.deps` (`deps/` by default). A clean checkout already at that commit is left untouched;
+missing or out-of-date checkouts are materialized as needed. Path dependencies remain at their
+locked relative locations. When dependencies exist
 but a fresh checkout has no lock, fetch performs the initial solve, shows the same selection report
 as update, confirms it, and writes the first lock. Later fetches reproduce that lock without
 reselecting versions, so fetch remains the appropriate command for normal builds and CI.
@@ -254,9 +258,10 @@ selected graph (what moved, what stayed, and why) without writing the lock or re
 checkouts. `--minimal` keeps one-line package changes and the summary count. The installed Slang
 toolchain is omitted unless its constraint fails. Resolver Git clones
 under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
-prints that report and asks before applying the exact graph it just resolved. Pass `--yes` for a
-non-interactive invocation. Normal CI and developer builds use `slang package fetch`; an
-inconsistent existing lock is an error.
+prints that report and asks before applying the exact graph it just resolved, unless that graph
+already matches the committed lock. Declining leaves the workspace unchanged and still succeeds.
+Pass `--yes` for a non-interactive invocation. Normal CI and developer builds use
+`slang package fetch`; an inconsistent existing lock is an error.
 
 The tool invokes the `git` executable from the system path. Existing Git credential and SSH
 configuration therefore applies without separate package-tool authentication. Git locations

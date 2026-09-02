@@ -235,5 +235,18 @@ bool lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right)
            _dependenciesEqual(left.dependencies, right.dependencies);
 }
 
+bool lockFilesEqual(const LockFile& left, const LockFile& right)
+{
+    if (left.packages.getCount() != right.packages.getCount())
+        return false;
+    for (const auto& package : left.packages)
+    {
+        Index index = findLockedPackageIndex(right, package.name);
+        if (index < 0 || !lockedPackagesEqual(package, right.packages[index]))
+            return false;
+    }
+    return true;
+}
+
 } // namespace PackageTool
 } // namespace Slang

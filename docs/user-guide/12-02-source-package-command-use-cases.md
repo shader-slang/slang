@@ -194,6 +194,12 @@ unchanged packages, use:
 slang package update --dry-run --minimal
 ```
 
+If no solution exists, the failure report names the package that exhausted the search, lists every
+incoming requirement with its owning package, and gives one reason for each candidate that was
+considered. Reasons distinguish an incompatible version from a publisher retraction or workspace
+exclusion. The final `Help:` line directs the workspace author back to the requirements and
+exclusions that can change the result.
+
 Apply the solve, then validate and build:
 
 ```sh
@@ -218,8 +224,10 @@ version, dependencies, and exports selected for this workspace.
 
 - `update` clones resolver metadata under `.slang/cache/`, examines compatible Git tags, resolves
   the complete transitive graph, and selects one version per package name.
-- A real update prints that exact selection and asks before applying it. `--yes` is required when
-  no interactive terminal is available.
+- A real update prints that exact selection and asks before applying it, unless the solve selects
+  exactly what the committed lock already records. `--yes` is required when no interactive terminal
+  is available. Declining the prompt leaves the workspace untouched and succeeds; it is a decision,
+  not a command failure.
 - A real update materializes Git source under `deps/NAME`, validates the selected graph, writes
   `slang-package-lock.json`, and regenerates `build/search-paths`.
 - `status` checks that the root manifest, lock, local registrations, materialized manifests, and
@@ -1024,6 +1032,14 @@ Without this flag, a real update resolves once, prints the exact selected graph,
 remote selection a second time. `--dry-run` remains an advisory preview across invocations; a later
 update may see newer remote state.
 
+The prompt only appears when there is a decision to make: a solve that would change the committed
+lock, or a `--clean` run that would discard local checkout state. Re-running `update` on a graph
+that already matches the lock exits without asking. Materialization also leaves each clean Git
+checkout untouched when it is already at the selected commit; it still restores missing checkouts
+and advances out-of-date ones. Answering “no” prints that nothing was applied and exits
+successfully, so a declined update does not fail a script that treats a non-zero exit as a broken
+workspace.
+
 ### Enabled overrides and deprecated `update --from-local`
 
 **Use them when:** one or more registered overrides have unpublished manifest changes that should
@@ -1228,12 +1244,17 @@ them or update this chapter and its regression tests in the same change.
 
 - `update` is the only normal command that reselects versions and writes a graph lock.
 - `update --dry-run` writes neither lock nor dependency checkouts.
-- A real update reports one selected in-memory graph, confirms it, and applies that exact graph.
+- A real update reports one selected in-memory graph, confirms it when it differs from the
+  committed lock, and applies that exact graph. A declined confirmation applies nothing and is not
+  an error.
 - Fetch with an existing lock selects nothing and does not rewrite that lock. Fetch with
   dependencies and no lock performs the confirmed initial solve and writes the first lock.
 - A real update writes the lock only after the candidate graph validates.
 - Every reachable dependency has one exact lock row; Git rows include ref and commit.
 - Path packages remain in place; Git packages materialize under the configured deps directory.
+- Materialization leaves a tool-owned, clean Git checkout untouched when its origin and `HEAD`
+  already match the lock. Missing, dirty, unowned, or out-of-date checkouts still follow the normal
+  repair or safety path.
 - Fetch, validate, update, build, status, and local-registration changes reject a path-only lock
   row when the corresponding manifest edge requires Git. This prevents a lock edit from
   redirecting a published dependency to arbitrary local source.
@@ -1311,16 +1332,24 @@ Start with these unit tests when changing a journey:
 - Fetch and initial lock: `PackageToolFetchRequiresLock`,
   `PackageToolDependencyCommandsAndInitialFetch`.
 - Update preview, confirmation, and report: `PackageToolUpdateDryRun`,
-  `PackageToolUpdateRequiresConfirmation`, `PackageResolveReportFormat`.
+  `PackageToolUpdateRequiresConfirmation`, `PackageToolUpdateSkipsConfirmationWhenLockIsUnchanged`,
+  `PackageGitSkipsAlreadyMaterializedRevision`, `PackageResolveReportFormat`.
 - Module layout and uniqueness: `PackageCommandsValidateDependencyModuleLayout`,
   `PackageToolUpdateRejectsBundleCaseConflict`, `PackageValidateRejectsFlattenedModuleAlias`.
 - Local overrides and enable state: `PackageToolLocalOverrideUpdatesDefinitiveLock`,
   `PackageLocalRegistryJSON`.
 - Path dependencies: `PackageToolPathDependencies`,
   `PackageToolFetchRejectsPathLockForGitDependency`, `PackageToolRejectsPathIntoSlangState`,
-  `PackageResolverPathShadowsSelectedGit`, `PackageResolverPathPackageGitTransitive`.
+  `PackageResolverPathShadowsSelectedGit`, `PackageResolverPathPackageGitTransitive`,
+  `PackageResolverDropsConstraintNotesFromShadowedGitPackage`.
 - Exclusions and retractions: `PackageResolverAppliesWorkspaceExclusions`,
-  `PackageToolFetchRejectsWorkspaceExclusion`, `PackageResolverUsesLatestReleaseRetractions`.
+  `PackageToolFetchRejectsWorkspaceExclusion`, `PackageResolverUsesLatestReleaseRetractions`,
+  `PackageResolverBacktracksPastRetractionAndExclude`,
+  `PackageResolverUnsatisfiableAfterRetractionAndExclude`.
+- Command failure formatting: `PackageToolFailureTranscripts`,
+  `PackageResolverReportsNoPublishedCandidates`,
+  `PackageResolveFailureIndentsMultiLineCandidateReason`,
+  `PackageResolverUnsatisfiableAfterRetractionAndExclude`.
 - Toolchain selection: `PackageToolSlangToolchain`, `PackageResolverSlangToolchain`.
 - Dependency editing and graph inspection: `PackageToolDependencyCommandsAndInitialFetch`.
 - Stable source build and experimental binary artifacts: `PackageToolBuild`, `PackageToolRun`,

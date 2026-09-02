@@ -38,6 +38,71 @@ static String _ownerLabel(const ResolveConstraintNote& note)
     return note.ownerName + "@" + note.ownerVersion;
 }
 
+/// Write one candidate's rejection reason and terminate the line, aligning any continuation lines
+/// under the first so the surrounding list stays readable.
+///
+/// Most reasons are a single clause such as "outside required range >=2.0.0". Some are not: when a
+/// candidate's manifest fails to parse, the reason carries the JSON diagnostic and the source text
+/// with it, and printing that verbatim would leave unindented lines sitting at the same margin as
+/// the "Candidates considered:" heading, so the reader can no longer tell where one candidate ends
+/// and the next begins. Indenting the continuation keeps the reason visually attached to its
+/// candidate.
+static void _appendReason(StringBuilder& builder, const String& reason)
+{
+    UnownedStringSlice rest = reason.getUnownedSlice();
+    while (rest.getLength() &&
+           (rest[rest.getLength() - 1] == '\n' || rest[rest.getLength() - 1] == '\r'))
+    {
+        rest = rest.head(rest.getLength() - 1);
+    }
+    for (;;)
+    {
+        Index newline = rest.indexOf('\n');
+        if (newline < 0)
+        {
+            builder << rest << "\n";
+            return;
+        }
+        builder << rest.head(newline) << "\n    ";
+        rest = rest.tail(newline + 1);
+    }
+}
+
+String formatResolveFailure(const ResolveFailure& failure)
+{
+    StringBuilder builder;
+    builder << "Could not select a version for package '" << failure.packageName << "'.\n";
+
+    if (failure.constraints.getCount())
+    {
+        builder << "\nRequired by:\n";
+        for (const auto& constraint : failure.constraints)
+            builder << "  " << _ownerLabel(constraint) << " requires " << constraint.text << "\n";
+    }
+
+    if (failure.candidates.getCount())
+    {
+        builder << "\nCandidates considered:\n";
+        for (const auto& candidate : failure.candidates)
+        {
+            builder << "  " << candidate.version << ": ";
+            _appendReason(builder, candidate.reason);
+        }
+        builder << "\nNo candidate satisfies every requirement for package '" << failure.packageName
+                << "'.\n";
+        builder << "Help: adjust the listed version requirements or workspace exclusions, then run "
+                   "'slang package update' again.";
+    }
+    else
+    {
+        builder << "\nPackage '" << failure.packageName
+                << "' has no published releases to select from.\n";
+        builder << "Help: confirm the dependency points at the right Git location and that it "
+                   "publishes 'vMAJOR.MINOR.PATCH' release tags.";
+    }
+    return builder.produceString();
+}
+
 static Index _changeKindOrder(ResolveChangeKind kind)
 {
     switch (kind)

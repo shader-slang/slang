@@ -154,6 +154,7 @@ SLANG_UNIT_TEST(PackageGitFreshCheckoutIgnoresRemoteHead)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
 
     String checkout = Path::combine(temp.path, "checkout");
+    bool didMaterialize = false;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
         temp.path,
         repository,
@@ -161,10 +162,54 @@ SLANG_UNIT_TEST(PackageGitFreshCheckoutIgnoresRemoteHead)
         version1Commit,
         checkout,
         false,
+        didMaterialize,
         error)));
+    SLANG_CHECK(didMaterialize);
     String checkoutCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, checkoutCommit, error)));
     SLANG_CHECK(checkoutCommit == version1Commit);
+}
+
+SLANG_UNIT_TEST(PackageGitSkipsAlreadyMaterializedRevision)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const String repository = Path::combine(temp.path, "repository");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(repository));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(repository, "content.txt"), "version 1")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+
+    String commit;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(repository, commit, error)));
+    const String checkout = Path::combine(temp.path, "checkout");
+    bool didMaterialize = false;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
+        temp.path,
+        repository,
+        commit,
+        commit,
+        checkout,
+        false,
+        didMaterialize,
+        error)));
+    SLANG_CHECK(didMaterialize);
+
+    // Once the checkout is clean at the target commit, materialization needs only its local state.
+    // Removing the remote makes this test fail if the implementation tries to fetch again.
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(Path::removeNonEmpty(repository)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
+        temp.path,
+        repository,
+        commit,
+        commit,
+        checkout,
+        false,
+        didMaterialize,
+        error)));
+    SLANG_CHECK(!didMaterialize);
 }
 
 SLANG_UNIT_TEST(PackageGitDirtyPredicateIncludesCommitsAndStashes)

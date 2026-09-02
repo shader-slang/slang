@@ -55,6 +55,8 @@ SlangResult materializeRevision(
 ///
 /// If `destination` exists, it must be clean at `currentCommit`. `allowClean` explicitly permits
 /// deleting and cloning a checkout that has changed files, commits, stashes, or a different origin.
+/// If the checkout is already clean at `targetCommit`, leave it untouched and set
+/// `outDidMaterialize` to false.
 SlangResult materializeLockedRevision(
     const String& workingDirectory,
     const String& gitURL,
@@ -62,6 +64,7 @@ SlangResult materializeLockedRevision(
     const String& targetCommit,
     const String& destination,
     bool allowClean,
+    bool& outDidMaterialize,
     String& outError);
 
 /// Return whether removing a checkout would discard no changes, commits, or stashes.

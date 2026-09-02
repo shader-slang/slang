@@ -288,6 +288,11 @@ public:
     SlangResult resolve(const Manifest& rootManifest, LockFile& outLock, String& outError)
     {
         this->rootManifest = &rootManifest;
+        if (report)
+        {
+            *report = ResolveReport();
+            report->rootPackageName = rootManifest.name;
+        }
         ResolvedManifest root;
         root.manifest = rootManifest;
         root.ownerKey = _rootOwnerKey();
@@ -296,7 +301,17 @@ public:
         for (const auto& dependency : rootManifest.dependencies)
             SLANG_RETURN_ON_FAIL(addDependency(dependency, root, outError));
 
-        SLANG_RETURN_ON_FAIL(search(outError));
+        ResolveFailure failure;
+        if (SLANG_FAILED(search(outError, failure)))
+        {
+            if (failure.packageName.getLength())
+            {
+                if (report)
+                    report->failure = failure;
+                outError = formatResolveFailure(failure);
+            }
+            return SLANG_FAIL;
+        }
         outLock = LockFile();
         List<bool> reachable;
         getReachablePackages(reachable);
@@ -363,6 +378,23 @@ private:
                 return i;
         }
         return -1;
+    }
+
+    /// Drop every constraint note on `package` that `owner` contributed.
+    ///
+    /// A note and the requirement it describes are two views of the same incoming edge: the
+    /// requirement is what `matchesAll` enforces, and the note is how the report explains it. If
+    /// the solver retracted one without the other, a report could tell the user that
+    /// `video-preview` requires `color-encoding >=2.0.0` after the path selection that removed
+    /// `video-preview` from the graph, and the printed requirements would no longer add up to the
+    /// failure being described. Every site that retracts requirements retracts the notes with them.
+    static void removeConstraintNotesFromOwner(ResolutionPackage& package, const String& owner)
+    {
+        for (Index i = package.constraintNotes.getCount() - 1; i >= 0; --i)
+        {
+            if (package.constraintNotes[i].ownerKey == owner)
+                package.constraintNotes.removeAt(i);
+        }
     }
 
     bool matchesAll(const ResolutionPackage& package, const SemanticVersion& version) const
@@ -448,7 +480,7 @@ private:
         return SLANG_OK;
     }
 
-    void removeGitRequirementsFromOwner(const String& owner)
+    void removeRequirementsFromOwner(const String& owner)
     {
         // Path selection of `owner`'s package retracts every Git constraint that representation
         // added, including constraints on other package names.
@@ -460,6 +492,7 @@ private:
                 if (package.gitRequirements[i].owner == owner)
                     package.gitRequirements.removeAt(i);
             }
+            removeConstraintNotesFromOwner(package, owner);
             package.git =
                 package.gitRequirements.getCount() ? package.gitRequirements[0].git : String();
             if (!package.canonicalPath.getLength() && package.selected && oldGit != package.git)
@@ -500,7 +533,7 @@ private:
                     !isOwnerActive(package.pathOwner, reachable))
                 {
                     String removedOwner = package.resolvedManifest.ownerKey;
-                    removeGitRequirementsFromOwner(removedOwner);
+                    removeRequirementsFromOwner(removedOwner);
                     package.canonicalPath = String();
                     package.pathOwner = String();
                     package.selected = false;
@@ -526,6 +559,15 @@ private:
                     package.locked = LockedPackage();
                     package.resolvedManifest = ResolvedManifest();
                     changed = true;
+                }
+                // Retract the explanations for edges that just went away. This also covers the
+                // `as` note from a path edge, which has no Git requirement of its own but is just
+                // as stale once its declaring owner leaves the graph. Note removal never feeds
+                // back into the solve, so it does not set `changed` and cannot extend this loop.
+                for (Index i = package.constraintNotes.getCount() - 1; i >= 0; --i)
+                {
+                    if (!isOwnerActive(package.constraintNotes[i].ownerKey, reachable))
+                        package.constraintNotes.removeAt(i);
                 }
             }
             if (!changed)
@@ -603,6 +645,7 @@ private:
         const VersionConstraint& constraint)
     {
         ResolveConstraintNote note;
+        note.ownerKey = declaringManifest.ownerKey;
         note.ownerName = declaringManifest.manifest.name;
         note.ownerVersion = ownerVersionFor(declaringManifest);
         note.text = text;
@@ -800,7 +843,7 @@ private:
         if (package.selected)
         {
             String removedOwner = package.resolvedManifest.ownerKey;
-            removeGitRequirementsFromOwner(removedOwner);
+            removeRequirementsFromOwner(removedOwner);
         }
         package.canonicalPath = canonicalPath;
         package.pathOwner = declaringManifest.ownerKey;
@@ -974,7 +1017,27 @@ private:
         return SLANG_OK;
     }
 
-    SlangResult search(String& outError)
+    /// Describe the first incoming requirement that rejects `version`.
+    ///
+    /// `matchesAll` remains the source of truth for candidate eligibility. This helper only
+    /// identifies one failed member of that same constraint set for the diagnostic.
+    String describeConstraintRejection(
+        const ResolutionPackage& package,
+        const SemanticVersion& version)
+    {
+        for (const auto& note : package.constraintNotes)
+        {
+            if (note.constraint.clauses.getCount() == 0 || note.constraint.matches(version))
+                continue;
+            String owner = note.ownerName;
+            if (note.ownerVersion.getLength())
+                owner = owner + "@" + note.ownerVersion;
+            return String("does not satisfy ") + note.text + " required by " + owner;
+        }
+        return "does not satisfy all incoming requirements";
+    }
+
+    SlangResult search(String& outError, ResolveFailure& outFailure)
     {
         List<bool> reachable;
         getReachablePackages(reachable);
@@ -1026,11 +1089,18 @@ private:
             SLANG_RETURN_ON_FAIL(
                 loadPublisherRetractions(unresolved, candidates, retractions, outError));
         }
-        String lastCandidateError;
+        ResolveFailure lastNestedFailure;
+        List<ResolveCandidateRejection> candidateRejections;
         for (const auto& candidate : candidates)
         {
             if (!matchesAll(unresolved, candidate.version))
+            {
+                ResolveCandidateRejection rejection;
+                rejection.version = formatExactVersion(candidate.version);
+                rejection.reason = describeConstraintRejection(unresolved, candidate.version);
+                candidateRejections.add(rejection);
                 continue;
+            }
             if (!candidate.path.getLength())
             {
                 if (const Exclusion* exclusion = findExclusion(unresolved.name, candidate.version))
@@ -1039,6 +1109,10 @@ private:
                     skip.version = formatExactVersion(candidate.version);
                     skip.reason = String("workspace excludes this release — ") + exclusion->reason;
                     packages[unresolvedIndex].skips.add(skip);
+                    ResolveCandidateRejection rejection;
+                    rejection.version = skip.version;
+                    rejection.reason = skip.reason;
+                    candidateRejections.add(rejection);
                     addWarning(
                         String("Workspace excludes package '") + unresolved.name + "' release " +
                         candidate.ref + ": " + exclusion->reason);
@@ -1050,6 +1124,10 @@ private:
                     skip.version = formatExactVersion(candidate.version);
                     skip.reason = String("retracted — ") + retraction->reason;
                     packages[unresolvedIndex].skips.add(skip);
+                    ResolveCandidateRejection rejection;
+                    rejection.version = skip.version;
+                    rejection.reason = skip.reason;
+                    candidateRejections.add(rejection);
                     addWarning(
                         String("Package '") + unresolved.name + "' retracts release " +
                         candidate.ref + ": " + retraction->reason);
@@ -1068,7 +1146,10 @@ private:
             if (SLANG_FAILED(
                     loadCandidateManifest(unresolved, candidate, manifest, candidateError)))
             {
-                lastCandidateError = candidateError;
+                ResolveCandidateRejection rejection;
+                rejection.version = formatExactVersion(candidate.version);
+                rejection.reason = candidateError;
+                candidateRejections.add(rejection);
                 packages = snapshot;
                 continue;
             }
@@ -1111,21 +1192,36 @@ private:
                     break;
                 }
             }
-            if (!dependencyConflict && SLANG_SUCCEEDED(search(candidateError)))
-                return SLANG_OK;
+            ResolveFailure candidateFailure;
+            if (!dependencyConflict)
+            {
+                if (SLANG_SUCCEEDED(search(candidateError, candidateFailure)))
+                    return SLANG_OK;
+                if (candidateFailure.packageName.getLength())
+                    lastNestedFailure = candidateFailure;
+            }
 
-            lastCandidateError = candidateError;
+            if (!candidateFailure.packageName.getLength())
+            {
+                ResolveCandidateRejection rejection;
+                rejection.version = formatExactVersion(candidate.version);
+                rejection.reason =
+                    candidateError.getLength() ? candidateError : "candidate could not be selected";
+                candidateRejections.add(rejection);
+            }
             packages = snapshot;
         }
 
-        outError =
-            String("No package selection satisfies all constraints for '") + unresolved.name + "'.";
-        if (lastCandidateError.getLength() != 0)
+        if (lastNestedFailure.packageName.getLength())
         {
-            appendErrorAdvice(
-                outError,
-                String("Last candidate failed because: ") + lastCandidateError);
+            outFailure = lastNestedFailure;
+            return SLANG_FAIL;
         }
+
+        outFailure.packageName = unresolved.name;
+        outFailure.constraints = unresolved.constraintNotes;
+        outFailure.candidates = candidateRejections;
+        outError = formatResolveFailure(outFailure);
         return SLANG_FAIL;
     }
 };

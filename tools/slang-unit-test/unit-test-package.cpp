@@ -1900,7 +1900,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         incompatibleLocalUpdateArguments,
         error)));
     SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("No package selection satisfies")) >= 0);
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Could not select a version")) >= 0);
     root.dependencies[0].version = ">=1.0.0";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
@@ -2096,6 +2096,47 @@ SLANG_UNIT_TEST(PackageAppendErrorAdviceUsesNewline)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice(".json Run")) < 0);
 }
 
+SLANG_UNIT_TEST(PackageToolFailureTranscripts)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+
+    String error;
+    const char* testArguments[] = {"slang-package", "test"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(testArguments), testArguments, error)));
+    SLANG_CHECK(
+        formatCommandError(error) ==
+        "slang-package: error: slang package test is not implemented yet.\n"
+        "The command is reserved until package testing has a dedicated model; it does not run "
+        "slang-test.\n");
+
+    const char* runArguments[] = {"slang-package", "run"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
+    SLANG_CHECK(
+        formatCommandError(error) ==
+        "slang-package: error: Host executable run is experimental. Re-run as 'slang package "
+        "--experimental run'.\n");
+
+    Manifest manifest;
+    manifest.name = "root";
+    Dependency dependency;
+    dependency.name = "noise";
+    dependency.git = "memory:noise";
+    dependency.version = ">=1.0.0";
+    manifest.dependencies.add(dependency);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(temp.path, "slang-package.json"), manifest, error)));
+    const char* statusArguments[] = {"slang-package", "status"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+    SLANG_CHECK(
+        formatCommandError(error) ==
+        "slang-package: error: Workspace has dependencies but no slang-package-lock.json. Run "
+        "'slang package fetch' to select the initial graph.\n");
+}
+
 SLANG_UNIT_TEST(PackageToolUpdateDryRun)
 {
     TemporaryDirectory temp;
@@ -2170,6 +2211,75 @@ SLANG_UNIT_TEST(PackageToolUpdateDryRun)
     const char* statusArguments[] = {"slang-package", "status"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+}
+
+// Re-running `update` on an already-current graph re-materializes what the lock already says, so
+// there is nothing for the user to approve. The prompt returns as soon as the solve would change
+// the lock, which unit tests observe as the non-interactive "re-run with --yes" failure.
+SLANG_UNIT_TEST(PackageToolUpdateSkipsConfirmationWhenLockIsUnchanged)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    auto writePathPackage = [&](const String& directory, const String& name) -> SlangResult
+    {
+        SLANG_RETURN_ON_FAIL(Path::createDirectoryRecursive(directory) ? SLANG_OK : SLANG_FAIL);
+        Manifest package;
+        package.name = name;
+        package.exports.add("src");
+        package.licenseFiles.add("LICENSE");
+        SLANG_RETURN_ON_FAIL(
+            writeManifest(Path::combine(directory, "slang-package.json"), package, error));
+        SLANG_RETURN_ON_FAIL(_writeFile(Path::combine(directory, "LICENSE"), name + " license\n"));
+        return _writeFile(
+            Path::combine(directory, "src", name + ".slang"),
+            String("module ") + name + ";\n");
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writePathPackage(Path::combine(temp.path, "vendor/a"), "a")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writePathPackage(Path::combine(temp.path, "vendor/b"), "b")));
+
+    Manifest root;
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency a;
+    a.name = "a";
+    a.path = "vendor/a";
+    a.as = "1.0.0";
+    root.dependencies.add(a);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    const char* confirmedUpdate[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(confirmedUpdate), confirmedUpdate, error)));
+    String lockPath = Path::combine(temp.path, "slang-package-lock.json");
+    String lockAfterFirstUpdate;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(lockPath, lockAfterFirstUpdate)));
+
+    const char* plainUpdate[] = {"slang-package", "update"};
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(plainUpdate), plainUpdate, error)));
+    String lockAfterUnchangedUpdate;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(lockPath, lockAfterUnchangedUpdate)));
+    SLANG_CHECK(lockAfterUnchangedUpdate == lockAfterFirstUpdate);
+
+    Dependency b;
+    b.name = "b";
+    b.path = "vendor/b";
+    b.as = "1.0.0";
+    root.dependencies.add(b);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(plainUpdate), plainUpdate, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
+    String lockAfterDeclinedUpdate;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(lockPath, lockAfterDeclinedUpdate)));
+    SLANG_CHECK(lockAfterDeclinedUpdate == lockAfterFirstUpdate);
 }
 
 SLANG_UNIT_TEST(PackageValidateStructureAndLicense)
@@ -2361,6 +2471,7 @@ class InMemoryPackageSource : public IPackageResolverSource
 {
 public:
     List<InMemoryRelease> releases;
+    bool allowEmptyReleaseLists = false;
 
     void addRelease(
         const String& git,
@@ -2426,7 +2537,7 @@ public:
             if (release.git == git)
                 outCandidates.add(release.candidate);
         }
-        if (outCandidates.getCount() == 0)
+        if (outCandidates.getCount() == 0 && !allowEmptyReleaseLists)
         {
             outError = String("No in-memory releases for ") + git;
             return SLANG_FAIL;
@@ -2517,6 +2628,64 @@ SLANG_UNIT_TEST(PackageResolverTransitiveRange)
     const LockedPackage* b = _findLockedPackage(lock, "b");
     SLANG_CHECK(a && a->ref == "v1.0.0");
     SLANG_CHECK(b && b->ref == "v1.4.0");
+}
+
+SLANG_UNIT_TEST(PackageResolverReportsNoPublishedCandidates)
+{
+    InMemoryPackageSource source;
+    source.allowEmptyReleaseLists = true;
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "noise", "memory:noise", ">=1.0.0");
+
+    PackageTool::LockFile lock;
+    ResolveReport report;
+    String error;
+    SLANG_CHECK(SLANG_FAILED(
+        resolveDependenciesWithSource(".", root, source, lock, error, nullptr, &report)));
+    SLANG_CHECK(report.failure.packageName == "noise");
+    SLANG_CHECK(
+        formatCommandError(error) ==
+        "slang-package: error: Could not select a version for package 'noise'.\n"
+        "\n"
+        "Required by:\n"
+        "  root requires >=1.0.0\n"
+        "\n"
+        "Package 'noise' has no published releases to select from.\n"
+        "Help: confirm the dependency points at the right Git location and that it publishes "
+        "'vMAJOR.MINOR.PATCH' release tags.\n");
+}
+
+// Most rejection reasons are a single clause, but a candidate whose manifest will not parse carries
+// the JSON diagnostic along with it. Those extra lines have to be indented under the candidate they
+// belong to; left at the margin they would line up with the section headings and the reader could
+// no longer tell where one candidate ends and the next begins.
+SLANG_UNIT_TEST(PackageResolveFailureIndentsMultiLineCandidateReason)
+{
+    ResolveFailure failure;
+    failure.packageName = "noise";
+    ResolveConstraintNote note;
+    note.ownerName = "root";
+    note.text = ">=1.0.0";
+    failure.constraints.add(note);
+    ResolveCandidateRejection rejection;
+    rejection.version = "1.0.0";
+    rejection.reason = "manifest could not be read:\nInvalid JSON in slang-package.json\n";
+    failure.candidates.add(rejection);
+
+    SLANG_CHECK(
+        formatResolveFailure(failure) ==
+        "Could not select a version for package 'noise'.\n"
+        "\n"
+        "Required by:\n"
+        "  root requires >=1.0.0\n"
+        "\n"
+        "Candidates considered:\n"
+        "  1.0.0: manifest could not be read:\n"
+        "    Invalid JSON in slang-package.json\n"
+        "\n"
+        "No candidate satisfies every requirement for package 'noise'.\n"
+        "Help: adjust the listed version requirements or workspace exclusions, then run 'slang "
+        "package update' again.");
 }
 
 SLANG_UNIT_TEST(PackageResolverSlangToolchain)
@@ -2665,6 +2834,136 @@ SLANG_UNIT_TEST(PackageResolverUsesLatestReleaseRetractions)
     SLANG_CHECK(noise->ref == "v1.0.0");
     SLANG_CHECK(warnings.getCount() == 1);
     SLANG_CHECK(warnings[0].getUnownedSlice().indexOf(UnownedStringSlice("retracts")) >= 0);
+}
+
+// Highest `a` is unsatisfiable because it needs a `math` release that does not exist. After
+// backtracking to `a@1.0`, `math@1.2` is publisher-retracted and `math@1.1` is workspace-excluded,
+// so the remaining matching release is `1.0.0`.
+SLANG_UNIT_TEST(PackageResolverBacktracksPastRetractionAndExclude)
+{
+    InMemoryPackageSource source;
+    Manifest mathLatest = _makeManifest("math");
+    Retraction retraction;
+    retraction.version = "1.2.0";
+    retraction.reason = "Broken numerics";
+    mathLatest.retractions.add(retraction);
+    source.addRelease("memory:math", "1.0.0", _makeManifest("math"));
+    source.addRelease("memory:math", "1.1.0", _makeManifest("math"));
+    source.addRelease("memory:math", "1.2.0", _makeManifest("math"));
+    source.addRelease("memory:math", "1.3.0", mathLatest);
+
+    Manifest aHigh = _makeManifest("a");
+    _addDependency(aHigh, "math", "memory:math", ">=1.4.0");
+    source.addRelease("memory:a", "2.0.0", aHigh);
+    Manifest aLow = _makeManifest("a");
+    _addDependency(aLow, "math", "memory:math", ">=1.0.0 <1.3.0");
+    source.addRelease("memory:a", "1.0.0", aLow);
+
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+    Exclusion exclusion;
+    exclusion.packageName = "math";
+    exclusion.version = "1.1.0";
+    exclusion.reason = "Workspace regression";
+    root.workspace.exclusions.add(exclusion);
+
+    PackageTool::LockFile lock;
+    List<String> warnings;
+    ResolveReport report;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveDependenciesWithSource(".", root, source, lock, error, &warnings, &report)));
+    const LockedPackage* lockedA = _findLockedPackage(lock, "a");
+    const LockedPackage* lockedMath = _findLockedPackage(lock, "math");
+    SLANG_CHECK_ABORT(lockedA && lockedMath);
+    SLANG_CHECK(lockedA->ref == "v1.0.0");
+    SLANG_CHECK(lockedMath->ref == "v1.0.0");
+
+    const ResolvePackageExplanation* mathReport = nullptr;
+    for (const auto& explanation : report.packages)
+    {
+        if (explanation.name == "math")
+            mathReport = &explanation;
+    }
+    SLANG_CHECK_ABORT(mathReport);
+    SLANG_CHECK(mathReport->skips.getCount() == 2);
+    SLANG_CHECK(mathReport->skips[0].version == "1.2.0");
+    SLANG_CHECK(
+        mathReport->skips[0].reason.getUnownedSlice().indexOf(UnownedStringSlice("retracted")) >=
+        0);
+    SLANG_CHECK(mathReport->skips[1].version == "1.1.0");
+    SLANG_CHECK(
+        mathReport->skips[1].reason.getUnownedSlice().indexOf(
+            UnownedStringSlice("workspace excludes")) >= 0);
+}
+
+// Same graph as the successful backtrack, except `a@1.0` also rejects `math@1.0`. Every remaining
+// matching `math` release is either retracted or excluded, so search exhausts the candidate list.
+SLANG_UNIT_TEST(PackageResolverUnsatisfiableAfterRetractionAndExclude)
+{
+    InMemoryPackageSource source;
+    Manifest mathLatest = _makeManifest("math");
+    Retraction retraction;
+    retraction.version = "1.2.0";
+    retraction.reason = "Broken numerics";
+    mathLatest.retractions.add(retraction);
+    source.addRelease("memory:math", "1.0.0", _makeManifest("math"));
+    source.addRelease("memory:math", "1.1.0", _makeManifest("math"));
+    source.addRelease("memory:math", "1.2.0", _makeManifest("math"));
+    source.addRelease("memory:math", "1.3.0", mathLatest);
+
+    Manifest aHigh = _makeManifest("a");
+    _addDependency(aHigh, "math", "memory:math", ">=1.4.0");
+    source.addRelease("memory:a", "2.0.0", aHigh);
+    Manifest aLow = _makeManifest("a");
+    _addDependency(aLow, "math", "memory:math", ">=1.1.0 <1.3.0");
+    source.addRelease("memory:a", "1.0.0", aLow);
+
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+    Exclusion exclusion;
+    exclusion.packageName = "math";
+    exclusion.version = "1.1.0";
+    exclusion.reason = "Workspace regression";
+    root.workspace.exclusions.add(exclusion);
+
+    PackageTool::LockFile lock;
+    List<String> warnings;
+    ResolveReport report;
+    String error;
+    SLANG_CHECK(SLANG_FAILED(
+        resolveDependenciesWithSource(".", root, source, lock, error, &warnings, &report)));
+    const String expectedTranscript =
+        "slang-package: error: Could not select a version for package 'math'.\n"
+        "\n"
+        "Required by:\n"
+        "  a@1.0.0 requires >=1.1.0 <1.3.0\n"
+        "\n"
+        "Candidates considered:\n"
+        "  1.3.0: does not satisfy >=1.1.0 <1.3.0 required by a@1.0.0\n"
+        "  1.2.0: retracted — Broken numerics\n"
+        "  1.1.0: workspace excludes this release — Workspace regression\n"
+        "  1.0.0: does not satisfy >=1.1.0 <1.3.0 required by a@1.0.0\n"
+        "\n"
+        "No candidate satisfies every requirement for package 'math'.\n"
+        "Help: adjust the listed version requirements or workspace exclusions, then run 'slang "
+        "package update' again.\n";
+    SLANG_CHECK(formatCommandError(error) == expectedTranscript);
+    bool sawRetractionWarning = false;
+    bool sawExcludeWarning = false;
+    for (const auto& warning : warnings)
+    {
+        if (warning.getUnownedSlice().indexOf(UnownedStringSlice("retracts")) >= 0)
+            sawRetractionWarning = true;
+        if (warning.getUnownedSlice().indexOf(UnownedStringSlice("excludes")) >= 0)
+            sawExcludeWarning = true;
+    }
+    SLANG_CHECK(sawRetractionWarning);
+    SLANG_CHECK(sawExcludeWarning);
+    SLANG_CHECK(report.failure.packageName == "math");
+    SLANG_CHECK(report.failure.constraints.getCount() == 1);
+    SLANG_CHECK(report.failure.candidates.getCount() == 4);
+    SLANG_CHECK(report.packages.getCount() == 0);
 }
 
 SLANG_UNIT_TEST(PackageResolveReportFormat)
@@ -2967,6 +3266,74 @@ SLANG_UNIT_TEST(PackageResolverPathShadowsSelectedGit)
     SLANG_CHECK(warnings.getCount() == 1);
 }
 
+// When a path edge shadows a Git package, the requirements that Git package contributed leave the
+// graph along with it, and the report has to say so. Here `root` and the Git release `q@1.0.0` both
+// require `shared`. The path copy of `q` under `m/vendor/q` then wins, so `q@1.0.0` is not in the
+// resolved graph at all and its `>=2.0.0` demand on `shared` is retracted. If the solver dropped
+// the requirement but kept the note that explains it, the report would tell the user that `shared`
+// was chosen to satisfy a package that was never selected.
+SLANG_UNIT_TEST(PackageResolverDropsConstraintNotesFromShadowedGitPackage)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String mRoot = Path::combine(temp.path, "m");
+    String pathQRoot = Path::combine(mRoot, "vendor/q");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(pathQRoot));
+
+    Manifest pathQ = _makeManifest("q");
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(pathQRoot, "slang-package.json"), pathQ, error)));
+
+    InMemoryPackageSource source;
+    Manifest gitQ = _makeManifest("q");
+    _addDependency(gitQ, "shared", "memory:shared", ">=2.0.0");
+    source.addRelease("memory:q", "1.0.0", gitQ);
+    source.addRelease("memory:shared", "1.0.0", _makeManifest("shared"));
+    source.addRelease("memory:shared", "2.0.0", _makeManifest("shared"));
+    Manifest m = _makeManifest("m");
+    Dependency qPath;
+    qPath.name = "q";
+    qPath.path = "vendor/q";
+    qPath.as = "1.0.0";
+    m.dependencies.add(qPath);
+    source.addRelease("memory:m", "1.0.0", m, mRoot);
+    Manifest z = _makeManifest("z");
+    _addDependency(z, "m", "memory:m", ">=1.0.0");
+    source.addRelease("memory:z", "1.0.0", z);
+
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "q", "memory:q", ">=1.0.0");
+    _addDependency(root, "z", "memory:z", ">=1.0.0");
+    _addDependency(root, "shared", "memory:shared", ">=1.0.0");
+
+    PackageTool::LockFile lock;
+    ResolveReport report;
+    SlangResult resolveResult =
+        resolveDependenciesWithSource(temp.path, root, source, lock, error, nullptr, &report);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveResult));
+
+    // The path copy of `q` is what ends up in the graph, so nothing in the report may still be
+    // attributed to the Git release it replaced.
+    const LockedPackage* lockedQ = _findLockedPackage(lock, "q");
+    SLANG_CHECK_ABORT(lockedQ);
+    SLANG_CHECK(lockedQ->path == "deps/m/vendor/q");
+    const LockedPackage* lockedShared = _findLockedPackage(lock, "shared");
+    SLANG_CHECK_ABORT(lockedShared);
+    SLANG_CHECK(lockedShared->version == "2.0.0");
+
+    const ResolvePackageExplanation* sharedReport = nullptr;
+    for (const auto& explanation : report.packages)
+    {
+        if (explanation.name == "shared")
+            sharedReport = &explanation;
+    }
+    SLANG_CHECK_ABORT(sharedReport);
+    SLANG_CHECK(sharedReport->constraints.getCount() == 1);
+    SLANG_CHECK(sharedReport->constraints[0].ownerName == "root");
+    SLANG_CHECK(sharedReport->constraints[0].text == ">=1.0.0");
+}
+
 SLANG_UNIT_TEST(PackageResolverCompatibleSelfCycle)
 {
     InMemoryPackageSource source;
@@ -3039,5 +3406,5 @@ SLANG_UNIT_TEST(PackageResolverRejectsUnsatisfiableCycle)
     String error;
     SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(root, source, lock, error)));
     SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("No package selection satisfies")) >= 0);
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Could not select a version")) >= 0);
 }

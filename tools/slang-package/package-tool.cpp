@@ -97,14 +97,26 @@ bool isAffirmativeConfirmationAnswer(const UnownedStringSlice& answer)
            trimmed.caseInsensitiveEquals(UnownedStringSlice("yes"));
 }
 
-/// Ask the user to approve an operation after its effects have been printed.
+/// Ask the user to approve an operation after its effects have been printed, reporting the answer
+/// in `outApproved`.
 ///
+/// Declining is a normal outcome rather than a failure: the user reviewed the proposed changes and
+/// chose to keep the workspace as it is, so the command reports that nothing was applied and
+/// succeeds. Failure is reserved for the cases where no answer can be obtained at all.
 /// Non-interactive callers must pass `--yes`; treating end-of-file as approval would let CI or a
 /// redirected stdin accidentally apply a graph that nobody reviewed.
-static SlangResult _confirmApply(bool assumeYes, const char* prompt, String& outError)
+static SlangResult _confirmApply(
+    bool assumeYes,
+    const char* prompt,
+    bool& outApproved,
+    String& outError)
 {
+    outApproved = false;
     if (assumeYes)
+    {
+        outApproved = true;
         return SLANG_OK;
+    }
     if (!FileWriter::isFileConsole(stdin))
     {
         outError = String(prompt) + " requires confirmation in a terminal. Re-run with --yes.";
@@ -119,10 +131,10 @@ static SlangResult _confirmApply(bool assumeYes, const char* prompt, String& out
         outError = "Confirmation was not received; no changes were applied.";
         return SLANG_FAIL;
     }
-    if (isAffirmativeConfirmationAnswer(UnownedStringSlice(response)))
-        return SLANG_OK;
-    outError = "Operation cancelled; no changes were applied.";
-    return SLANG_FAIL;
+    outApproved = isAffirmativeConfirmationAnswer(UnownedStringSlice(response));
+    if (!outApproved)
+        fprintf(stdout, "Cancelled; no changes were applied.\n");
+    return SLANG_OK;
 }
 
 static SlangResult _getProjectRoot(String& outRoot, String& outError)
@@ -304,12 +316,7 @@ static SlangResult _materialize(
                 }
             }
         }
-        fprintf(
-            stdout,
-            "Checking out '%s' at %s (%s).\n",
-            package.name.getBuffer(),
-            package.ref.getBuffer(),
-            package.commit.getBuffer());
+        bool didMaterialize = false;
         SLANG_RETURN_ON_FAIL(materializeLockedRevision(
             projectRoot,
             package.git,
@@ -317,7 +324,17 @@ static SlangResult _materialize(
             package.commit,
             destination,
             allowClean,
+            didMaterialize,
             outError));
+        if (didMaterialize)
+        {
+            fprintf(
+                stdout,
+                "Checked out '%s' at %s (%s).\n",
+                package.name.getBuffer(),
+                package.ref.getBuffer(),
+                package.commit.getBuffer());
+        }
     }
     return SLANG_OK;
 }
@@ -960,8 +977,14 @@ static SlangResult _fetch(
         _printCleanReplacementWarning(cleanReplacements);
         if (cleanReplacements.getCount())
         {
-            SLANG_RETURN_ON_FAIL(
-                _confirmApply(assumeYes, "Discard this local checkout state and fetch?", outError));
+            bool approved = false;
+            SLANG_RETURN_ON_FAIL(_confirmApply(
+                assumeYes,
+                "Discard this local checkout state and fetch?",
+                approved,
+                outError));
+            if (!approved)
+                return SLANG_OK;
         }
     }
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
@@ -1121,7 +1144,17 @@ static SlangResult _update(
     if (skipValidate)
         _warnSkippedSourceValidation();
     fprintf(stdout, "%s", reportText.getBuffer());
-    SLANG_RETURN_ON_FAIL(_confirmApply(assumeYes, "Apply this update?", outError));
+    // Only ask when there is a decision to make. A different committed lock is a change the user
+    // should review, and `--clean` discards local checkout state, but re-running `update` on an
+    // already-current graph only checks and validates what the lock already says.
+    const bool lockChanges = !previousLockPtr || !lockFilesEqual(*previousLockPtr, lock);
+    if (lockChanges || cleanReplacements.getCount())
+    {
+        bool approved = false;
+        SLANG_RETURN_ON_FAIL(_confirmApply(assumeYes, "Apply this update?", approved, outError));
+        if (!approved)
+            return SLANG_OK;
+    }
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, manifest, outError));
     if (SLANG_FAILED(_materialize(
             projectRoot,
@@ -2629,6 +2662,11 @@ SlangResult executeInDirectory(
     return SLANG_FAIL;
 }
 
+String formatCommandError(const String& error)
+{
+    return String("slang-package: error: ") + error + "\n";
+}
+
 int execute(int argc, const char* const* argv)
 {
     String error;
@@ -2636,7 +2674,8 @@ int execute(int argc, const char* const* argv)
     if (SLANG_FAILED(_getProjectRoot(projectRoot, error)) ||
         SLANG_FAILED(executeInDirectory(projectRoot, argc, argv, error)))
     {
-        fprintf(stderr, "slang-package: error: %s\n", error.getBuffer());
+        String transcript = formatCommandError(error);
+        fprintf(stderr, "%s", transcript.getBuffer());
         return 1;
     }
     return 0;

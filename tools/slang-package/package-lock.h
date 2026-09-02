@@ -44,6 +44,13 @@ SlangResult requireAllLockPackagesTrusted(
 /// True when two lock rows record the same identity, exports, and declared dependencies.
 bool lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right);
 
+/// True when two locks select the same set of packages with identical rows.
+///
+/// Package names are unique within a lock, so this compares by name rather than by position: a
+/// freshly resolved lock is sorted by name, while a committed lock may have been reordered by
+/// hand without changing which releases the workspace selected.
+bool lockFilesEqual(const LockFile& left, const LockFile& right);
+
 } // namespace PackageTool
 } // namespace Slang
 

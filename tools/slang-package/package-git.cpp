@@ -322,6 +322,7 @@ static SlangResult _materializeRevision(
     const String& targetCommit,
     const String& destination,
     bool allowClean,
+    bool& ioDidMaterialize,
     String& outError)
 {
     ExecuteResult result;
@@ -336,6 +337,7 @@ static SlangResult _materializeRevision(
         cloneArguments.add(gitURL);
         cloneArguments.add(destination);
         SLANG_RETURN_ON_FAIL(_runGit(workingDirectory, cloneArguments, result, outError));
+        ioDidMaterialize = true;
     }
     else if (!File::exists(Path::combine(destination, ".git")))
     {
@@ -358,6 +360,7 @@ static SlangResult _materializeRevision(
             targetCommit,
             destination,
             false,
+            ioDidMaterialize,
             outError);
     }
 
@@ -387,6 +390,7 @@ static SlangResult _materializeRevision(
             targetCommit,
             destination,
             false,
+            ioDidMaterialize,
             outError);
     }
 
@@ -416,8 +420,11 @@ static SlangResult _materializeRevision(
                 targetCommit,
                 destination,
                 false,
+                ioDidMaterialize,
                 outError);
         }
+        if (currentCommit == targetCommit)
+            return SLANG_OK;
     }
     else if (destinationExisted)
     {
@@ -440,9 +447,11 @@ static SlangResult _materializeRevision(
             targetCommit,
             destination,
             false,
+            ioDidMaterialize,
             outError);
     }
 
+    ioDidMaterialize = true;
     List<String> fetchArguments;
     fetchArguments.add("fetch");
     fetchArguments.add("origin");
@@ -463,6 +472,7 @@ SlangResult materializeRevision(
     const String& destination,
     String& outError)
 {
+    bool didMaterialize = false;
     return _materializeRevision(
         workingDirectory,
         gitURL,
@@ -470,6 +480,7 @@ SlangResult materializeRevision(
         revision,
         destination,
         false,
+        didMaterialize,
         outError);
 }
 
@@ -480,8 +491,10 @@ SlangResult materializeLockedRevision(
     const String& targetCommit,
     const String& destination,
     bool allowClean,
+    bool& outDidMaterialize,
     String& outError)
 {
+    outDidMaterialize = false;
     return _materializeRevision(
         workingDirectory,
         gitURL,
@@ -489,6 +502,7 @@ SlangResult materializeLockedRevision(
         targetCommit,
         destination,
         allowClean,
+        outDidMaterialize,
         outError);
 }
 

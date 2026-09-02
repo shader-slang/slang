@@ -17,6 +17,9 @@ SlangResult executeInDirectory(
     const char* const* argv,
     String& outError);
 
+/// Format one command failure exactly as the `slang-package` executable writes it to stderr.
+String formatCommandError(const String& error);
+
 /// Return whether a confirmation answer typed at a prompt approves the operation.
 ///
 /// The answer is passed in exactly as it was read, so it may still carry its line terminator and
