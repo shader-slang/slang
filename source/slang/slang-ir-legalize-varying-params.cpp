@@ -2781,7 +2781,7 @@ protected:
         SLANG_UNUSED(entryPoint);
     }
 
-    virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const
+    virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint)
     {
         SLANG_UNUSED(entryPoint);
     }
@@ -3791,12 +3791,14 @@ private:
         {
             auto parent = layoutDecor->parent;
             layoutDecor->removeAndDeallocate();
-            builder.addLayoutDecoration(parent, builder.getVarLayout(layoutOps));
+            return builder.addLayoutDecoration(parent, builder.getVarLayout(layoutOps));
         }
         return layoutDecor;
     }
 
-    // Find overlapping field semantics and legalize them
+protected:
+    // Canonicalize each field's semantic to a lowercase (name, index) pair and legalize
+    // overlapping indices
     void fixFieldSemanticsOfFlatStruct(IRStructType* structType)
     {
         // Goal is to ensure we do not have overlapping semantics for the user defined semantics:
@@ -3979,6 +3981,7 @@ private:
         }
     }
 
+private:
     void wrapReturnValueInStruct(EntryPointInfo entryPoint)
     {
         // Wrap return value into a struct if it is not already a struct.
@@ -4643,7 +4646,7 @@ protected:
             });
     }
 
-    void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
+    void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) SLANG_OVERRIDE
     {
         auto func = entryPoint.entryPointFunc;
 
@@ -4713,6 +4716,9 @@ protected:
 
                 verticesParam = param;
                 auto vertStruct = as<IRStructType>(vertexType);
+                // Neither an input nor the result, so nothing else canonicalizes the semantics;
+                // the case-insensitive sv_position match below still holds afterwards.
+                fixFieldSemanticsOfFlatStruct(vertStruct);
                 for (auto field : vertStruct->getFields())
                 {
                     auto key = field->getKey();
@@ -4744,6 +4750,8 @@ protected:
 
                 primitivesParam = param;
                 auto primStruct = as<IRStructType>(primitiveType);
+                // Lifted like the vertex struct above, so canonicalized the same way.
+                fixFieldSemanticsOfFlatStruct(primStruct);
                 for (auto field : primStruct->getFields())
                 {
                     auto key = field->getKey();
