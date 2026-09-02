@@ -2144,6 +2144,43 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     getSourceManager()->setFileSystemExt(m_fileSystemExt);
 }
 
+/// Does `irModule` import any symbol that the lazily loaded autodiff supplement owns?
+///
+/// A serialized module records the mangled name of every symbol it imports, and a mangled name
+/// carries the module that owns the symbol. That is enough to answer the question without
+/// loading the supplement to look inside it: the derivative implementations moved there keep
+/// the `autodiff` module qualifier in the names their importers already recorded.
+///
+/// The qualifier is built with the mangler's own encoder rather than spelled out, so it cannot
+/// drift from what `emitQualifiedName` produces.
+///
+/// A false positive here costs one unnecessary module load; a false negative costs an
+/// unresolved-symbol error at link time. The `indexOf` rather than a prefix test is deliberate
+/// for that reason: witness-table names (`_SW...`) put the qualifier after the symbol, not at
+/// the front.
+static bool _importsAutodiffSupplementSymbol(IRModule* irModule)
+{
+    if (!irModule)
+        return false;
+
+    StringBuilder qualifierBuilder;
+    emitNameForLinkage(
+        qualifierBuilder,
+        UnownedStringSlice(getBuiltinModuleNameStr(slang::BuiltinModuleName::Autodiff)));
+    const UnownedStringSlice qualifier = qualifierBuilder.getUnownedSlice();
+
+    for (auto globalInst : irModule->getGlobalInsts())
+    {
+        auto importDecoration = globalInst->findDecoration<IRImportDecoration>();
+        if (!importDecoration)
+            continue;
+
+        if (importDecoration->getMangledName().indexOf(qualifier) >= 0)
+            return true;
+    }
+    return false;
+}
+
 SlangResult Linkage::loadSerializedModuleContents(
     Module* module,
     const PathInfo& moduleFilePathInfo,
@@ -2261,6 +2298,22 @@ SlangResult Linkage::loadSerializedModuleContents(
     RefPtr<IRModule> irModule;
     SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule));
     module->setIRModule(irModule);
+
+    // Every other autodiff-supplement load trigger fires while semantically checking source. A
+    // module deserialized from a `.slang-module` never passes through those: its IR already
+    // refers to the derivative implementations by mangled name, so nothing re-checks the
+    // declarations that would ask for the supplement. Linking then fails with unresolved
+    // external symbols -- `slang.neural` hits this, because the activation functions it ships
+    // reference the builtin `exp`/`sin`/`tanh`/`max` derivatives.
+    //
+    // Load the supplement here instead, when the importing module says it will be needed. A
+    // failure is deliberately not propagated: it is not this module's error to report, and the
+    // link that actually needs the symbol diagnoses it with the position and name in hand.
+    if (_importsAutodiffSupplementSymbol(irModule))
+    {
+        Module* autodiffModule = nullptr;
+        getSessionImpl()->loadAutodiffModuleIfNeeded(autodiffModule);
+    }
 
     // The handling of file dependencies is complicated, because of
     // the way that the encoding logic tried to make all of the
