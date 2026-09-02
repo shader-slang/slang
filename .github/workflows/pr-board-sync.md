@@ -140,33 +140,15 @@ notice and asks recipients not to reply.
 
 ### The comment does not leave a human watching the PR
 
-GitHub subscribes whoever posts a comment to that PR's thread, and also lists
-them under the PR's participants. The workflow needs
+GitHub auto-subscribes whoever comments on a thread. The workflow still needs
 `SLANG_PR_BOT_TOKEN` for org-team and ProjectsV2 access, but commenting with
-that PAT would make its human owner watch every PR the workflow greets.
+that PAT would make its human owner watch every PR the workflow greets. There
+is no comment-API flag to skip that subscription.
 
-There is no way to opt out and no way to undo it with this token:
-
-- No comment API takes a "do not subscribe" flag — not REST `createComment`, not
-  GraphQL `addComment`.
-- Unsubscribing afterwards needs the `notifications` scope, which **only classic
-  PATs** have. `SLANG_PR_BOT_TOKEN` is fine-grained, and GitHub's docs state that
-  every thread-subscription REST endpoint "does not work with ... fine-grained
-  personal access tokens." The GraphQL `updateSubscription` mutation is gated the
-  same way, and notably `repo` does not substitute for it:
-
-  ```
-  INSUFFICIENT_SCOPES: The 'updateSubscription' field requires one of the
-  following scopes: ['notifications']
-  ```
-
-- Even with that scope, unsubscribing would not remove the account from the
-  participants list.
-
-So repo-scoped writes instead go through `actionsWrite`, which `fetch`es the
+Repo-scoped writes therefore go through `actionsWrite`, which `fetch`es the
 assignee, review-request, and comment endpoints with the run's `GITHUB_TOKEN`.
-Their visible actor is then `github-actions[bot]`. This is a raw `fetch` rather
-than the `github` client because `actions/github-script` provides exactly one
+Their visible actor is `github-actions[bot]`. This is a raw `fetch` rather than
+the `github` client because `actions/github-script` provides exactly one
 authenticated Octokit and it is bound to the PAT.
 
 Consequences worth knowing:
