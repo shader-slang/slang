@@ -104,6 +104,27 @@ SLANG_UNIT_TEST(lazyAutodiffModuleLoading)
             void useDifferentiableConstraint<T : IDifferentiable>(T value) { }
 
             interface IRefinesDifferentiable : IDifferentiable { }
+
+            // The three aggregate conformances the base-surface header names as needed by
+            // aggregate-conformance synthesis are Array, Optional and Tuple. Array and Optional
+            // are covered above by `makeArrayFromElement` and the helper signatures; Tuple needs
+            // its own use, and the pre-existing autodiff tests cannot stand in for it because they
+            // all also carry `[Differentiable]` and so load the supplement regardless.
+            struct HoldsTuple
+            {
+                Tuple<float, float> pair;
+            }
+
+            float useTuple(float value)
+            {
+                let pair = makeTuple(value, value);
+                return pair._0;
+            }
+
+            // The `IDifferentiablePtrType` extensions for Array and Optional moved to the base
+            // surface alongside the `IDifferentiable` ones.
+            void useArrayPtrConstraint<T : IDifferentiablePtrType>(T[2] values) { }
+            void useOptionalPtrConstraint<T : IDifferentiablePtrType>(Optional<T> value) { }
         )");
     SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount);
 
@@ -301,6 +322,46 @@ SLANG_UNIT_TEST(lazyAutodiffConcreteDifferentiableConformanceLoadsSupplement)
         "{"
         "    float values[2];"
         "    Optional<float> optionalValue;"
+        "}");
+    SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
+}
+
+// `[MaybeDifferentiable]` on an interface requirement is the third disjunct of
+// `_callableHasDifferentiabilityHeaderModifier`, and the only one that fires on a requirement
+// rather than an implementation. It needs its own global session because the supplement, once
+// loaded, stays loaded: sequencing this after any other trigger would assert nothing.
+//
+// Same purpose as the `primalSubstituteModule` check in `lazyAutodiffModuleLoading` — without a
+// test that this disjunct still loads the supplement, a regression that stopped firing it would
+// leave maybe-differentiable requirements checked against machinery that was never materialized,
+// and nothing here would notice.
+SLANG_UNIT_TEST(lazyAutodiffMaybeDifferentiableRequirementLoadsSupplement)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const Index baseCoreModuleCount = _loadedBuiltinModuleCount(globalSession);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    // No `[Differentiable]` implementation, no `fwd_diff`/`bwd_diff`, no primal substitute, and no
+    // concrete `IDifferentiable` conformance: the requirement's modifier is the only thing here
+    // that can drive the load.
+    _loadModule(
+        session,
+        "maybeDifferentiableModule",
+        "interface IThing"
+        "{"
+        "    [MaybeDifferentiable] float compute(float x);"
         "}");
     SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
 }
