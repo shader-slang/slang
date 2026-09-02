@@ -2924,6 +2924,43 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 actualOutputSB << "\ncontent:\n" << hover.contents.value << "\n";
             }
         }
+        else if (line.startsWith("RESOLVE"))
+        {
+            // Drive completionItem/resolve for an item that carries a textEdit but no `data`
+            // (the file/import completion shape). LSP requires resolve to answer with the item,
+            // never null, so the server must echo it back with its textEdit preserved.
+            LanguageServerProtocol::TextEditCompletionItem item;
+            item.label = "resolveItem";
+            item.textEdit.newText = "resolveItem";
+            item.textEdit.range.start.line = 5;
+            item.textEdit.range.start.character = 0;
+            item.textEdit.range.end.line = 5;
+            item.textEdit.range.end.character = 3;
+            if (SLANG_FAILED(connection->sendCall(
+                    UnownedStringSlice("completionItem/resolve"),
+                    &item,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\n";
+            LanguageServerProtocol::TextEditCompletionItem resolved;
+            if (receivedNullResult(connection))
+            {
+                actualOutputSB << "null\n";
+            }
+            else if (SLANG_SUCCEEDED(connection->getMessage(&resolved)))
+            {
+                actualOutputSB << "label: " << resolved.label << "\n";
+                actualOutputSB << "textEdit: " << resolved.textEdit.newText << "\n";
+                actualOutputSB << "range: " << resolved.textEdit.range.start.line << ","
+                               << resolved.textEdit.range.start.character << " - "
+                               << resolved.textEdit.range.end.line << ","
+                               << resolved.textEdit.range.end.character << "\n";
+            }
+        }
         else if (line.startsWith("DIAGNOSTICS"))
         {
             if (!diagnosticsReceived)

@@ -1414,9 +1414,24 @@ SlangResult LanguageServer::completionResolve(
     const JSONValue& responseId)
 {
     auto result = m_core.completionResolve(args, editItem);
-    if (SLANG_FAILED(result.returnCode) || result.isNull)
+    if (SLANG_FAILED(result.returnCode))
     {
-        m_connection->sendNullResult(responseId);
+        // Unlike the other requests, completionItem/resolve has a non-nullable result: LSP requires
+        // it to answer with a CompletionItem or a JSON-RPC error, never null. So report an actual
+        // resolution failure as an error rather than a null result.
+        m_connection->sendError(
+            JSONRPC::ErrorCode::InternalError,
+            UnownedStringSlice("failed to resolve completion item"),
+            responseId);
+        return SLANG_OK;
+    }
+    if (result.isNull)
+    {
+        // The item has no `data` to enrich but carries a textEdit (file/import completions). There
+        // is nothing to add, yet LSP still requires the item back, not null. A CompletionItem
+        // cannot carry a textEdit, so echo the TextEditCompletionItem the client sent to preserve
+        // it.
+        m_connection->sendResult(&editItem, responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
