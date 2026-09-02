@@ -433,6 +433,17 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
     )
+    if(SLANG_ENABLE_OPTIX)
+        target_compile_definitions(
+            slang-unit-test
+            PRIVATE SLANG_UNIT_TEST_ENABLE_OPTIX=1
+        )
+        target_include_directories(
+            slang-unit-test
+            SYSTEM
+            PRIVATE ${OptiX_INCLUDE_DIRS}
+        )
+    endif()
     slang_add_target(
         slang-reflection-test
         MODULE

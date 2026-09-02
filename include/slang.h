@@ -4528,6 +4528,11 @@ struct ISession : public ISlangUnknown
     loadModule(const char* moduleName, IBlob** outDiagnostics = nullptr) = 0;
 
     /** Load a module from Slang source code.
+
+        If `source` is null and `path` names a readable file, the module is
+        loaded from that file's contents. If `source` is null and `path` cannot
+        be read, the call returns null and (when `outDiagnostics` is provided)
+        writes a `CannotOpenFile` diagnostic.
      */
     virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSource(
         const char* moduleName,
