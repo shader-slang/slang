@@ -585,8 +585,12 @@ SlangResult validateResolvedProject(
         value = false;
     for (const auto& localPackage : localPackages)
     {
+        if (!isActiveLocalPackage(localPackage))
+            continue;
         if (findLockedPackageIndex(lock, localPackage.name) < 0)
         {
+            if (isParkedEdit(localPackage, lock))
+                continue;
             outError =
                 String("Registered local package is not present in the lock: ") + localPackage.name;
             return SLANG_FAIL;

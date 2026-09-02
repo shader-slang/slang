@@ -216,8 +216,8 @@ struct LocalPackage
 {
     String name;
     String path;
-    /// Optional exact version for an override. When absent, `update --from-local` uses the version
-    /// from the lock row being replaced.
+    /// Optional exact version for an override. When absent, `update` uses the version from the lock
+    /// row being replaced.
     String as;
     LocalPackageKind kind = LocalPackageKind::Override;
     /// Disabled overrides retain their configuration but do not participate in resolution.

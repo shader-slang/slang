@@ -12,6 +12,14 @@ namespace PackageTool
 
 Index findLockedPackageIndex(const LockFile& lock, const String& name);
 
+/// An in-place edit whose package is not in the current lock. The checkout and
+/// `slang-workspace.json` registration stay; a later solve that needs the package again reuses
+/// them.
+inline bool isParkedEdit(const LocalPackage& package, const LockFile& lock)
+{
+    return isEditedLocalPackage(package) && findLockedPackageIndex(lock, package.name) < 0;
+}
+
 /// Verify that a dependency is represented by a compatible package in the lock.
 SlangResult validateLockedDependency(
     const Dependency& dependency,

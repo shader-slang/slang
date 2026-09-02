@@ -15,7 +15,7 @@ naming is in [Writing Module Files, Import, and Include](module-files).
 
 The short form `slang pkg` accepts the same commands. Slang uses a single dash for
 multi-character options, for example `-help`, not `--help`, except for `slang package` flags such
-as `--dry-run` and `--from-local`.
+as `--dry-run` and `--ignore-overrides`.
 
 ## The example graph
 
@@ -223,8 +223,10 @@ slang package update
 
 Use `override disable NAME` to retain its path and version while selecting the published graph,
 then `override enable NAME` to switch back. `override list` shows both states.
-`--from-local` remains a deprecated compatibility spelling. A dry run prints the lock diff without
-writing it. The resulting lock records the
+`update --ignore-overrides` solves from Git for this command only, without disabling the
+registrations. Edits stay in place and those checkouts are not replaced, including edited packages
+that drop out of the published graph (parked edits). A later plain update restores them. A dry run
+prints the lock diff without writing it. The resulting lock records the
 local path plus the original Git identity, so another machine or CI fails unless it has the same
 `slang-workspace.json`. Disable the override and run `update` to restore a portable Git pin before
 you remove the registration or commit.

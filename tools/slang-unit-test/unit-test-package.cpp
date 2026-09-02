@@ -1917,7 +1917,6 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     const char* incompatibleLocalUpdateArguments[] = {
         "slang-package",
         "update",
-        "--from-local",
         "--dry-run",
     };
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
@@ -1940,7 +1939,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     String lockBeforeDryRun;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::readAllText(Path::combine(temp.path, "slang-package-lock.json"), lockBeforeDryRun)));
-    const char* dryRunArguments[] = {"slang-package", "update", "--from-local", "--dry-run"};
+    const char* dryRunArguments[] = {"slang-package", "update", "--dry-run"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(dryRunArguments), dryRunArguments, error)));
     String lockAfterDryRun;

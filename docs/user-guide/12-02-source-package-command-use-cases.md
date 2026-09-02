@@ -427,12 +427,10 @@ same local tree without re-entering its configuration.
 
 ### Current gaps and pitfalls
 
-- `--from-local` remains as a deprecated compatibility spelling. It never meant a package-scoped
-  update; current workflows use enabled overrides with plain update.
 - An edit is not a way to trial manifest changes. Use an override, or publish a new tag and run
   normal `update`.
-- If an edit is registered while you run the local-override solve, its checkout HEAD must match a
-  published release tag. An unpublished edit commit makes the local solve fail; use an override
+- If an edit is registered while enabled overrides participate in the solve, its checkout HEAD must
+  match a published release tag. An unpublished edit commit makes that solve fail; use an override
   when the version or manifest identity differs.
 - Overrides are path-only; there is no user-global Git-to-Git remapping policy.
 - `slang-workspace.json` must not be committed. A team-wide source relationship belongs in
@@ -1010,8 +1008,8 @@ populated.
 **It does not prove:** that remote source passes license and module-layout validation. Those trees
 are not materialized during the preview.
 
-**Combinations:** use it with `--minimal` or `--from-local`. `--dry-run --clean` is rejected because
-there is no checkout replacement to authorize.
+**Combinations:** use it with `--minimal` or `--ignore-overrides`. `--dry-run --clean` is rejected
+because there is no checkout replacement to authorize.
 
 ### `update --minimal`
 
@@ -1042,20 +1040,22 @@ and advances out-of-date ones. Answering “no” prints that nothing was applie
 successfully, so a declined update does not fail a script that treats a non-zero exit as a broken
 workspace.
 
-### Enabled overrides and deprecated `update --from-local`
+### Enabled overrides and `update --ignore-overrides`
 
-**Use them when:** one or more registered overrides have unpublished manifest changes that should
-participate in a trial solve. Enabled overrides participate in plain update automatically.
+**Use enabled overrides when:** unpublished local trees should participate in every plain update.
+The resolver uses each enabled override as the only candidate for that package name.
+Non-overridden and disabled packages still resolve from Git. The resulting lock records local
+paths and requires the same `slang-workspace.json`.
 
-**They change:** the full-graph resolver uses every enabled override as the candidate for that
-package name. Non-overridden and disabled packages still resolve from Git. The resulting lock
-records local paths and requires the same `slang-workspace.json`.
+**Use `--ignore-overrides` when:** this command should write the published Git graph without
+disabling registrations. Edits stay active and those checkouts are not replaced, even if the
+published graph no longer contains that package. The next plain `update` adopts enabled overrides
+again and reattaches parked edits.
 
 **They do not mean:** “update only this package,” “use every nearby repository,” or “adopt the
 changed manifest from an in-place edit.” Edits retain published Git candidates.
 
-Use `override enable` and `override disable` to switch without deleting configuration.
-`--from-local` remains a deprecated compatibility alias and still means a whole-graph solve.
+Use `override enable` and `override disable` for persistent per-package switches.
 
 ### `fetch --clean` and `update --clean`
 
@@ -1278,8 +1278,11 @@ them or update this chapter and its regression tests in the same change.
 - `override` records a machine-local path and exact effective version.
 - Enabled overrides participate in plain whole-graph update; disabled overrides retain
   configuration while published resolution is active.
-- `update --from-local` remains a deprecated compatibility alias, not a package-scoped update.
-- A registered edit used during a local-override solve must have HEAD at a published release tag.
+- `update --ignore-overrides` solves from Git for this command only. It does not disable
+  registrations or replace edited checkouts. An edited package that drops out of the published
+  graph stays registered and on disk (a parked edit) so a later plain update can restore it.
+- A registered edit used during a solve that includes enabled overrides must have HEAD at a
+  published release tag.
 - A local-path lock fails on another machine without matching `slang-workspace.json`.
 - Disable an override and update to restore published selection before removing it.
 - Local-registration changes regenerate `build/search-paths` when the current lock can represent
@@ -1339,6 +1342,7 @@ Start with these unit tests when changing a journey:
 - Module layout and uniqueness: `PackageCommandsValidateDependencyModuleLayout`,
   `PackageToolUpdateRejectsBundleCaseConflict`, `PackageValidateRejectsFlattenedModuleAlias`.
 - Local overrides and enable state: `PackageToolLocalOverrideUpdatesDefinitiveLock`,
+  `PackageToolUpdateIgnoresOverrides`, `PackageToolIgnoreOverridesParksEditedDependency`,
   `PackageLocalRegistryJSON`.
 - Path dependencies: `PackageToolPathDependencies`,
   `PackageToolFetchRejectsPathLockForGitDependency`, `PackageToolRejectsPathIntoSlangState`,

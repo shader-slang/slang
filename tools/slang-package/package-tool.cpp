@@ -39,10 +39,10 @@ static void _printHelp(bool experimental = false)
         "  init             Create a package manifest and standard directories.\n"
         "  fetch [--clean] [--yes] [--skip-validate]\n"
         "                   Materialize dependencies from the lock file.\n"
-        "  update [--from-local] [--clean] [--dry-run] [--minimal] [--yes]\n"
+        "  update [--ignore-overrides] [--clean] [--dry-run] [--minimal] [--yes]\n"
         "         [--skip-validate]\n"
         "                   Re-resolve dependencies and update the lock file.\n"
-        "                   --from-local uses registered local package manifests.\n"
+        "                   --ignore-overrides solves from Git even when overrides are enabled.\n"
         "                   --dry-run reports the selected graph without writing the lock.\n"
         "                   --minimal prints one-line package changes without rationale.\n"
         "                   --yes applies without an interactive confirmation.\n"
@@ -540,7 +540,8 @@ static SlangResult _validateLocalPackages(
     const String& projectRoot,
     const LockFile& lock,
     const List<LocalPackage>& localPackages,
-    String& outError)
+    String& outError,
+    List<String>* outWarnings = nullptr)
 {
     for (const auto& localPackage : localPackages)
     {
@@ -549,6 +550,17 @@ static SlangResult _validateLocalPackages(
         Index packageIndex = findLockedPackageIndex(lock, localPackage.name);
         if (packageIndex < 0)
         {
+            if (isEditedLocalPackage(localPackage))
+            {
+                if (outWarnings)
+                {
+                    outWarnings->add(
+                        String("Edited package '") + localPackage.name +
+                        "' is not in this graph; leaving its checkout and edit registration in "
+                        "place.");
+                }
+                continue;
+            }
             outError =
                 String("Registered local package is not present in the lock: ") + localPackage.name;
             return SLANG_FAIL;
@@ -915,7 +927,7 @@ static void _warnSkippedSourceValidation()
 
 static SlangResult _update(
     const String& projectRoot,
-    bool fromLocal,
+    bool ignoreOverrides,
     bool allowClean,
     bool dryRun,
     bool minimal,
@@ -960,7 +972,11 @@ static SlangResult _fetch(
     SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
-    SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
+    List<String> warnings;
+    SLANG_RETURN_ON_FAIL(
+        _validateLocalPackages(projectRoot, lock, localPackages, outError, &warnings));
+    for (const auto& warning : warnings)
+        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     if (!skipValidate)
         SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
     List<String> cleanReplacements;
@@ -994,7 +1010,6 @@ static SlangResult _fetch(
         _appendIncompleteMaterializationAdvice(outError, true);
         return SLANG_FAIL;
     }
-    List<String> warnings;
     if (skipValidate)
     {
         if (SLANG_FAILED(_validateMaterializedManifests(
@@ -1032,9 +1047,37 @@ static SlangResult _fetch(
     return SLANG_OK;
 }
 
+static bool _hasEnabledOverride(const List<LocalPackage>& localPackages)
+{
+    for (const auto& localPackage : localPackages)
+    {
+        if (!isEditedLocalPackage(localPackage) && localPackage.enabled)
+            return true;
+    }
+    return false;
+}
+
+/// Copy workspace registrations for one `update`, optionally treating every override as disabled.
+///
+/// Edits stay active: they own checkouts and must not be reverted by ignoring path overrides.
+static void _localPackagesForUpdate(
+    const List<LocalPackage>& localPackages,
+    bool ignoreOverrides,
+    List<LocalPackage>& outEffective)
+{
+    outEffective.clear();
+    for (const auto& localPackage : localPackages)
+    {
+        LocalPackage copy = localPackage;
+        if (ignoreOverrides && !isEditedLocalPackage(copy))
+            copy.enabled = false;
+        outEffective.add(copy);
+    }
+}
+
 static SlangResult _update(
     const String& projectRoot,
-    bool fromLocal,
+    bool ignoreOverrides,
     bool allowClean,
     bool dryRun,
     bool minimal,
@@ -1047,15 +1090,13 @@ static SlangResult _update(
 
     List<LocalPackage> localPackages;
     SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    bool useLocalResolver = fromLocal;
-    for (const auto& localPackage : localPackages)
+    const bool ignoredEnabledOverrides = ignoreOverrides && _hasEnabledOverride(localPackages);
+    List<LocalPackage> effectiveLocalPackages;
+    _localPackagesForUpdate(localPackages, ignoreOverrides, effectiveLocalPackages);
+    bool useLocalResolver = false;
+    for (const auto& localPackage : effectiveLocalPackages)
         useLocalResolver =
             useLocalResolver || (!isEditedLocalPackage(localPackage) && localPackage.enabled);
-    if (fromLocal && localPackages.getCount() == 0)
-    {
-        outError = "update --from-local requires a registered local package.";
-        return SLANG_FAIL;
-    }
     if (!skipValidate)
         SLANG_RETURN_ON_FAIL(validatePackageTree(projectRoot, manifest, outError));
 
@@ -1069,7 +1110,7 @@ static SlangResult _update(
     }
     if (useLocalResolver)
     {
-        for (auto& localPackage : localPackages)
+        for (auto& localPackage : effectiveLocalPackages)
         {
             if (!isActiveLocalPackage(localPackage) || isEditedLocalPackage(localPackage) ||
                 localPackage.as.getLength())
@@ -1094,7 +1135,7 @@ static SlangResult _update(
         SLANG_RETURN_ON_FAIL(resolveDependenciesFromLocalPackages(
             projectRoot,
             manifest,
-            localPackages,
+            effectiveLocalPackages,
             lock,
             outError,
             &warnings,
@@ -1105,15 +1146,16 @@ static SlangResult _update(
         SLANG_RETURN_ON_FAIL(
             resolveDependencies(projectRoot, manifest, lock, outError, &warnings, &report));
     }
-    SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(
+        _validateLocalPackages(projectRoot, lock, effectiveLocalPackages, outError, &warnings));
     String reportText =
         formatResolveReport(manifest, previousLockPtr, lock, report, dryRun, minimal);
-    if (fromLocal)
+    if (ignoredEnabledOverrides)
     {
         fprintf(
             stderr,
-            "slang-package: warning: --from-local is deprecated; enabled overrides now "
-            "participate in plain update.\n");
+            "slang-package: warning: ignoring enabled overrides for this update; they remain in "
+            "slang-workspace.json.\n");
     }
     if (dryRun)
     {
@@ -1133,7 +1175,7 @@ static SlangResult _update(
             manifest,
             lock,
             previousLockPtr,
-            localPackages,
+            effectiveLocalPackages,
             cleanReplacements,
             outError));
         _printCleanReplacementWarning(cleanReplacements);
@@ -1161,7 +1203,7 @@ static SlangResult _update(
             manifest,
             lock,
             previousLockPtr,
-            localPackages,
+            effectiveLocalPackages,
             allowClean,
             outError)))
     {
@@ -1174,7 +1216,7 @@ static SlangResult _update(
                 projectRoot,
                 manifest,
                 lock,
-                localPackages,
+                effectiveLocalPackages,
                 outError,
                 false,
                 &warnings)))
@@ -1189,7 +1231,7 @@ static SlangResult _update(
                 projectRoot,
                 manifest,
                 lock,
-                localPackages,
+                effectiveLocalPackages,
                 outError,
                 &warnings)))
         {
@@ -1198,7 +1240,8 @@ static SlangResult _update(
         }
     }
     SLANG_RETURN_ON_FAIL(writeLockFile(lockPath, lock, outError));
-    SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, manifest, lock, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(
+        _writeSearchPaths(projectRoot, manifest, lock, effectiveLocalPackages, outError));
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     if (useLocalResolver)
@@ -1414,6 +1457,14 @@ static SlangResult _status(const String& projectRoot, String& outError)
                         (long long)gitStatus.commitsAhead,
                         (long long)gitStatus.commitsBehind,
                         (long long)gitStatus.stashCount);
+                }
+                else if (lockedIndex < 0)
+                {
+                    fprintf(
+                        stdout,
+                        "  %s: edit at %s (not in the current lock; checkout left in place)\n",
+                        package.name.getBuffer(),
+                        package.path.getBuffer());
                 }
                 else
                 {
@@ -2474,7 +2525,7 @@ SlangResult executeInDirectory(
     }
     if (command == "update")
     {
-        bool fromLocal = false;
+        bool ignoreOverrides = false;
         bool allowClean = false;
         bool dryRun = false;
         bool minimal = false;
@@ -2483,8 +2534,8 @@ SlangResult executeInDirectory(
         for (int i = 2; i < argc; ++i)
         {
             String flag = argv[i];
-            if (flag == "--from-local")
-                fromLocal = true;
+            if (flag == "--ignore-overrides")
+                ignoreOverrides = true;
             else if (flag == "--clean")
                 allowClean = true;
             else if (flag == "--dry-run")
@@ -2508,7 +2559,7 @@ SlangResult executeInDirectory(
         }
         return _update(
             projectRoot,
-            fromLocal,
+            ignoreOverrides,
             allowClean,
             dryRun,
             minimal,

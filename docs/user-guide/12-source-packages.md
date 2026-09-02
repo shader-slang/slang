@@ -258,9 +258,10 @@ and returned to tool ownership. Fetch and update refuse to replace an unregister
 changed files, extra commits, or stashes. Pass `--clean` explicitly to permit replacement.
 
 Run `slang package update` deliberately when manifest constraints or upstream releases change.
-`slang package update --dry-run` and `slang package update --from-local --dry-run` print the
-selected graph (what moved, what stayed, and why) without writing the lock or replacing
-checkouts. `--minimal` keeps one-line package changes and the summary count. The installed Slang
+`slang package update --dry-run` prints the selected graph (what moved, what stayed, and why)
+without writing the lock or replacing checkouts. `--ignore-overrides` solves from Git even when
+overrides are enabled; it does not change `slang-workspace.json` or replace edited checkouts.
+`--minimal` keeps one-line package changes and the summary count. The installed Slang
 toolchain is omitted unless its constraint fails. Resolver Git clones
 under `.slang/cache/` may still be populated so the tool can inspect available tags. A real update
 prints that report and asks before applying the exact graph it just resolved, unless that graph
@@ -379,8 +380,10 @@ A registered local manifest must agree with the lock. An in-place edit keeps the
 in the lock, so changing its exports or dependencies requires publishing a new release tag and
 running normal `slang package update`. Use an override when local manifest changes must participate
 in resolution before publication. Enabled overrides automatically participate in plain
-`slang package update`; `--from-local` remains a deprecated compatibility spelling for the old
-full-local-graph mode. An override records both its original
+`slang package update`. `update --ignore-overrides` writes the published Git graph for this command
+only; the registrations stay enabled for the next plain update. An edited checkout that is absent
+from that published graph stays on disk and stays registered (a parked edit) so a later plain
+update can restore it without losing the work. An override records both its original
 Git location and its effective path and requires the matching registration in
 `slang-workspace.json`; it therefore fails explicitly on another machine or in CI. The override's
 effective version must satisfy every incoming constraint, and all of its transitive dependencies
