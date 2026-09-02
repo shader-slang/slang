@@ -19237,12 +19237,13 @@ void checkDerivativeOfAttributeImpl(
     derivativeAttr->funcExpr = declRefExpr;
     if constexpr (std::is_same_v<TDerivativeAttr, ForwardDerivativeAttribute>)
     {
-        SLANG_ASSERT(calleeDeclRef.is<FunctionDeclBase>());
-        checkDerivativeAttribute(
-            visitor,
-            calleeDeclRef.as<FunctionDeclBase>(),
-            funcDecl,
-            derivativeAttr);
+        // Successful higher-order resolution returns a declaration reference to the selected
+        // primal function. Error recovery can instead retain its enclosing `GenericDecl`, but that
+        // path has an `ErrorType` and returns after diagnosing failed generic argument inference.
+        // Enforce this boundary in release builds before the unchecked typed rewrap below.
+        SLANG_RELEASE_ASSERT(calleeDeclRef.is<FunctionDeclBase>());
+        auto primalDeclRef = calleeDeclRef.as<FunctionDeclBase>();
+        checkDerivativeAttribute(visitor, primalDeclRef, funcDecl, derivativeAttr);
     }
     else
     {
