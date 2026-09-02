@@ -7,10 +7,10 @@
 namespace Slang
 {
 
-// Returns true if `inst` is the `MatrixLayoutMode.Unknown` literal, i.e. a layout the source
-// left unspecified. `MatrixLayoutMode` is an enum rather than an `int` so that this stays
-// recognizable as a generic argument, where an `int` would look like a row or column count.
-// `inst` may be any operand (e.g. a `specialize` argument), so a non-layout is simply `false`.
+// Returns true if `inst` is the `MatrixLayoutMode.Unknown` literal, i.e. an unspecified layout.
+// `MatrixLayoutMode` is an enum rather than an `int` so the literal stays recognizable as a
+// generic argument. `inst` can be any `specialize` argument, so a non-match is not an error;
+// a matrix type's own layout operand is checked more strictly in `visitMatrixTypes`.
 static bool isUnknownMatrixLayout(IRInst* inst, IRType* matrixLayoutModeType)
 {
     auto lit = as<IRIntLit>(inst);
@@ -19,22 +19,23 @@ static bool isUnknownMatrixLayout(IRInst* inst, IRType* matrixLayoutModeType)
     return lit->getValue() == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 }
 
-// Collects the matrix types with an unspecified layout and the `specialize` insts that pass one
-// as a generic argument. The `MatrixLayoutMode` type is taken from the first matrix type seen.
+// Collects the matrix types with an unspecified layout, and the `specialize` insts that pass
+// one as a generic argument.
 struct UnresolvedMatrixLayoutCollector
 {
     IRType* matrixLayoutModeType = nullptr;
     List<IRMatrixType*> matrixTypes;
     List<IRSpecialize*> specializeInsts;
 
+    // Collects the matrix types whose layout is `Unknown`. Every layout operand is typed
+    // `MatrixLayoutMode`, and IR types are deduplicated, so the first matrix type seen provides
+    // that type and every later one must agree; a mismatch would be silently skipped.
     void visitMatrixTypes(IRInst* parent)
     {
         for (auto child : parent->getChildren())
         {
             if (auto matrixType = as<IRMatrixType>(child))
             {
-                // Any matrix type identifies `MatrixLayoutMode` for us. Types are deduplicated,
-                // so every layout operand must share it; a mismatch would be silently skipped.
                 auto layout = matrixType->getLayout();
                 if (!matrixLayoutModeType)
                     matrixLayoutModeType = layout->getFullType();
@@ -47,7 +48,8 @@ struct UnresolvedMatrixLayoutCollector
         }
     }
 
-    // Requires `matrixLayoutModeType`, i.e. call after `visitMatrixTypes`.
+    // Collects the `specialize` insts that pass `Unknown` as a generic argument.
+    // Needs `matrixLayoutModeType`, so call after `visitMatrixTypes`.
     void visitSpecializeInsts(IRInst* parent)
     {
         for (auto child : parent->getChildren())

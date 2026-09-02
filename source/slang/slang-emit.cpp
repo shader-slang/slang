@@ -644,8 +644,8 @@ void calcRequiredLoweringPassSet(
         result.lateRequireCapability = true;
         break;
     case kIROp_MatrixType:
-        // A layout that is `Unknown` needs resolving. A non-literal layout is a generic
-        // parameter, which specialization may later fill with `Unknown`, so flag that too.
+        // An `Unknown` layout needs the pass. So does `Unknown` passed as a generic argument,
+        // which this scan cannot recognize, so a generic (non-literal) layout requests it too.
         if (auto matrixType = as<IRMatrixType>(inst))
         {
             auto layout = as<IRIntLit>(matrixType->getLayout());
@@ -1457,10 +1457,9 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.lValueCast)
         SLANG_PASS(lowerLValueCast, targetProgram);
 
-    // Fill in default matrix layout into matrix types that left layout unspecified. Must run
-    // before specialization, so `row_major float4x4` and `float4x4` match as one type (and so
-    // an `Unknown` generic argument is resolved before it is substituted into a clone), and
-    // before `lowerEnumType`, which erases the `MatrixLayoutMode` type this pass looks for.
+    // Fill in the default matrix layout where the source left it unspecified. Must run before
+    // specialization, so `row_major float4x4` and `float4x4` match as one type, and before
+    // `lowerEnumType`, which erases the `MatrixLayoutMode` type this pass looks for.
     if (requiredLoweringPassSet.unresolvedMatrixLayout)
         SLANG_PASS(specializeMatrixLayout, targetProgram);
 
