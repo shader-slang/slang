@@ -12,6 +12,10 @@ extension float : IReal
 {
 }
 
+extension float3 : IReal
+{
+}
+
 struct P<Real : IReal> : IDifferentiable
 {
     float3 pos;
@@ -34,8 +38,12 @@ RWStructuredBuffer<float> outBuf;
 [numthreads(1, 1, 1)]
 void main(uint3 tid: SV_DispatchThreadID)
 {
-    outBuf[0] = get<float>(float3(tid.x, 1, 2));
+    outBuf[0] = get<float>(float3(tid.x, 1, 2)) + get<float3>(float3(tid.x, 3, 4));
 }
 
+// A zero-constituent OpConstantComposite ends right after its result type; the
+// positive check anchors the range and asserts a well-formed default is emitted.
 // CHECK: OpEntryPoint
 // CHECK-NOT: OpConstantComposite %float{{$}}
+// CHECK-NOT: OpConstantComposite %v3float{{$}}
+// CHECK: OpFunctionCall %P_Differential %P_Differential__init {{.*}} %float_0

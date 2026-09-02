@@ -24,5 +24,8 @@ void main(uint3 tid: SV_DispatchThreadID)
     outBuf[0] = dv.d.x;
 }
 
+// The positive check anchors the negative one so a storage-struct rename cannot make it
+// vacuous. `natural` is the buffer layout rule, orthogonal to -matrix-layout-row-major.
 // CHECK: OpEntryPoint
+// CHECK: %_MatrixStorage_float4x4natural = OpTypeStruct
 // CHECK-NOT: _MatrixStorage_float4x4natural_0

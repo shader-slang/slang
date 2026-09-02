@@ -1567,6 +1567,8 @@ Result linkAndOptimizeIR(
 
     // Fill in default matrix layout into matrix types that left layout unspecified. This runs
     // after specialization so matrix types minted from lazily imported generics are covered.
+    // Safe to defer: no earlier pass reads matrix layout; its consumers (buffer-element
+    // lowering, legalization, emit) all run later.
     SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // Lower DiffTypeInfo instructions to MakeTuple.
