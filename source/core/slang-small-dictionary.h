@@ -36,10 +36,15 @@ public:
         return nullptr;
     }
 
+    // Asserts if `key` already exists, matching `Dictionary::add`'s contract -- callers are
+    // expected to `tryGetValue` first, the same way every current caller of this type does.
     void add(const TKey& key, const TValue& value)
     {
         if (!m_overflowed)
         {
+            for (Index i = 0; i < m_inlineCount; i++)
+                SLANG_RELEASE_ASSERT(!(m_inlineKeys[i] == key));
+
             if (m_inlineCount < kInlineCapacity)
             {
                 m_inlineKeys[m_inlineCount] = key;
@@ -48,8 +53,11 @@ public:
                 return;
             }
 
-            // Promote once: move the inline entries into the real Dictionary so a case with many
+            // Promote once: copy the inline entries into the real Dictionary so a case with many
             // unique keys still gets O(1) average lookups instead of an ever-growing linear scan.
+            // The inline array is left populated (not cleared): later lookups still check it
+            // first, and every entry there is byte-identical to its Dictionary copy, so reading
+            // through either one gives the same answer.
             for (Index i = 0; i < m_inlineCount; i++)
                 m_overflow.add(m_inlineKeys[i], m_inlineValues[i]);
             m_overflowed = true;
@@ -58,8 +66,8 @@ public:
     }
 
 private:
-    TKey m_inlineKeys[kInlineCapacity];
-    TValue m_inlineValues[kInlineCapacity];
+    TKey m_inlineKeys[kInlineCapacity] = {};
+    TValue m_inlineValues[kInlineCapacity] = {};
     Index m_inlineCount = 0;
     bool m_overflowed = false;
     Dictionary<TKey, TValue> m_overflow;

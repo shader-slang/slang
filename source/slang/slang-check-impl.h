@@ -1261,6 +1261,12 @@ private:
     /// separate `_calcInheritanceInfo` calls -- each one otherwise re-running a full `Val`
     /// substitution from scratch. See #12139 (the `interface_depth` case left unresolved by that
     /// issue's SmallDictionary fix).
+    ///
+    /// Unsynchronized, like every other cache on this type: front-end work including
+    /// specialization is documented as non-reentrant and requiring external synchronization when
+    /// a `SharedSemanticsContext` is shared across threads (docs/user-guide/08-compiling.md,
+    /// "Multithreading"), so this needs no lock any more than `m_mapDeclRefToInheritanceInfo`
+    /// above does.
     Dictionary<SpecializeInterfaceInheritanceWitnessKey, SubtypeWitness*>
         m_specializeInterfaceInheritanceWitnessCache;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;

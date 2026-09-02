@@ -53,4 +53,45 @@ SLANG_UNIT_TEST(smallDictionary)
         SLANG_CHECK(dict.tryGetValue(1) && *dict.tryGetValue(1) == 101);
         SLANG_CHECK(dict.tryGetValue(2) && *dict.tryGetValue(2) == 102);
     }
+
+    // A duplicate key must be rejected, matching Dictionary::add's contract, while entries are
+    // still inline. SLANG_RELEASE_ASSERT throws by default (no SLANG_ASSERT env var set), so the
+    // failure is catchable here instead of crashing the test process; the rejected add must also
+    // leave the original value in place, not shadow or overwrite it.
+    {
+        SmallDictionary<int, int, 4> dict;
+        dict.add(1, 100);
+        bool threw = false;
+        try
+        {
+            dict.add(1, 200);
+        }
+        catch (const Exception&)
+        {
+            threw = true;
+        }
+        SLANG_CHECK(threw);
+        SLANG_CHECK(dict.tryGetValue(1) && *dict.tryGetValue(1) == 100);
+    }
+
+    // Same contract after promotion, where a duplicate add is a different code path (it reaches
+    // the overflow Dictionary instead of the inline linear scan).
+    {
+        SmallDictionary<int, int, 2> dict;
+        dict.add(1, 100);
+        dict.add(2, 200);
+        dict.add(3, 300); // promotes past the inline capacity of 2
+
+        bool threw = false;
+        try
+        {
+            dict.add(1, 999);
+        }
+        catch (const Exception&)
+        {
+            threw = true;
+        }
+        SLANG_CHECK(threw);
+        SLANG_CHECK(dict.tryGetValue(1) && *dict.tryGetValue(1) == 100);
+    }
 }

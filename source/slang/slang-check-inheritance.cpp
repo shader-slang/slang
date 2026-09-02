@@ -469,6 +469,10 @@ SubtypeWitness* SharedSemanticsContext::_specializeInterfaceInheritanceWitness(
         selfIsSubtypeOfBase,
         baseInterfaceDecl->getThisTypeDecl()));
 
+    // `as<SubtypeWitness>` can be null if substitution ever produced a non-witness `Val` for a
+    // witness input -- caching that is intentional and harmless: a cached null and a freshly
+    // recomputed null behave identically to every caller, so there is nothing this cache changes
+    // about how that case is handled.
     auto result =
         as<SubtypeWitness>(baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
     m_specializeInterfaceInheritanceWitnessCache.add(key, result);
