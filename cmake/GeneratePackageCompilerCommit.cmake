@@ -12,7 +12,9 @@ if(GIT_EXECUTABLE AND EXISTS "${SOURCE_DIR}/.git")
     if(commit_result EQUAL 0)
         set(commit "${commit_output}")
         execute_process(
-            COMMAND "${GIT_EXECUTABLE}" -C "${SOURCE_DIR}" diff --quiet --ignore-submodules HEAD --
+            COMMAND
+                "${GIT_EXECUTABLE}" -C "${SOURCE_DIR}" diff --quiet
+                --ignore-submodules HEAD --
             RESULT_VARIABLE diff_result
         )
         if(NOT diff_result EQUAL 0)
@@ -21,8 +23,7 @@ if(GIT_EXECUTABLE AND EXISTS "${SOURCE_DIR}/.git")
     endif()
 endif()
 
-set(
-    contents
+set(contents
     "#define SLANG_PACKAGE_COMPILER_COMMIT \"${commit}\"\n#define SLANG_PACKAGE_COMPILER_DIRTY ${dirty}\n"
 )
 set(write_file TRUE)
