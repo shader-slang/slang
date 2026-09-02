@@ -2,7 +2,7 @@
 
 // completionItem/resolve must answer with the completion item, never null, even for an item that
 // carries a textEdit but no `data` to enrich (file/import completions) — returning null there
-// breaks the LSP resolve contract for strict clients. Regression test for shader-slang/slang#12870.
+// breaks the LSP resolve contract for strict clients.
 
 int x;
 
