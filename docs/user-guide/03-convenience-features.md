@@ -38,30 +38,15 @@ a = 6; // Error, `a` is immutable.
 
 
 ## Compile-Time Constants (`constexpr`)
-Slang uses the `constexpr` qualifier to mark a value that must be known at compile time. Its only supported use today is on a **function parameter**, where it requires that the corresponding argument at every call site be a compile-time constant:
-```csharp
-// The argument for `offset` must be a compile-time constant at every call site.
-float4 sampleWithOffset(Texture2D t, SamplerState s, float2 uv, constexpr int2 offset)
-{
-    return t.SampleLevel(s, uv, 0.0, offset);
-}
-```
-Passing an argument that is not a compile-time constant produces an error such as `error 40013: argument is not a compile-time constant`.
+The Slang language allows `constexpr` to be used as a modifier, but at present it is not fully implemented and will not behave as users familiar with `constexpr` in C++ might expect. Use of `constexpr` in Slang code is currently discouraged.
 
-In other positions, `constexpr` is not fully implemented and does **not** cause an expression to be evaluated at compile time:
-- On a **variable or global**, `constexpr` is treated as `const`, and Slang emits `warning 31227`. Use `static const` for a global constant.
-- On a **function or other callable declaration** (including a method, initializer, subscript, accessor, or operator), `constexpr` is **ignored**, and Slang emits `warning 31228`. Slang does not evaluate user-defined function bodies at compile time, so a call to such a function is not a compile-time constant:
-```csharp
-constexpr int getCount() { return 4; } // warning 31228: constexpr is ignored
+Slang does not evaluate user-defined function bodies at compile time, so `constexpr` will parse but does not cause an expression to be evaluated at compile time. Depending on where the modifier appears, Slang currently reacts as follows:
+- On a **variable or global**, `constexpr` is treated as `const`, and Slang emits `warning 31227`. Use `static const` for a global constant instead.
+- On a **function or other callable declaration** (a method, initializer, subscript, accessor, or operator), `constexpr` is ignored, and Slang emits `warning 31228`.
 
-void f()
-{
-    int values[getCount()]; // error: getCount() is not a compile-time constant
-}
-```
-Because the call is not folded, using its result where a compile-time constant is required — an array size, a `[ForceUnroll]` loop bound, a `constexpr` argument, or a global `static const` initializer — fails. Use a literal, a `static const` (initialized from a literal or another constant), a preprocessor `#define`, or a generic value parameter (`struct Foo<int N> { ... }`) instead.
+These warnings may be turned into errors in a future version of the Slang language.
 
-Compile-time evaluation of user-defined functions is not yet supported; see the [Slang issue tracker](https://github.com/shader-slang/slang/issues) for the current status.
+When you need a value that is guaranteed to be known at compile time, use a literal, a `static const` value, a preprocessor `#define`, or a generic value parameter (`struct Foo<int N> { ... }`).
 
 
 ## Namespaces
