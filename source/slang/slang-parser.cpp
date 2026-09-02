@@ -2952,11 +2952,12 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
 {
     Name* baseName = nullptr;
     BaseGenericKind baseKind = BaseGenericKind::Unknown;
+    Expr* checkedBase = base;
     if (parser->semanticsVisitor)
     {
         // If we have access to a semantic visitor, we can check the base
         // and see if it refers to a generic.
-        auto checkedBase = parser->semanticsVisitor->CheckTerm(base);
+        checkedBase = parser->semanticsVisitor->CheckTerm(base);
         if (auto declRefExpr = as<DeclRefExpr>(checkedBase))
         {
             if (declRefExpr->declRef.is<GenericDecl>())
@@ -3008,7 +3009,7 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
 
     // If base is known to be a generic, just parse as generic app.
     if (baseKind == BaseGenericKind::Generic)
-        return parseGenericApp(parser, base);
+        return parseGenericApp(parser, checkedBase);
 
     // If base is known to be non-generic, just return base.
     if (baseKind == BaseGenericKind::NonGeneric)
