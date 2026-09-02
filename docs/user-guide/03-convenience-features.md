@@ -46,7 +46,7 @@ Slang does not evaluate user-defined function bodies at compile time, so `conste
 
 These warnings may be turned into errors in a future version of the Slang language.
 
-When you need a value that is guaranteed to be known at compile time, use a literal, a `static const` value, a preprocessor `#define`, or a generic value parameter (`struct Foo<int N> { ... }`).
+When you need a value that is guaranteed to be known at compile time, use a literal, a `static const` initialized from a compile-time constant, a preprocessor `#define`, or a generic value parameter (`struct Foo<int N> { ... }`).
 
 
 ## Namespaces
