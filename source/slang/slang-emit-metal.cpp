@@ -1070,21 +1070,29 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_MetalSetIndices:
         {
             auto setIndices = as<IRMetalSetIndices>(inst);
-            const auto indices = as<IRVectorType>(setIndices->getElementValue()->getDataType());
-            UInt numIndices = as<IRIntLit>(indices->getElementCount())->getValue();
-            for (UInt i = 0; i < numIndices; ++i)
+            auto value = setIndices->getElementValue();
+            // Scalar for point topology, uint2/uint3 for lines/triangles.
+            auto vectorType = as<IRVectorType>(value->getDataType());
+            IRIntegerValue numIndices = vectorType ? getIntVal(vectorType->getElementCount()) : 1;
+            for (IRIntegerValue i = 0; i < numIndices; ++i)
             {
                 m_writer->emit("_slang_mesh.set_index(");
-                emitOperand(setIndices->getIndex(), getInfo(EmitOp::General));
+                emitOperand(
+                    setIndices->getIndex(),
+                    leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Mul)));
                 m_writer->emit("*");
-                m_writer->emitUInt64(numIndices);
+                m_writer->emitInt64(numIndices);
                 m_writer->emit("+");
-                m_writer->emitUInt64(i);
-                m_writer->emit(",(");
-                emitOperand(setIndices->getElementValue(), getInfo(EmitOp::General));
-                m_writer->emit(")[");
-                m_writer->emitUInt64(i);
-                m_writer->emit("]);\n");
+                m_writer->emitInt64(i);
+                m_writer->emit(",");
+                emitOperand(value, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
+                if (vectorType)
+                {
+                    m_writer->emit("[");
+                    m_writer->emitInt64(i);
+                    m_writer->emit("]");
+                }
+                m_writer->emit(");\n");
             }
             return true;
         }
