@@ -11,7 +11,7 @@
 // Boundary on argument *composition*: a generic argument may itself be a
 // `specialize` result, because the opcode is a value like any other. The CHECK
 // pins one `specialize` textually inside another's argument list.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct Box<T> { T val; };
 

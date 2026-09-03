@@ -12,7 +12,7 @@
 // argument. `helper<T : IFoo>` needs a witness that `T` conforms, so the call
 // site's argument list is (type, witness) rather than (type) alone; the CHECK
 // pins two arguments after the base, the first being the concrete type `%A`.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

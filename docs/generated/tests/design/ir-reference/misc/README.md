@@ -24,7 +24,7 @@ by an IR pass, only by the host/Torch binding path, or by nothing at all are
 enumerated under `## Untested claims` with a reason.
 
 Two observation points are used. Opcodes that exist in the platform-neutral
-IR are read out of a `-target <text-target> -dump-ir -o /dev/null` snapshot,
+IR are read out of a `-target <text-target> -dump-ir -o -` snapshot,
 with patterns anchored at a user-named function and operands kept symbolic
 (behind a generic, or read from a thread id) so neither the constant folder
 nor DCE removes the inst before the CHECK sees it. Claims the doc states in
