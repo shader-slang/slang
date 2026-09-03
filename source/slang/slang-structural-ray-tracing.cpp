@@ -9,6 +9,40 @@
 namespace Slang
 {
 
+String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName)
+{
+    // Consider `Miss` and `Stages.Miss`. Keeping `Miss` unchanged preserves the public names used
+    // by existing structural programs. `Stages.Miss` cannot be emitted as a CUDA or C-like symbol,
+    // while C-like targets reserve the entry-point name `main`, so encode every UTF-8 byte of those
+    // names after a compiler-reserved prefix. We also encode source names that start with the
+    // prefix; consequently a user-written identifier cannot collide with an encoded qualified
+    // name.
+    static const UnownedStringSlice kEncodedPrefix = toSlice("__slang_structural_rt_");
+    bool isSimpleIdentifier =
+        sourceTypeName.getLength() != 0 && !sourceTypeName.startsWith(kEncodedPrefix) &&
+        sourceTypeName != toSlice("main") &&
+        ((sourceTypeName[0] >= 'A' && sourceTypeName[0] <= 'Z') ||
+         (sourceTypeName[0] >= 'a' && sourceTypeName[0] <= 'z') || sourceTypeName[0] == '_');
+    for (Index i = 1; isSimpleIdentifier && i < sourceTypeName.getLength(); ++i)
+    {
+        auto c = sourceTypeName[i];
+        isSimpleIdentifier =
+            (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+    }
+    if (isSimpleIdentifier)
+        return String(sourceTypeName);
+
+    StringBuilder result;
+    result << kEncodedPrefix;
+    for (auto c : sourceTypeName)
+    {
+        auto byte = uint8_t(c);
+        result.appendChar("0123456789abcdef"[byte >> 4]);
+        result.appendChar("0123456789abcdef"[byte & 0xf]);
+    }
+    return result.produceString();
+}
+
 const char* getStructuralRayTracingStageInterfaceName(StructuralRayTracingStageKind kind)
 {
     switch (kind)
