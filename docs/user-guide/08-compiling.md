@@ -198,7 +198,7 @@ If multiple source files are passed to `slangc`, they will be grouped into trans
 
 * Each `.hlsl` file will be grouped into a distinct translation unit of its own.
 
-* Each GLSL file will be grouped into a distinct translation unit of its own.
+* Each GLSL file (`.glsl`, `.vert`, `.frag`, `.geom`, `.tesc`, `.tese`, `.comp`, `.mesh`, `.task`, `.rgen`, `.rint`, `.rahit`, `.rchit`, `.rmiss`, or `.rcall`) will be grouped into a distinct translation unit of its own.
 
 * Each `.slang-module` file forms its own translation unit.
 

@@ -3,8 +3,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 #language 2026
-//CHECK: source-language directive overrides the language selected for this input
-//CHECK: the source directive takes precedence over the requested or file-extension-implied language
+//CHECK: source-language directive selects slang and overrides the file-extension-implied glsl source language
+//CHECK: the source directive selects slang instead of glsl
 
 [shader("vertex")]
 float4 main(float4 position : POSITION) : SV_Position

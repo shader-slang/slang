@@ -2855,9 +2855,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
         switch (optionKind)
         {
+        case OptionKind::AllowGLSL:
+            // Unlike ordinary compiler options, this deprecated spelling governs only the input
+            // translation units of the current compile request. Keeping it off the linkage avoids
+            // silently changing the language of source modules loaded by an `import`.
+            m_requestImpl->setLegacyAllowGLSLInput(true);
+            break;
         case OptionKind::NoMangle:
         case OptionKind::ValidateUniformity:
-        case OptionKind::AllowGLSL:
         case OptionKind::EnableExperimentalPasses:
         case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:

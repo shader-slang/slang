@@ -1264,15 +1264,21 @@ SLANG_UNIT_TEST(reproExtractFilesPreservesExplicitSourceLanguage)
 
     OffsetContainer container;
     auto requestPtr = container.newObject<RequestState>();
-    auto translationUnits = container.newArray<TranslationUnitRequestState>(1);
-    auto sourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
-    auto sourceFile = addSourceFileState(container, "explicit-language.slang");
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(2);
+    auto explicitSourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto inferredSourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto explicitSourceFile = addSourceFileState(container, "explicit-language.slang");
+    auto inferredSourceFile = addSourceFileState(container, "inferred-language.slang");
 
     container[requestPtr]->translationUnits = translationUnits;
     container[translationUnits[0]].language = SourceLanguage::GLSL;
     container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
-    container[translationUnits[0]].sourceFiles = sourceFiles;
-    container[sourceFiles[0]] = sourceFile;
+    container[translationUnits[0]].sourceFiles = explicitSourceFiles;
+    container[explicitSourceFiles[0]] = explicitSourceFile;
+    container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
+    container[translationUnits[1]].sourceFiles = inferredSourceFiles;
+    container[inferredSourceFiles[0]] = inferredSourceFile;
 
     OffsetBase& base = container.asBase();
     ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
@@ -1283,11 +1289,14 @@ SLANG_UNIT_TEST(reproExtractFilesPreservesExplicitSourceLanguage)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(fileSystem->loadFile("manifest.txt", manifestBlob.writeRef())));
 
-    // The serialized path deliberately has a `.slang` extension. Omitting `-lang glsl` would make
-    // the extracted command line parse it under the wrong language even though replaying the repro
-    // itself uses the preserved explicit selection.
+    // The first serialized path deliberately has a `.slang` extension. Omitting `-lang glsl` would
+    // parse it under the wrong language. That option remains active, so the following inferred
+    // Slang translation unit needs an explicit reset in the extracted command even though binary
+    // replay preserves its inferred provenance.
     String manifest = StringUtil::getString(manifestBlob);
-    SLANG_CHECK(manifest.indexOf(UnownedStringSlice("-lang glsl explicit-language.slang")) >= 0);
+    SLANG_CHECK(
+        manifest.indexOf(UnownedStringSlice(
+            "-lang glsl explicit-language.slang -lang slang inferred-language.slang")) >= 0);
 }
 
 SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)

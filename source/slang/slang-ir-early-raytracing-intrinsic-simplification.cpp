@@ -157,8 +157,12 @@ void recurseInFuncForOpsToReplace(IRInst* parent, CacheOfDataToReplaceOps* cache
 
     if (as<IRSPIRVAsm>(parent))
     {
-        for (auto i : parent->getChildren())
+        // Replacing an operand removes it from its parent and clears its sibling links. Save the
+        // next sibling first so one assembly block containing multiple location operands is fully
+        // handled.
+        for (IRInst* i = parent->getFirstChild(); i;)
         {
+            IRInst* next = i->getNextInst();
             if (isRayTracingLocationOperand(i->getOp()))
             {
                 auto op = i->getOperand(0);
@@ -169,6 +173,7 @@ void recurseInFuncForOpsToReplace(IRInst* parent, CacheOfDataToReplaceOps* cache
                 i->replaceUsesWith(spirvASM);
                 i->removeAndDeallocate();
             }
+            i = next;
         }
     }
 

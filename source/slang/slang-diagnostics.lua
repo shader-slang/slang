@@ -287,10 +287,10 @@ warning(
 )
 
 warning(
-    "source-language-directive-overrides-request",
+    "source-language-directive-overrides-selected-language",
     120,
-    "source-language directive overrides the language selected for this input",
-    span { loc = "location", message = "the source directive takes precedence over the requested or file-extension-implied language" }
+    "source-language directive selects ~directiveLanguage and overrides the ~selectionSource ~selectedLanguage source language",
+    span { loc = "location", message = "the source directive selects ~directiveLanguage instead of ~selectedLanguage" }
 )
 
 err(
@@ -326,6 +326,28 @@ warning(
     125,
     "importing the builtin `glsl` module into HLSL source may introduce conflicting language semantics",
     span { loc = "location", message = "the module exposes GLSL declarations and operator rules without enabling GLSL syntax" }
+)
+
+err(
+    "conflicting-slang-language-version-directives",
+    126,
+    "conflicting Slang language-version directives in one translation unit",
+    span { loc = "location", message = "this directive selects a different Slang language version" },
+    note { message = "the translation unit's first Slang language-version directive is here", span { loc = "firstLocation" } }
+)
+
+err(
+    "glsl-atomic-counter-requires-binding",
+    127,
+    "global `atomic_uint` declarations require a GLSL `layout(binding = ...)` qualifier",
+    span { loc = "location", message = "this atomic counter has no GLSL binding layout" }
+)
+
+err(
+    "glsl-atomic-counter-arrays-not-supported",
+    128,
+    "arrays of `atomic_uint` are not supported",
+    span { loc = "location", message = "declare each supported atomic counter as a directly-bound global" }
 )
 
 err(

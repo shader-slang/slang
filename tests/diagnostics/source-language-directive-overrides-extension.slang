@@ -4,8 +4,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 #version 450
-//CHECK: source-language directive overrides the language selected for this input
-//CHECK: the source directive takes precedence over the requested or file-extension-implied language
+//CHECK: source-language directive selects glsl and overrides the file-extension-implied slang source language
+//CHECK: the source directive selects glsl instead of slang
 
 void main()
 {}

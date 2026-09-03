@@ -1827,9 +1827,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             .entryPoint = entryPointName->text,
             .location = entryPointFuncDecl->loc});
 
-        // All remaining validation interprets the signature in a stage-specific context. An
-        // unknown stage is valid only until the diagnostic above: continuing would make semantic
-        // accessors and capability inference invent a stage context that the user never supplied.
+        // The missing stage was just diagnosed as an error. Stop here because all remaining
+        // validation interprets the signature in a stage-specific context; continuing would make
+        // semantic accessors and capability inference invent a stage that the user never supplied.
         return;
     }
 

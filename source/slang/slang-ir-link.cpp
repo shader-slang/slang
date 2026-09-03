@@ -2035,9 +2035,16 @@ void convertAtomicToStorageBuffer(
     }
 }
 
-/// Replace linked GLSL atomic-uint types with the storage-buffer representation supported by
-/// SPIR-V.
-void GLSLReplaceAtomicUint(IRSpecContext* context, IRModule* irModule)
+/// Replace directly-declared GLSL atomic-counter globals with storage-buffer-backed globals.
+///
+/// The GLSL front end lowers each supported `atomic_uint` global to a global whose direct type is
+/// `kIROp_GLSLAtomicUintType` and whose layout carries its binding and byte offset. This pass
+/// groups those globals by binding and rewrites their direct uses to the representation shared by
+/// SPIR-V and HLSL emission. Aggregate types containing atomic counters are outside that existing
+/// lowering contract and are intentionally not rediscovered by recursively walking arbitrary type
+/// graphs. Source semantic checking rejects a direct global that lacks the required GLSL binding
+/// layout; the release assertions below enforce that producer contract for loaded serialized IR.
+static void replaceGLSLAtomicUintGlobals(IRSpecContext* context, IRModule* irModule)
 {
     Dictionary<int, List<IRInst*>> bindingToInstMapUnsorted;
     for (auto inst : irModule->getGlobalInsts())
@@ -2048,16 +2055,15 @@ void GLSLReplaceAtomicUint(IRSpecContext* context, IRModule* irModule)
             {
             case kIROp_GLSLAtomicUintType:
                 {
-                    // atomic_uint are supported by GLSL->VK through converting to a different
-                    // type (GL_EXT_vulkan_glsl_relaxed). atomic_uint are not supported by
-                    // SPIR-V->VK; this means that to get SPIR-V to work we must convert the
-                    // type ourselves to an equivlent representation (storage buffer); the added
-                    // benifit is that then HLSL is possible to emit as a target as well since
-                    // atomic_uint is not an HLSL concept, but storageBuffer->RWBuffer is and
-                    // HLSL concept
-                    auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
+                    // GLSL drivers can implement `atomic_uint` through
+                    // `GL_EXT_vulkan_glsl_relaxed`, but the placeholder type cannot be emitted as
+                    // SPIR-V or HLSL. Use the existing storage-buffer representation for both.
+                    auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>();
+                    SLANG_RELEASE_ASSERT(layoutDecoration);
+                    auto layout = layoutDecoration->getLayout();
+                    SLANG_RELEASE_ASSERT(layout->getOperandCount() > 1);
                     auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1));
-                    SLANG_ASSERT(layoutVal != nullptr);
+                    SLANG_RELEASE_ASSERT(layoutVal);
                     bindingToInstMapUnsorted
                         .getOrAddValue(uint32_t(layoutVal->getOffset()), List<IRInst*>())
                         .add(inst);
@@ -2434,12 +2440,12 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // definition.
     diagnoseUnresolvedSymbols(targetReq, codeGenContext->getSink(), state->irModule);
 
-    // Rewrite any GLSL atomic-uint types that reached the linked IR. No target consumes this
-    // GLSL-only placeholder directly: SPIR-V cannot represent it, while targets such as HLSL need
-    // the equivalent storage-buffer representation. The opcode is therefore the cross-target
-    // source of truth for whether legalization is needed, and scanning a module without it is a
-    // no-op.
-    GLSLReplaceAtomicUint(context, state->irModule);
+    // Rewrite direct GLSL atomic-counter globals that reached the linked IR. No target consumes
+    // this placeholder directly: SPIR-V cannot represent it, while targets such as HLSL need the
+    // equivalent storage-buffer representation. The direct global's type opcode selects this
+    // existing legalization path. Unlike the ray-location rewrite, detecting it requires only this
+    // cheap global-instruction scan, which is a no-op for every module without such a global.
+    replaceGLSLAtomicUintGlobals(context, state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

@@ -144,8 +144,7 @@ public:
 
     void parseTranslationUnit(TranslationUnitRequest* translationUnit);
 
-    /// Consume the legacy `AllowGLSL` option by explicitly selecting GLSL for every translation
-    /// unit. No later compiler phase may attach independent semantics to that option.
+    /// Apply the legacy `AllowGLSL` option to this request's input translation units.
     ///
     /// For example, a request containing two `.slang` inputs plus `-allow-glsl` is normalized to
     /// two translation units that each record an explicit GLSL selection. Parser, semantic, IR,
@@ -157,10 +156,23 @@ public:
     /// translation unit declares one language while unrelated phases independently enable GLSL
     /// behavior; the deprecation diagnostic instead states that every input is treated as GLSL.
     ///
-    /// The end-to-end request calls this before inferring a default target, and front-end execution
-    /// calls it again for API clients that bypass the end-to-end path. The first call removes the
-    /// option, making every subsequent call a no-op without repeating its diagnostic.
-    void normalizeAllowGLSLInputOption();
+    /// `EndToEndCompileRequest` calls this method for request-local compatibility state, while
+    /// translation-unit parsing calls it when the request inherited a legacy `AllowGLSL` session
+    /// option. The latter spelling is still deprecated and warning-producing; session ownership
+    /// means only that every compilation in the session must honor it without consuming it. A
+    /// command-line or compile-request option, in contrast, must not affect source modules loaded
+    /// later on the same linkage. Reapplying the operation covers translation units added to a
+    /// reused request after an earlier compilation without mutating either owner's option storage;
+    /// the diagnostic is emitted only once per front-end request, and later phases ignore
+    /// `AllowGLSL`.
+    void applyLegacyAllowGLSLInputOption();
+
+    /// Whether this request has already diagnosed the legacy GLSL-input option.
+    ///
+    /// End-to-end requests may carry request-local compatibility state while this front-end request
+    /// also inherits session options from its linkage. Tracking the diagnostic here prevents those
+    /// two entry paths, or repeated compilation of one request, from emitting duplicate warnings.
+    bool hasDiagnosedLegacyAllowGLSLInputOption = false;
 
     // Perform primary semantic checking on all
     // of the translation units in the program

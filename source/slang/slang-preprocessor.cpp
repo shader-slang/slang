@@ -4498,23 +4498,29 @@ static void HandleExtensionDirective(PreprocessorDirectiveContext* context)
     SkipToEndOfLine(context);
 }
 
-/// Record the first language directive in this source segment and diagnose later conflicts.
+/// Try to record a language directive in this source segment.
 ///
 /// Preserving the first location lets the translation-unit layer combine independently
 /// preprocessed source segments while still reporting both sides of a conflict.
+/// `slangLanguageVersion` is meaningful only for Slang. The return value is true when the
+/// directive agrees with the first selection and the caller may commit its version-specific state;
+/// false means a diagnostic was emitted and the first selection must remain in force.
 /// `_applySourceLanguageDirective` diagnoses the same conflict across primary files, while
 /// `Linkage::findAndIncludeFile` handles directives discovered by a semantic `__include`.
-static void _handleSourceLanguageDirective(
+static bool _tryApplySourceLanguageDirective(
     PreprocessorDirectiveContext* context,
-    SourceLanguage language)
+    SourceLanguage language,
+    SlangLanguageVersion slangLanguageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN)
 {
     auto& directive = context->m_preprocessor->sourceLanguageDirective;
     if (directive.language == SourceLanguage::Unknown)
     {
         directive.language = language;
         directive.location = GetDirectiveLoc(context);
+        directive.slangLanguageVersion = slangLanguageVersion;
+        return true;
     }
-    else if (directive.language != language)
+    if (directive.language != language)
     {
         // A translation unit needs one effective source language before parsing starts. Preserve
         // the first content-level selection so a later conflicting directive cannot silently
@@ -4522,7 +4528,25 @@ static void _handleSourceLanguageDirective(
         GetSink(context)->diagnose(Diagnostics::ConflictingSourceLanguageDirectives{
             .location = GetDirectiveLoc(context),
             .firstLocation = directive.location});
+        return false;
     }
+
+    if (language != SourceLanguage::Slang)
+        return true;
+
+    // Every accepted Slang directive is created by `HandleLanguageDirective` after it has parsed a
+    // valid version. Make that producer contract explicit before comparing the first and current
+    // directives; GLSL reaches the early return above and intentionally carries no Slang version.
+    SLANG_RELEASE_ASSERT(slangLanguageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN);
+    SLANG_RELEASE_ASSERT(directive.slangLanguageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN);
+    if (directive.slangLanguageVersion != slangLanguageVersion)
+    {
+        GetSink(context)->diagnose(Diagnostics::ConflictingSlangLanguageVersionDirectives{
+            .location = GetDirectiveLoc(context),
+            .firstLocation = directive.location});
+        return false;
+    }
+    return true;
 }
 
 static void HandleVersionDirective(PreprocessorDirectiveContext* context)
@@ -4543,7 +4567,7 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
 
     if (isValidGLSLVersion(version))
     {
-        _handleSourceLanguageDirective(context, SourceLanguage::GLSL);
+        _tryApplySourceLanguageDirective(context, SourceLanguage::GLSL);
     }
     else
     {
@@ -4601,8 +4625,14 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
 
         if (isValidSlangLanguageVersion(version))
         {
-            _handleSourceLanguageDirective(context, SourceLanguage::Slang);
-            context->m_preprocessor->languageVersion = static_cast<SlangLanguageVersion>(version);
+            auto slangLanguageVersion = static_cast<SlangLanguageVersion>(version);
+            if (_tryApplySourceLanguageDirective(
+                    context,
+                    SourceLanguage::Slang,
+                    slangLanguageVersion))
+            {
+                context->m_preprocessor->languageVersion = slangLanguageVersion;
+            }
         }
         else
         {

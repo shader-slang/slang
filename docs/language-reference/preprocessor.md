@@ -28,8 +28,8 @@ Slang supports a C-style preprocessor with the following directives:
 >
 > *`SourceLanguageVersion`* = **`<[[:alnum:]]+>`**
 
-`#language` selects the Slang language and the Slang language version associated with that source unit.
-The language version is a per-source-unit property even when multiple Slang source files belong to one translation unit.
+`#language` selects the Slang language and Slang language version for its translation unit.
+When multiple primary source files belong to one translation unit, a directive in any of them selects the version for the complete module, and their directives must agree.
 See [Language Versioning](../user-guide/11-language-version.md) for the supported version names and their compatibility rules.
 
 ## Version Directive (GLSL)

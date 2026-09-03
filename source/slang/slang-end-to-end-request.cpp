@@ -132,16 +132,12 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     SLANG_PROFILE_SECTION(endToEndActions);
 
     // `-allow-glsl` used to enable an independent collection of parser, semantic, and IR
-    // behaviors without changing the declared language of any translation unit. Forward the
-    // legacy option to the front-end request so it can reduce that option to the single meaning
-    // that all input translation units are GLSL.
-    auto& requestOptions = getOptionSet();
-    if (requestOptions.getBoolOption(CompilerOptionName::AllowGLSL))
-        getFrontEndReq()->optionSet.set(CompilerOptionName::AllowGLSL, true);
-    getFrontEndReq()->normalizeAllowGLSLInputOption();
-
-    // Do not propagate the consumed option into target requests below.
-    requestOptions.options.remove(CompilerOptionName::AllowGLSL);
+    // behaviors without changing the declared language of any translation unit. Reduce it to the
+    // single meaning that this request's input translation units are GLSL. The compatibility bit
+    // is request-local because source modules loaded during semantic checking share the linkage
+    // but are not additional inputs governed by this option.
+    if (getLegacyAllowGLSLInput())
+        getFrontEndReq()->applyLegacyAllowGLSLInputOption();
 
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
@@ -1912,7 +1908,7 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
 
 void EndToEndCompileRequest::setAllowGLSLInput(bool value)
 {
-    getOptionSet().set(CompilerOptionName::AllowGLSL, value);
+    setLegacyAllowGLSLInput(value);
 }
 
 SlangResult EndToEndCompileRequest::compile()

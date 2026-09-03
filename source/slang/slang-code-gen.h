@@ -70,7 +70,7 @@ struct RequiredLoweringPassSet
     bool globalVaryingVar;
 
     /// Whether linked IR contains a SPIR-V ray-location operand that requires object resolution.
-    bool rayTracingLocationOperand;
+    bool rayTracingLocationOperand = false;
     bool glslSSBO;
     bool byteAddressBuffer;
     bool dynamicResource;

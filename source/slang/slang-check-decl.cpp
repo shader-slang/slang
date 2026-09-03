@@ -19819,6 +19819,36 @@ bool tryCheckDerivativeOfAttributeImpl(
 
 void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
+    // A supported global atomic counter has a GLSL `layout(binding = ...)` modifier. During
+    // parsing, that modifier also creates an explicit or implicit offset, which the checked
+    // modifier and parameter-layout paths preserve for the backing-storage rewrite. Diagnose a
+    // declaration that never entered that producer path while its source-level context is still
+    // available; otherwise it would become a decoration-less `kIROp_GLSLAtomicUintType` global
+    // that no target can emit.
+    //
+    // Existing atomic-counter legalization supports only directly-declared globals. Reject arrays
+    // at this producer boundary even when they have a binding; otherwise their element type
+    // remains an unhandled placeholder at emission. Supporting arrays requires a corresponding
+    // aggregate representation and legalization design, not a recursive scan in the linker.
+    if (isGlobalDecl(varDecl))
+    {
+        Type* declaredType = varDecl->getType();
+        Type* arrayElementType = unwrapArrayType(declaredType);
+        if (as<GLSLAtomicUintType>(arrayElementType))
+        {
+            if (arrayElementType != declaredType)
+            {
+                getSink()->diagnose(Diagnostics::GlslAtomicCounterArraysNotSupported{
+                    .location = varDecl->nameAndLoc.loc});
+            }
+            else if (!varDecl->findModifier<GLSLOffsetLayoutAttribute>())
+            {
+                getSink()->diagnose(Diagnostics::GlslAtomicCounterRequiresBinding{
+                    .location = varDecl->nameAndLoc.loc});
+            }
+        }
+    }
+
     bool hasSpecConstAttr = false;
     bool hasPushConstAttr = false;
     for (auto modifier : varDecl->modifiers)

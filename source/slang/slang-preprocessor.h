@@ -63,7 +63,9 @@ struct PreprocessorDesc
 /// The first source-language selection discovered while preprocessing one source segment.
 ///
 /// The preprocessor diagnoses later conflicting directives and preserves this first selection so
-/// the translation unit can choose one parser mode before any source file is parsed.
+/// the translation unit can choose one parser mode before any source file is parsed. A Slang
+/// `#language` directive also records its version so the translation unit can enforce one version
+/// for parsing and semantic checking of the complete module.
 struct SourceLanguageDirective
 {
     /// The selected language, or `Unknown` when the source contains no language directive.
@@ -71,6 +73,10 @@ struct SourceLanguageDirective
 
     /// The location of the first directive that selected `language`.
     SourceLoc location;
+
+    /// The version selected by a Slang `#language` directive, or `Unknown` for another language or
+    /// when the source contains no directive.
+    SlangLanguageVersion slangLanguageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
 };
 
 /// Preprocess `file` and return its tokens and first source-language directive, if any.

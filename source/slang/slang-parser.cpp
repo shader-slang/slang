@@ -1385,6 +1385,8 @@ static NodeBase* parseImportDecl(Parser* parser, void* /*userData*/)
             parser->sourceLanguage == SourceLanguage::Slang &&
             parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_202C)
         {
+            // `parseTranslationUnit` installs the preprocessed module-wide language version before
+            // parsing any primary file, so this also applies when a later file selects 202c.
             parser->sink->diagnose(Diagnostics::GlslModuleImportNotAllowedInSlang202c{
                 .location = decl->moduleNameAndLoc.loc});
         }
