@@ -6007,6 +6007,23 @@ static Expr* _checkHigherOrderInvokeExpr(
     HigherOrderInvokeExpr* expr,
     HigherOrderInvokeExprCheckingActions* actions)
 {
+    // Depending on the specific kind of higher-order invoke `expr` being checked, we may need to
+    // ensure that the autodiff module supplement has been loaded. Both `DifferentiateExpr` and
+    // `PrimalSubstituteExpr` need to access derivative implementations, and thus require the
+    // autodiff supplement to be available. The remaining `HigherOrderInvokeExpr` subtype,
+    // `DispatchKernelExpr`, only describes a kernel launch and needs no derivative
+    // implementations.
+    if (as<DifferentiateExpr>(expr) || as<PrimalSubstituteExpr>(expr))
+    {
+        // If loading the supplement fails, we can't check the expression properly, so we treat it
+        // as an error expression. The failed load attempt has already diagnosed an error, so we
+        // do not diagnose again here.
+        if (SLANG_FAILED(semantics->ensureAutodiffModuleLoaded(expr->loc)))
+        {
+            return semantics->CreateErrorExpr(expr);
+        }
+    }
+
     // Check/Resolve inner function declaration.
     SemanticsVisitor subVisitor(semantics->getShared());
     subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();

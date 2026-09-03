@@ -59,6 +59,83 @@ protected:
 
 } // namespace
 
+SlangResult SemanticsContext::ensureAutodiffModuleLoaded(SourceLoc location)
+{
+    auto session = getSession();
+    Module* module = nullptr;
+    const SlangResult loadResult = session->loadAutodiffModuleIfNeeded(module);
+    if (SLANG_FAILED(loadResult))
+    {
+        // The load only fails if the embedded supplement blob is corrupt, or a source-only build
+        // fails to compile the supplement on demand. Neither is reachable from a `.slang`
+        // regression test without fault injection, so this diagnostic (38038) has no automated
+        // test; the caller in `_checkHigherOrderInvokeExpr` then returns an error expression.
+        m_sink->diagnose(Diagnostics::UnableToLoadAutodiffModule{.location = location});
+        return loadResult;
+    }
+
+    if (module)
+    {
+        // `addLoadedAutodiffModule` returns whether this call is the first time this
+        // `SharedSemanticsContext` -- which is scoped to the one module currently being checked --
+        // has recorded the supplement. Later calls in the same module (a second `[Differentiable]`
+        // function, another `fwd_diff`/`bwd_diff`) already have their caches merged and their
+        // dependency recorded, so only the first call needs to do either.
+        if (!m_shared->addLoadedAutodiffModule(module->getModuleDecl()))
+            return SLANG_OK;
+
+        // Make the module we are checking come out of checking looking as if it had written
+        // `import` for the supplement, the same way `visitImportDecl` records a written import:
+        // synthesize an `ImportDecl` naming the supplement, add it as a member of the checked
+        // module, and record the dependency directly for immediate use in this compilation.
+        //
+        // `Module::_collectShaderParams` walks a module's `ImportDecl`s to build its requirement
+        // list, and AST serialization walks every cross-module `Decl*` reference -- including this
+        // `ImportDecl`'s own `importedModuleDecl` field -- to record which other modules a
+        // serialized module depends on (see `_findModuleDeclWasImportedFrom` in
+        // slang-serialize-ast.cpp). Adding a real `ImportDecl` here, rather than only updating
+        // `Module::addModuleDependency`'s bookkeeping directly, means both of those consumers pick
+        // up the dependency through the one mechanism they already use for a written `import`,
+        // instead of needing a second, parallel notion of "depends on" that could drift from it.
+        // `Linkage::loadSerializedModuleContents` relies on exactly this when a module compiled
+        // this way is later deserialized in a fresh session.
+        //
+        // Unlike `visitImportDecl`, we do not also call `importModuleIntoScope` here: ordinary
+        // unqualified lookup is never supposed to find declarations from the supplement. The
+        // eager/lazy split moved everything ordinary code can name into the eager core; what
+        // remains in the supplement is derivative-registration machinery reached only through the
+        // extension/associated-decl caches that `addLoadedAutodiffModule` merges above. Importing
+        // it into scope would let the module that happened to trigger the load also spuriously see
+        // the supplement's internal helper names by ordinary lookup.
+        if (auto currentModule = m_shared->getModule())
+        {
+            auto syntheticImportDecl = getASTBuilder()->create<ImportDecl>();
+            syntheticImportDecl->moduleNameAndLoc = NameLoc(session->autodiffModuleName, location);
+            syntheticImportDecl->loc = location;
+            syntheticImportDecl->importedModuleDecl = module->getModuleDecl();
+
+            // The declaration is fully formed above; mark it checked so that the ordinary
+            // decl-checking driver does not dispatch `visitImportDecl` on it, which would
+            // redundantly (and, per the note above, incorrectly) call `importModuleIntoScope`.
+            syntheticImportDecl->setCheckState(DeclCheckState::DefinitionChecked);
+
+            currentModule->getModuleDecl()->addMember(syntheticImportDecl);
+            currentModule->addModuleDependency(module);
+        }
+
+        return SLANG_OK;
+    }
+
+    // A successful load with no module means the recursion guard in `loadAutodiffModuleIfNeeded`
+    // was taken: while source-compiling a builtin module it declines to load, because that
+    // compilation already checks the supplement's declarations in the current module and there is
+    // no separate late module to merge. Returning SLANG_OK with no merge is therefore correct in
+    // that state, so this is a debug assertion documenting the invariant rather than a release
+    // guard — promoting it would turn a benign, self-consistent path into a crash.
+    SLANG_ASSERT(session->isCompilingBuiltinModule());
+    return SLANG_OK;
+}
+
 
 void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
 {
