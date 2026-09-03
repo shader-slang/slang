@@ -1502,7 +1502,8 @@ static void _inlineCandidateOperationCalls(IRFunc* adapter)
         }
         if (!callToInline)
             break;
-        SLANG_ASSERT(inlineCall(callToInline));
+        const bool didInline = inlineCall(callToInline);
+        SLANG_ASSERT(didInline);
     }
 }
 
