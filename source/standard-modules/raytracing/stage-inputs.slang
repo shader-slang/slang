@@ -114,6 +114,7 @@ public struct ClosestHitInput<Context>
             case hlsl:
             case glsl:
             case spirv:
+            case cuda:
                 return GeometryIndex();
             default:
                 return 0;
@@ -443,6 +444,7 @@ public struct AnyHitInput<Context>
             case hlsl:
             case glsl:
             case spirv:
+            case cuda:
                 return GeometryIndex();
             default:
                 return 0;
@@ -783,6 +785,7 @@ public struct IntersectionInput<Context>
             case hlsl:
             case glsl:
             case spirv:
+            case cuda:
                 return GeometryIndex();
             default:
                 return 0;
