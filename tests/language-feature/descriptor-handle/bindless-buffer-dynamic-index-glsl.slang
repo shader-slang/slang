@@ -4,6 +4,9 @@
 //
 // Keep this test buffer-only (no texture/sampler heap): a texture or sampler heap requests the
 // extension on its own and would mask a missing request on the buffer path.
+//
+// The load-bearing regression signal is that -emit-spirv-via-glsl compiles at all: without the
+// extension request glslang rejects the variable heap index and the run emits nothing for FileCheck.
 
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=GLSLSPV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-via-glsl

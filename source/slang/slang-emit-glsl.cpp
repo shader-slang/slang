@@ -1817,9 +1817,11 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     // declarations that don't specify a size.
     //
     // This must run before the specialized buffer / parameter-group
-    // declarations below, which emit their own unsized `[]` array and
-    // return early, so that a bindless buffer heap requests the extension
-    // just like an unsized texture or sampler array does.
+    // declarations below, which `return` early: without it, an unsized
+    // (bindless) array of any resource kind `isResourceType` accepts --
+    // structured and byte-address buffers, parameter groups, SSBOs -- would
+    // skip the request, while textures and samplers (which fall through to
+    // the tail) would still reach it.
     //
     if (as<IRUnsizedArrayType>(varType))
     {
