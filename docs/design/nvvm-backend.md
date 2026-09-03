@@ -7643,6 +7643,32 @@ discovery remains 72/72/72 over 72. The selected prefix passes 439/439 and the p
 passes 102/102. Focused direct PTX is 6,206 bytes at O0 and 1,300 bytes at O3, contains the native
 packed Half2 atomic in both modes, and assembles for SM70, SM80, and SM90.
 
+### Slice 194: Bounded usable-compute MVP reassessment
+
+The four remaining native-healthy frozen-v1 gaps are no longer treated as an automatic feature
+queue. Three are substandard floating-point workloads: one helper result is a user aggregate over
+FP8 fields, one is BFloat16, and one helper parameter is FloatE4M3. FP8 is explicitly outside the
+initial MVP, BFloat16 is not part of the ordinary numeric promise, and no selected representative
+release gate requires either family.
+
+The fourth gap, `cuda/require-prelude`, has live arbitrary-source semantics. Its
+`IRRequirePrelude` defines a macro consumed by following user GenericAsm. Dropping the marker would
+change behavior, while faithfully interpreting it would require a CUDA C++ macro/source evaluator
+outside the typed direct-provider architecture. Known standard-module operations may still replace
+target text with producer-owned semantic IR, but arbitrary target prelude text remains unsupported.
+
+Frozen corpus v1 is not reclassified to reflect these later scope decisions: its historical
+452-row/427-healthy contract honestly remains 423/423/423. Discovery remains separately 72/72/72
+over 72. The unchanged proposed corpus-v2 union is now 473/473/473 over 477, but stays proposed-only
+pending explicit approval.
+
+The selected usable-compute feature breadth is therefore complete for the current representative
+gates, with no unexplained healthy runtime mismatch or provider failure. Subsequent work pivots to
+productionization: first make discovery, adjacent deployment, ABI matching, per-session caching,
+and explicit-selection failure an executable contract; then automate packaging/install policy,
+establish CUDA 13 and physical SM70/80/90 coverage, and isolate kernel-runtime benchmarking from
+end-to-end census timing.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

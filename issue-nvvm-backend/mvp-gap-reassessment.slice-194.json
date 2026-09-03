@@ -1,0 +1,156 @@
+{
+  "schema": 1,
+  "status": "bounded-mvp-reassessed",
+  "evidence_slice": 193,
+  "corpora": {
+    "frozen_v1": {
+      "artifact": "issue-nvvm-backend/census.slice-193.tsv",
+      "rows": 452,
+      "healthy_reference_denominator": 427,
+      "o0_correct": 423,
+      "o3_correct": 423,
+      "both_correct": 423,
+      "old_correct_regressions": 0,
+      "all_rows": {
+        "native": {
+          "correct": 449,
+          "infrastructure": 3
+        },
+        "nvvm_o0": {
+          "correct": 437,
+          "preflight": 14,
+          "infrastructure": 1
+        },
+        "nvvm_o3": {
+          "correct": 437,
+          "preflight": 14,
+          "infrastructure": 1
+        }
+      }
+    },
+    "discovery": {
+      "artifact": "issue-nvvm-backend/discovery-census.slice-193.tsv",
+      "rows": 82,
+      "healthy_reference_denominator": 72,
+      "o0_correct": 72,
+      "o3_correct": 72,
+      "both_correct": 72,
+      "all_rows": {
+        "native": {
+          "correct": 72,
+          "runtime_mismatch": 2,
+          "infrastructure": 8
+        },
+        "nvvm_o0": {
+          "correct": 72,
+          "runtime_mismatch": 1,
+          "preflight": 2,
+          "infrastructure": 7
+        },
+        "nvvm_o3": {
+          "correct": 72,
+          "runtime_mismatch": 1,
+          "preflight": 2,
+          "infrastructure": 7
+        }
+      }
+    },
+    "proposed_v2": {
+      "status": "proposed-only-approval-required-before-freeze",
+      "composition_source": "issue-nvvm-backend/corpus-v2-proposed-additions.slice-157.tsv",
+      "composition_source_sha256": "8126F402CE9F45D706C24A51E189783528DB5B5797AA45035AA7FB2ACD08CE9E",
+      "addition_rows": 50,
+      "rows": 502,
+      "sources": 498,
+      "healthy_reference_denominator": 477,
+      "o0_correct": 473,
+      "o3_correct": 473,
+      "both_correct": 473,
+      "healthy_both_failures": 4,
+      "all_rows": {
+        "native": {
+          "correct": 499,
+          "infrastructure": 3
+        },
+        "nvvm_o0": {
+          "correct": 487,
+          "preflight": 14,
+          "infrastructure": 1
+        },
+        "nvvm_o3": {
+          "correct": 487,
+          "preflight": 14,
+          "infrastructure": 1
+        }
+      }
+    }
+  },
+  "remaining_healthy_frozen_v1_gaps": [
+    {
+      "id": "compute/dynamic-dispatch-substandard-float.slang#cuda-1",
+      "first_canonical_shape": "helper function result type: A",
+      "producer": "post-specialization linked IRFunc signature -> _validateNVVMHelperTarget",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function result type: A'",
+      "source_semantics": "A contains FloatE4M3 and FloatE5M2; the alternate dynamic implementation contains BFloat16",
+      "disposition": "deferred-substandard-floating-point",
+      "mvp_rationale": "FP8 is explicitly outside the initial MVP and no selected representative release gate requires it"
+    },
+    {
+      "id": "cuda/require-prelude.slang#cuda-1",
+      "first_canonical_shape": "RequirePrelude",
+      "producer": "core.meta.slang __requirePrelude intrinsic -> IRRequirePrelude -> _validateNVVMFunction",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'RequirePrelude'",
+      "source_semantics": "the prelude defines MY_CUDA_INTRINSIC and following user GenericAsm expressions consume that macro",
+      "disposition": "deferred-arbitrary-target-source",
+      "mvp_rationale": "faithful support requires a CUDA C++ macro/source evaluator or a new typed producer semantic; stripping the marker changes behavior"
+    },
+    {
+      "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+      "first_canonical_shape": "helper function result type: BFloat16",
+      "producer": "post-specialization linked IRFunc signature -> _validateNVVMHelperTarget",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function result type: BFloat16'",
+      "source_semantics": "BFloat16 values, vectors, conversions, bit transport, and dot-product behavior",
+      "disposition": "deferred-substandard-floating-point",
+      "mvp_rationale": "BFloat16 is not an ordinary numeric type in the bounded MVP and no selected representative release gate requires it"
+    },
+    {
+      "id": "hlsl-intrinsic/substandard-fp-folding.slang#cuda-1",
+      "first_canonical_shape": "helper function parameter: FloatE4M3",
+      "producer": "post-specialization linked IRFunc signature -> _validateNVVMHelperTarget",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: FloatE4M3'",
+      "source_semantics": "generic bit transport of FloatE4M3, FloatE5M2, and BFloat16 folded constants",
+      "disposition": "deferred-substandard-floating-point",
+      "mvp_rationale": "FP8 is explicitly outside the initial MVP and no selected representative release gate requires it"
+    }
+  ],
+  "bounded_mvp_assessment": {
+    "feature_breadth_gate": "met for the selected representative workloads and included numeric/resource/control-flow families",
+    "historical_frozen_score": "423/427 remains intentionally below 100%; scope decisions do not rewrite the fixed denominator",
+    "unexplained_provider_failures_in_claimed_subset": 0,
+    "unexplained_runtime_mismatches_in_claimed_subset": 0,
+    "next_priority": "productionization",
+    "revisit_deferred_features_when": "a selected real workload requires the feature and a typed canonical representation is identified"
+  },
+  "recommended_next_slices": [
+    {
+      "priority": 1,
+      "objective": "make provider discovery, deployment, ABI matching, and per-session cache behavior an executable contract",
+      "reason": "the compiler-matched provider is required by every supported kernel and current policy is incompletely enforced and tested"
+    },
+    {
+      "priority": 2,
+      "objective": "define and validate provider packaging/install/update policy",
+      "reason": "the isolated LLVM 14 provider must deploy beside Slang binaries without depending on a development environment override"
+    },
+    {
+      "priority": 3,
+      "objective": "establish the CUDA toolkit and architecture CI matrix with explicit infrastructure classification",
+      "reason": "CUDA 13 and physical SM70/SM80/SM90 execution remain unmeasured production requirements"
+    },
+    {
+      "priority": 4,
+      "objective": "separate kernel runtime benchmarking from end-to-end census timing",
+      "reason": "current compile-time and PTX-size evidence is useful, but runtime comparisons are not controlled benchmarks"
+    }
+  ]
+}
