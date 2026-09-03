@@ -1,9 +1,12 @@
 //TEST:SIMPLE: -std 2026 -warnings-as-errors 40021 -no-codegen
-//TEST:SIMPLE: -std 202c -no-codegen
-//TEST:SIMPLE(filecheck=CHECK): -std 202c -target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE_EX: -lang glsl tests/language-feature/operator-overload/import-glsl-overloads-without-generic-count.slang -std 202c -Wno-118 -Wno-119 -no-codegen
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/language-feature/operator-overload/import-glsl-overloads-without-generic-count.slang -std 202c -Wno-118 -Wno-119 -target spirv-asm -entry computeMain -stage compute
 
 // Slang 202c does not use generic parameter count to rank overloads. The surviving GLSL
 // declarations must therefore beat the core-module operators through OverloadRank alone.
+// The 202c invocations select GLSL explicitly because importing this module from Slang source is
+// no longer allowed then. They suppress the expected extension-override and redundant-import
+// warnings so that this file can also cover the legacy 2026 import behavior.
 import glsl;
 
 RWStructuredBuffer<float> outputBuffer;
