@@ -65,7 +65,10 @@ static SlangResult _runSlangc(const List<String>& arguments, ExecuteResult& outR
 SLANG_UNIT_TEST(PackageVersionConstraint)
 {
     VersionConstraint constraint;
+    SemanticVersion version;
     String error;
+    SLANG_CHECK(SLANG_FAILED(
+        parseReleaseTag(UnownedStringSlice("v999999999999999999999999999999.0.0"), version)));
     SLANG_CHECK(SLANG_SUCCEEDED(
         parseVersionConstraint(UnownedStringSlice(">=1.2.0 <2.0.0"), constraint, error)));
     SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 0)));
@@ -916,7 +919,7 @@ SLANG_UNIT_TEST(PackageToolRun)
         SLANG_COUNT_OF(stableRunArguments),
         stableRunArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("experimental")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not configure")) >= 0);
 
     const char* runArguments[] = {"slang-package", "--experimental", "run", "argument"};
     SLANG_CHECK(SLANG_FAILED(
@@ -940,6 +943,11 @@ SLANG_UNIT_TEST(PackageToolRun)
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/bundle/modules")));
     SLANG_CHECK(
         File::exists(Path::combine(temp.path, "build/bundle/source/package-run-test.slang")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(stableRunArguments),
+        stableRunArguments,
+        error)));
 
     const char* buildArguments[] = {"slang-package", "--experimental", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -952,13 +960,97 @@ SLANG_UNIT_TEST(PackageToolRun)
     SLANG_CHECK(File::exists(
         Path::combine(temp.path, "build/bundle/modules/package-run-test.slang-module")));
 
+    const char* binaryRunArguments[] =
+        {"slang-package", "--experimental", "run", "--binary", "argument"};
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "src/package-run-test.slang"))));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(binaryRunArguments),
+        binaryRunArguments,
+        error)));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not export")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageToolRunModes)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/package-run-test.slang"),
+        "module package_run_test;\n"
+        "export __extern_cpp int main() { return 0; }\n")));
+
+    Manifest manifest;
+    String manifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
+    manifest.build.host.executables.add("package-run-test");
+    manifest.build.host.defaultExecutable = "package-run-test";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
+
+    const char* sourceRun[] = {"slang-package", "run"};
+    SLANG_CHECK(
+        SLANG_FAILED(executeInDirectory(temp.path, SLANG_COUNT_OF(sourceRun), sourceRun, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("source entry")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang package build")) >= 0);
+
+    const char* experimentalSourceRun[] = {"slang-package", "--experimental", "run"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(experimentalSourceRun),
+        experimentalSourceRun,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("source entry")) >= 0);
+
+    const char* stableBinaryRun[] = {"slang-package", "run", "--binary"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(stableBinaryRun), stableBinaryRun, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires")) >= 0);
+
+    const char* experimentalBinaryRun[] = {"slang-package", "--experimental", "run", "--binary"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(experimentalBinaryRun),
+        experimentalBinaryRun,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has not been built")) >= 0);
+
+    manifest.workspace.bundle.source = false;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
+    SLANG_CHECK(
+        SLANG_FAILED(executeInDirectory(temp.path, SLANG_COUNT_OF(sourceRun), sourceRun, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("workspace.bundle.source")) >= 0);
+    manifest.workspace.bundle.source = true;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
+
+    const char* buildArguments[] = {"slang-package", "build"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+    SLANG_CHECK(
+        File::exists(Path::combine(temp.path, "build/bundle/source/package-run-test.slang")));
+    SLANG_CHECK(!File::exists(Path::combine(
+        temp.path,
+        String("build/host/package-run-test") + Process::getExecutableSuffix())));
+
+    const char* namedSourceRun[] = {"slang-package", "run", "package-run-test"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(namedSourceRun), namedSourceRun, error)));
+    const char* experimentalNamedSourceRun[] =
+        {"slang-package", "--experimental", "run", "package-run-test"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(experimentalNamedSourceRun),
+        experimentalNamedSourceRun,
+        error)));
 }
 
 SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
@@ -1012,10 +1104,10 @@ SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
     SLANG_CHECK(
         experimentalMarker.getUnownedSlice().indexOf(UnownedStringSlice("EXPERIMENTAL")) >= 0);
 
-    const char* defaultRun[] = {"slang-package", "--experimental", "run"};
+    const char* defaultRun[] = {"slang-package", "run"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(defaultRun), defaultRun, error)));
-    const char* namedRun[] = {"slang-package", "--experimental", "run", "beta", "arg"};
+    const char* namedRun[] = {"slang-package", "--experimental", "run", "--binary", "beta", "arg"};
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(executeInDirectory(temp.path, SLANG_COUNT_OF(namedRun), namedRun, error)));
 
@@ -2136,13 +2228,12 @@ SLANG_UNIT_TEST(PackageToolFailureTranscripts)
         "The command is reserved until package testing has a dedicated model; it does not run "
         "slang-test.\n");
 
-    const char* runArguments[] = {"slang-package", "run"};
+    const char* runArguments[] = {"slang-package", "run", "--binary"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
     SLANG_CHECK(
         formatCommandError(error) ==
-        "slang-package: error: Host executable run is experimental. Re-run as 'slang package "
-        "--experimental run'.\n");
+        "slang-package: error: run --binary requires the global --experimental option.\n");
 
     Manifest manifest;
     manifest.name = "root";

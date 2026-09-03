@@ -165,8 +165,8 @@ slang package --experimental build
 
 This example uses experimental build because its manifest configures `build.host.executables` and the
 walkthrough demonstrates `.slang-module` output. A stable `slang package build` distributes the
-source bundle and docs only; binary module generation, host executable compilation, and `run` are
-experimental.
+source bundle and docs only; binary module generation and host executable compilation are
+experimental. Source interpretation with `run` is stable.
 
 Build validates the materialized graph, then:
 
@@ -188,12 +188,18 @@ when it uses the exact toolchain recorded in provenance; the binary format has n
 guarantee. The stable distribution layout is `build/bundle/source/`.
 
 ```sh
-slang package --experimental run
+slang package run
 ```
 
-Run executes the existing `build.host.default` artifact (`video-preview`) and does not compile. If the
-binary is missing, it tells you to build first. A leading argument that matches a listed
-executable name selects that artifact; remaining arguments are forwarded.
+Run asks sibling `slangi` to interpret the existing `build.host.default` source
+(`build/bundle/source/video-preview.slang`) and does not build first. If the source bundle is
+missing, it tells you to build first. A leading argument that matches a listed executable name
+selects that primary; remaining arguments are forwarded. To run the experimental native artifact
+instead:
+
+```sh
+slang package --experimental run --binary
+```
 
 ```sh
 slang package docs

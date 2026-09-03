@@ -39,8 +39,8 @@ docs/
 `src/` contains importable Slang modules. Host executables are workspace primaries whose filename
 stem matches a name in `build.host.executables`. For example, `src/video-preview.slang` is the source for
 the `video-preview` executable and must declare `module video_preview;`.
-`slang package --experimental run` uses `build.host.default`, or the only listed executable when
-`default` is omitted.
+`slang package run` interprets `build.host.default` from the source bundle, or the only listed
+executable when `default` is omitted.
 
 `tests/` and `docs/` are reserved for package tests and documentation. The initial package tool
 creates these directories.
@@ -123,7 +123,7 @@ The optional top-level `build` object is how the package is compiled. Schema 1 o
 directory separators; the package tool adds the platform executable suffix and writes each result
 under `workspace.build/host`. Each name must match an exported workspace primary whose source
 filename is `<name>.slang`. When more than one executable is listed, `default` names the artifact
-`slang package --experimental run` executes if you do not pass an executable name.
+`slang package run` selects if you do not pass an executable name.
 With a single executable, `default` may be omitted and that name is used. Dependency manifests may
 declare this field, but only the workspace package controls executable generation. A top-level
 `host` object is an error; nest it as `build.host`. Later artifact kinds belong as additional keys
@@ -430,13 +430,19 @@ copied. Build also writes `build/docs/index.md`: the workspace dependency tree, 
 alphabetized list of copied Markdown files per package. Every package in the graph is listed;
 only packages that contributed Markdown link from the tree into that file list.
 
-`slang package --experimental run` executes an existing native artifact from
-`build.host.executables` and forwards trailing arguments. With no executable name, it runs
-`build.host.default`. It does not build first. Run
-fails with instructions when the manifest does not configure a host executable or when
-`slang package --experimental build` has not produced that artifact. The global
-`--experimental` option must appear immediately after `slang package`; normal help hides `run` and
-host build behavior.
+`slang package run` uses sibling `slangi` to interpret an existing primary in
+`build/bundle/source` and forwards trailing arguments. With no executable name, it selects
+`build.host.default`. It does not build first and fails with instructions when the manifest does
+not configure a host executable or `slang package build` has not produced the source bundle.
+Because `slangi` derives its only source search path from the input filename, this stable mode
+requires the configured primary to be at an export root, and therefore at the root of the
+flattened source bundle. Nested executable primaries require binary mode.
+
+`slang package --experimental run --binary` instead executes the selected native artifact under
+`build/host`. The global `--experimental` option must appear immediately after `slang package`,
+and `--binary` must immediately follow `run`. This mode requires output from
+`slang package --experimental build`; without `--binary`, experimental `run` still uses `slangi`
+and the source bundle.
 
 `slang package test` is reserved and currently reports that it is not implemented. It does not
 invoke `slang-test`. Package testing will get a dedicated model; `slang-test` remains an internal

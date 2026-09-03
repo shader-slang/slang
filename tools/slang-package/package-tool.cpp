@@ -49,6 +49,8 @@ static void _printHelp(bool experimental = false)
         "                   --skip-validate skips source, license, and module-layout checks.\n"
         "  build [--skip-validate]\n"
         "                   Build the distributable source bundle and docs.\n"
+        "  run [name] [args...]\n"
+        "                   Interpret a configured executable from the source bundle.\n"
         "  test             Reserved. Package testing is not implemented yet.\n"
         "  docs [--print]   Open build/docs/index.md with the registered application.\n"
         "                   --print writes the path instead of launching.\n"
@@ -76,7 +78,8 @@ static void _printHelp(bool experimental = false)
             stdout,
             "\nExperimental commands and build features:\n"
             "  build            Also generate enabled modules and host executables.\n"
-            "  run [name] [args...]  Run an experimental host executable produced by the last "
+            "  run --binary [name] [args...]\n"
+            "                   Run a native host executable produced by the last experimental "
             "build.\n");
     }
     fprintf(
@@ -2046,8 +2049,81 @@ static SlangResult _build(
     return SLANG_OK;
 }
 
+/// Select the configured executable named by the first argument, or the workspace default.
+static void _selectHostExecutable(
+    const Manifest& manifest,
+    int argumentCount,
+    const char* const* arguments,
+    String& outExecutableName,
+    int& outArgumentIndex)
+{
+    outExecutableName = manifest.build.host.defaultExecutable;
+    outArgumentIndex = 0;
+    if (argumentCount > 0 && isHostExecutableName(manifest, arguments[0]))
+    {
+        outExecutableName = arguments[0];
+        outArgumentIndex = 1;
+    }
+}
+
+/// Run a configured workspace primary from the distributable source bundle with `slangi`.
+static SlangResult _runSource(
+    const String& projectRoot,
+    int argumentCount,
+    const char* const* arguments,
+    String& outError)
+{
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
+    if (!hasHostExecutables(manifest))
+    {
+        outError =
+            "The workspace does not configure a host executable. Add 'build.host.executables' to "
+            "slang-package.json and run 'slang package build'.";
+        return SLANG_FAIL;
+    }
+    if (!manifest.workspace.bundle.source)
+    {
+        outError =
+            "Source run requires 'workspace.bundle.source'. Enable it and run 'slang package "
+            "build'.";
+        return SLANG_FAIL;
+    }
+
+    String executableName;
+    int argumentIndex;
+    _selectHostExecutable(manifest, argumentCount, arguments, executableName, argumentIndex);
+
+    String bundledSourcePath = Path::combine(
+        Path::combine(
+            Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest)),
+            "bundle",
+            "source"),
+        executableName + ".slang");
+    if (!File::exists(bundledSourcePath))
+    {
+        outError = String("The configured source entry has not been built: ") + bundledSourcePath +
+                   ". Source run requires that primary at an export root; move it there if needed, "
+                   "then run 'slang package build'.";
+        return SLANG_FAIL;
+    }
+
+    // `slangi` adds the input file's parent to its module search paths only when the argument has a
+    // directory component. Preserve that signal even for a source bundle rooted in the cwd.
+    if (!Path::getParentDirectory(bundledSourcePath).getLength())
+        bundledSourcePath = Path::combine(".", bundledSourcePath);
+
+    String slangiPath;
+    SLANG_RETURN_ON_FAIL(_findSiblingTool("slangi", slangiPath, outError));
+    List<String> interpreterArguments;
+    interpreterArguments.add(bundledSourcePath);
+    for (int i = argumentIndex; i < argumentCount; ++i)
+        interpreterArguments.add(arguments[i]);
+    return _runStreamingSiblingTool(slangiPath, interpreterArguments, outError);
+}
+
 /// Run an existing native executable configured by the workspace `build.host` section.
-static SlangResult _run(
+static SlangResult _runBinary(
     const String& projectRoot,
     int argumentCount,
     const char* const* arguments,
@@ -2063,13 +2139,9 @@ static SlangResult _run(
         return SLANG_FAIL;
     }
 
-    String executableName = manifest.build.host.defaultExecutable;
-    int argumentIndex = 0;
-    if (argumentCount > 0 && isHostExecutableName(manifest, arguments[0]))
-    {
-        executableName = arguments[0];
-        argumentIndex = 1;
-    }
+    String executableName;
+    int argumentIndex;
+    _selectHostExecutable(manifest, argumentCount, arguments, executableName, argumentIndex);
 
     String executablePath = _getExecutableOutputPath(projectRoot, manifest, executableName);
     if (!File::exists(executablePath))
@@ -2587,14 +2659,21 @@ SlangResult executeInDirectory(
     }
     if (command == "run")
     {
-        if (!experimental)
+        bool binary = false;
+        int argumentIndex = 2;
+        if (argc > argumentIndex && String(argv[argumentIndex]) == "--binary")
         {
-            outError =
-                "Host executable run is experimental. Re-run as 'slang package --experimental "
-                "run'.";
-            return SLANG_FAIL;
+            if (!experimental)
+            {
+                outError = "run --binary requires the global --experimental option.";
+                return SLANG_FAIL;
+            }
+            binary = true;
+            ++argumentIndex;
         }
-        return _run(projectRoot, argc - 2, argv + 2, outError);
+        if (binary)
+            return _runBinary(projectRoot, argc - argumentIndex, argv + argumentIndex, outError);
+        return _runSource(projectRoot, argc - argumentIndex, argv + argumentIndex, outError);
     }
     if (command == "test" && argc == 2)
         return _test(projectRoot, outError);

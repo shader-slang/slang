@@ -80,8 +80,8 @@ struct WorkspaceSettings
 ///
 /// Each entry in `executables` is both the output filename (without a platform suffix) and the
 /// stem of a workspace primary: `video-preview` requires an exported `video-preview.slang`.
-/// `defaultExecutable` is the artifact `slang package run` executes when no executable name is
-/// given.
+/// `defaultExecutable` selects the primary that `slang package run` interprets, or the native
+/// artifact that `slang package --experimental run --binary` executes.
 struct HostSettings
 {
     List<String> executables;

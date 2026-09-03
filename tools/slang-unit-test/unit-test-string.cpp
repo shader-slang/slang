@@ -183,6 +183,36 @@ SLANG_UNIT_TEST(string)
         SLANG_CHECK(
             SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-13824"), value)) &&
             value == -13824);
+        StringBuilder maxIntText;
+        maxIntText << kMaxInt;
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(StringUtil::parseInt(maxIntText.getUnownedSlice(), value)) &&
+            value == kMaxInt);
+        const char* minIntText =
+            sizeof(Int) == sizeof(Int64) ? "-9223372036854775808" : "-2147483648";
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice(minIntText), value)) &&
+            value == -kMaxInt - 1);
+        const char* belowMinIntText =
+            sizeof(Int) == sizeof(Int64) ? "-9223372036854775809" : "-2147483649";
+        SLANG_CHECK(SLANG_FAILED(StringUtil::parseInt(UnownedStringSlice(belowMinIntText), value)));
+        StringBuilder positiveOverflowText;
+        positiveOverflowText << UInt(kMaxInt) + 1;
+        SLANG_CHECK(
+            SLANG_FAILED(StringUtil::parseInt(positiveOverflowText.getUnownedSlice(), value)));
+        const char* maxIntHexText =
+            sizeof(Int) == sizeof(Int64) ? "0x7fffffffffffffff" : "0x7fffffff";
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice(maxIntHexText), value)) &&
+            value == kMaxInt);
+        const char* positiveHexOverflowText =
+            sizeof(Int) == sizeof(Int64) ? "0x8000000000000000" : "0x80000000";
+        SLANG_CHECK(
+            SLANG_FAILED(StringUtil::parseInt(UnownedStringSlice(positiveHexOverflowText), value)));
+        SLANG_CHECK(SLANG_FAILED(
+            StringUtil::parseInt(UnownedStringSlice("999999999999999999999999999999"), value)));
+        SLANG_CHECK(SLANG_FAILED(
+            StringUtil::parseInt(UnownedStringSlice("-999999999999999999999999999999"), value)));
     }
 
     {

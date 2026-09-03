@@ -795,8 +795,8 @@ application can consume it.
 ## Journey 8: build binary artifacts (experimental)
 
 Everything before this point uses stable commands. `.slang-module` generation, host executable
-compilation, and `run` are experimental, so they are separated here: the journeys above stay valid
-whether or not these features ship in their current form.
+compilation, and binary `run` are experimental, so they are separated here: the journeys above
+stay valid whether or not these features ship in their current form. Source `run` is stable.
 
 ### Goal
 
@@ -840,18 +840,27 @@ Declare the executable in the `build.host` section of `slang-package.json`:
 ```
 
 Plain `slang package build` still produces the stable source bundle and skips host and module
-binaries. Opt in to those outputs with the global flag, which must appear before the subcommand:
+binaries. The stable run path interprets that source bundle:
+
+```sh
+slang package build
+slang package run
+```
+
+Opt in to binary outputs and native execution with the global flag, which must appear before the
+subcommand, and the run-specific `--binary` option:
 
 ```sh
 slang package --experimental build
-slang package --experimental run
+slang package --experimental run --binary
 ```
 
-`run` accepts an optional executable name and forwards every remaining argument to the artifact
-verbatim, with no `--` separator:
+Both run modes accept an optional executable name and forward every remaining argument verbatim,
+with no `--` separator:
 
 ```sh
-slang package --experimental run image-viewer --input frame.exr
+slang package run image-viewer --input frame.exr
+slang package --experimental run --binary image-viewer --input frame.exr
 ```
 
 The leading value is treated as an executable name only when it matches a configured one, so an
@@ -868,19 +877,21 @@ application flag in that position is still forwarded.
   `EXPERIMENTAL.txt` even when copied separately from the rest of the build tree.
 - `build` without `--experimental` produces source and documentation only, regardless of module or
   host settings, and removes stale module and host directories from an earlier experimental build.
-- `run` executes the already-built artifact selected by the optional name, otherwise
-  `build.host.default` or the only configured executable. It never builds and never resolves packages.
-- `slang package --experimental help` lists the experimental commands; stable help omits them.
+- `run` interprets the already-built source copy selected by the optional name, otherwise
+  `build.host.default` or the only configured executable.
+- `--experimental run --binary` executes the corresponding already-built native artifact.
+- Neither mode builds or resolves packages.
+- `slang package --experimental help` documents the binary build and run options.
 
 ### Current gaps and pitfalls
 
 - There is no package-level build script. Host executables need a supported C++ compiler and the
   sibling Slang tools available at runtime, and the tool does not check for the C++ compiler as
   part of the toolchain constraint.
-- Because `run` never builds, a stale artifact runs silently after a source edit. Run `build`
-  first.
-- If the artifact does not exist, `run` reports the missing path and the build command instead of
-  attempting a compile.
+- Because `run` never builds, a stale source copy or native artifact runs silently after a source
+  edit. Run the corresponding build first.
+- If the selected output does not exist, `run` reports the missing path and build command instead
+  of attempting a build.
 - A stable build intentionally does not diagnose missing host toolchains or invalid executable
   entry points because it does not attempt those outputs.
 
@@ -987,8 +998,8 @@ without performing another update.
 Slang does not need npm-style hoisting, Gradle's opt-in locking model, or a registry-first
 publishing workflow to fix the journeys above. Remaining improvements include committed
 multi-package composition, package-content preview, testing, and transactional updates. Unlike
-Cargo's introductory loop, experimental `run` should not be read as build-and-run; it deliberately
-executes only an existing artifact.
+Cargo's introductory loop, `run` should not be read as build-and-run; it deliberately executes
+only an existing source copy or native artifact.
 
 ## How flags change the journeys
 
@@ -1108,9 +1119,10 @@ subcommand. Every other journey in this chapter is unaffected by it.
 
 ### Help spellings and commands without flags
 
-`slang package help`, `-help`, and `--help` print stable package help. Experimental run and host
-build behavior appear in `slang package --experimental help`. `init`, `validate`, `status`,
-`tree`, `edit`, `unedit`, and `docs` otherwise accept only their documented arguments. `test` is
+`slang package help`, `-help`, and `--help` print stable package help, including source `run`.
+Binary run and host build behavior appear in `slang package --experimental help`. `init`,
+`validate`, `status`, `tree`, `edit`, `unedit`, and `docs` otherwise accept only their documented
+arguments. `test` is
 present but returns a not-implemented error.
 
 ## Gaps, tensions, and intentional asymmetries
@@ -1177,8 +1189,8 @@ dependencies therefore appear only in each consumer's root lock.
 
 ### Run, docs, and test do less than their names may imply
 
-Experimental `run` does not build, `docs` opens `build/docs/index.md` (or prints the path with
-`--print`), and `test` is
+`run` does not build, `docs` opens `build/docs/index.md` (or prints the path with `--print`), and
+`test` is
 unimplemented. Narrow side effects make commands predictable, but missing `build --run`,
 documentation generation, and package testing leave common loops manual.
 
@@ -1326,8 +1338,10 @@ artifacts ship in their current form.
 - Host output lives under `build/host` with an `EXPERIMENTAL.txt` marker.
 - `build` without the flag still emits source and docs, skips binary outputs, and removes stale
   module and host directories.
-- Stable help omits experimental commands; `--experimental help` lists them.
-- `run` executes an existing artifact and never silently builds or resolves.
+- Stable `run` interprets the bundled source; `--experimental run --binary` executes an existing
+  native artifact.
+- `--experimental help` adds the binary build and run options.
+- Neither run mode silently builds or resolves.
 
 ## Executable test anchors
 
