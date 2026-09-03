@@ -281,11 +281,12 @@ void main()
 // METALLAYOUT-DAG: uint3 dispatchRaysIndex_{{[0-9]+}} {{\[\[thread_position_in_grid\]\]}}
 // METALLAYOUT-DAG: uint3 dispatchRaysDimensions_{{[0-9]+}} {{\[\[threads_per_grid\]\]}}
 
+// CUDALAYOUT-COUNT-3: optixGetSbtGASIndex()
 // CUDALAYOUT-DAG: __closesthit__ClosestHit
 // CUDALAYOUT-DAG: __anyhit__AnyHit
 // CUDALAYOUT-DAG: __intersection__Intersection
-// CUDALAYOUT-DAG: optixGetSbtGASIndex()
-// PTXLAYOUT-DAG: .visible .entry __closesthit__ClosestHit()
-// PTXLAYOUT-DAG: .visible .entry __anyhit__AnyHit()
-// PTXLAYOUT-DAG: .visible .entry __intersection__Intersection()
-// PTXLAYOUT-DAG: _optix_read_sbt_gas_idx
+// PTXLAYOUT: .visible .entry __intersection__Intersection()
+// PTXLAYOUT: .visible .entry __closesthit__ClosestHit()
+// PTXLAYOUT: _optix_read_sbt_gas_idx
+// PTXLAYOUT: .visible .entry __anyhit__AnyHit()
+// PTXLAYOUT: _optix_read_sbt_gas_idx
