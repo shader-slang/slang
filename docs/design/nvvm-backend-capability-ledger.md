@@ -2686,3 +2686,17 @@ GenericAsm as the existing atomic fixture, so those two failures form one operat
 Discovery remains 72/72/72 over 72. The selected prefix passes 437/437 and the permanent category
 passes 96/96. The unchanged proposed corpus-v2 composition would now be 470/470/470 over 477,
 with seven healthy gaps.
+
+Slice 192 gives ordinary no-offset `Texture.Sample` a producer-owned semantic identity. The CUDA
+standard module tags every valid separate texture/sampler shape, NVVM legalization removes the
+target text, and preflight derives the complete descriptor from the selected texture type and
+exact helper ABI. Provider ABI revision 35 adds the typed implicit `SAMPLE` operation and maps it
+to LLVM 14's unified implicit texture intrinsics. Supported results remain Float32 with one, two,
+or four lanes; Float3 retains an exact preflight diagnostic, and combined sampler resource types
+remain unsupported before operation lowering.
+
+Frozen `cuda/cuda-texture` gains two permanent direct lanes. Frozen v1 advances from 420/420/420
+to 421/421/421 over its unchanged 427 healthy denominator with no old-correct regression. The
+frozen generic-asm-texture cluster is eliminated. Discovery remains 72/72/72 over 72, the selected
+prefix passes 438/438, and the permanent NVVM category passes 98/98. The unchanged proposed
+corpus-v2 composition would now be 471/471/471 over 477, with six healthy gaps.

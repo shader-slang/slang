@@ -4425,6 +4425,7 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
     const bool isGatherElement = isFetchElement && operation.elementType.laneCount == 4;
     switch (operation.operation)
     {
+    case SLANG_NVVM_TEXTURE_OP_SAMPLE:
     case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
         return isSampleElement;
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
@@ -4470,17 +4471,26 @@ static llvm::Intrinsic::ID _getTextureIntrinsicID(const SlangNVVMTextureOperatio
     case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
         return llvm::Intrinsic::nvvm_txq_depth;
     }
+    if (operation.operation != SLANG_NVVM_TEXTURE_OP_SAMPLE &&
+        operation.operation != SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL)
+    {
+        return llvm::Intrinsic::not_intrinsic;
+    }
 
+    const bool hasExplicitLevel = operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL;
     if (operation.isArray)
     {
         switch (operation.shape)
         {
         case SLANG_NVVM_TEXTURE_SHAPE_1D:
-            return llvm::Intrinsic::nvvm_tex_unified_1d_array_level_v4f32_f32;
+            return hasExplicitLevel ? llvm::Intrinsic::nvvm_tex_unified_1d_array_level_v4f32_f32
+                                    : llvm::Intrinsic::nvvm_tex_unified_1d_array_v4f32_f32;
         case SLANG_NVVM_TEXTURE_SHAPE_2D:
-            return llvm::Intrinsic::nvvm_tex_unified_2d_array_level_v4f32_f32;
+            return hasExplicitLevel ? llvm::Intrinsic::nvvm_tex_unified_2d_array_level_v4f32_f32
+                                    : llvm::Intrinsic::nvvm_tex_unified_2d_array_v4f32_f32;
         case SLANG_NVVM_TEXTURE_SHAPE_CUBE:
-            return llvm::Intrinsic::nvvm_tex_unified_cube_array_level_v4f32_f32;
+            return hasExplicitLevel ? llvm::Intrinsic::nvvm_tex_unified_cube_array_level_v4f32_f32
+                                    : llvm::Intrinsic::nvvm_tex_unified_cube_array_v4f32_f32;
         }
     }
     else
@@ -4488,13 +4498,17 @@ static llvm::Intrinsic::ID _getTextureIntrinsicID(const SlangNVVMTextureOperatio
         switch (operation.shape)
         {
         case SLANG_NVVM_TEXTURE_SHAPE_1D:
-            return llvm::Intrinsic::nvvm_tex_unified_1d_level_v4f32_f32;
+            return hasExplicitLevel ? llvm::Intrinsic::nvvm_tex_unified_1d_level_v4f32_f32
+                                    : llvm::Intrinsic::nvvm_tex_unified_1d_v4f32_f32;
         case SLANG_NVVM_TEXTURE_SHAPE_2D:
-            return llvm::Intrinsic::nvvm_tex_unified_2d_level_v4f32_f32;
+            return hasExplicitLevel ? llvm::Intrinsic::nvvm_tex_unified_2d_level_v4f32_f32
+                                    : llvm::Intrinsic::nvvm_tex_unified_2d_v4f32_f32;
         case SLANG_NVVM_TEXTURE_SHAPE_3D:
-            return llvm::Intrinsic::nvvm_tex_unified_3d_level_v4f32_f32;
+            return hasExplicitLevel ? llvm::Intrinsic::nvvm_tex_unified_3d_level_v4f32_f32
+                                    : llvm::Intrinsic::nvvm_tex_unified_3d_v4f32_f32;
         case SLANG_NVVM_TEXTURE_SHAPE_CUBE:
-            return llvm::Intrinsic::nvvm_tex_unified_cube_level_v4f32_f32;
+            return hasExplicitLevel ? llvm::Intrinsic::nvvm_tex_unified_cube_level_v4f32_f32
+                                    : llvm::Intrinsic::nvvm_tex_unified_cube_v4f32_f32;
         }
     }
     return llvm::Intrinsic::not_intrinsic;
@@ -4512,8 +4526,9 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
     ModuleState* state = _getModule(module);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     const bool isGather = operation && operation->operation == SLANG_NVVM_TEXTURE_OP_GATHER;
+    const bool isSample = operation && operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE;
     const size_t expectedOperandCount =
-        isGather ? 2
+        isGather || isSample ? 2
         : operation && (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
                         operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
             ? 3
@@ -4528,7 +4543,7 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
     llvm::Value* texture = _getValue(operands[0]);
     const bool isSampleLevel = operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL;
     const bool isFetchLevel = operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL;
-    const bool hasCoordinate = isSampleLevel || isFetchLevel || isGather;
+    const bool hasCoordinate = isSample || isSampleLevel || isFetchLevel || isGather;
     llvm::Value* coordinate = hasCoordinate ? _getValue(operands[1]) : nullptr;
     llvm::Value* level = isSampleLevel || isFetchLevel ? _getValue(operands[2]) : nullptr;
     llvm::Type* floatType = llvm::Type::getFloatTy(state->context);
@@ -4693,7 +4708,8 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
                 ? coordinate
                 : state->builder.CreateExtractElement(coordinate, uint64_t(lane)));
     }
-    arguments.push_back(level);
+    if (isSampleLevel)
+        arguments.push_back(level);
 
     llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
     llvm::CallInst* call = state->builder.CreateCall(intrinsic, arguments);

@@ -220,20 +220,27 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
         SLANG_NVVM_TEXTURE_SHAPE_3D,
         SLANG_NVVM_TEXTURE_SHAPE_CUBE,
     };
-    for (const auto shape : shapes)
+    const SlangNVVMTextureOperation sampleOperations[] = {
+        SLANG_NVVM_TEXTURE_OP_SAMPLE,
+        SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL,
+    };
+    for (const auto sampleOperation : sampleOperations)
     {
-        const SlangNVVMTextureOperationDesc operation = {
-            SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL,
-            shape,
-            0,
-            floatType,
-        };
-        SLANG_CHECK(builder.supportsTextureOperation(operation));
-        if (shape != SLANG_NVVM_TEXTURE_SHAPE_3D)
+        for (const auto shape : shapes)
         {
-            SlangNVVMTextureOperationDesc arrayOperation = operation;
-            arrayOperation.isArray = 1;
-            SLANG_CHECK(builder.supportsTextureOperation(arrayOperation));
+            const SlangNVVMTextureOperationDesc operation = {
+                sampleOperation,
+                shape,
+                0,
+                floatType,
+            };
+            SLANG_CHECK(builder.supportsTextureOperation(operation));
+            if (shape != SLANG_NVVM_TEXTURE_SHAPE_3D)
+            {
+                SlangNVVMTextureOperationDesc arrayOperation = operation;
+                arrayOperation.isArray = 1;
+                SLANG_CHECK(builder.supportsTextureOperation(arrayOperation));
+            }
         }
     }
 
@@ -365,6 +372,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
     unsupportedGather.shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
     unsupportedGather.elementType.laneCount = 3;
     SLANG_CHECK(!builder.supportsTextureOperation(unsupportedGather));
+    unsupportedGather.operation = SLANG_NVVM_TEXTURE_OP_SAMPLE + 1;
+    SLANG_CHECK(!builder.supportsTextureOperation(unsupportedGather));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderEmitsVectorTextureSamples)
@@ -432,6 +441,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsVectorTextureSamples)
         SLANG_COUNT_OF(operands),
         result)));
     SLANG_CHECK_ABORT(result != nullptr);
+    SlangNVVMTextureOperationDesc implicitOperation = operation;
+    implicitOperation.operation = SLANG_NVVM_TEXTURE_OP_SAMPLE;
+    SlangNVVMValueHandle implicitResult = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder
+            .emitTextureOperation(module.module, implicitOperation, operands, 2, implicitResult)));
+    SLANG_CHECK_ABORT(implicitResult != nullptr);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
 
     const SlangNVVMSerializationFormat formats[] = {
@@ -445,7 +461,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsVectorTextureSamples)
             SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assemblyBlob)));
         const String assembly = _getBlobText(assemblyBlob);
         SLANG_CHECK(assembly.indexOf("@llvm.nvvm.tex.unified.2d.level.v4f32.f32") >= 0);
-        SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("insertelement")) == 4);
+        SLANG_CHECK(assembly.indexOf("@llvm.nvvm.tex.unified.2d.v4f32.f32") >= 0);
+        SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("insertelement")) == 8);
     }
 }
 

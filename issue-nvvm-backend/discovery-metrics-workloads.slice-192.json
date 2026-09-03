@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "implicit-texture-sample",
+      "source": "tests/cuda/cuda-texture.slang",
+      "census_id": "cuda/cuda-texture.slang#cuda-1"
+    }
+  ]
+}

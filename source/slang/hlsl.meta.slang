@@ -2568,11 +2568,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
+                        __intrinsic_asm(nvvmTextureSample) "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
+                        __intrinsic_asm(nvvmTextureSample) "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemapLayered<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
+                        __intrinsic_asm(nvvmTextureSample) "texCubemapLayered<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -2582,13 +2582,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1D<$T0>($0, ($2))";
+                        __intrinsic_asm(nvvmTextureSample) "tex1D<$T0>($0, ($2))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2D<$T0>($0, ($2).x, ($2).y)";
+                        __intrinsic_asm(nvvmTextureSample) "tex2D<$T0>($0, ($2).x, ($2).y)";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
+                        __intrinsic_asm(nvvmTextureSample) "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
+                        __intrinsic_asm(nvvmTextureSample) "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }

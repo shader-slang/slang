@@ -7599,6 +7599,28 @@ Direct O3 is 1,120 bytes at every architecture versus 9,143 bytes native; direct
 bytes. Median standalone compilation measured 370.6 ms native and 274.3/273.7 ms direct O0/O3
 SM70 in this exploratory run.
 
+### Slice 192: Producer-owned implicit texture sampling
+
+The ordinary CUDA-prelude `Texture.Sample(sampler, coordinate)` producer now carries one internal
+`TextureSample` semantic tag across all valid 1D, 2D, 3D, cube, and array branches. NVVM-ready
+legalization replaces the selected target text with `IRNVVMIntrinsic(semantic-id)`. Preflight
+derives shape, arrayness, element lanes, and coordinate width from the canonical selected texture
+type and exact three-parameter helper ABI; direct emission never parses the `tex*` spelling.
+
+Provider ABI revision 35 appends one typed `SAMPLE` operation to the existing texture descriptor
+and callback. The LLVM 14 provider maps it to the matching implicit
+`llvm.nvvm.tex.unified.*.v4f32.f32` intrinsic, omits the separately checked sampler because CUDA's
+texture object owns sampling state, and selects one, two, or four Float32 result lanes. The
+combined `Sampler2D` producer remains outside this contract because its helper parameter type is
+not yet selected by direct NVVM.
+
+`cuda/cuda-texture` now agrees with native CUDA in direct O0 and O3 and has permanent lanes. Frozen
+v1 advances to 421/421/421 over 427 with no old-correct loss; discovery remains 72/72/72 over 72.
+The selected prefix passes 438/438 and the permanent category passes 98/98. The measurement gate
+assembles native, direct O0 SM70, and direct O3 SM70/SM80/SM90 outputs. Median standalone compile
+time measured 353.5 ms native and 239.1/239.0 ms direct O0/O3 SM70; PTX measured 8,810, 4,648, and
+871 bytes respectively.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

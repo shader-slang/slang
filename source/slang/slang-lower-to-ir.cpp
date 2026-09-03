@@ -41,6 +41,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
+#include "slang-nvvm-intrinsic-semantics.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -58,7 +59,7 @@ namespace
 struct NVVMIntrinsicAsmSemanticName
 {
     const char* name;
-    SlangNVVMValueOperation operation;
+    NVVMIntrinsicSemantic semantic;
 };
 
 // These names are compiler-internal source-module vocabulary. They identify an operation rather
@@ -115,17 +116,18 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmWorkgroupBarrier", SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER},
     {"nvvmWorkgroupMemoryBarrier", SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER},
     {"nvvmThreadIndex", SLANG_NVVM_VALUE_OP_THREAD_INDEX},
+    {"nvvmTextureSample", kNVVMIntrinsicSemanticTextureSample},
 };
 
 bool _findNVVMIntrinsicAsmSemantic(
     const UnownedStringSlice& name,
-    SlangNVVMValueOperation& outOperation)
+    NVVMIntrinsicSemantic& outSemantic)
 {
     for (const auto& entry : kNVVMIntrinsicAsmSemanticNames)
     {
         if (name == UnownedStringSlice(entry.name))
         {
-            outOperation = entry.operation;
+            outSemantic = entry.semantic;
             return true;
         }
     }
@@ -9613,14 +9615,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             args.getArrayView().getBuffer());
         if (stmt->semanticToken.type != TokenType::Unknown)
         {
-            SlangNVVMValueOperation operation = 0;
+            NVVMIntrinsicSemantic semantic = 0;
             const bool hasKnownSemantic =
-                _findNVVMIntrinsicAsmSemantic(stmt->semanticToken.getContent(), operation);
+                _findNVVMIntrinsicAsmSemantic(stmt->semanticToken.getContent(), semantic);
             SLANG_RELEASE_ASSERT(hasKnownSemantic);
             builder->addDecoration(
                 genericAsm,
                 kIROp_NVVMSemanticDecoration,
-                builder->getIntValue(builder->getIntType(), operation));
+                builder->getIntValue(builder->getIntType(), semantic));
         }
     }
 
