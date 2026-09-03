@@ -2129,17 +2129,18 @@ static LegalVal legalizeBitCast(IRTypeLegalizationContext* context, IRInst* inst
     //
     // Three conditions must all hold; any that fails leaves the
     // instruction on the loud `SLANG_UNEXPECTED` below in every build configuration:
-    //  - the result is `simple` (a non-simple result was handled above or is out of contract);
-    //  - the cast carries an `IRAnyValueMarshalCastDecoration`, i.e. the AnyValue bulk-copy
-    //    marshalling pass emitted it — the only producer for which zero-filling an empty source is
-    //    the correct lowering. A user-authored `bit_cast<Word>(Empty{})` is unmarked, so it falls
+    //  - the result is a `simple` `IRStructType` carrying an `IRAnyValueSizeDecoration`, i.e. it is
+    //    the concrete `AnyValueN` storage struct that `ensureAnyValueType` produced — the only
+    //    destination for which zero-filling an empty source is the correct lowering. A
+    //    user-authored `bit_cast<Word>(Empty{})` targets a `Word` with no such marker, so it falls
     //    through to the loud failure instead of being silently rewritten to `Word{0}` (which would
-    //    mask the intended size-mismatch diagnostic);
+    //    mask the intended size-mismatch diagnostic). The `AnyValueN` struct is this pass's own
+    //    product, so the marker is a reliable provenance boundary;
     //  - the *source type* legalizes away to `none`. Gate on the source type, not the operand
     //    value: `legalizeUndefined` also lowers an undefined value of a non-empty type to an empty
     //    `LegalVal`, and such a value must stay loud rather than be silently zeroed.
-    if (type.flavor == LegalType::Flavor::simple &&
-        inst->findDecoration<IRAnyValueMarshalCastDecoration>() &&
+    if (type.flavor == LegalType::Flavor::simple && as<IRStructType>(type.getSimple()) &&
+        type.getSimple()->findDecoration<IRAnyValueSizeDecoration>() &&
         legalizeType(context, inst->getOperand(0)->getDataType()).flavor == LegalType::Flavor::none)
     {
         return LegalVal::simple(builder->emitDefaultConstruct(type.getSimple()));

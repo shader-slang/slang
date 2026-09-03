@@ -140,6 +140,11 @@ struct AnyValueMarshallingContext
         StringBuilder nameSb;
         nameSb << "AnyValue" << size;
         builder.addExportDecoration(structType, nameSb.getUnownedSlice());
+        // Mark the concrete storage struct with its AnyValue byte size. This is the provenance
+        // `legalizeBitCast` keys on to authorize zero-filling an empty source into this fixed-size
+        // payload (see the Form-2 gate there): only a struct this pass produced carries the marker,
+        // so a user-authored `bit_cast<UserStruct>(Empty{})` still fails loudly.
+        builder.addAnyValueSizeDecoration(structType, size);
         auto fieldCount = (size + sizeof(uint32_t) - 1) / sizeof(uint32_t);
         for (decltype(fieldCount) i = 0; i < fieldCount; i++)
         {
@@ -951,9 +956,7 @@ struct AnyValueMarshallingContext
 
         if (canBulkCopyMarshal(type, getIntVal(anyValueType->getSize())))
         {
-            auto boxed = builder.emitBitCast(anyValInfo->type, param);
-            builder.addAnyValueMarshalCastDecoration(boxed);
-            builder.emitReturn(boxed);
+            builder.emitReturn(builder.emitBitCast(anyValInfo->type, param));
             return func;
         }
 
@@ -1360,9 +1363,7 @@ struct AnyValueMarshallingContext
 
         if (canBulkCopyMarshal(type, getIntVal(anyValueType->getSize())))
         {
-            auto unboxed = builder.emitBitCast(type, param);
-            builder.addAnyValueMarshalCastDecoration(unboxed);
-            builder.emitReturn(unboxed);
+            builder.emitReturn(builder.emitBitCast(type, param));
             return func;
         }
 

@@ -203,8 +203,10 @@ struct IRRTTITypeSizeDecoration : IRDecoration
     IRIntegerValue getTypeSize() { return getTypeSizeOperand()->getValue(); }
 };
 
-/// A decoration on `IRInterfaceType` that marks the size of `AnyValue` that should
-/// be used to represent a polymorphic value of the interface.
+/// Marks an `AnyValue` byte size. On an `IRInterfaceType` it records the size used to represent a
+/// polymorphic value of the interface. `ensureAnyValueType` also places it on the concrete
+/// `AnyValueN` storage struct it generates, where it additionally serves as the provenance
+/// `legalizeBitCast` checks before zero-filling an empty source into that box.
 FIDDLE()
 struct IRAnyValueSizeDecoration : IRDecoration
 {
@@ -5239,11 +5241,6 @@ $(type_info.return_type) $(type_info.method_name)(
     }
 
     void addKeepAliveDecoration(IRInst* value) { addDecoration(value, kIROp_KeepAliveDecoration); }
-
-    void addAnyValueMarshalCastDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp_AnyValueMarshalCastDecoration);
-    }
 
     void addPublicDecoration(IRInst* value) { addDecoration(value, kIROp_PublicDecoration); }
     void addHLSLExportDecoration(IRInst* value)

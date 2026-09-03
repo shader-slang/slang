@@ -3,9 +3,9 @@
 // A user-authored `bit_cast` from an empty struct to a nonempty one is a size mismatch (0 payload
 // bytes into 4). Empty-type legalization lowers the empty source to `none`, so the cast reaches
 // type legalization with a non-simple operand and must fail loudly rather than compile. The
-// AnyValue bulk-copy empty-source zero-fill only applies to a cast carrying
-// `IRAnyValueMarshalCastDecoration` (attached solely by the marshalling pass), so this unmarked
-// user cast is never silently rewritten to `Word{0}`.
+// AnyValue bulk-copy empty-source zero-fill only applies when the cast's result is the concrete
+// `AnyValueN` storage struct (marked with `IRAnyValueSizeDecoration` by the marshalling pass), so
+// this cast to a plain user `Word` is never silently rewritten to `Word{0}`.
 
 struct Empty
 {

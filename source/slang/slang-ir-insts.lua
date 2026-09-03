@@ -2160,17 +2160,6 @@ local insts = {
 				},
 			},
 			{
-				anyValueMarshalCast = {
-					-- Marks the whole-object `bit_cast` that the AnyValue bulk-copy marshalling fast
-					-- path emits (`generatePackingFunc`/`generateUnpackingFunc`) to box or unbox a
-					-- byte-compatible value. Type legalization keys off this marker to zero-fill an
-					-- empty-source cast (see `legalizeBitCast`); an unmarked empty-source cast is out
-					-- of contract and keeps its loud failure, so a user-authored `bit_cast` is never
-					-- silently rewritten.
-					struct_name = "AnyValueMarshalCastDecoration",
-				},
-			},
-			{
 				noSideEffect = {
 					-- A `[NoSideEffect]` decoration marks a callee to be side-effect free.
 					struct_name = "NoSideEffectDecoration",
