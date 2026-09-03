@@ -743,10 +743,10 @@ InterfaceRequirementKey::InterfaceRequirementKey(
 
 void WitnessTable::add(Decl* requirementDecl, RequirementWitness const& witness)
 {
-    addRequirement(InterfaceRequirementKey(requirementDecl), witness);
+    add(InterfaceRequirementKey(requirementDecl), witness);
 }
 
-void WitnessTable::addRequirement(InterfaceRequirementKey key, RequirementWitness const& witness)
+void WitnessTable::add(InterfaceRequirementKey key, RequirementWitness const& witness)
 {
     m_requirementDictionary.add(key.getDecl(), witness);
 }

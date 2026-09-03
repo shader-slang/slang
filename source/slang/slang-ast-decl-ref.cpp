@@ -323,10 +323,11 @@ static RequirementWitnessTableLookupKey _getRequirementWitnessTableLookupKey(
 /// Resolves a stored table entry and restores the outer generic declaration requested by lookup.
 ///
 /// A generic interface requirement is keyed by its innermost non-generic declaration. Its
-/// satisfying witness likewise names the corresponding inner declaration, so lookup climbs one
-/// satisfying `GenericDecl` parent for every wrapper removed from the requested key. Substitutions
-/// from the conformance path remain unapplied here; the caller applies them after selecting the
-/// final leaf entry.
+/// satisfying witness likewise names the corresponding inner declaration, with the same consecutive
+/// chain of `GenericDecl` parents. Lookup climbs exactly the number of wrappers removed from the
+/// requested key and returns the decl-ref for the outermost corresponding satisfying wrapper.
+/// Substitutions from the conformance path remain unapplied here; the caller applies them after
+/// selecting the final leaf entry.
 static RequirementWitness _resolveRequirementWitnessForTableLookup(
     RequirementWitness requirementWitness,
     UCount genericWrapperCount)
@@ -342,14 +343,15 @@ static RequirementWitness _resolveRequirementWitnessForTableLookup(
         {
             auto satisfyingDeclRef =
                 as<DeclRefBase>(requirementWitness.getDeclRef().declRefBase->resolve());
-            while (satisfyingDeclRef && genericWrapperCount > 0)
+            while (genericWrapperCount > 0)
             {
+                SLANG_RELEASE_ASSERT(satisfyingDeclRef);
                 auto parent = satisfyingDeclRef->getParent();
-                if (parent && as<GenericDecl>(parent->getDecl()))
-                    genericWrapperCount--;
+                SLANG_RELEASE_ASSERT(parent && as<GenericDecl>(parent->getDecl()));
                 satisfyingDeclRef = parent;
+                genericWrapperCount--;
             }
-            SLANG_RELEASE_ASSERT(satisfyingDeclRef && genericWrapperCount == 0);
+            SLANG_RELEASE_ASSERT(satisfyingDeclRef);
             return RequirementWitness(satisfyingDeclRef);
         }
     case RequirementWitness::Flavor::val:
