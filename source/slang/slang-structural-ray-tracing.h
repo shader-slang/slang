@@ -242,4 +242,11 @@ private:
 
 const char* getStructuralRayTracingStageInterfaceName(StructuralRayTracingStageKind kind);
 
+/// Returns the deterministic target symbol used for a portable structural ray-tracing stage type.
+///
+/// Ordinary source identifiers other than target-reserved names are preserved. Qualified,
+/// reserved, or otherwise target-unsafe names are encoded injectively so reflection and
+/// synthesized entry points agree on one physical name.
+String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName);
+
 } // namespace Slang

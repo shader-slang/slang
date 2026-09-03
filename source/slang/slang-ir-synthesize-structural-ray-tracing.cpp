@@ -131,7 +131,12 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
     adapter->setFullType(builder.getFuncType(List<IRType*>(), builder.getVoidType()));
 
     auto stage = _getStructuralRayTracingNativeStage(stageKind);
-    auto name = getStructuralRayTracingSourceTypeName(stageType);
+    auto name = getStructuralRayTracingEntryPointName(
+        getStructuralRayTracingSourceTypeName(stageType).getUnownedSlice());
+    // A selected structural stage may have been renamed through the component API. Preserve its
+    // physical entry-point name when replacing the selected function with this adapter.
+    if (auto entryPoint = invoke->findDecoration<IREntryPointDecoration>())
+        name = entryPoint->getName()->getStringSlice();
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addEntryPointDecoration(
         adapter,
