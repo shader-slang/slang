@@ -366,6 +366,43 @@ SLANG_UNIT_TEST(lazyAutodiffMaybeDifferentiableRequirementLoadsSupplement)
     SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
 }
 
+// The `DifferentiableAttribute` disjunct of `_callableHasDifferentiabilityHeaderModifier` --
+// `[Differentiable]`/`[ForwardDifferentiable]`/etc. on a callable's own header -- is the
+// headline load trigger `checkDifferentiableCallableCommon` exists for, but
+// `lazyAutodiffModuleLoading` only ever checks it after `primalSubstituteModule` has already
+// loaded the supplement earlier in the same session. That makes its count assertion pass whether
+// or not the header-modifier trigger itself loads anything, so it cannot catch a regression that
+// dropped this disjunct. This needs its own global session, for the same reason
+// `lazyAutodiffMaybeDifferentiableRequirementLoadsSupplement` does: the supplement stays loaded
+// once loaded, so sequencing after any other trigger would assert nothing.
+SLANG_UNIT_TEST(lazyAutodiffDifferentiableHeaderModifierLoadsSupplement)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const Index baseCoreModuleCount = _loadedBuiltinModuleCount(globalSession);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    // No `fwd_diff`/`bwd_diff`, no primal substitute, and no concrete `IDifferentiable`
+    // conformance: the `[ForwardDifferentiable]` header modifier is the only thing here that can
+    // drive the load.
+    _loadModule(
+        session,
+        "differentiableHeaderModule",
+        "[ForwardDifferentiable] float f(float value) { return sin(value); }");
+    SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
+}
+
 // When checking a module from source triggers the on-demand autodiff-supplement load,
 // `SemanticsContext::ensureAutodiffModuleLoaded` records the supplement as a dependency of the
 // module being checked, the same way `visitImportDecl` records a written `import`. Serializing

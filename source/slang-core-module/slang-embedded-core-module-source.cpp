@@ -381,18 +381,18 @@ ComPtr<ISlangBlob> Session::getAutodiffBaseLibraryCode()
     return autodiffBaseLibraryCode;
 }
 
-ComPtr<ISlangBlob> Session::getAutodiffLibraryCode()
+ComPtr<ISlangBlob> Session::getAutodiffSupplementLibraryCode()
 {
 #if SLANG_EMBED_CORE_MODULE_SOURCE
-    if (!autodiffLibraryCode)
+    if (!autodiffSupplementLibraryCode)
     {
         const String path = getCoreModulePath();
         StringBuilder sb;
 #include "diff.meta.slang.h"
-        autodiffLibraryCode = StringBlob::moveCreate(sb);
+        autodiffSupplementLibraryCode = StringBlob::moveCreate(sb);
     }
 #endif
-    return autodiffLibraryCode;
+    return autodiffSupplementLibraryCode;
 }
 
 ComPtr<ISlangBlob> Session::getGLSLLibraryCode()

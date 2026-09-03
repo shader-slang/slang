@@ -2947,11 +2947,21 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::SaveAutodiffModuleBinSource:
         case OptionKind::SaveGLSLModuleBinSource:
             {
-                auto moduleName = slang::BuiltinModuleName::GLSL;
-                if (optionKind == OptionKind::SaveCoreModuleBinSource)
+                slang::BuiltinModuleName moduleName;
+                switch (optionKind)
+                {
+                case OptionKind::SaveCoreModuleBinSource:
                     moduleName = slang::BuiltinModuleName::Core;
-                else if (optionKind == OptionKind::SaveAutodiffModuleBinSource)
+                    break;
+                case OptionKind::SaveAutodiffModuleBinSource:
                     moduleName = slang::BuiltinModuleName::Autodiff;
+                    break;
+                case OptionKind::SaveGLSLModuleBinSource:
+                    moduleName = slang::BuiltinModuleName::GLSL;
+                    break;
+                default:
+                    SLANG_UNEXPECTED("unhandled Save*ModuleBinSource option");
+                }
                 SLANG_RETURN_ON_FAIL(addPendingBuiltinModuleSave(moduleName, true));
                 break;
             }

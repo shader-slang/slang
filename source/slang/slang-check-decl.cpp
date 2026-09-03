@@ -17695,10 +17695,10 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
 //      *after* another linkage loaded the supplement already includes it through
 //      `Session::coreModules`, so a later incremental merge here must not append those entries a
 //      second time.
-void SharedSemanticsContext::addLoadedAutodiffModule(ModuleDecl* moduleDecl)
+bool SharedSemanticsContext::addLoadedAutodiffModule(ModuleDecl* moduleDecl)
 {
     if (!m_loadedAutodiffModules.add(moduleDecl))
-        return;
+        return false;
 
     // This context may already have cached extensions from the base core and the module currently
     // being checked. Rebuilding the aggregate views would discard those current-module entries;
@@ -17718,6 +17718,8 @@ void SharedSemanticsContext::addLoadedAutodiffModule(ModuleDecl* moduleDecl)
         _mergeCandidateExtensionsFromModule(moduleDecl);
     if (m_associatedDeclListsBuilt)
         _mergeDeclAssociationsFromModule(moduleDecl);
+
+    return true;
 }
 
 void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)

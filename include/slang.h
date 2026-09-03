@@ -6006,9 +6006,16 @@ SLANG_API ISlangBlob* slang_getEmbeddedCoreModule();
 
 /* Returns a blob that contains the serialized autodiff supplement module.
 Returns nullptr if there isn't an embedded autodiff module.
-The supplement structurally depends on declarations in the serialized core module. Consumers must
-load the core archive into the same session before loading this blob; this getter only returns the
-blob and does not enforce that ordering.
+The supplement structurally depends on declarations in the serialized core module: deserializing
+it resolves references into the core module by looking up "core" in the target session, the same
+way any other cross-module reference is resolved (see Linkage::findOrImportModule). Consumers must
+therefore load the core archive into the same session (e.g. via loadBuiltinModule with
+BuiltinModuleName::Core) before loading this blob; this getter only returns the blob and does not
+enforce that ordering. Violating it does not fail the load outright -- the unresolved references
+deserialize to null and the failure only surfaces later, as a crash or as incorrect behavior,
+wherever code actually uses the affected declarations. The compiler's own internal use of this
+blob (Session::loadAutodiffModuleIfNeeded) never violates the ordering, because the core module is
+always compiled or loaded before any code path that could request the autodiff module.
 
 NOTE! API is experimental and not ready for production code
 */

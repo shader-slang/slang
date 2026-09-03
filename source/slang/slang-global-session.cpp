@@ -464,7 +464,7 @@ void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName
     case slang::BuiltinModuleName::Autodiff:
         // The supplement is a module that depends on the base core. Every builtin declaration
         // referenced by this source must therefore remain in one of the eager core segments above.
-        sb << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+        sb << (const char*)getAutodiffSupplementLibraryCode()->getBufferPointer();
         break;
     }
 }

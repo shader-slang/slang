@@ -76,7 +76,13 @@ SlangResult SemanticsContext::ensureAutodiffModuleLoaded(SourceLoc location)
 
     if (module)
     {
-        m_shared->addLoadedAutodiffModule(module->getModuleDecl());
+        // `addLoadedAutodiffModule` returns whether this call is the first time this
+        // `SharedSemanticsContext` -- which is scoped to the one module currently being checked --
+        // has recorded the supplement. Later calls in the same module (a second `[Differentiable]`
+        // function, another `fwd_diff`/`bwd_diff`) already have their caches merged and their
+        // dependency recorded, so only the first call needs to do either.
+        if (!m_shared->addLoadedAutodiffModule(module->getModuleDecl()))
+            return SLANG_OK;
 
         // Make the module we are checking come out of checking looking as if it had written
         // `import` for the supplement, the same way `visitImportDecl` records a written import:

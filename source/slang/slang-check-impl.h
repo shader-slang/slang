@@ -962,7 +962,11 @@ public:
     void registerCandidateExtension(Decl* typeDecl, ExtensionDecl* extDecl);
 
     /// Makes the autodiff supplement loaded during checking visible to this context's caches.
-    void addLoadedAutodiffModule(ModuleDecl* moduleDecl);
+    /// Returns `true` the first time `moduleDecl` is recorded for this context (the module being
+    /// checked has not previously merged this supplement), `false` on a later call for the same
+    /// `moduleDecl` -- so a caller that also needs a once-per-module signal (e.g. recording the
+    /// supplement as a dependency of the module being checked) does not need a second dedup.
+    bool addLoadedAutodiffModule(ModuleDecl* moduleDecl);
 
     /// Invalidate inheritance info for `type`
     void invalidateInheritanceInfo(Type* type);
