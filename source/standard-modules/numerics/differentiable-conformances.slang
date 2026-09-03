@@ -9,11 +9,11 @@ implementing differentiable;
     This METHOD(This other) { return ADAPTER(this, other); }
 
 #define NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(add, __differentiableNumericsAdd) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(sub, __differentiableNumericsSub) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(mul, __differentiableNumericsMul) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(div, __differentiableNumericsDiv) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(neg, __differentiableNumericsNeg) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(adding, __differentiableNumericsAdd) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(subtracting, __differentiableNumericsSub) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
+    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \
     NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         absoluteValue, __differentiableNumericsAbs)                             \
     NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
@@ -23,20 +23,21 @@ implementing differentiable;
     NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         fractionalPart, __differentiableNumericsFractionalPart)                 \
     NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
-        remainder, __differentiableNumericsRemainder)                           \
+        remainderWhenDividedBy, __differentiableNumericsRemainder)              \
     NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
-        copySign, __differentiableNumericsCopySign)
+        copyingSignFrom, __differentiableNumericsCopySign)
 
 #define NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS                        \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(exp, __differentiableNumericsExp) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(exp2, __differentiableNumericsExp2) \
+    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(exponential, __differentiableNumericsExp) \
+    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(exponentialWithBase2, __differentiableNumericsExp2) \
     NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
-        exp10, __differentiableNumericsRegisteredExp10)                         \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(log, __differentiableNumericsLog) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(log2, __differentiableNumericsLog2) \
+        exponentialWithBase10, __differentiableNumericsRegisteredExp10)         \
+    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(logarithm, __differentiableNumericsLog) \
+    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(logarithmWithBase2, __differentiableNumericsLog2) \
     NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
-        log10, __differentiableNumericsLog10)                                   \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(pow, __differentiableNumericsPow)
+        logarithmWithBase10, __differentiableNumericsLog10)                     \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
+        raisedToThePowerOf, __differentiableNumericsPow)
 
 #define NUMERICS_DIFFERENTIABLE_TRIGONOMETRIC_REQUIREMENTS                      \
     NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(sin, __differentiableNumericsSin) \
@@ -67,9 +68,9 @@ implementing differentiable;
         atanh, __differentiableNumericsAtanh)
 
 #define NUMERICS_DIFFERENTIABLE_ROOT_REQUIREMENTS                               \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(sqrt, __differentiableNumericsSqrt) \
+    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(squareRoot, __differentiableNumericsSqrt) \
     NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
-        rsqrt, __differentiableNumericsRsqrt)
+        reciprocalSquareRoot, __differentiableNumericsRsqrt)
 
 #define NUMERICS_DIFFERENTIABLE_ORDERING_REQUIREMENTS                           \
     NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
@@ -80,6 +81,11 @@ implementing differentiable;
 #define NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(TYPE)                       \
     public extension TYPE : IScalarDifferentiableFloatingPoint                  \
     {                                                                            \
+        [Differentiable] [ForceInline]                                           \
+        __init<TSource : __BuiltinFloatingPointType>(TSource value)              \
+        {                                                                        \
+            this = __differentiableNumericsConstructFromFloatingPoint<TYPE>(value); \
+        }                                                                        \
         NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
         NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS                     \
     }                                                                            \
@@ -125,6 +131,12 @@ public extension<
     let N : int>
     vector<T, N> : IDifferentiableFloatingPoint
 {
+    [Differentiable] [ForceInline]
+    __init<TSource : __BuiltinFloatingPointType>(TSource value)
+    {
+        this = __differentiableNumericsConstructVectorFromFloatingPoint<T, TSource, N>(value);
+    }
+
     NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS
     NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS
 }
@@ -201,11 +213,11 @@ public extension<
     }
 
 #define NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS                  \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(add, __differentiableNumericsAdd) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(sub, __differentiableNumericsSub) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(mul, __differentiableNumericsMul) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(div, __differentiableNumericsDiv) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(neg, __differentiableNumericsNeg) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(adding, __differentiableNumericsAdd) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(subtracting, __differentiableNumericsSub) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
+    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \
     NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         absoluteValue, __differentiableNumericsAbs)                             \
     NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
@@ -215,19 +227,19 @@ public extension<
     NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         fractionalPart, __differentiableNumericsFractionalPart)                 \
     NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
-        remainder, __differentiableNumericsRemainder)                           \
+        remainderWhenDividedBy, __differentiableNumericsRemainder)              \
     NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
-        copySign, __differentiableNumericsCopySign)
+        copyingSignFrom, __differentiableNumericsCopySign)
 
 #define NUMERICS_DIFFERENTIABLE_MATRIX_EXPONENTIAL_REQUIREMENTS                 \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(exp, __differentiableNumericsExp) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(exp2, __differentiableNumericsExp2) \
+    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(exponential, __differentiableNumericsExp) \
+    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(exponentialWithBase2, __differentiableNumericsExp2) \
     NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
-        exp10, __differentiableNumericsRegisteredExp10)                         \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(log, __differentiableNumericsLog) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(log2, __differentiableNumericsLog2) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(log10, __differentiableNumericsLog10) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(pow, __differentiableNumericsPow)
+        exponentialWithBase10, __differentiableNumericsRegisteredExp10)         \
+    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(logarithm, __differentiableNumericsLog) \
+    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(logarithmWithBase2, __differentiableNumericsLog2) \
+    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(logarithmWithBase10, __differentiableNumericsLog10) \
+    NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(raisedToThePowerOf, __differentiableNumericsPow)
 
 #define NUMERICS_DIFFERENTIABLE_MATRIX_TRIGONOMETRIC_REQUIREMENTS               \
     NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(sin, __differentiableNumericsSin) \
@@ -259,8 +271,8 @@ public extension<
     NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(atanh, __differentiableNumericsAtanh)
 
 #define NUMERICS_DIFFERENTIABLE_MATRIX_ROOT_REQUIREMENTS                        \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(sqrt, __differentiableNumericsSqrt) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(rsqrt, __differentiableNumericsRsqrt)
+    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(squareRoot, __differentiableNumericsSqrt) \
+    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(reciprocalSquareRoot, __differentiableNumericsRsqrt)
 
 #define NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS                    \
     NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
@@ -275,6 +287,13 @@ public extension<
     let L : int>
     matrix<T, R, C, L> : IDifferentiableFloatingPoint
 {
+    [Differentiable] [ForceInline]
+    __init<TSource : __BuiltinFloatingPointType>(TSource value)
+    {
+        this = __differentiableNumericsConstructMatrixFromFloatingPoint<
+            T, TSource, R, C, L>(value);
+    }
+
     NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS
     NUMERICS_DIFFERENTIABLE_MATRIX_FLOATING_POINT_REQUIREMENTS
 }

@@ -1,8 +1,7 @@
 implementing numerics;
 
-// The sealed builtin interfaces cannot directly refine the public scalar hierarchy today. The
-// recursive `Scalar == This` constraints cause the conformance checker to construct an invalid
-// witness while checking the builtin interface itself, so the concrete scalar types conform here.
+// These conformances are owned by `slang.numerics`, so importing this experimental module opts the
+// builtin scalar types into its public numeric hierarchy without adding a dependency from `core`.
 public extension bool : IBooleanMask
 {
     [__unsafeForceInlineEarly] This logicalNot() { return !this; }
@@ -22,36 +21,35 @@ public extension bool : IBooleanMask
         [__unsafeForceInlineEarly]                                               \
         static This fromScalar(Scalar value) { return value; }                   \
         [__unsafeForceInlineEarly]                                               \
-        static Scalar getZero() { return Scalar(0); }                            \
+        __init<TSource : __BuiltinIntegerType>(TSource value)                    \
+        {                                                                        \
+            this = __numericsBuiltinConstructFromInteger<TYPE>(value);           \
+        }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        static Scalar getOne() { return Scalar(1); }                             \
+        static This zero() { return This(0); }                                   \
         [__unsafeForceInlineEarly]                                               \
-        bool isEqual(This other) { return __numericsBuiltinEqual(this, other); } \
+        static This one() { return This(1); }                                    \
+        [__unsafeForceInlineEarly]                                               \
+        bool isEqualTo(This other)                                               \
+        {                                                                        \
+            return __numericsBuiltinEqual(this, other);                          \
+        }                                                                        \
         [__unsafeForceInlineEarly]                                               \
         bool isLessThan(This other)                                              \
         {                                                                        \
             return __numericsBuiltinLess(this, other);                           \
         }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        bool isLessThanOrEqual(This other)                                       \
+        bool isLessThanOrEqualTo(This other)                                     \
         {                                                                        \
             return __numericsBuiltinLessEqual(this, other);                      \
         }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        bool equals(This other) { return __numericsBuiltinEqual(this, other); }  \
+        This adding(This other) { return this + other; }                         \
         [__unsafeForceInlineEarly]                                               \
-        bool lessThan(This other) { return __numericsBuiltinLess(this, other); } \
+        This subtracting(This other) { return this - other; }                    \
         [__unsafeForceInlineEarly]                                               \
-        bool lessThanOrEquals(This other)                                        \
-        {                                                                        \
-            return __numericsBuiltinLessEqual(this, other);                      \
-        }                                                                        \
-        [__unsafeForceInlineEarly]                                               \
-        This add(This other) { return __numericsLegacyAdd(this, other); }        \
-        [__unsafeForceInlineEarly]                                               \
-        This sub(This other) { return __numericsLegacySub(this, other); }        \
-        [__unsafeForceInlineEarly]                                               \
-        This mul(This other) { return __numericsLegacyMul(this, other); }        \
+        This multipliedBy(This other) { return this * other; }                   \
     }
 
 NUMERICS_SCALAR_CONFORMANCE(int8_t)
@@ -74,7 +72,7 @@ NUMERICS_SCALAR_CONFORMANCE(double)
     public extension TYPE : IScalarSignedNumeric                                \
     {                                                                            \
         [__unsafeForceInlineEarly]                                               \
-        This neg() { return __numericsLegacyNeg(this); }                         \
+        This negated() { return -this; }                                         \
         [__unsafeForceInlineEarly]                                               \
         This absoluteValue() { return __numericInterfaceBuiltinAbs(this); }      \
     }
@@ -96,23 +94,32 @@ NUMERICS_SIGNED_INTEGER_CONFORMANCE(intptr_t)
         typealias ShiftAmount = int;                                             \
                                                                                  \
         [__unsafeForceInlineEarly]                                               \
-        This quotient(This divisor)                                              \
+        This quotientWhenDividedBy(This divisor)                                 \
         {                                                                        \
             return __numericsBuiltinIntegerDivide(this, divisor);                \
         }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        This remainder(This divisor)                                             \
+        This remainderWhenDividedBy(This divisor)                                \
         {                                                                        \
             return __numericsBuiltinIntegerRemainder(this, divisor);             \
         }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        This bitAnd(This other) { return __numericsBuiltinBitAnd(this, other); } \
+        This bitwiseAnd(This other)                                              \
+        {                                                                        \
+            return __numericsBuiltinBitAnd(this, other);                         \
+        }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        This bitOr(This other) { return __numericsBuiltinBitOr(this, other); }   \
+        This bitwiseOr(This other)                                               \
+        {                                                                        \
+            return __numericsBuiltinBitOr(this, other);                          \
+        }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        This bitXor(This other) { return __numericsBuiltinBitXor(this, other); } \
+        This bitwiseXor(This other)                                              \
+        {                                                                        \
+            return __numericsBuiltinBitXor(this, other);                         \
+        }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        This bitNot() { return __numericsBuiltinBitNot(this); }                  \
+        This bitwiseNot() { return __numericsBuiltinBitNot(this); }              \
         [__unsafeForceInlineEarly]                                               \
         This shiftedLeftBy(int amount)                                           \
         {                                                                        \
@@ -166,15 +173,20 @@ NUMERICS_UNSIGNED_INTEGER_REFINEMENT(uintptr_t)
     public extension TYPE : IScalarFractional                                   \
     {                                                                            \
         [__unsafeForceInlineEarly]                                               \
-        This add(This other) { return __numericsLegacyAdd(this, other); }        \
+        __init<TSource : __BuiltinFloatingPointType>(TSource value)              \
+        {                                                                        \
+            this = __numericsBuiltinConstructFromFloatingPoint<TYPE>(value);     \
+        }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        This sub(This other) { return __numericsLegacySub(this, other); }        \
+        This adding(This other) { return this + other; }                         \
         [__unsafeForceInlineEarly]                                               \
-        This mul(This other) { return __numericsLegacyMul(this, other); }        \
+        This subtracting(This other) { return this - other; }                    \
         [__unsafeForceInlineEarly]                                               \
-        This div(This other) { return __numericsLegacyDiv(this, other); }        \
+        This multipliedBy(This other) { return this * other; }                   \
         [__unsafeForceInlineEarly]                                               \
-        This neg() { return __numericsLegacyNeg(this); }                         \
+        This dividedBy(This other) { return this / other; }                      \
+        [__unsafeForceInlineEarly]                                               \
+        This negated() { return -this; }                                         \
         [__unsafeForceInlineEarly]                                               \
         This absoluteValue() { return __numericInterfaceBuiltinAbs(this); }      \
         [__unsafeForceInlineEarly]                                               \
@@ -289,29 +301,46 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     typealias ShiftAmount = vector<int, N>;
 
     [__unsafeForceInlineEarly] static This fromScalar(Scalar value) { return This(value); }
-    [__unsafeForceInlineEarly] static Scalar getZero() { return Scalar.getZero(); }
-    [__unsafeForceInlineEarly] static Scalar getOne() { return Scalar.getOne(); }
     [__unsafeForceInlineEarly]
-    Mask isEqual(This other) { return __numericsBuiltinEqual(this, other); }
+    __init<TSource : __BuiltinIntegerType>(TSource value)
+    {
+        this = This.fromScalar(__numericsBuiltinConstructFromInteger<T>(value));
+    }
+    [__unsafeForceInlineEarly] static This zero() { return This(Scalar.zero()); }
+    [__unsafeForceInlineEarly] static This one() { return This(Scalar.one()); }
+    [__unsafeForceInlineEarly]
+    Mask isEqualTo(This other) { return __numericsBuiltinEqual(this, other); }
     [__unsafeForceInlineEarly]
     Mask isLessThan(This other) { return __numericsBuiltinLess(this, other); }
     [__unsafeForceInlineEarly]
-    Mask isLessThanOrEqual(This other)
+    Mask isLessThanOrEqualTo(This other)
     {
         return __numericsBuiltinLessEqual(this, other);
     }
     [__unsafeForceInlineEarly]
-    This quotient(This divisor) { return __numericsBuiltinIntegerDivide(this, divisor); }
+    This adding(This other) { return __numericsBuiltinAdd(this, other); }
     [__unsafeForceInlineEarly]
-    This remainder(This divisor) { return __numericsBuiltinIntegerRemainder(this, divisor); }
+    This subtracting(This other) { return __numericsBuiltinSubtract(this, other); }
     [__unsafeForceInlineEarly]
-    This bitAnd(This other) { return __numericsBuiltinBitAnd(this, other); }
+    This multipliedBy(This other) { return __numericsBuiltinMultiply(this, other); }
     [__unsafeForceInlineEarly]
-    This bitOr(This other) { return __numericsBuiltinBitOr(this, other); }
+    This quotientWhenDividedBy(This divisor)
+    {
+        return __numericsBuiltinIntegerDivide(this, divisor);
+    }
     [__unsafeForceInlineEarly]
-    This bitXor(This other) { return __numericsBuiltinBitXor(this, other); }
+    This remainderWhenDividedBy(This divisor)
+    {
+        return __numericsBuiltinIntegerRemainder(this, divisor);
+    }
     [__unsafeForceInlineEarly]
-    This bitNot() { return __numericsBuiltinBitNot(this); }
+    This bitwiseAnd(This other) { return __numericsBuiltinBitAnd(this, other); }
+    [__unsafeForceInlineEarly]
+    This bitwiseOr(This other) { return __numericsBuiltinBitOr(this, other); }
+    [__unsafeForceInlineEarly]
+    This bitwiseXor(This other) { return __numericsBuiltinBitXor(this, other); }
+    [__unsafeForceInlineEarly]
+    This bitwiseNot() { return __numericsBuiltinBitNot(this); }
     [__unsafeForceInlineEarly]
     This shiftedLeftBy(ShiftAmount amount)
     {
@@ -330,6 +359,8 @@ public extension<
     vector<T, N> : ISignedIntegerType
 {
     [__unsafeForceInlineEarly]
+    This negated() { return __numericsBuiltinNegate(this); }
+    [__unsafeForceInlineEarly]
     This absoluteValue() { return __numericInterfaceBuiltinAbs(this); }
 }
 
@@ -345,11 +376,11 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
 
     [__unsafeForceInlineEarly] static This fromScalar(Scalar value) { return This(value); }
     [__unsafeForceInlineEarly]
-    Mask isEqual(This other) { return __numericsBuiltinEqual(this, other); }
+    Mask isEqualTo(This other) { return __numericsBuiltinEqual(this, other); }
     [__unsafeForceInlineEarly]
     Mask isLessThan(This other) { return __numericsBuiltinLess(this, other); }
     [__unsafeForceInlineEarly]
-    Mask isLessThanOrEqual(This other)
+    Mask isLessThanOrEqualTo(This other)
     {
         return __numericsBuiltinLessEqual(this, other);
     }
@@ -358,8 +389,28 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
 public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int>
     vector<T, N> : IFractional
 {
-    [__unsafeForceInlineEarly] static T getZero() { return T.getZero(); }
-    [__unsafeForceInlineEarly] static T getOne() { return T.getOne(); }
+    [__unsafeForceInlineEarly]
+    __init<TSource : __BuiltinIntegerType>(TSource value)
+    {
+        this = This.fromScalar(__numericsBuiltinConstructFromInteger<T>(value));
+    }
+    [__unsafeForceInlineEarly]
+    __init<TSource : __BuiltinFloatingPointType>(TSource value)
+    {
+        this = This.fromScalar(__numericsBuiltinConstructFromFloatingPoint<T>(value));
+    }
+    [__unsafeForceInlineEarly] static This zero() { return This(T.zero()); }
+    [__unsafeForceInlineEarly] static This one() { return This(T.one()); }
+    [__unsafeForceInlineEarly]
+    This adding(This other) { return __numericsBuiltinAdd(this, other); }
+    [__unsafeForceInlineEarly]
+    This subtracting(This other) { return __numericsBuiltinSubtract(this, other); }
+    [__unsafeForceInlineEarly]
+    This multipliedBy(This other) { return __numericsBuiltinMultiply(this, other); }
+    [__unsafeForceInlineEarly]
+    This dividedBy(This other) { return __numericsBuiltinDivide(this, other); }
+    [__unsafeForceInlineEarly]
+    This negated() { return __numericsBuiltinNegate(this); }
     [__unsafeForceInlineEarly]
     This absoluteValue() { return __numericInterfaceBuiltinAbs(this); }
     [__unsafeForceInlineEarly]
@@ -379,7 +430,7 @@ public extension<
     [__unsafeForceInlineEarly] static This fromScalar(Scalar value) { return This(value); }
 
     [__unsafeForceInlineEarly]
-    Mask isEqual(This other)
+    Mask isEqualTo(This other)
     {
         Mask result;
         [ForceUnroll]
@@ -413,7 +464,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    Mask isLessThanOrEqual(This other)
+    Mask isLessThanOrEqualTo(This other)
     {
         Mask result;
         [ForceUnroll]
@@ -437,8 +488,29 @@ public extension<
     let L : int>
     matrix<T, R, C, L> : IFractional
 {
-    [__unsafeForceInlineEarly] static T getZero() { return T.getZero(); }
-    [__unsafeForceInlineEarly] static T getOne() { return T.getOne(); }
+    [__unsafeForceInlineEarly]
+    __init<TSource : __BuiltinIntegerType>(TSource value)
+    {
+        this = This.fromScalar(__numericsBuiltinConstructFromInteger<T>(value));
+    }
+    [__unsafeForceInlineEarly]
+    __init<TSource : __BuiltinFloatingPointType>(TSource value)
+    {
+        this = This.fromScalar(__numericsBuiltinConstructFromFloatingPoint<T>(value));
+    }
+    [__unsafeForceInlineEarly] static This zero() { return This(T.zero()); }
+    [__unsafeForceInlineEarly] static This one() { return This(T.one()); }
+
+    [__unsafeForceInlineEarly]
+    This adding(This other) { return __numericsBuiltinAdd(this, other); }
+    [__unsafeForceInlineEarly]
+    This subtracting(This other) { return __numericsBuiltinSubtract(this, other); }
+    [__unsafeForceInlineEarly]
+    This multipliedBy(This other) { return __numericsBuiltinMultiply(this, other); }
+    [__unsafeForceInlineEarly]
+    This dividedBy(This other) { return __numericsBuiltinDivide(this, other); }
+    [__unsafeForceInlineEarly]
+    This negated() { return __numericsBuiltinNegate(this); }
 
     [__unsafeForceInlineEarly]
     This absoluteValue()

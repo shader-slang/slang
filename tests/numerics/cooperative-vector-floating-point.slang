@@ -17,11 +17,19 @@ bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
     return all(left < right);
 }
 
+T constructFromBuiltinFloatingPoint<
+    T : IFractional,
+    TSource : __BuiltinFloatingPointType>(TSource value)
+{
+    return T(value);
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    CoopVec<float, 4> value = CoopVec<float, 4>(0.5);
+    CoopVec<float, 4> value =
+        constructFromBuiltinFloatingPoint<CoopVec<float, 4>>(half(0.5));
     CoopVec<float, 4> result = realCurve(value, CoopVec<float, 4>(4.0));
     bool ordered = allLessThan(value, CoopVec<float, 4>(1.0));
     outputBuffer[0] = result[0] + float(ordered);

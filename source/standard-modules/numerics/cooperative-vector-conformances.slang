@@ -11,11 +11,18 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
 
     [ForceInline] [require(cooperative_vector)]
     static This fromScalar(Scalar value) { return This(value); }
-    [ForceInline] static Scalar getZero() { return Scalar.getZero(); }
-    [ForceInline] static Scalar getOne() { return Scalar.getOne(); }
+    [ForceInline] [require(cooperative_vector)]
+    __init<TSource : __BuiltinIntegerType>(TSource value)
+    {
+        this = This.fromScalar(__numericsBuiltinConstructFromInteger<T>(value));
+    }
+    [ForceInline] [require(cooperative_vector)]
+    static This zero() { return This(Scalar.zero()); }
+    [ForceInline] [require(cooperative_vector)]
+    static This one() { return This(Scalar.one()); }
 
     [ForceInline] [require(cooperative_vector)]
-    Mask isEqual(This other)
+    Mask isEqualTo(This other)
     {
         Mask result;
         [ForceUnroll]
@@ -35,7 +42,7 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     }
 
     [ForceInline] [require(cooperative_vector)]
-    Mask isLessThanOrEqual(This other)
+    Mask isLessThanOrEqualTo(This other)
     {
         Mask result;
         [ForceUnroll]
@@ -45,9 +52,15 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     }
 
     [ForceInline] [require(cooperative_vector)]
-    This quotient(This divisor) { return this.div(divisor); }
+    This adding(This other) { return this.add(other); }
     [ForceInline] [require(cooperative_vector)]
-    This remainder(This divisor) { return this.mod(divisor); }
+    This subtracting(This other) { return this.sub(other); }
+    [ForceInline] [require(cooperative_vector)]
+    This multipliedBy(This other) { return this.mul(other); }
+    [ForceInline] [require(cooperative_vector)]
+    This quotientWhenDividedBy(This divisor) { return this.div(divisor); }
+    [ForceInline] [require(cooperative_vector)]
+    This remainderWhenDividedBy(This divisor) { return this.mod(divisor); }
 
     [ForceInline] [require(cooperative_vector)]
     This shiftedLeftBy(ShiftAmount amount)
@@ -80,14 +93,14 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
         return result;                                                           \
     }
 
-    NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitAnd, &)
-    NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitOr, |)
-    NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitXor, ^)
+    NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitwiseAnd, &)
+    NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitwiseOr, |)
+    NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitwiseXor, ^)
 
 #undef NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT
 
     [ForceInline] [require(cooperative_vector)]
-    This bitNot()
+    This bitwiseNot()
     {
         This result;
         [ForceUnroll]
@@ -102,6 +115,9 @@ public extension<
     let N : int>
     CoopVec<T, N> : ISignedIntegerType
 {
+    [ForceInline] [require(cooperative_vector)]
+    This negated() { return this.neg(); }
+
     [ForceInline] [require(cooperative_vector)]
     This absoluteValue()
     {
@@ -127,7 +143,7 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     static This fromScalar(Scalar value) { return This(value); }
 
     [ForceInline] [require(cooperative_vector)]
-    Mask isEqual(This other)
+    Mask isEqualTo(This other)
     {
         Mask result;
         [ForceUnroll]
@@ -147,7 +163,7 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     }
 
     [ForceInline] [require(cooperative_vector)]
-    Mask isLessThanOrEqual(This other)
+    Mask isLessThanOrEqualTo(This other)
     {
         Mask result;
         [ForceUnroll]
@@ -160,8 +176,31 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
 public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int>
     CoopVec<T, N> : IFractional
 {
-    [ForceInline] static Scalar getZero() { return Scalar.getZero(); }
-    [ForceInline] static Scalar getOne() { return Scalar.getOne(); }
+    [ForceInline] [require(cooperative_vector)]
+    __init<TSource : __BuiltinIntegerType>(TSource value)
+    {
+        this = This.fromScalar(__numericsBuiltinConstructFromInteger<T>(value));
+    }
+    [ForceInline] [require(cooperative_vector)]
+    __init<TSource : __BuiltinFloatingPointType>(TSource value)
+    {
+        this = This.fromScalar(__numericsBuiltinConstructFromFloatingPoint<T>(value));
+    }
+    [ForceInline] [require(cooperative_vector)]
+    static This zero() { return This(Scalar.zero()); }
+    [ForceInline] [require(cooperative_vector)]
+    static This one() { return This(Scalar.one()); }
+
+    [ForceInline] [require(cooperative_vector)]
+    This adding(This other) { return this.add(other); }
+    [ForceInline] [require(cooperative_vector)]
+    This subtracting(This other) { return this.sub(other); }
+    [ForceInline] [require(cooperative_vector)]
+    This multipliedBy(This other) { return this.mul(other); }
+    [ForceInline] [require(cooperative_vector)]
+    This dividedBy(This other) { return this.div(other); }
+    [ForceInline] [require(cooperative_vector)]
+    This negated() { return this.neg(); }
 
     [ForceInline] [require(cooperative_vector)]
     This absoluteValue()
@@ -231,13 +270,13 @@ public extension<T : __BuiltinFloatingPointType & ITrigonometricFunctions, let N
 public extension<T : __BuiltinFloatingPointType & IExponentialFunctions, let N : int>
     CoopVec<T, N> : IExponentialFunctions
 {
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(exp, __numericInterfaceBuiltinExp)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(exp2, __numericInterfaceBuiltinExp2)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(exp10, __numericInterfaceBuiltinExp10)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(log, __numericInterfaceBuiltinLog)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(log2, __numericInterfaceBuiltinLog2)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(log10, __numericInterfaceBuiltinLog10)
-    NUMERICS_COOPVEC_BINARY_REQUIREMENT(pow, __numericInterfaceBuiltinPow)
+    NUMERICS_COOPVEC_UNARY_REQUIREMENT(exponential, __numericInterfaceBuiltinExp)
+    NUMERICS_COOPVEC_UNARY_REQUIREMENT(exponentialWithBase2, __numericInterfaceBuiltinExp2)
+    NUMERICS_COOPVEC_UNARY_REQUIREMENT(exponentialWithBase10, __numericInterfaceBuiltinExp10)
+    NUMERICS_COOPVEC_UNARY_REQUIREMENT(logarithm, __numericInterfaceBuiltinLog)
+    NUMERICS_COOPVEC_UNARY_REQUIREMENT(logarithmWithBase2, __numericInterfaceBuiltinLog2)
+    NUMERICS_COOPVEC_UNARY_REQUIREMENT(logarithmWithBase10, __numericInterfaceBuiltinLog10)
+    NUMERICS_COOPVEC_BINARY_REQUIREMENT(raisedToThePowerOf, __numericInterfaceBuiltinPow)
 }
 
 public extension<T : __BuiltinFloatingPointType & IInverseTrigonometricFunctions, let N : int>
@@ -263,8 +302,8 @@ public extension<T : __BuiltinFloatingPointType & IHyperbolicFunctions, let N : 
 public extension<T : __BuiltinFloatingPointType & IRootFunctions, let N : int>
     CoopVec<T, N> : IRootFunctions
 {
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(sqrt, __numericInterfaceBuiltinSqrt)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(rsqrt, __numericInterfaceBuiltinReciprocalSqrt)
+    NUMERICS_COOPVEC_UNARY_REQUIREMENT(squareRoot, __numericInterfaceBuiltinSqrt)
+    NUMERICS_COOPVEC_UNARY_REQUIREMENT(reciprocalSquareRoot, __numericInterfaceBuiltinReciprocalSqrt)
 }
 
 #undef NUMERICS_COOPVEC_UNARY_REQUIREMENT
@@ -301,7 +340,7 @@ public extension<T : __BuiltinFloatingPointType & IScalarReal, let N : int>
         for (int index = 0; index < N; ++index)
         {
             result[index] =
-                this[index] < edge[index] ? T.getZero() : T.getOne();
+                this[index] < edge[index] ? T.zero() : T.one();
         }
         return result;
     }

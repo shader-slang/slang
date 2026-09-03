@@ -21,14 +21,14 @@ struct CustomReal
     typealias Scalar = CustomReal;
     typealias Mask = bool;
 
-    __init(int value)
+    __init<TSource : __BuiltinIntegerType>(TSource value)
     {
-        this.value = float(value);
+        this.value = __realCast<float>(value);
     }
 
-    __init(float value)
+    __init<TSource : __BuiltinFloatingPointType>(TSource value)
     {
-        this.value = value;
+        this.value = __realCast<float>(value);
     }
 
     static This fromScalar(Scalar value)
@@ -36,37 +36,37 @@ struct CustomReal
         return value;
     }
 
-    static Scalar getZero()
+    static This zero()
     {
         return {0.0};
     }
 
-    static Scalar getOne()
+    static This one()
     {
         return {1.0};
     }
 
-    This add(This other)
+    This adding(This other)
     {
         return {value + other.value};
     }
 
-    This sub(This other)
+    This subtracting(This other)
     {
         return {value - other.value};
     }
 
-    This mul(This other)
+    This multipliedBy(This other)
     {
         return {value * other.value};
     }
 
-    This div(This other)
+    This dividedBy(This other)
     {
         return {value / other.value};
     }
 
-    This neg()
+    This negated()
     {
         return {-value};
     }
@@ -81,7 +81,7 @@ struct CustomReal
         return {rcp(value)};
     }
 
-    Mask isEqual(This other)
+    Mask isEqualTo(This other)
     {
         return value == other.value;
     }
@@ -91,60 +91,46 @@ struct CustomReal
         return value < other.value;
     }
 
-    Mask isLessThanOrEqual(This other)
+    Mask isLessThanOrEqualTo(This other)
     {
         return value <= other.value;
     }
 
-    bool equals(This other)
-    {
-        return isEqual(other);
-    }
-
-    bool lessThan(This other)
-    {
-        return isLessThan(other);
-    }
-
-    bool lessThanOrEquals(This other)
-    {
-        return isLessThanOrEqual(other);
-    }
 }
 
 extension CustomReal : IExponentialFunctions
 {
-    This exp()
+    This exponential()
     {
         return {exp(value)};
     }
 
-    This exp2()
+    This exponentialWithBase2()
     {
         return {exp2(value)};
     }
 
-    This exp10()
+    This exponentialWithBase10()
     {
         return {exp10(value)};
     }
 
-    This log()
+    This logarithm()
     {
         return {log(value)};
     }
 
-    This log2()
+    This logarithmWithBase2()
     {
         return {log2(value)};
     }
 
-    This log10()
+    This logarithmWithBase10()
     {
         return {log10(value)};
     }
 
-    This pow(This exponent)
+    This raisedToThePowerOf(This exponent)
     {
         return {pow(value, exponent.value)};
     }
@@ -235,12 +221,12 @@ extension CustomReal : IHyperbolicFunctions
 
 extension CustomReal : IRootFunctions
 {
-    This sqrt()
+    This squareRoot()
     {
         return {sqrt(value)};
     }
 
-    This rsqrt()
+    This reciprocalSquareRoot()
     {
         return {rsqrt(value)};
     }
@@ -273,7 +259,12 @@ T realCurve<T : IReal>(T value, T other)
         step(value, other);
 }
 
-T constructFromLiteralTypes<T : IFractional>(int integerValue, float floatingValue)
+T constructFromBuiltinTypes<
+    T : IFractional,
+    TInteger : __BuiltinIntegerType,
+    TFloatingPoint : __BuiltinFloatingPointType>(
+    TInteger integerValue,
+    TFloatingPoint floatingValue)
 {
     return T(integerValue) + T(floatingValue);
 }
@@ -282,6 +273,8 @@ T constructFromLiteralTypes<T : IFractional>(int integerValue, float floatingVal
 [numthreads(1, 1, 1)]
 void main()
 {
-    CustomReal result = realCurve(constructFromLiteralTypes<CustomReal>(0, 0.5), CustomReal(4.0));
+    CustomReal result = realCurve(
+        constructFromBuiltinTypes<CustomReal>(int16_t(0), double(0.5)),
+        CustomReal(4.0));
     outputBuffer[0] = result.value;
 }

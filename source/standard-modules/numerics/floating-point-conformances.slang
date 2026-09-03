@@ -1,5 +1,10 @@
 implementing numerics;
 
+// These conformances implement the public numeric requirements in terms of the established
+// core-module operations. Calls use the distinguished builtin-adapter names, or an explicitly
+// shaped builtin overload, so they cannot resolve back through a public interface-generic wrapper
+// to the witness currently being implemented and form a dispatch cycle.
+
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public extension half : IScalarFloatingPoint
 {
@@ -10,26 +15,26 @@ public extension half : IScalarFloatingPoint
     }
 
     [__unsafeForceInlineEarly]
-    This ceil()
+    This ceiling()
     {
         return __numericInterfaceBuiltinCeil(this);
     }
 
     [__unsafeForceInlineEarly]
-    This round()
+    This rounded()
     {
         return __numericInterfaceBuiltinRound(this);
     }
 
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
-    This roundEven()
+    This roundedToNearestEven()
     {
         return __numericInterfaceBuiltinRoundEven(this);
     }
 
     [__unsafeForceInlineEarly]
-    This truncate()
+    This truncated()
     {
         return __numericInterfaceBuiltinTruncate(this);
     }
@@ -41,19 +46,19 @@ public extension half : IScalarFloatingPoint
     }
 
     [__unsafeForceInlineEarly]
-    This remainder(This divisor)
+    This remainderWhenDividedBy(This divisor)
     {
         return __numericInterfaceBuiltinRemainder(this, divisor);
     }
 
     [__unsafeForceInlineEarly]
-    This copySign(This signSource)
+    This copyingSignFrom(This signSource)
     {
         return __numericInterfaceBuiltinCopySign(this, signSource);
     }
 
     [__unsafeForceInlineEarly]
-    This splitFraction(out This integralPart)
+    This fractionalPart(out This integralPart)
     {
         return __numericInterfaceBuiltinSplitFraction(this, integralPart);
     }
@@ -109,43 +114,43 @@ public extension half : ITrigonometricFunctions
 public extension half : IExponentialFunctions
 {
     [__unsafeForceInlineEarly]
-    This exp()
+    This exponential()
     {
         return __numericInterfaceBuiltinExp(this);
     }
 
     [__unsafeForceInlineEarly]
-    This exp2()
+    This exponentialWithBase2()
     {
         return __numericInterfaceBuiltinExp2(this);
     }
 
     [__unsafeForceInlineEarly]
-    This exp10()
+    This exponentialWithBase10()
     {
         return __numericInterfaceBuiltinExp10(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log()
+    This logarithm()
     {
         return __numericInterfaceBuiltinLog(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log2()
+    This logarithmWithBase2()
     {
         return __numericInterfaceBuiltinLog2(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log10()
+    This logarithmWithBase10()
     {
         return __numericInterfaceBuiltinLog10(this);
     }
 
     [__unsafeForceInlineEarly]
-    This pow(This exponent)
+    This raisedToThePowerOf(This exponent)
     {
         return __numericInterfaceBuiltinPow(this, exponent);
     }
@@ -223,13 +228,13 @@ public extension half : IHyperbolicFunctions
 public extension half : IRootFunctions
 {
     [__unsafeForceInlineEarly]
-    This sqrt()
+    This squareRoot()
     {
         return __numericInterfaceBuiltinSqrt(this);
     }
 
     [__unsafeForceInlineEarly]
-    This rsqrt()
+    This reciprocalSquareRoot()
     {
         return __numericInterfaceBuiltinReciprocalSqrt(this);
     }
@@ -238,8 +243,6 @@ public extension half : IRootFunctions
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public extension half : IRealOrderingFunctions
 {
-    // Select the existing builtin overload explicitly. An unqualified call can specialize back
-    // through the interface-generic overload and form a routing cycle across builtin shapes.
     [__unsafeForceInlineEarly]
     This minimum(This other)
     {
@@ -255,7 +258,7 @@ public extension half : IRealOrderingFunctions
     [__unsafeForceInlineEarly]
     This step(This edge)
     {
-        return this < edge ? This.getZero() : This.getOne();
+        return this < edge ? This.zero() : This.one();
     }
 }
 
@@ -269,26 +272,26 @@ public extension float : IScalarFloatingPoint
     }
 
     [__unsafeForceInlineEarly]
-    This ceil()
+    This ceiling()
     {
         return __numericInterfaceBuiltinCeil(this);
     }
 
     [__unsafeForceInlineEarly]
-    This round()
+    This rounded()
     {
         return __numericInterfaceBuiltinRound(this);
     }
 
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
-    This roundEven()
+    This roundedToNearestEven()
     {
         return __numericInterfaceBuiltinRoundEven(this);
     }
 
     [__unsafeForceInlineEarly]
-    This truncate()
+    This truncated()
     {
         return __numericInterfaceBuiltinTruncate(this);
     }
@@ -300,19 +303,19 @@ public extension float : IScalarFloatingPoint
     }
 
     [__unsafeForceInlineEarly]
-    This remainder(This divisor)
+    This remainderWhenDividedBy(This divisor)
     {
         return __numericInterfaceBuiltinRemainder(this, divisor);
     }
 
     [__unsafeForceInlineEarly]
-    This copySign(This signSource)
+    This copyingSignFrom(This signSource)
     {
         return __numericInterfaceBuiltinCopySign(this, signSource);
     }
 
     [__unsafeForceInlineEarly]
-    This splitFraction(out This integralPart)
+    This fractionalPart(out This integralPart)
     {
         return __numericInterfaceBuiltinSplitFraction(this, integralPart);
     }
@@ -368,43 +371,43 @@ public extension float : ITrigonometricFunctions
 public extension float : IExponentialFunctions
 {
     [__unsafeForceInlineEarly]
-    This exp()
+    This exponential()
     {
         return __numericInterfaceBuiltinExp(this);
     }
 
     [__unsafeForceInlineEarly]
-    This exp2()
+    This exponentialWithBase2()
     {
         return __numericInterfaceBuiltinExp2(this);
     }
 
     [__unsafeForceInlineEarly]
-    This exp10()
+    This exponentialWithBase10()
     {
         return __numericInterfaceBuiltinExp10(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log()
+    This logarithm()
     {
         return __numericInterfaceBuiltinLog(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log2()
+    This logarithmWithBase2()
     {
         return __numericInterfaceBuiltinLog2(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log10()
+    This logarithmWithBase10()
     {
         return __numericInterfaceBuiltinLog10(this);
     }
 
     [__unsafeForceInlineEarly]
-    This pow(This exponent)
+    This raisedToThePowerOf(This exponent)
     {
         return __numericInterfaceBuiltinPow(this, exponent);
     }
@@ -482,13 +485,13 @@ public extension float : IHyperbolicFunctions
 public extension float : IRootFunctions
 {
     [__unsafeForceInlineEarly]
-    This sqrt()
+    This squareRoot()
     {
         return __numericInterfaceBuiltinSqrt(this);
     }
 
     [__unsafeForceInlineEarly]
-    This rsqrt()
+    This reciprocalSquareRoot()
     {
         return __numericInterfaceBuiltinReciprocalSqrt(this);
     }
@@ -497,8 +500,6 @@ public extension float : IRootFunctions
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public extension float : IRealOrderingFunctions
 {
-    // Select the existing builtin overload explicitly. An unqualified call can specialize back
-    // through the interface-generic overload and form a routing cycle across builtin shapes.
     [__unsafeForceInlineEarly]
     This minimum(This other)
     {
@@ -514,7 +515,7 @@ public extension float : IRealOrderingFunctions
     [__unsafeForceInlineEarly]
     This step(This edge)
     {
-        return this < edge ? This.getZero() : This.getOne();
+        return this < edge ? This.zero() : This.one();
     }
 }
 
@@ -528,26 +529,26 @@ public extension double : IScalarFloatingPoint
     }
 
     [__unsafeForceInlineEarly]
-    This ceil()
+    This ceiling()
     {
         return __numericInterfaceBuiltinCeil(this);
     }
 
     [__unsafeForceInlineEarly]
-    This round()
+    This rounded()
     {
         return __numericInterfaceBuiltinRound(this);
     }
 
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
-    This roundEven()
+    This roundedToNearestEven()
     {
         return __numericInterfaceBuiltinRoundEven(this);
     }
 
     [__unsafeForceInlineEarly]
-    This truncate()
+    This truncated()
     {
         return __numericInterfaceBuiltinTruncate(this);
     }
@@ -559,19 +560,19 @@ public extension double : IScalarFloatingPoint
     }
 
     [__unsafeForceInlineEarly]
-    This remainder(This divisor)
+    This remainderWhenDividedBy(This divisor)
     {
         return __numericInterfaceBuiltinRemainder(this, divisor);
     }
 
     [__unsafeForceInlineEarly]
-    This copySign(This signSource)
+    This copyingSignFrom(This signSource)
     {
         return __numericInterfaceBuiltinCopySign(this, signSource);
     }
 
     [__unsafeForceInlineEarly]
-    This splitFraction(out This integralPart)
+    This fractionalPart(out This integralPart)
     {
         return __numericInterfaceBuiltinSplitFraction(this, integralPart);
     }
@@ -627,43 +628,43 @@ public extension double : ITrigonometricFunctions
 public extension double : IExponentialFunctions
 {
     [__unsafeForceInlineEarly]
-    This exp()
+    This exponential()
     {
         return __numericInterfaceBuiltinExp(this);
     }
 
     [__unsafeForceInlineEarly]
-    This exp2()
+    This exponentialWithBase2()
     {
         return __numericInterfaceBuiltinExp2(this);
     }
 
     [__unsafeForceInlineEarly]
-    This exp10()
+    This exponentialWithBase10()
     {
         return __numericInterfaceBuiltinExp10(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log()
+    This logarithm()
     {
         return __numericInterfaceBuiltinLog(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log2()
+    This logarithmWithBase2()
     {
         return __numericInterfaceBuiltinLog2(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log10()
+    This logarithmWithBase10()
     {
         return __numericInterfaceBuiltinLog10(this);
     }
 
     [__unsafeForceInlineEarly]
-    This pow(This exponent)
+    This raisedToThePowerOf(This exponent)
     {
         return __numericInterfaceBuiltinPow(this, exponent);
     }
@@ -741,13 +742,13 @@ public extension double : IHyperbolicFunctions
 public extension double : IRootFunctions
 {
     [__unsafeForceInlineEarly]
-    This sqrt()
+    This squareRoot()
     {
         return __numericInterfaceBuiltinSqrt(this);
     }
 
     [__unsafeForceInlineEarly]
-    This rsqrt()
+    This reciprocalSquareRoot()
     {
         return __numericInterfaceBuiltinReciprocalSqrt(this);
     }
@@ -756,8 +757,6 @@ public extension double : IRootFunctions
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public extension double : IRealOrderingFunctions
 {
-    // Select the existing builtin overload explicitly. An unqualified call can specialize back
-    // through the interface-generic overload and form a routing cycle across builtin shapes.
     [__unsafeForceInlineEarly]
     This minimum(This other)
     {
@@ -773,7 +772,7 @@ public extension double : IRealOrderingFunctions
     [__unsafeForceInlineEarly]
     This step(This edge)
     {
-        return this < edge ? This.getZero() : This.getOne();
+        return this < edge ? This.zero() : This.one();
     }
 }
 
@@ -789,26 +788,26 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This ceil()
+    This ceiling()
     {
         return __numericInterfaceBuiltinCeil(this);
     }
 
     [__unsafeForceInlineEarly]
-    This round()
+    This rounded()
     {
         return __numericInterfaceBuiltinRound(this);
     }
 
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
-    This roundEven()
+    This roundedToNearestEven()
     {
         return __numericInterfaceBuiltinRoundEven(this);
     }
 
     [__unsafeForceInlineEarly]
-    This truncate()
+    This truncated()
     {
         return __numericInterfaceBuiltinTruncate(this);
     }
@@ -820,19 +819,19 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This remainder(This divisor)
+    This remainderWhenDividedBy(This divisor)
     {
         return __numericInterfaceBuiltinRemainder(this, divisor);
     }
 
     [__unsafeForceInlineEarly]
-    This copySign(This signSource)
+    This copyingSignFrom(This signSource)
     {
         return __numericInterfaceBuiltinCopySign(this, signSource);
     }
 
     [__unsafeForceInlineEarly]
-    This splitFraction(out This integralPart)
+    This fractionalPart(out This integralPart)
     {
         return __numericInterfaceBuiltinSplitFraction(this, integralPart);
     }
@@ -892,43 +891,43 @@ public extension<
     let N : int> vector<T, N> : IExponentialFunctions
 {
     [__unsafeForceInlineEarly]
-    This exp()
+    This exponential()
     {
         return __numericInterfaceBuiltinExp(this);
     }
 
     [__unsafeForceInlineEarly]
-    This exp2()
+    This exponentialWithBase2()
     {
         return __numericInterfaceBuiltinExp2(this);
     }
 
     [__unsafeForceInlineEarly]
-    This exp10()
+    This exponentialWithBase10()
     {
         return __numericInterfaceBuiltinExp10(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log()
+    This logarithm()
     {
         return __numericInterfaceBuiltinLog(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log2()
+    This logarithmWithBase2()
     {
         return __numericInterfaceBuiltinLog2(this);
     }
 
     [__unsafeForceInlineEarly]
-    This log10()
+    This logarithmWithBase10()
     {
         return __numericInterfaceBuiltinLog10(this);
     }
 
     [__unsafeForceInlineEarly]
-    This pow(This exponent)
+    This raisedToThePowerOf(This exponent)
     {
         return __numericInterfaceBuiltinPow(this, exponent);
     }
@@ -1012,13 +1011,13 @@ public extension<
     let N : int> vector<T, N> : IRootFunctions
 {
     [__unsafeForceInlineEarly]
-    This sqrt()
+    This squareRoot()
     {
         return __numericInterfaceBuiltinSqrt(this);
     }
 
     [__unsafeForceInlineEarly]
-    This rsqrt()
+    This reciprocalSquareRoot()
     {
         return __numericInterfaceBuiltinReciprocalSqrt(this);
     }
@@ -1029,8 +1028,6 @@ public extension<
     T : __BuiltinFloatingPointType & IScalarReal,
     let N : int> vector<T, N> : IRealOrderingFunctions
 {
-    // The explicit generic shape selects the existing builtin vector overload instead of the
-    // interface-generic overload implemented by this witness.
     [__unsafeForceInlineEarly]
     This minimum(This other)
     {
@@ -1049,7 +1046,7 @@ public extension<
         This result;
         [ForceUnroll]
         for (int i = 0; i < N; ++i)
-            result[i] = this[i] < edge[i] ? T.getZero() : T.getOne();
+            result[i] = this[i] < edge[i] ? T.zero() : T.one();
         return result;
     }
 }
@@ -1079,7 +1076,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This ceil()
+    This ceiling()
     {
         This result;
         [ForceUnroll]
@@ -1093,7 +1090,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This round()
+    This rounded()
     {
         This result;
         [ForceUnroll]
@@ -1108,7 +1105,7 @@ public extension<
 
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
-    This roundEven()
+    This roundedToNearestEven()
     {
         This result;
         [ForceUnroll]
@@ -1122,7 +1119,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This truncate()
+    This truncated()
     {
         This result;
         [ForceUnroll]
@@ -1151,7 +1148,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This remainder(This divisor)
+    This remainderWhenDividedBy(This divisor)
     {
         This result;
         [ForceUnroll]
@@ -1166,7 +1163,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This copySign(This signSource)
+    This copyingSignFrom(This signSource)
     {
         This result;
         [ForceUnroll]
@@ -1181,7 +1178,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This splitFraction(out This integralPart)
+    This fractionalPart(out This integralPart)
     {
         This fractionalPart;
         [ForceUnroll]
@@ -1317,7 +1314,7 @@ public extension<
     let L : int> matrix<T, R, C, L> : IExponentialFunctions
 {
     [__unsafeForceInlineEarly]
-    This exp()
+    This exponential()
     {
         This result;
         [ForceUnroll]
@@ -1331,7 +1328,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This exp2()
+    This exponentialWithBase2()
     {
         This result;
         [ForceUnroll]
@@ -1345,7 +1342,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This exp10()
+    This exponentialWithBase10()
     {
         This result;
         [ForceUnroll]
@@ -1359,7 +1356,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This log()
+    This logarithm()
     {
         This result;
         [ForceUnroll]
@@ -1373,7 +1370,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This log2()
+    This logarithmWithBase2()
     {
         This result;
         [ForceUnroll]
@@ -1387,7 +1384,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This log10()
+    This logarithmWithBase10()
     {
         This result;
         [ForceUnroll]
@@ -1401,7 +1398,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This pow(This exponent)
+    This raisedToThePowerOf(This exponent)
     {
         This result;
         [ForceUnroll]
@@ -1587,7 +1584,7 @@ public extension<
     let L : int> matrix<T, R, C, L> : IRootFunctions
 {
     [__unsafeForceInlineEarly]
-    This sqrt()
+    This squareRoot()
     {
         This result;
         [ForceUnroll]
@@ -1601,7 +1598,7 @@ public extension<
     }
 
     [__unsafeForceInlineEarly]
-    This rsqrt()
+    This reciprocalSquareRoot()
     {
         This result;
         [ForceUnroll]
@@ -1664,7 +1661,7 @@ public extension<
             for (int column = 0; column < C; ++column)
             {
                 result[row][column] =
-                    this[row][column] < edge[row][column] ? T.getZero() : T.getOne();
+                    this[row][column] < edge[row][column] ? T.zero() : T.one();
             }
         }
         return result;

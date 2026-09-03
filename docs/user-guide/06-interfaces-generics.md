@@ -1379,162 +1379,39 @@ In this example, `EvalNode<4, 8, 16>` recursively expands to a chain like
 both branch types conform to `INode`, the `rest` field can be used uniformly
 even before specialization has determined which branch is taken.
 
-## Experimental Numeric Interfaces
-
-The experimental `slang.numerics` standard module provides representation-independent interfaces
-for generic code that should work with user-defined numeric types as well as builtin scalars and
-shaped values.
-The API is experimental and may change incompatibly while its decomposition and implementation
-are evaluated.
-Importing it requires both an explicit source import and the `-experimental-feature` compiler
-option:
-
-```csharp
-import slang.numerics;
-```
-
-The broad interfaces describe scalar-or-shaped operations.
-Arithmetic and comparisons are component-wise, `Scalar` names the logical element type, and `Mask`
-names the corresponding comparison-result type.
-For example, `float3.Scalar` is `float` and `float3.Mask` is `vector<bool, 3>`, while a scalar
-`float` uses itself as `Scalar` and `bool` as `Mask`.
-
-The base hierarchy separates capabilities that do not always have the same mathematical meaning:
-
-- `INumericShapedType` introduces `Scalar`, `Mask`, and `fromScalar`.
-  `IScalarShapedType` constrains `Scalar` to the conforming type and `Mask` to `bool`.
-- `IAdditive`, `INumeric`, and `ISignedNumeric` successively add component-wise addition and
-  subtraction, multiplication, and signed operations.
-  Their scalar refinements are `IScalarAdditive`, `IScalarNumeric`, and
-  `IScalarSignedNumeric`.
-- `IIntegerType` adds integer quotient, remainder, bitwise operations, same-shape shifts, and
-  component-wise ordering.
-  `ISignedIntegerType` and `IUnsignedIntegerType` distinguish signed and unsigned values, and each
-  has an `IScalar...` refinement.
-- `IFractional` adds signed division, absolute value, and reciprocal operations.
-  It does not imply a floating-point representation, elementary functions, ordering, or
-  differentiability, so fixed-point, ratio, dual-number, and interval types can use it when those
-  operations fit their semantics.
-- `IFloatingPoint` adds representation-specific rounding, remainder, split, sign-copying, and
-  classification operations.
-- `IExponentialFunctions`, `ITrigonometricFunctions`, `IInverseTrigonometricFunctions`,
-  `IHyperbolicFunctions`, and `IRootFunctions` provide independent families of component-wise
-  elementary functions.
-  They do not imply arithmetic, ordering, or differentiability.
-- `IElementaryFunctions` is a conjunction of all five elementary-function families.
-- `IRealOrderingFunctions` adds component-wise minimum, maximum, and step operations whose
-  conventional definitions depend on a real ordering.
-- `IReal` combines fractional arithmetic, elementary functions, component-wise partial ordering,
-  and real-order-dependent operations.
-  `IScalarReal` is its scalar refinement.
-- `IComponentwiseEquatable` and `IComponentwiseOrdered` return `Mask` values.
-  `IEquatable`, `IPartiallyOrdered`, and `ITotallyOrdered` are independent, general-purpose
-  relations that return `bool`.
-- `IBooleanMask` provides component-wise Boolean operations and the horizontal `any()` and `all()`
-  reductions.
-
-`IFloatingPoint` and the elementary-function families are independent capabilities.
-For example, a generic that performs fractional arithmetic and calls trigonometric functions can
-use `T : IFractional & ITrigonometricFunctions`, while a generic that needs the conventional
-real-valued bundle can use `T : IReal`.
-`IReal` does not imply `IFloatingPoint`: a user-defined type can provide fractional arithmetic,
-elementary functions, and real-valued ordering without claiming a floating-point representation.
-
-Conjunction aliases such as `IElementaryFunctions` and `IReal` are intended for generic constraints.
-A user-defined type satisfies an alias by conforming to its constituent interfaces; it does not
-declare a separate nominal conformance to the alias.
-When a custom scalar declares arithmetic and component-wise ordering independently, declare its
-common `IScalarShapedType` conformance explicitly so those capabilities share the same `Scalar` and
-`Mask` witnesses.
-
-The following generic works for scalar and shaped ordered values and explicitly reduces its
-component-wise comparison result:
-
-```csharp
-bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
-{
-    return (left < right).all();
-}
-
-bool scalarResult = allLessThan(1.0, 2.0);
-bool vectorResult = allLessThan(float3(1.0), float3(2.0));
-```
-
-Use the associated scalar identities with `fromScalar` when a generic needs a shaped zero or one:
-
-```csharp
-T addOne<T : INumeric>(T value)
-{
-    T one = T.fromScalar(T.getOne());
-    return value + one;
-}
-```
-
-The base numeric interfaces do not guarantee that calls through their requirements are
-differentiable.
-Code that needs that guarantee imports the experimental differentiable annex, which re-exports the
-base module:
-
-```csharp
-import slang.numerics.differentiable;
-
-[Differentiable]
-T smoothWave<T : IDifferentiableFractional & IDifferentiableTrigonometricFunctions>(T value)
-{
-    return sin(value) + value * value;
-}
-```
-
-`IDifferentiableFractional` re-declares the differentiable arithmetic, absolute-value, and
-reciprocal requirements from `IFractional`.
-`IDifferentiableFloatingPoint` adds the differentiable subset of the representation-specific
-floating-point operations; discontinuous rounding and classification remain available through
-`IFloatingPoint` without a differentiability guarantee.
-Each elementary-function family has a corresponding `IDifferentiable...Functions` refinement, and
-`IDifferentiableElementaryFunctions` combines those refinements.
-`IDifferentiableRealOrderingFunctions` covers differentiable minimum and maximum operations, while
-`step` remains a base operation.
-`IDifferentiableReal` combines the applicable differentiable capabilities.
-
-The differentiable interfaces refine rather than replace the base interfaces.
-This split lets a custom type expose ordinary numeric operations without providing an autodiff
-implementation, and it keeps the differentiable declarations out of programs that import only
-`slang.numerics`.
-`fromScalar` remains available through `INumericShapedType`, but the differentiable interfaces do
-not guarantee differentiation through that conversion.
-
-Builtin integer and floating-point scalars and vectors receive the applicable conformances.
-Floating-point matrices preserve their layout type through component-wise operations.
-Cooperative vectors receive base integer, fractional, elementary-function, and ordering conformances
-where their element type supports the corresponding scalar capability.
-The differentiable annex does not yet provide cooperative-vector conformances.
-
 ## Builtin Interfaces
 
-Slang supports the following builtin interfaces:
+Slang's core module provides several interfaces for generic programming.
+The experimental [`slang.numerics`](a3-02-numerics.md) module provides a more systematic set of numeric interfaces for builtin and user-defined scalar and shaped types.
 
-- `IComparable`, provides methods for comparing two values of the conforming type. Supported by all basic data types, vector types, and matrix types.
-- `IRangedValue`, provides methods for retrieving the minimum and maximum value expressed by the range of the type. Supported by all integer and floating-point scalar types.
-- `IArithmetic`, provides methods for the `+`, `-`, `*`, `/`, `%`, and negating operations. Also provides a method for explicit conversion from `int`. Implemented by all builtin integer and floating-point scalar, vector, and matrix types.
-- `ILogical`, provides methods for all bit operations and logical `and`, `or`, `not` operations. Also provides a method for explicit conversion from `int`. Implemented by all builtin integer scalar, vector, and matrix types.
-- `IInteger`, represents a logical integer that supports both `IArithmetic` and `ILogical` operations. Implemented by all builtin integer scalar types.
-- `IDifferentiable`, represents a value that is differentiable.
-- `IFloat`, represents a logical float that supports `IArithmetic`, `ILogical`, and `IDifferentiable` operations. Also provides methods to convert to and from `float`. Implemented by all builtin floating-point scalar, vector, and matrix types.
-- `IArray<T>`, represents a logical array that supports retrieving an element of type `T` from an index. Implemented by array types, vectors, matrices, and `StructuredBuffer`.
-- `IRWArray<T>`, represents a logical array whose elements are mutable. Implemented by array types, vectors, matrices, `RWStructuredBuffer`, and `RasterizerOrderedStructuredBuffer`.
-- `IFunc<TResult, TParams...>`, represents a callable object (with `operator()`) that returns `TResult` and takes `TParams...` as argument.
-- `IMutatingFunc<TResult, TParams...>`, similar to `IFunc`, but the `operator()` method is `[mutating]`.
-- `IDifferentiableFunc<TResult, TParams...>`, similar to `IFunc`, but the `operator()` method is `[Differentiable]`.
-- `IDifferentiableMutatingFunc<TResult, TParams...>`, similar to `IFunc`, but the `operator()` method is `[Differentiable]` and `[mutating]`.
-- `__EnumType`, implemented by all enum types.
-- `__BuiltinIntegerType`, implemented by all integer scalar types.
-- `__BuiltinFloatingPointType`, implemented by all floating-point scalar types.
-- `__BuiltinArithmeticType`, implemented by all integer and floating-point scalar types.
-- `__BuiltinLogicalType`, implemented by all integer types and the `bool` type.
+### General-Purpose Interfaces
 
-Operator overloads are defined for `IArithmetic`, `ILogical`, `IInteger`, `IFloat`, `__BuiltinIntegerType`, `__BuiltinFloatingPointType`, `__BuiltinArithmeticType`, and `__BuiltinLogicalType` types, so the following code is valid:
+- `IComparable` provides methods for comparing two values of the conforming type.
+  All basic data types, vector types, and matrix types implement it.
+- `IRangedValue` provides methods for retrieving the minimum and maximum values in the range of a type.
+  All integer and floating-point scalar types implement it.
+- `IArray<T>` represents a logical array from which code can retrieve an element of type `T` by index.
+  Arrays, vectors, matrices, and `StructuredBuffer` implement it.
+- `IRWArray<T>` represents a logical array whose elements are mutable.
+  Arrays, vectors, matrices, `RWStructuredBuffer`, and `RasterizerOrderedStructuredBuffer` implement it.
+- `IFunc<TResult, TParams...>` represents a callable object whose `operator()` returns `TResult` and takes `TParams...` as arguments.
+- `IMutatingFunc<TResult, TParams...>` is the mutating counterpart of `IFunc`.
 
-```csharp
+### Legacy Numeric Interfaces
+
+The following interfaces remain supported for compatibility, but new generic numeric code should prefer the interfaces in [`slang.numerics`](a3-02-numerics.md) when experimental modules are acceptable.
+They are not deprecated, and existing code does not need to migrate immediately.
+
+- `IArithmetic` provides methods for the `+`, `-`, `*`, `/`, `%`, and negation operations, plus explicit conversion from `int`.
+  All builtin integer and floating-point scalar, vector, and matrix types implement it.
+- `ILogical` provides methods for bitwise and logical operations, plus explicit conversion from `int`.
+  All builtin integer scalar, vector, and matrix types implement it.
+- `IInteger` combines `IArithmetic` and `ILogical` for builtin integer scalar types.
+- `IFloat` combines `IArithmetic`, `ILogical`, and `IDifferentiable` for builtin floating-point scalar, vector, and matrix types, and provides conversions to and from `float`.
+
+Operator overloads are defined for these interfaces, so existing generic code such as the following remains valid:
+
+```slang
 T f<T:IFloat>(T x, T y)
 {
     if (x > T(0))
@@ -1547,3 +1424,26 @@ void test()
     let rs = f(float3(4), float3(5)); // rs = float3(9,9,9)
 }
 ```
+
+### Differentiation Interfaces
+
+- `IDifferentiable` represents a value that is differentiable.
+- `IDifferentiableFunc<TResult, TParams...>` is the differentiable counterpart of `IFunc`.
+- `IDifferentiableMutatingFunc<TResult, TParams...>` is both differentiable and mutating.
+
+See [Automatic Differentiation](07-autodiff.md) for the differentiation model and [Generic Numerics](a3-02-numerics.md) for the numeric interfaces that provide differentiable operations.
+
+### Internal-Use-Only Interfaces
+
+The following double-underscored interfaces support the implementation of Slang's builtin types and standard modules.
+They are not public API contracts.
+Some user code has historically relied on them, but such use is unsupported and may break as the compiler and standard modules evolve.
+
+- `__EnumType` is implemented by all enum types.
+- `__BuiltinIntegerType` is implemented by all builtin integer scalar types.
+- `__BuiltinFloatingPointType` is implemented by all builtin floating-point scalar types.
+- `__BuiltinArithmeticType` is implemented by all builtin integer and floating-point scalar types.
+- `__BuiltinLogicalType` is implemented by all builtin integer scalar types and `bool`.
+
+The core module defines operator overloads using these interfaces as an implementation detail.
+User code should constrain generic parameters with supported public interfaces instead.

@@ -41,6 +41,20 @@ T genericDifferentiableSin<T : IDifferentiableTrigonometricFunctions>(T value)
     return sin(value);
 }
 
+[Differentiable]
+T constructFromBuiltinFloatingPoint<
+    T : IDifferentiableFractional,
+    TSource : __BuiltinFloatingPointType>(TSource value)
+{
+    return T(value);
+}
+
+[Differentiable]
+float3 useDifferentiableConstruction(half value)
+{
+    return constructFromBuiltinFloatingPoint<float3>(value);
+}
+
 struct CustomTrigonometric : IDifferentiableTrigonometricFunctions
 {
     float value;
@@ -107,6 +121,8 @@ void main()
         DifferentialPair<float2x2>(float2x2(1.0), float2x2(1.0)));
     DifferentialPair<CustomTrigonometric> customResult = fwd_diff(useCustom)(
         DifferentialPair<CustomTrigonometric>({1.0}, {1.0}));
+    DifferentialPair<float3> constructedResult = fwd_diff(useDifferentiableConstruction)(
+        DifferentialPair<half>(half(1.0), half(1.0)));
 
     var scalarReverse = DifferentialPair<float>(1.0, 0.0);
     bwd_diff(useScalar)(scalarReverse, 1.0);

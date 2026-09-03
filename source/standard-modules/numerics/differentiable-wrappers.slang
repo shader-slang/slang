@@ -8,10 +8,16 @@ implementing differentiable;
 //         return sin(value);
 //     }
 //
-// Ordinary code resolves `sin(value)` to the non-differentiable wrapper in hlsl.meta.slang. Once
-// autodiff loads this supplement, the stronger constraint selects this overload instead. Its body
-// calls the differentiable interface requirement, so custom conformances and builtin witnesses use
-// the same source-level spelling without making differentiability part of the base contract.
+// This file exposes conventional operators and free functions for the differentiable interface
+// requirements. Importing `slang.numerics.differentiable` makes these overloads available, and
+// declarations in this module are found before the corresponding declarations brought in by its
+// exported import of `slang.numerics`. The free functions intentionally use the base module's -10
+// fallback rank, while the operators use its -4 fallback rank. Those negative ranks keep concrete
+// and legacy core overloads preferred; raising only selected differentiable wrappers would make the
+// overload policy depend on incidental operation-by-operation exceptions. The bodies dispatch to
+// differentiable requirements so that builtin and user-defined conformances can use spellings such
+// as `sin(value)` instead of `value.sin()` without making differentiability part of the base
+// contracts.
 
 [__readNone]
 [Differentiable]
@@ -55,7 +61,7 @@ public T fract<T : IDifferentiableFloatingPoint>(T value)
 [OverloadRank(-10)]
 public T fmod<T : IDifferentiableFloatingPoint>(T value, T divisor)
 {
-    return value.remainder(divisor);
+    return value.remainderWhenDividedBy(divisor);
 }
 
 [__readNone]
@@ -64,7 +70,7 @@ public T fmod<T : IDifferentiableFloatingPoint>(T value, T divisor)
 [OverloadRank(-10)]
 public T copysign<T : IDifferentiableFloatingPoint>(T magnitude, T signSource)
 {
-    return magnitude.copySign(signSource);
+    return magnitude.copyingSignFrom(signSource);
 }
 
 [__readNone]
@@ -73,7 +79,7 @@ public T copysign<T : IDifferentiableFloatingPoint>(T magnitude, T signSource)
 [OverloadRank(-10)]
 public T exp<T : IDifferentiableExponentialFunctions>(T value)
 {
-    return value.exp();
+    return value.exponential();
 }
 
 [__readNone]
@@ -82,7 +88,7 @@ public T exp<T : IDifferentiableExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T exp2<T : IDifferentiableExponentialFunctions>(T value)
 {
-    return value.exp2();
+    return value.exponentialWithBase2();
 }
 
 [__readNone]
@@ -91,7 +97,7 @@ public T exp2<T : IDifferentiableExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T exp10<T : IDifferentiableExponentialFunctions>(T value)
 {
-    return value.exp10();
+    return value.exponentialWithBase10();
 }
 
 [__readNone]
@@ -100,7 +106,7 @@ public T exp10<T : IDifferentiableExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T log<T : IDifferentiableExponentialFunctions>(T value)
 {
-    return value.log();
+    return value.logarithm();
 }
 
 [__readNone]
@@ -109,7 +115,7 @@ public T log<T : IDifferentiableExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T log2<T : IDifferentiableExponentialFunctions>(T value)
 {
-    return value.log2();
+    return value.logarithmWithBase2();
 }
 
 [__readNone]
@@ -118,7 +124,7 @@ public T log2<T : IDifferentiableExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T log10<T : IDifferentiableExponentialFunctions>(T value)
 {
-    return value.log10();
+    return value.logarithmWithBase10();
 }
 
 [__readNone]
@@ -127,13 +133,13 @@ public T log10<T : IDifferentiableExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T pow<T : IDifferentiableExponentialFunctions>(T base, T exponent)
 {
-    return base.pow(exponent);
+    return base.raisedToThePowerOf(exponent);
 }
 
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T sin<T : IDifferentiableTrigonometricFunctions>(T value)
 {
     return value.sin();
@@ -265,7 +271,7 @@ public T atanh<T : IDifferentiableHyperbolicFunctions>(T value)
 [OverloadRank(-10)]
 public T sqrt<T : IDifferentiableRootFunctions>(T value)
 {
-    return value.sqrt();
+    return value.squareRoot();
 }
 
 [__readNone]
@@ -274,13 +280,13 @@ public T sqrt<T : IDifferentiableRootFunctions>(T value)
 [OverloadRank(-10)]
 public T rsqrt<T : IDifferentiableRootFunctions>(T value)
 {
-    return value.rsqrt();
+    return value.reciprocalSquareRoot();
 }
 
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T min<T : IDifferentiableRealOrderingFunctions>(T left, T right)
 {
     return left.minimum(right);
@@ -289,7 +295,7 @@ public T min<T : IDifferentiableRealOrderingFunctions>(T left, T right)
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T max<T : IDifferentiableRealOrderingFunctions>(T left, T right)
 {
     return left.maximum(right);
@@ -310,13 +316,13 @@ public T clamp<T : IDifferentiableRealOrderingFunctions>(
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T saturate<T : IDifferentiableFractional & IDifferentiableRealOrderingFunctions>(T value)
 {
-    // `fromScalar` is intentionally outside the differentiable contract. These identity values
+    // Identity construction is intentionally outside the differentiable contract. These values
     // are constants, so no derivative needs to flow through their construction.
-    T zero = no_diff(T.fromScalar(T.getZero()));
-    T one = no_diff(T.fromScalar(T.getOne()));
+    T zero = no_diff(T.zero());
+    T one = no_diff(T.one());
     return value.maximum(zero).minimum(one);
 }
 
@@ -324,35 +330,35 @@ public T saturate<T : IDifferentiableFractional & IDifferentiableRealOrderingFun
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T fdim<T : IDifferentiableFractional & IDifferentiableRealOrderingFunctions>(T x, T y)
 {
-    T zero = no_diff(T.fromScalar(T.getZero()));
-    return x.sub(y).maximum(zero);
+    T zero = no_diff(T.zero());
+    return x.subtracting(y).maximum(zero);
 }
 
 /// Divides values through a differentiable fractional-arithmetic contract.
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T divide<T : IDifferentiableFractional>(T x, T y)
 {
-    return x.div(y);
+    return x.dividedBy(y);
 }
 
 /// Linearly interpolates through a differentiable fractional-arithmetic contract.
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T lerp<T : IDifferentiableFractional>(T x, T y, T factor)
 {
-    return x.add(y.sub(x).mul(factor));
+    return x.adding(y.subtracting(x).multipliedBy(factor));
 }
 
 #define NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(NAME, BODY)                  \
-    [__readNone] [Differentiable] [ForceInline] [OverloadRank(-9)]             \
+    [__readNone] [Differentiable] [ForceInline] [OverloadRank(-10)]            \
     public T NAME<T : IDifferentiableRealOrderingFunctions>(T x, T y, T z)     \
     {                                                                            \
         BODY                                                                     \
@@ -367,7 +373,7 @@ NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(
 #undef NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM
 
 #define NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(NAME, BODY)                  \
-    [__readNone] [Differentiable] [ForceInline] [OverloadRank(-9)]             \
+    [__readNone] [Differentiable] [ForceInline] [OverloadRank(-10)]            \
     public T NAME<                                                              \
         T : IDifferentiableFloatingPoint & IDifferentiableRealOrderingFunctions>( \
         T x, T y, T z)                                                          \
@@ -378,7 +384,7 @@ NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T fmax<
     T : IDifferentiableFloatingPoint & IDifferentiableRealOrderingFunctions>(T x, T y)
 {
@@ -390,7 +396,7 @@ NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(fmax3, return x.maximum(y.maximum(z));
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T fmin<
     T : IDifferentiableFloatingPoint & IDifferentiableRealOrderingFunctions>(T x, T y)
 {
@@ -408,30 +414,30 @@ NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T powr<T : IDifferentiableExponentialFunctions>(T x, T y)
 {
-    return x.pow(y);
+    return x.raisedToThePowerOf(y);
 }
 
 /// Applies differentiable Hermite interpolation between zero and one.
 [__readNone]
 [Differentiable]
 [ForceInline]
-[OverloadRank(-9)]
+[OverloadRank(-10)]
 public T smoothstep<
     T : IDifferentiableFractional & IDifferentiableRealOrderingFunctions>(
     T minimumValue,
     T maximumValue,
     T value)
 {
-    T zero = no_diff(T.fromScalar(T.getZero()));
-    T one = no_diff(T.fromScalar(T.getOne()));
-    T t = value.sub(minimumValue).div(maximumValue.sub(minimumValue));
+    T zero = no_diff(T.zero());
+    T one = no_diff(T.one());
+    T t = value.subtracting(minimumValue).dividedBy(maximumValue.subtracting(minimumValue));
     t = t.maximum(zero).minimum(one);
-    T two = one.add(one);
-    T three = two.add(one);
-    return t.mul(t).mul(three.sub(two.mul(t)));
+    T two = one.adding(one);
+    T three = two.adding(one);
+    return t.multipliedBy(t).multipliedBy(three.subtracting(two.multipliedBy(t)));
 }
 
 __generic<T : IDifferentiableFractional>
@@ -440,7 +446,7 @@ __generic<T : IDifferentiableFractional>
 [OverloadRank(-4)]
 public T operator +(T left, T right)
 {
-    return left.add(right);
+    return left.adding(right);
 }
 
 __generic<T : IDifferentiableFractional>
@@ -449,7 +455,7 @@ __generic<T : IDifferentiableFractional>
 [OverloadRank(-4)]
 public T operator -(T left, T right)
 {
-    return left.sub(right);
+    return left.subtracting(right);
 }
 
 __generic<T : IDifferentiableFractional>
@@ -458,7 +464,7 @@ __generic<T : IDifferentiableFractional>
 [OverloadRank(-4)]
 public T operator *(T left, T right)
 {
-    return left.mul(right);
+    return left.multipliedBy(right);
 }
 
 __generic<T : IDifferentiableFractional>
@@ -467,7 +473,7 @@ __generic<T : IDifferentiableFractional>
 [OverloadRank(-4)]
 public T operator /(T left, T right)
 {
-    return left.div(right);
+    return left.dividedBy(right);
 }
 
 __generic<T : IDifferentiableFloatingPoint>
@@ -476,7 +482,7 @@ __generic<T : IDifferentiableFloatingPoint>
 [OverloadRank(-4)]
 public T operator %(T left, T right)
 {
-    return left.remainder(right);
+    return left.remainderWhenDividedBy(right);
 }
 
 __generic<T : IDifferentiableFractional>
@@ -485,5 +491,5 @@ __generic<T : IDifferentiableFractional>
 [OverloadRank(-4)]
 public __prefix T operator -(T value)
 {
-    return value.neg();
+    return value.negated();
 }

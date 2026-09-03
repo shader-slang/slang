@@ -57,9 +57,11 @@ endif()
 set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive_without_timestamp})
 set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
-# These adapter modules are deliberately checked before the public interface-generic overloads.
-# Their calls therefore resolve to the established core-module operations instead of recursively
-# selecting a witness-backed overload from `slang.numerics`.
+# These adapter modules deliberately do not import the public numerics modules. Their lookup
+# environments therefore cannot contain the public interface-generic overloads, so their calls
+# resolve to established core-module operations instead of recursively selecting a witness-backed
+# overload. The public modules import these adapters, which makes the serialized adapter artifacts
+# ordinary build dependencies of the public artifacts.
 add_custom_command(
     OUTPUT ${numerics_builtin_module_file}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${numerics_private_output_dir}

@@ -9,20 +9,24 @@ public interface IDifferentiableFractional : IFractional, IDifferentiable
 {
     __constraint Scalar : IScalarDifferentiableFractional;
 
+    /// Constructs a value from any builtin floating-point representation.
     [Differentiable]
-    This add(This other);
+    __init<TSource : __BuiltinFloatingPointType>(TSource value);
 
     [Differentiable]
-    This sub(This other);
+    This adding(This other);
 
     [Differentiable]
-    This mul(This other);
+    This subtracting(This other);
 
     [Differentiable]
-    This div(This other);
+    This multipliedBy(This other);
 
     [Differentiable]
-    This neg();
+    This dividedBy(This other);
+
+    [Differentiable]
+    This negated();
 
     [Differentiable]
     This absoluteValue();
@@ -49,10 +53,10 @@ public interface IDifferentiableFloatingPoint : IFloatingPoint, IDifferentiableF
     This fractionalPart();
 
     [Differentiable]
-    This remainder(This divisor);
+    This remainderWhenDividedBy(This divisor);
 
     [Differentiable]
-    This copySign(This signSource);
+    This copyingSignFrom(This signSource);
 }
 
 /// Scalar refinement of `IDifferentiableFloatingPoint`.
@@ -65,25 +69,25 @@ public interface IScalarDifferentiableFloatingPoint
 public interface IDifferentiableExponentialFunctions : IExponentialFunctions, IDifferentiable
 {
     [Differentiable]
-    This exp();
+    This exponential();
 
     [Differentiable]
-    This exp2();
+    This exponentialWithBase2();
 
     [Differentiable]
-    This exp10();
+    This exponentialWithBase10();
 
     [Differentiable]
-    This log();
+    This logarithm();
 
     [Differentiable]
-    This log2();
+    This logarithmWithBase2();
 
     [Differentiable]
-    This log10();
+    This logarithmWithBase10();
 
     [Differentiable]
-    This pow(This exponent);
+    This raisedToThePowerOf(This exponent);
 }
 
 /// Supports differentiable trigonometric functions.
@@ -145,10 +149,10 @@ public interface IDifferentiableHyperbolicFunctions : IHyperbolicFunctions, IDif
 public interface IDifferentiableRootFunctions : IRootFunctions, IDifferentiable
 {
     [Differentiable]
-    This sqrt();
+    This squareRoot();
 
     [Differentiable]
-    This rsqrt();
+    This reciprocalSquareRoot();
 }
 
 /// Supports the differentiable variants of all elementary-function families.

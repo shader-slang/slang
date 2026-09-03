@@ -17,9 +17,9 @@ struct CustomValue : IScalarAdditive, ITrigonometricFunctions
     typealias Mask = bool;
 
     static This fromScalar(Scalar value) { return value; }
-    static Scalar getZero() { return {0.0}; }
-    This add(This other) { return {value + other.value}; }
-    This sub(This other) { return {value - other.value}; }
+    static This zero() { return {0.0}; }
+    This adding(This other) { return {value + other.value}; }
+    This subtracting(This other) { return {value - other.value}; }
     This sin() { return {::sin(value)}; }
     This cos() { return {::cos(value)}; }
     This tan() { return {::tan(value)}; }

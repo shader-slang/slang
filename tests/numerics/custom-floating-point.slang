@@ -15,14 +15,14 @@ struct FloatingPointOnly : IScalarFloatingPoint
     typealias Scalar = FloatingPointOnly;
     typealias Mask = bool;
 
-    __init(int value)
+    __init<TSource : __BuiltinIntegerType>(TSource value)
     {
-        this.value = float(value);
+        this.value = __realCast<float>(value);
     }
 
-    __init(float value)
+    __init<TSource : __BuiltinFloatingPointType>(TSource value)
     {
-        this.value = value;
+        this.value = __realCast<float>(value);
     }
 
     static This fromScalar(Scalar value)
@@ -30,37 +30,37 @@ struct FloatingPointOnly : IScalarFloatingPoint
         return value;
     }
 
-    static Scalar getZero()
+    static This zero()
     {
         return {0.0};
     }
 
-    static Scalar getOne()
+    static This one()
     {
         return {1.0};
     }
 
-    This add(This other)
+    This adding(This other)
     {
         return {value + other.value};
     }
 
-    This sub(This other)
+    This subtracting(This other)
     {
         return {value - other.value};
     }
 
-    This mul(This other)
+    This multipliedBy(This other)
     {
         return {value * other.value};
     }
 
-    This div(This other)
+    This dividedBy(This other)
     {
         return {value / other.value};
     }
 
-    This neg()
+    This negated()
     {
         return {-value};
     }
@@ -80,23 +80,23 @@ struct FloatingPointOnly : IScalarFloatingPoint
         return {floor(value)};
     }
 
-    This ceil()
+    This ceiling()
     {
         return {ceil(value)};
     }
 
-    This round()
+    This rounded()
     {
         return {round(value)};
     }
 
     [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
-    This roundEven()
+    This roundedToNearestEven()
     {
         return {rint(value)};
     }
 
-    This truncate()
+    This truncated()
     {
         return {trunc(value)};
     }
@@ -106,17 +106,17 @@ struct FloatingPointOnly : IScalarFloatingPoint
         return {frac(value)};
     }
 
-    This remainder(This divisor)
+    This remainderWhenDividedBy(This divisor)
     {
         return {fmod(value, divisor.value)};
     }
 
-    This copySign(This signSource)
+    This copyingSignFrom(This signSource)
     {
         return {copysign(value, signSource.value)};
     }
 
-    This splitFraction(out This integralPart)
+    This fractionalPart(out This integralPart)
     {
         float integralValue;
         float fractionalValue = modf(value, integralValue);
@@ -189,7 +189,12 @@ T incrementRepresentationOperations<T : IFloatingPoint>(T value)
     return result;
 }
 
-T constructFromLiteralTypes<T : IFractional>(int integerValue, float floatingValue)
+T constructFromBuiltinTypes<
+    T : IFractional,
+    TInteger : __BuiltinIntegerType,
+    TFloatingPoint : __BuiltinFloatingPointType>(
+    TInteger integerValue,
+    TFloatingPoint floatingValue)
 {
     return T(integerValue) + T(floatingValue);
 }
@@ -211,7 +216,8 @@ void main()
     FloatingPointOnly incremented = incrementRepresentationOperations(FloatingPointOnly(1.5));
     FloatingPointOnly integralPart;
     FloatingPointOnly splitFractional = splitRepresentation(FloatingPointOnly(1.5), integralPart);
-    FloatingPointOnly constructed = constructFromLiteralTypes<FloatingPointOnly>(1, 0.5);
+    FloatingPointOnly constructed =
+        constructFromBuiltinTypes<FloatingPointOnly>(uint64_t(1), half(0.5));
     outputBuffer[0] = rounded.value + fractional.value + binary.value + compound.value +
         incremented.value + integralPart.value + splitFractional.value + constructed.value +
         float(finite) + float(infinite) + float(notANumber);

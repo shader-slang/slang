@@ -16,9 +16,9 @@ struct WrappedInt : IScalarSignedIntegerType
     typealias Mask = bool;
     typealias ShiftAmount = int;
 
-    __init(int value)
+    __init<TSource : __BuiltinIntegerType>(TSource value)
     {
-        this.value = value;
+        this.value = __intCast<int>(value);
     }
 
     static This fromScalar(Scalar value)
@@ -26,17 +26,17 @@ struct WrappedInt : IScalarSignedIntegerType
         return value;
     }
 
-    static Scalar getZero()
+    static This zero()
     {
         return {0};
     }
 
-    static Scalar getOne()
+    static This one()
     {
         return {1};
     }
 
-    bool isEqual(This other)
+    bool isEqualTo(This other)
     {
         return value == other.value;
     }
@@ -46,42 +46,27 @@ struct WrappedInt : IScalarSignedIntegerType
         return value < other.value;
     }
 
-    bool isLessThanOrEqual(This other)
+    bool isLessThanOrEqualTo(This other)
     {
         return value <= other.value;
     }
 
-    bool equals(This other)
-    {
-        return isEqual(other);
-    }
-
-    bool lessThan(This other)
-    {
-        return isLessThan(other);
-    }
-
-    bool lessThanOrEquals(This other)
-    {
-        return isLessThanOrEqual(other);
-    }
-
-    This add(This other)
+    This adding(This other)
     {
         return {value + other.value};
     }
 
-    This sub(This other)
+    This subtracting(This other)
     {
         return {value - other.value};
     }
 
-    This mul(This other)
+    This multipliedBy(This other)
     {
         return {value * other.value};
     }
 
-    This neg()
+    This negated()
     {
         return {-value};
     }
@@ -91,32 +76,32 @@ struct WrappedInt : IScalarSignedIntegerType
         return {abs(value)};
     }
 
-    This quotient(This divisor)
+    This quotientWhenDividedBy(This divisor)
     {
         return {value / divisor.value};
     }
 
-    This remainder(This divisor)
+    This remainderWhenDividedBy(This divisor)
     {
         return {value % divisor.value};
     }
 
-    This bitAnd(This other)
+    This bitwiseAnd(This other)
     {
         return {value & other.value};
     }
 
-    This bitOr(This other)
+    This bitwiseOr(This other)
     {
         return {value | other.value};
     }
 
-    This bitXor(This other)
+    This bitwiseXor(This other)
     {
         return {value ^ other.value};
     }
 
-    This bitNot()
+    This bitwiseNot()
     {
         return {~value};
     }
@@ -141,7 +126,7 @@ struct SignedIntegerPair<T : IScalarSignedIntegerType> : ISignedIntegerType
     typealias Mask = vector<bool, 2>;
     typealias ShiftAmount = vector<int, 2>;
 
-    __init(int value)
+    __init<TSource : __BuiltinIntegerType>(TSource value)
     {
         let scalar = T(value);
         x = scalar;
@@ -159,17 +144,17 @@ struct SignedIntegerPair<T : IScalarSignedIntegerType> : ISignedIntegerType
         return {value, value};
     }
 
-    static Scalar getZero()
+    static This zero()
     {
-        return Scalar.getZero();
+        return fromScalar(Scalar.zero());
     }
 
-    static Scalar getOne()
+    static This one()
     {
-        return Scalar.getOne();
+        return fromScalar(Scalar.one());
     }
 
-    Mask isEqual(This other)
+    Mask isEqualTo(This other)
     {
         return Mask(x == other.x, y == other.y);
     }
@@ -179,27 +164,27 @@ struct SignedIntegerPair<T : IScalarSignedIntegerType> : ISignedIntegerType
         return Mask(x < other.x, y < other.y);
     }
 
-    Mask isLessThanOrEqual(This other)
+    Mask isLessThanOrEqualTo(This other)
     {
         return Mask(x <= other.x, y <= other.y);
     }
 
-    This add(This other)
+    This adding(This other)
     {
         return {x + other.x, y + other.y};
     }
 
-    This sub(This other)
+    This subtracting(This other)
     {
         return {x - other.x, y - other.y};
     }
 
-    This mul(This other)
+    This multipliedBy(This other)
     {
         return {x * other.x, y * other.y};
     }
 
-    This neg()
+    This negated()
     {
         return {-x, -y};
     }
@@ -209,32 +194,32 @@ struct SignedIntegerPair<T : IScalarSignedIntegerType> : ISignedIntegerType
         return {abs(x), abs(y)};
     }
 
-    This quotient(This divisor)
+    This quotientWhenDividedBy(This divisor)
     {
         return {x / divisor.x, y / divisor.y};
     }
 
-    This remainder(This divisor)
+    This remainderWhenDividedBy(This divisor)
     {
         return {x % divisor.x, y % divisor.y};
     }
 
-    This bitAnd(This other)
+    This bitwiseAnd(This other)
     {
         return {x & other.x, y & other.y};
     }
 
-    This bitOr(This other)
+    This bitwiseOr(This other)
     {
         return {x | other.x, y | other.y};
     }
 
-    This bitXor(This other)
+    This bitwiseXor(This other)
     {
         return {x ^ other.x, y ^ other.y};
     }
 
-    This bitNot()
+    This bitwiseNot()
     {
         return {~x, ~y};
     }
@@ -258,7 +243,7 @@ struct SignedIntegerPair<T : IScalarSignedIntegerType> : ISignedIntegerType
 
 T integerCurve<T : IIntegerType>(T left, T right)
 {
-    T one = T.fromScalar(T.getOne());
+    T one = T.one();
     return (left / right + left % right) ^ ((left & right) | ~one);
 }
 
@@ -291,7 +276,7 @@ T integerShiftCurve<T : IIntegerType>(T value, T.ShiftAmount left, T.ShiftAmount
     return value >> right;
 }
 
-T constructFromIntegerLiteralType<T : INumeric>(int value)
+T constructFromBuiltinInteger<T : INumeric, TSource : __BuiltinIntegerType>(TSource value)
 {
     return T(value);
 }
@@ -316,7 +301,7 @@ T scalarIdentity<T : IScalarSignedIntegerType>(T value)
 void main()
 {
     WrappedInt scalar = scalarIdentity(integerCurve(
-        constructFromIntegerLiteralType<WrappedInt>(7), WrappedInt(3)));
+        constructFromBuiltinInteger<WrappedInt>(int8_t(7)), WrappedInt(3)));
 
     SignedIntegerPair<WrappedInt> left = {WrappedInt(-7), WrappedInt(10)};
     SignedIntegerPair<WrappedInt> right = {WrappedInt(3), WrappedInt(4)};
@@ -326,9 +311,10 @@ void main()
     let shifted = integerShiftCurve(left, int2(1, 2), int2(0, 1));
     let magnitude = absoluteInteger(left);
     let mask = orderedMask(left, right);
+    let wideConstructed = constructFromBuiltinInteger<SignedIntegerPair<WrappedInt>>(uint64_t(5));
 
     outputBuffer[0] = scalar.value + shaped.x.value + shaped.y.value + compound.x.value +
         compound.y.value + incremented.x.value + incremented.y.value + magnitude.x.value +
         magnitude.y.value + shifted.x.value + shifted.y.value + int(mask.any()) +
-        int(mask.all());
+        int(mask.all()) + wideConstructed.x.value;
 }

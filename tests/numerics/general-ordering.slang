@@ -13,17 +13,17 @@ struct NotificationKind : IPartiallyOrdered
 {
     int interruptionPriority;
 
-    bool equals(This other)
+    bool isEqualTo(This other)
     {
         return interruptionPriority == other.interruptionPriority;
     }
 
-    bool lessThan(This other)
+    bool isLessThan(This other)
     {
         return interruptionPriority < other.interruptionPriority;
     }
 
-    bool lessThanOrEquals(This other)
+    bool isLessThanOrEqualTo(This other)
     {
         return interruptionPriority <= other.interruptionPriority;
     }
