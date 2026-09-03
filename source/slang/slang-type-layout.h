@@ -645,106 +645,130 @@ struct ParameterCategoryFlag
 typedef ParameterCategoryFlags LayoutResourceKindFlags;
 typedef ParameterCategoryFlag LayoutResourceKindFlag;
 
-// Layout information for a value that consumes one primary resource kind, and may also carry
-// a second unit in another kind.
-struct SimpleLayoutInfo
+// Layout size and alignment measured in a single unit, a `LayoutResourceKind`.
+//
+// A simple or object layout holds one or more of these, one for each unit that the value is
+// measured in. Most values use a single unit, while a Metal argument buffer field uses two,
+// bytes and argument buffer element slots.
+struct AtomicLayoutInfo
 {
-    // What kind of resource should we consume?
-    LayoutResourceKind kind;
+    LayoutResourceKind kind = LayoutResourceKind::None;
+    LayoutSize size = 0;
 
-    // How many resources of that kind?
-    //
-    // For uniform, the size is the number of bytes "reserved" exclusively for an instance of that
-    // type. In *general* it is not necessary for a size to be rounded up to the alignment. Some
-    // targets do though - for example C++ and CUDA targets always have size as a multiple of
-    // alignment.
-    LayoutSize size;
+    // The alignment only applies to the uniform unit.
+    LayoutOffset alignment = 1;
 
-    // only useful in the uniform case
-    LayoutOffset alignment;
-
-    // The second unit is never uniform, so it needs no alignment.
-    LayoutResourceKind secondKind = LayoutResourceKind::None;
-    LayoutSize secondSize = LayoutSize(0);
-
-    SimpleLayoutInfo()
-        : kind(LayoutResourceKind::None), size(0), alignment(1)
-    {
-    }
-
-    SimpleLayoutInfo(UniformLayoutInfo uniformInfo)
-        : kind(LayoutResourceKind::Uniform)
-        , size(uniformInfo.size)
-        , alignment(uniformInfo.alignment)
-    {
-    }
-
-    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, UInt alignment = 1)
+    AtomicLayoutInfo() = default;
+    AtomicLayoutInfo(LayoutResourceKind kind, LayoutSize size, LayoutOffset alignment = 1)
         : kind(kind), size(size), alignment(alignment)
     {
-    }
-
-    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, LayoutOffset alignment)
-        : kind(kind), size(size), alignment(alignment)
-    {
-    }
-
-    bool hasSecondUnit() const { return secondKind != LayoutResourceKind::None; }
-
-    // The layout must not already have a second unit, and the new unit must not be uniform.
-    void setSecondUnit(LayoutResourceKind unitKind, LayoutSize unitSize)
-    {
-        SLANG_ASSERT(!hasSecondUnit());
-        SLANG_ASSERT(unitKind != LayoutResourceKind::Uniform);
-        secondKind = unitKind;
-        secondSize = unitSize;
-    }
-
-    // Convert to layout for uniform data
-    UniformLayoutInfo getUniformLayout()
-    {
-        if (kind == LayoutResourceKind::Uniform)
-        {
-            return UniformLayoutInfo(size, alignment);
-        }
-        else
-        {
-            return UniformLayoutInfo(0, 1);
-        }
     }
 };
 
-// Only useful in the case of a homogeneous array
+// Layout size and alignment measured in up to `N` units, one AtomicLayoutInfo per unit. Most
+// values use a single unit, bytes for uniform data or a slot count for a varying parameter. A
+// Metal argument buffer field uses two, bytes and argument buffer element slots.
+//
+// Simple and object layouts alias this template so their unit bounds can differ later without
+// disturbing client code.
+template<int N>
+struct CompositeLayoutInfo
+{
+    ShortList<AtomicLayoutInfo, N> units;
+
+    CompositeLayoutInfo() = default;
+
+    CompositeLayoutInfo(UniformLayoutInfo uniformInfo)
+    {
+        units.add(
+            AtomicLayoutInfo(LayoutResourceKind::Uniform, uniformInfo.size, uniformInfo.alignment));
+    }
+
+    CompositeLayoutInfo(LayoutResourceKind kind, LayoutSize size, UInt alignment = 1)
+    {
+        units.add(AtomicLayoutInfo(kind, size, LayoutOffset(alignment)));
+    }
+
+    CompositeLayoutInfo(LayoutResourceKind kind, LayoutSize size, LayoutOffset alignment)
+    {
+        units.add(AtomicLayoutInfo(kind, size, alignment));
+    }
+
+    CompositeLayoutInfo(AtomicLayoutInfo unit) { units.add(unit); }
+
+    CompositeLayoutInfo(AtomicLayoutInfo first, AtomicLayoutInfo second)
+    {
+        units.add(first);
+        units.add(second);
+    }
+
+    // Add `size` of usage in `unit`. When the layout already tracks `unit`, the size adds onto the
+    // existing amount, with no alignment applied. Otherwise the layout gains a new entry and must
+    // have room for it.
+    void addUsage(LayoutResourceKind unit, LayoutSize size)
+    {
+        for (auto& existing : units)
+        {
+            if (existing.kind == unit)
+            {
+                existing.size += size;
+                return;
+            }
+        }
+        SLANG_RELEASE_ASSERT(units.getCount() < N);
+        units.add(AtomicLayoutInfo(unit, size));
+    }
+
+    // Get the uniform unit's alignment, or 1 when there is no uniform unit.
+    LayoutOffset getAlignmentInBytes() const
+    {
+        for (auto& unit : units)
+            if (unit.kind == LayoutResourceKind::Uniform)
+                return unit.alignment;
+        return LayoutOffset(1);
+    }
+
+    // Convert to layout for uniform data.
+    UniformLayoutInfo getUniformLayout() const
+    {
+        for (auto& unit : units)
+            if (unit.kind == LayoutResourceKind::Uniform)
+                return UniformLayoutInfo(unit.size, unit.alignment);
+        return UniformLayoutInfo(0, 1);
+    }
+
+    Index getUnitCount() const { return units.getCount(); }
+
+    // The value must be measured in exactly one unit.
+    AtomicLayoutInfo getSole() const
+    {
+        SLANG_RELEASE_ASSERT(units.getCount() == 1);
+        return units[0];
+    }
+};
+
+// Layout information for a simple type, such as a scalar, vector, or matrix. A SimpleLayoutInfo
+// records layout in up to two units, where a unit is a LayoutResourceKind. Usually it measures a
+// type in bytes alone. In some modes a scalar or vector measures in a unit other than bytes, the
+// way a varying parameter measures in slots. In a Metal argument buffer a simple type measures in
+// bytes and a second unit, an argument buffer slot.
+using SimpleLayoutInfo = CompositeLayoutInfo<2>;
+
+// A simple layout for a homogeneous array, adding the uniform byte stride between elements.
 struct SimpleArrayLayoutInfo : SimpleLayoutInfo
 {
-    // This field is only useful in the uniform case
-    LayoutOffset elementStride;
+    LayoutOffset elementStride = 0;
 
-    // Convert to layout for uniform data
-    UniformArrayLayoutInfo getUniformLayout()
+    // Convert to layout for uniform data.
+    UniformArrayLayoutInfo getUniformLayout() const
     {
-        if (kind == LayoutResourceKind::Uniform)
-        {
-            return UniformArrayLayoutInfo(size, alignment, elementStride);
-        }
-        else
-        {
-            return UniformArrayLayoutInfo(0, 1, 0);
-        }
+        auto uniform = SimpleLayoutInfo::getUniformLayout();
+        return UniformArrayLayoutInfo(uniform.size, uniform.alignment, elementStride);
     }
 };
 
-struct ObjectLayoutInfo
-{
-    ShortList<SimpleLayoutInfo, 2> layoutInfos;
-    ObjectLayoutInfo() = default;
-    ObjectLayoutInfo(SimpleLayoutInfo layoutInfo) { layoutInfos.add(layoutInfo); }
-    SimpleLayoutInfo getSimple()
-    {
-        SLANG_ASSERT(layoutInfos.getCount() == 1);
-        return layoutInfos[0];
-    }
-};
+// Layout for an object type, measured in the same units as a simple type.
+using ObjectLayoutInfo = CompositeLayoutInfo<2>;
 
 struct LayoutRulesImpl;
 class VarLayout;
@@ -819,6 +843,12 @@ public:
         info.kind = kind;
         info.count = count;
         addResourceUsage(info);
+    }
+
+    void addResourceUsage(SimpleLayoutInfo info)
+    {
+        for (auto& unit : info.units)
+            addResourceUsage(unit.kind, unit.size);
     }
 
     void removeResourceUsage(LayoutResourceKind kind);

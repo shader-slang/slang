@@ -2416,7 +2416,10 @@ struct ExtendedTypeLayoutContext
                 case LayoutResourceKind::Uniform:
                 case LayoutResourceKind::ConstantBuffer: // for metal
                 case LayoutResourceKind::MetalArgumentBufferElement:
-                    resInfo = info;
+                    // The descriptor range locates a buffer's device pointer, so keep the Uniform
+                    // usage that reports a byte offset rather than the argument buffer slot.
+                    if (resInfo.kind != LayoutResourceKind::Uniform)
+                        resInfo = info;
                     break;
                 }
             }

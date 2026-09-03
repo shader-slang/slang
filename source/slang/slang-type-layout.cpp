@@ -256,9 +256,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
         override
     {
-        SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
-        auto elementSize = elementInfo.size.getFiniteValue();
-        auto elementAlignment = elementInfo.alignment;
+        auto element = elementInfo.getSole();
+        SLANG_RELEASE_ASSERT(element.size.isFinite());
+        auto elementSize = element.size.getFiniteValue();
+        auto elementAlignment = element.alignment;
         auto elementStride = _roundToAlignment(elementSize, elementAlignment);
 
         // An array with no elements will have zero size.
@@ -291,9 +292,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         }
 
         SimpleArrayLayoutInfo arrayInfo;
-        arrayInfo.kind = elementInfo.kind;
-        arrayInfo.size = arraySize;
-        arrayInfo.alignment = elementAlignment;
+        arrayInfo.units.add(AtomicLayoutInfo(element.kind, arraySize, elementAlignment));
         arrayInfo.elementStride = elementStride;
         return arrayInfo;
     }
@@ -304,11 +303,8 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
-        SimpleLayoutInfo vectorInfo;
-        vectorInfo.kind = elementInfo.kind;
-        vectorInfo.size = elementInfo.size * elementCount;
-        vectorInfo.alignment = elementInfo.alignment;
-        return vectorInfo;
+        auto element = elementInfo.getSole();
+        return SimpleLayoutInfo(element.kind, element.size * elementCount, element.alignment);
     }
 
     SimpleArrayLayoutInfo GetMatrixLayout(
@@ -403,7 +399,8 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         // For non-bindless targets, DescriptorHandle<T> has the layout of uint2
         auto uintInfo = GetScalarLayout(BaseType::UInt, context);
         auto uint2Info = GetVectorLayout(BaseType::UInt, uintInfo, 2);
-        return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint2Info.size, uint2Info.alignment));
+        auto uint2 = uint2Info.getSole();
+        return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint2.size, uint2.alignment));
     }
 };
 
@@ -418,10 +415,11 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
-        if (elementInfo.kind != LayoutResourceKind::Uniform)
+        auto element = elementInfo.getSole();
+        if (element.kind != LayoutResourceKind::Uniform)
         {
-            auto arrayInfo = GetArrayLayout(elementInfo, LayoutSize(elementCount));
-            return SimpleLayoutInfo(arrayInfo.kind, arrayInfo.size, arrayInfo.alignment);
+            auto atom = GetArrayLayout(elementInfo, LayoutSize(elementCount)).getSole();
+            return SimpleLayoutInfo(atom.kind, atom.size, atom.alignment);
         }
 
         // The `std140` and `std430` rules require vectors to be aligned to the next power of
@@ -431,10 +429,10 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         // Note that in this case we have a type layout where the size is *not* a multiple
         // of the alignment, so it should be possible to pack a scalar after a `float3`.
         //
-        SLANG_RELEASE_ASSERT(elementInfo.kind == LayoutResourceKind::Uniform);
-        SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
+        SLANG_RELEASE_ASSERT(element.kind == LayoutResourceKind::Uniform);
+        SLANG_RELEASE_ASSERT(element.size.isFinite());
 
-        auto size = elementInfo.size * elementCount;
+        auto size = element.size * elementCount;
         SimpleLayoutInfo vectorInfo(
             LayoutResourceKind::Uniform,
             size,
@@ -457,7 +455,9 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         // The size of an array must be rounded up to be a multiple of its alignment.
         //
         auto info = Super::GetArrayLayout(elementInfo, elementCount);
-        info.size = _roundToAlignment(info.size, info.alignment);
+        SLANG_RELEASE_ASSERT(info.getUnitCount() == 1);
+        auto& atom = info.units[0];
+        atom.size = _roundToAlignment(atom.size, atom.alignment);
         return info;
     }
 
@@ -481,7 +481,8 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         {
             // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
             auto uint64Info = GetScalarLayout(BaseType::UInt64, context);
-            return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint64Info.size, uint64Info.alignment));
+            auto uint64 = uint64Info.getSole();
+            return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint64.size, uint64.alignment));
         }
 
         // For non-bindless GLSL/SPIRV targets, fall back to default layout
@@ -507,9 +508,11 @@ struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
         // The `std140` rules require that array elements
         // be aligned on 16-byte boundaries.
         //
-        if (elementInfo.kind == LayoutResourceKind::Uniform)
+        SLANG_RELEASE_ASSERT(elementInfo.getUnitCount() == 1);
+        auto& element = elementInfo.units[0];
+        if (element.kind == LayoutResourceKind::Uniform)
         {
-            elementInfo.alignment = maximum(elementInfo.alignment, 16);
+            element.alignment = maximum(element.alignment, 16);
         }
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
@@ -545,9 +548,11 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
         override
     {
-        if (elementInfo.kind == LayoutResourceKind::Uniform)
+        SLANG_RELEASE_ASSERT(elementInfo.getUnitCount() == 1);
+        auto& element = elementInfo.units[0];
+        if (element.kind == LayoutResourceKind::Uniform)
         {
-            elementInfo.alignment = maximum(elementInfo.alignment, 16);
+            element.alignment = maximum(element.alignment, 16);
         }
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
@@ -637,8 +642,10 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
             auto info = Super::GetArrayLayout(elementInfo, LayoutSize(1));
 
             // So it is actually a Array<T> on CPU which is a pointer and a size
-            info.size = sizeof(void*) * 2;
-            info.alignment = alignof(void*);
+            SLANG_RELEASE_ASSERT(info.getUnitCount() == 1);
+            auto& atom = info.units[0];
+            atom.size = sizeof(void*) * 2;
+            atom.alignment = alignof(void*);
 
             return info;
         }
@@ -706,12 +713,11 @@ struct LLVMLayoutRulesImpl : DefaultLayoutRulesImpl
         size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
-        SimpleLayoutInfo vectorInfo;
-        vectorInfo.kind = elementInfo.kind;
-        vectorInfo.size = elementInfo.size * elementCount;
+        auto element = elementInfo.getSole();
+        auto size = element.size * elementCount;
         // Align vector to next power of two.
-        vectorInfo.alignment = Slang::_roundUpToPowerOfTwo(vectorInfo.size.getFiniteValue());
-        return vectorInfo;
+        auto alignment = LayoutOffset(Slang::_roundUpToPowerOfTwo(size.getFiniteValue()));
+        return SimpleLayoutInfo(element.kind, size, alignment);
     }
 
     UniformLayoutInfo BeginStructLayout() override { return Super::BeginStructLayout(); }
@@ -784,7 +790,8 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
         override
     {
-        SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
+        auto element = elementInfo.getSole();
+        SLANG_RELEASE_ASSERT(element.size.isFinite());
 
         if (elementCount.isInfinite())
         {
@@ -792,8 +799,10 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
             auto info = Super::GetArrayLayout(elementInfo, LayoutSize(1));
 
             // So it is actually a Array<T> on CUDA which is a pointer and a size
-            info.size = _roundToAlignment((CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
-            info.alignment = sizeof(CUDAPtr);
+            SLANG_RELEASE_ASSERT(info.getUnitCount() == 1);
+            auto& atom = info.units[0];
+            atom.size = _roundToAlignment((CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
+            atom.alignment = sizeof(CUDAPtr);
             return info;
         }
 
@@ -801,10 +810,9 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // happen in EndStructLayout). If that weren't the case the array may be smaller than
         // elementSize * elementCount which would be wrong for CUDA.
         SLANG_ASSERT(
-            elementInfo.alignment.isInvalid() ||
-            _isAligned(
-                elementInfo.size.getFiniteValue().getValidValue(),
-                elementInfo.alignment.getValidValue()));
+            element.alignment.isInvalid() || _isAligned(
+                                                 element.size.getFiniteValue().getValidValue(),
+                                                 element.alignment.getValidValue()));
 
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
@@ -814,25 +822,18 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
-        if (elementInfo.size.isInfinite())
+        auto element = elementInfo.getSole();
+        if (element.size.isInfinite())
         {
-            SimpleLayoutInfo vectorInfo;
-            vectorInfo.kind = elementInfo.kind;
-            vectorInfo.size = LayoutSize::infinite();
-            vectorInfo.alignment = elementInfo.alignment;
-            return vectorInfo;
+            return SimpleLayoutInfo(element.kind, LayoutSize::infinite(), element.alignment);
         }
-        if (elementInfo.size.isInvalid())
+        if (element.size.isInvalid())
         {
-            SimpleLayoutInfo vectorInfo;
-            vectorInfo.kind = elementInfo.kind;
-            vectorInfo.size = LayoutSize::invalid();
-            vectorInfo.alignment = elementInfo.alignment;
-            return vectorInfo;
+            return SimpleLayoutInfo(element.kind, LayoutSize::invalid(), element.alignment);
         }
 
         // We just checked it wasn't infinite or invalid
-        auto elementSize = elementInfo.size.getFiniteValue().getValidValue();
+        auto elementSize = element.size.getFiniteValue().getValidValue();
 
         // These rules can largely be determines by looking at
         // 'vector_types.h' in the CUDA SDK
@@ -859,12 +860,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // We checked these earlier
         SLANG_ASSERT(_isAligned(size, alignment));
 
-        SimpleLayoutInfo vectorInfo;
-        vectorInfo.kind = elementInfo.kind;
-        vectorInfo.size = LayoutSize{size};
-        vectorInfo.alignment = alignment;
-
-        return vectorInfo;
+        return SimpleLayoutInfo(element.kind, LayoutSize{size}, LayoutOffset(alignment));
     }
 
     SimpleArrayLayoutInfo GetMatrixLayout(
@@ -926,38 +922,26 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
+        auto element = elementInfo.getSole();
 
-        if (elementInfo.size.isInfinite())
+        if (element.size.isInfinite())
         {
-            SimpleLayoutInfo vectorInfo;
-            vectorInfo.kind = elementInfo.kind;
-            vectorInfo.size = LayoutSize::infinite();
-            vectorInfo.alignment = elementInfo.alignment;
-            return vectorInfo;
+            return SimpleLayoutInfo(element.kind, LayoutSize::infinite(), element.alignment);
         }
-        if (elementInfo.size.isInvalid())
+        if (element.size.isInvalid())
         {
-            SimpleLayoutInfo vectorInfo;
-            vectorInfo.kind = elementInfo.kind;
-            vectorInfo.size = LayoutSize::invalid();
-            vectorInfo.alignment = elementInfo.alignment;
-            return vectorInfo;
+            return SimpleLayoutInfo(element.kind, LayoutSize::invalid(), element.alignment);
         }
 
         // We checked validity earlier
-        const auto elementSize = elementInfo.size.getFiniteValue().getValidValue();
+        const auto elementSize = element.size.getFiniteValue().getValidValue();
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
         // Metal aligns vectors to 2/4 element boundaries.
         size_t size = alignedElementCount * elementSize;
         size_t alignment = alignedElementCount * elementSize;
 
-        SimpleLayoutInfo vectorInfo;
-        vectorInfo.kind = elementInfo.kind;
-        vectorInfo.size = size;
-        vectorInfo.alignment = alignment;
-
-        return vectorInfo;
+        return SimpleLayoutInfo(element.kind, LayoutSize{size}, LayoutOffset(alignment));
     }
 };
 
@@ -973,11 +957,8 @@ struct MetalStructuredBufferLayoutRulesImpl : MetalLayoutRulesImpl
         size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
-        SimpleLayoutInfo vectorInfo;
-        vectorInfo.kind = elementInfo.kind;
-        vectorInfo.size = elementInfo.size * elementCount;
-        vectorInfo.alignment = elementInfo.alignment;
-        return vectorInfo;
+        auto element = elementInfo.getSole();
+        return SimpleLayoutInfo(element.kind, element.size * elementCount, element.alignment);
     }
 };
 
@@ -1234,15 +1215,15 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::TextureSampler:
             {
                 ObjectLayoutInfo info;
-                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::ShaderResource, 1));
-                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::SamplerState, 1));
+                info.addUsage(LayoutResourceKind::ShaderResource, 1);
+                info.addUsage(LayoutResourceKind::SamplerState, 1);
                 return info;
             }
         case ShaderParameterKind::MutableTextureSampler:
             {
                 ObjectLayoutInfo info;
-                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::UnorderedAccess, 1));
-                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::SamplerState, 1));
+                info.addUsage(LayoutResourceKind::UnorderedAccess, 1);
+                info.addUsage(LayoutResourceKind::SamplerState, 1);
                 return info;
             }
         case ShaderParameterKind::InputRenderTarget:
@@ -1266,7 +1247,7 @@ struct WGSLObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
         {
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
-            info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, 1));
+            info.addUsage(LayoutResourceKind::DescriptorTableSlot, 1);
             break;
         }
 
@@ -1596,12 +1577,10 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
             {
-                ObjectLayoutInfo info;
-                info.layoutInfos.add(
-                    SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*)));
-                info.layoutInfos.add(
-                    SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*)));
-                return info;
+                return SimpleLayoutInfo(
+                    LayoutResourceKind::Uniform,
+                    2 * sizeof(void*),
+                    alignof(void*));
             }
         case ShaderParameterKind::InputRenderTarget:
             // TODO: how to handle these?
@@ -2610,8 +2589,8 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::MutableTextureSampler:
             {
                 ObjectLayoutInfo info;
-                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::MetalTexture, 1));
-                info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::SamplerState, 1));
+                info.addUsage(LayoutResourceKind::MetalTexture, 1);
+                info.addUsage(LayoutResourceKind::SamplerState, 1);
                 return info;
             }
         default:
@@ -2621,63 +2600,22 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
     }
 };
 
-// These rules serve the explicit MetalArgumentBufferTier2 request, so a resource object carries
-// only the tier 2 bytes. The default parameter block layout uses rules that also carry the tier 1
-// slot.
-struct MetalTier2ObjectLayoutRulesImpl : ObjectLayoutRulesImpl
-{
-    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */)
-        override
-    {
-        switch (kind)
-        {
-        case ShaderParameterKind::ConstantBuffer:
-        case ShaderParameterKind::ParameterBlock:
-        case ShaderParameterKind::StructuredBuffer:
-        case ShaderParameterKind::MutableStructuredBuffer:
-        case ShaderParameterKind::RawBuffer:
-        case ShaderParameterKind::Buffer:
-        case ShaderParameterKind::MutableRawBuffer:
-        case ShaderParameterKind::MutableBuffer:
-        case ShaderParameterKind::ShaderStorageBuffer:
-        case ShaderParameterKind::AccelerationStructure:
-            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
-        case ShaderParameterKind::AppendConsumeStructuredBuffer:
-            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
-        case ShaderParameterKind::MutableTexture:
-        case ShaderParameterKind::TextureUniformBuffer:
-        case ShaderParameterKind::Texture:
-        case ShaderParameterKind::SamplerState:
-            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
-        case ShaderParameterKind::TextureSampler:
-        case ShaderParameterKind::MutableTextureSampler:
-            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
-        case ShaderParameterKind::SubpassInput:
-            return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, 1);
-        default:
-            SLANG_UNEXPECTED("unhandled shader parameter kind");
-            UNREACHABLE_RETURN(SimpleLayoutInfo());
-        }
-    }
-};
-
 static MetalObjectLayoutRulesImpl kMetalObjectLayoutRulesImpl;
-static MetalTier2ObjectLayoutRulesImpl kMetalTier2ObjectLayoutRulesImpl;
 static MetalLayoutRulesImpl kMetalLayoutRulesImpl;
 static MetalStructuredBufferLayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl;
 
 // A Metal argument buffer field carries two units, the slot that a tier 1 device indexes and
 // the byte offset that a tier 2 device uses. A device is wholly one tier at runtime, so the
 // element layout carries both and a consumer reads the unit for its tier. These rules add the
-// slot on top of the standard Metal byte layout, so a field keeps the same bytes that the
-// explicit tier 2 path gives it. A matrix adds its slot in the caller instead, since
-// GetMatrixLayout drops the second unit.
+// slot on top of the standard Metal byte layout.
 struct MetalArgumentBufferContentsLayoutRulesImpl : MetalLayoutRulesImpl
 {
+    typedef MetalLayoutRulesImpl Super;
+
     SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) override
     {
-        SimpleLayoutInfo info = MetalLayoutRulesImpl::GetScalarLayout(baseType, context);
-        info.setSecondUnit(LayoutResourceKind::MetalArgumentBufferElement, 1);
+        SimpleLayoutInfo info = Super::GetScalarLayout(baseType, context);
+        info.addUsage(LayoutResourceKind::MetalArgumentBufferElement, 1);
         return info;
     }
 
@@ -2686,9 +2624,34 @@ struct MetalArgumentBufferContentsLayoutRulesImpl : MetalLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
-        SimpleLayoutInfo info =
-            MetalLayoutRulesImpl::GetVectorLayout(elementType, elementInfo, elementCount);
-        info.setSecondUnit(LayoutResourceKind::MetalArgumentBufferElement, 1);
+        // Give the base rules only the element's byte layout, so they never see the argument
+        // buffer slot.
+        SimpleLayoutInfo info = Super::GetVectorLayout(
+            elementType,
+            SimpleLayoutInfo(elementInfo.getUniformLayout()),
+            elementCount);
+        info.addUsage(LayoutResourceKind::MetalArgumentBufferElement, 1);
+        return info;
+    }
+
+    SimpleArrayLayoutInfo GetMatrixLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t rowCount,
+        size_t columnCount) override
+    {
+        // Lay out the matrix bytes as an array of row vectors. Give the base rules only the
+        // element's bytes, so the row vector carries no argument buffer slot and GetArrayLayout
+        // sees a single unit.
+        SimpleArrayLayoutInfo info = GetArrayLayout(
+            Super::GetVectorLayout(
+                elementType,
+                SimpleLayoutInfo(elementInfo.getUniformLayout()),
+                columnCount),
+            rowCount);
+        // The matrix occupies one argument buffer slot for each row or column along its major
+        // axis. That major count arrives here as rowCount.
+        info.addUsage(LayoutResourceKind::MetalArgumentBufferElement, LayoutSize(rowCount));
         return info;
     }
 };
@@ -2716,27 +2679,21 @@ struct MetalArgumentBufferContentsObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::Texture:
         case ShaderParameterKind::SamplerState:
-            {
-                SimpleLayoutInfo info(LayoutResourceKind::Uniform, 8, 8);
-                info.setSecondUnit(LayoutResourceKind::MetalArgumentBufferElement, 1);
-                return info;
-            }
+            return SimpleLayoutInfo(
+                AtomicLayoutInfo(LayoutResourceKind::Uniform, 8, 8),
+                AtomicLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1));
         // A texture sampler pair or an append consume buffer occupies two device pointers.
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
         case ShaderParameterKind::AppendConsumeStructuredBuffer:
-            {
-                SimpleLayoutInfo info(LayoutResourceKind::Uniform, 16, 8);
-                info.setSecondUnit(LayoutResourceKind::MetalArgumentBufferElement, 2);
-                return info;
-            }
+            return SimpleLayoutInfo(
+                AtomicLayoutInfo(LayoutResourceKind::Uniform, 16, 8),
+                AtomicLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 2));
         // A subpass input has no device pointer, so it uses an attachment index instead of bytes.
         case ShaderParameterKind::SubpassInput:
-            {
-                SimpleLayoutInfo info(LayoutResourceKind::InputAttachmentIndex, 1);
-                info.setSecondUnit(LayoutResourceKind::MetalArgumentBufferElement, 1);
-                return info;
-            }
+            return SimpleLayoutInfo(
+                AtomicLayoutInfo(LayoutResourceKind::InputAttachmentIndex, 1),
+                AtomicLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1));
         default:
             SLANG_UNEXPECTED("unhandled shader parameter kind");
             UNREACHABLE_RETURN(SimpleLayoutInfo());
@@ -2764,18 +2721,6 @@ LayoutRulesImpl kMetalParameterBlockLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
     &kMetalArgumentBufferContentsLayoutRulesImpl,
     &kMetalArgumentBufferContentsObjectLayoutRulesImpl,
-};
-
-LayoutRulesImpl kMetalTier2ConstantBufferLayoutRulesImpl_ = {
-    &kMetalLayoutRulesFamilyImpl,
-    &kMetalLayoutRulesImpl,
-    &kMetalTier2ObjectLayoutRulesImpl,
-};
-
-LayoutRulesImpl kMetalTier2ParameterBlockLayoutRulesImpl_ = {
-    &kMetalLayoutRulesFamilyImpl,
-    &kMetalLayoutRulesImpl,
-    &kMetalTier2ObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
@@ -2871,17 +2816,20 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return nullptr;
 }
 
+// A tier 2 nested buffer is a device pointer at a byte offset, so it shares the default parameter
+// block's contents rules. The descriptor range reports that byte offset, so the tier 2 layout needs
+// no rule set of its own.
 LayoutRulesImpl* MetalArgumentBufferTier2LayoutRulesFamilyImpl::getConstantBufferRules(
     CompilerOptionSet&,
     Type*)
 {
-    return &kMetalTier2ConstantBufferLayoutRulesImpl_;
+    return &kMetalParameterBlockLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* MetalArgumentBufferTier2LayoutRulesFamilyImpl::getParameterBlockRules(
     CompilerOptionSet&)
 {
-    return &kMetalTier2ParameterBlockLayoutRulesImpl_;
+    return &kMetalParameterBlockLayoutRulesImpl_;
 }
 
 
@@ -3160,35 +3108,11 @@ static TypeLayoutResult createSimpleTypeLayout(
     typeLayout->type = type;
     typeLayout->rules = rules;
 
-    typeLayout->uniformAlignment = info.alignment;
+    typeLayout->uniformAlignment = info.getAlignmentInBytes();
 
-    typeLayout->addResourceUsage(info.kind, info.size);
-    if (info.hasSecondUnit())
-        typeLayout->addResourceUsage(info.secondKind, info.secondSize);
+    typeLayout->addResourceUsage(info);
 
     return TypeLayoutResult(typeLayout, info);
-}
-
-static TypeLayoutResult createSimpleTypeLayout(
-    const ObjectLayoutInfo& info,
-    Type* type,
-    LayoutRulesImpl* rules)
-{
-    RefPtr<TypeLayout> typeLayout = new TypeLayout();
-
-    typeLayout->type = type;
-    typeLayout->rules = rules;
-
-    typeLayout->uniformAlignment = info.layoutInfos[0].alignment;
-
-    for (auto entry : info.layoutInfos)
-    {
-        typeLayout->addResourceUsage(entry.kind, entry.size);
-        if (entry.hasSecondUnit())
-            typeLayout->addResourceUsage(entry.secondKind, entry.secondSize);
-    }
-
-    return TypeLayoutResult(typeLayout, info.layoutInfos[0]);
 }
 
 static SimpleLayoutInfo _getParameterGroupLayoutInfo(
@@ -3198,29 +3122,27 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
 {
     if (as<ConstantBufferType>(type))
     {
-        return rules
-            ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context.objectLayoutOptions)
-            .getSimple();
+        return rules->GetObjectLayout(
+            ShaderParameterKind::ConstantBuffer,
+            context.objectLayoutOptions);
     }
     else if (as<TextureBufferType>(type))
     {
-        return rules
-            ->GetObjectLayout(
-                ShaderParameterKind::TextureUniformBuffer,
-                context.objectLayoutOptions)
-            .getSimple();
+        return rules->GetObjectLayout(
+            ShaderParameterKind::TextureUniformBuffer,
+            context.objectLayoutOptions);
     }
     else if (as<GLSLShaderStorageBufferType>(type))
     {
-        return rules
-            ->GetObjectLayout(ShaderParameterKind::ShaderStorageBuffer, context.objectLayoutOptions)
-            .getSimple();
+        return rules->GetObjectLayout(
+            ShaderParameterKind::ShaderStorageBuffer,
+            context.objectLayoutOptions);
     }
     else if (as<ParameterBlockType>(type))
     {
-        auto info =
-            rules->GetObjectLayout(ShaderParameterKind::ParameterBlock, context.objectLayoutOptions)
-                .getSimple();
+        auto info = rules->GetObjectLayout(
+            ShaderParameterKind::ParameterBlock,
+            context.objectLayoutOptions);
 
         // Note: we default to consuming zero register spces here, because
         // a parameter block might not contain anything (or all it contains
@@ -3232,8 +3154,9 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
         //
         // TODO: wouldn't it be any different to just allocate this
         // as an empty `SimpleLayoutInfo` of any other kind?
-        if (info.kind == LayoutResourceKind::SubElementRegisterSpace)
-            info.size = 0;
+        auto& atom = info.units[0];
+        if (atom.kind == LayoutResourceKind::SubElementRegisterSpace)
+            atom.size = 0;
         return info;
     }
 
@@ -4100,12 +4023,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         }
         auto bufferUsage =
             parameterGroupRules->GetObjectLayout(parameterKind, context.objectLayoutOptions);
-        for (auto layoutInfo : bufferUsage.layoutInfos)
-        {
-            containerTypeLayout->addResourceUsage(layoutInfo.kind, layoutInfo.size);
-            if (layoutInfo.hasSecondUnit())
-                containerTypeLayout->addResourceUsage(layoutInfo.secondKind, layoutInfo.secondSize);
-        }
+        containerTypeLayout->addResourceUsage(bufferUsage);
     }
 
     // Similarly to how we only need a constant buffer to be allocated
@@ -4476,15 +4394,9 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
 
     typeLayout->elementTypeLayout = elementTypeLayout;
 
-    for (auto info : objInfo.layoutInfos)
-    {
-        if (info.kind == LayoutResourceKind::Uniform)
-            typeLayout->uniformAlignment = info.alignment;
-        if (info.size.compare(0) == std::partial_ordering::greater)
-            typeLayout->addResourceUsage(info.kind, info.size);
-        if (info.hasSecondUnit())
-            typeLayout->addResourceUsage(info.secondKind, info.secondSize);
-    }
+    typeLayout->uniformAlignment = objInfo.getAlignmentInBytes();
+
+    typeLayout->addResourceUsage(objInfo);
 
     // If element type contains existential type params and object params,
     // we need to propagate them through the StructuredBufferLayout.
@@ -4883,8 +4795,7 @@ TypeLayoutResult makeTypeLayoutResult(RefPtr<TypeLayout> typeLayout)
         auto resInfo = typeLayout->resourceInfos[0];
         if (resInfo.kind != LayoutResourceKind::Uniform)
         {
-            result.info.kind = resInfo.kind;
-            result.info.size = resInfo.count;
+            result.info = SimpleLayoutInfo(resInfo.kind, resInfo.count);
             return result;
         }
     }
@@ -4894,9 +4805,10 @@ TypeLayoutResult makeTypeLayoutResult(RefPtr<TypeLayout> typeLayout)
     //
     if (auto resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
     {
-        result.info.kind = LayoutResourceKind::Uniform;
-        result.info.alignment = typeLayout->uniformAlignment;
-        result.info.size = resInfo->count;
+        result.info = SimpleLayoutInfo(
+            LayoutResourceKind::Uniform,
+            resInfo->count,
+            typeLayout->uniformAlignment);
     }
 
     // If there was no ordinary/uniform resource usage, then we
@@ -5137,10 +5049,7 @@ static TypeLayoutResult _createTypeLayoutForGlobalGenericTypeParam(
     Type* type,
     GlobalGenericParamDecl* globalGenericParamDecl)
 {
-    SimpleLayoutInfo info;
-    info.alignment = 0;
-    info.size = 0;
-    info.kind = LayoutResourceKind::GenericResource;
+    SimpleLayoutInfo info(LayoutResourceKind::GenericResource, 0);
 
     RefPtr<GenericParamTypeLayout> typeLayout = new GenericParamTypeLayout();
     // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
@@ -5215,7 +5124,11 @@ static TypeLayoutResult createArrayLikeTypeLayout(
     // support unbounded types.
     //
 
-    auto arrayUniformInfo = rules->GetArrayLayout(elementInfo, elementCount).getUniformLayout();
+    // GetArrayLayout accepts a single unit, so strip the element to its bytes. Its other units,
+    // such as a Metal argument buffer slot, reach the array through elementTypeLayout below.
+    auto arrayUniformInfo =
+        rules->GetArrayLayout(SimpleLayoutInfo(elementInfo.getUniformLayout()), elementCount)
+            .getUniformLayout();
 
     RefPtr<ArrayTypeLayout> typeLayout = new ArrayTypeLayout();
 
@@ -5392,10 +5305,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             context.sink->diagnose(diag);
         }
         // Return a layout with unknown size, if we run out of recursion depth.
-        ObjectLayoutInfo info;
-        info.layoutInfos.add(
-            SimpleLayoutInfo(UniformLayoutInfo(LayoutSize::invalid(), LayoutOffset(1))));
-        return createSimpleTypeLayout(info, type, context.rules);
+        return createSimpleTypeLayout(
+            SimpleLayoutInfo(UniformLayoutInfo(LayoutSize::invalid(), LayoutOffset(1))),
+            type,
+            context.rules);
     }
 
     context.recursionDepth++;
@@ -5433,27 +5346,28 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // Set the uniform alignment for the parameter group type based on the
         // alignment required for the container itself (e.g., pointer alignment
         // for CUDA/CPU targets where parameter blocks are represented as pointers).
-        typeLayout->uniformAlignment = info.alignment;
+        typeLayout->uniformAlignment = info.getAlignmentInBytes();
 
         return TypeLayoutResult(typeLayout, info);
     }
     else if (as<SubpassInputType>(type))
     {
-        // SubpassInputType fills 2 slots, 'shader resource' and 'input_attachment_index'
-        auto objLayout1 =
+        // A SubpassInput uses a texture and an input attachment index. Under the Metal
+        // contents rules the texture alone fills the two units that an object layout holds,
+        // so add the subpass usage to the type layout, whose resource list has no fixed capacity.
+        auto textureLayout =
             rules->GetObjectLayout(ShaderParameterKind::Texture, context.objectLayoutOptions);
-        auto objLayout2 =
+        auto subpassLayout =
             rules->GetObjectLayout(ShaderParameterKind::SubpassInput, context.objectLayoutOptions);
-        objLayout1.layoutInfos.add(objLayout2.layoutInfos.getFirst());
-        return createSimpleTypeLayout(objLayout1, type, rules);
+        auto result = createSimpleTypeLayout(textureLayout, type, rules);
+        result.layout->addResourceUsage(subpassLayout);
+        return result;
     }
     else if (auto structuredBufferType = as<HLSLStructuredBufferType>(type))
     {
-        auto info = rules
-                        ->GetObjectLayout(
-                            ShaderParameterKind::StructuredBuffer,
-                            context.objectLayoutOptions)
-                        .getSimple();
+        auto info = rules->GetObjectLayout(
+            ShaderParameterKind::StructuredBuffer,
+            context.objectLayoutOptions);
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
             ShaderParameterKind::StructuredBuffer,
@@ -5463,11 +5377,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto rwStructuredBufferType = as<HLSLRWStructuredBufferType>(type))
     {
-        auto info = rules
-                        ->GetObjectLayout(
-                            ShaderParameterKind::MutableStructuredBuffer,
-                            context.objectLayoutOptions)
-                        .getSimple();
+        auto info = rules->GetObjectLayout(
+            ShaderParameterKind::MutableStructuredBuffer,
+            context.objectLayoutOptions);
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
             ShaderParameterKind::MutableStructuredBuffer,
@@ -5479,11 +5391,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         auto rasterizerOrderedStructuredBufferType =
             as<HLSLRasterizerOrderedStructuredBufferType>(type))
     {
-        auto info = rules
-                        ->GetObjectLayout(
-                            ShaderParameterKind::MutableStructuredBuffer,
-                            context.objectLayoutOptions)
-                        .getSimple();
+        auto info = rules->GetObjectLayout(
+            ShaderParameterKind::MutableStructuredBuffer,
+            context.objectLayoutOptions);
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
             ShaderParameterKind::MutableStructuredBuffer,
@@ -5493,11 +5403,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto appendStructuredBufferType = as<HLSLAppendStructuredBufferType>(type))
     {
-        auto info = rules
-                        ->GetObjectLayout(
-                            ShaderParameterKind::AppendConsumeStructuredBuffer,
-                            context.objectLayoutOptions)
-                        .getSimple();
+        auto info = rules->GetObjectLayout(
+            ShaderParameterKind::AppendConsumeStructuredBuffer,
+            context.objectLayoutOptions);
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
             ShaderParameterKind::AppendConsumeStructuredBuffer,
@@ -5507,11 +5415,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto consumeStructuredBufferType = as<HLSLConsumeStructuredBufferType>(type))
     {
-        auto info = rules
-                        ->GetObjectLayout(
-                            ShaderParameterKind::AppendConsumeStructuredBuffer,
-                            context.objectLayoutOptions)
-                        .getSimple();
+        auto info = rules->GetObjectLayout(
+            ShaderParameterKind::AppendConsumeStructuredBuffer,
+            context.objectLayoutOptions);
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
             ShaderParameterKind::AppendConsumeStructuredBuffer,
@@ -5598,11 +5504,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         typeLayout->elementTypeLayout = element.layout;
         typeLayout->uniformStride = element.info.getUniformLayout().size.getFiniteValue();
 
-        if (info.kind == LayoutResourceKind::Uniform)
-            typeLayout->uniformAlignment = info.alignment;
-        typeLayout->addResourceUsage(info.kind, info.size);
-        if (info.hasSecondUnit())
-            typeLayout->addResourceUsage(info.secondKind, info.secondSize);
+        typeLayout->uniformAlignment = info.getAlignmentInBytes();
+        typeLayout->addResourceUsage(info);
 
         return TypeLayoutResult(typeLayout, info);
     }
@@ -5675,33 +5578,23 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // row is aligned up to a 16-byte boundary).  Using the scalar element's alignment here
         // would cause `getStride()` on the row vector to report the natural vector size (e.g. 12
         // for a `float3`) instead of the matrix element stride (16).
-        rowTypeLayout->uniformAlignment = info.alignment;
+        rowTypeLayout->uniformAlignment = info.getAlignmentInBytes();
 
         rowTypeLayout->uniformStride = colStride;
         rowTypeLayout->elementTypeLayout = elementTypeLayout;
-        rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
-        if (rowInfo.hasSecondUnit())
-            rowTypeLayout->addResourceUsage(rowInfo.secondKind, rowInfo.secondSize);
+        rowTypeLayout->addResourceUsage(rowInfo);
 
         RefPtr<MatrixTypeLayout> typeLayout = new MatrixTypeLayout();
 
         typeLayout->type = type;
         typeLayout->rules = rules;
-        typeLayout->uniformAlignment = info.alignment;
+        typeLayout->uniformAlignment = info.getAlignmentInBytes();
 
         typeLayout->elementTypeLayout = rowTypeLayout;
         typeLayout->uniformStride = rowStride;
         typeLayout->mode = (MatrixLayoutMode)matrixLayout;
 
-        typeLayout->addResourceUsage(info.kind, info.size);
-
-        // GetArrayLayout drops the second unit, so the matrix info from GetMatrixLayout never
-        // carries one and rowInfo supplies the slot instead. The matrix has one argument buffer
-        // slot for each row or column along its major axis.
-        if (rowInfo.hasSecondUnit())
-            typeLayout->addResourceUsage(
-                rowInfo.secondKind,
-                rowInfo.secondSize * LayoutSize(layoutMajorCount));
+        typeLayout->addResourceUsage(info);
 
         return TypeLayoutResult(typeLayout, info);
     }
@@ -5729,9 +5622,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         ptrLayout->type = type;
         ptrLayout->rules = rules;
 
-        ptrLayout->uniformAlignment = info.alignment;
+        ptrLayout->uniformAlignment = info.getAlignmentInBytes();
 
-        ptrLayout->addResourceUsage(info.kind, info.size);
+        ptrLayout->addResourceUsage(info);
 
         TypeLayoutResult valueTypeLayout;
         if (context.rules != &kScalarLayoutRulesImpl_)
@@ -6325,7 +6218,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
             auto info = varyingRules[rr]->GetScalarLayout(baseType, context);
-            typeLayout->addResourceUsage(info.kind, info.size);
+            typeLayout->addResourceUsage(info);
         }
 
         return typeLayout;
@@ -6339,7 +6232,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
             auto info = varyingRules[rr]->GetPointerLayout(context);
-            typeLayout->addResourceUsage(info.kind, info.size);
+            typeLayout->addResourceUsage(info);
         }
 
         return typeLayout;
@@ -6388,7 +6281,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
             auto varyingRuleSet = varyingRules[rr];
             auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType, context);
             auto info = varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, elementCount);
-            typeLayout->addResourceUsage(info.kind, info.size);
+            typeLayout->addResourceUsage(info);
         }
 
         return typeLayout;
@@ -6447,7 +6340,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
                 elementInfo,
                 layoutMajorCount,
                 layoutMinorCount);
-            typeLayout->addResourceUsage(info.kind, info.size);
+            typeLayout->addResourceUsage(info);
 
             if (context.matrixLayoutMode == kMatrixLayoutMode_RowMajor)
             {
@@ -6455,7 +6348,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
                 // resource usage for the row type.
                 auto rowInfo =
                     varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, colCount);
-                rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
+                rowTypeLayout->addResourceUsage(rowInfo);
             }
         }
 
@@ -6481,12 +6374,9 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
                 descriptorHandleType->getElementType(),
                 context);
 
-            // For combined texture samplers, objLayoutInfo may contain multiple layoutInfos
-            // (e.g., one for texture and one for sampler)
-            for (const auto& layoutInfo : objLayoutInfo.layoutInfos)
-            {
-                typeLayout->addResourceUsage(layoutInfo.kind, layoutInfo.size);
-            }
+            // A combined object such as a texture sampler carries more than one unit, and
+            // addResourceUsage records them all.
+            typeLayout->addResourceUsage(objLayoutInfo);
         }
 
         return typeLayout;
