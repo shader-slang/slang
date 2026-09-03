@@ -777,6 +777,93 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         self.assertIn("DA:5,99\n", result.stdout)
         self.assertEqual(result.stderr, "")
 
+    def test_binary_counters_reject_oversized_buffer(self):
+        # A buffer larger than the manifest expects means the counters
+        # were read back from a different compile of the shader. Slot
+        # indices are per-compile, so quietly using a prefix of the
+        # buffer yields plausible but wrong hit counts. Coalescing makes
+        # this the natural mistake, because counter_count drops sharply
+        # between an old and a new compile of the same source.
+        manifest = {
+            "version": 2,
+            "counter_count": 2,
+            "buffer": {"element_type": "uint32", "element_stride": 4},
+            "entries": [
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 10},
+                {"kind": "line", "counter": 1, "file": "shader.slang", "line": 11},
+            ],
+        }
+        counters = struct.pack("<4I", 7, 13, 99, 99)
+
+        result = self.run_converter_binary(manifest, counters, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expects exactly 8", result.stderr)
+        self.assertIn("same compile", result.stderr)
+
+    def test_binary_counters_reject_undersized_buffer(self):
+        # The undersized direction was already rejected; pin it so the
+        # move from a lower-bound to an exact check keeps it rejected.
+        manifest = {
+            "version": 2,
+            "counter_count": 4,
+            "buffer": {"element_type": "uint32", "element_stride": 4},
+            "entries": [
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 10},
+            ],
+        }
+        counters = struct.pack("<2I", 7, 13)
+
+        result = self.run_converter_binary(manifest, counters, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expects exactly 16", result.stderr)
+
+    def test_text_counters_reject_extra_values(self):
+        # Same contract on the text input path.
+        manifest = {
+            "version": 2,
+            "counter_count": 2,
+            "buffer": {"element_type": "uint32", "element_stride": 4},
+            "entries": [
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 10},
+                {"kind": "line", "counter": 1, "file": "shader.slang", "line": 11},
+            ],
+        }
+
+        result = self.run_converter(manifest, counters_text="7 13 99", check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expects exactly 2", result.stderr)
+
+    def test_entries_may_share_a_counter_slot(self):
+        # Coalesced line coverage points several source entries at one
+        # counter. The converter must accumulate per *entry*, so a slot
+        # shared by two lines reports that slot's value on each line,
+        # and two entries on the same line still sum — this is what
+        # keeps LCOV output unchanged when coalescing is enabled.
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "buffer": {"element_type": "uint32", "element_stride": 4},
+            "entries": [
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 10},
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 11},
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 12},
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 12},
+            ],
+        }
+        counters = struct.pack("<1I", 5)
+
+        result = self.run_converter_binary(manifest, counters)
+
+        self.assertIn("DA:10,5\n", result.stdout)
+        self.assertIn("DA:11,5\n", result.stdout)
+        # Two entries on line 12 sum, exactly as they would with two
+        # dedicated slots holding 5 each.
+        self.assertIn("DA:12,10\n", result.stdout)
+        self.assertEqual(result.stderr, "")
+
     def test_binary_counters_unsupported_stride_errors(self):
         # The converter only handles 4-byte and 8-byte counters today.
         # A 2-byte / 16-byte stride must produce a clear error rather

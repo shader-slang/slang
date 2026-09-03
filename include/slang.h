@@ -4929,11 +4929,25 @@ struct CoverageEntryInfo
 
     /// Counter slot used by this entry, or
     /// `kInvalidCoverageCounterIndex` when the entry has no runtime
-    /// counter. The current line/function/branch producers use one
-    /// direct counter per entry. Future source-region coverage may use
-    /// `kInvalidCoverageCounterIndex` for entries whose count is
-    /// derived from other counters or represented through tail-extended
-    /// fields.
+    /// counter.
+    ///
+    /// This is NOT unique per entry. Line coverage coalesces entries
+    /// that provably execute together (those in one basic block with
+    /// nothing between them that can abandon the invocation) onto a
+    /// single counter, which is what keeps instrumented shader code
+    /// small. Several entries therefore report the same
+    /// `counterIndex`, and `getCounterCount()` is correspondingly
+    /// smaller than the entry count.
+    ///
+    /// Read results per entry (`counters[entry.counterIndex]` for each
+    /// entry), never per counter: a counter does not identify one
+    /// source location. Sizing a readback buffer from the entry count
+    /// rather than the counter count is a bug.
+    ///
+    /// Function and branch entries always use a dedicated counter.
+    /// Future coverage modes may use `kInvalidCoverageCounterIndex`
+    /// for entries whose count is derived from other counters or
+    /// represented through tail-extended fields.
     uint32_t counterIndex = kInvalidCoverageCounterIndex;
 
     /// Semantic kind of this source coverage entry.
@@ -5029,10 +5043,13 @@ struct ICoverageTracingMetadata : public ISlangCastable
         {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
 
     /// Number of runtime counter slots in the synthesized coverage
-    /// buffer. This can differ from `getEntryCount()` once a coverage
-    /// mode has counterless metadata entries, shares one counter across
-    /// several source entries, or reports entries whose counts are
-    /// derived from other counters.
+    /// buffer. Never larger than `getEntryCount()`, and smaller when
+    /// line coverage shares one counter across the source entries of a
+    /// straight-line region. Function and branch entries always take a
+    /// dedicated counter, so the two counts are equal for a compile that
+    /// enables only those modes, or for line coverage where every marker
+    /// lands in its own basic block. Size the counter readback buffer
+    /// from this value, never from the entry count.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
     /// Populate `outInfo` with attribution info for source coverage
@@ -5061,10 +5078,10 @@ struct ICoverageTracingMetadata : public ISlangCastable
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
 
     /// Number of source coverage entries available through
-    /// `getEntryInfo`. The current line/function/branch producers have
-    /// one entry per counter, but future source-region coverage may
-    /// expose entries that do not map one-to-one with runtime counter
-    /// slots.
+    /// `getEntryInfo`. Every coverage marker produces one entry, so
+    /// this is NOT the number of runtime counters: several entries may
+    /// name the same `counterIndex`. Use `getCounterCount()` to size
+    /// the readback buffer.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
