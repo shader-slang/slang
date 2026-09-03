@@ -365,3 +365,79 @@ SLANG_UNIT_TEST(lazyAutodiffMaybeDifferentiableRequirementLoadsSupplement)
         "}");
     SLANG_CHECK(_loadedBuiltinModuleCount(globalSession) == baseCoreModuleCount + 1);
 }
+
+// When checking a module from source triggers the on-demand autodiff-supplement load,
+// `SemanticsContext::ensureAutodiffModuleLoaded` records the supplement as a dependency of the
+// module being checked, the same way `visitImportDecl` records a written `import`. Serializing
+// that module and reloading it in a fresh global session -- one whose `coreModules` has never seen
+// the supplement -- must therefore load the supplement automatically while deserializing the
+// module's AST, through the ordinary `ImportedModule`/`findOrImportModule` mechanism used for any
+// other cross-module reference.
+//
+// This mirrors the `slang.neural` scenario that originally motivated scanning the deserialized
+// IR's mangled names for the supplement's module qualifier (see the removed
+// `_importsAutodiffSupplementSymbol` in slang-session.cpp): a module with no source-visible
+// `import` of the supplement that nonetheless calls a builtin registered derivative. Before the
+// dependency-tracking fix this test pins, nothing loaded the supplement for a module reached only
+// by deserialization, and linking a caller of such a module would fail with an unresolved external
+// symbol for the derivative.
+SLANG_UNIT_TEST(lazyAutodiffModuleDependencySurvivesSerialization)
+{
+    ComPtr<slang::IGlobalSession> sourceGlobalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, sourceGlobalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc sourceTargetDesc = {};
+    sourceTargetDesc.format = SLANG_HLSL;
+    sourceTargetDesc.profile = sourceGlobalSession->findProfile("sm_5_0");
+    slang::SessionDesc sourceSessionDesc = {};
+    sourceSessionDesc.targetCount = 1;
+    sourceSessionDesc.targets = &sourceTargetDesc;
+
+    ComPtr<slang::ISession> sourceSession;
+    SLANG_CHECK_ABORT(
+        sourceGlobalSession->createSession(sourceSessionDesc, sourceSession.writeRef()) ==
+        SLANG_OK);
+
+    ComPtr<slang::IModule> sourceModule = _loadModule(
+        sourceSession,
+        "usesBuiltinDerivative",
+        "float useBuiltinBackwardDerivative(float value)"
+        "{"
+        "    var pair = diffPair(value, 0.0);"
+        "    bwd_diff(sin)(pair, 1.0);"
+        "    return pair.d;"
+        "}");
+
+    ComPtr<slang::IBlob> serializedModule;
+    SLANG_CHECK_ABORT(sourceModule->serialize(serializedModule.writeRef()) == SLANG_OK);
+
+    // A separate global session, so its `coreModules` starts without the autodiff supplement --
+    // nothing in this process has triggered a load in it yet.
+    ComPtr<slang::IGlobalSession> reloadGlobalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, reloadGlobalSession.writeRef()) == SLANG_OK);
+    const Index baseCoreModuleCount = _loadedBuiltinModuleCount(reloadGlobalSession);
+
+    slang::TargetDesc reloadTargetDesc = {};
+    reloadTargetDesc.format = SLANG_HLSL;
+    reloadTargetDesc.profile = reloadGlobalSession->findProfile("sm_5_0");
+    slang::SessionDesc reloadSessionDesc = {};
+    reloadSessionDesc.targetCount = 1;
+    reloadSessionDesc.targets = &reloadTargetDesc;
+
+    ComPtr<slang::ISession> reloadSession;
+    SLANG_CHECK_ABORT(
+        reloadGlobalSession->createSession(reloadSessionDesc, reloadSession.writeRef()) ==
+        SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> reloadedModule(reloadSession->loadModuleFromIRBlob(
+        "usesBuiltinDerivative",
+        "usesBuiltinDerivative",
+        serializedModule,
+        diagnostics.writeRef()));
+    SLANG_CHECK_ABORT(reloadedModule != nullptr);
+
+    SLANG_CHECK(_loadedBuiltinModuleCount(reloadGlobalSession) == baseCoreModuleCount + 1);
+}

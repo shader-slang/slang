@@ -1561,12 +1561,7 @@ RefPtr<Module> Linkage::findOrImportModule(
 
     // If the name being requested matches the name of a built-in module,
     // then we will special-case the process by loading that builtin
-    // module directly.
-    //
-    // TODO: right now this logic is only considering the built-in `glsl`
-    // module, but it should probably be generalized so that we can more
-    // easily support having multiple built-in modules rather than just
-    // putting everything into `core`.
+    // module directly, rather than searching the file system for it.
     //
     if (moduleName == getSessionImpl()->glslModuleName)
     {
@@ -1586,6 +1581,26 @@ RefPtr<Module> Linkage::findOrImportModule(
             sink->diagnose(Diagnostics::GlslModuleNotAvailable{.location = requestingLoc});
         }
         return glslModule;
+    }
+
+    if (moduleName == getSessionImpl()->autodiffModuleName)
+    {
+        // This is the builtin autodiff supplement, loaded lazily (unlike `glsl` above, which is
+        // always compiled eagerly): a reference to it can reach this point either because a
+        // module currently being checked from source is about to `import` it explicitly (once
+        // that becomes a supported spelling), or because `_readImportedModule` is reconstructing
+        // a dependency that was recorded when some module was originally checked and its checking
+        // triggered an on-demand load of the supplement (see `SemanticsContext::
+        // ensureAutodiffModuleLoaded`, which records that dependency the same way an explicit
+        // `import` does). Either way, resolving the name here just means loading the supplement
+        // if it is not already loaded.
+        Module* autodiffModule = nullptr;
+        if (SLANG_FAILED(getSessionImpl()->loadAutodiffModuleIfNeeded(autodiffModule)) ||
+            !autodiffModule)
+        {
+            sink->diagnose(Diagnostics::UnableToLoadAutodiffModule{.location = requestingLoc});
+        }
+        return autodiffModule;
     }
 
     // We are going to use a loop to search for a suitable file to
@@ -2144,43 +2159,6 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     getSourceManager()->setFileSystemExt(m_fileSystemExt);
 }
 
-/// Does `irModule` import any symbol that the lazily loaded autodiff supplement owns?
-///
-/// A serialized module records the mangled name of every symbol it imports, and a mangled name
-/// carries the module that owns the symbol. That is enough to answer the question without
-/// loading the supplement to look inside it: the derivative implementations moved there keep
-/// the `autodiff` module qualifier in the names their importers already recorded.
-///
-/// The qualifier is built with the mangler's own encoder rather than spelled out, so it cannot
-/// drift from what `emitQualifiedName` produces.
-///
-/// A false positive here costs one unnecessary module load; a false negative costs an
-/// unresolved-symbol error at link time. The `indexOf` rather than a prefix test is deliberate
-/// for that reason: witness-table names (`_SW...`) put the qualifier after the symbol, not at
-/// the front.
-static bool _importsAutodiffSupplementSymbol(IRModule* irModule)
-{
-    if (!irModule)
-        return false;
-
-    StringBuilder qualifierBuilder;
-    emitNameForLinkage(
-        qualifierBuilder,
-        UnownedStringSlice(getBuiltinModuleNameStr(slang::BuiltinModuleName::Autodiff)));
-    const UnownedStringSlice qualifier = qualifierBuilder.getUnownedSlice();
-
-    for (auto globalInst : irModule->getGlobalInsts())
-    {
-        auto importDecoration = globalInst->findDecoration<IRImportDecoration>();
-        if (!importDecoration)
-            continue;
-
-        if (importDecoration->getMangledName().indexOf(qualifier) >= 0)
-            return true;
-    }
-    return false;
-}
-
 SlangResult Linkage::loadSerializedModuleContents(
     Module* module,
     const PathInfo& moduleFilePathInfo,
@@ -2299,21 +2277,16 @@ SlangResult Linkage::loadSerializedModuleContents(
     SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule));
     module->setIRModule(irModule);
 
-    // Every other autodiff-supplement load trigger fires while semantically checking source. A
-    // module deserialized from a `.slang-module` never passes through those: its IR already
-    // refers to the derivative implementations by mangled name, so nothing re-checks the
-    // declarations that would ask for the supplement. Linking then fails with unresolved
-    // external symbols -- `slang.neural` hits this, because the activation functions it ships
-    // reference the builtin `exp`/`sin`/`tanh`/`max` derivatives.
-    //
-    // Load the supplement here instead, when the importing module says it will be needed. A
-    // failure is deliberately not propagated: it is not this module's error to report, and the
-    // link that actually needs the symbol diagnoses it with the position and name in hand.
-    if (_importsAutodiffSupplementSymbol(irModule))
-    {
-        Module* autodiffModule = nullptr;
-        getSessionImpl()->loadAutodiffModuleIfNeeded(autodiffModule);
-    }
+    // Note: a module deserialized from a `.slang-module` never passes through semantic checking,
+    // so the on-demand autodiff-supplement load triggers in `SemanticsContext::
+    // ensureAutodiffModuleLoaded` never fire for it directly. That is not a gap here, though: when
+    // the module was originally checked from source and that checking triggered the on-demand
+    // load, `ensureAutodiffModuleLoaded` recorded the supplement as a dependency the same way a
+    // written `import` would (see that function). `readSerializedModuleAST` above already
+    // resolved that recorded dependency while reading the AST chunk, through the same
+    // `ImportedModule`/`findOrImportModule` path any other cross-module reference uses (see
+    // `ASTSerialReadContext::_readImportedModule` and the `autodiffModuleName` case in
+    // `Linkage::findOrImportModule`), which is what actually loads the supplement here.
 
     // The handling of file dependencies is complicated, because of
     // the way that the encoding logic tried to make all of the

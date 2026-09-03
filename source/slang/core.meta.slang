@@ -469,8 +469,12 @@ attribute_syntax [BackwardDifferentiable(order:int = 0)] : BackwardDifferentiabl
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribute;
 
-// Keep the custom-derivative attribute spellings in the base module. Semantic checking uses a
-// recognized attribute as the signal to load the full autodiff module before validating it.
+// We have split support for automatic differentiation into a supplement that loads as a separate
+// module, in order to improve compile times for code that doesn't need it. Existing Slang code
+// may assume autodiff support is pervasively available, so we place the relevant public
+// declarations and attributes (such as `[ForwardDerivative(...)]`) here in the core module rather
+// than the supplement; user code that refers to these attributes triggers on-demand loading of
+// the autodiff supplement.
 /// `[ForwardDerivative(fwdFn)]` attribute can be used to provide a forward-mode
 /// derivative implementation.
 /// Invoking `fwd_diff(decoratedFn)` will place a call to `fwdFn` instead of synthesizing

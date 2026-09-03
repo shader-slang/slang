@@ -221,12 +221,22 @@ public:
     Scope* slangLanguageScope = nullptr;
     Scope* glslLanguageScope = nullptr;
     Name* glslModuleName = nullptr;
-    Name* neuralModuleName = nullptr;
+    Name* autodiffModuleName = nullptr;
 
     ModuleDecl* baseModuleDecl = nullptr;
+
+    /// Builtin modules whose declarations become part of the session's globally searched
+    /// declaration set once loaded: `Core` (always compiled eagerly) and `Autodiff` (compiled
+    /// lazily, on first use of a differentiability construct). See `belongsInCoreModulesList`.
+    /// `GLSL` is deliberately not a member of this list: its declarations stay visible only to
+    /// modules that explicitly `import glsl`.
     List<RefPtr<Module>> coreModules;
-    // Prevent a differentiability annotation inside a builtin module from recursively requesting
-    // the autodiff supplement while the builtin set is still being generated.
+
+    /// True for the duration of `compileBuiltinModule`, while a builtin module (`Core` or
+    /// `Autodiff`) is being compiled from source. `loadAutodiffModuleIfNeeded` reads this flag to
+    /// avoid a recursive load: a differentiability construct that appears inside a builtin
+    /// module's own source is already being checked as part of that same builtin compilation, so
+    /// it needs no separate on-demand load of the autodiff supplement.
     bool m_isCompilingBuiltinModule = false;
 
     SourceManager builtinSourceManager;
@@ -387,6 +397,12 @@ private:
     };
 
     BuiltinModuleInfo getBuiltinModuleInfo(slang::BuiltinModuleName name);
+
+    /// Does `name` identify a builtin module that belongs in `coreModules` once compiled? This is
+    /// `Core` and `Autodiff`: both become part of the session's globally searched declaration set
+    /// (see `coreModules`), unlike `GLSL`, which stays confined to modules that `import` it by
+    /// name.
+    bool belongsInCoreModulesList(slang::BuiltinModuleName name);
 
     void _initCodeGenTransitionMap();
 

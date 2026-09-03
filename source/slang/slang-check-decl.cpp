@@ -14962,8 +14962,12 @@ static void _maybeAddImplicitNoDiffThisForNonDifferentiableThis(
 
 void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl* decl)
 {
-    // This is the header-modifier load trigger: a callable whose header says it participates in
-    // differentiation needs the supplement's derivative machinery to finish setup.
+    // We trigger an on-demand load of the autodiff supplement from two places: here, when a
+    // callable's header carries a differentiability attribute, and from
+    // `_checkHigherOrderInvokeExpr`, when a `fwd_diff`/`bwd_diff`/primal-substitute expression is
+    // checked. A callable whose header says it participates in differentiation needs the
+    // supplement's derivative machinery to finish checking its declaration, which is why we
+    // trigger the load here rather than waiting for some later use of the callable.
     //
     // `_callableHasDifferentiabilityHeaderModifier` draws that line by base class rather than by
     // spelling, so it is worth being precise about which declarations land on each side:
@@ -14989,7 +14993,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
     // needs the supplement anyway -- but a maintainer changing either trigger should know the
     // other is not the sole path.
     //
-    // If the load fails, abort the rest of the differentiable setup below (implicit `no_diff`
+    // If the load fails, we abort the rest of the differentiable setup below (implicit `no_diff`
     // synthesis etc.), which reads supplement declarations; `ensureAutodiffModuleLoaded` has
     // already diagnosed the failure.
     if (_callableHasDifferentiabilityHeaderModifier(decl) &&

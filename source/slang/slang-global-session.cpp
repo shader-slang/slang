@@ -110,7 +110,7 @@ void Session::init()
     glslLanguageScope->nextSibling = slangLanguageScope;
 
     glslModuleName = getNameObj("glsl");
-    neuralModuleName = getNameObj("neural");
+    autodiffModuleName = getNameObj(getBuiltinModuleNameStr(slang::BuiltinModuleName::Autodiff));
 
     {
         for (Index i = 0; i < Index(SourceLanguage::CountOf); ++i)
@@ -432,6 +432,18 @@ Session::BuiltinModuleInfo Session::getBuiltinModuleInfo(slang::BuiltinModuleNam
     return result;
 }
 
+bool Session::belongsInCoreModulesList(slang::BuiltinModuleName name)
+{
+    switch (name)
+    {
+    case slang::BuiltinModuleName::Core:
+    case slang::BuiltinModuleName::Autodiff:
+        return true;
+    default:
+        return false;
+    }
+}
+
 SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlags)
 {
     return compileBuiltinModule(slang::BuiltinModuleName::Core, compileFlags);
@@ -469,8 +481,7 @@ SlangResult Session::compileBuiltinModule(
 
 #ifdef _DEBUG
     time_t beginTime = 0;
-    if (moduleName == slang::BuiltinModuleName::Core ||
-        moduleName == slang::BuiltinModuleName::Autodiff)
+    if (belongsInCoreModulesList(moduleName))
     {
         // Print a message in debug builds to notice the user that compiling the core module
         // can take a while.
@@ -498,8 +509,7 @@ SlangResult Session::compileBuiltinModule(
         moduleSrcBlob,
         compiledModule);
 
-    if (moduleName == slang::BuiltinModuleName::Core ||
-        moduleName == slang::BuiltinModuleName::Autodiff)
+    if (belongsInCoreModulesList(moduleName))
     {
         // We need to retain this AST so that we can use it in other code
         // (Note that the `Scope` type does not retain the AST it points to)
@@ -569,8 +579,7 @@ SlangResult Session::loadBuiltinModule(
         builtinModuleInfo.name,
         module));
 
-    if (moduleName == slang::BuiltinModuleName::Core ||
-        moduleName == slang::BuiltinModuleName::Autodiff)
+    if (belongsInCoreModulesList(moduleName))
     {
         // We need to retain this AST so that we can use it in other code
         // (Note that the `Scope` type does not retain the AST it points to)
