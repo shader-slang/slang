@@ -50,6 +50,11 @@ T.Mask integerLessThan<T : IIntegerType>(T left, T right)
     return left < right;
 }
 
+T constructFromBuiltinInteger<T : INumeric, TSource : __BuiltinIntegerType>(TSource value)
+{
+    return T(value);
+}
+
 void storeMask<T : IIntegerType>(T left, T right, uint offset)
 {
     T.Mask equalMask = left == right;
@@ -64,6 +69,7 @@ void computeMain()
     CoopVec<int, 2> left = CoopVec<int, 2>(7, 10);
     CoopVec<int, 2> right = CoopVec<int, 2>(3, 4);
     CoopVec<uint, 2> unsignedValue = CoopVec<uint, 2>(15, 8);
+    CoopVec<int, 2> constructed = constructFromBuiltinInteger<CoopVec<int, 2>>(int8_t(2));
 
     let arithmetic = integerArithmetic(left, right);
     let bitwise = integerBitwise(unsignedValue, CoopVec<uint, 2>(3, 1));
@@ -71,7 +77,7 @@ void computeMain()
     let shifted = integerShift(left, CoopVec<int, 2>(1, 2), CoopVec<int, 2>(0, 1));
     let unsignedResult = unsignedIntegerIdentity(unsignedValue);
 
-    outputBuffer[0] = arithmetic[0];
+    outputBuffer[0] = arithmetic[0] + constructed[0] - 2;
     outputBuffer[1] = arithmetic[1];
     outputBuffer[2] = int(bitwise[0]);
     outputBuffer[3] = int(unsignedResult[0]);

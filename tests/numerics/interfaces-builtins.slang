@@ -17,20 +17,22 @@ T splatValue<T : INumericShapedType>(T.Scalar value)
 
 T zeroValue<T : IAdditive>()
 {
-    return T.fromScalar(T.getZero());
+    return T.zero();
 }
 
 T oneValue<T : INumeric>()
 {
-    return T.fromScalar(T.getOne());
+    return T.one();
 }
 
-T fromIntegerLiteralType<T : INumeric>(int value)
+T fromBuiltinInteger<T : INumeric, TSource : __BuiltinIntegerType>(TSource value)
 {
     return T(value);
 }
 
-T fromFloatingPointLiteralType<T : IFractional>(float value)
+T fromBuiltinFloatingPoint<
+    T : IFractional,
+    TSource : __BuiltinFloatingPointType>(TSource value)
 {
     return T(value);
 }
@@ -272,8 +274,12 @@ void main()
 
     float3 splatVector = splatValue<float3>(2.0);
     int3 zeroVector = zeroValue<int3>();
-    int3 literalIntegerVector = fromIntegerLiteralType<int3>(3);
-    float2x2 literalFloatingMatrix = fromFloatingPointLiteralType<float2x2>(0.5);
+    int3 integerConstructedFromInt8 = fromBuiltinInteger<int3>(int8_t(3));
+    uint64_t integerConstructedFromUInt = fromBuiltinInteger<uint64_t>(uint(4));
+    float2x2 floatingMatrixConstructedFromHalf =
+        fromBuiltinFloatingPoint<float2x2>(half(0.5));
+    float3 floatingVectorConstructedFromDouble =
+        fromBuiltinFloatingPoint<float3>(double(0.25));
     float2x2 oneMatrix = oneValue<float2x2>();
     float scalarFractional = fractionalCurve(2.0);
     float3 vectorFractional = fractionalCurve(float3(2.0));
@@ -362,8 +368,10 @@ void main()
             int(integerBits.x) + shiftedScalar + shiftedVector.x + signedInteger +
             int(unsignedInteger)) +
         float(scalarOrder) + float(vectorOrder.x) + float(vectorEquality) + splatVector.x +
-        float(zeroVector.x + literalIntegerVector.x) + literalFloatingMatrix[0][0] +
-        oneMatrix[0][0] + scalarFractional + vectorFractional.x +
+        float(zeroVector.x + integerConstructedFromInt8.x) +
+        float(integerConstructedFromUInt) + floatingMatrixConstructedFromHalf[0][0] +
+        floatingVectorConstructedFromDouble.x + oneMatrix[0][0] + scalarFractional +
+        vectorFractional.x +
         matrixFractional[0][0] + vectorRounding.x + matrixFractionalParts[0][0] +
         scalarBinaryRepresentation + vectorBinaryRepresentation.x +
         matrixBinaryRepresentation[0][0] + scalarCompound + vectorCompound.x +

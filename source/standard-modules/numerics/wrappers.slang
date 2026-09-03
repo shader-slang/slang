@@ -1,10 +1,21 @@
 implementing numerics;
 
+// These wrappers coexist with core-module overloads, and the compiler does not yet generally rank
+// one generic overload above another from their interface refinements. Keep the ranks aligned with
+// the existing core tiers:
+//
+// - Rank -10 is the ordinary interface-generic fallback. Unranked core math overloads and rank-10
+//   builtin operators therefore continue to handle builtin types.
+// - Rank -4 is immediately below the legacy IArithmetic operator tier at -3 (with IFloat at -2
+//   and IDifferentiableArithmetic at -1), so existing generic constraints retain their operators.
+// - Ranks -9 and -11 bracket the legacy IComparable adapters at -10. Scalar bool-valued relations
+//   and min/max win at -9, while component-wise Mask-valued relations remain fallback behavior at
+//   -11 for types that also conform to IComparable.
+
 /// Returns true if every logical component is true.
 __generic<M : IBooleanMask>
 [__readNone]
 [__unsafeForceInlineEarly]
-[OverloadRank(-10)]
 public bool all(M value)
 {
     return value.all();
@@ -14,7 +25,6 @@ public bool all(M value)
 __generic<M : IBooleanMask>
 [__readNone]
 [__unsafeForceInlineEarly]
-[OverloadRank(-10)]
 public bool any(M value)
 {
     return value.any();
@@ -24,15 +34,6 @@ __generic<T : ISignedNumeric>
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T abs(T value)
-{
-    return value.absoluteValue();
-}
-
-__generic<T : IFractional>
-[__readNone]
-[__unsafeForceInlineEarly]
-[OverloadRank(-9)]
 public T abs(T value)
 {
     return value.absoluteValue();
@@ -55,7 +56,7 @@ __generic<T : IEquatable>
 [OverloadRank(-9)]
 public bool operator ==(T v0, T v1)
 {
-    return v0.equals(v1);
+    return v0.isEqualTo(v1);
 }
 
 __generic<T : IEquatable>
@@ -63,7 +64,7 @@ __generic<T : IEquatable>
 [OverloadRank(-9)]
 public bool operator !=(T v0, T v1)
 {
-    return !v0.equals(v1);
+    return !v0.isEqualTo(v1);
 }
 
 __generic<T : IPartiallyOrdered>
@@ -71,7 +72,7 @@ __generic<T : IPartiallyOrdered>
 [OverloadRank(-9)]
 public bool operator <(T v0, T v1)
 {
-    return v0.lessThan(v1);
+    return v0.isLessThan(v1);
 }
 
 __generic<T : IPartiallyOrdered>
@@ -79,7 +80,7 @@ __generic<T : IPartiallyOrdered>
 [OverloadRank(-9)]
 public bool operator >(T v0, T v1)
 {
-    return v1.lessThan(v0);
+    return v1.isLessThan(v0);
 }
 
 __generic<T : IPartiallyOrdered>
@@ -87,7 +88,7 @@ __generic<T : IPartiallyOrdered>
 [OverloadRank(-9)]
 public bool operator <=(T v0, T v1)
 {
-    return v0.lessThanOrEquals(v1);
+    return v0.isLessThanOrEqualTo(v1);
 }
 
 __generic<T : IPartiallyOrdered>
@@ -95,7 +96,7 @@ __generic<T : IPartiallyOrdered>
 [OverloadRank(-9)]
 public bool operator >=(T v0, T v1)
 {
-    return v1.lessThanOrEquals(v0);
+    return v1.isLessThanOrEqualTo(v0);
 }
 
 // Component-wise comparison is a separate numeric-shape contract. Shaped comparisons return a
@@ -107,7 +108,7 @@ __generic<T : IComponentwiseEquatable>
 [OverloadRank(-11)]
 public T.Mask operator ==(T v0, T v1)
 {
-    return v0.isEqual(v1);
+    return v0.isEqualTo(v1);
 }
 
 __generic<T : IComponentwiseEquatable>
@@ -115,7 +116,7 @@ __generic<T : IComponentwiseEquatable>
 [OverloadRank(-11)]
 public T.Mask operator !=(T v0, T v1)
 {
-    return v0.isEqual(v1).logicalNot();
+    return v0.isEqualTo(v1).logicalNot();
 }
 
 __generic<T : IComponentwiseOrdered>
@@ -131,7 +132,7 @@ __generic<T : IComponentwiseOrdered>
 [OverloadRank(-11)]
 public T.Mask operator <=(T v0, T v1)
 {
-    return v0.isLessThanOrEqual(v1);
+    return v0.isLessThanOrEqualTo(v1);
 }
 
 __generic<T : IComponentwiseOrdered>
@@ -147,7 +148,7 @@ __generic<T : IComponentwiseOrdered>
 [OverloadRank(-11)]
 public T.Mask operator >=(T v0, T v1)
 {
-    return v1.isLessThanOrEqual(v0);
+    return v1.isLessThanOrEqualTo(v0);
 }
 
 // These overloads expose the new scalar-or-shaped numeric hierarchy without changing the existing
@@ -159,7 +160,7 @@ __generic<T : IAdditive>
 [OverloadRank(-4)]
 public T operator +(T v0, T v1)
 {
-    return v0.add(v1);
+    return v0.adding(v1);
 }
 
 __generic<T : IAdditive>
@@ -167,7 +168,7 @@ __generic<T : IAdditive>
 [OverloadRank(-4)]
 public T operator -(T v0, T v1)
 {
-    return v0.sub(v1);
+    return v0.subtracting(v1);
 }
 
 __generic<T : IAdditive>
@@ -183,7 +184,7 @@ __generic<T : INumeric>
 [OverloadRank(-4)]
 public T operator *(T v0, T v1)
 {
-    return v0.mul(v1);
+    return v0.multipliedBy(v1);
 }
 
 __generic<T : ISignedNumeric>
@@ -191,39 +192,7 @@ __generic<T : ISignedNumeric>
 [OverloadRank(-4)]
 public __prefix T operator -(T v0)
 {
-    return v0.neg();
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public T operator +(T v0, T v1)
-{
-    return v0.add(v1);
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public T operator -(T v0, T v1)
-{
-    return v0.sub(v1);
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public __prefix T operator +(T value)
-{
-    return value;
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public T operator *(T v0, T v1)
-{
-    return v0.mul(v1);
+    return v0.negated();
 }
 
 __generic<T : IFractional>
@@ -231,7 +200,7 @@ __generic<T : IFractional>
 [OverloadRank(-4)]
 public T operator /(T v0, T v1)
 {
-    return v0.div(v1);
+    return v0.dividedBy(v1);
 }
 
 __generic<T : IFloatingPoint>
@@ -239,15 +208,7 @@ __generic<T : IFloatingPoint>
 [OverloadRank(-4)]
 public T operator %(T v0, T v1)
 {
-    return v0.remainder(v1);
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public __prefix T operator -(T v0)
-{
-    return v0.neg();
+    return v0.remainderWhenDividedBy(v1);
 }
 
 __generic<T : IIntegerType>
@@ -255,7 +216,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator /(T v0, T v1)
 {
-    return v0.quotient(v1);
+    return v0.quotientWhenDividedBy(v1);
 }
 
 __generic<T : IIntegerType>
@@ -263,7 +224,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator %(T v0, T v1)
 {
-    return v0.remainder(v1);
+    return v0.remainderWhenDividedBy(v1);
 }
 
 __generic<T : IIntegerType>
@@ -271,7 +232,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator &(T v0, T v1)
 {
-    return v0.bitAnd(v1);
+    return v0.bitwiseAnd(v1);
 }
 
 __generic<T : IIntegerType>
@@ -279,7 +240,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator |(T v0, T v1)
 {
-    return v0.bitOr(v1);
+    return v0.bitwiseOr(v1);
 }
 
 __generic<T : IIntegerType>
@@ -287,7 +248,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator ^(T v0, T v1)
 {
-    return v0.bitXor(v1);
+    return v0.bitwiseXor(v1);
 }
 
 __generic<T : IIntegerType>
@@ -295,7 +256,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public __prefix T operator ~(T v0)
 {
-    return v0.bitNot();
+    return v0.bitwiseNot();
 }
 
 __generic<T : IIntegerType>
@@ -322,7 +283,7 @@ __generic<T : IAdditive>
 [OverloadRank(-4)]
 public T operator +=(in out T left, T right)
 {
-    left = left.add(right);
+    left = left.adding(right);
     return left;
 }
 
@@ -331,7 +292,7 @@ __generic<T : IAdditive>
 [OverloadRank(-4)]
 public T operator -=(in out T left, T right)
 {
-    left = left.sub(right);
+    left = left.subtracting(right);
     return left;
 }
 
@@ -340,34 +301,7 @@ __generic<T : INumeric>
 [OverloadRank(-4)]
 public T operator *=(in out T left, T right)
 {
-    left = left.mul(right);
-    return left;
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public T operator +=(in out T left, T right)
-{
-    left = left.add(right);
-    return left;
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public T operator -=(in out T left, T right)
-{
-    left = left.sub(right);
-    return left;
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public T operator *=(in out T left, T right)
-{
-    left = left.mul(right);
+    left = left.multipliedBy(right);
     return left;
 }
 
@@ -376,7 +310,7 @@ __generic<T : IFractional>
 [OverloadRank(-4)]
 public T operator /=(in out T left, T right)
 {
-    left = left.div(right);
+    left = left.dividedBy(right);
     return left;
 }
 
@@ -385,7 +319,7 @@ __generic<T : IFloatingPoint>
 [OverloadRank(-4)]
 public T operator %=(in out T left, T right)
 {
-    left = left.remainder(right);
+    left = left.remainderWhenDividedBy(right);
     return left;
 }
 
@@ -394,7 +328,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator /=(in out T left, T right)
 {
-    left = left.quotient(right);
+    left = left.quotientWhenDividedBy(right);
     return left;
 }
 
@@ -403,7 +337,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator %=(in out T left, T right)
 {
-    left = left.remainder(right);
+    left = left.remainderWhenDividedBy(right);
     return left;
 }
 
@@ -412,7 +346,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator &=(in out T left, T right)
 {
-    left = left.bitAnd(right);
+    left = left.bitwiseAnd(right);
     return left;
 }
 
@@ -421,7 +355,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator |=(in out T left, T right)
 {
-    left = left.bitOr(right);
+    left = left.bitwiseOr(right);
     return left;
 }
 
@@ -430,7 +364,7 @@ __generic<T : IIntegerType>
 [OverloadRank(-4)]
 public T operator ^=(in out T left, T right)
 {
-    left = left.bitXor(right);
+    left = left.bitwiseXor(right);
     return left;
 }
 
@@ -457,7 +391,7 @@ __generic<T : INumeric>
 [OverloadRank(-4)]
 public __prefix T operator ++(in out T value)
 {
-    value = value.add(T.fromScalar(T.getOne()));
+    value = value.adding(T.one());
     return value;
 }
 
@@ -467,7 +401,7 @@ __generic<T : INumeric>
 public __postfix T operator ++(in out T value)
 {
     let original = value;
-    value = value.add(T.fromScalar(T.getOne()));
+    value = value.adding(T.one());
     return original;
 }
 
@@ -476,7 +410,7 @@ __generic<T : INumeric>
 [OverloadRank(-4)]
 public __prefix T operator --(in out T value)
 {
-    value = value.sub(T.fromScalar(T.getOne()));
+    value = value.subtracting(T.one());
     return value;
 }
 
@@ -486,53 +420,9 @@ __generic<T : INumeric>
 public __postfix T operator --(in out T value)
 {
     let original = value;
-    value = value.sub(T.fromScalar(T.getOne()));
+    value = value.subtracting(T.one());
     return original;
 }
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public __prefix T operator ++(in out T value)
-{
-    T one = T.fromScalar(T.getOne());
-    value = value.add(one);
-    return value;
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public __postfix T operator ++(in out T value)
-{
-    let original = value;
-    T one = T.fromScalar(T.getOne());
-    value = value.add(one);
-    return original;
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public __prefix T operator --(in out T value)
-{
-    T one = T.fromScalar(T.getOne());
-    value = value.sub(one);
-    return value;
-}
-
-__generic<T : IFractional>
-[__unsafeForceInlineEarly]
-[OverloadRank(-4)]
-public __postfix T operator --(in out T value)
-{
-    let original = value;
-    T one = T.fromScalar(T.getOne());
-    value = value.sub(one);
-    return original;
-}
-
-
 
 [__readNone]
 [__unsafeForceInlineEarly]
@@ -547,7 +437,7 @@ public T floor<T : IFloatingPoint>(T value)
 [OverloadRank(-10)]
 public T ceil<T : IFloatingPoint>(T value)
 {
-    return value.ceil();
+    return value.ceiling();
 }
 
 [__readNone]
@@ -555,7 +445,7 @@ public T ceil<T : IFloatingPoint>(T value)
 [OverloadRank(-10)]
 public T round<T : IFloatingPoint>(T value)
 {
-    return value.round();
+    return value.rounded();
 }
 
 [__readNone]
@@ -564,7 +454,7 @@ public T round<T : IFloatingPoint>(T value)
 [OverloadRank(-10)]
 public T rint<T : IFloatingPoint>(T value)
 {
-    return value.roundEven();
+    return value.roundedToNearestEven();
 }
 
 [__readNone]
@@ -572,7 +462,7 @@ public T rint<T : IFloatingPoint>(T value)
 [OverloadRank(-10)]
 public T trunc<T : IFloatingPoint>(T value)
 {
-    return value.truncate();
+    return value.truncated();
 }
 
 [__readNone]
@@ -596,7 +486,7 @@ public T fract<T : IFloatingPoint>(T value)
 [OverloadRank(-10)]
 public T fmod<T : IFloatingPoint>(T value, T divisor)
 {
-    return value.remainder(divisor);
+    return value.remainderWhenDividedBy(divisor);
 }
 
 [__readNone]
@@ -604,7 +494,7 @@ public T fmod<T : IFloatingPoint>(T value, T divisor)
 [OverloadRank(-10)]
 public T copysign<T : IFloatingPoint>(T magnitude, T signSource)
 {
-    return magnitude.copySign(signSource);
+    return magnitude.copyingSignFrom(signSource);
 }
 
 [__readNone]
@@ -612,7 +502,7 @@ public T copysign<T : IFloatingPoint>(T magnitude, T signSource)
 [OverloadRank(-10)]
 public T modf<T : IFloatingPoint>(T value, out T integralPart)
 {
-    return value.splitFraction(integralPart);
+    return value.fractionalPart(integralPart);
 }
 
 [__readNone]
@@ -644,7 +534,7 @@ public T.Mask isinf<T : IFloatingPoint>(T value)
 [OverloadRank(-10)]
 public T exp<T : IExponentialFunctions>(T value)
 {
-    return value.exp();
+    return value.exponential();
 }
 
 [__readNone]
@@ -652,7 +542,7 @@ public T exp<T : IExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T exp2<T : IExponentialFunctions>(T value)
 {
-    return value.exp2();
+    return value.exponentialWithBase2();
 }
 
 [__readNone]
@@ -660,7 +550,7 @@ public T exp2<T : IExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T exp10<T : IExponentialFunctions>(T value)
 {
-    return value.exp10();
+    return value.exponentialWithBase10();
 }
 
 [__readNone]
@@ -668,7 +558,7 @@ public T exp10<T : IExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T log<T : IExponentialFunctions>(T value)
 {
-    return value.log();
+    return value.logarithm();
 }
 
 [__readNone]
@@ -676,7 +566,7 @@ public T log<T : IExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T log2<T : IExponentialFunctions>(T value)
 {
-    return value.log2();
+    return value.logarithmWithBase2();
 }
 
 [__readNone]
@@ -684,7 +574,7 @@ public T log2<T : IExponentialFunctions>(T value)
 [OverloadRank(-10)]
 public T log10<T : IExponentialFunctions>(T value)
 {
-    return value.log10();
+    return value.logarithmWithBase10();
 }
 
 [__readNone]
@@ -796,7 +686,7 @@ public T atanh<T : IHyperbolicFunctions>(T value)
 [OverloadRank(-10)]
 public T pow<T : IExponentialFunctions>(T base, T exponent)
 {
-    return base.pow(exponent);
+    return base.raisedToThePowerOf(exponent);
 }
 
 [__readNone]
@@ -812,7 +702,7 @@ public void sincos<T : ITrigonometricFunctions>(T value, out T sineResult, out T
 [OverloadRank(-10)]
 public T sqrt<T : IRootFunctions>(T value)
 {
-    return value.sqrt();
+    return value.squareRoot();
 }
 
 [__readNone]
@@ -820,7 +710,7 @@ public T sqrt<T : IRootFunctions>(T value)
 [OverloadRank(-10)]
 public T rsqrt<T : IRootFunctions>(T value)
 {
-    return value.rsqrt();
+    return value.reciprocalSquareRoot();
 }
 
 [__readNone]
@@ -854,8 +744,8 @@ public T saturate<T : IFractional & IRealOrderingFunctions>(T value)
 {
     return clamp<T>(
         value,
-        T.fromScalar(T.getZero()),
-        T.fromScalar(T.getOne()));
+        T.zero(),
+        T.one());
 }
 
 /// Returns the positive component-wise difference between `x` and `y`.
@@ -864,8 +754,8 @@ public T saturate<T : IFractional & IRealOrderingFunctions>(T value)
 [OverloadRank(-10)]
 public T fdim<T : IFractional & IRealOrderingFunctions>(T x, T y)
 {
-    T zero = T.fromScalar(T.getZero());
-    return x.sub(y).maximum(zero);
+    T zero = T.zero();
+    return x.subtracting(y).maximum(zero);
 }
 
 /// Divides values that support fractional arithmetic.
@@ -874,7 +764,7 @@ public T fdim<T : IFractional & IRealOrderingFunctions>(T x, T y)
 [OverloadRank(-10)]
 public T divide<T : IFractional>(T x, T y)
 {
-    return x.div(y);
+    return x.dividedBy(y);
 }
 
 /// Linearly interpolates between `x` and `y` by `factor`.
@@ -958,7 +848,7 @@ public T fmedian3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
 [OverloadRank(-10)]
 public T powr<T : IExponentialFunctions>(T x, T y)
 {
-    return x.pow(y);
+    return x.raisedToThePowerOf(y);
 }
 
 /// Applies a Hermite interpolation between zero and one.
@@ -971,7 +861,7 @@ public T smoothstep<T : IFractional & IRealOrderingFunctions>(
     T value)
 {
     T t = saturate((value - minimumValue) / (maximumValue - minimumValue));
-    T one = T.fromScalar(T.getOne());
+    T one = T.one();
     T two = one + one;
     T three = two + one;
     return t * t * (three - two * t);

@@ -29,10 +29,9 @@ public interface INumericShapedType
     /// The result type of component-wise comparison and classification operations.
     associatedtype Mask : IBooleanMask;
 
-    /// Constructs a value by splatting `value` across its logical shape.
+    /// Constructs a value whose every logical component is `value`.
     ///
-    /// This is a named operation because a constructor requirement would duplicate the existing
-    /// `IArithmetic.init(This)` requirement when `Scalar == This`.
+    /// For a logical scalar, this operation returns `value` unchanged.
     static This fromScalar(Scalar value);
 }
 
@@ -47,7 +46,7 @@ public interface IScalarShapedType : INumericShapedType
 public interface IComponentwiseEquatable : INumericShapedType
 {
     /// Compares this value with `other` and returns one Boolean result per logical component.
-    Mask isEqual(This other);
+    Mask isEqualTo(This other);
 }
 
 /// Supports component-wise relational comparisons.
@@ -58,7 +57,7 @@ public interface IComponentwiseOrdered : IComponentwiseEquatable
 
     /// Tests whether each logical component is less than or equal to the corresponding component
     /// of `other`.
-    Mask isLessThanOrEqual(This other);
+    Mask isLessThanOrEqualTo(This other);
 }
 
 /// Represents a type with an equality relation.
@@ -67,7 +66,7 @@ public interface IComponentwiseOrdered : IComponentwiseEquatable
 public interface IEquatable
 {
     /// Returns true when this value is equal to `other`.
-    bool equals(This other);
+    bool isEqualTo(This other);
 }
 
 /// Represents a type with a partial order.
@@ -77,11 +76,11 @@ public interface IEquatable
 public interface IPartiallyOrdered : IEquatable
 {
     /// Returns true when this value is less than `other` according to the partial order.
-    bool lessThan(This other);
+    bool isLessThan(This other);
 
     /// Returns true when this value is less than or equal to `other` according to the partial
     /// order.
-    bool lessThanOrEquals(This other);
+    bool isLessThanOrEqualTo(This other);
 }
 
 /// Represents a type with a total order, such as builtin integers.
@@ -89,22 +88,16 @@ public interface ITotallyOrdered : IPartiallyOrdered
 {
 }
 
-/// Supports explicit construction from the default type of an integer literal.
-///
-/// This requirement makes expressions such as `T(0)` available in generic code. It deliberately
-/// models literal construction rather than conversion from every builtin integer type.
-public interface IConstructibleFromInt
+/// Supports explicit construction from every builtin integer type.
+public interface IConstructibleFromBuiltinInteger
 {
-    __init(int value);
+    __init<TSource : __BuiltinIntegerType>(TSource value);
 }
 
-/// Supports explicit construction from the default type of a floating-point literal.
-///
-/// This requirement makes expressions such as `T(0.0)` available in generic code. It deliberately
-/// models literal construction rather than conversion from every builtin floating-point type.
-public interface IConstructibleFromFloat
+/// Supports explicit construction from every builtin floating-point type.
+public interface IConstructibleFromBuiltinFloatingPoint
 {
-    __init(float value);
+    __init<TSource : __BuiltinFloatingPointType>(TSource value);
 }
 
 /// Supports addition and subtraction for logical scalars and shaped values.
@@ -112,16 +105,14 @@ public interface IAdditive : INumericShapedType
 {
     __constraint Scalar : IScalarAdditive;
 
-    /// Returns the additive identity in the logical scalar domain.
-    ///
-    /// Use `fromScalar(getZero())` when a shaped value is required.
-    static Scalar getZero();
+    /// Returns the component-wise additive identity in this type's logical shape.
+    static This zero();
 
     /// Returns the component-wise sum with `other`.
-    This add(This other);
+    This adding(This other);
 
     /// Returns the component-wise difference from `other`.
-    This sub(This other);
+    This subtracting(This other);
 }
 
 /// Scalar refinement of `IAdditive`.
@@ -130,17 +121,17 @@ public interface IScalarAdditive : IAdditive, IScalarShapedType
 }
 
 /// Supports same-type multiplication in addition to additive arithmetic.
-public interface INumeric : IAdditive, IConstructibleFromInt
+public interface INumeric : IAdditive, IConstructibleFromBuiltinInteger
 {
     __constraint Scalar : IScalarNumeric;
 
-    /// Returns the multiplicative identity in the logical scalar domain.
+    /// Returns the component-wise multiplicative identity in this type's logical shape.
     ///
-    /// Use `fromScalar(getOne())` when a shaped value is required.
-    static Scalar getOne();
+    /// For a matrix, this is a matrix filled with ones rather than a matrix-algebra identity.
+    static This one();
 
     /// Returns the component-wise product with `other`.
-    This mul(This other);
+    This multipliedBy(This other);
 }
 
 /// Scalar refinement of `INumeric`.
@@ -154,7 +145,7 @@ public interface ISignedNumeric : INumeric
     __constraint Scalar : IScalarSignedNumeric;
 
     /// Returns the component-wise arithmetic negation.
-    This neg();
+    This negated();
 
     /// Returns the component-wise absolute value in the same numeric representation.
     ///
@@ -191,22 +182,22 @@ public interface IIntegerType : INumeric, IComponentwiseOrdered, IBitShiftOperat
     __constraint ShiftAmount : IIntegerType;
 
     /// Returns the component-wise integer quotient.
-    This quotient(This divisor);
+    This quotientWhenDividedBy(This divisor);
 
     /// Returns the component-wise integer remainder.
-    This remainder(This divisor);
+    This remainderWhenDividedBy(This divisor);
 
     /// Returns the component-wise bitwise conjunction with `other`.
-    This bitAnd(This other);
+    This bitwiseAnd(This other);
 
     /// Returns the component-wise bitwise disjunction with `other`.
-    This bitOr(This other);
+    This bitwiseOr(This other);
 
     /// Returns the component-wise bitwise exclusive disjunction with `other`.
-    This bitXor(This other);
+    This bitwiseXor(This other);
 
     /// Returns the component-wise bitwise complement.
-    This bitNot();
+    This bitwiseNot();
 }
 
 /// Scalar refinement of `IIntegerType`.
@@ -242,24 +233,24 @@ public interface IScalarSignedIntegerType
 /// This interface does not imply a floating-point representation, elementary functions, or an
 /// ordering. Fixed-point, ratio, dual-number, and interval types can conform when they provide the
 /// required arithmetic behavior.
-public interface IFractional : ISignedNumeric, IConstructibleFromFloat
+public interface IFractional : ISignedNumeric, IConstructibleFromBuiltinFloatingPoint
 {
     __constraint Scalar : IScalarFractional;
 
     /// Returns the component-wise sum with `other`.
-    This add(This other);
+    This adding(This other);
 
     /// Returns the component-wise difference from `other`.
-    This sub(This other);
+    This subtracting(This other);
 
     /// Returns the component-wise product with `other`.
-    This mul(This other);
+    This multipliedBy(This other);
 
     /// Returns the component-wise quotient after division by `other`.
-    This div(This other);
+    This dividedBy(This other);
 
     /// Returns the component-wise arithmetic negation.
-    This neg();
+    This negated();
 
     /// Returns the component-wise absolute value in the same representation.
     This absoluteValue();
@@ -284,35 +275,35 @@ public interface IFloatingPoint : IFractional
     This floor();
 
     /// Returns the least integral value not less than this value, component-wise.
-    This ceil();
+    This ceiling();
 
     /// Returns the nearest integral value, component-wise.
     ///
     /// A conformance may follow its target's convention for values exactly between two integers.
-    This round();
+    This rounded();
 
     /// Returns the nearest integral value with ties rounded to even, component-wise.
     ///
     /// This operation is unavailable on targets where Slang does not currently expose `rint`.
     [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
-    This roundEven();
+    This roundedToNearestEven();
 
     /// Discards the fractional part, component-wise.
-    This truncate();
+    This truncated();
 
     /// Returns the fractional part, component-wise.
     This fractionalPart();
 
     /// Returns the component-wise floating-point remainder after truncating the quotient.
-    This remainder(This divisor);
+    This remainderWhenDividedBy(This divisor);
 
     /// Returns the magnitude of this value with the component-wise sign of `signSource`.
-    This copySign(This signSource);
+    This copyingSignFrom(This signSource);
 
     /// Splits this value into component-wise integral and fractional parts.
     ///
     /// The integral part is written to `integralPart`, and the fractional part is returned.
-    This splitFraction(out This integralPart);
+    This fractionalPart(out This integralPart);
 
     /// Classifies NaN values component-wise.
     Mask isNaN();
@@ -333,25 +324,25 @@ public interface IScalarFloatingPoint : IFloatingPoint, IScalarFractional
 public interface IExponentialFunctions
 {
     /// Computes the base-e exponential component-wise.
-    This exp();
+    This exponential();
 
     /// Computes the base-2 exponential component-wise.
-    This exp2();
+    This exponentialWithBase2();
 
     /// Computes the base-10 exponential component-wise.
-    This exp10();
+    This exponentialWithBase10();
 
     /// Computes the natural logarithm component-wise.
-    This log();
+    This logarithm();
 
     /// Computes the base-2 logarithm component-wise.
-    This log2();
+    This logarithmWithBase2();
 
     /// Computes the base-10 logarithm component-wise.
-    This log10();
+    This logarithmWithBase10();
 
     /// Raises this value to `exponent` component-wise.
-    This pow(This exponent);
+    This raisedToThePowerOf(This exponent);
 }
 
 /// Supports trigonometric functions without implying arithmetic or ordering.
@@ -412,10 +403,10 @@ public interface IHyperbolicFunctions
 public interface IRootFunctions
 {
     /// Computes the square root component-wise.
-    This sqrt();
+    This squareRoot();
 
     /// Computes the reciprocal square root component-wise.
-    This rsqrt();
+    This reciprocalSquareRoot();
 }
 
 /// Supports the standard families of elementary functions without imposing arithmetic or order.

@@ -1,11 +1,113 @@
-/**
-Adapters from the experimental numeric contracts to existing builtin operations.
-
-@remarks This module is an implementation detail of `slang.numerics`. It is compiled before the
-public numeric wrappers, so lookup in these bodies can only select the established core overloads.
-Keeping this boundary avoids recursive dispatch without copying target-specific intrinsic bodies.
-*/
+// This module adapts the experimental numeric contracts to existing builtin operations. It does
+// not import `slang.numerics`, so the public numeric wrappers are absent from lookup in these
+// bodies. Keeping this visibility boundary avoids recursive dispatch without copying
+// target-specific intrinsic bodies.
+//
+// This adapter layer is temporary compatibility scaffolding, not an intended long-term public
+// abstraction. An `import` currently adds declarations to unqualified lookup but does not bind the
+// imported module as a scope that source code can qualify, so the public module cannot write a call
+// such as `core::sin(value)` to exclude its own overload. Once Slang supports qualified lookup into
+// an imported module, including a way to name operator declarations such as the core `operator+`,
+// these distinguished forwarding names should be removed in favor of direct qualified calls.
 module __builtin;
+
+// These conversion adapters keep constructor bodies in `slang.numerics` from redispatching to
+// the very generic constructor requirement they implement. Because this module does not import
+// `slang.numerics`, each construction below can only resolve to an established core constructor.
+[__readNone]
+[__unsafeForceInlineEarly]
+public TDestination __numericsBuiltinConstructFromInteger<
+    TDestination : __BuiltinIntegerType,
+    TSource : __BuiltinIntegerType>(TSource value)
+{
+    return __intCast<TDestination>(value);
+}
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public TDestination __numericsBuiltinConstructFromInteger<
+    TDestination : __BuiltinFloatingPointType,
+    TSource : __BuiltinIntegerType>(TSource value)
+{
+    return __realCast<TDestination>(value);
+}
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public TDestination __numericsBuiltinConstructFromFloatingPoint<
+    TDestination : __BuiltinFloatingPointType,
+    TSource : __BuiltinFloatingPointType>(TSource value)
+{
+    return __realCast<TDestination>(value);
+}
+
+// Generic shaped conformances cannot spell these operations with the public operators: doing so
+// can select the interface-generic wrapper and cycle back to the witness being implemented. The
+// established core members are also preferable for matrices because `mul` is component-wise while
+// matrix `operator*` has matrix-algebra semantics.
+#define NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(NAME, METHOD)                       \
+    [__readNone] [__unsafeForceInlineEarly]                                     \
+    public vector<T, N> NAME<T : __BuiltinIntegerType, let N : int>(           \
+        vector<T, N> left,                                                       \
+        vector<T, N> right)                                                      \
+    {                                                                            \
+        return left.METHOD(right);                                               \
+    }                                                                            \
+                                                                                 \
+    [__readNone] [__unsafeForceInlineEarly]                                     \
+    public vector<T, N> NAME<T : __BuiltinFloatingPointType, let N : int>(     \
+        vector<T, N> left,                                                       \
+        vector<T, N> right)                                                      \
+    {                                                                            \
+        return left.METHOD(right);                                               \
+    }                                                                            \
+                                                                                 \
+    [__readNone] [__unsafeForceInlineEarly]                                     \
+    public matrix<T, R, C, L> NAME<                                             \
+        T : __BuiltinFloatingPointType,                                         \
+        let R : int,                                                             \
+        let C : int,                                                             \
+        let L : int>(                                                            \
+        matrix<T, R, C, L> left,                                                 \
+        matrix<T, R, C, L> right)                                                \
+    {                                                                            \
+        return left.METHOD(right);                                               \
+    }
+
+NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinAdd, add)
+NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinSubtract, sub)
+NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinMultiply, mul)
+NUMERICS_BUILTIN_ARITHMETIC_ADAPTER(__numericsBuiltinDivide, div)
+
+#undef NUMERICS_BUILTIN_ARITHMETIC_ADAPTER
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public vector<T, N> __numericsBuiltinNegate<T : __BuiltinIntegerType, let N : int>(
+    vector<T, N> value)
+{
+    return value.neg();
+}
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public vector<T, N> __numericsBuiltinNegate<
+    T : __BuiltinFloatingPointType,
+    let N : int>(vector<T, N> value)
+{
+    return value.neg();
+}
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __numericsBuiltinNegate<
+    T : __BuiltinFloatingPointType,
+    let R : int,
+    let C : int,
+    let L : int>(matrix<T, R, C, L> value)
+{
+    return value.neg();
+}
 
 [__readNone]
 [__unsafeForceInlineEarly]
@@ -69,42 +171,6 @@ public bool __numericsBuiltinAll<let R : int, let C : int, let L : int>(
         }
     }
     return true;
-}
-
-[__unsafeForceInlineEarly]
-public T __numericsLegacyAdd<T : IArithmetic>(T left, T right)
-{
-    return left.add(right);
-}
-
-[__unsafeForceInlineEarly]
-public T __numericsLegacySub<T : IArithmetic>(T left, T right)
-{
-    return left.sub(right);
-}
-
-[__unsafeForceInlineEarly]
-public T __numericsLegacyMul<T : IArithmetic>(T left, T right)
-{
-    return left.mul(right);
-}
-
-[__unsafeForceInlineEarly]
-public T __numericsLegacyDiv<T : IArithmetic>(T left, T right)
-{
-    return left.div(right);
-}
-
-[__unsafeForceInlineEarly]
-public T __numericsLegacyMod<T : IArithmetic>(T left, T right)
-{
-    return left.mod(right);
-}
-
-[__unsafeForceInlineEarly]
-public T __numericsLegacyNeg<T : IArithmetic>(T value)
-{
-    return value.neg();
 }
 
 #define NUMERICS_SCALAR_COMPARISON_ADAPTER(NAME, OP)                            \
