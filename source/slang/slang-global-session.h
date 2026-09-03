@@ -154,10 +154,8 @@ public:
     checkCompileTargetSupport(SlangCompileTarget target) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL
     checkPassThroughSupport(SlangPassThrough passThrough) override;
-    SLANG_NO_THROW SlangResult SLANG_MCALL getDownstreamCompilerVersion(
-        SlangPassThrough passThrough,
-        int* outMajor,
-        int* outMinor) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerPath(SlangPassThrough passThrough, ISlangBlob** outPath) override;
 
     void writeCoreModuleDoc(String config);
     SLANG_NO_THROW SlangResult SLANG_MCALL
