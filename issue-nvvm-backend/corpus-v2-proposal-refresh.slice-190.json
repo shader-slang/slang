@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "status": "proposed-only-ready-for-review",
+  "composition_source": {
+    "path": "issue-nvvm-backend/corpus-v2-proposed-additions.slice-157.tsv",
+    "sha256": "8126F402CE9F45D706C24A51E189783528DB5B5797AA45035AA7FB2ACD08CE9E",
+    "unchanged_additions": 50,
+    "baseline_tag_representatives": 23,
+    "newly_unlocked_invariants_at_slice_157": 14,
+    "remaining_healthy_failures_at_slice_157": 13
+  },
+  "current_evidence": {
+    "frozen_v1": {
+      "rows": 452,
+      "healthy_mvp_denominator": 427,
+      "o0_correct": 419,
+      "o3_correct": 419,
+      "both_correct": 419
+    },
+    "discovery": {
+      "rows": 82,
+      "healthy_reference_denominator": 72,
+      "o0_correct": 72,
+      "o3_correct": 72,
+      "both_correct": 72
+    },
+    "proposed_additions": {
+      "resolved": 50,
+      "healthy_native_reference": 50,
+      "o0_correct": 50,
+      "o3_correct": 50,
+      "both_correct": 50,
+      "frozen_v1_id_overlap": 0,
+      "frozen_v1_source_overlap": 0
+    }
+  },
+  "candidate": {
+    "rows": 502,
+    "sources": 498,
+    "healthy_mvp_denominator": 477,
+    "o0_correct": 469,
+    "o0_percent": 98.3,
+    "o3_correct": 469,
+    "o3_percent": 98.3,
+    "both_correct": 469,
+    "both_percent": 98.3,
+    "healthy_both_failures": 8,
+    "all_rows_native_correct": 499,
+    "all_rows_native_infrastructure": 3,
+    "all_rows_direct_o0": {
+      "correct": 483,
+      "preflight": 18,
+      "infrastructure": 1,
+      "runtime_mismatch": 0
+    },
+    "all_rows_direct_o3": {
+      "correct": 483,
+      "preflight": 18,
+      "infrastructure": 1,
+      "runtime_mismatch": 0
+    }
+  },
+  "representative_release_gates": [
+    {
+      "name": "resource-aggregate-helper",
+      "id": "compute/dynamic-dispatch-bindless-texture.slang#cuda-1",
+      "native": "correct",
+      "nvvm_o0": "correct",
+      "nvvm_o3": "correct"
+    },
+    {
+      "name": "parameter-block-layout",
+      "id": "compute/parameter-block.slang#cuda-1",
+      "native": "correct",
+      "nvvm_o0": "correct",
+      "nvvm_o3": "correct"
+    },
+    {
+      "name": "shared-control-barriers",
+      "id": "language-feature/execution-model/groupshared-multi-barrier-functional.slang#cuda-1",
+      "native": "correct",
+      "nvvm_o0": "correct",
+      "nvvm_o3": "correct"
+    }
+  ],
+  "approval_required_before_freeze": true
+}

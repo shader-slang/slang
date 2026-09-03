@@ -2656,3 +2656,13 @@ newly correct in both modes. Frozen v1 advances from 418/418/418 to 419/419/419 
 427 healthy denominator with no old-correct regression. All-row direct runtime mismatches fall to
 zero. Discovery remains 72/72/72 over 72. The selected prefix passes 437/437, the permanent NVVM
 category passes 94/94, and provider ABI revision 34 is unchanged.
+
+Slice 190 refreshes the exact corpus-v2 composition proposed by Slice 157 without changing either
+active corpus. Its 50 discovery additions remain identity/source-disjoint from frozen v1, retain
+healthy native references, and are now all correct in direct O0 and O3. The unchanged candidate is
+502 rows from 498 sources with a 477-row healthy-MVP denominator.
+
+Current candidate correctness is 469/469/469, or 98.3%, with all eight healthy frozen-v1 gaps
+still visible. Frozen v1 remains separately 419/419/419 over 427 and discovery remains 72/72/72
+over 72. The proposal is ready for explicit review but remains proposed-only; no runner, baseline,
+compiler, provider, test, or ABI changes.

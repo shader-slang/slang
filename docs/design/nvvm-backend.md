@@ -7554,6 +7554,24 @@ bytes, and direct O3 measured 3,476 bytes at each architecture. Median standalon
 367.8 ms native and 240.3/247.6 ms for direct O0/O3 SM70 in this exploratory run. Provider ABI
 revision 34 is unchanged.
 
+### Slice 190: Refresh the proposed corpus-v2 checkpoint
+
+The exact 50-workload addition set proposed by Slice 157 remains the corpus-v2 composition source.
+Its 23 original tag representatives, 14 then-newly-unlocked invariants, and 13 then-remaining
+healthy failures have not been reselected now that they pass. This preserves the historical
+semantic rationale and avoids creating a passing-only denominator.
+
+All 50 additions now have healthy native references and are correct in direct O0 and O3. Combined
+with all 452 frozen-v1 identities, the unchanged candidate has 502 rows from 498 sources and a
+477-row healthy denominator. It is currently 469/469/469, or 98.3%, with the eight healthy
+frozen-v1 preflight gaps still visible. Corpus v1 remains 419/419/419 over 427 and discovery
+remains 72/72/72 over 72.
+
+The proposed release gates are the existing measurement defaults: resource/aggregate/helper
+transport, parameter-block layout, and shared-memory/control/barrier workloads. All three are
+healthy and correct in both modes. The candidate remains proposed-only pending explicit approval;
+no active manifest, runner, provider ABI, or historical baseline changed.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
