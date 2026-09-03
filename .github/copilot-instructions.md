@@ -93,7 +93,8 @@ change.)
   renumbering note belongs in the commit message). Prefer one "if X, then Y, because Z" sentence
   over a paragraph of premises with no stated point. If justifying one line takes several
   paragraphs, restructure the code instead — extract a named helper, assert the invariant, simplify
-  the condition.
+  the condition. This is about ordinary comments; a genuinely subtle cross-pass invariant can still
+  warrant a fuller worked example — that is the exception, not the default.
 - **Reuse before you write; then extract.** Before adding a helper, check shared headers
   (`slang-ast-type.h`, `slang-ir-util.h`, the `*-util.h` files) for an existing one (e.g.
   `isDeclRefTypeOf<T>`). When the logic is genuinely new, extract it into a named, documented helper
