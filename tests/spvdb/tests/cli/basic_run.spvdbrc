@@ -1,0 +1,9 @@
+# Basic run: load add_uint, bind two inputs, run, read output.
+# add_uint has: set=0 binding=0 input buffer, set=0 binding=1 output buffer.
+# Verifies: file loading, descriptor binding, run, info outputs.
+file @SPIRV_BIN_DIR@/add_uint.spv
+entry main
+set input 0 0 [3, 4]
+set input 0 1 [0]
+run
+info outputs

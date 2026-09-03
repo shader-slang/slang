@@ -4964,6 +4964,573 @@ TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
     return TestResult::Ignored;
 }
 
+// ---------------------------------------------------------------------------
+// SPVDB_DEBUGGER: compile a .slang file to SPIR-V, then execute debugger
+// commands embedded in the source file as "// SPVDB-CMD: ..." comments
+// in-process via libspvdb, and validate the output with FileCheck.
+//
+// Test directive syntax:
+//   //TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute
+//
+// The args are forwarded to slangc (after -target spirv -g2 -o <stem>.spv).
+// libspvdb is vendored at tests/spvdb and is always linked in when slang-test
+// is built (see the SLANG_ENABLE_SPVDB block in tools/CMakeLists.txt).
+// ---------------------------------------------------------------------------
+
+#ifdef SLANG_ENABLE_SPVDB
+#include "api/spvdb.h"
+#include "api/spvdb_session.h"
+
+#include <cstring>
+#include <fstream>
+#include <sstream>
+#include <vector>
+
+// Format a spvdb Value as a human-readable string.
+static std::string spvdb_value_str(const spvdb::Value& v)
+{
+    using Kind = spvdb::Value::Kind;
+    switch (v.kind)
+    {
+    case Kind::Bool:
+        return v.scalar.b ? "true" : "false";
+    case Kind::Int32:
+        return std::to_string(v.scalar.i32);
+    case Kind::UInt32:
+        return std::to_string(v.scalar.u32);
+    case Kind::Int64:
+        return std::to_string(v.scalar.i64);
+    case Kind::UInt64:
+        return std::to_string(v.scalar.u64);
+    case Kind::Float32:
+        {
+            std::ostringstream os;
+            os << v.scalar.f32;
+            return os.str();
+        }
+    case Kind::Float64:
+        {
+            std::ostringstream os;
+            os << v.scalar.f64;
+            return os.str();
+        }
+    case Kind::Composite:
+        {
+            bool named = !v.member_names.empty() && v.member_names.size() == v.elements.size();
+            std::string s = named ? "{" : "(";
+            for (size_t i = 0; i < v.elements.size(); ++i)
+            {
+                if (i)
+                    s += ", ";
+                if (named && !v.member_names[i].empty())
+                    s += v.member_names[i] + "=";
+                s += spvdb_value_str(v.elements[i]);
+            }
+            return s + (named ? "}" : ")");
+        }
+    default:
+        return "<complex>";
+    }
+}
+
+static std::string spvdb_stop_reason_str(spvdb::StopReason r)
+{
+    using SR = spvdb::StopReason;
+    switch (r)
+    {
+    case SR::Breakpoint:
+        return "Breakpoint";
+    case SR::Step:
+        return "Step";
+    case SR::EntryReached:
+        return "EntryReached";
+    case SR::EntryFinished:
+        return "EntryFinished";
+    case SR::Panic:
+        return "Panic";
+    }
+    return "Unknown";
+}
+
+// Split a line into whitespace-separated tokens.
+static std::vector<std::string> spvdb_tokenize(const std::string& line)
+{
+    std::vector<std::string> tokens;
+    std::istringstream ss(line);
+    std::string tok;
+    while (ss >> tok)
+        tokens.push_back(tok);
+    return tokens;
+}
+
+// Scan a source file for "// SPVDB-CMD: <command>" directives.
+static std::vector<std::string> spvdb_extract_commands(const std::string& path)
+{
+    std::vector<std::string> cmds;
+    std::ifstream f(path);
+    if (!f.is_open())
+        return cmds;
+    std::string line;
+    while (std::getline(f, line))
+    {
+        // Strip leading whitespace.
+        size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos)
+            continue;
+        std::string trimmed = line.substr(start);
+
+        const std::string prefix = "// SPVDB-CMD:";
+        if (trimmed.size() < prefix.size())
+            continue;
+        if (trimmed.compare(0, prefix.size(), prefix) != 0)
+            continue;
+
+        std::string cmd = trimmed.substr(prefix.size());
+        // Strip leading whitespace from the command itself.
+        size_t cs = cmd.find_first_not_of(" \t");
+        if (cs != std::string::npos)
+            cmds.push_back(cmd.substr(cs));
+    }
+    return cmds;
+}
+
+// Execute a list of SPVDB-CMD directives against a loaded SPIR-V module.
+// Returns the collected output as a string suitable for FileCheck validation.
+// On error, sets *error_out and returns "".
+static std::string spvdb_run_commands(
+    const std::string& spv_path,
+    const std::vector<std::string>& commands,
+    std::string* error_out)
+{
+    auto mod_result = spvdb::load_module_from_file(spv_path);
+    if (!mod_result)
+    {
+        *error_out = std::string("spvdb: failed to load SPIR-V: ") + spv_path;
+        return "";
+    }
+    auto mod = *mod_result;
+
+    std::string entry_name = "main";
+    std::unique_ptr<spvdb::Session> sess;
+    std::ostringstream out;
+
+    auto ensure_session = [&]() -> bool
+    {
+        if (!sess)
+        {
+            auto r = spvdb::create_session(mod, entry_name);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: create_session failed: ") + r.error().message;
+                return false;
+            }
+            sess = std::move(*r);
+        }
+        return true;
+    };
+
+    for (const auto& cmd_line : commands)
+    {
+        auto tokens = spvdb_tokenize(cmd_line);
+        if (tokens.empty())
+            continue;
+        const std::string& cmd = tokens[0];
+
+        if (cmd == "entry")
+        {
+            if (tokens.size() < 2)
+            {
+                *error_out = "spvdb: entry requires <name>";
+                return "";
+            }
+            entry_name = tokens[1];
+            sess.reset();
+        }
+        else if (cmd == "descriptor")
+        {
+            if (tokens.size() < 4)
+            {
+                *error_out = "spvdb: descriptor requires <set> <binding> <json>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            uint32_t set = static_cast<uint32_t>(std::stoul(tokens[1]));
+            uint32_t binding = static_cast<uint32_t>(std::stoul(tokens[2]));
+            std::string json;
+            for (size_t i = 3; i < tokens.size(); ++i)
+            {
+                if (i > 3)
+                    json += " ";
+                json += tokens[i];
+            }
+            auto r = spvdb::set_descriptor_json(*sess, set, binding, json);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: set_descriptor_json failed: ") + r.error().message;
+                return "";
+            }
+        }
+        else if (cmd == "inputloc")
+        {
+            // inputloc <location> <json>  — bind a vertex/fragment Input variable by Location.
+            if (tokens.size() < 3)
+            {
+                *error_out = "spvdb: inputloc requires <location> <json>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            uint32_t loc = static_cast<uint32_t>(std::stoul(tokens[1]));
+            std::string json;
+            for (size_t i = 2; i < tokens.size(); ++i)
+            {
+                if (i > 2)
+                    json += " ";
+                json += tokens[i];
+            }
+            auto r = spvdb::set_input_location_json(*sess, loc, json);
+            if (!r)
+            {
+                *error_out =
+                    std::string("spvdb: set_input_location_json failed: ") + r.error().message;
+                return "";
+            }
+        }
+        else if (cmd == "outputs")
+        {
+            if (!ensure_session())
+                return "";
+            auto vars = spvdb::output_variables(*sess);
+            for (const auto& lv : vars)
+                out << "output: " << lv.name << " = " << spvdb_value_str(lv.value) << "\n";
+            if (vars.empty())
+                out << "outputs: (none)\n";
+        }
+        else if (cmd == "break")
+        {
+            if (tokens.size() < 3)
+            {
+                *error_out = "spvdb: break requires <file_suffix> <line>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            std::string file = tokens[1];
+            uint32_t line = static_cast<uint32_t>(std::stoul(tokens[2]));
+            auto r = spvdb::set_breakpoint(*sess, file, line);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: set_breakpoint failed: ") + r.error().message;
+                return "";
+            }
+        }
+        else if (cmd == "run" || cmd == "continue")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::run(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "step")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::step(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "stepi")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::step_instruction(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "next")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::step_over(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "finish")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::step_out(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "print")
+        {
+            if (tokens.size() < 2)
+            {
+                *error_out = "spvdb: print requires <name>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            auto r = spvdb::evaluate_variable(*sess, tokens[1]);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: evaluate_variable failed: ") + r.error().message;
+                return "";
+            }
+            out << "print: " << r->name << " = " << spvdb_value_str(r->value) << "\n";
+        }
+        else if (cmd == "builtin")
+        {
+            // builtin <name> <val0> [val1] [val2] [val3]
+            if (tokens.size() < 3)
+            {
+                *error_out = "spvdb: builtin requires <name> <val...>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+
+            // Map common builtin names to SpvBuiltIn enum values.
+            static const struct
+            {
+                const char* name;
+                uint32_t id;
+            } kBuiltins[] = {
+                {"GlobalInvocationID", SpvBuiltInGlobalInvocationId},
+                {"LocalInvocationID", SpvBuiltInLocalInvocationId},
+                {"WorkgroupID", SpvBuiltInWorkgroupId},
+                {"LocalInvocationIndex", SpvBuiltInLocalInvocationIndex},
+                {"VertexIndex", SpvBuiltInVertexIndex},
+                {"InstanceIndex", SpvBuiltInInstanceIndex},
+                {"Position", SpvBuiltInPosition},
+                {"PointSize", SpvBuiltInPointSize},
+                {"FragCoord", SpvBuiltInFragCoord},
+                {"FrontFacing", SpvBuiltInFrontFacing},
+                {"FragDepth", SpvBuiltInFragDepth},
+                {"NumWorkgroups", SpvBuiltInNumWorkgroups},
+                {"SubgroupSize", SpvBuiltInSubgroupSize},
+            };
+            uint32_t bi = 0;
+            bool found = false;
+            for (const auto& kb : kBuiltins)
+            {
+                if (tokens[1] == kb.name)
+                {
+                    bi = kb.id;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                *error_out = std::string("spvdb: unknown builtin: ") + tokens[1];
+                return "";
+            }
+
+            spvdb::Value bval;
+            size_t nvals = tokens.size() - 2; // number of value tokens
+            if (nvals >= 3)
+            {
+                // Three or four components — build a composite.
+                std::vector<spvdb::Value> elems;
+                bool as_float = false;
+                for (size_t i = 2; i < tokens.size(); ++i)
+                {
+                    if (tokens[i].find('.') != std::string::npos)
+                    {
+                        as_float = true;
+                        break;
+                    }
+                }
+                for (size_t i = 2; i < tokens.size(); ++i)
+                    elems.push_back(
+                        as_float
+                            ? spvdb::Value::make_f32(std::stof(tokens[i]))
+                            : spvdb::Value::make_u32(static_cast<uint32_t>(std::stoul(tokens[i]))));
+                bval = spvdb::Value::make_composite(std::move(elems));
+            }
+            else
+            {
+                // Single scalar — try uint first, then float.
+                const std::string& sv = tokens[2];
+                if (sv.find('.') != std::string::npos)
+                    bval = spvdb::Value::make_f32(std::stof(sv));
+                else
+                    bval = spvdb::Value::make_u32(static_cast<uint32_t>(std::stoul(sv)));
+            }
+
+            auto r = spvdb::set_builtin(*sess, bi, bval);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: set_builtin failed: ") + r.error().message;
+                return "";
+            }
+        }
+        else if (cmd == "location")
+        {
+            if (!ensure_session())
+                return "";
+            auto loc = spvdb::current_location(*sess);
+            out << "location: " << loc.file << ":" << loc.line << "\n";
+        }
+        else if (cmd == "locals")
+        {
+            if (!ensure_session())
+                return "";
+            auto vars = spvdb::local_variables(*sess);
+            for (const auto& lv : vars)
+                out << "local: " << lv.name << " = " << spvdb_value_str(lv.value) << "\n";
+            if (vars.empty())
+                out << "locals: (none)\n";
+        }
+        else if (cmd == "backtrace")
+        {
+            if (!ensure_session())
+                return "";
+            auto bt = spvdb::backtrace(*sess);
+            for (size_t i = 0; i < bt.size(); ++i)
+            {
+                out << "frame[" << i << "]: " << bt[i].function_name << " at " << bt[i].loc.file
+                    << ":" << bt[i].loc.line << "\n";
+            }
+            if (bt.empty())
+                out << "backtrace: (empty)\n";
+        }
+        else if (cmd == "read")
+        {
+            if (tokens.size() < 3)
+            {
+                *error_out = "spvdb: read requires <set> <binding>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            uint32_t set = static_cast<uint32_t>(std::stoul(tokens[1]));
+            uint32_t binding = static_cast<uint32_t>(std::stoul(tokens[2]));
+            auto r = spvdb::read_descriptor(*sess, set, binding);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: read_descriptor failed: ") + r.error().message;
+                return "";
+            }
+            const auto& bytes = *r;
+            size_t n_u32 = bytes.size() / sizeof(uint32_t);
+            out << "read[" << set << "][" << binding << "]: [";
+            for (size_t i = 0; i < n_u32; ++i)
+            {
+                if (i)
+                    out << ", ";
+                uint32_t val;
+                std::memcpy(&val, bytes.data() + i * sizeof(uint32_t), sizeof(uint32_t));
+                out << val;
+            }
+            out << "]\n";
+        }
+        else
+        {
+            *error_out = std::string("spvdb: unknown command: ") + cmd;
+            return "";
+        }
+    }
+
+    return out.str();
+}
+#endif // SLANG_ENABLE_SPVDB
+
+TestResult runSpvdbDebuggerTest(TestContext* context, TestInput& input)
+{
+    if (context->isCollectingRequirements())
+        return TestResult::Pass;
+
+#ifndef SLANG_ENABLE_SPVDB
+    // libspvdb not linked in this build of slang-test (see the
+    // SLANG_ENABLE_SPVDB block in tools/CMakeLists.txt).
+    auto reporter = context->getTestReporter();
+    if (reporter)
+        reporter->message(
+            TestMessageType::Info,
+            "SPVDB_DEBUGGER test skipped: spvdb not available in this slang-test build");
+    return TestResult::Ignored;
+#else
+    auto outputStem = input.outputStem;
+    String spvPath = outputStem + ".spvdb.spv";
+
+    // --- Step 1: compile the source file to SPIR-V with debug info ---
+    {
+        CommandLine slangcCmdLine;
+        slangcCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangc"));
+        slangcCmdLine.addArg(input.filePath);
+        slangcCmdLine.addArg("-target");
+        slangcCmdLine.addArg("spirv");
+        slangcCmdLine.addArg("-g2");
+        slangcCmdLine.addArg("-o");
+        slangcCmdLine.addArg(spvPath);
+
+        for (auto arg : input.testOptions->args)
+            slangcCmdLine.addArg(arg);
+
+        ExecuteResult slangcRes;
+        TEST_RETURN_ON_DONE(
+            spawnAndWait(context, outputStem, SpawnType::UseExe, slangcCmdLine, slangcRes));
+
+        if (slangcRes.resultCode != 0)
+        {
+            auto reporter = context->getTestReporter();
+            if (reporter)
+                reporter->message(
+                    TestMessageType::TestFailure,
+                    String("slangc failed:\n") + getOutput(slangcRes));
+            return TestResult::Fail;
+        }
+    }
+
+    // --- Step 2: run SPVDB-CMD directives in-process via libspvdb ---
+    String actualOutput;
+    {
+        std::string sourcePath(input.filePath.getBuffer());
+        std::string spvPathStd(spvPath.getBuffer());
+
+        auto commands = spvdb_extract_commands(sourcePath);
+        if (commands.empty())
+        {
+            auto reporter = context->getTestReporter();
+            if (reporter)
+                reporter->message(
+                    TestMessageType::TestFailure,
+                    String("spvdb: no SPVDB-CMD directives found in: ") + input.filePath);
+            return TestResult::Fail;
+        }
+
+        std::string error;
+        std::string output = spvdb_run_commands(spvPathStd, commands, &error);
+        if (!error.empty())
+        {
+            auto reporter = context->getTestReporter();
+            if (reporter)
+                reporter->message(TestMessageType::TestFailure, error.c_str());
+            return TestResult::Fail;
+        }
+        actualOutput = output.c_str();
+    }
+
+    // --- Step 3: validate output via FileCheck / comparison ---
+    return _validateOutput(context, input, actualOutput);
+#endif // SLANG_ENABLE_SPVDB
+}
+
 // based on command name, dispatch to an appropriate callback
 struct TestCommandInfo
 {
@@ -5000,7 +5567,8 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"COMPILE_TARGET", &runCompileTarget, 0},
     {"DOC", &runDocTest, 0},
     {"LANG_SERVER", &runLanguageServerTest, 0},
-    {"EXECUTABLE", &runExecutableTest, RenderApiFlag::CPU}};
+    {"EXECUTABLE", &runExecutableTest, RenderApiFlag::CPU},
+    {"SPVDB_DEBUGGER", &runSpvdbDebuggerTest, 0}};
 
 const TestCommandInfo* _findTestCommandInfoByCommand(const UnownedStringSlice& name)
 {

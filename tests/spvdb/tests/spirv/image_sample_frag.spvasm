@@ -1,0 +1,50 @@
+; image_sample_frag.spvasm
+; Fragment shader: samples a 2D combined-image-sampler at an input UV,
+; stores the result to an output color.
+; Exercises: OpTypeSampledImage, OpLoad of sampler variable, OpImageSampleImplicitLod.
+;
+; Descriptor bindings:
+;   set=0, binding=0  CombinedImageSampler (2D float)
+; Input  location 0:  vec2 UV coordinates
+; Output location 0:  vec4 sampled color
+
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %uv_in %color_out
+               OpExecutionMode %main OriginUpperLeft
+
+               OpName %uv_in     "uv_in"
+               OpName %color_out "color_out"
+               OpName %samp_var  "samp_var"
+
+               OpDecorate %uv_in     Location 0
+               OpDecorate %color_out Location 0
+               OpDecorate %samp_var  DescriptorSet 0
+               OpDecorate %samp_var  Binding 0
+
+        %void = OpTypeVoid
+       %vfunc = OpTypeFunction %void
+       %float = OpTypeFloat 32
+     %v2float = OpTypeVector %float 2
+     %v4float = OpTypeVector %float 4
+
+      ; 2D image type + combined sampler type
+       %img_t = OpTypeImage %float 2D 0 0 0 1 Unknown
+      %samp_t = OpTypeSampledImage %img_t
+
+   %ptr_in_v2 = OpTypePointer Input  %v2float
+  %ptr_out_v4 = OpTypePointer Output %v4float
+  %ptr_samp   = OpTypePointer UniformConstant %samp_t
+
+      %uv_in  = OpVariable %ptr_in_v2  Input
+   %color_out = OpVariable %ptr_out_v4 Output
+    %samp_var = OpVariable %ptr_samp   UniformConstant
+
+        %main = OpFunction %void None %vfunc
+       %entry = OpLabel
+          %uv = OpLoad %v2float %uv_in
+          %si = OpLoad %samp_t %samp_var
+       %color = OpImageSampleImplicitLod %v4float %si %uv
+                OpStore %color_out %color
+                OpReturn
+                OpFunctionEnd

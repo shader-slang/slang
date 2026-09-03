@@ -236,6 +236,17 @@ if(SLANG_ENABLE_GFX)
     )
 endif()
 if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
+    # ---- spvdb integration for SPVDB_DEBUGGER tests -------------------------
+    # spvdb (vendored at tests/spvdb) is a SPIR-V interpreter and source-level
+    # debugger. Build libspvdb here and link it into slang-test so that
+    # .slang test files under tests/debuginfo can drive the debugger
+    # in-process and validate its output with FileCheck.
+    add_subdirectory(
+        "${slang_SOURCE_DIR}/tests/spvdb"
+        "${CMAKE_CURRENT_BINARY_DIR}/spvdb"
+        EXCLUDE_FROM_ALL
+    )
+
     # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
@@ -264,9 +275,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             compiler-core
             slang
             stb
+            spvdb
             ${CMAKE_DL_LIBS}
             Threads::Threads
         INCLUDE_FROM_PRIVATE prelude slang-rhi
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_ENABLE_SPVDB=1
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         REQUIRES
             # Shared libraries dlopened by slang-test

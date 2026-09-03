@@ -1,0 +1,161 @@
+---
+Language:        Cpp
+AccessModifierOffset: -4
+AlignAfterOpenBracket: Align
+
+# This option causes a segfault in clang-format(?)
+#AlignArrayOfStructures: Right
+AlignArrayOfStructures: None
+
+AlignConsecutiveAssignments: None
+AlignConsecutiveBitFields: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: None
+AlignEscapedNewlines: Left
+AlignOperands: AlignAfterOperator
+AlignTrailingComments: false
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLambdasOnASingleLine: All
+AllowShortLoopsOnASingleLine: true
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: MultiLine
+AttributeMacros: []
+BinPackArguments: false
+BinPackParameters: false
+BitFieldColonSpacing: Both
+
+BraceWrapping:
+    AfterCaseLabel:  false
+    AfterClass:      true
+    AfterControlStatement: MultiLine
+    AfterEnum:       true
+    AfterFunction:   true
+    AfterNamespace:  true
+    AfterStruct:     true
+    AfterUnion:      true
+    AfterExternBlock: true
+    BeforeCatch:     false
+    BeforeElse:      false
+    BeforeLambdaBody: true
+    BeforeWhile:     false
+    IndentBraces:    false
+    SplitEmptyFunction: true
+    SplitEmptyRecord: true
+    SplitEmptyNamespace: true
+
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeBraces: Custom
+BreakBeforeConceptDeclarations: true
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: AfterComma
+BreakStringLiterals: false
+ColumnLimit: 100
+#CommentPragmas: ""
+CompactNamespaces: false
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+# TODO?
+Cpp11BracedListStyle: true
+EmptyLineAfterAccessModifier: Never
+EmptyLineBeforeAccessModifier: Always
+FixNamespaceComments: true
+ForEachMacros: []
+IfMacros: []
+# TODO?
+IncludeBlocks: Preserve
+IndentAccessModifiers: false
+IndentCaseBlocks: true
+IndentCaseLabels: true
+IndentExternBlock: NoIndent
+IndentGotoLabels: false
+IndentPPDirectives: None
+IndentRequires: true
+IndentWidth: 4
+IndentWrappedFunctionNames: false
+# disabled for c++ now, but maybe it'll show up in the future?
+#InsertTrailingCommas: Wrapped
+KeepEmptyLinesAtTheStartOfBlocks: false
+LambdaBodyIndentation: Signature
+#MacroBlockBegin: ""
+#MacroBlockEnd: ""
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+NamespaceMacros: []
+PPIndentWidth: 1
+
+AllowAllConstructorInitializersOnNextLine: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+#clang-format 14 PackConstructorInitializers: Never
+
+# TODO customize penalty values until things look nice
+PenaltyBreakAssignment: 100
+PenaltyBreakBeforeFirstCallParameter: 100
+PenaltyBreakComment: 10000
+PenaltyBreakFirstLessLess: 100
+#PenaltyBreakOpenParenthesis: 100
+PenaltyBreakString: 10000
+PenaltyBreakTemplateDeclaration: 0
+PenaltyExcessCharacter: 101
+PenaltyIndentedWhitespace: 0
+PenaltyReturnTypeOnItsOwnLine: 500
+PointerAlignment: Right
+#clang-format 14 QualifierAlignment: Custom
+#clang-format 14 QualifierOrder: ['constexpr', 'inline', 'static', 'type', 'const']
+ReferenceAlignment: Right
+ReflowComments: true
+#clang-format 14 RemoveBracesLLVM: false
+#clang-format 14 SeparateDefinitionBlocks: Always
+ShortNamespaceLines: 0
+SortIncludes: CaseSensitive
+SortUsingDeclarations: false
+SpaceAfterCStyleCast: true
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: false
+SpaceAroundPointerQualifiers: Default
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+# I wish I could choose based on whether it was Object{} or variable{}
+SpaceBeforeCpp11BracedList: true
+SpaceBeforeCtorInitializerColon: false
+SpaceBeforeInheritanceColon: true
+# TODO this one gets more complex in clang-format 14
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: Never
+SpacesInCStyleCastParentheses: false
+SpacesInConditionalStatement: false
+
+SpacesInLineCommentPrefix:
+    Minimum:         1
+    Maximum:         -1
+
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+Standard: c++20
+StatementAttributeLikeMacros: []
+StatementMacros: []
+TabWidth: 4
+TypenameMacros: []
+UseCRLF: false
+UseTab: Never
+WhitespaceSensitiveMacros: []
+
+---
+# This part just silences an annoying set of errors when running the 'format'
+# rule in meson
+Language:        ObjC
+BasedOnStyle:    None
+
+...
