@@ -10,6 +10,8 @@
 //TEST:SIMPLE(filecheck=SPVLAYOUT): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=DXILLAYOUT): -experimental-feature -entry main -stage raygeneration -target dxil -profile sm_6_7
 //TEST:SIMPLE(filecheck=METALLAYOUT): -experimental-feature -entry main -stage raygeneration -target metal -profile metallib_2_4
+//TEST:SIMPLE(filecheck=CUDALAYOUT): -experimental-feature -entry main -stage raygeneration -target cuda
+//TEST:SIMPLE(filecheck=PTXLAYOUT): -experimental-feature -entry main -stage raygeneration -target ptx -Xnvrtc -I"./external/optix-dev/include/"
 
 import slang.raytracing;
 
@@ -278,3 +280,12 @@ void main()
 // METALLAYOUT-DAG: _slang_result.world_to_object_transform
 // METALLAYOUT-DAG: uint3 dispatchRaysIndex_{{[0-9]+}} {{\[\[thread_position_in_grid\]\]}}
 // METALLAYOUT-DAG: uint3 dispatchRaysDimensions_{{[0-9]+}} {{\[\[threads_per_grid\]\]}}
+
+// CUDALAYOUT-DAG: __closesthit__ClosestHit
+// CUDALAYOUT-DAG: __anyhit__AnyHit
+// CUDALAYOUT-DAG: __intersection__Intersection
+// CUDALAYOUT-DAG: optixGetSbtGASIndex()
+// PTXLAYOUT-DAG: .visible .entry __closesthit__ClosestHit()
+// PTXLAYOUT-DAG: .visible .entry __anyhit__AnyHit()
+// PTXLAYOUT-DAG: .visible .entry __intersection__Intersection()
+// PTXLAYOUT-DAG: _optix_read_sbt_gas_idx
