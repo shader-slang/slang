@@ -207,6 +207,35 @@ change.)
   newElementType, `vector<T,N>` → `vector<newElementType,N>`, `matrix<T,R,C>` → `matrix<newElementType,R,C>`."_
   — not _"element coerce target"_.
 
+- **Write comments as declarative statements about the design, not imperatives directed at the
+  reader.** State how the code is structured and why, in the present tense ("We split X into Y
+  because Z"), not as an instruction to whoever is reading it ("Keep X in Y"). Prefer:
+
+  > _"We have split support for automatic differentiation into a supplement that loads as a
+  > separate module, in order to improve compile times for code that doesn't need it. Existing
+  > Slang code may assume autodiff support is pervasively available, so we place the relevant
+  > public declarations and attributes here in the core module rather than the supplement; user
+  > code that refers to these attributes triggers on-demand loading of the autodiff supplement."_
+
+  over:
+
+  > _"Keep the custom-derivative attribute spellings in the base module. Semantic checking uses a
+  > recognized attribute as the signal to load the full autodiff module before validating it."_
+
+  An imperative comment tends to state only _what_ to do and skip _why_ the structure exists;
+  declarative "we" phrasing makes the why unavoidable. Give a paragraph an explicit subject
+  instead of opening with an unattached "This."
+
+- **Keep comments proportionate to what they explain, and land on a conclusion.** A comment
+  records durable state — an invariant, a constraint, the reason for an unusual shape — not the
+  edits or review rounds that produced it (a renumbering note belongs in the commit message, not
+  the header). Prefer one "if X, then Y, because Z" sentence over a paragraph of premises that
+  never states its point. If justifying a single conditional or a single line takes several
+  paragraphs, treat that as a signal to restructure the code — extract a named helper, assert the
+  invariant, simplify the condition — rather than a signal to add more prose. This is about
+  ordinary comments; a genuinely subtle cross-pass invariant can still warrant the fuller worked
+  example below, but that is the exception, not the default.
+
 - **Use conversational examples for code comments and PR explanations.** When explaining a subtle
   compiler path, prefer "Consider this example:" followed by the relevant user code. Do not use
   abstract labels such as "Full source shape", "AST trace", or "IR trace" as a substitute for
