@@ -77,7 +77,7 @@ void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
 
         m_nvvmIRBuilderLoadAttempted = false;
         m_nvvmIRBuilderLoadResult = SLANG_E_UNINITIALIZED;
-        m_nvvmIRBuilderExplicitPath = String();
+        m_nvvmIRBuilderSearchPath = String();
         m_nvvmIRBuilder = NVVMIRBuilder();
 
         // Set the loader
@@ -85,35 +85,54 @@ void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
     }
 }
 
-SlangResult Session::getOrLoadNVVMIRBuilder(NVVMIRBuilder*& outBuilder, String* outExplicitPath)
+SlangResult Session::getOrLoadNVVMIRBuilder(NVVMIRBuilder*& outBuilder, String* outSearchPath)
 {
     std::lock_guard<std::recursive_mutex> lock(m_downstreamCompilerMutex);
 
     outBuilder = nullptr;
     if (!m_nvvmIRBuilderLoadAttempted)
     {
+        SlangResult searchPathResult = SLANG_OK;
         StringBuilder pathBuilder;
         if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
                 toSlice("SLANG_NVVM_BUILDER_PATH"),
                 pathBuilder)) &&
             pathBuilder.getLength())
         {
-            m_nvvmIRBuilderExplicitPath = pathBuilder.produceString();
+            m_nvvmIRBuilderSearchPath = pathBuilder.produceString();
         }
         else
         {
-            m_nvvmIRBuilderExplicitPath = String();
+            // The compiler-matched provider is deployed beside Slang executables. Resolve that
+            // location explicitly so desktop platforms do not depend on process-wide DLL/SO
+            // search order.
+            pathBuilder.clear();
+            searchPathResult = PlatformUtil::getInstancePath(pathBuilder);
+            if (SLANG_SUCCEEDED(searchPathResult) && pathBuilder.getLength())
+            {
+                m_nvvmIRBuilderSearchPath = pathBuilder.produceString();
+            }
+            else
+            {
+                m_nvvmIRBuilderSearchPath = String();
+                if (SLANG_SUCCEEDED(searchPathResult))
+                    searchPathResult = SLANG_E_NOT_FOUND;
+            }
         }
 
         m_nvvmIRBuilderLoadAttempted = true;
-        m_nvvmIRBuilderLoadResult = NVVMIRBuilder::load(
-            m_nvvmIRBuilderExplicitPath,
-            m_sharedLibraryLoader,
-            m_nvvmIRBuilder);
+        m_nvvmIRBuilderLoadResult = searchPathResult;
+        if (SLANG_SUCCEEDED(searchPathResult))
+        {
+            m_nvvmIRBuilderLoadResult = NVVMIRBuilder::load(
+                m_nvvmIRBuilderSearchPath,
+                m_sharedLibraryLoader,
+                m_nvvmIRBuilder);
+        }
     }
 
-    if (outExplicitPath)
-        *outExplicitPath = m_nvvmIRBuilderExplicitPath;
+    if (outSearchPath)
+        *outSearchPath = m_nvvmIRBuilderSearchPath;
     if (SLANG_SUCCEEDED(m_nvvmIRBuilderLoadResult))
         outBuilder = &m_nvvmIRBuilder;
     return m_nvvmIRBuilderLoadResult;

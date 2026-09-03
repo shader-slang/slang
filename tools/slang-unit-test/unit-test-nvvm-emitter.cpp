@@ -7503,6 +7503,13 @@ SLANG_UNIT_TEST(nvvmSlangBuilderIdentityAffectsHashAndIsSessionCached)
         SLANG_CHECK_ABORT(hashWithBuilder != nullptr);
         SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 1);
+        const String expectedSearchPath = _getExpectedNVVMBuilderSearchPath();
+        if (expectedSearchPath.getLength())
+        {
+            SLANG_CHECK(
+                gFakeNVVMBuilder.loadedPath.getUnownedSlice().indexOf(
+                    expectedSearchPath.getUnownedSlice()) == 0);
+        }
 
         ComPtr<slang::IBlob> code;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -8652,8 +8659,32 @@ SLANG_UNIT_TEST(nvvmSlangMissingBuilderDoesNotFallback)
             code,
             diagnostics)));
         SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
+        const String firstDiagnostic = _getBlobText(diagnostics);
+        SLANG_CHECK(firstDiagnostic.indexOf("E52016") >= 0);
+        const String expectedSearchPath = _getExpectedNVVMBuilderSearchPath();
+        if (expectedSearchPath.getLength())
+        {
+            SLANG_CHECK(firstDiagnostic.indexOf(expectedSearchPath.getUnownedSlice()) >= 0);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.loadedPath.getUnownedSlice().indexOf(
+                    expectedSearchPath.getUnownedSlice()) == 0);
+        }
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+
+        // A failed provider load is a session result too. Recompiling must report the same
+        // resolved location without another load attempt or a fallback to NVRTC.
+        code.setNull();
+        diagnostics.setNull();
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            globalSession,
+            kDirectNVVMEmptyComputeSource,
+            code,
+            diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(_getBlobText(diagnostics).indexOf("E52016") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.successfulLoadCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);

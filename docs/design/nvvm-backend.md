@@ -7669,6 +7669,31 @@ and explicit-selection failure an executable contract; then automate packaging/i
 establish CUDA 13 and physical SM70/80/90 coverage, and isolate kernel-runtime benchmarking from
 end-to-end census timing.
 
+### Slice 195: Compiler-matched provider deployment
+
+Provider discovery now implements the documented package layout directly. A nonempty
+`SLANG_NVVM_BUILDER_PATH` is the authoritative directory or module file. Without it, each global
+session resolves `slang-llvm-nvvm` from the running executable's directory; it does not continue to
+PATH or fall back to NVRTC. The selected path and first success or failure are cached together, and
+E52016 names the actual location. Replacing the shared-library loader still invalidates the cache.
+
+The independent LLVM 14 provider project now offers component `slang-llvm-nvvm`, which installs one
+platform MODULE artifact under `${CMAKE_INSTALL_BINDIR}`. Installing it into the same prefix as the
+Slang executables creates the default adjacent layout. The provider README defines the forward-only
+update policy: build compiler and provider from one checkout, require the exact ABI revision, deploy
+them as one package update, and create a new global session after an on-disk replacement.
+
+A clean Windows component install contained exactly `bin/slang-llvm-nvvm.dll`; the installed bytes
+matched the fresh provider build. Both explicit installed-directory loading and no-override
+adjacent loading passed real serialization, direct compilation, libNVVM, and `ptxas`. An older
+adjacent provider was rejected until replaced with the compiler-matched build, demonstrating that
+exact ABI negotiation catches partial updates. Provider ABI revision 35 is unchanged.
+
+Frozen v1 remains 423/423/423 over 427 and discovery remains separately 72/72/72 over 72, with no
+classification changes. The selected unit prefix passes 439/439 and the permanent category passes
+102/102. The three representative gates retain their PTX sizes and assemble through direct O3 for
+SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

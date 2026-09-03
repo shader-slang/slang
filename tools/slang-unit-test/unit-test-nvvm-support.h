@@ -6582,7 +6582,9 @@ public:
         *outLibrary = nullptr;
         gFakeNVVMBuilder.loadedPath = path;
         ++gFakeNVVMBuilder.loadRequestCount;
-        if (gFakeNVVMBuilder.loadedPath != "slang-llvm-nvvm")
+        // Production resolves the default provider beside the executable, while focused builder
+        // tests may still call the wrapper with its logical name.
+        if (gFakeNVVMBuilder.loadedPath.getUnownedSlice().indexOf(toSlice("slang-llvm-nvvm")) < 0)
             return SLANG_E_NOT_FOUND;
         if (gFakeNVVMBuilder.libraryUnavailable)
             return SLANG_E_NOT_FOUND;
@@ -7305,6 +7307,24 @@ struct RealNVVMBuilderLocation
     bool isExplicit = false;
     bool moduleExists = false;
 };
+
+// Mirrors the public deployment inputs, not the loader's path-decoration algorithm. Tests use the
+// result to prove that session discovery starts from the configured directory rather than PATH.
+static String _getExpectedNVVMBuilderSearchPath()
+{
+    StringBuilder pathBuilder;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            toSlice("SLANG_NVVM_BUILDER_PATH"),
+            pathBuilder)) &&
+        pathBuilder.getLength())
+    {
+        return pathBuilder.produceString();
+    }
+    pathBuilder.clear();
+    if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(pathBuilder)) && pathBuilder.getLength())
+        return pathBuilder.produceString();
+    return String();
+}
 
 static RealNVVMBuilderLocation _getRealNVVMBuilderLocation(UnitTestContext* context)
 {

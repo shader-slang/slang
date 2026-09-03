@@ -293,9 +293,7 @@ public:
     /// available.
     IDownstreamCompiler* getOrLoadDownstreamCompiler(PassThroughMode type, DiagnosticSink* sink);
     /// Loads and retains the optional LLVM 14 NVVM builder used by direct PTX emission.
-    SlangResult getOrLoadNVVMIRBuilder(
-        NVVMIRBuilder*& outBuilder,
-        String* outExplicitPath = nullptr);
+    SlangResult getOrLoadNVVMIRBuilder(NVVMIRBuilder*& outBuilder, String* outSearchPath = nullptr);
     /// Will unload the specified shared library if it's currently loaded
     void resetDownstreamCompiler(PassThroughMode type);
 
@@ -348,7 +346,7 @@ public:
     DownstreamCompilerLocatorFunc m_downstreamCompilerLocators[int(PassThroughMode::CountOf)];
     bool m_nvvmIRBuilderLoadAttempted = false;
     SlangResult m_nvvmIRBuilderLoadResult = SLANG_E_UNINITIALIZED;
-    String m_nvvmIRBuilderExplicitPath;
+    String m_nvvmIRBuilderSearchPath;
     NVVMIRBuilder m_nvvmIRBuilder;
     Name* m_completionTokenName = nullptr; ///< The name of a completion request token.
 

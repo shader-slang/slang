@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 
 project(slang-llvm-nvvm LANGUAGES C CXX)
 
+include(GNUInstallDirs)
+
 get_filename_component(_default_slang_source_dir "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 set(
     SLANG_SOURCE_DIR
@@ -145,3 +147,13 @@ else()
         PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/slang-llvm-nvvm.version-script"
     )
 endif()
+
+# The direct backend resolves its compiler-matched provider beside the running Slang executable.
+# Keep every platform's MODULE artifact in the install bindir so packages have one deployment
+# layout instead of relying on platform-wide library search paths.
+install(
+    TARGETS slang-llvm-nvvm
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    COMPONENT slang-llvm-nvvm
+)

@@ -3655,15 +3655,15 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
     SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requirements));
 
     NVVMIRBuilder* builder = nullptr;
-    String explicitBuilderPath;
-    SlangResult loadResult = getSession()->getOrLoadNVVMIRBuilder(builder, &explicitBuilderPath);
+    String builderSearchPath;
+    SlangResult loadResult = getSession()->getOrLoadNVVMIRBuilder(builder, &builderSearchPath);
     if (SLANG_FAILED(loadResult) || !builder || !builder->isInitialized())
     {
         StringBuilder location;
-        if (explicitBuilderPath.getLength())
-            location << "'" << explicitBuilderPath << "'";
+        if (builderSearchPath.getLength())
+            location << "'" << builderSearchPath << "'";
         else
-            location << "the default library search path";
+            location << "the running executable directory";
         getSink()->diagnose(Diagnostics::NvvmIrBuilderUnavailable{
             .location = location.produceString(),
         });

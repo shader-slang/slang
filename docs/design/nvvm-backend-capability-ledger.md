@@ -2715,3 +2715,22 @@ Frozen v1 advances to 423/423/423 over 427 with no old-correct regression; disco
 72/72/72 over 72. The selected prefix passes 439/439, the permanent category passes 102/102, and
 the unchanged proposed corpus-v2 composition would now be 473/473/473 over 477, with four healthy
 gaps.
+
+Slice 194 audits the four remaining native-healthy frozen-v1 gaps without changing their historical
+classification. Three require FP8 or BFloat16 helper types outside the bounded ordinary-numeric
+MVP. The fourth carries live `IRRequirePrelude` text consumed by following user GenericAsm, so
+stripping it would change behavior and generic support would require a CUDA source evaluator.
+Frozen v1 therefore honestly stays 423/423/423 over 427 while the selected feature-breadth gate is
+complete. Discovery stays 72/72/72, and the unchanged proposed-v2 union is 473/473/473 over 477.
+
+Slice 195 makes provider deployment an executable contract. `SLANG_NVVM_BUILDER_PATH` remains an
+authoritative directory-or-file override; otherwise a global session resolves the provider beside
+the running executable. It caches one resolved location and success/failure, names that location in
+E52016, and never continues to PATH or NVRTC. The standalone provider CMake project installs its
+single MODULE artifact into `${CMAKE_INSTALL_BINDIR}` as optional component `slang-llvm-nvvm`.
+
+Fake-boundary success and failure tests prove one-attempt caching and no fallback. A clean installed
+provider and the no-override adjacent layout both pass real LLVM serialization, direct libNVVM
+compilation, and PTX assembly. The selected unit prefix passes 439/439 and the permanent category
+passes 102/102. Frozen v1 remains 423/423/423 over 427; discovery remains 72/72/72 over 72; both
+have zero classification change. Provider ABI revision 35 is unchanged.
