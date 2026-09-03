@@ -1,4 +1,6 @@
-//TEST:SIMPLE:
+// Regression test for https://github.com/shader-slang/slang/issues/9810
+
+//TEST:INTERPRET(filecheck=CHECK):
 
 struct Foo
 {
@@ -8,12 +10,13 @@ struct Foo
     }
 };
 
-void test()
+void main()
 {
     Foo f;
     Foo* foo = &f;
 
-    // Verify calling a generic member function via a pointer succeeds
-    // without emitting error 30101 (cannot dereference type 'Foo').
-    int result = foo->Bar<42>();
+    // A generic member call through a pointer must compile (no error 30101)
+    // AND return the correct value.
+    //CHECK: 42
+    printf("%d\n", foo->Bar<42>());
 }
