@@ -886,6 +886,13 @@ struct SharedSemanticsContext : public RefObject
     /// The (optional) "primary" module that is the parent to everything that will be checked.
     Module* m_module = nullptr;
 
+    /// The Slang language version whose rules apply to this checking session.
+    ///
+    /// Normal module checking derives this value from the primary module. Ad hoc checking that
+    /// has no primary module must instead choose a version explicitly when it constructs the
+    /// context.
+    SlangLanguageVersion m_languageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
+
     DiagnosticSink* m_sink = nullptr;
 
     // Whether the current module has imported the GLSL module.
@@ -951,6 +958,13 @@ public:
                m_isGLSLModuleImported;
     }
 
+private:
+    static SlangLanguageVersion _getModuleLanguageVersion(Module* module)
+    {
+        SLANG_RELEASE_ASSERT(module);
+        return module->getModuleDecl()->languageVersion;
+    }
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -960,10 +974,35 @@ public:
         TranslationUnitRequest* translationUnit = nullptr)
         : m_linkage(linkage)
         , m_module(module)
+        , m_languageVersion(_getModuleLanguageVersion(module))
         , m_sink(sink)
         , m_environmentModules(environmentModules)
         , m_translationUnitRequest(translationUnit)
     {
+    }
+
+    SharedSemanticsContext(
+        Linkage* linkage,
+        SlangLanguageVersion languageVersion,
+        DiagnosticSink* sink)
+        : m_linkage(linkage), m_languageVersion(languageVersion), m_sink(sink)
+    {
+        SLANG_RELEASE_ASSERT(languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN);
+    }
+
+    /// Creates a context for an ad hoc checking operation whose primary module may be absent.
+    ///
+    /// A present module supplies the source-language policy and the moduleless version is ignored.
+    /// Otherwise, the caller must provide the version for the ad hoc operation.
+    static RefPtr<SharedSemanticsContext> createForOptionalModule(
+        Linkage* linkage,
+        Module* module,
+        SlangLanguageVersion modulelessLanguageVersion,
+        DiagnosticSink* sink)
+    {
+        if (module)
+            return new SharedSemanticsContext(linkage, module, sink);
+        return new SharedSemanticsContext(linkage, modulelessLanguageVersion, sink);
     }
 
     Session* getSession() { return m_linkage->getSessionImpl(); }
@@ -971,6 +1010,8 @@ public:
     Linkage* getLinkage() { return m_linkage; }
 
     Module* getModule() { return m_module; }
+
+    SlangLanguageVersion getLanguageVersion() const { return m_languageVersion; }
 
     TranslationUnitRequest* getTranslationUnitRequest() { return m_translationUnitRequest; }
 
@@ -1301,6 +1342,11 @@ public:
                 CompilerOptionName::DisableShortCircuit);
         }
     }
+
+    // This context stores a non-owning pointer. Reject a temporary owner so that its destruction
+    // cannot leave `m_shared` dangling. An lvalue `RefPtr` intentionally reaches the raw-pointer
+    // constructor through its implicit conversion while the caller keeps that owner in a local.
+    SemanticsContext(RefPtr<SharedSemanticsContext>&&) = delete;
 
     SharedSemanticsContext* getShared() { return m_shared; }
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
@@ -1647,6 +1693,10 @@ struct SemanticsVisitor : public SemanticsContext
         : Super(shared)
     {
     }
+
+    // Keep direct visitor construction subject to the ownership rule on `SemanticsContext`; an
+    // lvalue `RefPtr` still reaches the raw-pointer constructor through its implicit conversion.
+    SemanticsVisitor(RefPtr<SharedSemanticsContext>&&) = delete;
 
     SemanticsVisitor(SemanticsContext const& context)
         : Super(context)
@@ -3451,10 +3501,24 @@ public:
     // so that the better candidate compares as less-than the other
     int CompareOverloadCandidates(OverloadCandidate* left, OverloadCandidate* right);
 
-    /// If `declRef` representations a specialization of a generic, returns the number of
-    /// specialized generic arguments. Otherwise, returns zero.
+    /// Applies the pre-202c generic-parameter-count tie-breaker after all ordinary ranking rules.
+    /// On success, copies the unique selected candidate into `context.bestCandidateStorage`, points
+    /// `context.bestCandidate` at that storage, clears `context.bestCandidates`, and returns true.
+    /// When `warningSink` is non-null, also emits the deprecation warning at `warningLocation`.
+    /// On failure, leaves `context` unchanged and returns false.
     ///
-    Int getSpecializedParamCount(DeclRef<Decl> const& declRef);
+    /// The final source-level call sites are `ResolveInvoke` and `_coerce`. `ResolveInvoke` always
+    /// materializes an expression and passes its sink. `_coerce` passes its sink only when it also
+    /// receives `outToExpr`; a speculative conversion-cost probe passes null so that the eventual
+    /// materialization reports the warning.
+    bool tryResolveOverloadUsingLegacyGenericParameterCountFallback(
+        OverloadResolveContext& context,
+        SourceLoc warningLocation,
+        DiagnosticSink* warningSink);
+
+    /// Returns the required parameter count of the generic whose inner declaration `declRef`
+    /// names, or zero when `declRef` does not name a generic's inner declaration.
+    Int getRequiredGenericParameterCount(DeclRef<Decl> const& declRef);
 
     /// Compare items `left` and `right` produced by lookup, to see if one should be favored for
     /// overloading.
