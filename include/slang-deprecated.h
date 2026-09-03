@@ -578,8 +578,8 @@ extern "C"
     // -1 covers two distinct cases: `type` is not a generic-type-parameter layout, or
     // it is one but no global ordering was available (program-less layout of a type
     // referencing a global generic parameter). Check
-    // spReflectionType_GetKind(type) == SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER first
-    // to distinguish them.
+    // spReflectionTypeLayout_getKind(type) == SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER
+    // first to distinguish them.
     SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLayout* type);
 
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(
