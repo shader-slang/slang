@@ -206,6 +206,20 @@ IRType* getMatrixElementType(IRType* type);
 bool isResourceType(IRType* type);
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
 
+// True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
+// i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is
+// also the set of `DescriptorHandle` element types that are represented as `uint64` under that
+// capability; every other kind (buffers, acceleration structures) stays `uint2`.
+bool isBindlessTextureNVEncodableResourceType(IRType* type);
+
+// True if `descriptorHandleType` (an `IRDescriptorHandleType`) is represented as `uint64` rather
+// than `uint2` for SPIR-V. Under `spvBindlessTextureNV` (passed in as `hasBindlessTextureNV`, since
+// callers detect the capability in different ways) only the resource kinds that extension can
+// convert — see `isBindlessTextureNVEncodableResourceType` — use the wide form; buffers and
+// acceleration structures stay `uint2`. Returns false when the capability is absent or the type is
+// not a descriptor handle.
+bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool hasBindlessTextureNV);
+
 // True if type is a pointer to a resource
 bool isPointerToResourceType(IRType* type);
 
