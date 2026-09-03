@@ -7482,6 +7482,17 @@ emission records remain one per canonical instruction. Rich resource, atomic, po
 and compound-recipe families need typed plan variants and remain future inventory. Provider ABI 34
 and frozen/discovery correctness are unchanged at 418/418/418 and 72/72/72.
 
+### Slice 185: Planned scalar recipe families
+
+Preflight now owns source-keyed typed records for canonical UInt64 word construction, numeric
+truthiness, CUDA floating remainder, and bitfield extraction/insertion. These records preserve the
+resolved operands, semantic types, exact generic provider steps, and diagnostics. Operand
+validation and emission no longer invoke the four family resolvers.
+
+Capability requirements remain a separate deduplicated set and are still checked before module
+creation. No IR shape or provider ABI changed. Frozen corpus v1 remains 418/418/418 over 427,
+discovery remains 72/72/72 over 72, and the permanent gates pass 437/437 and 92/92.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

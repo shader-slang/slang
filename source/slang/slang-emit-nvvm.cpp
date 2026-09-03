@@ -3655,20 +3655,6 @@ bool _resolveNVVMTaggedValueOperation(
 // Describes one queried scalar operation in a compiler-owned compound recipe. The descriptor is
 // shared by the ordinary scalar recipes below and the established compound-wave recipes; only the
 // recipe emitter decides how intermediate values flow between steps.
-struct NVVMValueRecipeStep
-{
-    SlangNVVMValueOperation operation = 0;
-    SlangNVVMValueTypeDesc resultType = {};
-    SlangNVVMValueTypeDesc operandTypes[3] = {};
-    uint32_t operandCount = 0;
-    const char* diagnosticName = nullptr;
-
-    SlangNVVMValueOperationDesc getDesc() const
-    {
-        return {operation, resultType, operandCount ? operandTypes : nullptr, operandCount};
-    }
-};
-
 void _setNVVMValueRecipeStep(
     NVVMValueRecipeStep& step,
     SlangNVVMValueOperation operation,
@@ -4759,16 +4745,9 @@ bool _setNVVMSupportedValueRecipeStep(
 // Describes the canonical low-word/high-word reconstruction emitted by AnyValue unmarshalling.
 // Both inputs are semantic UInt32 values; zero extension makes the provider's signless i64
 // representation independent of the source words' high bits.
-struct NVVMUInt64WordConstruction
-{
-    IRInst* lowWord = nullptr;
-    IRInst* highWord = nullptr;
-    NVVMValueRecipeStep wordConversion;
-    NVVMValueRecipeStep highWordShift;
-    NVVMValueRecipeStep combine;
-};
-
-bool _resolveNVVMUInt64WordConstruction(IRInst* inst, NVVMUInt64WordConstruction& outConstruction)
+bool _resolveNVVMUInt64WordConstruction(
+    IRInst* inst,
+    NVVMPlannedUInt64WordConstruction& outConstruction)
 {
     outConstruction = {};
     if (!inst || inst->getOp() != kIROp_MakeUInt64 || inst->getOperandCount() != 2 ||
@@ -4817,6 +4796,7 @@ bool _resolveNVVMUInt64WordConstruction(IRInst* inst, NVVMUInt64WordConstruction
 
     outConstruction.lowWord = lowWord;
     outConstruction.highWord = highWord;
+    outConstruction.source = inst;
     return true;
 }
 
@@ -5398,16 +5378,6 @@ struct NVVMResolvedValueOperation
 // Describes the CUDA floating-remainder recipe selected for one canonical `kIROp_FRem`.
 // LLVM `frem` is not a semantic substitute for CUDA `fmod` near an exactly representable
 // multiple, so selected vectors are explicitly decomposed into scalar libdevice operations.
-struct NVVMFloatingRemainderOperation
-{
-    IRInst* operands[2] = {};
-    bool operandIsVector[2] = {};
-    IRType* resultType = nullptr;
-    IRType* scalarType = nullptr;
-    uint32_t laneCount = 0;
-    NVVMValueRecipeStep scalarStep;
-};
-
 struct NVVMPointerBitCast
 {
     IRInst* value = nullptr;
@@ -6178,10 +6148,7 @@ void _planNVVMValueOperation(
     const NVVMResolvedValueOperation& operation)
 {
     SLANG_ASSERT(source);
-    _requireValueOperation(
-        requirements.valueOperations,
-        operation.desc,
-        operation.diagnosticName);
+    _requireValueOperation(requirements.valueOperations, operation.desc, operation.diagnosticName);
 
     NVVMPlannedValueOperation planned;
     planned.source = source;
@@ -6199,6 +6166,17 @@ const NVVMPlannedValueOperation* _findPlannedNVVMValueOperation(
     IRInst* source)
 {
     for (const auto& operation : requirements.emissionPlan.valueOperations)
+    {
+        if (operation.source == source)
+            return &operation;
+    }
+    return nullptr;
+}
+
+template<typename T>
+const T* _findPlannedNVVMOperation(const List<T>& operations, IRInst* source)
+{
+    for (const auto& operation : operations)
     {
         if (operation.source == source)
             return &operation;
@@ -6454,7 +6432,7 @@ void _requireNVVMScalarIntrinsicRecipeOperations(
 
 void _requireNVVMUInt64WordConstructionOperations(
     NVVMValueOperationRequirements& requirements,
-    const NVVMUInt64WordConstruction& construction)
+    const NVVMPlannedUInt64WordConstruction& construction)
 {
     const NVVMValueRecipeStep* steps[] = {
         &construction.wordConversion,
@@ -6479,7 +6457,7 @@ void _requireNVVMRawBufferDescriptorBitCastOperations(
 
 bool _resolveNVVMFloatingRemainderOperation(
     IRInst* inst,
-    NVVMFloatingRemainderOperation& outOperation)
+    NVVMPlannedFloatingRemainder& outOperation)
 {
     outOperation = {};
     if (!inst || inst->getOp() != kIROp_FRem || inst->getOperandCount() != 2)
@@ -6544,6 +6522,7 @@ bool _resolveNVVMFloatingRemainderOperation(
     outOperation.scalarType = scalarType;
     outOperation.laneCount = laneCount;
     outOperation.scalarStep.diagnosticName = family.diagnosticName;
+    outOperation.source = inst;
     return true;
 }
 
@@ -6586,17 +6565,10 @@ bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOpe
     return true;
 }
 
-struct NVVMResolvedNumericTruthiness
-{
-    IRInst* value = nullptr;
-    SlangNVVMValueTypeDesc valueType = {};
-    NVVMValueRecipeStep comparison;
-};
-
 // Resolves a canonical checked numeric-to-Boolean cast as truthiness rather than a width
 // conversion. Integer lowering uses `IntCast`, while floating lowering uses `CastFloatToInt`;
 // their complete scalar source and Bool result types prove the shared nonzero comparison semantic.
-bool _resolveNVVMNumericTruthiness(IRInst* inst, NVVMResolvedNumericTruthiness& outOperation)
+bool _resolveNVVMNumericTruthiness(IRInst* inst, NVVMPlannedNumericTruthiness& outOperation)
 {
     outOperation = {};
     if (!inst || (inst->getOp() != kIROp_IntCast && inst->getOp() != kIROp_CastFloatToInt) ||
@@ -6632,44 +6604,13 @@ bool _resolveNVVMNumericTruthiness(IRInst* inst, NVVMResolvedNumericTruthiness& 
         return false;
     }
     outOperation.value = value;
+    outOperation.source = inst;
     return true;
 }
 
-enum class NVVMBitfieldOperationKind
-{
-    None,
-    Extract,
-    Insert,
-};
-
-struct NVVMResolvedBitfieldOperation
-{
-    NVVMBitfieldOperationKind kind = NVVMBitfieldOperationKind::None;
-    IRInst* value = nullptr;
-    IRInst* insertedValue = nullptr;
-    IRInst* offset = nullptr;
-    IRInst* count = nullptr;
-    IRType* dataIRType = nullptr;
-    SlangNVVMValueTypeDesc dataType = {};
-    SlangNVVMValueTypeDesc unsignedDataType = {};
-    SlangNVVMValueTypeDesc unsignedScalarType = {};
-    bool needsCountConversion = false;
-    bool isSigned = false;
-    NVVMValueRecipeStep countConversion;
-    NVVMValueRecipeStep toUnsigned;
-    NVVMValueRecipeStep toSigned;
-    NVVMValueRecipeStep subtract;
-    NVVMValueRecipeStep shiftLeft;
-    NVVMValueRecipeStep logicalShiftRight;
-    NVVMValueRecipeStep signedShiftRight;
-    NVVMValueRecipeStep bitAnd;
-    NVVMValueRecipeStep bitOr;
-    NVVMValueRecipeStep bitNot;
-};
-
 // Resolves ordinary checked bitfield IR to a finite typed recipe. Offset and count remain scalar
 // UInt32 at the Slang boundary; emission converts and splats them to the selected data shape.
-bool _resolveNVVMBitfieldOperation(IRInst* inst, NVVMResolvedBitfieldOperation& outOperation)
+bool _resolveNVVMBitfieldOperation(IRInst* inst, NVVMPlannedBitfieldOperation& outOperation)
 {
     outOperation = {};
     if (!inst || (inst->getOp() != kIROp_BitfieldExtract && inst->getOp() != kIROp_BitfieldInsert))
@@ -6697,8 +6638,8 @@ bool _resolveNVVMBitfieldOperation(IRInst* inst, NVVMResolvedBitfieldOperation& 
         return false;
     }
 
-    outOperation.kind =
-        isInsert ? NVVMBitfieldOperationKind::Insert : NVVMBitfieldOperationKind::Extract;
+    outOperation.kind = isInsert ? NVVMPlannedBitfieldOperationKind::Insert
+                                 : NVVMPlannedBitfieldOperationKind::Extract;
     outOperation.value = value;
     outOperation.insertedValue = insertedValue;
     outOperation.offset = offset;
@@ -6825,12 +6766,13 @@ bool _resolveNVVMBitfieldOperation(IRInst* inst, NVVMResolvedBitfieldOperation& 
     {
         return false;
     }
+    outOperation.source = inst;
     return true;
 }
 
 void _requireNVVMNumericTruthinessOperations(
     NVVMValueOperationRequirements& requirements,
-    const NVVMResolvedNumericTruthiness& operation)
+    const NVVMPlannedNumericTruthiness& operation)
 {
     _requireValueOperation(
         requirements,
@@ -6840,7 +6782,7 @@ void _requireNVVMNumericTruthinessOperations(
 
 void _requireNVVMBitfieldOperations(
     NVVMValueOperationRequirements& requirements,
-    const NVVMResolvedBitfieldOperation& operation)
+    const NVVMPlannedBitfieldOperation& operation)
 {
     if (operation.needsCountConversion)
     {
@@ -6868,7 +6810,7 @@ void _requireNVVMBitfieldOperations(
         requirements,
         operation.shiftLeft.getDesc(),
         operation.shiftLeft.diagnosticName);
-    if (operation.kind == NVVMBitfieldOperationKind::Extract)
+    if (operation.kind == NVVMPlannedBitfieldOperationKind::Extract)
     {
         _requireValueOperation(
             requirements,
@@ -6882,7 +6824,7 @@ void _requireNVVMBitfieldOperations(
                 operation.signedShiftRight.diagnosticName);
         }
     }
-    if (operation.kind == NVVMBitfieldOperationKind::Insert)
+    if (operation.kind == NVVMPlannedBitfieldOperationKind::Insert)
     {
         _requireValueOperation(
             requirements,
@@ -8188,7 +8130,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_MakeUInt64:
                 {
-                    NVVMUInt64WordConstruction construction;
+                    NVVMPlannedUInt64WordConstruction construction;
                     if (!_resolveNVVMUInt64WordConstruction(inst, construction))
                     {
                         return _diagnoseUnsupportedIR(
@@ -8198,6 +8140,7 @@ SlangResult _validateNVVMFunction(
                     _requireNVVMUInt64WordConstructionOperations(
                         requirements.valueOperations,
                         construction);
+                    requirements.emissionPlan.uint64WordConstructions.add(construction);
                 }
                 break;
 
@@ -8235,12 +8178,13 @@ SlangResult _validateNVVMFunction(
             case kIROp_FloatCast:
             case kIROp_Select:
                 {
-                    NVVMResolvedNumericTruthiness truthiness;
+                    NVVMPlannedNumericTruthiness truthiness;
                     if (_resolveNVVMNumericTruthiness(inst, truthiness))
                     {
                         _requireNVVMNumericTruthinessOperations(
                             requirements.valueOperations,
                             truthiness);
+                        requirements.emissionPlan.numericTruthinessOperations.add(truthiness);
                         break;
                     }
                     NVVMResolvedValueOperation operation;
@@ -8260,7 +8204,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_FRem:
                 {
-                    NVVMFloatingRemainderOperation operation;
+                    NVVMPlannedFloatingRemainder operation;
                     if (!_resolveNVVMFloatingRemainderOperation(inst, operation))
                     {
                         return _diagnoseUnsupportedIRTypeRelation(
@@ -8274,13 +8218,14 @@ SlangResult _validateNVVMFunction(
                         operation.scalarStep.getDesc(),
                         operation.scalarStep.diagnosticName);
                     requirements.requiresCUDADeviceLibrary = true;
+                    requirements.emissionPlan.floatingRemainderOperations.add(operation);
                 }
                 break;
 
             case kIROp_BitfieldExtract:
             case kIROp_BitfieldInsert:
                 {
-                    NVVMResolvedBitfieldOperation operation;
+                    NVVMPlannedBitfieldOperation operation;
                     if (!_resolveNVVMBitfieldOperation(inst, operation))
                     {
                         return _diagnoseUnsupportedIR(
@@ -8288,6 +8233,7 @@ SlangResult _validateNVVMFunction(
                             UnownedStringSlice(getIROpInfo(inst->getOp()).name));
                     }
                     _requireNVVMBitfieldOperations(requirements.valueOperations, operation);
+                    requirements.emissionPlan.bitfieldOperations.add(operation);
                 }
                 break;
 
@@ -8899,17 +8845,19 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_MakeUInt64:
                 {
-                    NVVMUInt64WordConstruction construction;
-                    SLANG_RELEASE_ASSERT(_resolveNVVMUInt64WordConstruction(inst, construction));
+                    const auto construction = _findPlannedNVVMOperation(
+                        requirements.emissionPlan.uint64WordConstructions,
+                        inst);
+                    SLANG_RELEASE_ASSERT(construction);
                     SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                         codeGenContext,
-                        construction.lowWord,
+                        construction->lowWord,
                         inst,
                         availableValues,
                         dominatorTree));
                     SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                         codeGenContext,
-                        construction.highWord,
+                        construction->highWord,
                         inst,
                         availableValues,
                         dominatorTree));
@@ -8955,14 +8903,15 @@ SlangResult _validateNVVMFunction(
                 {
                     if (inst->getOp() == kIROp_FRem)
                     {
-                        NVVMFloatingRemainderOperation operation;
-                        SLANG_RELEASE_ASSERT(
-                            _resolveNVVMFloatingRemainderOperation(inst, operation));
+                        SLANG_RELEASE_ASSERT(_findPlannedNVVMOperation(
+                            requirements.emissionPlan.floatingRemainderOperations,
+                            inst));
                     }
                     else
                     {
-                        NVVMResolvedNumericTruthiness truthiness;
-                        if (!_resolveNVVMNumericTruthiness(inst, truthiness))
+                        if (!_findPlannedNVVMOperation(
+                                requirements.emissionPlan.numericTruthinessOperations,
+                                inst))
                         {
                             SLANG_RELEASE_ASSERT(
                                 _findPlannedNVVMValueOperation(requirements, inst));
@@ -8985,8 +8934,9 @@ SlangResult _validateNVVMFunction(
             case kIROp_BitfieldExtract:
             case kIROp_BitfieldInsert:
                 {
-                    NVVMResolvedBitfieldOperation operation;
-                    SLANG_RELEASE_ASSERT(_resolveNVVMBitfieldOperation(inst, operation));
+                    SLANG_RELEASE_ASSERT(_findPlannedNVVMOperation(
+                        requirements.emissionPlan.bitfieldOperations,
+                        inst));
                     for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
                          ++operandIndex)
                     {
@@ -10308,7 +10258,7 @@ SlangResult _emitNVVMFloatingRemainderOperation(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
-    const NVVMFloatingRemainderOperation& operation,
+    const NVVMPlannedFloatingRemainder& operation,
     NVVMValueMap& valueMap,
     NVVMTypeLoweringContext& typeContext,
     SlangNVVMValueHandle& outValue)
@@ -10618,7 +10568,7 @@ SlangResult _emitNVVMUInt64WordConstruction(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
-    const NVVMUInt64WordConstruction& construction,
+    const NVVMPlannedUInt64WordConstruction& construction,
     NVVMValueMap& valueMap,
     NVVMTypeLoweringContext& typeContext,
     SlangNVVMValueHandle& outValue)
@@ -11122,7 +11072,7 @@ SlangResult _emitNVVMNumericTruthiness(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
-    const NVVMResolvedNumericTruthiness& operation,
+    const NVVMPlannedNumericTruthiness& operation,
     NVVMValueMap& valueMap,
     NVVMTypeLoweringContext& typeContext,
     SlangNVVMValueHandle& outValue)
@@ -11189,7 +11139,7 @@ SlangResult _emitNVVMBitfieldCount(
     SlangNVVMModuleHandle module,
     IRInst* irValue,
     const char* diagnosticName,
-    const NVVMResolvedBitfieldOperation& operation,
+    const NVVMPlannedBitfieldOperation& operation,
     NVVMValueMap& valueMap,
     NVVMTypeLoweringContext& typeContext,
     SlangNVVMValueHandle& outValue)
@@ -11232,7 +11182,7 @@ SlangResult _emitNVVMBitfieldOperation(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
-    const NVVMResolvedBitfieldOperation& operation,
+    const NVVMPlannedBitfieldOperation& operation,
     NVVMValueMap& valueMap,
     NVVMTypeLoweringContext& typeContext,
     SlangNVVMValueHandle& outValue)
@@ -11283,7 +11233,7 @@ SlangResult _emitNVVMBitfieldOperation(
         typeContext,
         count));
 
-    if (operation.kind == NVVMBitfieldOperationKind::Extract)
+    if (operation.kind == NVVMPlannedBitfieldOperationKind::Extract)
     {
         const SlangNVVMValueHandle initialShiftOperands[] = {value, offset};
         SlangNVVMValueHandle shifted = nullptr;
@@ -11361,7 +11311,7 @@ SlangResult _emitNVVMBitfieldOperation(
             outValue);
     }
 
-    SLANG_RELEASE_ASSERT(operation.kind == NVVMBitfieldOperationKind::Insert);
+    SLANG_RELEASE_ASSERT(operation.kind == NVVMPlannedBitfieldOperationKind::Insert);
     SlangNVVMValueHandle insertedValue = nullptr;
     SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
         codeGenContext,
@@ -13439,6 +13389,38 @@ SlangResult emitNVVMIRFromLinkedIR(
         SLANG_RELEASE_ASSERT(!plannedValueOperationIndices.containsKey(operation.source));
         plannedValueOperationIndices[operation.source] = i;
     }
+    Dictionary<IRInst*, Index> plannedUInt64WordConstructionIndices;
+    for (Index i = 0; i < requirements.emissionPlan.uint64WordConstructions.getCount(); ++i)
+    {
+        const auto& operation = requirements.emissionPlan.uint64WordConstructions[i];
+        SLANG_RELEASE_ASSERT(operation.source);
+        SLANG_RELEASE_ASSERT(!plannedUInt64WordConstructionIndices.containsKey(operation.source));
+        plannedUInt64WordConstructionIndices[operation.source] = i;
+    }
+    Dictionary<IRInst*, Index> plannedNumericTruthinessIndices;
+    for (Index i = 0; i < requirements.emissionPlan.numericTruthinessOperations.getCount(); ++i)
+    {
+        const auto& operation = requirements.emissionPlan.numericTruthinessOperations[i];
+        SLANG_RELEASE_ASSERT(operation.source);
+        SLANG_RELEASE_ASSERT(!plannedNumericTruthinessIndices.containsKey(operation.source));
+        plannedNumericTruthinessIndices[operation.source] = i;
+    }
+    Dictionary<IRInst*, Index> plannedFloatingRemainderIndices;
+    for (Index i = 0; i < requirements.emissionPlan.floatingRemainderOperations.getCount(); ++i)
+    {
+        const auto& operation = requirements.emissionPlan.floatingRemainderOperations[i];
+        SLANG_RELEASE_ASSERT(operation.source);
+        SLANG_RELEASE_ASSERT(!plannedFloatingRemainderIndices.containsKey(operation.source));
+        plannedFloatingRemainderIndices[operation.source] = i;
+    }
+    Dictionary<IRInst*, Index> plannedBitfieldOperationIndices;
+    for (Index i = 0; i < requirements.emissionPlan.bitfieldOperations.getCount(); ++i)
+    {
+        const auto& operation = requirements.emissionPlan.bitfieldOperations[i];
+        SLANG_RELEASE_ASSERT(operation.source);
+        SLANG_RELEASE_ASSERT(!plannedBitfieldOperationIndices.containsKey(operation.source));
+        plannedBitfieldOperationIndices[operation.source] = i;
+    }
 
     // The canonical global owns storage class, value type, extent, and name. Lower those facts once
     // before any function declaration; ordinary body uses then resolve through the shared value
@@ -14230,9 +14212,11 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_MakeUInt64:
                     {
-                        NVVMUInt64WordConstruction construction;
-                        SLANG_RELEASE_ASSERT(
-                            _resolveNVVMUInt64WordConstruction(inst, construction));
+                        const Index* operationIndex =
+                            plannedUInt64WordConstructionIndices.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(operationIndex);
+                        const auto& construction =
+                            requirements.emissionPlan.uint64WordConstructions[*operationIndex];
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMUInt64WordConstruction(
                             codeGenContext,
@@ -14291,9 +14275,13 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_WaveMaskBallot:
                 case kIROp_WaveMaskMatch:
                     {
-                        NVVMResolvedNumericTruthiness truthiness;
-                        if (_resolveNVVMNumericTruthiness(inst, truthiness))
+                        const Index* truthinessIndex =
+                            plannedNumericTruthinessIndices.tryGetValue(inst);
+                        if (truthinessIndex)
                         {
+                            const auto& truthiness =
+                                requirements.emissionPlan
+                                    .numericTruthinessOperations[*truthinessIndex];
                             SlangNVVMValueHandle loweredValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_emitNVVMNumericTruthiness(
                                 codeGenContext,
@@ -14341,9 +14329,11 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_FRem:
                     {
-                        NVVMFloatingRemainderOperation operation;
-                        SLANG_RELEASE_ASSERT(
-                            _resolveNVVMFloatingRemainderOperation(inst, operation));
+                        const Index* operationIndex =
+                            plannedFloatingRemainderIndices.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(operationIndex);
+                        const auto& operation =
+                            requirements.emissionPlan.floatingRemainderOperations[*operationIndex];
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMFloatingRemainderOperation(
                             codeGenContext,
@@ -14360,8 +14350,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_BitfieldExtract:
                 case kIROp_BitfieldInsert:
                     {
-                        NVVMResolvedBitfieldOperation operation;
-                        SLANG_RELEASE_ASSERT(_resolveNVVMBitfieldOperation(inst, operation));
+                        const Index* operationIndex =
+                            plannedBitfieldOperationIndices.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(operationIndex);
+                        const auto& operation =
+                            requirements.emissionPlan.bitfieldOperations[*operationIndex];
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMBitfieldOperation(
                             codeGenContext,
@@ -14417,7 +14410,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 plannedValueOperationIndices.tryGetValue(inst);
                             SLANG_RELEASE_ASSERT(operationIndex);
                             const NVVMValueOperationRequirement& operation =
-                                requirements.emissionPlan.valueOperations[*operationIndex].operation;
+                                requirements.emissionPlan.valueOperations[*operationIndex]
+                                    .operation;
                             SlangNVVMValueHandle loweredOperand = nullptr;
                             SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                 codeGenContext,

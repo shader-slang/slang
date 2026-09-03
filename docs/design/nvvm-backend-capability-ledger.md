@@ -2601,3 +2601,12 @@ Deduplicated capability requirements remain separate so every typed provider ove
 once before module creation. Rich recipes/resources/atomics retain typed resolver paths pending
 dedicated plan variants. Provider ABI revision 34 is unchanged; frozen corpus v1 remains
 418/418/418, discovery remains 72/72/72, and the regression gates remain 437/437 and 92/92.
+
+Slice 185 extends the plan with exact records for UInt64 word construction, numeric truthiness,
+CUDA floating remainder, and bitfield recipes. Their canonical resolvers now run only in the first
+preflight walk; SSA validation and provider emission consume the stored operands and recipe steps.
+Capability queries remain separately deduplicated and complete before module creation.
+
+Provider ABI revision 34 is unchanged. Frozen corpus v1 remains 418/418/418 over 427 healthy
+references with zero old-correct regression. Discovery remains 72/72/72 over 72. The selected
+prefix passes 437/437 and the permanent NVVM category passes 92/92.
