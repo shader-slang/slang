@@ -1818,7 +1818,7 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     //
     // This must run before the specialized buffer / parameter-group
     // declarations below, which `return` early: without it, an unsized
-    // (bindless) array of any resource kind `isResourceType` accepts --
+    // (bindless) array of the resource kinds those branches handle --
     // structured and byte-address buffers, parameter groups, SSBOs -- would
     // skip the request, while textures and samplers (which fall through to
     // the tail) would still reach it.
