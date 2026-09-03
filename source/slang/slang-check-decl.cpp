@@ -10181,7 +10181,7 @@ bool SemanticsVisitor::ensureInheritedInterfaceRequirement(
     if (!isOnCanonicalPath)
     {
         if (!witnessTable->containsRequirement(requirementKey))
-            witnessTable->addRequirement(requirementKey, RequirementWitness(subIsReqWitness));
+            witnessTable->add(requirementKey, RequirementWitness(subIsReqWitness));
         return true;
     }
 
@@ -10203,7 +10203,7 @@ bool SemanticsVisitor::ensureInheritedInterfaceRequirement(
         satisfyingWitnessTable = new WitnessTable();
         satisfyingWitnessTable->witnessedType = subType;
         satisfyingWitnessTable->baseType = reqType;
-        witnessTable->addRequirement(requirementKey, RequirementWitness(satisfyingWitnessTable));
+        witnessTable->add(requirementKey, RequirementWitness(satisfyingWitnessTable));
     }
 
     auto reqInterfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(reqType);
@@ -11028,20 +11028,15 @@ SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequi
                         break;
                     }
 
-                    if (!ensureInheritedInterfaceRequirement(
-                            interfaceState->owner.Ptr(),
-                            interfaceState->conformingType,
-                            requiredInheritanceDeclRef,
-                            witnessTable,
-                            InheritedInterfaceRequirementMode::PrepareForLookup))
-                    {
-                        witnessTable->removeRequirement(requirementKey);
-                        witnessTable->setRequirementCheckState(
-                            requirementKey,
-                            RequirementCheckState::Failed);
-                        result.status = RequirementLookupStatus::Failed;
-                        return result;
-                    }
+                    // Preparation only publishes the canonical nested table (or its existing
+                    // non-canonical conformance witness); validation is deliberately deferred.
+                    // It therefore cannot fail for a well-formed inherited-interface requirement.
+                    SLANG_RELEASE_ASSERT(ensureInheritedInterfaceRequirement(
+                        interfaceState->owner.Ptr(),
+                        interfaceState->conformingType,
+                        requiredInheritanceDeclRef,
+                        witnessTable,
+                        InheritedInterfaceRequirementMode::PrepareForLookup));
                     RequirementWitness preparedWitness;
                     SLANG_RELEASE_ASSERT(
                         witnessTable->tryGetRequirementWitness(requirementKey, preparedWitness));
@@ -11201,6 +11196,8 @@ SemanticsVisitor::RequirementProjectionResolutionResult SemanticsVisitor::
     {
     case RequirementLookupStatus::Unavailable:
     case RequirementLookupStatus::Recursive:
+        // Neither result provides a concrete value: the former path is not forceable here, while
+        // the latter is owned by an enclosing request. Both must remain symbolic for the caller.
         return result;
     case RequirementLookupStatus::Failed:
         result.status = RequirementProjectionResolutionStatus::Failed;
@@ -11225,6 +11222,11 @@ SemanticsVisitor::RequirementProjectionResolutionResult SemanticsVisitor::
     Val* satisfyingValue = nullptr;
     switch (lookupResult.witness.getFlavor())
     {
+    case RequirementWitness::Flavor::none:
+    case RequirementWitness::Flavor::witnessTable:
+        // Optional and inherited-interface requirements can be found structurally without naming
+        // a satisfying value. They are not value projections, so leave the input symbolic.
+        return result;
     case RequirementWitness::Flavor::declRef:
         satisfyingValue = lookupResult.witness.getDeclRef().declRefBase;
         break;
@@ -11232,7 +11234,7 @@ SemanticsVisitor::RequirementProjectionResolutionResult SemanticsVisitor::
         satisfyingValue = lookupResult.witness.getVal();
         break;
     default:
-        return result;
+        SLANG_UNEXPECTED("unknown requirement witness flavor");
     }
 
     if (resultMustBeType)
@@ -11242,7 +11244,7 @@ SemanticsVisitor::RequirementProjectionResolutionResult SemanticsVisitor::
         else if (auto satisfyingDeclRef = as<DeclRefBase>(satisfyingValue))
             result.value = DeclRefType::create(m_astBuilder, DeclRef<Decl>(satisfyingDeclRef));
         else
-            return result;
+            SLANG_UNEXPECTED("associated-type requirement did not produce a type");
     }
     else
     {
@@ -11291,9 +11293,9 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     // *before* we go about checking fine-grained requirements,
     // in order to short-circuit any potential for infinite recursion.
 
-    // Note: we will re-use the witness table attached to the inheritance decl,
-    // if there is one. This catches cases where semantic checking might
-    // have synthesized some of the conformance witnesses for us.
+    // Reuse a table already registered for this interface first. Otherwise, use a table attached
+    // to the inheritance declaration when earlier semantic work has synthesized entries there,
+    // and allocate a new table only when neither source exists.
     //
     if (!witnessTable)
     {

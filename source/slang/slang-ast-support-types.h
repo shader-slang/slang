@@ -1700,8 +1700,8 @@ FIDDLE() namespace Slang
         /// Adds a witness while normalizing `requirementDecl` to its table-local requirement key.
         void add(Decl* requirementDecl, RequirementWitness const& witness);
 
-        /// Adds the witness for `key` using the table-local requirement identity.
-        void addRequirement(InterfaceRequirementKey key, RequirementWitness const& witness);
+        /// Adds the witness for an already-normalized table-local requirement key.
+        void add(InterfaceRequirementKey key, RequirementWitness const& witness);
 
         /// Returns whether this table contains a witness for `key`.
         bool containsRequirement(InterfaceRequirementKey key) const
