@@ -1778,8 +1778,8 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    // Don't need to run any further target-dependent passes if we are generating code
-    // for host vm.
+    // HostVM skips the later target pipelines, but its bytecode arithmetic derives one source size
+    // from operand zero's element width and lane count. Make scalar broadcasts explicit first.
     if (target == CodeGenTarget::HostVM)
     {
         SLANG_PASS(performForceInlining);
@@ -1787,6 +1787,7 @@ Result linkAndOptimizeIR(
         // bytecode constants section cannot represent void values. Remove them before emission,
         // as the later target pipelines do.
         SLANG_PASS(cleanUpVoidType);
+        SLANG_PASS(legalizeScalarOperandsOfBinaryOps);
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
         return SLANG_OK;
     }
