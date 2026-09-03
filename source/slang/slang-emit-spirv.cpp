@@ -4679,7 +4679,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         auto name = getName(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
-        auto debugType = emitDebugType(varType, false);
+        auto debugType = emitDebugType(varType);
 
         auto spvDebugLocalVar = emitOpDebugLocalVariable(
             getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -4781,7 +4781,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto name = getName(globalInst);
         IRBuilder builder(globalInst);
         auto varType = tryGetPointedToType(&builder, globalInst->getDataType());
-        auto debugType = emitDebugType(varType, false);
+        auto debugType = emitDebugType(varType);
 
         // Use default debug source and line info similar to struct debug type emission
         auto loc = globalInst->findDecoration<IRDebugLocationDecoration>();
@@ -10668,7 +10668,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!scope)
             return nullptr;
 
-        SpvInst* neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()), false);
+        SpvInst* neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()));
         SLANG_ASSERT(neededDebugType);
 
         IRBuilder builder(debugFunc);
@@ -10946,19 +10946,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     static constexpr const int kUnknownPhysicalLayout = 1 << 17;
     static constexpr const int kDebugTypeAtomicQualifier = 3;
 
-    // Normalize matrix layout for debug info emission.
-    // Matrix layout (row-major vs column-major) only affects memory accesses
-    // to buffers.
-    // For non-buffer contexts, matrices are always treated as row-major (in
-    // Slang terms).
-    IRType* normalizeMatrixDebugType(IRType* type, bool isTypeInBuffer)
+    // Normalize matrix types to Slang's row-major layout mode when emitting debug info, matching
+    // the DebugTypeMatrix shape emitted by DXC and glslang. This only selects the debug type and
+    // cache key; it does not transpose matrix values or change matrix accesses or storage
+    // decorations.
+    IRType* normalizeMatrixDebugType(IRType* type)
     {
-        if (isTypeInBuffer)
-            return type; // Keep layout for types in buffers
-
         if (auto matrixType = as<IRMatrixType>(type))
         {
-            // Normalize to row-major for types not in buffers
             if (getIntVal(matrixType->getLayout()) != kMatrixLayoutMode_RowMajor)
             {
                 IRBuilder builder(type);
@@ -10972,7 +10967,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return type;
     }
 
-    SpvInst* emitDebugTypeImpl(IRType* type, bool isTypeInBuffer)
+    SpvInst* emitDebugTypeImpl(IRType* type)
     {
         auto scope = findDebugScope(type);
         if (!scope)
@@ -10984,13 +10979,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             SpvInst* returnType = ensureInst(m_voidType);
             if (!as<IRVoidType>(funcType->getResultType()))
             {
-                returnType = emitDebugType(funcType->getResultType(), isTypeInBuffer);
+                returnType = emitDebugType(funcType->getResultType());
             }
 
             List<SpvInst*> argTypes;
             for (UInt i = 0; i < funcType->getParamCount(); ++i)
             {
-                argTypes.add(emitDebugType(funcType->getParamType(i), isTypeInBuffer));
+                argTypes.add(emitDebugType(funcType->getParamType(i)));
             }
 
             return emitOpDebugTypeFunction(
@@ -11063,12 +11058,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 if (spvFieldType == nullptr)
                 {
-                    bool isFieldTypeInBuffer =
-                        structType->findDecorationImpl(kIROp_SPIRVBlockDecoration) != nullptr ||
-                        structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration) !=
-                            nullptr ||
-                        structType->findDecorationImpl(kIROp_PhysicalTypeDecoration) != nullptr;
-                    spvFieldType = emitDebugType(fieldType, isFieldTypeInBuffer);
+                    spvFieldType = emitDebugType(fieldType);
                 }
 
                 // Check if the field key has a debug location decoration
@@ -11141,7 +11131,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
-                emitDebugType(arrayType->getElementType(), isTypeInBuffer),
+                emitDebugType(arrayType->getElementType()),
                 sizedArrayType ? builder.getIntValue(
                                      builder.getUIntType(),
                                      getArraySizeVal(sizedArrayType->getElementCount()))
@@ -11149,7 +11139,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else if (auto vectorType = as<IRVectorType>(type))
         {
-            auto elementType = emitDebugType(vectorType->getElementType(), isTypeInBuffer);
+            auto elementType = emitDebugType(vectorType->getElementType());
             return emitOpDebugTypeVector(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
@@ -11162,35 +11152,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else if (auto matrixType = as<IRMatrixType>(type))
         {
-            IRInst* count = nullptr;
-            bool isSpvColMajor;
-            IRType* innerVectorType = nullptr;
-
-            // kMatrixLayoutMode_RowMajor maps to SpvDecorationColMajor (and vice versa)
-            if (getIntVal(matrixType->getLayout()) == kMatrixLayoutMode_ColumnMajor)
-            {
-                innerVectorType =
-                    builder.getVectorType(matrixType->getElementType(), matrixType->getRowCount());
-                isSpvColMajor = false;
-                count = matrixType->getColumnCount();
-            }
-            else
-            {
-                innerVectorType = builder.getVectorType(
-                    matrixType->getElementType(),
-                    matrixType->getColumnCount());
-                isSpvColMajor = true;
-                count = matrixType->getRowCount();
-            }
-            auto elementType = emitDebugType(innerVectorType, isTypeInBuffer);
+            auto innerVectorType =
+                builder.getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+            auto elementType = emitDebugType(innerVectorType);
             return emitOpDebugTypeMatrix(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
                 elementType,
-                builder.getIntValue(builder.getUIntType(), getIntVal(count)),
-                builder.getBoolValue(isSpvColMajor));
+                builder.getIntValue(builder.getUIntType(), getIntVal(matrixType->getRowCount())),
+                builder.getBoolValue(true));
         }
         else if (as<IRBasicType>(type) || as<IRPackedFloatType>(type))
         {
@@ -11258,7 +11230,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             IRType* baseType = ptrType->getValueType();
             // Emit DebugTypePointer for pointer types.
-            SpvInst* debugBaseType = emitDebugType(baseType, isTypeInBuffer);
+            SpvInst* debugBaseType = emitDebugType(baseType);
             SpvStorageClass storageClass = SpvStorageClassFunction;
             if (ptrType->hasAddressSpace())
                 storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
@@ -11275,7 +11247,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         else if (auto atomicType = as<IRAtomicType>(type))
         {
             auto baseType = atomicType->getElementType();
-            auto debugBaseType = emitDebugType(baseType, isTypeInBuffer);
+            auto debugBaseType = emitDebugType(baseType);
 
             return emitOpDebugTypeQualifier(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -11310,16 +11282,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             List<SpvInst*>()); // No members
     }
 
-    SpvInst* emitDebugType(IRType* type, bool isTypeInBuffer)
+    SpvInst* emitDebugType(IRType* type)
     {
-        type = normalizeMatrixDebugType(type, isTypeInBuffer);
+        type = normalizeMatrixDebugType(type);
 
         if (auto debugType = m_mapTypeToDebugType.tryGetValue(type))
             return *debugType;
         bool isStruct = type->getOp() == kIROp_StructType;
         if (isStruct)
             m_emittingTypes.add(type);
-        auto result = emitDebugTypeImpl(type, isTypeInBuffer);
+        auto result = emitDebugTypeImpl(type);
         if (isStruct)
             m_emittingTypes.remove(type);
         m_mapTypeToDebugType[type] = result;
