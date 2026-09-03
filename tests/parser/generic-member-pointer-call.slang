@@ -1,5 +1,3 @@
-// Regression test for https://github.com/shader-slang/slang/issues/9810
-
 //TEST:INTERPRET(filecheck=CHECK):
 // Regression test for https://github.com/shader-slang/slang/issues/9810
 
