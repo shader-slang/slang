@@ -9,8 +9,8 @@ implementing differentiable;
     This METHOD(This other) { return ADAPTER(this, other); }
 
 #define NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(adding, __differentiableNumericsAdd) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(subtracting, __differentiableNumericsSub) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(plus, __differentiableNumericsAdd) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(minus, __differentiableNumericsSub) \
     NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
     NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
     NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \
@@ -222,8 +222,8 @@ public extension<
     }
 
 #define NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS                  \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(adding, __differentiableNumericsAdd) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(subtracting, __differentiableNumericsSub) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(plus, __differentiableNumericsAdd) \
+    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(minus, __differentiableNumericsSub) \
     NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
     NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
     NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \

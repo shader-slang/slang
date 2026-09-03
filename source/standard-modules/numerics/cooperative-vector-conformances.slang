@@ -52,9 +52,9 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     }
 
     [ForceInline] [require(cooperative_vector)]
-    This adding(This other) { return this.add(other); }
+    This plus(This other) { return this.add(other); }
     [ForceInline] [require(cooperative_vector)]
-    This subtracting(This other) { return this.sub(other); }
+    This minus(This other) { return this.sub(other); }
     [ForceInline] [require(cooperative_vector)]
     This multipliedBy(This other) { return this.mul(other); }
     [ForceInline] [require(cooperative_vector)]
@@ -192,9 +192,9 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     static This one() { return This(Scalar.one()); }
 
     [ForceInline] [require(cooperative_vector)]
-    This adding(This other) { return this.add(other); }
+    This plus(This other) { return this.add(other); }
     [ForceInline] [require(cooperative_vector)]
-    This subtracting(This other) { return this.sub(other); }
+    This minus(This other) { return this.sub(other); }
     [ForceInline] [require(cooperative_vector)]
     This multipliedBy(This other) { return this.mul(other); }
     [ForceInline] [require(cooperative_vector)]

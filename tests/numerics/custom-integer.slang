@@ -51,12 +51,12 @@ struct WrappedInt : IScalarSignedIntegerType
         return value <= other.value;
     }
 
-    This adding(This other)
+    This plus(This other)
     {
         return {value + other.value};
     }
 
-    This subtracting(This other)
+    This minus(This other)
     {
         return {value - other.value};
     }
@@ -169,12 +169,12 @@ struct SignedIntegerPair<T : IScalarSignedIntegerType> : ISignedIntegerType
         return Mask(x <= other.x, y <= other.y);
     }
 
-    This adding(This other)
+    This plus(This other)
     {
         return {x + other.x, y + other.y};
     }
 
-    This subtracting(This other)
+    This minus(This other)
     {
         return {x - other.x, y - other.y};
     }

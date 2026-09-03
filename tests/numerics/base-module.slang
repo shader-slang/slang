@@ -18,8 +18,8 @@ struct CustomValue : IScalarAdditive, ITrigonometricFunctions
 
     static This fromScalar(Scalar value) { return value; }
     static This zero() { return {0.0}; }
-    This adding(This other) { return {value + other.value}; }
-    This subtracting(This other) { return {value - other.value}; }
+    This plus(This other) { return {value + other.value}; }
+    This minus(This other) { return {value - other.value}; }
     This sin() { return {::sin(value)}; }
     This cos() { return {::cos(value)}; }
     This tan() { return {::tan(value)}; }
