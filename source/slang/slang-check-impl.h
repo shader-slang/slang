@@ -796,6 +796,31 @@ struct SubtypeWitnessCacheEntry
     UInt superTypeGeneration = 0;
 };
 
+/// Key for the `_specializeInterfaceInheritanceWitness` result cache.
+///
+/// The three fields are exactly that function's parameters (see its declaration below), so this
+/// key captures its complete input.
+struct SpecializeInterfaceInheritanceWitnessKey
+{
+    InterfaceDecl* baseInterfaceDecl = nullptr;
+    SubtypeWitness* selfIsSubtypeOfBase = nullptr;
+    SubtypeWitness* baseIsSubtypeOfFacet = nullptr;
+
+    HashCode getHashCode() const
+    {
+        return combineHash(
+            Slang::getHashCode(baseInterfaceDecl),
+            Slang::getHashCode(selfIsSubtypeOfBase),
+            Slang::getHashCode(baseIsSubtypeOfFacet));
+    }
+    bool operator==(const SpecializeInterfaceInheritanceWitnessKey& other) const
+    {
+        return baseInterfaceDecl == other.baseInterfaceDecl &&
+               selfIsSubtypeOfBase == other.selfIsSubtypeOfBase &&
+               baseIsSubtypeOfFacet == other.baseIsSubtypeOfFacet;
+    }
+};
+
 /// Cached information about how to convert between two types.
 struct ImplicitCastMethod
 {
@@ -1223,6 +1248,27 @@ private:
     Dictionary<Type*, InheritanceInfoCacheEntry> m_mapTypeToInheritanceInfo;
     Dictionary<DeclRef<Decl>, InheritanceInfoCacheEntry> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitnessCacheEntry> m_mapTypePairToSubtypeWitness;
+
+    /// Cache for `_specializeInterfaceInheritanceWitness`, keyed on its full input.
+    ///
+    /// That function is a pure transformation of an already-resolved witness (a substitution,
+    /// not a conformance query), so unlike the caches above it needs no generation/epoch
+    /// tracking: the same three inputs always produce the same output regardless of what
+    /// extensions are registered later. `_calcInheritanceInfo` calls it once per inheritance
+    /// level while composing a type's transitive facets, so on a deep, non-diamond-shared
+    /// inheritance chain (e.g. `interface I64 : I63 : ... : I0`) the same
+    /// `(baseInterfaceDecl, selfIsSubtypeOfBase, baseIsSubtypeOfFacet)` triple recurs across many
+    /// separate `_calcInheritanceInfo` calls -- each one otherwise re-running a full `Val`
+    /// substitution from scratch. See #12139 (the `interface_depth` case left unresolved by that
+    /// issue's ShortDictionary fix).
+    ///
+    /// Unsynchronized, like every other cache on this type: front-end work including
+    /// specialization is documented as non-reentrant and requiring external synchronization when
+    /// a `SharedSemanticsContext` is shared across threads (docs/user-guide/08-compiling.md,
+    /// "Multithreading"), so this needs no lock any more than `m_mapDeclRefToInheritanceInfo`
+    /// above does.
+    Dictionary<SpecializeInterfaceInheritanceWitnessKey, SubtypeWitness*>
+        m_specializeInterfaceInheritanceWitnessCache;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     Dictionary<Type*, bool> m_isCStyleTypeCache;
     Dictionary<Decl*, UInt> m_mapDeclToExtensionEpoch;
