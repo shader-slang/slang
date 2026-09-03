@@ -9,13 +9,10 @@ namespace Slang
 
 static String _getStageEntryPointName(Type* stageType)
 {
-    auto declRefType = as<DeclRefType>(stageType ? stageType->resolve() : nullptr);
-    auto decl = declRefType ? declRefType->getDeclRef().getDecl() : nullptr;
-    auto name = decl ? decl->getName() : nullptr;
-    if (!name)
+    auto sourceTypeName = getStructuralRayTracingSourceTypeName(stageType);
+    if (sourceTypeName.getLength() == 0)
         return String();
 
-    auto sourceTypeName = declRefType->toString();
     return getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice());
 }
 

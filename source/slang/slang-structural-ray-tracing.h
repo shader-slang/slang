@@ -242,6 +242,12 @@ private:
 
 const char* getStructuralRayTracingStageInterfaceName(StructuralRayTracingStageKind kind);
 
+/// Returns the source declaration path used as the name hint for a structural ray-tracing type.
+///
+/// The path includes namespaces and enclosing types, but intentionally excludes module names and
+/// generic substitutions so it agrees with the existing IR name-hint ABI.
+String getStructuralRayTracingSourceTypeName(Type* type);
+
 /// Returns the deterministic target symbol used for a portable structural ray-tracing stage type.
 ///
 /// Ordinary source identifiers other than target-reserved names are preserved. Qualified,

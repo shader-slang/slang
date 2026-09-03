@@ -9,6 +9,39 @@
 namespace Slang
 {
 
+static String _getStructuralRayTracingSourceDeclName(Decl* decl)
+{
+    if (!decl)
+        return String();
+
+    auto leafName = decl->getName();
+    if (!leafName || leafName->text.getLength() == 0)
+        return String();
+
+    auto parentDecl = decl->parentDecl;
+    if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+        parentDecl = genericParentDecl->parentDecl;
+    if (auto fileParentDecl = as<FileDecl>(parentDecl))
+        parentDecl = fileParentDecl->parentDecl;
+    if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
+        parentDecl = moduleParentDecl->parentDecl;
+
+    auto parentName = _getStructuralRayTracingSourceDeclName(parentDecl);
+    if (parentName.getLength() == 0)
+        return leafName->text;
+
+    StringBuilder result;
+    result << parentName << "." << leafName->text;
+    return result.produceString();
+}
+
+String getStructuralRayTracingSourceTypeName(Type* type)
+{
+    auto declRefType = as<DeclRefType>(type ? type->resolve() : nullptr);
+    return _getStructuralRayTracingSourceDeclName(
+        declRefType ? declRefType->getDeclRef().getDecl() : nullptr);
+}
+
 String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName)
 {
     // Consider `Miss` and `Stages.Miss`. Keeping `Miss` unchanged preserves the public names used
