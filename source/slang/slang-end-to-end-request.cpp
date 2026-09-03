@@ -1721,7 +1721,7 @@ SlangResult EndToEndCompileRequest::addLibraryReference(
     // We need to deserialize and add the modules
     ComPtr<IModuleLibrary> library;
 
-    // Parse out of the blob's bytes, not the caller's.
+    // Parsing has to read from `libBlob`'s own bytes, not from `libData` directly.
     //
     // `RawBlob::create` *copies*, so `libBlob` holds the data at a different address than
     // `libData`. Passing `libData` as the thing to parse while retaining `libBlob` left the

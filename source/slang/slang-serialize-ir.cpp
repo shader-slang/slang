@@ -869,12 +869,12 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
     // with no entry to decode: the next access would find nothing, return quietly,
     // and hand the caller an empty body as though it were complete.
 
-    // Replay this subtree from where the load walk left off, with deferral
-    // disabled so nested instructions materialize in full.
-    // Allocate every instruction in the subtree before wiring any of them, exactly
-    // as the load-time path does. Instructions forward-reference each other --
-    // a branch names a block defined later -- so an operand read before its target
-    // exists would silently resolve to null.
+    // This replays the subtree from where the load walk left off, with deferral
+    // disabled so nested instructions materialize in full. Every instruction in the
+    // subtree is allocated before any of them are wired, matching the load-time path:
+    // instructions forward-reference each other -- a branch names a block defined
+    // later -- so an operand read before its target exists would silently resolve to
+    // null.
     {
         // A private cursor for the sizing walk, named as at load time and deliberately
         // not the member: this pass runs ahead of the decode to size allocations, so
@@ -1351,8 +1351,8 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     // decoder outlives it whenever any body was deferred.
     decoder->instIsEagerDuringLoadWalk = nullptr;
 
-    // Keep the decoder alive so the bodies it skipped can still be decoded. It
-    // holds the flat table and the instruction array, which a body needs: its
+    // The decoder must stay alive so the bodies it skipped can still be decoded later: it
+    // holds the flat table and the instruction array a body needs, since a body's
     // operands are indices into that array and may name any module-scope global.
     if (decoder->deferredBodies.getCount())
     {

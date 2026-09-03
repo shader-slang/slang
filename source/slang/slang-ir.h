@@ -56,7 +56,7 @@ class TargetRequest;
 // decoration iterator carry the decision once, not to consult the parent per link.
 //
 
-/// Release-store `value` into `slot`, publishing everything written before it.
+/// Release-stores `value` into `slot`, publishing everything written before it.
 ///
 /// Paired with `irLoadInstLink`, which every traversal of an instruction list uses.
 SLANG_FORCE_INLINE void irPublishInstLink(IRInst*& slot, IRInst* value)
@@ -64,7 +64,7 @@ SLANG_FORCE_INLINE void irPublishInstLink(IRInst*& slot, IRInst* value)
     std::atomic_ref<IRInst*>(slot).store(value, std::memory_order_release);
 }
 
-/// Acquire-load a `next`/`first` link of an instruction list.
+/// Acquire-loads a `next`/`first` link of an instruction list.
 ///
 /// Every read of a link goes through this, because every read of a link goes through an
 /// accessor: `getNextInst`/`getPrevInst` and the `peek` pair on `IRInst`, and
@@ -756,7 +756,7 @@ struct IRInst
     /// Out-of-line slow path behind `ensureBodyMaterialized`.
     void _materializeDeferredBody();
 
-    /// Materialize the parent's body, if this instruction has a parent. The sibling
+    /// Materializes the parent's body, if this instruction has a parent. The sibling
     /// links are the parent's to publish, so this is what makes them trustworthy.
     SLANG_FORCE_INLINE void _materializeParent()
     {
@@ -903,7 +903,7 @@ public:
     // `IRUse` values that represent operands.
     //
     // Because it cannot be made private, the rule it now carries has to be stated
-    // instead: **read this field through the accessors below, not directly.** On a
+    // instead: **this field is read through the accessors below, never directly.** On a
     // module loaded with deferred bodies, `.first`/`.last` describe only the
     // decorations until `ensureBodyMaterialized()` has run, so a direct read of a
     // global value's children sees an empty body and reports success. That failure
@@ -928,24 +928,24 @@ private:
     IRInstListBase m_decorationsAndChildren;
 
 public:
-    /// Read the head of the list *without* materializing a deferred body.
+    /// Reads the head of the list *without* materializing a deferred body.
     ///
     /// Decoration lookup depends on not paying for materialization -- materializing
     /// during a decoration walk would defeat on-demand loading entirely -- so it reads
     /// the head directly. Acquire, pairing with the release store that publishes a body.
     IRInst* peekFirstDecorationOrChild() { return irLoadInstLink(m_decorationsAndChildren.first); }
 
-    /// Read the tail of the list without materializing a deferred body.
+    /// Reads the tail of the list without materializing a deferred body.
     IRInst* peekLastDecorationOrChild() { return irLoadInstLink(m_decorationsAndChildren.last); }
 
-    /// Publish `value` as the head of the list, releasing everything written to the
+    /// Publishes `value` as the head of the list, releasing everything written to the
     /// chain behind it.
     void setFirstDecorationOrChild(IRInst* value)
     {
         irPublishInstLink(m_decorationsAndChildren.first, value);
     }
 
-    /// Publish `value` as the tail of the list.
+    /// Publishes `value` as the tail of the list.
     void setLastDecorationOrChild(IRInst* value)
     {
         irPublishInstLink(m_decorationsAndChildren.last, value);

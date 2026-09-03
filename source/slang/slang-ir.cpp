@@ -9005,8 +9005,8 @@ void IRDecorationList::Iterator::operator++()
     // a global whose body is deferred this link is the one a concurrent materialization
     // publishes into.
     inst = inst->peekNextInst();
-    // And stop here rather than at a saved sentinel, so a body appearing mid-walk ends
-    // the iteration instead of being walked as though it were more decorations.
+    // The iteration stops here rather than at a saved sentinel, so a body appearing
+    // mid-walk ends it instead of being walked as though it were more decorations.
     if (inst && !as<IRDecoration>(inst))
         inst = nullptr;
 }
