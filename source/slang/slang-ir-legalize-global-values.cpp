@@ -111,6 +111,16 @@ bool GlobalInstInliningContextGeneric::isInlinableGlobalInst(IRInst* inst)
     case kIROp_BitCast:
     case kIROp_IntCast:
     case kIROp_FloatCast:
+    // A `DescriptorHandle`'s representation is `uint64` or `uint2` depending on the descriptor kind
+    // and target, so an initializer may supply the other width. Reconciling the two is only
+    // possible inside a block (by folding, or a `BitCast`), so these casts — and a `Select` that a
+    // `?:` initializer can put between them — have to be inlinable for the chain around them to
+    // sink into the function that uses the handle.
+    case kIROp_CastUInt2ToDescriptorHandle:
+    case kIROp_CastUInt64ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastDescriptorHandleToUInt64:
+    case kIROp_Select:
     case kIROp_Greater:
     case kIROp_Less:
     case kIROp_Geq:

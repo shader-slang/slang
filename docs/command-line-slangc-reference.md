@@ -316,7 +316,7 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
+Instrument the shader with per-statement line coverage counters. Statements that provably execute together share one counter and one runtime probe, which keeps instrumented shader code small without changing reported per-line results; the manifest therefore reports no more counters than source entries, and fewer whenever a straight-line region is coalesced. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
 
 
 <a id="trace-function-coverage"></a>
@@ -735,12 +735,12 @@ Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library
 
 
 
-<a id="none-version"></a>
-### -&lt;compiler&gt;-version
+<a id="get-none-path"></a>
+### -get-&lt;compiler&gt;-path
 
-**-&lt;[compiler](#compiler)&gt;-version**
+**-get-&lt;[compiler](#compiler)&gt;-path**
 
-Print the version of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located. Takes no value. 
+Print the on-disk path of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located, or "not available" if it has no recoverable shared-library path. Takes no value. 
 
 
 

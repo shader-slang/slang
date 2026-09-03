@@ -4505,6 +4505,17 @@ internal typealias __ImagePtr<T> =
 __intrinsic_op($(kIROp_ImageTexelPointer))
 __ImagePtr<T> __imageTexelPointer<T, TImage, TCoord>(TImage image, TCoord coord, int sample);
 
+// Internal SPIR-V-legalization helper for the image-atomic snippets below. Its
+// `GetLegalizedSPIRVGlobalParamAddr` inst has no emitter; the SPIR-V legalize
+// pass only strips it while rewriting a global parameter's uses. A user call
+// passes an ordinary rvalue, not a global parameter, so that rewrite never
+// reaches it and the inst would survive to emit and abort. `internal` keeps the
+// name out of user scope; it is declared here, in the same module as its only
+// callers (the image-atomic snippets below), so those callers can still see it.
+internal __generic<T>
+__intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
+__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
+
 ${
 {
     struct ImageTypeInfo

@@ -614,3 +614,95 @@ SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
 
     ctx().disable();
 }
+
+// =============================================================================
+// getDownstreamCompilerPath: end-to-end record -> replay via executeAll().
+// Records several getDownstreamCompilerPath queries in Record mode, switches to Playback, and lets
+// executeAll() re-dispatch each recorded call through its registered handler
+// (REPLAY_REGISTER(GlobalSessionProxy, getDownstreamCompilerPath)). On playback the recorded inputs
+// drive the calls and each ISlangBlob* path output is reconstructed from its recorded content hash,
+// so the whole stream is consumed. A partial replay (a call silently skipped) would leave bytes and
+// fail the atEnd() check -- that consumption check is the test's guaranteed assertion.
+//
+// The queries deliberately span a range of pass-through inputs so the round-trip replays more than
+// the single glslang query, and may record different runner-dependent outcomes:
+//   - SLANG_PASS_THROUGH_NONE is rejected at the public boundary -> SLANG_E_NOT_FOUND, no blob.
+//     This is deterministic on every runner, so it is asserted directly.
+//   - glslang / NVRTC (shared-library) and clang (executable-based command-line) resolve
+//     differently depending on what is installed on the runner: SLANG_OK with a path blob,
+//     SLANG_E_NOT_AVAILABLE (loaded, no recoverable shared-library path), or SLANG_E_NOT_FOUND (not
+//     loaded). Rather than require a particular outcome, we assert the API contract for whichever
+//     one occurs -- the result is one of those three codes, SLANG_OK carries a non-null blob, and
+//     any failure leaves the blob null -- so the added coverage is deterministic without depending
+//     on a given compiler being present.
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextGetDownstreamCompilerPathPlayback)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc globalDesc = {};
+    globalDesc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, globalSession.writeRef())));
+
+    // SLANG_PASS_THROUGH_NONE (like any out-of-range value) is rejected at the public boundary and
+    // returns SLANG_E_NOT_FOUND with no blob. This outcome is deterministic on every runner, so we
+    // assert it directly; it also gives the round-trip a recorded call whose no-blob failure output
+    // must replay.
+    Slang::ComPtr<ISlangBlob> noneBlob;
+    SLANG_CHECK(
+        globalSession->getDownstreamCompilerPath(SLANG_PASS_THROUGH_NONE, noneBlob.writeRef()) ==
+        SLANG_E_NOT_FOUND);
+    SLANG_CHECK(noneBlob == nullptr);
+
+    // Record queries for a shared-library compiler (glslang, NVRTC) and an executable-based
+    // command-line compiler (clang). Which result each produces depends on what is installed on the
+    // runner, so instead of requiring a specific code we fail loudly on anything outside the
+    // contract and assert the outPath contract for whichever outcome occurs: the result is one of
+    // exactly SLANG_OK / SLANG_E_NOT_FOUND / SLANG_E_NOT_AVAILABLE, SLANG_OK carries a non-null
+    // path blob, and any failure leaves the blob null. Recording several distinct pass-throughs
+    // broadens the range of pass-through inputs the round-trip below replays -- and may exercise
+    // different runner-dependent outcomes -- beyond the single glslang query this test used to
+    // make.
+    static const SlangPassThrough kRunnerDependentPassThroughs[] = {
+        SLANG_PASS_THROUGH_GLSLANG,
+        SLANG_PASS_THROUGH_NVRTC,
+        SLANG_PASS_THROUGH_CLANG,
+    };
+    for (SlangPassThrough passThrough : kRunnerDependentPassThroughs)
+    {
+        Slang::ComPtr<ISlangBlob> pathBlob;
+        SlangResult pathResult =
+            globalSession->getDownstreamCompilerPath(passThrough, pathBlob.writeRef());
+        SLANG_CHECK(
+            pathResult == SLANG_OK || pathResult == SLANG_E_NOT_FOUND ||
+            pathResult == SLANG_E_NOT_AVAILABLE);
+        if (pathResult == SLANG_OK)
+        {
+            SLANG_CHECK(pathBlob != nullptr);
+        }
+        else
+        {
+            SLANG_CHECK(pathBlob == nullptr);
+        }
+    }
+
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isPlayback());
+
+    // Re-dispatch every recorded call (slang_createGlobalSession2 then the
+    // getDownstreamCompilerPath queries) through the registered replay handlers. On playback each
+    // recorded output slot is consumed from the stream -- a resolved path blob is reconstructed
+    // from its recorded content hash, and a failed call consumes its (empty) output slot.
+    ctx().executeAll();
+
+    // The whole recorded stream must be consumed; a single silently-skipped
+    // getDownstreamCompilerPath call would leave bytes here.
+    SLANG_CHECK(ctx().getStream().atEnd());
+
+    ctx().disable();
+}

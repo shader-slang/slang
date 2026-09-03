@@ -10,6 +10,7 @@
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-type-layout.h"
 
 #include <set>
 
@@ -410,7 +411,7 @@ protected:
     Stage m_stage = Stage::Unknown;
 
 
-    void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
+    virtual void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
     {
         m_entryPointFunc = entryPointFunc;
 
@@ -554,7 +555,7 @@ protected:
         m_param = param;
 
         // We expect and require all entry-point parameters to have layout
-        // information assocaited with them at this point.
+        // information associated with them at this point.
         //
         auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(paramLayoutDecoration);
@@ -609,10 +610,10 @@ protected:
 
     void processMutableParam(IRParam* param, IROutParamTypeBase* paramPtrType)
     {
-        // The deafult handling of any mutable (`out` or `inout`) parameter
+        // The default handling of any mutable (`out` or `inout`) parameter
         // will be to introduce a local variable of the corresponding
         // type and to use that in place of the actual parameter during
-        // exeuction of the function.
+        // execution of the function.
 
         // The replacement variable will have the type of the original
         // parameter (the `T` in `Out<T>` or `InOut<T>`).
@@ -644,7 +645,7 @@ protected:
         }
 
         // Because the `out` or `inout` parameter is represented
-        // as a pointer, and our local variabel is also a pointer
+        // as a pointer, and our local variable is also a pointer
         // we can directly replace all uses of the original parameter
         // with uses of the variable.
         //
@@ -836,7 +837,7 @@ protected:
 
     LegalizedVaryingVal _createLegalVaryingVal(VaryingParamInfo const& info)
     {
-        // By default, when we seek to creating a legalized value
+        // By default, when we seek to create a legalized value
         // for a varying parameter, we will look at its type to
         // decide what to do.
         //
@@ -1134,6 +1135,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         int registerCount;
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
+
+    bool hasAlreadyRegisteredPayloadWriteback(IRType* payloadType) const
+    {
+        return m_payloadWritebacks.findFirstIndex(
+                   [&](const PayloadWritebackInfo& writeback)
+                   { return writeback.payloadType == payloadType; }) != -1;
+    }
 
     // Get C++ size and alignment of a type using CUDA layout rules.
     // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
@@ -2170,6 +2178,18 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return nullptr;
     }
 
+    void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
+        SLANG_OVERRIDE
+    {
+        // OptiX direct-callable programs use the CUDA function-call ABI, so their signatures
+        // should not undergo varying-parameter legalization. The CUDA emitter preserves the
+        // pointer-typed parameters and emits the callable as an ordinary __device__ function.
+        if (entryPointDecor->getProfile().getStage() == Stage::Callable)
+            return;
+
+        EntryPointVaryingParamLegalizeContext::processEntryPoint(entryPointFunc, entryPointDecor);
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         // Because many of the varying parameters are defined
@@ -2323,6 +2343,20 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             {
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
+
+                // The incoming value of an `inout` register payload is read once,
+                // on the `VaryingInput` pass; its outgoing value is produced by the
+                // write-back registered on that same pass. The `VaryingOutput` pass
+                // therefore has no register read to perform, so return an empty
+                // value (making the output assignment a no-op) rather than emitting
+                // a redundant readback. Match by payload type so that a distinct
+                // payload using the pointer-packing fallback still reaches its own
+                // output assignment.
+                if (info.kind == LayoutResourceKind::VaryingOutput &&
+                    hasAlreadyRegisteredPayloadWriteback(info.type))
+                {
+                    return LegalizedVaryingVal();
+                }
 
                 // Only use register-based payload for hit/miss/anyhit shaders
                 // Raygen shaders pass payload TO TraceRay, not receive it FROM registers
