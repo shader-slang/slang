@@ -18468,9 +18468,12 @@ static Expr* getDerivativeExprWithPrimalGenericArgumentsIfNeeded(
     return genericAppExpr;
 }
 
-// Applies a resolved primal specialization to the imaginary argument types in place. Consider a
-// derivative over `vector<T, N>` that selects a primal declared over `U`: the substitution rewrites
-// the primal's imaginary `U` arguments into the derivative's `T` context before validation.
+// Applies a resolved primal specialization to freshly synthesized imaginary argument types in
+// place. `getImaginaryArgsToForwardDerivative` creates these expressions from the primal's
+// unsubstituted parameter and receiver types, so no checked AST shares the nodes and the
+// specialization must be applied exactly once. Consider a derivative over `vector<T, N>` that
+// selects a primal declared over `U`: the substitution rewrites the primal's imaginary `U`
+// arguments into the derivative's `T` context before validation.
 static void specializeImaginaryArgumentTypes(
     ASTBuilder* astBuilder,
     ArgsWithDirectionInfo& args,
@@ -19155,7 +19158,10 @@ void checkDerivativeOfAttributeImpl(
             {
                 // If we can't resolve a type, something went wrong. If we're working with a
                 // generic decl, the most likely cause is a failure of generic argument
-                // inference.
+                // inference. The error-recovery candidate still refers to the enclosing
+                // `GenericDecl`, while `calleeFunc` refers to its inner function, so the later
+                // null check would not stop function-only processing. This diagnostic is the
+                // terminal boundary for that non-canonical reference.
                 //
                 visitor->getSink()->diagnose(
                     Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{
@@ -19218,6 +19224,10 @@ void checkDerivativeOfAttributeImpl(
     }
     else
     {
+        // The backward-derivative and primal-substitute consumers still validate and synthesize
+        // from an unspecialized primal declaration. Keep their existing path explicit: unlike the
+        // forward-derivative path above, an overloaded generic primal is not yet supported for
+        // these two attribute kinds.
         auto outterGeneric = visitor->GetOuterGeneric(funcDecl);
         declRef = makeDeclRef<Decl>((outterGeneric ? (Decl*)outterGeneric : funcDecl));
 
@@ -19237,10 +19247,11 @@ void checkDerivativeOfAttributeImpl(
     derivativeAttr->funcExpr = declRefExpr;
     if constexpr (std::is_same_v<TDerivativeAttr, ForwardDerivativeAttribute>)
     {
-        // Successful higher-order resolution returns a declaration reference to the selected
-        // primal function. Error recovery can instead retain its enclosing `GenericDecl`, but that
-        // path has an `ErrorType` and returns after diagnosing failed generic argument inference.
-        // Enforce this boundary in release builds before the unchecked typed rewrap below.
+        // `AddHigherOrderOverloadCandidates` replaces a successfully inferred generic candidate's
+        // base function with its specialized inner function reference. Error recovery can instead
+        // retain the enclosing `GenericDecl`, but the `ErrorType` path above returns after
+        // diagnosing failed generic argument inference. Enforce this producer-consumer boundary
+        // in release builds before the unchecked typed rewrap below.
         SLANG_RELEASE_ASSERT(calleeDeclRef.is<FunctionDeclBase>());
         auto primalDeclRef = calleeDeclRef.as<FunctionDeclBase>();
         checkDerivativeAttribute(visitor, primalDeclRef, funcDecl, derivativeAttr);
