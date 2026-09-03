@@ -18,6 +18,28 @@ struct BitCastLoweringContext
     OrderedHashSet<IRInst*> workList;
     DiagnosticSink* sink;
 
+    // Leaves descriptor bit transport for the direct NVVM preflight/emitter boundary. Consider
+    // `reinterpret<uint2>(DescriptorHandle<Texture2D<float4>>)`: CUDA defines the handle's
+    // physical representation, while common IR intentionally keeps it opaque. Recursively reading
+    // the opaque semantic type would either crash here or invent a target representation.
+    bool shouldPreserveDirectNVVMDescriptorBitCast(IRType* fromType, IRType* toType)
+    {
+        if (!targetProgram->shouldEmitNVVMDirectly())
+            return false;
+
+        auto fromDescriptor = as<IRDescriptorHandleType>(fromType);
+        auto toDescriptor = as<IRDescriptorHandleType>(toType);
+        if (bool(fromDescriptor) == bool(toDescriptor))
+            return false;
+
+        IRType* payloadType = fromDescriptor ? toType : fromType;
+        auto payloadVector = as<IRVectorType>(payloadType);
+        auto payloadCount =
+            payloadVector ? as<IRIntLit>(payloadVector->getElementCount()) : nullptr;
+        return payloadVector && payloadVector->getElementType()->getOp() == kIROp_UIntType &&
+               payloadCount && (payloadCount->value.intVal == 2 || payloadCount->value.intVal == 4);
+    }
+
     void addToWorkList(IRInst* inst)
     {
         for (auto ii = inst->getParent(); ii; ii = ii->getParent())
@@ -244,26 +266,11 @@ struct BitCastLoweringContext
         IRSizeAndAlignment fromTypeSize;
         getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize);
 
-        // DescriptorHandle<T> is intentionally opaque in canonical Slang IR, while a bindless
-        // target gives it the same physical representation as T. AnyValue's one canonical
-        // 16-byte raw-buffer transport is a bit cast between that handle and `uint4`. The direct
-        // NVVM emitter owns the target representation and legalizes this exact operation after
-        // lowering T to `{global T*, uint64 count}`. Recursing through the opaque handle here
-        // would instead invent scalar extraction from one unsupported 16-byte leaf.
-        auto descriptorType = as<IRDescriptorHandleType>(fromType);
-        auto payloadType = descriptorType ? as<IRVectorType>(toType) : nullptr;
-        if (!descriptorType)
-        {
-            descriptorType = as<IRDescriptorHandleType>(toType);
-            payloadType = descriptorType ? as<IRVectorType>(fromType) : nullptr;
-        }
-        auto payloadCount = payloadType ? as<IRIntLit>(payloadType->getElementCount()) : nullptr;
-        if (targetProgram->shouldEmitNVVMDirectly() && descriptorType && payloadType &&
-            payloadType->getElementType()->getOp() == kIROp_UIntType && payloadCount &&
-            payloadCount->value.intVal == 4 && fromTypeSize.size == 16 && toTypeSize.size == 16)
-        {
+        // Direct NVVM owns the physical descriptor representation. Keep its canonical bit
+        // transport intact so exact supported shapes can be emitted and adjacent shapes receive
+        // the target's deterministic preflight diagnostic.
+        if (shouldPreserveDirectNVVMDescriptorBitCast(fromType, toType))
             return;
-        }
 
         // Check if the target is directly emitted SPIRV and if the target is SPIRV 1.5 or later
         bool isDirectSpirv = false;

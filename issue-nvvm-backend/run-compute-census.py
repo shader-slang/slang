@@ -312,8 +312,6 @@ def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str
 
     if "no tests run" in output.lower():
         return "infrastructure", "generated census test was not discovered", shape
-    if return_code == 0:
-        return "correct", diagnostic, shape
     if diagnostic_code == "E52017":
         return "preflight", diagnostic, shape
     if diagnostic_code == "E52018" or "NVVM IR verification" in output or "libNVVM" in output:
@@ -325,12 +323,16 @@ def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str
         "CUDA driver version is insufficient",
         "Unsupported backend",
         "Check cuda: Not Supported",
+        "Unable to create renderer [CUDA]",
     )
     if any(marker.lower() in output.lower() for marker in infrastructure_markers):
         return "infrastructure", diagnostic, shape
-    if mode.startswith("nvrtc-") and (
-        re.search(r"nvrtc[^\r\n]*:\s*(?:error|.* error )", output, re.IGNORECASE)
-        or "profile implicitly upgraded" in output
+    if return_code == 0:
+        return "correct", diagnostic, shape
+    if "profile implicitly upgraded" in output:
+        return "infrastructure", diagnostic or "profile implicitly upgraded", shape
+    if mode.startswith("nvrtc-") and re.search(
+        r"nvrtc[^\r\n]*:\s*(?:error|.* error )", output, re.IGNORECASE
     ):
         return "infrastructure", diagnostic, shape
     if "EXPECTED{{{" in output and "ACTUAL{{{" in output:

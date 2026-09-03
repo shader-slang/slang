@@ -7517,6 +7517,22 @@ silently couple fixtures. No representation, accepted shape, or provider ABI cha
 corpus v1 remains 418/418/418, discovery remains 72/72/72, and the permanent gates pass 437/437
 and 92/92.
 
+### Slice 188: Truthful runtime-failure staging
+
+The three frozen rows previously labeled runtime mismatches contained three different stages.
+Only zero-index bounds behavior executes and disagrees. An SM90 mixed-width atomic row stops on a
+capability-profile warning, and `anyvalue-layout` used to abort while common bit-cast lowering
+recursed into an opaque descriptor handle. The census now reports those as infrastructure and
+preflight respectively.
+
+Direct bit-cast lowering preserves only canonical unsigned `uint2`/`uint4` descriptor transport.
+Supported `uint4` raw-buffer transport still reaches its existing physical recipe; adjacent
+`uint2` transport now reaches exact preflight instead of an internal error. The remaining bounds
+gap is not emitter-visible: direct PTX is byte-identical with and without
+`SLANG_ENABLE_BOUND_ZERO_INDEX`, while native CUDA PTX changes because the define is consumed by
+the CUDA text prelude. No provider ABI changed. Frozen healthy correctness remains 418/418/418,
+discovery remains 72/72/72, and old-correct regressions remain zero.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

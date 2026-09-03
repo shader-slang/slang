@@ -2630,3 +2630,17 @@ This is an ownership-only refactor: no canonical shape, capability query, or pro
 changed. Provider ABI revision 34 is unchanged. Frozen corpus v1 remains 418/418/418 over 427 with
 zero old-correct regression, discovery remains 72/72/72 over 72, and the regression gates pass
 437/437 and 92/92.
+
+Slice 188 audits the three frozen rows formerly labeled runtime mismatches. The mixed-width atomic
+row is an infrastructure failure caused by capability-profile selection. `anyvalue-layout` is a
+preflight failure at canonical `bitCast type: vector<uint,2> -> DescriptorHandle`; common bit-cast
+lowering now preserves that exact target-owned operation instead of raising an internal error.
+Only `bound-check-zero-index` reaches execution and differs from native CUDA.
+
+The bounds row's `SLANG_ENABLE_BOUND_ZERO_INDEX` define affects generated CUDA-prelude text but is
+absent from direct canonical IR. Direct O3 PTX with and without the define has identical 2,163-byte
+output and SHA-256 `3AD64F789B2C04D775199393D708764E005FDEC74C3B873276718B67FAF6FC70`;
+native outputs differ in both hash and size. The emitter therefore cannot repair the gap without a
+new producer-side bound-fix representation. Provider ABI revision 34 is unchanged. Frozen v1
+remains 418/418/418 over 427, discovery remains 72/72/72 over 72, and the gates pass 437/437 and
+92/92.

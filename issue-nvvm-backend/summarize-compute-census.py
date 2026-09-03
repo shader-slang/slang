@@ -120,6 +120,11 @@ def _failure_ownership(row: dict[str, str]) -> tuple[str, str]:
     if classification == "runtime-mismatch":
         return _runtime_cluster(source)
     if classification == "infrastructure":
+        if "profile implicitly upgraded" in row["diagnostic"]:
+            return (
+                "infrastructure-capability-profile",
+                "census directive capability selection -> Slang profile validation",
+            )
         return "infrastructure-native-reference", "NVRTC/toolkit or generated reference contract"
     if classification == "provider":
         if "by-value aggregate field pointer" in row["diagnostic"]:
@@ -144,6 +149,11 @@ def _failure_ownership(row: dict[str, str]) -> tuple[str, str]:
         return (
             "aggregate-pointer-layout-transport",
             "canonical linked aggregate/pointer IR -> _validateNVVMFunction",
+        )
+    if shape.startswith("bitCast type:") and "DescriptorHandle" in shape:
+        return (
+            "descriptor-handle-bit-transport",
+            "descriptor reinterpret/AnyValue producer -> lowerBitCast -> direct NVVM preflight",
         )
     if shape in NUMERIC_SHAPES:
         return (
