@@ -426,12 +426,12 @@ The numerics module defines conformances to the appropriate interfaces for:
 
 Cooperative vectors of built-in integer types conform to the applicable integer interfaces.
 Cooperative vectors of built-in floating-point types conform to `IFractional`, the elementary-function interfaces, `IComponentwiseOrdered`, and `IRealOrderingFunctions`, and therefore satisfy the `IReal` convenience definition.
+Importing `slang.numerics.differentiable` adds the corresponding differentiable conformances, so floating-point cooperative vectors also satisfy `IDifferentiableReal`.
 
 Known limitations include:
 
 - Matrices of built-in integer types do not currently conform to the numeric interfaces.
 - Cooperative vectors of built-in floating-point types satisfy `IReal`, but do not currently conform to `IFloatingPoint`.
-- Cooperative vectors do not currently conform to the differentiable numeric interfaces.
 - Cooperative matrices do not currently conform to the numeric interfaces.
 
 Because the numerics modules are experimental, the set of supported conformances is expected to change as the design and implementation of the module evolves.

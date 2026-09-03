@@ -373,6 +373,202 @@ public extension<
     NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS
 }
 
+// Cooperative vectors already provide differentiable core arithmetic and element access. Define
+// the numerics witnesses in terms of those operations and the differentiated scalar adapters so
+// that every component follows the corresponding scalar derivative.
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(METHOD, ADAPTER)      \
+    [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
+    This METHOD()                                                               \
+    {                                                                            \
+        This result;                                                             \
+        [ForceUnroll]                                                            \
+        for (int index = 0; index < N; ++index)                                 \
+            result[index] = ADAPTER(this[index]);                                \
+        return result;                                                           \
+    }
+
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(METHOD, ADAPTER)     \
+    [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
+    This METHOD(This other)                                                     \
+    {                                                                            \
+        This result;                                                             \
+        [ForceUnroll]                                                            \
+        for (int index = 0; index < N; ++index)                                 \
+            result[index] = ADAPTER(this[index], other[index]);                  \
+        return result;                                                           \
+    }
+
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(METHOD, CORE_METHOD) \
+    [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
+    This METHOD(This other) { return this.CORE_METHOD(other); }
+
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_FRACTIONAL_REQUIREMENTS                \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(plus, add)          \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(minus, sub)         \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(multipliedBy, mul)  \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(dividedBy, div)     \
+    [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
+    This negated() { return this.neg(); }                                        \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        absoluteValue, __differentiableNumericsAbs)                             \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        reciprocal, __differentiableNumericsRcp)
+
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_EXPONENTIAL_REQUIREMENTS               \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        exponential, __differentiableNumericsExp)                              \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        exponentialWithBase2, __differentiableNumericsExp2)                    \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        exponentialWithBase10, __differentiableNumericsRegisteredExp10)        \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        logarithm, __differentiableNumericsLog)                                \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        logarithmWithBase2, __differentiableNumericsLog2)                      \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        logarithmWithBase10, __differentiableNumericsLog10)                    \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
+        raisedToThePowerOf, __differentiableNumericsPow)
+
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_TRIGONOMETRIC_REQUIREMENTS             \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        sin, __differentiableNumericsSin)                                      \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        cos, __differentiableNumericsCos)                                      \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        tan, __differentiableNumericsTan)                                      \
+    [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
+    void sincos(out This sineResult, out This cosineResult)                      \
+    {                                                                            \
+        [ForceUnroll]                                                            \
+        for (int index = 0; index < N; ++index)                                 \
+            __differentiableNumericsSinCos(                                     \
+                this[index], sineResult[index], cosineResult[index]);            \
+    }
+
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_INVERSE_REQUIREMENTS                   \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        asin, __differentiableNumericsAsin)                                    \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        acos, __differentiableNumericsAcos)                                    \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        atan, __differentiableNumericsAtan)                                    \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
+        atan2, __differentiableNumericsAtan2)
+
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_HYPERBOLIC_REQUIREMENTS                \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        sinh, __differentiableNumericsSinh)                                    \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        cosh, __differentiableNumericsCosh)                                    \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        tanh, __differentiableNumericsTanh)                                    \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        asinh, __differentiableNumericsAsinh)                                  \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        acosh, __differentiableNumericsAcosh)                                  \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        atanh, __differentiableNumericsAtanh)
+
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_ROOT_REQUIREMENTS                      \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        squareRoot, __differentiableNumericsSqrt)                              \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+        reciprocalSquareRoot, __differentiableNumericsRsqrt)
+
+#define NUMERICS_DIFFERENTIABLE_COOPVEC_ORDERING_REQUIREMENTS                  \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
+        minimum, __differentiableNumericsMinimum)                              \
+    NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
+        maximum, __differentiableNumericsMaximum)
+
+// Keep this conformance separate so it owns the differentiated `fromScalar` witness. Reusing the
+// inherited `INumericShapedType` conformance would select the base, non-differentiable witness.
+public extension<T : __BuiltinFloatingPointType & IScalarDifferentiableFractional, let N : int>
+    CoopVec<T, N> : IDifferentiableNumericShapedType
+{
+    typealias Scalar = T;
+    typealias Mask = vector<bool, N>;
+
+    [Differentiable] [ForceInline] [require(cooperative_vector)]
+    static This fromScalar(Scalar value)
+    {
+        This result;
+        [ForceUnroll]
+        for (int index = 0; index < N; ++index)
+            result[index] = value;
+        return result;
+    }
+}
+
+public extension<T : __BuiltinFloatingPointType & IScalarDifferentiableFractional, let N : int>
+    CoopVec<T, N> : IDifferentiableFractional
+{
+    [Differentiable] [ForceInline] [require(cooperative_vector)]
+    __init<TSource : __BuiltinFloatingPointType>(TSource value)
+    {
+        this = This.fromScalar(
+            __differentiableNumericsConstructFromFloatingPoint<T>(value));
+    }
+
+    NUMERICS_DIFFERENTIABLE_COOPVEC_FRACTIONAL_REQUIREMENTS
+}
+
+public extension<
+    T : __BuiltinFloatingPointType & IDifferentiableExponentialFunctions,
+    let N : int>
+    CoopVec<T, N> : IDifferentiableExponentialFunctions
+{
+    NUMERICS_DIFFERENTIABLE_COOPVEC_EXPONENTIAL_REQUIREMENTS
+}
+
+public extension<
+    T : __BuiltinFloatingPointType & IDifferentiableTrigonometricFunctions,
+    let N : int>
+    CoopVec<T, N> : IDifferentiableTrigonometricFunctions
+{
+    NUMERICS_DIFFERENTIABLE_COOPVEC_TRIGONOMETRIC_REQUIREMENTS
+}
+
+public extension<
+    T : __BuiltinFloatingPointType & IDifferentiableInverseTrigonometricFunctions,
+    let N : int>
+    CoopVec<T, N> : IDifferentiableInverseTrigonometricFunctions
+{
+    NUMERICS_DIFFERENTIABLE_COOPVEC_INVERSE_REQUIREMENTS
+}
+
+public extension<
+    T : __BuiltinFloatingPointType & IDifferentiableHyperbolicFunctions,
+    let N : int>
+    CoopVec<T, N> : IDifferentiableHyperbolicFunctions
+{
+    NUMERICS_DIFFERENTIABLE_COOPVEC_HYPERBOLIC_REQUIREMENTS
+}
+
+public extension<T : __BuiltinFloatingPointType & IDifferentiableRootFunctions, let N : int>
+    CoopVec<T, N> : IDifferentiableRootFunctions
+{
+    NUMERICS_DIFFERENTIABLE_COOPVEC_ROOT_REQUIREMENTS
+}
+
+public extension<T : __BuiltinFloatingPointType & IScalarDifferentiableReal, let N : int>
+    CoopVec<T, N> : IDifferentiableRealOrderingFunctions
+{
+    NUMERICS_DIFFERENTIABLE_COOPVEC_ORDERING_REQUIREMENTS
+}
+
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_ORDERING_REQUIREMENTS
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_ROOT_REQUIREMENTS
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_HYPERBOLIC_REQUIREMENTS
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_INVERSE_REQUIREMENTS
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_TRIGONOMETRIC_REQUIREMENTS
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_EXPONENTIAL_REQUIREMENTS
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_FRACTIONAL_REQUIREMENTS
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT
+#undef NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT
+
 #undef NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS
 #undef NUMERICS_DIFFERENTIABLE_MATRIX_ROOT_REQUIREMENTS
 #undef NUMERICS_DIFFERENTIABLE_MATRIX_HYPERBOLIC_REQUIREMENTS
