@@ -108,6 +108,28 @@ struct NVVMPlannedBitfieldOperation
     NVVMValueRecipeStep bitNot;
 };
 
+enum class NVVMPlannedResourceBitCastKind
+{
+    OpaqueHandle64,
+    RawBuffer,
+};
+
+/// Owns one exact AnyValue/resource bit-transport decision made during preflight.
+struct NVVMPlannedResourceBitCast
+{
+    IRInst* source = nullptr;
+    IRInst* value = nullptr;
+    IRType* resourceValueType = nullptr;
+    IRVectorType* payloadType = nullptr;
+    IRType* rawBufferElementType = nullptr;
+    NVVMPlannedResourceBitCastKind kind = NVVMPlannedResourceBitCastKind::OpaqueHandle64;
+    bool rawBufferIsByteAddress = false;
+    bool rawBufferElementUsesStructuredStorage = false;
+    bool resultIsResourceValue = false;
+    NVVMValueRecipeStep steps[3] = {};
+    uint32_t stepCount = 0;
+};
+
 enum class NVVMPlannedDefaultResourceValueKind
 {
     RawStructuredBuffer,
@@ -172,6 +194,7 @@ struct NVVMEmissionPlan
     List<NVVMPlannedNumericTruthiness> numericTruthinessOperations;
     List<NVVMPlannedFloatingRemainder> floatingRemainderOperations;
     List<NVVMPlannedBitfieldOperation> bitfieldOperations;
+    List<NVVMPlannedResourceBitCast> resourceBitCasts;
     List<NVVMPlannedDefaultResourceValue> defaultResourceValues;
     List<NVVMPlannedEphemeralValue> ephemeralValues;
     List<NVVMPlannedSurfaceOperation> surfaceOperations;
@@ -223,6 +246,7 @@ public:
     const NVVMPlannedNumericTruthiness* findNumericTruthiness(IRInst* source) const;
     const NVVMPlannedFloatingRemainder* findFloatingRemainder(IRInst* source) const;
     const NVVMPlannedBitfieldOperation* findBitfieldOperation(IRInst* source) const;
+    const NVVMPlannedResourceBitCast* findResourceBitCast(IRInst* source) const;
     const NVVMPlannedDefaultResourceValue* findDefaultResourceValue(IRInst* source) const;
     const NVVMPlannedEphemeralValue* findEphemeralValue(IRInst* source) const;
     const NVVMPlannedSurfaceOperation* findSurfaceOperation(IRInst* source) const;
@@ -235,6 +259,7 @@ private:
     Dictionary<IRInst*, Index> m_numericTruthinessOperations;
     Dictionary<IRInst*, Index> m_floatingRemainderOperations;
     Dictionary<IRInst*, Index> m_bitfieldOperations;
+    Dictionary<IRInst*, Index> m_resourceBitCasts;
     Dictionary<IRInst*, Index> m_defaultResourceValues;
     Dictionary<IRInst*, Index> m_ephemeralValues;
     Dictionary<IRInst*, Index> m_surfaceOperations;

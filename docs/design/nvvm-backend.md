@@ -7572,6 +7572,33 @@ transport, parameter-block layout, and shared-memory/control/barrier workloads. 
 healthy and correct in both modes. The candidate remains proposed-only pending explicit approval;
 no active manifest, runner, provider ABI, or historical baseline changed.
 
+### Slice 191: Planned canonical resource bit transport
+
+AnyValue and resource reinterpret lowering retain exact `bitCast` operations between a selected
+CUDA resource value and an unsigned i32 word vector. Direct preflight now derives the vector width
+from the physical representation already owned by NVVM type lowering: selected texture, sampler,
+and surface values are opaque 64-bit handles transported as `uint2`, while raw buffers are
+`{global element*, uint64 count}` values transported as `uint4`. A supported
+`DescriptorHandle<T>` keeps T's representation.
+
+One `NVVMPlannedResourceBitCast` records that decision, its semantic operand, exact raw-buffer
+element/storage facts, and complete typed recipe during preflight. SSA validation and emission use
+the source-keyed plan entry rather than reclassifying the operation. The typed
+`BIT_REINTERPRET` family now follows LLVM's equal-total-bit-width rule for distinct selected
+scalar/vector shapes; the existing provider operation emits the LLVM bitcast, so provider ABI
+revision 34 is unchanged.
+
+`language-feature/anyvalue-layout` now agrees with native CUDA in direct O0 and O3 and has two
+permanent lanes. `compute/reinterpret-structured-buffer` clears its raw-resource transport and
+exposes the independent Half2 atomic-reduction GenericAsm. Frozen v1 advances to 420/420/420 over
+427 with no old-correct loss; discovery remains 72/72/72 over 72. The selected prefix passes
+437/437 and the permanent category passes 96/96.
+
+The promoted measurement gate assembles native, direct O0 SM70, and direct O3 SM70/SM80/SM90 PTX.
+Direct O3 is 1,120 bytes at every architecture versus 9,143 bytes native; direct O0 is 46,395
+bytes. Median standalone compilation measured 370.6 ms native and 274.3/273.7 ms direct O0/O3
+SM70 in this exploratory run.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

@@ -38,6 +38,7 @@ void NVVMEmissionPlanIndex::initialize(const NVVMEmissionPlan& plan)
     _indexOperations(plan.numericTruthinessOperations, m_numericTruthinessOperations);
     _indexOperations(plan.floatingRemainderOperations, m_floatingRemainderOperations);
     _indexOperations(plan.bitfieldOperations, m_bitfieldOperations);
+    _indexOperations(plan.resourceBitCasts, m_resourceBitCasts);
     _indexOperations(plan.defaultResourceValues, m_defaultResourceValues);
     _indexOperations(plan.ephemeralValues, m_ephemeralValues);
     _indexOperations(plan.surfaceOperations, m_surfaceOperations);
@@ -76,6 +77,11 @@ SLANG_NVVM_DEFINE_PLAN_FIND(
     NVVMPlannedBitfieldOperation,
     bitfieldOperations,
     m_bitfieldOperations)
+SLANG_NVVM_DEFINE_PLAN_FIND(
+    findResourceBitCast,
+    NVVMPlannedResourceBitCast,
+    resourceBitCasts,
+    m_resourceBitCasts)
 SLANG_NVVM_DEFINE_PLAN_FIND(
     findDefaultResourceValue,
     NVVMPlannedDefaultResourceValue,

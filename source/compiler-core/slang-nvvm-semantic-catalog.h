@@ -1045,10 +1045,12 @@ inline bool resolveValueOperationFamily(
     const bool hasBitOperand =
         desc.operandCount == 1 && (isSelectedIntegerValue(desc.operandTypes[0]) ||
                                    isSelectedFloatValue(desc.operandTypes[0]));
+    const bool hasDistinctEqualWidthBitTypes =
+        hasBitResult && hasBitOperand && !areSameType(desc.resultType, desc.operandTypes[0]) &&
+        desc.resultType.bitWidth * desc.resultType.laneCount ==
+            desc.operandTypes[0].bitWidth * desc.operandTypes[0].laneCount;
     if (desc.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET && hasBitResult && hasBitOperand &&
-        desc.resultType.kind != desc.operandTypes[0].kind &&
-        desc.resultType.bitWidth == desc.operandTypes[0].bitWidth &&
-        desc.resultType.laneCount == desc.operandTypes[0].laneCount)
+        hasDistinctEqualWidthBitTypes)
     {
         outResolution = {ValueOperationFamily::BitReinterpret, "bitwise value reinterpretation"};
         return true;

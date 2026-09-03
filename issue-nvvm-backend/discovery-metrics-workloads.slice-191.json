@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "anyvalue-resource-bit-transport",
+      "source": "tests/language-feature/anyvalue-layout.slang",
+      "census_id": "language-feature/anyvalue-layout.slang#cuda-1",
+      "compiler_args": ["-conformance", "Foo:IFoo=0"]
+    }
+  ]
+}

@@ -2666,3 +2666,23 @@ Current candidate correctness is 469/469/469, or 98.3%, with all eight healthy f
 still visible. Frozen v1 remains separately 419/419/419 over 427 and discovery remains 72/72/72
 over 72. The proposal is ready for explicit review but remains proposed-only; no runner, baseline,
 compiler, provider, test, or ABI changes.
+
+Slice 191 replaces the emitter-local raw-buffer descriptor bitcast with one planned resource-bit
+transport family. Exact selected texture/sampler/surface values and their supported descriptor
+handles use the established 64-bit CUDA representation and `uint2`; selected raw resources and
+their handles use the established pointer/count representation and `uint4`. Preflight owns the
+resource kind, operand, physical raw-buffer element facts, and recipe. Validation and emission use
+the immutable source-keyed record.
+
+The generic typed bit-reinterpret family now accepts distinct selected scalar/vector shapes with
+equal total bit width, which the provider's existing LLVM `bitcast` implementation supports.
+Mismatched total widths and identical semantic types remain rejected. No provider callback or ABI
+revision changes.
+
+Frozen `language-feature/anyvalue-layout` gains two permanent direct lanes. Frozen v1 advances
+from 419/419/419 to 420/420/420 over its unchanged 427 healthy denominator with no old-correct
+regression. `reinterpret-structured-buffer` advances to the same canonical Half2 atomic-reduction
+GenericAsm as the existing atomic fixture, so those two failures form one operation-shaped cluster.
+Discovery remains 72/72/72 over 72. The selected prefix passes 437/437 and the permanent category
+passes 96/96. The unchanged proposed corpus-v2 composition would now be 470/470/470 over 477,
+with seven healthy gaps.

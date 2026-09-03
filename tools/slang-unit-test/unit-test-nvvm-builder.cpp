@@ -3913,6 +3913,39 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
     };
     SLANG_CHECK(!builder.supportsValueOperation(sameTypeBitReinterpret));
 
+    const SlangNVVMValueTypeDesc uint32x2 = {
+        SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+        32,
+        2,
+    };
+    const SlangNVVMValueTypeDesc uint64Operands[] = {NVVMSemantics::kUnsignedI64};
+    const SlangNVVMValueOperationDesc scalarToVectorBitReinterpret = {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        uint32x2,
+        uint64Operands,
+        SLANG_COUNT_OF(uint64Operands),
+    };
+    SLANG_CHECK(builder.supportsValueOperation(scalarToVectorBitReinterpret));
+    const SlangNVVMValueTypeDesc uint32x2Operands[] = {uint32x2};
+    const SlangNVVMValueOperationDesc vectorToScalarBitReinterpret = {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        NVVMSemantics::kUnsignedI64,
+        uint32x2Operands,
+        SLANG_COUNT_OF(uint32x2Operands),
+    };
+    SLANG_CHECK(builder.supportsValueOperation(vectorToScalarBitReinterpret));
+
+    SlangNVVMValueTypeDesc uint32x3 = uint32x2;
+    uint32x3.laneCount = 3;
+    const SlangNVVMValueTypeDesc uint32x3Operands[] = {uint32x3};
+    const SlangNVVMValueOperationDesc mismatchedWidthBitReinterpret = {
+        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+        NVVMSemantics::kUnsignedI64,
+        uint32x3Operands,
+        SLANG_COUNT_OF(uint32x3Operands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(mismatchedWidthBitReinterpret));
+
     const SlangNVVMValueTypeDesc float16x2 = {
         SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
         16,

@@ -5360,22 +5360,47 @@ struct NVVMPointerBitCast
     bool resultIsPointer = false;
 };
 
-// Describes the exact bit transport emitted by AnyValue marshalling for a bindless
-// DescriptorHandle<StructuredBuffer<T>>. CUDA defines the handle as the resource's native
-// 16-byte `{global T*, uint64 count}` view, while AnyValue stores those bytes as `uint4`.
-// The high-level handle intentionally remains opaque until this target-specific boundary.
-struct NVVMRawBufferDescriptorBitCast
+// Classifies the selected resource side of an AnyValue bit transport by the physical CUDA value
+// established by NVVM type lowering. Consider the two producers covered by
+// `anyvalue-layout.slang` and `reinterpret-structured-buffer.slang`:
+//
+//     uint2 bits = reinterpret<uint2>(foo.texHandle);
+//     RWStructuredBuffer<half2> pairs =
+//         reinterpret<RWStructuredBuffer<half2>>(*inputBuffer);
+//
+// DescriptorHandle<T> deliberately has T's representation, so unwrap it only to select the
+// representation while retaining the semantic handle type in the plan. The bare raw resource in
+// the second example follows the same type-lowering contract. This accepts no arbitrary
+// equal-sized aggregate.
+bool _getNVVMResourceBitCastKind(
+    IRType* type,
+    NVVMPlannedResourceBitCastKind& outKind,
+    NVVMRawBufferType& outRawBufferType)
 {
-    IRInst* value = nullptr;
-    IRType* handleType = nullptr;
-    IRVectorType* payloadType = nullptr;
-    NVVMRawBufferType rawBufferType;
-    bool resultIsHandle = false;
-    NVVMValueRecipeStep steps[3] = {};
-    uint32_t stepCount = 0;
-};
+    outKind = NVVMPlannedResourceBitCastKind::OpaqueHandle64;
+    outRawBufferType = {};
 
-bool _getNVVMRawBufferDescriptorBitCast(IRInst* inst, NVVMRawBufferDescriptorBitCast& outCast)
+    IRType* resourceType = nullptr;
+    if (!asNVVMSupportedDescriptorHandleType(type, &resourceType))
+        resourceType = type;
+
+    if (getNVVMSupportedRawBufferType(resourceType, outRawBufferType))
+    {
+        outKind = NVVMPlannedResourceBitCastKind::RawBuffer;
+        return true;
+    }
+
+    NVVMSurfaceType surfaceType;
+    NVVMReadOnlyTextureType textureType;
+    return getNVVMSupportedSurfaceType(resourceType, surfaceType) ||
+           getNVVMSupportedReadOnlyTextureType(resourceType, textureType) ||
+           asNVVMSupportedSamplerValueType(resourceType);
+}
+
+// Resolves the exact bit transport emitted by AnyValue and resource reinterpret lowering. CUDA
+// owns two selected physical forms: an opaque 64-bit texture/sampler/surface handle transported as
+// `uint2`, or a 16-byte raw-buffer pointer/count view transported as `uint4`.
+bool _resolveNVVMResourceBitCast(IRInst* inst, NVVMPlannedResourceBitCast& outCast)
 {
     outCast = {};
     if (!inst || inst->getOp() != kIROp_BitCast || inst->getOperandCount() != 1)
@@ -5384,26 +5409,55 @@ bool _getNVVMRawBufferDescriptorBitCast(IRInst* inst, NVVMRawBufferDescriptorBit
     IRInst* value = inst->getOperand(0);
     if (!value)
         return false;
-    IRType* sourceType = value->getDataType();
-    IRType* resultType = inst->getDataType();
-    IRType* handleType = asNVVMSupportedDescriptorHandleType(resultType) ? resultType : sourceType;
-    IRType* payloadType = handleType == resultType ? sourceType : resultType;
-    const bool resultIsHandle = handleType == resultType;
+    IRType* sourceType = as<IRType>(value->getDataType());
+    IRType* resultType = as<IRType>(inst->getDataType());
+    if (!sourceType || !resultType)
+        return false;
+
+    NVVMPlannedResourceBitCastKind kind = NVVMPlannedResourceBitCastKind::OpaqueHandle64;
+    NVVMRawBufferType rawBufferType;
+    IRType* resourceValueType = resultType;
+    IRType* payloadType = sourceType;
+    bool resultIsResourceValue = _getNVVMResourceBitCastKind(resultType, kind, rawBufferType);
+    if (!resultIsResourceValue)
+    {
+        resourceValueType = sourceType;
+        payloadType = resultType;
+        if (!_getNVVMResourceBitCastKind(sourceType, kind, rawBufferType))
+            return false;
+    }
 
     bool payloadIsSigned = false;
     uint32_t payloadLaneCount = 0;
     auto payloadVector =
         asNVVMSupportedI32VectorType(payloadType, &payloadIsSigned, &payloadLaneCount);
-    IRType* resourceType = nullptr;
-    NVVMRawBufferType rawBufferType;
-    if (!asNVVMSupportedDescriptorHandleType(handleType, &resourceType) || !payloadVector ||
-        payloadIsSigned || payloadLaneCount != 4 ||
-        !getNVVMSupportedRawBufferType(resourceType, rawBufferType))
+    const uint32_t expectedLaneCount = kind == NVVMPlannedResourceBitCastKind::RawBuffer ? 4u : 2u;
+    if (!payloadVector || payloadIsSigned || payloadLaneCount != expectedLaneCount)
     {
         return false;
     }
 
-    if (resultIsHandle)
+    if (kind == NVVMPlannedResourceBitCastKind::OpaqueHandle64)
+    {
+        SlangNVVMValueTypeDesc payloadSemantic = NVVMSemantics::kUnsignedI32;
+        payloadSemantic.laneCount = 2;
+        const SlangNVVMValueTypeDesc resultSemantic =
+            resultIsResourceValue ? NVVMSemantics::kUnsignedI64 : payloadSemantic;
+        const SlangNVVMValueTypeDesc operandSemantic =
+            resultIsResourceValue ? payloadSemantic : NVVMSemantics::kUnsignedI64;
+        if (!_setNVVMSupportedValueRecipeStep(
+                outCast.steps[0],
+                SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
+                resultSemantic,
+                &operandSemantic,
+                1,
+                "opaque resource bit transport"))
+        {
+            return false;
+        }
+        outCast.stepCount = 1;
+    }
+    else if (resultIsResourceValue)
     {
         const SlangNVVMValueTypeDesc conversionOperands[] = {NVVMSemantics::kUnsignedI32};
         const SlangNVVMValueTypeDesc binaryOperands[] = {
@@ -5436,7 +5490,7 @@ bool _getNVVMRawBufferDescriptorBitCast(IRInst* inst, NVVMRawBufferDescriptorBit
         }
         outCast.stepCount = 3;
     }
-    else
+    else if (kind == NVVMPlannedResourceBitCastKind::RawBuffer)
     {
         const SlangNVVMValueTypeDesc conversionOperands[] = {NVVMSemantics::kUnsignedI64};
         const SlangNVVMValueTypeDesc shiftOperands[] = {
@@ -5463,11 +5517,17 @@ bool _getNVVMRawBufferDescriptorBitCast(IRInst* inst, NVVMRawBufferDescriptorBit
         outCast.stepCount = 2;
     }
 
+    outCast.source = inst;
     outCast.value = value;
-    outCast.handleType = handleType;
+    outCast.resourceValueType = resourceValueType;
     outCast.payloadType = payloadVector;
-    outCast.rawBufferType = rawBufferType;
-    outCast.resultIsHandle = resultIsHandle;
+    outCast.rawBufferElementType = rawBufferType.structuredElementType;
+    outCast.kind = kind;
+    outCast.rawBufferIsByteAddress = rawBufferType.kind == NVVMRawBufferKind::ByteAddress;
+    outCast.rawBufferElementUsesStructuredStorage =
+        rawBufferType.structuredElementType &&
+        isNVVMSupportedStructuredBufferStorageType(rawBufferType.structuredElementType);
+    outCast.resultIsResourceValue = resultIsResourceValue;
     return true;
 }
 
@@ -6406,11 +6466,11 @@ void _requireNVVMUInt64WordConstructionOperations(
         _requireValueOperation(requirements, step->getDesc(), step->diagnosticName);
 }
 
-void _requireNVVMRawBufferDescriptorBitCastOperations(
+void _requireNVVMResourceBitCastOperations(
     NVVMValueOperationRequirements& requirements,
-    const NVVMRawBufferDescriptorBitCast& bitCast)
+    const NVVMPlannedResourceBitCast& bitCast)
 {
-    SLANG_ASSERT(bitCast.stepCount >= 2 && bitCast.stepCount <= SLANG_COUNT_OF(bitCast.steps));
+    SLANG_ASSERT(bitCast.stepCount >= 1 && bitCast.stepCount <= SLANG_COUNT_OF(bitCast.steps));
     for (uint32_t i = 0; i < bitCast.stepCount; ++i)
     {
         const auto& step = bitCast.steps[i];
@@ -8219,12 +8279,13 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_BitCast:
                 {
-                    NVVMRawBufferDescriptorBitCast descriptorCast;
-                    if (_getNVVMRawBufferDescriptorBitCast(inst, descriptorCast))
+                    NVVMPlannedResourceBitCast resourceBitCast;
+                    if (_resolveNVVMResourceBitCast(inst, resourceBitCast))
                     {
-                        _requireNVVMRawBufferDescriptorBitCastOperations(
+                        _requireNVVMResourceBitCastOperations(
                             requirements.valueOperations,
-                            descriptorCast);
+                            resourceBitCast);
+                        requirements.emissionPlan.resourceBitCasts.add(resourceBitCast);
                         break;
                     }
                     NVVMPointerBitCast pointerCast;
@@ -8943,12 +9004,13 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_BitCast:
                 {
-                    NVVMRawBufferDescriptorBitCast descriptorCast;
-                    if (_getNVVMRawBufferDescriptorBitCast(inst, descriptorCast))
+                    const auto resourceBitCast =
+                        _findPlannedNVVMOperation(requirements.emissionPlan.resourceBitCasts, inst);
+                    if (resourceBitCast)
                     {
                         SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                             codeGenContext,
-                            descriptorCast.value,
+                            resourceBitCast->value,
                             inst,
                             availableValues,
                             dominatorTree));
@@ -10605,11 +10667,11 @@ SlangResult _emitNVVMUInt64WordConstruction(
         outValue);
 }
 
-SlangResult _emitNVVMRawBufferDescriptorBitCast(
+SlangResult _emitNVVMResourceBitCast(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
-    const NVVMRawBufferDescriptorBitCast& bitCast,
+    const NVVMPlannedResourceBitCast& bitCast,
     NVVMValueMap& valueMap,
     NVVMTypeLoweringContext& typeContext,
     SlangNVVMValueHandle& outValue)
@@ -10624,6 +10686,20 @@ SlangResult _emitNVVMRawBufferDescriptorBitCast(
         valueMap,
         typeContext,
         input));
+
+    if (bitCast.kind == NVVMPlannedResourceBitCastKind::OpaqueHandle64)
+    {
+        return _emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            bitCast.steps[0],
+            &input,
+            1,
+            outValue);
+    }
+
+    SLANG_RELEASE_ASSERT(bitCast.kind == NVVMPlannedResourceBitCastKind::RawBuffer);
 
     SlangNVVMTypeHandle uintType = nullptr;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -10643,7 +10719,7 @@ SlangResult _emitNVVMRawBufferDescriptorBitCast(
             _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, i, indices[i]));
     }
 
-    if (!bitCast.resultIsHandle)
+    if (!bitCast.resultIsResourceValue)
     {
         SlangNVVMValueHandle dataPointer = nullptr;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -10725,7 +10801,7 @@ SlangResult _emitNVVMRawBufferDescriptorBitCast(
         builder.emitVectorConstruct(module, uint2Type, words, 2, pointerWords)));
 
     SlangNVVMTypeHandle elementType = nullptr;
-    if (bitCast.rawBufferType.kind == NVVMRawBufferKind::ByteAddress)
+    if (bitCast.rawBufferIsByteAddress)
     {
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
@@ -10734,14 +10810,11 @@ SlangResult _emitNVVMRawBufferDescriptorBitCast(
     }
     else
     {
-        const NVVMTypeUse elementUse =
-            isNVVMSupportedStructuredBufferStorageType(bitCast.rawBufferType.structuredElementType)
-                ? NVVMTypeUse::StructuredBufferStorage
-                : NVVMTypeUse::Value;
-        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-            bitCast.rawBufferType.structuredElementType,
-            elementUse,
-            elementType));
+        const NVVMTypeUse elementUse = bitCast.rawBufferElementUsesStructuredStorage
+                                           ? NVVMTypeUse::StructuredBufferStorage
+                                           : NVVMTypeUse::Value;
+        SLANG_RETURN_ON_FAIL(
+            typeContext.lowerType(bitCast.rawBufferElementType, elementUse, elementType));
     }
     SlangNVVMTypeHandle dataPointerType = nullptr;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -10794,15 +10867,16 @@ SlangResult _emitNVVMRawBufferDescriptorBitCast(
         SLANG_COUNT_OF(combineOperands),
         count));
 
-    SlangNVVMTypeHandle handleType = nullptr;
-    SLANG_RETURN_ON_FAIL(typeContext.lowerType(bitCast.handleType, NVVMTypeUse::Value, handleType));
+    SlangNVVMTypeHandle resourceValueType = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        typeContext.lowerType(bitCast.resourceValueType, NVVMTypeUse::Value, resourceValueType));
     const SlangNVVMValueHandle handleElements[] = {dataPointer, count};
     return _requireBuilderOperation(
         codeGenContext,
         "descriptor raw-buffer view reconstruction",
         builder.emitAggregateConstruct(
             module,
-            handleType,
+            resourceValueType,
             handleElements,
             SLANG_COUNT_OF(handleElements),
             outValue));
@@ -14315,15 +14389,15 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_BitCast:
                     {
-                        NVVMRawBufferDescriptorBitCast descriptorCast;
-                        if (_getNVVMRawBufferDescriptorBitCast(inst, descriptorCast))
+                        const auto resourceBitCast = planIndex.findResourceBitCast(inst);
+                        if (resourceBitCast)
                         {
                             SlangNVVMValueHandle loweredValue = nullptr;
-                            SLANG_RETURN_ON_FAIL(_emitNVVMRawBufferDescriptorBitCast(
+                            SLANG_RETURN_ON_FAIL(_emitNVVMResourceBitCast(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
-                                descriptorCast,
+                                *resourceBitCast,
                                 valueMap,
                                 typeContext,
                                 loweredValue));

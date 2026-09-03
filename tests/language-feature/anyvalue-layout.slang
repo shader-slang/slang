@@ -1,7 +1,8 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12  -profile cs_6_1 -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -output-using-type
-//DIAGNOSTIC_TEST:SIMPLE(diag=NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -conformance Foo:IFoo=0 -o anyvalue-layout-nvvm-unsupported.ptx
+//TEST(compute, nvvm):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 interface IFoo
 {
@@ -73,5 +74,3 @@ void computeMain()
     // CHECK: 1024.0
     outputBuffer[6] = gFoo[0].getDescriptorHandleHigh()>>32;
 }
-
-//NVVM: direct NVVM lowering does not support Slang IR instruction or shape 'bitCast type: vector<uint,2> -> DescriptorHandle'

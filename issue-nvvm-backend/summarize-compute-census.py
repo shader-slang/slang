@@ -77,18 +77,22 @@ def _coverage_tier(source: str) -> tuple[str, str]:
     return "mvp", ""
 
 
-def _generic_asm_cluster(source: str) -> tuple[str, str]:
+def _generic_asm_cluster(diagnostic: str) -> tuple[str, str]:
     producer = (
         "StmtLoweringVisitor::visitIntrinsicAsmStmt -> IRGenericAsm; "
         "_validateNVVMFunction semantic resolution"
     )
-    if re.search(r"wave|divergence|reconvergence", source, re.IGNORECASE):
+    if re.search(
+        r"assembly=.*(?:wave|__ballot_sync|__shfl_sync|_getLane)",
+        diagnostic,
+        re.IGNORECASE,
+    ):
         return "generic-asm-wave-reconvergence", producer
-    if re.search(r"atomic|cas-int64", source, re.IGNORECASE):
+    if re.search(r"assembly=.*(?:atomic|cas)", diagnostic, re.IGNORECASE):
         return "generic-asm-atomic", producer
-    if "texture" in source.lower():
+    if re.search(r"assembly=\s*(?:tex|surf)", diagnostic, re.IGNORECASE):
         return "generic-asm-texture", producer
-    if "realtime-clock" in source.lower():
+    if re.search(r"assembly=\s*clock", diagnostic, re.IGNORECASE):
         return "generic-asm-device-clock", producer
     return "generic-asm-ordinary-intrinsic", producer
 
@@ -139,7 +143,7 @@ def _failure_ownership(row: dict[str, str]) -> tuple[str, str]:
     if classification != "preflight":
         return "unclassified", "manual audit required"
     if shape == "GenericAsm":
-        return _generic_asm_cluster(source)
+        return _generic_asm_cluster(row["diagnostic"])
     if shape in {"helper function parameter", "helper function result type"}:
         return (
             "helper-abi-type-contract",
