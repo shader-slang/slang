@@ -1,5 +1,7 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK): -vk -shaderobj -output-using-type -render-feature bindless
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK): -vk -shaderobj -output-using-type -render-feature bindless -Xslang -DREPRO
+// -emit-spirv-directly is required: a dynamically-indexed bindless resource-heap read does not
+// lower to valid GLSL (no GL_EXT_nonuniform_qualifier), so the via-glsl cross-check cannot build it.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK): -vk -shaderobj -output-using-type -render-feature bindless -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK): -vk -shaderobj -output-using-type -render-feature bindless -emit-spirv-directly -Xslang -DREPRO
 //TEST:REFLECTION(filecheck=REFLECTION):-target spirv-asm -stage compute -entry computeMain
 //TEST:REFLECTION(filecheck=REFLECTION_REPRO):-target spirv-asm -stage compute -entry computeMain -DREPRO
 //TEST:SIMPLE(filecheck=HEAP): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly
