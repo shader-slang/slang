@@ -6147,17 +6147,6 @@ const T* _findPlannedNVVMOperation(const List<T>& operations, IRInst* source)
     return nullptr;
 }
 
-template<typename T>
-void _indexPlannedNVVMOperations(const List<T>& operations, Dictionary<IRInst*, Index>& outIndices)
-{
-    for (Index i = 0; i < operations.getCount(); ++i)
-    {
-        SLANG_RELEASE_ASSERT(operations[i].source);
-        SLANG_RELEASE_ASSERT(!outIndices.containsKey(operations[i].source));
-        outIndices[operations[i].source] = i;
-    }
-}
-
 void _requireNVVMAtomicOperations(
     NVVMOperationRequirements& requirements,
     const NVVMPlannedAtomicOperation& operation)
@@ -13358,6 +13347,9 @@ SlangResult emitNVVMIRFromLinkedIR(
     SLANG_RELEASE_ASSERT(functions.getCount() && functions[0] == entryPoint);
     SLANG_RELEASE_ASSERT(functionNames.getCount() == functions.getCount());
 
+    NVVMEmissionPlanIndex planIndex;
+    planIndex.initialize(requirements.emissionPlan);
+
     ScopedNVVMModule moduleScope;
     moduleScope.builder = &builder;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -13372,42 +13364,6 @@ SlangResult emitNVVMIRFromLinkedIR(
     NVVMValueMap entryAggregatePointerMap;
     NVVMGlobalUserPointerSet globalUserPointers;
     Dictionary<IRBlock*, SlangNVVMBlockHandle> blockMap;
-    Dictionary<IRInst*, Index> plannedValueOperationIndices;
-    Dictionary<IRInst*, Index> plannedUInt64WordConstructionIndices;
-    Dictionary<IRInst*, Index> plannedNumericTruthinessIndices;
-    Dictionary<IRInst*, Index> plannedFloatingRemainderIndices;
-    Dictionary<IRInst*, Index> plannedBitfieldOperationIndices;
-    Dictionary<IRInst*, Index> plannedDefaultResourceValueIndices;
-    Dictionary<IRInst*, Index> plannedEphemeralValueIndices;
-    Dictionary<IRInst*, Index> plannedSurfaceOperationIndices;
-    Dictionary<IRInst*, Index> plannedAtomicOperationIndices;
-    _indexPlannedNVVMOperations(
-        requirements.emissionPlan.valueOperations,
-        plannedValueOperationIndices);
-    _indexPlannedNVVMOperations(
-        requirements.emissionPlan.uint64WordConstructions,
-        plannedUInt64WordConstructionIndices);
-    _indexPlannedNVVMOperations(
-        requirements.emissionPlan.numericTruthinessOperations,
-        plannedNumericTruthinessIndices);
-    _indexPlannedNVVMOperations(
-        requirements.emissionPlan.floatingRemainderOperations,
-        plannedFloatingRemainderIndices);
-    _indexPlannedNVVMOperations(
-        requirements.emissionPlan.bitfieldOperations,
-        plannedBitfieldOperationIndices);
-    _indexPlannedNVVMOperations(
-        requirements.emissionPlan.defaultResourceValues,
-        plannedDefaultResourceValueIndices);
-    _indexPlannedNVVMOperations(
-        requirements.emissionPlan.ephemeralValues,
-        plannedEphemeralValueIndices);
-    _indexPlannedNVVMOperations(
-        requirements.emissionPlan.surfaceOperations,
-        plannedSurfaceOperationIndices);
-    _indexPlannedNVVMOperations(
-        requirements.emissionPlan.atomicOperations,
-        plannedAtomicOperationIndices);
 
     // The canonical global owns storage class, value type, extent, and name. Lower those facts once
     // before any function declaration; ordinary body uses then resolve through the shared value
@@ -13778,35 +13734,33 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_GetStringHash:
                 case kIROp_DebugNoScope:
                     {
-                        const Index* operationIndex =
-                            plannedEphemeralValueIndices.tryGetValue(inst);
-                        SLANG_RELEASE_ASSERT(operationIndex);
-                        const auto& value =
-                            requirements.emissionPlan.ephemeralValues[*operationIndex];
-                        if (value.kind == NVVMPlannedEphemeralValueKind::IgnoredDebugNoScope)
+                        const auto value = planIndex.findEphemeralValue(inst);
+                        SLANG_RELEASE_ASSERT(value);
+                        if (value->kind == NVVMPlannedEphemeralValueKind::IgnoredDebugNoScope)
                             break;
 
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        if (value.kind == NVVMPlannedEphemeralValueKind::ChosenUndefined)
+                        if (value->kind == NVVMPlannedEphemeralValueKind::ChosenUndefined)
                         {
                             SLANG_RETURN_ON_FAIL(_emitNVVMChosenUndefinedValue(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
-                                value.valueType,
+                                value->valueType,
                                 typeContext,
                                 loweredValue));
                         }
                         else
                         {
                             SLANG_RELEASE_ASSERT(
-                                value.kind == NVVMPlannedEphemeralValueKind::StableStringHash);
+                                value->kind == NVVMPlannedEphemeralValueKind::StableStringHash);
                             SlangNVVMTypeHandle loweredType = nullptr;
                             SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-                                value.valueType,
+                                value->valueType,
                                 NVVMTypeUse::Value,
                                 loweredType));
-                            const UnownedStringSlice string = value.stringLiteral->getStringSlice();
+                            const UnownedStringSlice string =
+                                value->stringLiteral->getStringSlice();
                             const uint32_t hashBits =
                                 getStableHashCode32(string.begin(), string.getLength()).hash;
                             const int64_t hash = hashBits >= (uint64_t(1) << 31)
@@ -14161,18 +14115,15 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_ImageLoad:
                 case kIROp_ImageStore:
                     {
-                        const Index* operationIndex =
-                            plannedSurfaceOperationIndices.tryGetValue(inst);
-                        SLANG_RELEASE_ASSERT(operationIndex);
-                        const auto& operation =
-                            requirements.emissionPlan.surfaceOperations[*operationIndex];
+                        const auto operation = planIndex.findSurfaceOperation(inst);
+                        SLANG_RELEASE_ASSERT(operation);
 
                         IRInst* semanticOperands[] = {
-                            operation.surface,
-                            operation.coordinate,
-                            operation.value,
+                            operation->surface,
+                            operation->coordinate,
+                            operation->value,
                         };
-                        const size_t operandCount = operation.value ? 3 : 2;
+                        const size_t operandCount = operation->value ? 3 : 2;
                         SlangNVVMValueHandle loweredOperands[3] = {};
                         for (size_t operandIndex = 0; operandIndex < operandCount; ++operandIndex)
                         {
@@ -14188,31 +14139,28 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredResult = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            operation.diagnosticName,
+                            operation->diagnosticName,
                             builder.emitSurfaceOperation(
                                 moduleScope.module,
-                                operation.desc,
+                                operation->desc,
                                 loweredOperands,
                                 operandCount,
                                 loweredResult)));
-                        if (!operation.value)
+                        if (!operation->value)
                             valueMap[inst] = loweredResult;
                     }
                     break;
 
                 case kIROp_MakeUInt64:
                     {
-                        const Index* operationIndex =
-                            plannedUInt64WordConstructionIndices.tryGetValue(inst);
-                        SLANG_RELEASE_ASSERT(operationIndex);
-                        const auto& construction =
-                            requirements.emissionPlan.uint64WordConstructions[*operationIndex];
+                        const auto construction = planIndex.findUInt64WordConstruction(inst);
+                        SLANG_RELEASE_ASSERT(construction);
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMUInt64WordConstruction(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            construction,
+                            *construction,
                             valueMap,
                             typeContext,
                             loweredValue));
@@ -14222,17 +14170,14 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_DefaultConstruct:
                     {
-                        const Index* operationIndex =
-                            plannedDefaultResourceValueIndices.tryGetValue(inst);
-                        SLANG_RELEASE_ASSERT(operationIndex);
-                        const auto& defaultValue =
-                            requirements.emissionPlan.defaultResourceValues[*operationIndex];
+                        const auto defaultValue = planIndex.findDefaultResourceValue(inst);
+                        SLANG_RELEASE_ASSERT(defaultValue);
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMDefaultResourceValue(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            defaultValue,
+                            *defaultValue,
                             typeContext,
                             loweredValue));
                         valueMap[inst] = loweredValue;
@@ -14268,30 +14213,25 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_WaveMaskBallot:
                 case kIROp_WaveMaskMatch:
                     {
-                        const Index* truthinessIndex =
-                            plannedNumericTruthinessIndices.tryGetValue(inst);
-                        if (truthinessIndex)
+                        const auto truthiness = planIndex.findNumericTruthiness(inst);
+                        if (truthiness)
                         {
-                            const auto& truthiness =
-                                requirements.emissionPlan
-                                    .numericTruthinessOperations[*truthinessIndex];
                             SlangNVVMValueHandle loweredValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_emitNVVMNumericTruthiness(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
-                                truthiness,
+                                *truthiness,
                                 valueMap,
                                 typeContext,
                                 loweredValue));
                             valueMap[inst] = loweredValue;
                             break;
                         }
-                        const Index* operationIndex =
-                            plannedValueOperationIndices.tryGetValue(inst);
-                        SLANG_RELEASE_ASSERT(operationIndex);
+                        const auto plannedOperation = planIndex.findValueOperation(inst);
+                        SLANG_RELEASE_ASSERT(plannedOperation);
                         const NVVMValueOperationRequirement& operation =
-                            requirements.emissionPlan.valueOperations[*operationIndex].operation;
+                            plannedOperation->operation;
                         SlangNVVMValueHandle loweredOperands[3] = {};
                         for (UInt operandIndex = 0; operandIndex < inst->getOperandCount();
                              ++operandIndex)
@@ -14322,17 +14262,14 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_FRem:
                     {
-                        const Index* operationIndex =
-                            plannedFloatingRemainderIndices.tryGetValue(inst);
-                        SLANG_RELEASE_ASSERT(operationIndex);
-                        const auto& operation =
-                            requirements.emissionPlan.floatingRemainderOperations[*operationIndex];
+                        const auto operation = planIndex.findFloatingRemainder(inst);
+                        SLANG_RELEASE_ASSERT(operation);
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMFloatingRemainderOperation(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            operation,
+                            *operation,
                             valueMap,
                             typeContext,
                             loweredValue));
@@ -14343,17 +14280,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_BitfieldExtract:
                 case kIROp_BitfieldInsert:
                     {
-                        const Index* operationIndex =
-                            plannedBitfieldOperationIndices.tryGetValue(inst);
-                        SLANG_RELEASE_ASSERT(operationIndex);
-                        const auto& operation =
-                            requirements.emissionPlan.bitfieldOperations[*operationIndex];
+                        const auto operation = planIndex.findBitfieldOperation(inst);
+                        SLANG_RELEASE_ASSERT(operation);
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMBitfieldOperation(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            operation,
+                            *operation,
                             valueMap,
                             typeContext,
                             loweredValue));
@@ -14399,12 +14333,10 @@ SlangResult emitNVVMIRFromLinkedIR(
                         NVVMPointerBitCast pointerCast;
                         if (!_getNVVMPointerBitCast(inst, pointerCast))
                         {
-                            const Index* operationIndex =
-                                plannedValueOperationIndices.tryGetValue(inst);
-                            SLANG_RELEASE_ASSERT(operationIndex);
+                            const auto plannedOperation = planIndex.findValueOperation(inst);
+                            SLANG_RELEASE_ASSERT(plannedOperation);
                             const NVVMValueOperationRequirement& operation =
-                                requirements.emissionPlan.valueOperations[*operationIndex]
-                                    .operation;
+                                plannedOperation->operation;
                             SlangNVVMValueHandle loweredOperand = nullptr;
                             SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                 codeGenContext,
@@ -14469,26 +14401,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_AtomicInc:
                 case kIROp_AtomicDec:
                     {
-                        const Index* operationIndex =
-                            plannedAtomicOperationIndices.tryGetValue(inst);
-                        SLANG_RELEASE_ASSERT(operationIndex);
-                        const auto& operation =
-                            requirements.emissionPlan.atomicOperations[*operationIndex];
+                        const auto operation = planIndex.findAtomicOperation(inst);
+                        SLANG_RELEASE_ASSERT(operation);
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            operation.pointer,
+                            operation->pointer,
                             valueMap,
                             typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle loweredOperands[3] = {loweredPointer};
                         size_t loweredOperandCount = 1;
-                        if (operation.hasImplicitValue)
+                        if (operation->hasImplicitValue)
                         {
                             auto pointerType =
-                                cast<IRPtrTypeBase>(operation.pointer->getDataType());
+                                cast<IRPtrTypeBase>(operation->pointer->getDataType());
                             SlangNVVMTypeHandle loweredValueType = nullptr;
                             SLANG_RETURN_ON_FAIL(typeContext.lowerType(
                                 pointerType->getValueType(),
@@ -14500,33 +14429,33 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 builder.getIntegerConstant(
                                     moduleScope.module,
                                     loweredValueType,
-                                    operation.implicitValue,
+                                    operation->implicitValue,
                                     loweredOperands[loweredOperandCount])));
                             ++loweredOperandCount;
                         }
                         else
                         {
-                            for (uint32_t i = 0; i < operation.valueCount; ++i)
+                            for (uint32_t i = 0; i < operation->valueCount; ++i)
                             {
                                 SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                     codeGenContext,
                                     builder,
                                     moduleScope.module,
-                                    operation.values[i],
+                                    operation->values[i],
                                     valueMap,
                                     typeContext,
                                     loweredOperands[loweredOperandCount]));
                                 ++loweredOperandCount;
                             }
                         }
-                        if (operation.negatesValue)
+                        if (operation->negatesValue)
                         {
                             SlangNVVMValueHandle negatedValue = nullptr;
                             SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
-                                operation.valueNegation,
+                                operation->valueNegation,
                                 &loweredOperands[1],
                                 1,
                                 negatedValue));
@@ -14535,10 +14464,10 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredResult = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            operation.diagnosticName,
+                            operation->diagnosticName,
                             builder.emitAtomicOperation(
                                 moduleScope.module,
-                                operation.desc,
+                                operation->desc,
                                 loweredOperands,
                                 loweredOperandCount,
                                 loweredResult)));

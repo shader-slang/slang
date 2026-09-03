@@ -7504,6 +7504,19 @@ GenericAsm atomic reductions, byte-address atomics, and surface helpers remain s
 helper contracts. No accepted shape or provider ABI changed. Frozen corpus v1 stays 418/418/418,
 discovery stays 72/72/72, and the permanent gates pass 437/437 and 92/92.
 
+### Slice 187: Separate plan ownership from provider emission
+
+The immutable plan schema and its checked source index now live in
+`slang-emit-nvvm-plan.{h,cpp}`. The emitter initializes one `NVVMEmissionPlanIndex` before creating
+the provider module and uses typed lookups for every planned family. This removes nine local index
+dictionaries and makes the preflight/emission ownership boundary visible in the source layout.
+
+The NVVM fake-provider support intentionally remains header-only. Its anonymous namespace gives
+each decomposed test translation unit isolated state; moving it into one implementation file would
+silently couple fixtures. No representation, accepted shape, or provider ABI changed. Frozen
+corpus v1 remains 418/418/418, discovery remains 72/72/72, and the permanent gates pass 437/437
+and 92/92.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

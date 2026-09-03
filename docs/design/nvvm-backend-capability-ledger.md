@@ -2619,3 +2619,14 @@ now constructs every per-family source index.
 GenericAsm helper families retain their distinct contracts. Provider ABI revision 34 is unchanged.
 Frozen corpus v1 remains 418/418/418 over 427 with zero old-correct regression, discovery remains
 72/72/72 over 72, and the regression gates pass 437/437 and 92/92.
+
+Slice 187 moves the complete immutable plan schema and its source-key index into
+`slang-emit-nvvm-plan.{h,cpp}`. One `NVVMEmissionPlanIndex` validates all source keys before module
+creation and provides typed lookups to emission, replacing nine emitter-local dictionaries. The
+fake-provider test support remains header-only because its anonymous state is deliberately
+isolated per decomposed test translation unit.
+
+This is an ownership-only refactor: no canonical shape, capability query, or provider operation
+changed. Provider ABI revision 34 is unchanged. Frozen corpus v1 remains 418/418/418 over 427 with
+zero old-correct regression, discovery remains 72/72/72 over 72, and the regression gates pass
+437/437 and 92/92.

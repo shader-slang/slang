@@ -1,6 +1,9 @@
 #pragma once
 
-// Shared implementation support for the decomposed NVVM unit-test translation units.
+// Shared implementation support for the decomposed NVVM unit-test translation units. This file is
+// intentionally header-only: its anonymous namespace gives every test translation unit an isolated
+// fake-provider state. Moving that state into one implementation file would couple otherwise
+// independent fixtures, so extract only helpers whose ownership is made explicit.
 
 #include "compiler-core/slang-artifact-representation.h"
 #include "compiler-core/slang-artifact-util.h"
