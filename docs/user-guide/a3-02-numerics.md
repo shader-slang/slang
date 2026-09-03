@@ -399,7 +399,7 @@ The `slang.numerics.differentiable` module re-exports all of the definitions fro
 
 The differentiable numerics module provides various `IDifferentiable...` counterparts to interfaces from the base numerics module:
 
-- `IDifferentiableShapedType`
+- `IDifferentiableNumericShapedType`
 - `IDifferentiableFractional`
 - `IDifferentiableFloatingPoint`
 - `IDifferentiableRealOrderingFunctions`
