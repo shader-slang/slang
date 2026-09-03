@@ -123,6 +123,8 @@ String EntryPoint::getEntryPointNameOverride(Index index)
     SLANG_UNUSED(index);
     SLANG_ASSERT(index == 0);
 
+    if (m_entryPointNameOverride.getLength() != 0)
+        return m_entryPointNameOverride;
     return m_name ? m_name->text : "";
 }
 

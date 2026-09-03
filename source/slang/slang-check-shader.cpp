@@ -2656,6 +2656,13 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         auto entryPoint =
             EntryPoint::create(linkage, structuralEntryPointDeclRef, entryPointProfile);
         entryPoint->setNameOverride(entryPointName);
+        // A qualified stage type such as `Stages.Miss` is the source lookup identity, but the dot
+        // is not legal in CUDA and other C-like target symbols. Store the compiler-owned physical
+        // default separately so an unrenamed component agrees with trace-program reflection. An
+        // explicit `renameEntryPoint()` still wraps this component and replaces the default.
+        auto sourceTypeName = structuralInfo.stageType->toString();
+        entryPoint->setEntryPointNameOverride(
+            getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
         entryPoint->setStructuralRayTracingInfo(structuralInfo);
         return sink->getErrorCount() ? nullptr : entryPoint;
     }

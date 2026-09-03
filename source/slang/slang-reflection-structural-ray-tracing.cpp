@@ -12,7 +12,11 @@ static String _getStageEntryPointName(Type* stageType)
     auto declRefType = as<DeclRefType>(stageType ? stageType->resolve() : nullptr);
     auto decl = declRefType ? declRefType->getDeclRef().getDecl() : nullptr;
     auto name = decl ? decl->getName() : nullptr;
-    return name ? String(name->text) : String();
+    if (!name)
+        return String();
+
+    auto sourceTypeName = declRefType->toString();
+    return getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice());
 }
 
 static RefPtr<StructuralRayTracingStageReflection> _createStageReflection(

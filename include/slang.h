@@ -2180,6 +2180,7 @@ public:                                                              \
     spReflectionRayTracingStage_getStage(SlangReflectionRayTracingStage* stage);
     SLANG_API SlangReflectionType* spReflectionRayTracingStage_getType(
         SlangReflectionRayTracingStage* stage);
+    /** Get the target-safe physical entry-point name used by portable structural RT lowering. */
     SLANG_API char const* spReflectionRayTracingStage_getEntryPointName(
         SlangReflectionRayTracingStage* stage);
 

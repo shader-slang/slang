@@ -210,6 +210,9 @@ public:
     /// declaration (for example, a structural ray-tracing stage implemented by `invoke`).
     void setNameOverride(Name* name) { m_name = name; }
 
+    /// Set the default physical name independently of the source-level lookup name.
+    void setEntryPointNameOverride(String name) { m_entryPointNameOverride = _Move(name); }
+
     /// Get the profile associated with the entry point
     ///
     /// Note: only the stage part of the profile is expected
@@ -334,6 +337,7 @@ private:
     // The name of the entry point function (e.g., `main`)
     //
     Name* m_name = nullptr;
+    String m_entryPointNameOverride;
 
     // The declaration of the entry-point function itself.
     //
