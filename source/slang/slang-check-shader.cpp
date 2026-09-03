@@ -2660,7 +2660,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         // is not legal in CUDA and other C-like target symbols. Store the compiler-owned physical
         // default separately so an unrenamed component agrees with trace-program reflection. An
         // explicit `renameEntryPoint()` still wraps this component and replaces the default.
-        auto sourceTypeName = structuralInfo.stageType->toString();
+        auto sourceTypeName = getStructuralRayTracingSourceTypeName(structuralInfo.stageType);
         entryPoint->setEntryPointNameOverride(
             getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
         entryPoint->setStructuralRayTracingInfo(structuralInfo);
