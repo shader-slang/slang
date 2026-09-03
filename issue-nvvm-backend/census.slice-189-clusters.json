@@ -1,0 +1,28 @@
+{
+  "nvrtc-o3": {
+    "infrastructure-capability-profile": 1,
+    "infrastructure-native-reference": 2
+  },
+  "nvvm-o0": {
+    "infrastructure-capability-profile": 1,
+    "helper-abi-type-contract": 5,
+    "preflight-other": 1,
+    "generic-asm-texture": 1,
+    "residual-target-marker-or-undefined-value": 2,
+    "generic-asm-atomic": 1,
+    "generic-asm-wave-reconvergence": 6,
+    "descriptor-handle-bit-transport": 1,
+    "generic-asm-device-clock": 1
+  },
+  "nvvm-o3": {
+    "infrastructure-capability-profile": 1,
+    "helper-abi-type-contract": 5,
+    "preflight-other": 1,
+    "generic-asm-texture": 1,
+    "residual-target-marker-or-undefined-value": 2,
+    "generic-asm-atomic": 1,
+    "generic-asm-wave-reconvergence": 6,
+    "descriptor-handle-bit-transport": 1,
+    "generic-asm-device-clock": 1
+  }
+}

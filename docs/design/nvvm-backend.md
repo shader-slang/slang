@@ -7533,6 +7533,27 @@ gap is not emitter-visible: direct PTX is byte-identical with and without
 the CUDA text prelude. No provider ABI changed. Frozen healthy correctness remains 418/418/418,
 discovery remains 72/72/72, and old-correct regressions remain zero.
 
+### Slice 189: Canonical zero-index bounds policy
+
+Direct legalization now reads the existing `SLANG_ENABLE_BOUND_ZERO_INDEX` target option and
+materializes its semantics before capability preflight. It visits only the four canonical access
+shapes proven by the existing bounds workload. Structured resource extents come from
+`StructuredBufferGetDimensions`; byte-address extent uses the same equivalent uint-word view as
+the standard `GetDimensions` implementation; fixed arrays retain their literal count. The
+resulting compare, select, cast, and arithmetic instructions use the existing generic provider
+surface.
+
+`compute/bound-check-zero-index` now agrees with native CUDA in direct O0 and O3 and has permanent
+lanes for both. Frozen corpus v1 remains exactly 452/427 and advances to 419/419/419 with one gain,
+no old-correct loss, and no remaining direct runtime mismatch. Discovery remains exactly 82/72 at
+72/72/72. The selected prefix passes 437/437 and the permanent NVVM category passes 94/94.
+
+The promoted measurement gate assembles native NVRTC, direct O0 SM70, and direct O3
+SM70/SM80/SM90 PTX through CUDA 12.9. Native PTX measured 12,717 bytes, direct O0 measured 4,069
+bytes, and direct O3 measured 3,476 bytes at each architecture. Median standalone compilation was
+367.8 ms native and 240.3/247.6 ms for direct O0/O3 SM70 in this exploratory run. Provider ABI
+revision 34 is unchanged.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

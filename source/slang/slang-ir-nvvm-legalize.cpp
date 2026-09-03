@@ -29,6 +29,235 @@ struct NVVMCUDALayoutQuery
     IRType* explicitType = nullptr;
 };
 
+// Returns whether the compile request selected the bounds policy implemented by the CUDA and CPU
+// preludes. Consider this example:
+//
+//     slangc shader.slang -target ptx -DSLANG_ENABLE_BOUND_ZERO_INDEX
+//
+// The definition is consumed by the generated CUDA prelude, but direct NVVM never preprocesses
+// that text. Recognize the same request option at the direct target boundary so the policy can be
+// represented in IR before preflight. The macro value is deliberately irrelevant, matching the
+// prelude's `#ifdef` contract.
+bool _isNVVMZeroIndexBoundsEnabled(CodeGenContext* codeGenContext)
+{
+    for (const auto& define : codeGenContext->getTargetProgram()->getOptionSet().getArray(
+             CompilerOptionName::MacroDefine))
+    {
+        if (define.stringValue == "SLANG_ENABLE_BOUND_ZERO_INDEX")
+            return true;
+    }
+    return false;
+}
+
+// Emits `index < count ? index : 0` with an unsigned comparison. Structured-buffer subscripts are
+// allowed to retain a signed i32 index in canonical IR, but CUDA converts that value to `size_t`
+// before applying `SLANG_BOUND_ZERO_INDEX`. Comparing an unsigned view preserves that behavior for
+// negative indices while returning the original index type expected by the access instruction.
+IRInst* _emitNVVMZeroBoundedElementIndex(IRBuilder& builder, IRInst* index, IRInst* count)
+{
+    if (!index || !count || !isNVVMInteger32Type(index->getDataType()) ||
+        !isNVVMUnsignedI32Type(count->getDataType()))
+    {
+        return nullptr;
+    }
+
+    IRInst* unsignedIndex = index;
+    if (!isNVVMUnsignedI32Type(index->getDataType()))
+    {
+        unsignedIndex = builder.emitIntrinsicInst(builder.getUIntType(), kIROp_IntCast, 1, &index);
+    }
+    IRInst* comparisonOperands[] = {unsignedIndex, count};
+    IRInst* inBounds = builder.emitIntrinsicInst(
+        builder.getBoolType(),
+        kIROp_Less,
+        SLANG_COUNT_OF(comparisonOperands),
+        comparisonOperands);
+    IRInst* zero = builder.getIntValue(index->getDataType(), 0);
+    IRInst* selectOperands[] = {inBounds, index, zero};
+    return builder.emitIntrinsicInst(
+        index->getDataType(),
+        kIROp_Select,
+        SLANG_COUNT_OF(selectOperands),
+        selectOperands);
+}
+
+// Obtains the runtime element count from either canonical read-only or read-write structured
+// resource storage. Keeping this query typed lets preflight select the established physical
+// resource recipe later.
+IRInst* _emitNVVMStructuredBufferElementCount(IRBuilder& builder, IRInst* buffer)
+{
+    if (!buffer || !as<IRHLSLStructuredBufferTypeBase>(buffer->getDataType()))
+        return nullptr;
+
+    IRType* dimensionsType = builder.getVectorType(builder.getUIntType(), 2);
+    IRInst* dimensions =
+        builder.emitIntrinsicInst(dimensionsType, kIROp_StructuredBufferGetDimensions, 1, &buffer);
+    return builder.emitGetElement(builder.getUIntType(), dimensions, 0);
+}
+
+// Reinterprets the canonical byte-address view as uint words and obtains its runtime byte size.
+// `ByteAddressBuffer.GetDimensions` has exactly the same producer: it queries this equivalent view
+// and multiplies the element count by four. Reusing that representation keeps the extent in typed
+// IR rather than exposing the provider's `{data, count}` layout to legalization.
+IRInst* _emitNVVMByteAddressBufferSize(IRBuilder& builder, IRInst* buffer)
+{
+    auto bufferType = buffer ? as<IRByteAddressBufferTypeBase>(buffer->getDataType()) : nullptr;
+    if (!bufferType || bufferType->getOperandCount() != 0)
+        return nullptr;
+
+    IROp structuredBufferOp = kIROp_Invalid;
+    switch (bufferType->getOp())
+    {
+    case kIROp_HLSLByteAddressBufferType:
+        structuredBufferOp = kIROp_HLSLStructuredBufferType;
+        break;
+    case kIROp_HLSLRWByteAddressBufferType:
+        structuredBufferOp = kIROp_HLSLRWStructuredBufferType;
+        break;
+    default:
+        return nullptr;
+    }
+
+    IRInst* typeOperands[] = {builder.getUIntType(), builder.getDefaultBufferLayoutType()};
+    IRType* equivalentType =
+        builder.getType(structuredBufferOp, SLANG_COUNT_OF(typeOperands), typeOperands);
+    IRInst* equivalentBuffer =
+        builder.emitIntrinsicInst(equivalentType, kIROp_GetEquivalentStructuredBuffer, 1, &buffer);
+    IRInst* wordCount = _emitNVVMStructuredBufferElementCount(builder, equivalentBuffer);
+    if (!wordCount)
+        return nullptr;
+    IRInst* four = builder.getIntValue(builder.getUIntType(), 4);
+    IRInst* multiplyOperands[] = {wordCount, four};
+    return builder.emitIntrinsicInst(
+        builder.getUIntType(),
+        kIROp_Mul,
+        SLANG_COUNT_OF(multiplyOperands),
+        multiplyOperands);
+}
+
+// Carries the CUDA prelude's selected zero-index bounds policy into ordinary linked IR. Each
+// access keeps its canonical opcode; only its index operand is replaced by compare/select
+// arithmetic derived from the access's own resource or fixed-array type.
+SlangResult _legalizeNVVMZeroIndexBounds(CodeGenContext* codeGenContext, LinkedIR& linkedIR)
+{
+    if (!_isNVVMZeroIndexBoundsEnabled(codeGenContext))
+        return SLANG_OK;
+
+    List<IRInst*> accesses;
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        auto function = as<IRFunc>(globalInst);
+        if (!function)
+            continue;
+        for (auto block : function->getBlocks())
+        {
+            for (auto inst : block->getOrdinaryInsts())
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_ByteAddressBufferLoad:
+                case kIROp_StructuredBufferLoad:
+                case kIROp_RWStructuredBufferGetElementPtr:
+                case kIROp_GetElement:
+                    accesses.add(inst);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
+    IRBuilder builder(linkedIR.module);
+    for (auto access : accesses)
+    {
+        if (access->getOperandCount() < 2)
+            continue;
+        IRInst* index = access->getOperand(1);
+        if (!isNVVMInteger32Type(index->getDataType()))
+            continue;
+
+        builder.setInsertBefore(access);
+        IRInst* boundedIndex = nullptr;
+        switch (access->getOp())
+        {
+        case kIROp_ByteAddressBufferLoad:
+            {
+                IRInst* buffer = access->getOperand(0);
+                IRType* valueType = access->getDataType();
+                IRSizeAndAlignment valueLayout;
+                if (!isNVVMUnsignedI32Type(index->getDataType()) ||
+                    SLANG_FAILED(getSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        IRTypeLayoutRules::getCUDA(),
+                        valueType,
+                        &valueLayout)) ||
+                    valueLayout.size <= 0 || valueLayout.size > UINT32_MAX)
+                {
+                    continue;
+                }
+
+                IRInst* sizeInBytes = _emitNVVMByteAddressBufferSize(builder, buffer);
+                if (!sizeInBytes)
+                    continue;
+                IRInst* elementSize =
+                    builder.getIntValue(builder.getUIntType(), IRIntegerValue(valueLayout.size));
+                IRInst* subtractionOperands[] = {sizeInBytes, elementSize};
+                IRInst* lastValidOffset = builder.emitIntrinsicInst(
+                    builder.getUIntType(),
+                    kIROp_Sub,
+                    SLANG_COUNT_OF(subtractionOperands),
+                    subtractionOperands);
+                IRInst* comparisonOperands[] = {index, lastValidOffset};
+                IRInst* inBounds = builder.emitIntrinsicInst(
+                    builder.getBoolType(),
+                    kIROp_Leq,
+                    SLANG_COUNT_OF(comparisonOperands),
+                    comparisonOperands);
+                IRInst* zero = builder.getIntValue(index->getDataType(), 0);
+                IRInst* selectOperands[] = {inBounds, index, zero};
+                boundedIndex = builder.emitIntrinsicInst(
+                    index->getDataType(),
+                    kIROp_Select,
+                    SLANG_COUNT_OF(selectOperands),
+                    selectOperands);
+            }
+            break;
+
+        case kIROp_StructuredBufferLoad:
+        case kIROp_RWStructuredBufferGetElementPtr:
+            {
+                IRInst* count =
+                    _emitNVVMStructuredBufferElementCount(builder, access->getOperand(0));
+                boundedIndex = _emitNVVMZeroBoundedElementIndex(builder, index, count);
+            }
+            break;
+
+        case kIROp_GetElement:
+            {
+                auto arrayType = as<IRArrayType>(access->getOperand(0)->getDataType());
+                auto count = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
+                if (!arrayType || arrayType->getOperandCount() != 2 || !count ||
+                    count->getValue() <= 0 || count->getValue() > UINT32_MAX)
+                {
+                    continue;
+                }
+                IRInst* unsignedCount =
+                    builder.getIntValue(builder.getUIntType(), count->getValue());
+                boundedIndex = _emitNVVMZeroBoundedElementIndex(builder, index, unsignedCount);
+            }
+            break;
+
+        default:
+            SLANG_UNEXPECTED("uncollected zero-index bounds access");
+        }
+
+        if (boundedIndex)
+            access->setOperand(1, boundedIndex);
+    }
+    return SLANG_OK;
+}
+
 SlangResult _diagnoseNVVMLegalization(
     CodeGenContext* codeGenContext,
     const UnownedStringSlice& construct)
@@ -381,6 +610,7 @@ SlangResult legalizeIRForNVVM(CodeGenContext* codeGenContext, LinkedIR& linkedIR
     if (!linkedIR.module)
         return _diagnoseNVVMLegalization(codeGenContext, toSlice("CUDA layout query module"));
 
+    SLANG_RETURN_ON_FAIL(_legalizeNVVMZeroIndexBounds(codeGenContext, linkedIR));
     SLANG_RETURN_ON_FAIL(_foldNVVMCompileTimeLayoutQueries(codeGenContext, linkedIR));
     SLANG_RETURN_ON_FAIL(_removeNVVMCompileTimeOnlyInstructions(codeGenContext, linkedIR));
     _legalizeNVVMSemanticIntrinsics(linkedIR);

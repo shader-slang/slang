@@ -2,9 +2,11 @@
 
 // Check 'zero indexing' bound check feature, supported by CPU and CUDA
 
-// Currently zero index bound checking doesn't appear to be working properly for CUDA.
+// The option is consumed by the CUDA/CPU preludes and by direct NVVM legalization.
 //TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj -Xslang... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X.
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -Xslang... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X.
+//TEST(compute, nvvm):COMPARE_COMPUTE:-cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0 -Xslang -DSLANG_ENABLE_BOUND_ZERO_INDEX
+//TEST(compute, nvvm):COMPARE_COMPUTE:-cuda -shaderobj -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3 -Xslang -DSLANG_ENABLE_BOUND_ZERO_INDEX
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4]):name=byteAddressBuffer
 ByteAddressBuffer byteAddressBuffer;

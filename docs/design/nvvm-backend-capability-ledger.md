@@ -2644,3 +2644,15 @@ native outputs differ in both hash and size. The emitter therefore cannot repair
 new producer-side bound-fix representation. Provider ABI revision 34 is unchanged. Frozen v1
 remains 418/418/418 over 427, discovery remains 72/72/72 over 72, and the gates pass 437/437 and
 92/92.
+
+Slice 189 carries the selected zero-index bounds policy into canonical IR at the direct-NVVM
+legalization boundary. Exact byte-address loads, structured-buffer loads, RW structured-buffer
+element pointers, and fixed-array element accesses receive typed compare/select indices derived
+from their canonical runtime or literal extent. Byte-address extent reuses the standard module's
+equivalent `StructuredBuffer<uint>` representation; no provider physical layout is exposed.
+
+Frozen `compute/bound-check-zero-index` gains two permanent direct lanes and becomes the only row
+newly correct in both modes. Frozen v1 advances from 418/418/418 to 419/419/419 over its unchanged
+427 healthy denominator with no old-correct regression. All-row direct runtime mismatches fall to
+zero. Discovery remains 72/72/72 over 72. The selected prefix passes 437/437, the permanent NVVM
+category passes 94/94, and provider ABI revision 34 is unchanged.

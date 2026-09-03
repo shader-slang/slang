@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "workloads": [
+    {
+      "name": "zero-index-bounds-policy",
+      "source": "tests/compute/bound-check-zero-index.slang",
+      "census_id": "compute/bound-check-zero-index.slang#cuda-1",
+      "compiler_args": ["-DSLANG_ENABLE_BOUND_ZERO_INDEX"]
+    }
+  ]
+}
