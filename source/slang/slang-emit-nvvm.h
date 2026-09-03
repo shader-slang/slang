@@ -114,6 +114,64 @@ struct NVVMPlannedBitfieldOperation
     NVVMValueRecipeStep bitNot;
 };
 
+enum class NVVMPlannedDefaultResourceValueKind
+{
+    RawStructuredBuffer,
+    DescriptorHandle,
+};
+
+/// Owns the provider representation selected for one canonical default resource value.
+struct NVVMPlannedDefaultResourceValue
+{
+    IRInst* source = nullptr;
+    IRType* resultType = nullptr;
+    IRType* structuredElementType = nullptr;
+    NVVMPlannedDefaultResourceValueKind kind =
+        NVVMPlannedDefaultResourceValueKind::RawStructuredBuffer;
+};
+
+enum class NVVMPlannedEphemeralValueKind
+{
+    ChosenUndefined,
+    StableStringHash,
+    IgnoredDebugNoScope,
+};
+
+/// Owns the canonical meaning selected for one value or marker consumed without CUDA syntax.
+struct NVVMPlannedEphemeralValue
+{
+    IRInst* source = nullptr;
+    NVVMPlannedEphemeralValueKind kind = NVVMPlannedEphemeralValueKind::ChosenUndefined;
+    IRType* valueType = nullptr;
+    IRStringLit* stringLiteral = nullptr;
+};
+
+/// Owns one explicit image surface operation and its exact provider descriptor.
+struct NVVMPlannedSurfaceOperation
+{
+    IRInst* source = nullptr;
+    SlangNVVMSurfaceOperationDesc desc = {};
+    IRInst* surface = nullptr;
+    IRInst* coordinate = nullptr;
+    IRInst* value = nullptr;
+    const char* diagnosticName = nullptr;
+};
+
+/// Owns one canonical scalar atomic operation and any compiler-side value recipe.
+struct NVVMPlannedAtomicOperation
+{
+    IRInst* source = nullptr;
+    SlangNVVMAtomicOperationDesc desc = {};
+    IRInst* pointer = nullptr;
+    IRInst* values[2] = {};
+    uint32_t valueCount = 0;
+    NVVMValueRecipeStep valueNegation;
+    int64_t implicitValue = 0;
+    bool hasImplicitValue = false;
+    bool negatesValue = false;
+    const char* diagnosticName = nullptr;
+};
+
 /// Owns stable module decisions produced by preflight and consumed without reclassification.
 struct NVVMEmissionPlan
 {
@@ -124,6 +182,10 @@ struct NVVMEmissionPlan
     List<NVVMPlannedNumericTruthiness> numericTruthinessOperations;
     List<NVVMPlannedFloatingRemainder> floatingRemainderOperations;
     List<NVVMPlannedBitfieldOperation> bitfieldOperations;
+    List<NVVMPlannedDefaultResourceValue> defaultResourceValues;
+    List<NVVMPlannedEphemeralValue> ephemeralValues;
+    List<NVVMPlannedSurfaceOperation> surfaceOperations;
+    List<NVVMPlannedAtomicOperation> atomicOperations;
 };
 
 /// Owns one exact typed atomic-operation overload required by accepted linked IR.

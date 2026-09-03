@@ -7493,6 +7493,17 @@ Capability requirements remain a separate deduplicated set and are still checked
 creation. No IR shape or provider ABI changed. Frozen corpus v1 remains 418/418/418 over 427,
 discovery remains 72/72/72 over 72, and the permanent gates pass 437/437 and 92/92.
 
+### Slice 186: Planned memory and resource families
+
+Preflight now owns typed source records for canonical ephemeral/default-resource values, explicit
+image surface operations, and ordinary atomic IR. Pointer-consumer validation and provider
+emission use those records instead of invoking their resolvers. All plan families use one checked
+source-index constructor, so source uniqueness is enforced in one place.
+
+GenericAsm atomic reductions, byte-address atomics, and surface helpers remain separate typed
+helper contracts. No accepted shape or provider ABI changed. Frozen corpus v1 stays 418/418/418,
+discovery stays 72/72/72, and the permanent gates pass 437/437 and 92/92.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

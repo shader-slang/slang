@@ -2610,3 +2610,12 @@ Capability queries remain separately deduplicated and complete before module cre
 Provider ABI revision 34 is unchanged. Frozen corpus v1 remains 418/418/418 over 427 healthy
 references with zero old-correct regression. Discovery remains 72/72/72 over 72. The selected
 prefix passes 437/437 and the permanent NVVM category passes 92/92.
+
+Slice 186 extends the plan to ordinary atomics, explicit image surfaces, optional default resource
+values, and canonical ephemeral values. The first preflight walk owns their full typed resolution;
+SSA validation, pointer-consumer checks, and emission use the source record. One checked template
+now constructs every per-family source index.
+
+GenericAsm helper families retain their distinct contracts. Provider ABI revision 34 is unchanged.
+Frozen corpus v1 remains 418/418/418 over 427 with zero old-correct regression, discovery remains
+72/72/72 over 72, and the regression gates pass 437/437 and 92/92.

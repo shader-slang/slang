@@ -2105,23 +2105,12 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
     return true;
 }
 
-enum class NVVMDefaultResourceValueKind
-{
-    RawStructuredBuffer,
-    DescriptorHandle,
-};
-
-struct NVVMDefaultResourceValue
-{
-    IRType* resultType = nullptr;
-    NVVMDefaultResourceValueKind kind = NVVMDefaultResourceValueKind::RawStructuredBuffer;
-    NVVMRawBufferType rawBufferType;
-};
-
 // Resolves the exact resource leaves retained when optional lowering constructs the irrelevant
 // payload of `none`. Raw structured buffers use their established pointer/count view, while the
 // selected texture and sampler descriptor handles are aliases of an i64 resource handle.
-bool _resolveNVVMDefaultResourceValue(IRInst* inst, NVVMDefaultResourceValue& outDefaultValue)
+bool _resolveNVVMDefaultResourceValue(
+    IRInst* inst,
+    NVVMPlannedDefaultResourceValue& outDefaultValue)
 {
     outDefaultValue = {};
     if (!as<IRDefaultConstruct>(inst) || inst->getOperandCount() != 0)
@@ -2133,8 +2122,9 @@ bool _resolveNVVMDefaultResourceValue(IRInst* inst, NVVMDefaultResourceValue& ou
         rawBufferType.kind == NVVMRawBufferKind::Structured)
     {
         outDefaultValue.resultType = resultType;
-        outDefaultValue.kind = NVVMDefaultResourceValueKind::RawStructuredBuffer;
-        outDefaultValue.rawBufferType = rawBufferType;
+        outDefaultValue.kind = NVVMPlannedDefaultResourceValueKind::RawStructuredBuffer;
+        outDefaultValue.structuredElementType = rawBufferType.structuredElementType;
+        outDefaultValue.source = inst;
         return true;
     }
 
@@ -2145,7 +2135,8 @@ bool _resolveNVVMDefaultResourceValue(IRInst* inst, NVVMDefaultResourceValue& ou
          asNVVMSupportedSamplerValueType(resourceType)))
     {
         outDefaultValue.resultType = resultType;
-        outDefaultValue.kind = NVVMDefaultResourceValueKind::DescriptorHandle;
+        outDefaultValue.kind = NVVMPlannedDefaultResourceValueKind::DescriptorHandle;
+        outDefaultValue.source = inst;
         return true;
     }
     return false;
@@ -2606,25 +2597,11 @@ bool _isNVVMSupportedModuleConstantValue(IRInst* value)
     return _isNVVMSupportedModuleConstantValue(value, activeValues);
 }
 
-enum class NVVMEphemeralValueKind
-{
-    ChosenUndefined,
-    StableStringHash,
-    IgnoredDebugNoScope,
-};
-
-struct NVVMResolvedEphemeralValue
-{
-    NVVMEphemeralValueKind kind = NVVMEphemeralValueKind::ChosenUndefined;
-    IRType* valueType = nullptr;
-    IRStringLit* stringLiteral = nullptr;
-};
-
 // Resolves canonical values and markers that code generation consumes without a source-level CUDA
 // expression. Every accepted form has one upstream semantic source of truth: SSA construction
 // chooses an arbitrary value, GPU string validation proves the literal, and inlining owns the
 // debug-scope marker.
-bool _resolveNVVMEphemeralValue(IRInst* inst, NVVMResolvedEphemeralValue& outValue)
+bool _resolveNVVMEphemeralValue(IRInst* inst, NVVMPlannedEphemeralValue& outValue)
 {
     outValue = {};
     if (!inst)
@@ -2635,8 +2612,9 @@ bool _resolveNVVMEphemeralValue(IRInst* inst, NVVMResolvedEphemeralValue& outVal
     case kIROp_LoadFromUninitializedMemory:
         if (!isNVVMSupportedCopyableValueType(inst->getDataType()))
             return false;
-        outValue.kind = NVVMEphemeralValueKind::ChosenUndefined;
+        outValue.kind = NVVMPlannedEphemeralValueKind::ChosenUndefined;
         outValue.valueType = inst->getDataType();
+        outValue.source = inst;
         return true;
 
     case kIROp_GetStringHash:
@@ -2645,28 +2623,22 @@ bool _resolveNVVMEphemeralValue(IRInst* inst, NVVMResolvedEphemeralValue& outVal
         outValue.stringLiteral = as<IRStringLit>(inst->getOperand(0));
         if (!outValue.stringLiteral)
             return false;
-        outValue.kind = NVVMEphemeralValueKind::StableStringHash;
+        outValue.kind = NVVMPlannedEphemeralValueKind::StableStringHash;
         outValue.valueType = inst->getDataType();
+        outValue.source = inst;
         return true;
 
     case kIROp_DebugNoScope:
         if (!as<IRVoidType>(inst->getDataType()))
             return false;
-        outValue.kind = NVVMEphemeralValueKind::IgnoredDebugNoScope;
+        outValue.kind = NVVMPlannedEphemeralValueKind::IgnoredDebugNoScope;
+        outValue.source = inst;
         return true;
 
     default:
         return false;
     }
 }
-
-struct NVVMResolvedSurfaceOperation
-{
-    SlangNVVMSurfaceOperationDesc desc = {};
-    IRInst* surface = nullptr;
-    IRInst* coordinate = nullptr;
-    IRInst* value = nullptr;
-};
 
 uint32_t _getNVVMSurfaceBaseCoordinateLaneCount(SlangNVVMTextureShape shape)
 {
@@ -2710,7 +2682,7 @@ bool _getNVVMSurfaceCallStorageFormat(
 bool _resolveNVVMSurfaceGenericAsm(
     IRGenericAsm* genericAsm,
     IRFunc* function,
-    NVVMResolvedSurfaceOperation& outOperation)
+    NVVMPlannedSurfaceOperation& outOperation)
 {
     outOperation = {};
     if (!genericAsm || !function || genericAsm->getOperandCount() != 1)
@@ -2852,7 +2824,7 @@ bool _resolveNVVMSurfaceGenericAsm(
 }
 
 // Resolves the explicit image load/store form produced by PTX image-subscript legalization.
-bool _resolveNVVMSurfaceImageOperation(IRInst* inst, NVVMResolvedSurfaceOperation& outOperation)
+bool _resolveNVVMSurfaceImageOperation(IRInst* inst, NVVMPlannedSurfaceOperation& outOperation)
 {
     outOperation = {};
     const bool isLoad = as<IRImageLoad>(inst) != nullptr;
@@ -2906,6 +2878,9 @@ bool _resolveNVVMSurfaceImageOperation(IRInst* inst, NVVMResolvedSurfaceOperatio
     outOperation.surface = surface;
     outOperation.coordinate = coordinate;
     outOperation.value = value;
+    outOperation.source = inst;
+    outOperation.diagnosticName =
+        isLoad ? "native image surface load" : "native image surface store";
     return true;
 }
 
@@ -5570,19 +5545,6 @@ bool _getNVVMDescriptorHandleConversion(IRInst* inst, IRInst*& outValue)
     return true;
 }
 
-struct NVVMResolvedAtomicOperation
-{
-    SlangNVVMAtomicOperationDesc desc = {};
-    IRInst* pointer = nullptr;
-    IRInst* values[2] = {};
-    uint32_t valueCount = 0;
-    NVVMValueRecipeStep valueNegation;
-    int64_t implicitValue = 0;
-    bool hasImplicitValue = false;
-    bool negatesValue = false;
-    const char* diagnosticName = nullptr;
-};
-
 struct NVVMResolvedAtomicReduction
 {
     SlangNVVMAtomicOperationDesc desc = {};
@@ -5932,7 +5894,7 @@ bool _resolveNVVMAtomicPointer(IRInst* value, NVVMResolvedAtomicPointer& outPoin
 
 // Resolves one canonical scalar atomic to the complete descriptor consumed by both preflight and
 // emission. Memory-order literals are semantic metadata and are not provider SSA operands.
-bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMResolvedAtomicOperation& outOperation)
+bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMPlannedAtomicOperation& outOperation)
 {
     outOperation = {};
     if (!inst)
@@ -6080,6 +6042,7 @@ bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMResolvedAtomicOperation& outO
     outOperation.pointer = pointer;
     outOperation.valueCount = valueCount;
     outOperation.diagnosticName = "relaxed scalar atomic operation";
+    outOperation.source = inst;
     return true;
 }
 
@@ -6184,9 +6147,20 @@ const T* _findPlannedNVVMOperation(const List<T>& operations, IRInst* source)
     return nullptr;
 }
 
+template<typename T>
+void _indexPlannedNVVMOperations(const List<T>& operations, Dictionary<IRInst*, Index>& outIndices)
+{
+    for (Index i = 0; i < operations.getCount(); ++i)
+    {
+        SLANG_RELEASE_ASSERT(operations[i].source);
+        SLANG_RELEASE_ASSERT(!outIndices.containsKey(operations[i].source));
+        outIndices[operations[i].source] = i;
+    }
+}
+
 void _requireNVVMAtomicOperations(
     NVVMOperationRequirements& requirements,
-    const NVVMResolvedAtomicOperation& operation)
+    const NVVMPlannedAtomicOperation& operation)
 {
     _requireAtomicOperation(
         requirements.atomicOperations,
@@ -7092,6 +7066,7 @@ SlangResult _validateByteAddressValue(
 // Checks an available scalar pointer and enforces the source access qualifier for stores.
 SlangResult _validatePointerValue(
     CodeGenContext* codeGenContext,
+    const NVVMOperationRequirements& requirements,
     IRInst* value,
     IRInst* consumer,
     const HashSet<IRInst*>& availableValues,
@@ -7223,9 +7198,9 @@ SlangResult _validatePointerValue(
     IRType* actualPointeeType = acceptedPtrType->getValueType();
     if (!expectedPointeeType || !isTypeEqual(actualPointeeType, expectedPointeeType))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("device pointer pointee type"));
-    NVVMResolvedAtomicOperation atomicOperation;
-    const bool isAtomicConsumer =
-        _resolveNVVMAtomicOperation(consumer, atomicOperation) && atomicOperation.pointer == value;
+    const auto atomicOperation =
+        _findPlannedNVVMOperation(requirements.emissionPlan.atomicOperations, consumer);
+    const bool isAtomicConsumer = atomicOperation && atomicOperation->pointer == value;
     NVVMSequentialElementPointer childElementPointer;
     const bool hasSequentialChild = consumer && consumer->getOp() == kIROp_GetElementPtr &&
                                     consumer->getOperandCount() == 2 &&
@@ -8027,13 +8002,14 @@ SlangResult _validateNVVMFunction(
             case kIROp_GetStringHash:
             case kIROp_DebugNoScope:
                 {
-                    NVVMResolvedEphemeralValue value;
+                    NVVMPlannedEphemeralValue value;
                     if (!_resolveNVVMEphemeralValue(inst, value))
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
                             UnownedStringSlice(getIROpInfo(inst->getOp()).name));
                     }
+                    requirements.emissionPlan.ephemeralValues.add(value);
                 }
                 break;
 
@@ -8111,7 +8087,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_ImageLoad:
             case kIROp_ImageStore:
                 {
-                    NVVMResolvedSurfaceOperation surfaceOperation;
+                    NVVMPlannedSurfaceOperation surfaceOperation;
                     if (!_resolveNVVMSurfaceImageOperation(inst, surfaceOperation))
                     {
                         return _diagnoseUnsupportedIR(
@@ -8125,6 +8101,7 @@ SlangResult _validateNVVMFunction(
                         surfaceOperation.desc.operation == SLANG_NVVM_SURFACE_OP_LOAD
                             ? "native image surface load"
                             : "native image surface store");
+                    requirements.emissionPlan.surfaceOperations.add(surfaceOperation);
                 }
                 break;
 
@@ -8146,7 +8123,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_DefaultConstruct:
                 {
-                    NVVMDefaultResourceValue defaultValue;
+                    NVVMPlannedDefaultResourceValue defaultValue;
                     if (!_resolveNVVMDefaultResourceValue(inst, defaultValue))
                     {
                         return _diagnoseUnsupportedIRType(
@@ -8154,6 +8131,7 @@ SlangResult _validateNVVMFunction(
                             "default construct type",
                             inst->getDataType());
                     }
+                    requirements.emissionPlan.defaultResourceValues.add(defaultValue);
                 }
                 break;
 
@@ -8288,12 +8266,13 @@ SlangResult _validateNVVMFunction(
             case kIROp_AtomicInc:
             case kIROp_AtomicDec:
                 {
-                    NVVMResolvedAtomicOperation operation;
+                    NVVMPlannedAtomicOperation operation;
                     if (!_resolveNVVMAtomicOperation(inst, operation))
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
                             UnownedStringSlice(getIROpInfo(inst->getOp()).name));
                     _requireNVVMAtomicOperations(requirements, operation);
+                    requirements.emissionPlan.atomicOperations.add(operation);
                 }
                 break;
 
@@ -8399,7 +8378,7 @@ SlangResult _validateNVVMFunction(
                     NVVMAggregateWaveOperation aggregateWaveOperation;
                     NVVMResolvedByteAddressAtomic byteAddressAtomic;
                     NVVMResolvedAtomicReduction atomicReduction;
-                    NVVMResolvedSurfaceOperation surfaceOperation;
+                    NVVMPlannedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
                     if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
                     {
@@ -8747,9 +8726,10 @@ SlangResult _validateNVVMFunction(
             case kIROp_GetStringHash:
             case kIROp_DebugNoScope:
                 {
-                    NVVMResolvedEphemeralValue value;
-                    SLANG_RELEASE_ASSERT(_resolveNVVMEphemeralValue(inst, value));
-                    if (value.kind != NVVMEphemeralValueKind::IgnoredDebugNoScope)
+                    const auto value =
+                        _findPlannedNVVMOperation(requirements.emissionPlan.ephemeralValues, inst);
+                    SLANG_RELEASE_ASSERT(value);
+                    if (value->kind != NVVMPlannedEphemeralValueKind::IgnoredDebugNoScope)
                         availableValues.add(inst);
                 }
                 break;
@@ -8759,6 +8739,7 @@ SlangResult _validateNVVMFunction(
                     auto load = cast<IRLoad>(inst);
                     SLANG_RETURN_ON_FAIL(_validatePointerValue(
                         codeGenContext,
+                        requirements,
                         load->getPtr(),
                         load,
                         availableValues,
@@ -8774,6 +8755,7 @@ SlangResult _validateNVVMFunction(
                     auto store = cast<IRStore>(inst);
                     SLANG_RETURN_ON_FAIL(_validatePointerValue(
                         codeGenContext,
+                        requirements,
                         store->getPtr(),
                         store,
                         availableValues,
@@ -8795,6 +8777,7 @@ SlangResult _validateNVVMFunction(
                     SLANG_RELEASE_ASSERT(_getNVVMVectorSwizzledStore(inst, store));
                     SLANG_RETURN_ON_FAIL(_validatePointerValue(
                         codeGenContext,
+                        requirements,
                         store.destination,
                         inst,
                         availableValues,
@@ -8813,25 +8796,27 @@ SlangResult _validateNVVMFunction(
             case kIROp_ImageLoad:
             case kIROp_ImageStore:
                 {
-                    NVVMResolvedSurfaceOperation surfaceOperation;
-                    SLANG_RELEASE_ASSERT(_resolveNVVMSurfaceImageOperation(inst, surfaceOperation));
+                    const auto surfaceOperation = _findPlannedNVVMOperation(
+                        requirements.emissionPlan.surfaceOperations,
+                        inst);
+                    SLANG_RELEASE_ASSERT(surfaceOperation);
                     SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                         codeGenContext,
-                        surfaceOperation.surface,
+                        surfaceOperation->surface,
                         inst,
                         availableValues,
                         dominatorTree));
                     SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                         codeGenContext,
-                        surfaceOperation.coordinate,
+                        surfaceOperation->coordinate,
                         inst,
                         availableValues,
                         dominatorTree));
-                    if (surfaceOperation.value)
+                    if (surfaceOperation->value)
                     {
                         SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                             codeGenContext,
-                            surfaceOperation.value,
+                            surfaceOperation->value,
                             inst,
                             availableValues,
                             dominatorTree));
@@ -8867,8 +8852,9 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_DefaultConstruct:
                 {
-                    NVVMDefaultResourceValue defaultValue;
-                    SLANG_RELEASE_ASSERT(_resolveNVVMDefaultResourceValue(inst, defaultValue));
+                    SLANG_RELEASE_ASSERT(_findPlannedNVVMOperation(
+                        requirements.emissionPlan.defaultResourceValues,
+                        inst));
                     availableValues.add(inst);
                 }
                 break;
@@ -8996,6 +8982,7 @@ SlangResult _validateNVVMFunction(
                         {
                             SLANG_RETURN_ON_FAIL(_validatePointerValue(
                                 codeGenContext,
+                                requirements,
                                 pointerCast.value,
                                 inst,
                                 availableValues,
@@ -9032,21 +9019,23 @@ SlangResult _validateNVVMFunction(
             case kIROp_AtomicInc:
             case kIROp_AtomicDec:
                 {
-                    NVVMResolvedAtomicOperation operation;
-                    SLANG_RELEASE_ASSERT(_resolveNVVMAtomicOperation(inst, operation));
+                    const auto operation =
+                        _findPlannedNVVMOperation(requirements.emissionPlan.atomicOperations, inst);
+                    SLANG_RELEASE_ASSERT(operation);
                     SLANG_RETURN_ON_FAIL(_validatePointerValue(
                         codeGenContext,
-                        operation.pointer,
+                        requirements,
+                        operation->pointer,
                         inst,
                         availableValues,
                         dominatorTree,
                         true,
-                        cast<IRPtrTypeBase>(operation.pointer->getDataType())->getValueType()));
-                    for (uint32_t i = 0; i < operation.valueCount; ++i)
+                        cast<IRPtrTypeBase>(operation->pointer->getDataType())->getValueType()));
+                    for (uint32_t i = 0; i < operation->valueCount; ++i)
                     {
                         SLANG_RETURN_ON_FAIL(_validateSelectedValue(
                             codeGenContext,
-                            operation.values[i],
+                            operation->values[i],
                             inst,
                             availableValues,
                             dominatorTree));
@@ -9124,6 +9113,7 @@ SlangResult _validateNVVMFunction(
                         {
                             SLANG_RETURN_ON_FAIL(_validatePointerValue(
                                 codeGenContext,
+                                requirements,
                                 argument,
                                 call,
                                 availableValues,
@@ -9282,6 +9272,7 @@ SlangResult _validateNVVMFunction(
                     }
                     SLANG_RETURN_ON_FAIL(_validatePointerValue(
                         codeGenContext,
+                        requirements,
                         basePointer,
                         inst,
                         availableValues,
@@ -9336,6 +9327,7 @@ SlangResult _validateNVVMFunction(
                         {
                             SLANG_RETURN_ON_FAIL(_validatePointerValue(
                                 codeGenContext,
+                                requirements,
                                 basePointer,
                                 inst,
                                 availableValues,
@@ -9583,6 +9575,7 @@ SlangResult _validateNVVMFunction(
                             {
                                 SLANG_RETURN_ON_FAIL(_validatePointerValue(
                                     codeGenContext,
+                                    requirements,
                                     returnInst->getVal(),
                                     returnInst,
                                     availableValues,
@@ -9918,14 +9911,14 @@ SlangResult _emitNVVMDefaultResourceValue(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
-    const NVVMDefaultResourceValue& defaultValue,
+    const NVVMPlannedDefaultResourceValue& defaultValue,
     NVVMTypeLoweringContext& typeContext,
     SlangNVVMValueHandle& outValue)
 {
     outValue = nullptr;
     SLANG_RELEASE_ASSERT(defaultValue.resultType);
 
-    if (defaultValue.kind == NVVMDefaultResourceValueKind::DescriptorHandle)
+    if (defaultValue.kind == NVVMPlannedDefaultResourceValueKind::DescriptorHandle)
     {
         SlangNVVMTypeHandle handleType = nullptr;
         SLANG_RETURN_ON_FAIL(
@@ -9937,17 +9930,15 @@ SlangResult _emitNVVMDefaultResourceValue(
     }
 
     SLANG_RELEASE_ASSERT(
-        defaultValue.kind == NVVMDefaultResourceValueKind::RawStructuredBuffer &&
-        defaultValue.rawBufferType.structuredElementType);
+        defaultValue.kind == NVVMPlannedDefaultResourceValueKind::RawStructuredBuffer &&
+        defaultValue.structuredElementType);
     const NVVMTypeUse elementUse =
-        isNVVMSupportedStructuredBufferStorageType(defaultValue.rawBufferType.structuredElementType)
+        isNVVMSupportedStructuredBufferStorageType(defaultValue.structuredElementType)
             ? NVVMTypeUse::StructuredBufferStorage
             : NVVMTypeUse::Value;
     SlangNVVMTypeHandle elementType = nullptr;
-    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-        defaultValue.rawBufferType.structuredElementType,
-        elementUse,
-        elementType));
+    SLANG_RETURN_ON_FAIL(
+        typeContext.lowerType(defaultValue.structuredElementType, elementUse, elementType));
     SlangNVVMTypeHandle dataPointerType = nullptr;
     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
         codeGenContext,
@@ -13382,45 +13373,41 @@ SlangResult emitNVVMIRFromLinkedIR(
     NVVMGlobalUserPointerSet globalUserPointers;
     Dictionary<IRBlock*, SlangNVVMBlockHandle> blockMap;
     Dictionary<IRInst*, Index> plannedValueOperationIndices;
-    for (Index i = 0; i < requirements.emissionPlan.valueOperations.getCount(); ++i)
-    {
-        const auto& operation = requirements.emissionPlan.valueOperations[i];
-        SLANG_RELEASE_ASSERT(operation.source);
-        SLANG_RELEASE_ASSERT(!plannedValueOperationIndices.containsKey(operation.source));
-        plannedValueOperationIndices[operation.source] = i;
-    }
     Dictionary<IRInst*, Index> plannedUInt64WordConstructionIndices;
-    for (Index i = 0; i < requirements.emissionPlan.uint64WordConstructions.getCount(); ++i)
-    {
-        const auto& operation = requirements.emissionPlan.uint64WordConstructions[i];
-        SLANG_RELEASE_ASSERT(operation.source);
-        SLANG_RELEASE_ASSERT(!plannedUInt64WordConstructionIndices.containsKey(operation.source));
-        plannedUInt64WordConstructionIndices[operation.source] = i;
-    }
     Dictionary<IRInst*, Index> plannedNumericTruthinessIndices;
-    for (Index i = 0; i < requirements.emissionPlan.numericTruthinessOperations.getCount(); ++i)
-    {
-        const auto& operation = requirements.emissionPlan.numericTruthinessOperations[i];
-        SLANG_RELEASE_ASSERT(operation.source);
-        SLANG_RELEASE_ASSERT(!plannedNumericTruthinessIndices.containsKey(operation.source));
-        plannedNumericTruthinessIndices[operation.source] = i;
-    }
     Dictionary<IRInst*, Index> plannedFloatingRemainderIndices;
-    for (Index i = 0; i < requirements.emissionPlan.floatingRemainderOperations.getCount(); ++i)
-    {
-        const auto& operation = requirements.emissionPlan.floatingRemainderOperations[i];
-        SLANG_RELEASE_ASSERT(operation.source);
-        SLANG_RELEASE_ASSERT(!plannedFloatingRemainderIndices.containsKey(operation.source));
-        plannedFloatingRemainderIndices[operation.source] = i;
-    }
     Dictionary<IRInst*, Index> plannedBitfieldOperationIndices;
-    for (Index i = 0; i < requirements.emissionPlan.bitfieldOperations.getCount(); ++i)
-    {
-        const auto& operation = requirements.emissionPlan.bitfieldOperations[i];
-        SLANG_RELEASE_ASSERT(operation.source);
-        SLANG_RELEASE_ASSERT(!plannedBitfieldOperationIndices.containsKey(operation.source));
-        plannedBitfieldOperationIndices[operation.source] = i;
-    }
+    Dictionary<IRInst*, Index> plannedDefaultResourceValueIndices;
+    Dictionary<IRInst*, Index> plannedEphemeralValueIndices;
+    Dictionary<IRInst*, Index> plannedSurfaceOperationIndices;
+    Dictionary<IRInst*, Index> plannedAtomicOperationIndices;
+    _indexPlannedNVVMOperations(
+        requirements.emissionPlan.valueOperations,
+        plannedValueOperationIndices);
+    _indexPlannedNVVMOperations(
+        requirements.emissionPlan.uint64WordConstructions,
+        plannedUInt64WordConstructionIndices);
+    _indexPlannedNVVMOperations(
+        requirements.emissionPlan.numericTruthinessOperations,
+        plannedNumericTruthinessIndices);
+    _indexPlannedNVVMOperations(
+        requirements.emissionPlan.floatingRemainderOperations,
+        plannedFloatingRemainderIndices);
+    _indexPlannedNVVMOperations(
+        requirements.emissionPlan.bitfieldOperations,
+        plannedBitfieldOperationIndices);
+    _indexPlannedNVVMOperations(
+        requirements.emissionPlan.defaultResourceValues,
+        plannedDefaultResourceValueIndices);
+    _indexPlannedNVVMOperations(
+        requirements.emissionPlan.ephemeralValues,
+        plannedEphemeralValueIndices);
+    _indexPlannedNVVMOperations(
+        requirements.emissionPlan.surfaceOperations,
+        plannedSurfaceOperationIndices);
+    _indexPlannedNVVMOperations(
+        requirements.emissionPlan.atomicOperations,
+        plannedAtomicOperationIndices);
 
     // The canonical global owns storage class, value type, extent, and name. Lower those facts once
     // before any function declaration; ordinary body uses then resolve through the shared value
@@ -13791,13 +13778,16 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_GetStringHash:
                 case kIROp_DebugNoScope:
                     {
-                        NVVMResolvedEphemeralValue value;
-                        SLANG_RELEASE_ASSERT(_resolveNVVMEphemeralValue(inst, value));
-                        if (value.kind == NVVMEphemeralValueKind::IgnoredDebugNoScope)
+                        const Index* operationIndex =
+                            plannedEphemeralValueIndices.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(operationIndex);
+                        const auto& value =
+                            requirements.emissionPlan.ephemeralValues[*operationIndex];
+                        if (value.kind == NVVMPlannedEphemeralValueKind::IgnoredDebugNoScope)
                             break;
 
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        if (value.kind == NVVMEphemeralValueKind::ChosenUndefined)
+                        if (value.kind == NVVMPlannedEphemeralValueKind::ChosenUndefined)
                         {
                             SLANG_RETURN_ON_FAIL(_emitNVVMChosenUndefinedValue(
                                 codeGenContext,
@@ -13810,7 +13800,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                         else
                         {
                             SLANG_RELEASE_ASSERT(
-                                value.kind == NVVMEphemeralValueKind::StableStringHash);
+                                value.kind == NVVMPlannedEphemeralValueKind::StableStringHash);
                             SlangNVVMTypeHandle loweredType = nullptr;
                             SLANG_RETURN_ON_FAIL(typeContext.lowerType(
                                 value.valueType,
@@ -14171,11 +14161,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_ImageLoad:
                 case kIROp_ImageStore:
                     {
-                        NVVMResolvedSurfaceOperation operation;
-                        SLANG_RELEASE_ASSERT(_resolveNVVMSurfaceImageOperation(inst, operation));
-                        const auto requirement =
-                            _findSurfaceOperationRequirement(requirements.surfaceOperations, inst);
-                        SLANG_RELEASE_ASSERT(requirement);
+                        const Index* operationIndex =
+                            plannedSurfaceOperationIndices.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(operationIndex);
+                        const auto& operation =
+                            requirements.emissionPlan.surfaceOperations[*operationIndex];
 
                         IRInst* semanticOperands[] = {
                             operation.surface,
@@ -14198,10 +14188,10 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredResult = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            requirement->diagnosticName,
+                            operation.diagnosticName,
                             builder.emitSurfaceOperation(
                                 moduleScope.module,
-                                requirement->desc,
+                                operation.desc,
                                 loweredOperands,
                                 operandCount,
                                 loweredResult)));
@@ -14232,8 +14222,11 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_DefaultConstruct:
                     {
-                        NVVMDefaultResourceValue defaultValue;
-                        SLANG_RELEASE_ASSERT(_resolveNVVMDefaultResourceValue(inst, defaultValue));
+                        const Index* operationIndex =
+                            plannedDefaultResourceValueIndices.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(operationIndex);
+                        const auto& defaultValue =
+                            requirements.emissionPlan.defaultResourceValues[*operationIndex];
                         SlangNVVMValueHandle loweredValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMDefaultResourceValue(
                             codeGenContext,
@@ -14476,8 +14469,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_AtomicInc:
                 case kIROp_AtomicDec:
                     {
-                        NVVMResolvedAtomicOperation operation;
-                        SLANG_RELEASE_ASSERT(_resolveNVVMAtomicOperation(inst, operation));
+                        const Index* operationIndex =
+                            plannedAtomicOperationIndices.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(operationIndex);
+                        const auto& operation =
+                            requirements.emissionPlan.atomicOperations[*operationIndex];
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
