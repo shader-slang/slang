@@ -61,10 +61,10 @@ public:
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
 
-    /// Queries one complete typed scalar atomic operation.
+    /// Queries one complete typed atomic operation.
     bool supportsAtomicOperation(const SlangNVVMAtomicOperationDesc& operation) const;
 
-    /// Emits one complete typed scalar atomic operation.
+    /// Emits one complete typed atomic operation.
     SlangResult emitAtomicOperation(
         SlangNVVMModuleHandle module,
         const SlangNVVMAtomicOperationDesc& operation,

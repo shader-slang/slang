@@ -7621,6 +7621,28 @@ assembles native, direct O0 SM70, and direct O3 SM70/SM80/SM90 outputs. Median s
 time measured 353.5 ms native and 239.1/239.0 ms direct O0/O3 SM70; PTX measured 8,810, 4,648, and
 871 bytes respectively.
 
+### Slice 193: Producer-owned atomic reductions and Half2 add
+
+The complete ordinary atomic-reduction family now carries operation-specific internal semantics
+from both canonical standard-module producers. CUDA branches for add, subtract, min, max, bitwise
+and/or/xor, increment, and decrement legalize to `IRNVVMIntrinsic`; direct preflight no longer
+matches any `__slang_atomic_reduce_*` assembly spelling. The exact void helper signature still owns
+the selected value type, and call validation still requires a canonical global reference and a
+literal relaxed memory order.
+
+The existing typed atomic descriptor already represented a Float16 value with two lanes, so
+provider ABI revision 35 did not change. Its shared semantic catalog now admits only global relaxed
+Float16x2 add. The LLVM 14 provider preserves `<2 x half>` at its boundary and bitcasts to the one
+32-bit pointer/register pair required by `atom.global.add.noftz.f16x2`; unsupported vector shapes,
+shared Half2, and BFloat16 remain outside the contract.
+
+Frozen `compute/reinterpret-structured-buffer` and
+`hlsl-intrinsic/atomic/atomic-reduce-half-cuda` gain permanent O0/O3 lanes. Frozen v1 advances from
+421/421/421 to 423/423/423 over its unchanged 427 healthy denominator with no old-correct loss;
+discovery remains 72/72/72 over 72. The selected prefix passes 439/439 and the permanent category
+passes 102/102. Focused direct PTX is 6,206 bytes at O0 and 1,300 bytes at O3, contains the native
+packed Half2 atomic in both modes, and assembles for SM70, SM80, and SM90.
+
 ## Authoritative References
 
 - [NVVM IR specification](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)

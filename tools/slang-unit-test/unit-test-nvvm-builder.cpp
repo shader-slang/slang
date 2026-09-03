@@ -7281,6 +7281,15 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     SlangNVVMAtomicOperationDesc selectedHalfAddOperation = selectedFloatingAddOperation;
     selectedHalfAddOperation.valueType.bitWidth = 16;
     SLANG_CHECK(builder.supportsAtomicOperation(selectedHalfAddOperation));
+    SlangNVVMAtomicOperationDesc selectedHalf2AddOperation = selectedHalfAddOperation;
+    selectedHalf2AddOperation.valueType.laneCount = 2;
+    SLANG_CHECK(builder.supportsAtomicOperation(selectedHalf2AddOperation));
+    SlangNVVMAtomicOperationDesc unsupportedSharedHalf2AddOperation = selectedHalf2AddOperation;
+    unsupportedSharedHalf2AddOperation.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedSharedHalf2AddOperation));
+    SlangNVVMAtomicOperationDesc unsupportedHalf3AddOperation = selectedHalf2AddOperation;
+    unsupportedHalf3AddOperation.valueType.laneCount = 3;
+    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedHalf3AddOperation));
     unsupportedAtomicOperation = selectedHalfAddOperation;
     unsupportedAtomicOperation.valueType.bitWidth = 8;
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedAtomicOperation));
@@ -7515,6 +7524,87 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     SLANG_CHECK(compatibleAssembly.indexOf("monotonic, align") < 0);
     SLANG_CHECK(compatibleAssembly.indexOf("atomicrmw add i32 addrspace(1)*") >= 0);
     SLANG_CHECK(compatibleAssembly.indexOf("atomicrmw umax i64 addrspace(1)*") >= 0);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderEmitsGlobalHalf2AtomicAdd)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+
+    ScopedNVVMBuilderModule module;
+    module.builder = &builder;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createModule(toSlice("global-half2-atomic-add"), module.module)));
+
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle halfType = nullptr;
+    SlangNVVMTypeHandle half2Type = nullptr;
+    SlangNVVMTypeHandle pointerType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, 16, halfType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getVectorType(module.module, halfType, 2, half2Type)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+        module.module,
+        half2Type,
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        pointerType)));
+
+    const SlangNVVMTypeHandle parameterTypes[] = {pointerType, half2Type};
+    SlangNVVMTypeHandle functionType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+        module.module,
+        voidType,
+        parameterTypes,
+        SLANG_COUNT_OF(parameterTypes),
+        functionType)));
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        module.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("globalHalf2AtomicAdd"),
+        function)));
+    SlangNVVMValueHandle pointer = nullptr;
+    SlangNVVMValueHandle value = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, pointer)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 1, value)));
+    SlangNVVMBlockHandle block = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createBlock(module.module, function, toSlice("entry"), block)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, block)));
+
+    const SlangNVVMAtomicOperationDesc operation = {
+        SLANG_NVVM_ATOMIC_OP_ADD,
+        {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, 2},
+        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+        SLANG_NVVM_MEMORY_ORDER_RELAXED,
+    };
+    const SlangNVVMValueHandle operands[] = {pointer, value};
+    SlangNVVMValueHandle originalValue = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitAtomicOperation(
+        module.module,
+        operation,
+        operands,
+        SLANG_COUNT_OF(operands),
+        originalValue)));
+    SLANG_CHECK_ABORT(originalValue != nullptr);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+
+    ComPtr<ISlangBlob> assemblyBlob;
+    String diagnostics;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        module.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+        assemblyBlob,
+        diagnostics)));
+    SLANG_CHECK(diagnostics.getLength() == 0);
+    const String assembly = _getBlobText(assemblyBlob);
+    SLANG_CHECK(assembly.indexOf("atom.global.add.noftz.f16x2 $0, [$1], $2;") >= 0);
+    SLANG_CHECK(assembly.indexOf("=r,l,r") >= 0);
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerBitOperations)

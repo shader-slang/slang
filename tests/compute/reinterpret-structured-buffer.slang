@@ -3,6 +3,8 @@
 // StructuredBuffer on CUDA (16 bytes: T* data + size_t count).
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(compute, nvvm):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 //TEST_INPUT: ubuffer(data=[1.0h 2.0h 3.0h 4.0h], stride=2, count=4):name=inputBuffer
 uniform RWStructuredBuffer<half>.Handle inputBuffer;

@@ -5750,7 +5750,7 @@ void __atomic_reduce_add<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm(nvvmAtomicReduceAdd) "__slang_atomic_reduce_add($0, $1, (int)$2)";
     default: __atomic_add(val, value, order);
     }
 }
@@ -5790,7 +5790,7 @@ void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, -($1), (int)$2)";
+    case cuda: __intrinsic_asm(nvvmAtomicReduceSubtract) "__slang_atomic_reduce_add($0, -($1), (int)$2)";
     default: __atomic_sub(val, value, order);
     }
 }
@@ -5806,7 +5806,7 @@ void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_min($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm(nvvmAtomicReduceMin) "__slang_atomic_reduce_min($0, $1, (int)$2)";
     default: __atomic_min(val, value, order);
     }
 }
@@ -5822,7 +5822,7 @@ void __atomic_reduce_max<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_max($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm(nvvmAtomicReduceMax) "__slang_atomic_reduce_max($0, $1, (int)$2)";
     default: __atomic_max(val, value, order);
     }
 }
@@ -5838,7 +5838,7 @@ void __atomic_reduce_and<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_and($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm(nvvmAtomicReduceBitAnd) "__slang_atomic_reduce_and($0, $1, (int)$2)";
     default: __atomic_and(val, value, order);
     }
 }
@@ -5854,7 +5854,7 @@ void __atomic_reduce_or<T>(__ref T val, T value, MemoryOrder order = MemoryOrder
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_or($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm(nvvmAtomicReduceBitOr) "__slang_atomic_reduce_or($0, $1, (int)$2)";
     default: __atomic_or(val, value, order);
     }
 }
@@ -5870,7 +5870,7 @@ void __atomic_reduce_xor<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_xor($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm(nvvmAtomicReduceBitXor) "__slang_atomic_reduce_xor($0, $1, (int)$2)";
     default: __atomic_xor(val, value, order);
     }
 }
@@ -5885,7 +5885,7 @@ void __atomic_reduce_inc<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_inc($0, (int)$1)";
+    case cuda: __intrinsic_asm(nvvmAtomicReduceIncrement) "__slang_atomic_reduce_inc($0, (int)$1)";
     default: __atomic_increment(val);
     }
 }
@@ -5900,7 +5900,7 @@ void __atomic_reduce_dec<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_dec($0, (int)$1)";
+    case cuda: __intrinsic_asm(nvvmAtomicReduceDecrement) "__slang_atomic_reduce_dec($0, (int)$1)";
     default: __atomic_decrement(val);
     }
 }

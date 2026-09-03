@@ -5804,95 +5804,95 @@ bool _resolveNVVMByteAddressAtomic(
     return true;
 }
 
-// Resolves one final CUDA atomic-reduction helper from its complete assembly/signature contract.
-// The helper reference is semantic; `Atomic<T>` and `T` references both point at physical `T`.
-bool _resolveNVVMAtomicReduction(
-    IRGenericAsm* genericAsm,
+struct NVVMAtomicReductionSemantic
+{
+    NVVMIntrinsicSemantic semantic;
+    SlangNVVMAtomicOperation operation;
+    bool negatesValue;
+    bool hasImplicitValue;
+    int64_t implicitValue;
+    const char* diagnosticName;
+};
+
+static const NVVMAtomicReductionSemantic kNVVMAtomicReductionSemantics[] = {
+    {kNVVMIntrinsicSemanticAtomicReduceAdd,
+     SLANG_NVVM_ATOMIC_OP_ADD,
+     false,
+     false,
+     0,
+     "relaxed atomic reduction add"},
+    {kNVVMIntrinsicSemanticAtomicReduceSubtract,
+     SLANG_NVVM_ATOMIC_OP_ADD,
+     true,
+     false,
+     0,
+     "relaxed atomic reduction subtract"},
+    {kNVVMIntrinsicSemanticAtomicReduceMin,
+     SLANG_NVVM_ATOMIC_OP_MIN,
+     false,
+     false,
+     0,
+     "relaxed atomic reduction minimum"},
+    {kNVVMIntrinsicSemanticAtomicReduceMax,
+     SLANG_NVVM_ATOMIC_OP_MAX,
+     false,
+     false,
+     0,
+     "relaxed atomic reduction maximum"},
+    {kNVVMIntrinsicSemanticAtomicReduceBitAnd,
+     SLANG_NVVM_ATOMIC_OP_BIT_AND,
+     false,
+     false,
+     0,
+     "relaxed atomic reduction bitwise-and"},
+    {kNVVMIntrinsicSemanticAtomicReduceBitOr,
+     SLANG_NVVM_ATOMIC_OP_BIT_OR,
+     false,
+     false,
+     0,
+     "relaxed atomic reduction bitwise-or"},
+    {kNVVMIntrinsicSemanticAtomicReduceBitXor,
+     SLANG_NVVM_ATOMIC_OP_BIT_XOR,
+     false,
+     false,
+     0,
+     "relaxed atomic reduction bitwise-xor"},
+    {kNVVMIntrinsicSemanticAtomicReduceIncrement,
+     SLANG_NVVM_ATOMIC_OP_ADD,
+     false,
+     true,
+     1,
+     "relaxed atomic reduction increment"},
+    {kNVVMIntrinsicSemanticAtomicReduceDecrement,
+     SLANG_NVVM_ATOMIC_OP_ADD,
+     false,
+     true,
+     -1,
+     "relaxed atomic reduction decrement"},
+};
+
+// Resolves one producer-tagged atomic-reduction helper from its semantic identity and exact typed
+// signature. The helper reference is semantic; `Atomic<T>` and `T` references both point at
+// physical `T`.
+bool _resolveNVVMTaggedAtomicReduction(
+    IRNVVMIntrinsic* intrinsic,
     IRFunc* function,
     NVVMResolvedAtomicReduction& outReduction)
 {
     outReduction = {};
-    IRBlock* block = function ? function->getFirstBlock() : nullptr;
-    if (!genericAsm || !block || block->getNextBlock() || genericAsm->getParent() != block ||
-        genericAsm->getOperandCount() != 1 || !as<IRVoidType>(function->getResultType()))
+    if (!_isCanonicalNVVMIntrinsicValueHelper(intrinsic, function) ||
+        intrinsic->getOperandCount() != 1 || !as<IRVoidType>(function->getResultType()))
     {
         return false;
     }
-    for (auto inst : block->getOrdinaryInsts())
-    {
-        if (inst != genericAsm)
-            return false;
-    }
 
-    struct ReductionSignature
+    auto semanticValue = as<IRIntLit>(intrinsic->getOperand(0));
+    if (!semanticValue || semanticValue->getValue() < 0)
+        return false;
+    const NVVMAtomicReductionSemantic* signature = nullptr;
+    for (const auto& candidate : kNVVMAtomicReductionSemantics)
     {
-        const char* assembly;
-        SlangNVVMAtomicOperation operation;
-        bool negatesValue;
-        bool hasImplicitValue;
-        int64_t implicitValue;
-        const char* diagnosticName;
-    };
-    static const ReductionSignature kSignatures[] = {
-        {"__slang_atomic_reduce_add($0, $1, (int)$2)",
-         SLANG_NVVM_ATOMIC_OP_ADD,
-         false,
-         false,
-         0,
-         "relaxed atomic reduction add"},
-        {"__slang_atomic_reduce_add($0, -($1), (int)$2)",
-         SLANG_NVVM_ATOMIC_OP_ADD,
-         true,
-         false,
-         0,
-         "relaxed atomic reduction subtract"},
-        {"__slang_atomic_reduce_min($0, $1, (int)$2)",
-         SLANG_NVVM_ATOMIC_OP_MIN,
-         false,
-         false,
-         0,
-         "relaxed atomic reduction minimum"},
-        {"__slang_atomic_reduce_max($0, $1, (int)$2)",
-         SLANG_NVVM_ATOMIC_OP_MAX,
-         false,
-         false,
-         0,
-         "relaxed atomic reduction maximum"},
-        {"__slang_atomic_reduce_and($0, $1, (int)$2)",
-         SLANG_NVVM_ATOMIC_OP_BIT_AND,
-         false,
-         false,
-         0,
-         "relaxed atomic reduction bitwise-and"},
-        {"__slang_atomic_reduce_or($0, $1, (int)$2)",
-         SLANG_NVVM_ATOMIC_OP_BIT_OR,
-         false,
-         false,
-         0,
-         "relaxed atomic reduction bitwise-or"},
-        {"__slang_atomic_reduce_xor($0, $1, (int)$2)",
-         SLANG_NVVM_ATOMIC_OP_BIT_XOR,
-         false,
-         false,
-         0,
-         "relaxed atomic reduction bitwise-xor"},
-        {"__slang_atomic_reduce_inc($0, (int)$1)",
-         SLANG_NVVM_ATOMIC_OP_ADD,
-         false,
-         true,
-         1,
-         "relaxed atomic reduction increment"},
-        {"__slang_atomic_reduce_dec($0, (int)$1)",
-         SLANG_NVVM_ATOMIC_OP_ADD,
-         false,
-         true,
-         -1,
-         "relaxed atomic reduction decrement"},
-    };
-    const ReductionSignature* signature = nullptr;
-    for (const auto& candidate : kSignatures)
-    {
-        if (genericAsm->getAsm() == UnownedStringSlice(candidate.assembly))
+        if (NVVMIntrinsicSemantic(semanticValue->getValue()) == candidate.semantic)
         {
             signature = &candidate;
             break;
@@ -8458,12 +8458,17 @@ SlangResult _validateNVVMFunction(
                     auto intrinsic = as<IRNVVMIntrinsic>(inst);
                     NVVMGenericAsmValueOperation valueOperation;
                     NVVMScalarIntrinsicRecipe scalarRecipe;
+                    NVVMResolvedAtomicReduction atomicReduction;
                     NVVMResolvedTextureOperation textureOperation;
                     if (isEntryPoint || intrinsic != terminator)
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("nvvmIntrinsic"));
                     }
-                    if (_resolveNVVMTaggedTextureSample(intrinsic, function, textureOperation))
+                    if (_resolveNVVMTaggedAtomicReduction(intrinsic, function, atomicReduction))
+                    {
+                        _requireNVVMAtomicReductionOperations(requirements, atomicReduction);
+                    }
+                    else if (_resolveNVVMTaggedTextureSample(intrinsic, function, textureOperation))
                     {
                         _requireTextureOperations(
                             requirements.textureOperations,
@@ -8512,7 +8517,6 @@ SlangResult _validateNVVMFunction(
                     NVVMMaskedWaveScalarOperation maskedWaveOperation;
                     NVVMAggregateWaveOperation aggregateWaveOperation;
                     NVVMResolvedByteAddressAtomic byteAddressAtomic;
-                    NVVMResolvedAtomicReduction atomicReduction;
                     NVVMPlannedSurfaceOperation surfaceOperation;
                     NVVMResolvedTextureOperation textureOperation;
                     if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
@@ -8529,11 +8533,6 @@ SlangResult _validateNVVMFunction(
                             requirements.atomicOperations,
                             byteAddressAtomic.desc,
                             byteAddressAtomic.diagnosticName);
-                        break;
-                    }
-                    if (_resolveNVVMAtomicReduction(genericAsm, function, atomicReduction))
-                    {
-                        _requireNVVMAtomicReductionOperations(requirements, atomicReduction);
                         break;
                     }
                     if (_resolveNVVMGenericAsmValueOperation(genericAsm, function, valueOperation))
@@ -9194,10 +9193,10 @@ SlangResult _validateNVVMFunction(
                             toSlice("direct scalar call"));
                     }
                     auto calleeBlock = callee->getFirstBlock();
-                    auto calleeAsm =
-                        calleeBlock ? as<IRGenericAsm>(calleeBlock->getTerminator()) : nullptr;
+                    auto calleeIntrinsic =
+                        calleeBlock ? as<IRNVVMIntrinsic>(calleeBlock->getTerminator()) : nullptr;
                     NVVMResolvedAtomicReduction atomicReduction;
-                    if (_resolveNVVMAtomicReduction(calleeAsm, callee, atomicReduction))
+                    if (_resolveNVVMTaggedAtomicReduction(calleeIntrinsic, callee, atomicReduction))
                     {
                         if (!_isNVVMGlobalHelperReferenceArgument(call->getArg(0)))
                         {
@@ -14924,6 +14923,18 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_NVVMIntrinsic:
                     {
                         auto intrinsic = as<IRNVVMIntrinsic>(inst);
+                        NVVMResolvedAtomicReduction atomicReduction;
+                        if (_resolveNVVMTaggedAtomicReduction(intrinsic, function, atomicReduction))
+                        {
+                            SLANG_RETURN_ON_FAIL(_emitNVVMAtomicReduction(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                atomicReduction,
+                                valueMap,
+                                typeContext));
+                            break;
+                        }
                         if (auto textureRequirement = _findTextureOperationRequirement(
                                 requirements.textureOperations,
                                 function))
@@ -15042,18 +15053,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 builder,
                                 moduleScope.module,
                                 byteAddressAtomic,
-                                valueMap,
-                                typeContext));
-                            break;
-                        }
-                        NVVMResolvedAtomicReduction atomicReduction;
-                        if (_resolveNVVMAtomicReduction(genericAsm, function, atomicReduction))
-                        {
-                            SLANG_RETURN_ON_FAIL(_emitNVVMAtomicReduction(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                atomicReduction,
                                 valueMap,
                                 typeContext));
                             break;

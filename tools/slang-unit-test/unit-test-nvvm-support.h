@@ -5209,7 +5209,15 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitAtomicOperation(
     {
         const bool hasExpectedType =
             operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
-                ? _isFakeNVVMBuilderFloatingPointValue(operands[i], operation->valueType.bitWidth)
+                ? (operation->valueType.laneCount == 1
+                       ? _isFakeNVVMBuilderFloatingPointValue(
+                             operands[i],
+                             operation->valueType.bitWidth)
+                       : operation->valueType.bitWidth == 16 &&
+                             _isFakeNVVMBuilderVectorValue(
+                                 operands[i],
+                                 FakeNVVMBuilderScalarTypeKind::Half,
+                                 operation->valueType.laneCount))
                 : _isFakeNVVMBuilderIntegerValue(operands[i]);
         if (!hasExpectedType || !_getFakeNVVMBuilderValueRef(operands[i], valueRefs[i - 1]))
             return SLANG_E_INVALID_ARG;
@@ -12401,6 +12409,7 @@ static const char kDirectNVVMAtomicReductionSource[] = R"(
 RWStructuredBuffer<uint> integerTarget;
 RWStructuredBuffer<float> floatTarget;
 RWStructuredBuffer<double> doubleTarget;
+RWStructuredBuffer<half2> half2Target;
 RWStructuredBuffer<int> output;
 
 [numthreads(1, 1, 1)]
@@ -12409,6 +12418,7 @@ void computeMain()
     __atomic_reduce_xor(integerTarget[0], 7u);
     __atomic_reduce_add(floatTarget[0], 0.5f);
     __atomic_reduce_add(doubleTarget[0], 0.25);
+    __atomic_reduce_add(half2Target[0], half2(0.125h, 0.25h));
     output[0] = int(integerTarget[0]);
 }
 )";

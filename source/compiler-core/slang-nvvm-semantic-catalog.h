@@ -1090,6 +1090,8 @@ inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
         desc.valueType.laneCount == 1;
     const bool isF32 = desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
                        desc.valueType.bitWidth == 32 && desc.valueType.laneCount == 1;
+    const bool isHalf2 = desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                         desc.valueType.bitWidth == 16 && desc.valueType.laneCount == 2;
     const bool isSelectedIntegerReduction =
         isAtomicAddressSpace && isSelectedInteger &&
         (desc.operation == SLANG_NVVM_ATOMIC_OP_ADD ||
@@ -1100,10 +1102,11 @@ inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
     const bool isSelectedFloatingReduction =
         desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
         desc.operation == SLANG_NVVM_ATOMIC_OP_ADD &&
-        desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-        (desc.valueType.bitWidth == 16 || desc.valueType.bitWidth == 32 ||
-         desc.valueType.bitWidth == 64) &&
-        desc.valueType.laneCount == 1;
+        ((desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+          (desc.valueType.bitWidth == 16 || desc.valueType.bitWidth == 32 ||
+           desc.valueType.bitWidth == 64) &&
+          desc.valueType.laneCount == 1) ||
+         isHalf2);
     const bool isCommonMemoryOperation = isAtomicAddressSpace && (isSelectedInteger || isF32) &&
                                          (desc.operation == SLANG_NVVM_ATOMIC_OP_LOAD ||
                                           desc.operation == SLANG_NVVM_ATOMIC_OP_STORE ||

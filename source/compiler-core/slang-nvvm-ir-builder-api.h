@@ -219,7 +219,7 @@ extern "C"
 #define SLANG_NVVM_MEMORY_ORDER_SEQUENTIALLY_CONSISTENT ((SlangNVVMMemoryOrder)4u)
 #define SLANG_NVVM_MEMORY_ORDER_COUNT 5u
 
-    /** Describes one complete typed scalar atomic overload. */
+    /** Describes one complete typed atomic overload. */
     typedef struct SlangNVVMAtomicOperationDesc
     {
         SlangNVVMAtomicOperation operation;

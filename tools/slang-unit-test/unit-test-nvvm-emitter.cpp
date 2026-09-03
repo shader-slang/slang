@@ -7258,6 +7258,7 @@ SLANG_UNIT_TEST(nvvmSlangAtomicReductionsUseGlobalHelperReferences)
         bool sawUnsignedXor = false;
         bool sawFloat32Add = false;
         bool sawFloat64Add = false;
+        bool sawHalf2Add = false;
         for (const SlangNVVMAtomicOperationDesc& operation : gFakeNVVMBuilder.atomicOperations)
         {
             SLANG_CHECK(operation.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL);
@@ -7271,18 +7272,22 @@ SLANG_UNIT_TEST(nvvmSlangAtomicReductionsUseGlobalHelperReferences)
             sawFloat64Add |=
                 operation.operation == SLANG_NVVM_ATOMIC_OP_ADD &&
                 NVVMSemantics::areSameType(operation.valueType, NVVMSemantics::kFloat64);
+            sawHalf2Add |= operation.operation == SLANG_NVVM_ATOMIC_OP_ADD &&
+                           operation.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                           operation.valueType.bitWidth == 16 && operation.valueType.laneCount == 2;
         }
-        SLANG_CHECK(gFakeNVVMBuilder.atomicOperations.getCount() == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.atomicOperations.getCount() == 4);
         SLANG_CHECK(sawUnsignedXor);
         SLANG_CHECK(sawFloat32Add);
         SLANG_CHECK(sawFloat64Add);
-        SLANG_CHECK(gFakeNVVMBuilder.emitPointerAddressSpaceCastCallCount == 6);
+        SLANG_CHECK(sawHalf2Add);
+        SLANG_CHECK(gFakeNVVMBuilder.emitPointerAddressSpaceCastCallCount == 8);
         for (const FakeNVVMBuilderValueRef& pointer :
              gFakeNVVMBuilder.atomicOperationPointerValueRefs)
         {
             SLANG_CHECK(pointer.kind == FakeNVVMBuilderValueKind::PointerAddressSpaceCast);
         }
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 3);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 4);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);

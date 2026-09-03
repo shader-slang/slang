@@ -885,11 +885,17 @@ static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
         operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
         pointeeType->isFloatingPointTy() &&
         pointeeType->getScalarSizeInBits() == operation->valueType.bitWidth;
+    auto pointeeVectorType = llvm::dyn_cast_or_null<llvm::FixedVectorType>(pointeeType);
+    const bool hasExpectedHalf2Type =
+        pointeeVectorType && operation &&
+        operation->valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+        operation->valueType.bitWidth == 16 && operation->valueType.laneCount == 2 &&
+        pointeeVectorType->getNumElements() == 2 && pointeeVectorType->getElementType()->isHalfTy();
     if (!operation || !Slang::NVVMSemantics::isSupported(*operation) || !outValue || !operands ||
         operandCount != expectedOperandCount || !pointerType ||
         pointerType->getAddressSpace() != operation->addressSpace || !pointeeType ||
-        (!hasExpectedIntegerType && !hasExpectedFloatingType) || !insertionBlock ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer))
+        (!hasExpectedIntegerType && !hasExpectedFloatingType && !hasExpectedHalf2Type) ||
+        !insertionBlock || !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmPointer))
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -905,7 +911,7 @@ static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
         }
     }
 
-    const llvm::Align alignment(operation->valueType.bitWidth / 8);
+    const llvm::Align alignment(operation->valueType.bitWidth * operation->valueType.laneCount / 8);
     const llvm::AtomicOrdering ordering = llvm::AtomicOrdering::Monotonic;
     const llvm::SyncScope::ID syncScope = llvm::SyncScope::System;
 
@@ -925,6 +931,29 @@ static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     }
 
     llvm::Value* originalValue = nullptr;
+    if (hasExpectedHalf2Type && operation->operation == SLANG_NVVM_ATOMIC_OP_ADD)
+    {
+        // CUDA's packed Half2 atomic add crosses the PTX boundary as one 32-bit register. The
+        // descriptor and LLVM values remain typed as <2 x half>; these bitcasts only establish the
+        // exact register and pointer types required by the inline-assembly constraints.
+        llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
+        llvm::PointerType* int32PointerType =
+            llvm::PointerType::get(int32Type, SLANG_NVVM_ADDRESS_SPACE_GLOBAL);
+        llvm::Value* integerPointer = state->builder.CreateBitCast(llvmPointer, int32PointerType);
+        llvm::Value* integerValue = state->builder.CreateBitCast(llvmValues[0], int32Type);
+        llvm::FunctionType* functionType =
+            llvm::FunctionType::get(int32Type, {int32PointerType, int32Type}, false);
+        llvm::InlineAsm* inlineAsm = llvm::InlineAsm::get(
+            functionType,
+            "atom.global.add.noftz.f16x2 $0, [$1], $2;",
+            "=r,l,r",
+            true);
+        llvm::Value* resultBits =
+            state->builder.CreateCall(inlineAsm, {integerPointer, integerValue});
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
+            state->builder.CreateBitCast(resultBits, pointeeType));
+        return SLANG_OK;
+    }
     if (hasExpectedFloatingType && operation->valueType.bitWidth == 16 &&
         operation->operation == SLANG_NVVM_ATOMIC_OP_ADD)
     {

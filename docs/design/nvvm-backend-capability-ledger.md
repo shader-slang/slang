@@ -2700,3 +2700,18 @@ to 421/421/421 over its unchanged 427 healthy denominator with no old-correct re
 frozen generic-asm-texture cluster is eliminated. Discovery remains 72/72/72 over 72, the selected
 prefix passes 438/438, and the permanent NVVM category passes 98/98. The unchanged proposed
 corpus-v2 composition would now be 471/471/471 over 477, with six healthy gaps.
+
+Slice 193 removes CUDA-text classification from all nine ordinary atomic-reduction operations.
+Both `core.meta.slang`'s `Atomic<T>.reduce*` methods and `hlsl.meta.slang`'s free functions now
+produce operation-specific `IRNVVMIntrinsic` semantics. Exact helper and call contracts continue to
+enforce void results, selected reference/value types, global storage, and relaxed ordering. The
+existing provider ABI remains revision 35 because its atomic descriptor already carries lane count.
+
+Global relaxed Float16x2 add is now selected and emitted as typed `<2 x half>` values crossing one
+exact packed `atom.global.add.noftz.f16x2` boundary. Half3/Half4, shared Half2, non-add vector
+atomics, and BFloat16 remain unsupported. The two formerly identical generic-asm-atomic failures,
+`reinterpret-structured-buffer` and `atomic-reduce-half-cuda`, are permanent O0/O3 regressions.
+Frozen v1 advances to 423/423/423 over 427 with no old-correct regression; discovery remains
+72/72/72 over 72. The selected prefix passes 439/439, the permanent category passes 102/102, and
+the unchanged proposed corpus-v2 composition would now be 473/473/473 over 477, with four healthy
+gaps.
