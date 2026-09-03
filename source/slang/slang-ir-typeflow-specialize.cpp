@@ -1602,7 +1602,7 @@ struct TypeFlowSpecializationContext
         }
     }
 
-    bool isEntryPoint(IRFunc* func)
+    bool isSpecializationRoot(IRFunc* func)
     {
         for (auto decoration : func->getDecorations())
         {
@@ -1619,6 +1619,35 @@ struct TypeFlowSpecializationContext
                 return true;
             default:
                 break;
+            }
+        }
+
+        // Structural ray-tracing stage methods are referenced by metadata before
+        // their backend entry-point adapters are synthesized. Treat those methods
+        // as roots so dynamic dispatch in their reachable call graph is specialized.
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (auto info = as<IRStructuralRayTracingEntryPointInfoDecoration>(user))
+            {
+                if (info->getInvoke() == func)
+                    return true;
+            }
+            else if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(user))
+            {
+                if (group->getClosestHit() == func || group->getAnyHit() == func ||
+                    group->getIntersection() == func)
+                    return true;
+            }
+            else if (auto group = as<IRStructuralRayTracingMissGroupInfoDecoration>(user))
+            {
+                if (group->getMiss() == func)
+                    return true;
+            }
+            else if (auto group = as<IRStructuralRayTracingCallableGroupInfoDecoration>(user))
+            {
+                if (group->getCallable() == func)
+                    return true;
             }
         }
         return false;
@@ -1721,7 +1750,7 @@ struct TypeFlowSpecializationContext
         //
         for (auto inst : module->getGlobalInsts())
             if (auto func = as<IRFunc>(inst))
-                if (isEntryPoint(func) && !isInvalidExistentialSpecialization(func))
+                if (isSpecializationRoot(func) && !isInvalidExistentialSpecialization(func))
                     discoverContext(func, workQueue);
 
         drainWorkQueue(workQueue);
@@ -3517,7 +3546,7 @@ struct TypeFlowSpecializationContext
     }
 
     // Collect functions reachable from an entry point by following `IRCall`
-    // callees. Seeds from `isEntryPoint` so the seed set matches the lowering
+    // callees. Seeds from `isSpecializationRoot` so the seed set matches the lowering
     // pass's work-list seed.
     //
     // Two things about what the walk follows are load-bearing for callers:
@@ -3544,7 +3573,7 @@ struct TypeFlowSpecializationContext
         for (auto globalInst : module->getGlobalInsts())
         {
             auto func = as<IRFunc>(globalInst);
-            if (func && isEntryPoint(func) && outReachable.add(func))
+            if (func && isSpecializationRoot(func) && outReachable.add(func))
                 workList.add(func);
         }
         while (workList.getCount())
@@ -3616,7 +3645,7 @@ struct TypeFlowSpecializationContext
             // previous entry-point-only behaviour and covers the reported case
             // (#12486, a directly-reachable helper), but it does not claim to
             // catch every unresolved dispatch that reaches emit.
-            if (!isEntryPoint(func) && !reachableFromEntryPoint.contains(func))
+            if (!isSpecializationRoot(func) && !reachableFromEntryPoint.contains(func))
                 continue;
             for (auto block : func->getBlocks())
             {
@@ -5589,7 +5618,7 @@ struct TypeFlowSpecializationContext
         for (auto inst : module->getGlobalInsts())
         {
             if (auto func = as<IRFunc>(inst))
-                if (isEntryPoint(func))
+                if (isSpecializationRoot(func))
                     globalWorkList.enqueue(func);
 
             if (auto structType = as<IRStructType>(inst))
