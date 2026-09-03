@@ -82,6 +82,9 @@ implementing differentiable;
     public extension TYPE : IScalarDifferentiableFloatingPoint                  \
     {                                                                            \
         [Differentiable] [ForceInline]                                           \
+        static This fromScalar(Scalar value) { return value; }                   \
+                                                                                 \
+        [Differentiable] [ForceInline]                                           \
         __init<TSource : __BuiltinFloatingPointType>(TSource value)              \
         {                                                                        \
             this = __differentiableNumericsConstructFromFloatingPoint<TYPE>(value); \
@@ -131,6 +134,12 @@ public extension<
     let N : int>
     vector<T, N> : IDifferentiableFloatingPoint
 {
+    [Differentiable] [ForceInline]
+    static This fromScalar(Scalar value)
+    {
+        return __differentiableNumericsConstructVectorFromFloatingPoint<T, T, N>(value);
+    }
+
     [Differentiable] [ForceInline]
     __init<TSource : __BuiltinFloatingPointType>(TSource value)
     {
@@ -287,6 +296,12 @@ public extension<
     let L : int>
     matrix<T, R, C, L> : IDifferentiableFloatingPoint
 {
+    [Differentiable] [ForceInline]
+    static This fromScalar(Scalar value)
+    {
+        return __differentiableNumericsConstructMatrixFromFloatingPoint<T, T, R, C, L>(value);
+    }
+
     [Differentiable] [ForceInline]
     __init<TSource : __BuiltinFloatingPointType>(TSource value)
     {

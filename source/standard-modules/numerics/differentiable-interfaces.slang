@@ -1,11 +1,23 @@
 implementing differentiable;
 
+/// Supports differentiable construction of a scalar or shaped numeric value from its logical
+/// scalar.
+public interface IDifferentiableNumericShapedType : INumericShapedType, IDifferentiable
+{
+    __constraint Scalar : IDifferentiable;
+
+    /// Constructs a value whose every logical component is `value` and propagates derivatives
+    /// through that scalar repetition.
+    [Differentiable]
+    static This fromScalar(Scalar value);
+}
+
 /// Supports differentiable signed arithmetic with division.
 ///
 /// This interface refines the representation-independent `IFractional` contract without making
 /// differentiability a cost of using that base interface. It re-declares the operations that Slang
 /// can differentiate for builtin floating-point scalar and shaped types.
-public interface IDifferentiableFractional : IFractional, IDifferentiable
+public interface IDifferentiableFractional : IFractional, IDifferentiableNumericShapedType
 {
     __constraint Scalar : IScalarDifferentiableFractional;
 
