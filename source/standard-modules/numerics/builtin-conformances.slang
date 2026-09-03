@@ -45,9 +45,9 @@ public extension bool : IBooleanMask
             return __numericsBuiltinLessEqual(this, other);                      \
         }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        This adding(This other) { return this + other; }                         \
+        This plus(This other) { return this + other; }                           \
         [__unsafeForceInlineEarly]                                               \
-        This subtracting(This other) { return this - other; }                    \
+        This minus(This other) { return this - other; }                          \
         [__unsafeForceInlineEarly]                                               \
         This multipliedBy(This other) { return this * other; }                   \
     }
@@ -178,9 +178,9 @@ NUMERICS_UNSIGNED_INTEGER_REFINEMENT(uintptr_t)
             this = __numericsBuiltinConstructFromFloatingPoint<TYPE>(value);     \
         }                                                                        \
         [__unsafeForceInlineEarly]                                               \
-        This adding(This other) { return this + other; }                         \
+        This plus(This other) { return this + other; }                           \
         [__unsafeForceInlineEarly]                                               \
-        This subtracting(This other) { return this - other; }                    \
+        This minus(This other) { return this - other; }                          \
         [__unsafeForceInlineEarly]                                               \
         This multipliedBy(This other) { return this * other; }                   \
         [__unsafeForceInlineEarly]                                               \
@@ -318,9 +318,9 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
         return __numericsBuiltinLessEqual(this, other);
     }
     [__unsafeForceInlineEarly]
-    This adding(This other) { return __numericsBuiltinAdd(this, other); }
+    This plus(This other) { return __numericsBuiltinAdd(this, other); }
     [__unsafeForceInlineEarly]
-    This subtracting(This other) { return __numericsBuiltinSubtract(this, other); }
+    This minus(This other) { return __numericsBuiltinSubtract(this, other); }
     [__unsafeForceInlineEarly]
     This multipliedBy(This other) { return __numericsBuiltinMultiply(this, other); }
     [__unsafeForceInlineEarly]
@@ -402,9 +402,9 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     [__unsafeForceInlineEarly] static This zero() { return This(T.zero()); }
     [__unsafeForceInlineEarly] static This one() { return This(T.one()); }
     [__unsafeForceInlineEarly]
-    This adding(This other) { return __numericsBuiltinAdd(this, other); }
+    This plus(This other) { return __numericsBuiltinAdd(this, other); }
     [__unsafeForceInlineEarly]
-    This subtracting(This other) { return __numericsBuiltinSubtract(this, other); }
+    This minus(This other) { return __numericsBuiltinSubtract(this, other); }
     [__unsafeForceInlineEarly]
     This multipliedBy(This other) { return __numericsBuiltinMultiply(this, other); }
     [__unsafeForceInlineEarly]
@@ -502,9 +502,9 @@ public extension<
     [__unsafeForceInlineEarly] static This one() { return This(T.one()); }
 
     [__unsafeForceInlineEarly]
-    This adding(This other) { return __numericsBuiltinAdd(this, other); }
+    This plus(This other) { return __numericsBuiltinAdd(this, other); }
     [__unsafeForceInlineEarly]
-    This subtracting(This other) { return __numericsBuiltinSubtract(this, other); }
+    This minus(This other) { return __numericsBuiltinSubtract(this, other); }
     [__unsafeForceInlineEarly]
     This multipliedBy(This other) { return __numericsBuiltinMultiply(this, other); }
     [__unsafeForceInlineEarly]

@@ -334,7 +334,7 @@ public T saturate<T : IDifferentiableFractional & IDifferentiableRealOrderingFun
 public T fdim<T : IDifferentiableFractional & IDifferentiableRealOrderingFunctions>(T x, T y)
 {
     T zero = no_diff(T.zero());
-    return x.subtracting(y).maximum(zero);
+    return x.minus(y).maximum(zero);
 }
 
 /// Divides values through a differentiable fractional-arithmetic contract.
@@ -354,7 +354,7 @@ public T divide<T : IDifferentiableFractional>(T x, T y)
 [OverloadRank(-10)]
 public T lerp<T : IDifferentiableFractional>(T x, T y, T factor)
 {
-    return x.adding(y.subtracting(x).multipliedBy(factor));
+    return x.plus(y.minus(x).multipliedBy(factor));
 }
 
 #define NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(NAME, BODY)                  \
@@ -433,11 +433,11 @@ public T smoothstep<
 {
     T zero = no_diff(T.zero());
     T one = no_diff(T.one());
-    T t = value.subtracting(minimumValue).dividedBy(maximumValue.subtracting(minimumValue));
+    T t = value.minus(minimumValue).dividedBy(maximumValue.minus(minimumValue));
     t = t.maximum(zero).minimum(one);
-    T two = one.adding(one);
-    T three = two.adding(one);
-    return t.multipliedBy(t).multipliedBy(three.subtracting(two.multipliedBy(t)));
+    T two = one.plus(one);
+    T three = two.plus(one);
+    return t.multipliedBy(t).multipliedBy(three.minus(two.multipliedBy(t)));
 }
 
 __generic<T : IDifferentiableFractional>
@@ -446,7 +446,7 @@ __generic<T : IDifferentiableFractional>
 [OverloadRank(-4)]
 public T operator +(T left, T right)
 {
-    return left.adding(right);
+    return left.plus(right);
 }
 
 __generic<T : IDifferentiableFractional>
@@ -455,7 +455,7 @@ __generic<T : IDifferentiableFractional>
 [OverloadRank(-4)]
 public T operator -(T left, T right)
 {
-    return left.subtracting(right);
+    return left.minus(right);
 }
 
 __generic<T : IDifferentiableFractional>

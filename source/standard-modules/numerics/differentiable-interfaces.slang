@@ -26,10 +26,10 @@ public interface IDifferentiableFractional : IFractional, IDifferentiableNumeric
     __init<TSource : __BuiltinFloatingPointType>(TSource value);
 
     [Differentiable]
-    This adding(This other);
+    This plus(This other);
 
     [Differentiable]
-    This subtracting(This other);
+    This minus(This other);
 
     [Differentiable]
     This multipliedBy(This other);

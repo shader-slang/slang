@@ -46,12 +46,12 @@ struct CustomReal
         return {1.0};
     }
 
-    This adding(This other)
+    This plus(This other)
     {
         return {value + other.value};
     }
 
-    This subtracting(This other)
+    This minus(This other)
     {
         return {value - other.value};
     }

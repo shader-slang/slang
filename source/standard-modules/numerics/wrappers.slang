@@ -160,7 +160,7 @@ __generic<T : IAdditive>
 [OverloadRank(-4)]
 public T operator +(T v0, T v1)
 {
-    return v0.adding(v1);
+    return v0.plus(v1);
 }
 
 __generic<T : IAdditive>
@@ -168,7 +168,7 @@ __generic<T : IAdditive>
 [OverloadRank(-4)]
 public T operator -(T v0, T v1)
 {
-    return v0.subtracting(v1);
+    return v0.minus(v1);
 }
 
 __generic<T : IAdditive>
@@ -283,7 +283,7 @@ __generic<T : IAdditive>
 [OverloadRank(-4)]
 public T operator +=(in out T left, T right)
 {
-    left = left.adding(right);
+    left = left.plus(right);
     return left;
 }
 
@@ -292,7 +292,7 @@ __generic<T : IAdditive>
 [OverloadRank(-4)]
 public T operator -=(in out T left, T right)
 {
-    left = left.subtracting(right);
+    left = left.minus(right);
     return left;
 }
 
@@ -391,7 +391,7 @@ __generic<T : INumeric>
 [OverloadRank(-4)]
 public __prefix T operator ++(in out T value)
 {
-    value = value.adding(T.one());
+    value = value.plus(T.one());
     return value;
 }
 
@@ -401,7 +401,7 @@ __generic<T : INumeric>
 public __postfix T operator ++(in out T value)
 {
     let original = value;
-    value = value.adding(T.one());
+    value = value.plus(T.one());
     return original;
 }
 
@@ -410,7 +410,7 @@ __generic<T : INumeric>
 [OverloadRank(-4)]
 public __prefix T operator --(in out T value)
 {
-    value = value.subtracting(T.one());
+    value = value.minus(T.one());
     return value;
 }
 
@@ -420,7 +420,7 @@ __generic<T : INumeric>
 public __postfix T operator --(in out T value)
 {
     let original = value;
-    value = value.subtracting(T.one());
+    value = value.minus(T.one());
     return original;
 }
 
@@ -755,7 +755,7 @@ public T saturate<T : IFractional & IRealOrderingFunctions>(T value)
 public T fdim<T : IFractional & IRealOrderingFunctions>(T x, T y)
 {
     T zero = T.zero();
-    return x.subtracting(y).maximum(zero);
+    return x.minus(y).maximum(zero);
 }
 
 /// Divides values that support fractional arithmetic.

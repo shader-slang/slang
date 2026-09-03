@@ -109,10 +109,10 @@ public interface IAdditive : INumericShapedType
     static This zero();
 
     /// Returns the component-wise sum with `other`.
-    This adding(This other);
+    This plus(This other);
 
     /// Returns the component-wise difference from `other`.
-    This subtracting(This other);
+    This minus(This other);
 }
 
 /// Scalar refinement of `IAdditive`.
@@ -238,10 +238,10 @@ public interface IFractional : ISignedNumeric, IConstructibleFromBuiltinFloating
     __constraint Scalar : IScalarFractional;
 
     /// Returns the component-wise sum with `other`.
-    This adding(This other);
+    This plus(This other);
 
     /// Returns the component-wise difference from `other`.
-    This subtracting(This other);
+    This minus(This other);
 
     /// Returns the component-wise product with `other`.
     This multipliedBy(This other);
