@@ -22,6 +22,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 /*CHECK:
  ^^^^^^^^^^^^^^^^^^^^ cannot resolve derivative function
  ^^^^^^^^^^^^^^^^^^^^ cannot resolve the custom derivative function
+                      ^^^^^^^^^^^^^^ deprecated generic-parameter-count overload tie-breaker
+                      ^^^^^^^^^^^^^^ overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c
 */
 void backwardPrimalDerivative(
     inout DifferentialPair<vector<T, N>> value,
@@ -48,6 +50,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 /*CHECK:
  ^^^^^^^^^^^^^^^^^^ cannot resolve derivative function
  ^^^^^^^^^^^^^^^^^^ cannot resolve the custom derivative function
+                    ^^^^^^^^^^^^^^^^ deprecated generic-parameter-count overload tie-breaker
+                    ^^^^^^^^^^^^^^^^ overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c
 */
 [Differentiable]
 vector<T, N> substitutePrimalReplacement(vector<T, N> value)

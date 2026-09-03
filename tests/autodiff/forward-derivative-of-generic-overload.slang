@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_6_0 -entry computeMain -line-directive-mode none
-//TEST:COMPARE_COMPUTE(filecheck-buffer=RESULT): -cpu -output-using-type
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_6_0 -entry computeMain -line-directive-mode none -warnings-disable 40021
+//TEST:COMPARE_COMPUTE(filecheck-buffer=RESULT): -cpu -output-using-type -xslang -Wno-40021
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 
