@@ -87,7 +87,12 @@ static void _printHelp(bool experimental = false)
         "  help             Show this help text.\n"
         "\n"
         "Global options:\n"
-        "  --experimental   Enable experimental commands and build features.\n");
+        "  --experimental   Enable experimental commands and build features.\n"
+        "\n"
+        "Commands load slang-package.json, slang-package-lock.json, and slang-workspace.json\n"
+        "from the nearest ancestor directory that contains the manifest. Nested packages, such\n"
+        "as dependencies under deps/, keep their own root when they have a manifest.\n"
+        "`init` still creates a package in the current directory.\n");
 }
 
 bool isAffirmativeConfirmationAnswer(const UnownedStringSlice& answer)
@@ -140,14 +145,70 @@ static SlangResult _confirmApply(
     return SLANG_OK;
 }
 
-static SlangResult _getProjectRoot(String& outRoot, String& outError)
+SlangResult discoverPackageRoot(const String& startDirectory, String& outRoot, String& outError)
 {
-    if (SLANG_FAILED(Path::getCanonical(".", outRoot)))
+    String current;
+    if (SLANG_FAILED(Path::getCanonical(startDirectory, current)))
     {
-        outError = "Cannot determine the current directory.";
+        outError = String("Cannot determine the package directory: ") + startDirectory;
         return SLANG_FAIL;
     }
-    return SLANG_OK;
+
+    String directory = current;
+    for (;;)
+    {
+        if (File::exists(Path::combine(directory, kManifestName)))
+        {
+            outRoot = directory;
+            return SLANG_OK;
+        }
+        String parent = Path::getParentDirectory(directory);
+        if (parent.getLength() == 0 || parent == directory)
+            break;
+        directory = parent;
+    }
+
+    outError = String("Cannot find slang-package.json from ") + current +
+               ". Run this command from a package directory or a subdirectory of a package.";
+    return SLANG_FAIL;
+}
+
+static int _commandArgumentIndex(int argc, const char* const* argv)
+{
+    int index = 1;
+    if (index < argc && String(argv[index]) == "--experimental")
+        ++index;
+    return index;
+}
+
+static bool _isHelpCommand(int argc, const char* const* argv)
+{
+    int index = _commandArgumentIndex(argc, argv);
+    if (index >= argc)
+        return true;
+    String command = argv[index];
+    return command == "help" || command == "-help" || command == "--help";
+}
+
+static bool _isInitCommand(int argc, const char* const* argv)
+{
+    int index = _commandArgumentIndex(argc, argv);
+    return index < argc && String(argv[index]) == "init";
+}
+
+static bool _commandRequiresPackageRoot(int argc, const char* const* argv)
+{
+    if (_isHelpCommand(argc, argv) || _isInitCommand(argc, argv))
+        return false;
+    int index = _commandArgumentIndex(argc, argv);
+    if (index >= argc)
+        return false;
+    String command = argv[index];
+    return command == "fetch" || command == "update" || command == "validate" ||
+           command == "build" || command == "run" || command == "test" || command == "docs" ||
+           command == "status" || command == "tree" || command == "why" ||
+           command == "dependency" || command == "override" || command == "unoverride" ||
+           command == "edit" || command == "unedit";
 }
 
 static LockedPackage* _findLockedPackage(LockFile& lock, const String& name)
@@ -160,6 +221,11 @@ static LockedPackage* _findLockedPackage(LockFile& lock, const String& name)
     return nullptr;
 }
 
+/// Write `build/search-paths` with the same export roots `build` passes to `slangc`.
+///
+/// Those roots come from `getLockedPackageRoot`, so Git checkouts, path dependencies, and local
+/// overrides are all workspace-rooted. A later `slangc -I` can use a line from this file even when
+/// the compiler is invoked from a subdirectory.
 static SlangResult _writeSearchPaths(
     const String& projectRoot,
     const Manifest& manifest,
@@ -168,29 +234,17 @@ static SlangResult _writeSearchPaths(
     String& outError)
 {
     StringBuilder searchPaths;
+    String depsDirectory = getWorkspaceDepsDirectory(manifest);
     for (const auto& package : lock.packages)
     {
-        Index localIndex = findActiveLocalPackageIndex(localPackages, package.name);
-        if (localIndex >= 0)
-        {
-            for (const auto& exportPath : package.exports)
-                searchPaths << Path::combine(localPackages[localIndex].path, exportPath) << "\n";
-            continue;
-        }
-        if (isPathOnlyLockedPackage(package))
-        {
-            for (const auto& exportPath : package.exports)
-                searchPaths << Path::combine(package.path, exportPath) << "\n";
-            continue;
-        }
-        if (isLocalOverrideLockedPackage(package))
-        {
-            outError = String("Locked local override '") + package.name +
-                       "' is not registered in slang-workspace.json.";
-            return SLANG_FAIL;
-        }
-
-        String packageRoot = Path::combine(getWorkspaceDepsDirectory(manifest), package.name);
+        String packageRoot;
+        SLANG_RETURN_ON_FAIL(getLockedPackageRoot(
+            projectRoot,
+            depsDirectory,
+            package,
+            localPackages,
+            packageRoot,
+            outError));
         for (const auto& exportPath : package.exports)
             searchPaths << Path::combine(packageRoot, exportPath) << "\n";
     }
@@ -2798,18 +2852,36 @@ String formatCommandError(const String& error)
     return String("slang-package: error: ") + error + "\n";
 }
 
-int execute(int argc, const char* const* argv)
+int executeFromStartDirectory(const String& startDirectory, int argc, const char* const* argv)
 {
     String error;
     String projectRoot;
-    if (SLANG_FAILED(_getProjectRoot(projectRoot, error)) ||
-        SLANG_FAILED(executeInDirectory(projectRoot, argc, argv, error)))
+    if (SLANG_FAILED(Path::getCanonical(startDirectory, projectRoot)))
+    {
+        error = String("Cannot determine the current directory: ") + startDirectory;
+        String transcript = formatCommandError(error);
+        fprintf(stderr, "%s", transcript.getBuffer());
+        return 1;
+    }
+    if (_commandRequiresPackageRoot(argc, argv) &&
+        SLANG_FAILED(discoverPackageRoot(projectRoot, projectRoot, error)))
+    {
+        String transcript = formatCommandError(error);
+        fprintf(stderr, "%s", transcript.getBuffer());
+        return 1;
+    }
+    if (SLANG_FAILED(executeInDirectory(projectRoot, argc, argv, error)))
     {
         String transcript = formatCommandError(error);
         fprintf(stderr, "%s", transcript.getBuffer());
         return 1;
     }
     return 0;
+}
+
+int execute(int argc, const char* const* argv)
+{
+    return executeFromStartDirectory(".", argc, argv);
 }
 
 } // namespace PackageTool

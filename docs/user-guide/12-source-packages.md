@@ -19,10 +19,15 @@ A **package** is a directory with `slang-package.json`. Its name, exports, licen
 dependencies apply wherever that package appears in a graph, including as a Git pin or a path
 dependency.
 
-A **workspace** is the directory where you run `slang package` for a given solve. It is also a
-package: the one whose manifest starts resolution. The workspace owns `slang-package-lock.json` and
-generated state under `.slang/`. Nested packages' lockfiles are not used for that solve. A module
-is a Slang language unit (`module NAME;`), not a package-manager concept.
+A **workspace** is the package whose `slang-package.json` starts resolution for a given solve. You
+can run `slang package` from that directory or from an ordinary subdirectory (`src/`, `docs/`, and
+so on). The command loads the workspace `slang-package.json`, `slang-package-lock.json`, and
+gitignored `slang-workspace.json` from the nearest ancestor that contains the manifest. A nested
+package, such as a materialized dependency under `deps/` that has its own `slang-package.json`,
+keeps that nearer root. `slang package init` still creates a package in the current directory. The
+workspace owns `slang-package-lock.json` and generated state under `.slang/`. Nested packages'
+lockfiles are not used for that solve. A module is a Slang language unit (`module NAME;`), not a
+package-manager concept.
 
 ## Package layout
 
@@ -277,8 +282,9 @@ control characters.
 After fetching, `{workspace.build}/search-paths` (by default `build/search-paths`) lists the source
 roots, one per line. A caller must translate each line into a separate `slangc -I <path>` argument;
 `slangc` does not read this file directly. It is a derived file and may be deleted with the rest of
-the build directory; fetch or update regenerates it. Paths in this file are relative to the
-workspace root and are not added to compiler sessions automatically.
+the build directory; fetch or update regenerates it. Each line is a workspace-rooted filesystem
+path, so it can be passed to `slangc` from a subdirectory. Package commands do not inject these
+paths into compiler sessions automatically.
 
 ## Validating packages
 

@@ -303,6 +303,27 @@ SlangResult getRepositoryHeadCommit(
     return SLANG_OK;
 }
 
+SlangResult getGitWorkingTreeRoot(const String& workingDirectory, String& outRoot, String& outError)
+{
+    List<String> arguments;
+    arguments.add("rev-parse");
+    arguments.add("--show-toplevel");
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(workingDirectory, arguments, result, outError));
+    String gitRoot = result.standardOutput.trim();
+    if (gitRoot.getLength() == 0)
+    {
+        outError = String("Git did not report a working-tree root for: ") + workingDirectory;
+        return SLANG_FAIL;
+    }
+    if (SLANG_FAILED(Path::getCanonical(gitRoot, outRoot)))
+    {
+        outError = String("Cannot canonicalize the Git working-tree root: ") + gitRoot;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 SlangResult getRepositoryOrigin(const String& repositoryPath, String& outOrigin, String& outError)
 {
     List<String> arguments;

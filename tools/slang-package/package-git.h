@@ -41,6 +41,15 @@ SlangResult getRepositoryHeadCommit(
     String& outCommit,
     String& outError);
 
+/// Return the working-tree root of the Git repository that contains `workingDirectory`.
+///
+/// This is `git -C workingDirectory rev-parse --show-toplevel`. A nested checkout, such as a
+/// materialized dependency under `deps/`, reports that checkout rather than a parent superproject.
+SlangResult getGitWorkingTreeRoot(
+    const String& workingDirectory,
+    String& outRoot,
+    String& outError);
+
 /// Return the configured URL for the repository's `origin` remote.
 SlangResult getRepositoryOrigin(const String& repositoryPath, String& outOrigin, String& outError);
 

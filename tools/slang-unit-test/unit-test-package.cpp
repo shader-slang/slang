@@ -550,6 +550,132 @@ SLANG_UNIT_TEST(PackageLocalRegistryJSON)
     SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
 }
 
+static SlangResult _initializeGitRepository(const String& repository)
+{
+    CommandLine commandLine;
+    commandLine.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Name, "git"));
+    commandLine.addArg("-c");
+    commandLine.addArg("init.defaultBranch=main");
+    commandLine.addArg("-c");
+    commandLine.addArg("init.templateDir=");
+    commandLine.addArg("init");
+    commandLine.addArg("-q");
+    commandLine.addArg(repository);
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(ProcessUtil::execute(commandLine, result));
+    return result.resultCode == 0 ? SLANG_OK : SLANG_FAIL;
+}
+
+SLANG_UNIT_TEST(PackageToolDiscoversRootFromSubdirectory)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const char* initArguments[] = {"slang-package", "init"};
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+    String nestedSource = Path::combine(temp.path, "src");
+    String discovered;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(discoverPackageRoot(nestedSource, discovered, error)));
+    String canonicalRoot;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(Path::getCanonical(temp.path, canonicalRoot)));
+    SLANG_CHECK(discovered == canonicalRoot);
+
+    const char* statusArguments[] = {"slang-package", "status"};
+    SLANG_CHECK(
+        executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(statusArguments), statusArguments) ==
+        0);
+    const char* validateArguments[] = {"slang-package", "validate"};
+    SLANG_CHECK(
+        executeFromStartDirectory(
+            nestedSource,
+            SLANG_COUNT_OF(validateArguments),
+            validateArguments) == 0);
+    const char* updateArguments[] = {"slang-package", "update", "--yes"};
+    SLANG_CHECK(
+        executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(updateArguments), updateArguments) ==
+        0);
+    const char* treeArguments[] = {"slang-package", "tree"};
+    SLANG_CHECK(
+        executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(treeArguments), treeArguments) == 0);
+    const char* testArguments[] = {"slang-package", "test"};
+    SLANG_CHECK(
+        executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(testArguments), testArguments) != 0);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, "src/main.slang"),
+        "module main;\n"
+        "public int value() { return 1; }\n")));
+    const char* buildArguments[] = {"slang-package", "build"};
+    SLANG_CHECK(
+        executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(buildArguments), buildArguments) ==
+        0);
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/source/main.slang")));
+    const char* docsArguments[] = {"slang-package", "docs", "--print"};
+    SLANG_CHECK(
+        executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(docsArguments), docsArguments) == 0);
+
+    String vendorRoot = Path::combine(temp.path, "vendor/noise");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(vendorRoot));
+    Manifest vendor;
+    vendor.name = "noise";
+    vendor.exports.add("src");
+    vendor.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(vendorRoot, "slang-package.json"), vendor, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(vendorRoot, "LICENSE"), "Noise license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(vendorRoot, "src/noise.slang"), "module noise;\n")));
+    Manifest root;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(readManifest(Path::combine(temp.path, "slang-package.json"), root, error)));
+    Dependency pathDep;
+    pathDep.name = "noise";
+    pathDep.path = "vendor/noise";
+    pathDep.as = "1.0.0";
+    root.dependencies.add(pathDep);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(temp.path, "slang-package.json"), root, error)));
+    SLANG_CHECK(
+        executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(updateArguments), updateArguments) ==
+        0);
+    String searchPaths;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, "build/search-paths"), searchPaths)));
+    String expectedExport = Path::combine(canonicalRoot, "vendor/noise/src");
+    SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(expectedExport.getUnownedSlice()) >= 0);
+
+    String nestedPackage = Path::combine(temp.path, "examples/nested");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(nestedPackage));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(nestedPackage, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    String nestedPackageSource = Path::combine(nestedPackage, "src");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(discoverPackageRoot(nestedPackageSource, discovered, error)));
+    String canonicalNestedPackage;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(Path::getCanonical(nestedPackage, canonicalNestedPackage)));
+    SLANG_CHECK(discovered == canonicalNestedPackage);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeGitRepository(temp.path)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(discoverPackageRoot(nestedSource, discovered, error)));
+    SLANG_CHECK(discovered == canonicalRoot);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(discoverPackageRoot(nestedPackageSource, discovered, error)));
+    SLANG_CHECK(discovered == canonicalNestedPackage);
+
+    TemporaryDirectory nestedRepo;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(nestedRepo)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(nestedRepo.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeGitRepository(nestedRepo.path)));
+    String dependencySource = Path::combine(nestedRepo.path, "src");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(discoverPackageRoot(dependencySource, discovered, error)));
+    String canonicalDependency;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(Path::getCanonical(nestedRepo.path, canonicalDependency)));
+    SLANG_CHECK(discovered == canonicalDependency);
+}
+
 SLANG_UNIT_TEST(PackageToolInit)
 {
     TemporaryDirectory temp;

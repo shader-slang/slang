@@ -36,7 +36,10 @@ video-preview
 Three packages constrain `color-encoding`. The resolver intersects those ranges and selects one
 tag, which appears once in the lock and is checked out once under `deps/`.
 
-Clone the workspace and work from its root:
+Clone the workspace. Commands that load the three JSON files (`slang-package.json`,
+`slang-package-lock.json`, and `slang-workspace.json`) also work from ordinary subdirectories,
+such as `src/`. They use the nearest ancestor that contains `slang-package.json`. Nested packages
+under `deps/` keep their own root when they have a manifest.
 
 ```sh
 git clone https://github.com/jhelferty-nv/video-preview.git
