@@ -737,8 +737,9 @@ handle uses from the emitted shader. Hosts that need to decide whether to bind a
 should query target metadata for `IBindlessResourceMetadata::usesBindlessResourceHeap()` instead of
 using `getBindlessSpaceIndex() >= 0` as the usage test.
 
-Default behavior uses the `VkMutableBindlessBindings` enum to assign binding indices based on
-descriptor types:
+Default behavior calls `defaultGetDescriptorFromHandle` with its default
+`BindlessDescriptorOptions.VkMutable` preset. That preset uses the
+`VkMutableBindlessBindings` enum to assign binding indices based on descriptor types:
 
 | Enum Value              | Vulkan Descriptor Type                    | Binding Index |
 | ----------------------- | ----------------------------------------- | ------------- |
