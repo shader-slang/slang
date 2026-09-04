@@ -24,6 +24,8 @@ typedef Vector<uint32_t, 2> uint2;
 typedef Vector<uint32_t, 3> uint3;
 typedef Vector<uint32_t, 4> uint4;
 
+#include "slang-cpp-ray-query.h"
+
 // We can just map `NonUniformResourceIndex` type directly to the index type on CPU, as CPU does not
 // require any special handling around such accesses.
 typedef size_t NonUniformResourceIndex;

@@ -283,6 +283,13 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << ">";
             return SLANG_OK;
         }
+    case kIROp_RayQueryType:
+        {
+            out << "RayQuery<";
+            out << getIntVal(type->getOperand(0));
+            out << ">";
+            return SLANG_OK;
+        }
     case kIROp_ConstantBufferType:
     case kIROp_ParameterBlockType:
         {
