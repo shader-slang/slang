@@ -7,8 +7,8 @@ public extension bool : IBooleanMask
     [__unsafeForceInlineEarly] This logicalNot() { return !this; }
     [__unsafeForceInlineEarly] This logicalAnd(This other) { return this && other; }
     [__unsafeForceInlineEarly] This logicalOr(This other) { return this || other; }
-    [__unsafeForceInlineEarly] bool any() { return __numericsBuiltinAny(this); }
-    [__unsafeForceInlineEarly] bool all() { return __numericsBuiltinAll(this); }
+    [__unsafeForceInlineEarly] bool any() { return this; }
+    [__unsafeForceInlineEarly] bool all() { return this; }
 }
 
 #define SLANG_NUMERICS_SCALAR_CONFORMANCE(TYPE)                                       \
@@ -318,11 +318,11 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
         return __numericsBuiltinLessEqual(this, other);
     }
     [__unsafeForceInlineEarly]
-    This plus(This other) { return __numericsBuiltinAdd(this, other); }
+    This plus(This other) { return this.add(other); }
     [__unsafeForceInlineEarly]
-    This minus(This other) { return __numericsBuiltinSubtract(this, other); }
+    This minus(This other) { return this.sub(other); }
     [__unsafeForceInlineEarly]
-    This multipliedBy(This other) { return __numericsBuiltinMultiply(this, other); }
+    This multipliedBy(This other) { return this.mul(other); }
     [__unsafeForceInlineEarly]
     This quotientWhenDividedBy(This divisor)
     {
@@ -359,7 +359,7 @@ public extension<
     vector<T, N> : ISignedIntegerType
 {
     [__unsafeForceInlineEarly]
-    This negated() { return __numericsBuiltinNegate(this); }
+    This negated() { return this.neg(); }
     [__unsafeForceInlineEarly]
     This absoluteValue() { return __numericInterfaceBuiltinAbs(this); }
 }
@@ -402,15 +402,15 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     [__unsafeForceInlineEarly] static This zero() { return This(T.zero()); }
     [__unsafeForceInlineEarly] static This one() { return This(T.one()); }
     [__unsafeForceInlineEarly]
-    This plus(This other) { return __numericsBuiltinAdd(this, other); }
+    This plus(This other) { return this.add(other); }
     [__unsafeForceInlineEarly]
-    This minus(This other) { return __numericsBuiltinSubtract(this, other); }
+    This minus(This other) { return this.sub(other); }
     [__unsafeForceInlineEarly]
-    This multipliedBy(This other) { return __numericsBuiltinMultiply(this, other); }
+    This multipliedBy(This other) { return this.mul(other); }
     [__unsafeForceInlineEarly]
-    This dividedBy(This other) { return __numericsBuiltinDivide(this, other); }
+    This dividedBy(This other) { return this.div(other); }
     [__unsafeForceInlineEarly]
-    This negated() { return __numericsBuiltinNegate(this); }
+    This negated() { return this.neg(); }
     [__unsafeForceInlineEarly]
     This absoluteValue() { return __numericInterfaceBuiltinAbs(this); }
     [__unsafeForceInlineEarly]
@@ -502,15 +502,15 @@ public extension<
     [__unsafeForceInlineEarly] static This one() { return This(T.one()); }
 
     [__unsafeForceInlineEarly]
-    This plus(This other) { return __numericsBuiltinAdd(this, other); }
+    This plus(This other) { return this.add(other); }
     [__unsafeForceInlineEarly]
-    This minus(This other) { return __numericsBuiltinSubtract(this, other); }
+    This minus(This other) { return this.sub(other); }
     [__unsafeForceInlineEarly]
-    This multipliedBy(This other) { return __numericsBuiltinMultiply(this, other); }
+    This multipliedBy(This other) { return this.mul(other); }
     [__unsafeForceInlineEarly]
-    This dividedBy(This other) { return __numericsBuiltinDivide(this, other); }
+    This dividedBy(This other) { return this.div(other); }
     [__unsafeForceInlineEarly]
-    This negated() { return __numericsBuiltinNegate(this); }
+    This negated() { return this.neg(); }
 
     [__unsafeForceInlineEarly]
     This absoluteValue()

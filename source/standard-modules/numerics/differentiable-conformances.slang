@@ -8,12 +8,20 @@ implementing differentiable;
     [Differentiable] [ForceInline]                                              \
     This METHOD(This other) { return ADAPTER(this, other); }
 
+#define SLANG_NUMERICS_DIFFERENTIABLE_CORE_UNARY_REQUIREMENT(METHOD, CORE_METHOD)     \
+    [Differentiable] [ForceInline]                                              \
+    This METHOD() { return this.CORE_METHOD(); }
+
+#define SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT(METHOD, CORE_METHOD)    \
+    [Differentiable] [ForceInline]                                              \
+    This METHOD(This other) { return this.CORE_METHOD(other); }
+
 #define SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
-    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(plus, __differentiableNumericsAdd) \
-    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(minus, __differentiableNumericsSub) \
-    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
-    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
-    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT(plus, add)             \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT(minus, sub)            \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT(multipliedBy, mul)     \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT(dividedBy, div)        \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_UNARY_REQUIREMENT(negated, neg)           \
     SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         absoluteValue, __differentiableNumericsAbs)                             \
     SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
@@ -226,11 +234,11 @@ public extension<
     }
 
 #define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS                  \
-    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(plus, __differentiableNumericsAdd) \
-    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(minus, __differentiableNumericsSub) \
-    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
-    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
-    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT(plus, add)             \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT(minus, sub)            \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT(multipliedBy, mul)     \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT(dividedBy, div)        \
+    SLANG_NUMERICS_DIFFERENTIABLE_CORE_UNARY_REQUIREMENT(negated, neg)           \
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         absoluteValue, __differentiableNumericsAbs)                             \
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
@@ -599,5 +607,7 @@ public extension<T : __BuiltinFloatingPointType & IScalarDifferentiableReal, let
 #undef SLANG_NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS
 #undef SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS
 #undef SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_CORE_BINARY_REQUIREMENT
+#undef SLANG_NUMERICS_DIFFERENTIABLE_CORE_UNARY_REQUIREMENT
 #undef SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT
 #undef SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT
