@@ -4537,6 +4537,10 @@ attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribu
 __attributeTarget(FuncDecl)
 attribute_syntax [outputtopology(topology)]         : OutputTopologyAttribute;
 
+/// Alias for `outputtopology`.
+__attributeTarget(FuncDecl)
+attribute_syntax [OutputTopology(topology)]         : OutputTopologyAttribute;
+
 /// Used on an hull shader entrypoint to specify the patch type used by the hull shader.
 /// @param mode The patch type used by the hull shader. Valid values are "tri", "quad" and "isoline".
 __attributeTarget(FuncDecl)
