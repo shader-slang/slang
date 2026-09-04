@@ -12615,7 +12615,11 @@ void SemanticsVisitor::ensureDeclBase(
 void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
 {
     SemanticsVisitor visitor(withDeclToExcludeFromLookup(decl));
-    decl->type = visitor.CheckProperType(decl->type);
+    // A `typealias` names a type; it is not itself the type of a value. It still needs the full
+    // `CheckProperType` resolution (TypeType unwrap, generic default-fill) that IR lowering relies
+    // on, but a conjunction (`typealias IBoth = A & B`) is a legal name here -- so allow it, and
+    // let the value-type rejection fire where the alias is *used*, not at the alias itself.
+    decl->type = visitor.CheckProperType(decl->type, /*allowTypeConjunction:*/ true);
     checkVisibility(decl);
     propagateOptionalConstraintsThroughTypealias(decl);
 }
