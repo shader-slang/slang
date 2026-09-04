@@ -11,6 +11,26 @@
 namespace Slang
 {
 
+// True for the texture access modes that lower to writable surface accesses
+// (RW / write-only / rasterizer-ordered). Read-only (sampled) and sampler-feedback
+// textures are deliberately excluded: they do not go through the size-scaling surface
+// path. Shared by the GLSL-legality check and the CUDA specialization arm.
+static bool isWritableTextureType(IRType* type)
+{
+    auto texType = as<IRTextureType>(type);
+    if (!texType)
+        return false;
+    switch (texType->getAccess())
+    {
+    case SLANG_RESOURCE_ACCESS_READ_WRITE:
+    case SLANG_RESOURCE_ACCESS_WRITE:
+    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+        return true;
+    default:
+        return false;
+    }
+}
+
 struct ResourceParameterSpecializationCondition : FunctionCallSpecializeCondition
 {
     // This pass is intended to specialize functions
@@ -71,6 +91,15 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         else if (isWGPUTarget(targetRequest))
         {
             return isIllegalWGSLParameterType(type);
+        }
+        else if (isCUDATarget(targetRequest))
+        {
+            // A writable texture's backing `[format]` decoration is only reachable at the
+            // surface-access site through the concrete global, not through an undecorated
+            // parameter; specializing the callee to the global restores that reachability
+            // (shader-slang/slang#12737), as it already does for Khronos/WGSL.
+            if (isWritableTextureType(type))
+                return true;
         }
 
         // For now, we will not treat any other parameters as
@@ -1334,18 +1363,8 @@ bool isIllegalGLSLParameterType(IRType* type)
         return true;
     if (as<IRGLSLImageType>(type))
         return true;
-    if (auto texType = as<IRTextureType>(type))
-    {
-        switch (texType->getAccess())
-        {
-        case SLANG_RESOURCE_ACCESS_READ_WRITE:
-        case SLANG_RESOURCE_ACCESS_WRITE:
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-            return true;
-        default:
-            break;
-        }
-    }
+    if (isWritableTextureType(type))
+        return true;
     if (as<IRSubpassInputType>(type))
         return true;
     if (as<IRMeshOutputType>(type))
