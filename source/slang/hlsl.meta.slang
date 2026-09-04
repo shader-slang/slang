@@ -17787,6 +17787,20 @@ uint _WaveCountBits(uint4 value)
     }
 }
 
+// Counts a subgroup ballot's set bits over the lanes preceding the current one (an exclusive prefix
+// scan), as opposed to `_WaveCountBits`, which reduces over all lanes.
+/// @category wave
+__spirv_version(1.3)
+[require(spirv, subgroup_ballot)]
+uint _WavePrefixCountBits(uint4 value)
+{
+    return spirv_asm
+    {
+        OpCapability GroupNonUniformBallot;
+        OpGroupNonUniformBallotBitCount $$uint result Subgroup ExclusiveScan $value
+    };
+}
+
 // Prefix
 /// @category wave
 __generic<T : __BuiltinArithmeticType>
@@ -18549,12 +18563,7 @@ uint WavePrefixCountBits(bool value)
         __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
     case spirv:
-        return spirv_asm
-        {
-            OpCapability GroupNonUniformBallot;
-            %__mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
-            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %__mask
-        };
+        return _WavePrefixCountBits(WaveActiveBallot(value));
     default:
         return WaveMaskPrefixCountBits(WaveGetActiveMask(), value);
     }
