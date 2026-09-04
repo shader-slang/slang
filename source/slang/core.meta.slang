@@ -4537,7 +4537,8 @@ attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribu
 __attributeTarget(FuncDecl)
 attribute_syntax [outputtopology(topology)]         : OutputTopologyAttribute;
 
-/// Alias for `outputtopology`.
+/// Used on an hull shader entrypoint to declare the output primitive type of the tessellator.
+/// @param topology The output primitive type, must be one of "point", "line", "triangle_cw", and "triangle_ccw".
 __attributeTarget(FuncDecl)
 attribute_syntax [OutputTopology(topology)]         : OutputTopologyAttribute;
 
