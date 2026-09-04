@@ -136,5 +136,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK-COUNT-28: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 
-// NOSCOPE-COUNT-14: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
+// Every call here is inlined into a caller that has a DebugFunction, so each inlined region ends by
+// restoring that caller's scope and none of them clears it. See shader-slang/slang#11616.
 // NOSCOPE-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
