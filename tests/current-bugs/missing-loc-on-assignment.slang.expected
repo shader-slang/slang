@@ -1,6 +1,0 @@
-result code = -1
-standard error = {
-(0): error 30019: expected an expression of type 'vector<float,4>', got 'matrix<float,4,4>'
-}
-standard output = {
-}
