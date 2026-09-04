@@ -1,84 +1,88 @@
 implementing differentiable;
 
-#define NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(METHOD, ADAPTER)              \
+#define SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(METHOD, ADAPTER)              \
     [Differentiable] [ForceInline]                                              \
     This METHOD() { return ADAPTER(this); }
 
-#define NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(METHOD, ADAPTER)             \
+#define SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(METHOD, ADAPTER)             \
     [Differentiable] [ForceInline]                                              \
     This METHOD(This other) { return ADAPTER(this, other); }
 
-#define NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(plus, __differentiableNumericsAdd) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(minus, __differentiableNumericsSub) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+#define SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(plus, __differentiableNumericsAdd) \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(minus, __differentiableNumericsSub) \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         absoluteValue, __differentiableNumericsAbs)                             \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         reciprocal, __differentiableNumericsRcp)
 
-#define NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS                     \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+#define SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS                     \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         fractionalPart, __differentiableNumericsFractionalPart)                 \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         remainderWhenDividedBy, __differentiableNumericsRemainder)              \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         copyingSignFrom, __differentiableNumericsCopySign)
 
-#define NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS                        \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(exponential, __differentiableNumericsExp) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(exponentialWithBase2, __differentiableNumericsExp2) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+#define SLANG_NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS                        \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+        exponential, __differentiableNumericsExp)                                     \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+        exponentialWithBase2, __differentiableNumericsExp2)                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         exponentialWithBase10, __differentiableNumericsRegisteredExp10)         \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(logarithm, __differentiableNumericsLog) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(logarithmWithBase2, __differentiableNumericsLog2) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+        logarithm, __differentiableNumericsLog)                                       \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+        logarithmWithBase2, __differentiableNumericsLog2)                            \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         logarithmWithBase10, __differentiableNumericsLog10)                     \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         raisedToThePowerOf, __differentiableNumericsPow)
 
-#define NUMERICS_DIFFERENTIABLE_TRIGONOMETRIC_REQUIREMENTS                      \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(sin, __differentiableNumericsSin) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(cos, __differentiableNumericsCos) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(tan, __differentiableNumericsTan) \
+#define SLANG_NUMERICS_DIFFERENTIABLE_TRIGONOMETRIC_REQUIREMENTS                      \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(sin, __differentiableNumericsSin) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(cos, __differentiableNumericsCos) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(tan, __differentiableNumericsTan) \
     [Differentiable] [ForceInline]                                              \
     void sincos(out This sineResult, out This cosineResult)                      \
     {                                                                            \
         __differentiableNumericsSinCos(this, sineResult, cosineResult);          \
     }
 
-#define NUMERICS_DIFFERENTIABLE_INVERSE_TRIGONOMETRIC_REQUIREMENTS              \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(asin, __differentiableNumericsAsin) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(acos, __differentiableNumericsAcos) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(atan, __differentiableNumericsAtan) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
+#define SLANG_NUMERICS_DIFFERENTIABLE_INVERSE_TRIGONOMETRIC_REQUIREMENTS              \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(asin, __differentiableNumericsAsin) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(acos, __differentiableNumericsAcos) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(atan, __differentiableNumericsAtan) \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         atan2, __differentiableNumericsAtan2)
 
-#define NUMERICS_DIFFERENTIABLE_HYPERBOLIC_REQUIREMENTS                         \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(sinh, __differentiableNumericsSinh) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(cosh, __differentiableNumericsCosh) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(tanh, __differentiableNumericsTanh) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+#define SLANG_NUMERICS_DIFFERENTIABLE_HYPERBOLIC_REQUIREMENTS                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(sinh, __differentiableNumericsSinh) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(cosh, __differentiableNumericsCosh) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(tanh, __differentiableNumericsTanh) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         asinh, __differentiableNumericsAsinh)                                   \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         acosh, __differentiableNumericsAcosh)                                   \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         atanh, __differentiableNumericsAtanh)
 
-#define NUMERICS_DIFFERENTIABLE_ROOT_REQUIREMENTS                               \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(squareRoot, __differentiableNumericsSqrt) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
+#define SLANG_NUMERICS_DIFFERENTIABLE_ROOT_REQUIREMENTS                               \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(squareRoot, __differentiableNumericsSqrt) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(                                  \
         reciprocalSquareRoot, __differentiableNumericsRsqrt)
 
-#define NUMERICS_DIFFERENTIABLE_ORDERING_REQUIREMENTS                           \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
+#define SLANG_NUMERICS_DIFFERENTIABLE_ORDERING_REQUIREMENTS                           \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         minimum, __differentiableNumericsMinimum)                               \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         maximum, __differentiableNumericsMaximum)
 
-#define NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(TYPE)                       \
+#define SLANG_NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(TYPE)                       \
     public extension TYPE : IScalarDifferentiableFloatingPoint                  \
     {                                                                            \
         [Differentiable] [ForceInline]                                           \
@@ -89,45 +93,45 @@ implementing differentiable;
         {                                                                        \
             this = __differentiableNumericsConstructFromFloatingPoint<TYPE>(value); \
         }                                                                        \
-        NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
-        NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS                     \
+        SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS                         \
+        SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS                     \
     }                                                                            \
                                                                                  \
     public extension TYPE : IDifferentiableExponentialFunctions                 \
     {                                                                            \
-        NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS                        \
+        SLANG_NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS                        \
     }                                                                            \
                                                                                  \
     public extension TYPE : IDifferentiableTrigonometricFunctions               \
     {                                                                            \
-        NUMERICS_DIFFERENTIABLE_TRIGONOMETRIC_REQUIREMENTS                      \
+        SLANG_NUMERICS_DIFFERENTIABLE_TRIGONOMETRIC_REQUIREMENTS                      \
     }                                                                            \
                                                                                  \
     public extension TYPE : IDifferentiableInverseTrigonometricFunctions        \
     {                                                                            \
-        NUMERICS_DIFFERENTIABLE_INVERSE_TRIGONOMETRIC_REQUIREMENTS              \
+        SLANG_NUMERICS_DIFFERENTIABLE_INVERSE_TRIGONOMETRIC_REQUIREMENTS              \
     }                                                                            \
                                                                                  \
     public extension TYPE : IDifferentiableHyperbolicFunctions                  \
     {                                                                            \
-        NUMERICS_DIFFERENTIABLE_HYPERBOLIC_REQUIREMENTS                         \
+        SLANG_NUMERICS_DIFFERENTIABLE_HYPERBOLIC_REQUIREMENTS                         \
     }                                                                            \
                                                                                  \
     public extension TYPE : IDifferentiableRootFunctions                        \
     {                                                                            \
-        NUMERICS_DIFFERENTIABLE_ROOT_REQUIREMENTS                               \
+        SLANG_NUMERICS_DIFFERENTIABLE_ROOT_REQUIREMENTS                               \
     }                                                                            \
                                                                                  \
     public extension TYPE : IDifferentiableRealOrderingFunctions                \
     {                                                                            \
-        NUMERICS_DIFFERENTIABLE_ORDERING_REQUIREMENTS                           \
+        SLANG_NUMERICS_DIFFERENTIABLE_ORDERING_REQUIREMENTS                           \
     }
 
-NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(half)
-NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(float)
-NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(double)
+SLANG_NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(half)
+SLANG_NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(float)
+SLANG_NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES(double)
 
-#undef NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES
+#undef SLANG_NUMERICS_DIFFERENTIABLE_SCALAR_CONFORMANCES
 
 public extension<
     T : __BuiltinFloatingPointType & IScalarDifferentiableFloatingPoint,
@@ -146,8 +150,8 @@ public extension<
         this = __differentiableNumericsConstructVectorFromFloatingPoint<T, TSource, N>(value);
     }
 
-    NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS
-    NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS
 }
 
 public extension<
@@ -155,7 +159,7 @@ public extension<
     let N : int>
     vector<T, N> : IDifferentiableExponentialFunctions
 {
-    NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS
 }
 
 public extension<
@@ -163,7 +167,7 @@ public extension<
     let N : int>
     vector<T, N> : IDifferentiableTrigonometricFunctions
 {
-    NUMERICS_DIFFERENTIABLE_TRIGONOMETRIC_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_TRIGONOMETRIC_REQUIREMENTS
 }
 
 public extension<
@@ -171,7 +175,7 @@ public extension<
     let N : int>
     vector<T, N> : IDifferentiableInverseTrigonometricFunctions
 {
-    NUMERICS_DIFFERENTIABLE_INVERSE_TRIGONOMETRIC_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_INVERSE_TRIGONOMETRIC_REQUIREMENTS
 }
 
 public extension<
@@ -179,7 +183,7 @@ public extension<
     let N : int>
     vector<T, N> : IDifferentiableHyperbolicFunctions
 {
-    NUMERICS_DIFFERENTIABLE_HYPERBOLIC_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_HYPERBOLIC_REQUIREMENTS
 }
 
 public extension<
@@ -187,7 +191,7 @@ public extension<
     let N : int>
     vector<T, N> : IDifferentiableRootFunctions
 {
-    NUMERICS_DIFFERENTIABLE_ROOT_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_ROOT_REQUIREMENTS
 }
 
 public extension<
@@ -195,10 +199,10 @@ public extension<
     let N : int>
     vector<T, N> : IDifferentiableRealOrderingFunctions
 {
-    NUMERICS_DIFFERENTIABLE_ORDERING_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_ORDERING_REQUIREMENTS
 }
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(METHOD, ADAPTER)       \
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(METHOD, ADAPTER)       \
     [Differentiable] [ForceInline]                                              \
     This METHOD()                                                               \
     {                                                                            \
@@ -209,7 +213,7 @@ public extension<
         return result;                                                           \
     }
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(METHOD, ADAPTER)      \
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(METHOD, ADAPTER)      \
     [Differentiable] [ForceInline]                                              \
     This METHOD(This other)                                                     \
     {                                                                            \
@@ -221,39 +225,45 @@ public extension<
         return result;                                                           \
     }
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS                  \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(plus, __differentiableNumericsAdd) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(minus, __differentiableNumericsSub) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
-    NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
-    NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS                  \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(plus, __differentiableNumericsAdd) \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(minus, __differentiableNumericsSub) \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(multipliedBy, __differentiableNumericsMul) \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(dividedBy, __differentiableNumericsDiv) \
+    SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT(negated, __differentiableNumericsNeg) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         absoluteValue, __differentiableNumericsAbs)                             \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         reciprocal, __differentiableNumericsRcp)
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_FLOATING_POINT_REQUIREMENTS              \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_FLOATING_POINT_REQUIREMENTS              \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         fractionalPart, __differentiableNumericsFractionalPart)                 \
-    NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
         remainderWhenDividedBy, __differentiableNumericsRemainder)              \
-    NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
         copyingSignFrom, __differentiableNumericsCopySign)
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_EXPONENTIAL_REQUIREMENTS                 \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(exponential, __differentiableNumericsExp) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(exponentialWithBase2, __differentiableNumericsExp2) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_EXPONENTIAL_REQUIREMENTS                 \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+        exponential, __differentiableNumericsExp)                                     \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+        exponentialWithBase2, __differentiableNumericsExp2)                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         exponentialWithBase10, __differentiableNumericsRegisteredExp10)         \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(logarithm, __differentiableNumericsLog) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(logarithmWithBase2, __differentiableNumericsLog2) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(logarithmWithBase10, __differentiableNumericsLog10) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(raisedToThePowerOf, __differentiableNumericsPow)
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+        logarithm, __differentiableNumericsLog)                                       \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+        logarithmWithBase2, __differentiableNumericsLog2)                            \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+        logarithmWithBase10, __differentiableNumericsLog10)                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
+        raisedToThePowerOf, __differentiableNumericsPow)
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_TRIGONOMETRIC_REQUIREMENTS               \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(sin, __differentiableNumericsSin) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(cos, __differentiableNumericsCos) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(tan, __differentiableNumericsTan) \
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_TRIGONOMETRIC_REQUIREMENTS               \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(sin, __differentiableNumericsSin) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(cos, __differentiableNumericsCos) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(tan, __differentiableNumericsTan) \
     [Differentiable] [ForceInline]                                              \
     void sincos(out This sineResult, out This cosineResult)                      \
     {                                                                            \
@@ -265,28 +275,30 @@ public extension<
                     cosineResult[row][column]);                                  \
     }
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_INVERSE_REQUIREMENTS                     \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(asin, __differentiableNumericsAsin) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(acos, __differentiableNumericsAcos) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(atan, __differentiableNumericsAtan) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(atan2, __differentiableNumericsAtan2)
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_INVERSE_REQUIREMENTS                     \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(asin, __differentiableNumericsAsin) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(acos, __differentiableNumericsAcos) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(atan, __differentiableNumericsAtan) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(atan2, __differentiableNumericsAtan2)
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_HYPERBOLIC_REQUIREMENTS                  \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(sinh, __differentiableNumericsSinh) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(cosh, __differentiableNumericsCosh) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(tanh, __differentiableNumericsTanh) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(asinh, __differentiableNumericsAsinh) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(acosh, __differentiableNumericsAcosh) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(atanh, __differentiableNumericsAtanh)
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_HYPERBOLIC_REQUIREMENTS                  \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(sinh, __differentiableNumericsSinh) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(cosh, __differentiableNumericsCosh) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(tanh, __differentiableNumericsTanh) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(asinh, __differentiableNumericsAsinh) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(acosh, __differentiableNumericsAcosh) \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(atanh, __differentiableNumericsAtanh)
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_ROOT_REQUIREMENTS                        \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(squareRoot, __differentiableNumericsSqrt) \
-    NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(reciprocalSquareRoot, __differentiableNumericsRsqrt)
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ROOT_REQUIREMENTS                        \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+        squareRoot, __differentiableNumericsSqrt)                                     \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
+        reciprocalSquareRoot, __differentiableNumericsRsqrt)
 
-#define NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS                    \
-    NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
+#define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS                    \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
         minimum, __differentiableNumericsMinimum)                               \
-    NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
         maximum, __differentiableNumericsMaximum)
 
 public extension<
@@ -309,8 +321,8 @@ public extension<
             T, TSource, R, C, L>(value);
     }
 
-    NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS
-    NUMERICS_DIFFERENTIABLE_MATRIX_FLOATING_POINT_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_FLOATING_POINT_REQUIREMENTS
 }
 
 public extension<
@@ -320,7 +332,7 @@ public extension<
     let L : int>
     matrix<T, R, C, L> : IDifferentiableExponentialFunctions
 {
-    NUMERICS_DIFFERENTIABLE_MATRIX_EXPONENTIAL_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_EXPONENTIAL_REQUIREMENTS
 }
 
 public extension<
@@ -330,7 +342,7 @@ public extension<
     let L : int>
     matrix<T, R, C, L> : IDifferentiableTrigonometricFunctions
 {
-    NUMERICS_DIFFERENTIABLE_MATRIX_TRIGONOMETRIC_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_TRIGONOMETRIC_REQUIREMENTS
 }
 
 public extension<
@@ -340,7 +352,7 @@ public extension<
     let L : int>
     matrix<T, R, C, L> : IDifferentiableInverseTrigonometricFunctions
 {
-    NUMERICS_DIFFERENTIABLE_MATRIX_INVERSE_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_INVERSE_REQUIREMENTS
 }
 
 public extension<
@@ -350,7 +362,7 @@ public extension<
     let L : int>
     matrix<T, R, C, L> : IDifferentiableHyperbolicFunctions
 {
-    NUMERICS_DIFFERENTIABLE_MATRIX_HYPERBOLIC_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_HYPERBOLIC_REQUIREMENTS
 }
 
 public extension<
@@ -360,7 +372,7 @@ public extension<
     let L : int>
     matrix<T, R, C, L> : IDifferentiableRootFunctions
 {
-    NUMERICS_DIFFERENTIABLE_MATRIX_ROOT_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ROOT_REQUIREMENTS
 }
 
 public extension<
@@ -370,13 +382,13 @@ public extension<
     let L : int>
     matrix<T, R, C, L> : IDifferentiableRealOrderingFunctions
 {
-    NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS
 }
 
 // Cooperative vectors already provide differentiable core arithmetic and element access. Define
 // the numerics witnesses in terms of those operations and the differentiated scalar adapters so
 // that every component follows the corresponding scalar derivative.
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(METHOD, ADAPTER)      \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(METHOD, ADAPTER)      \
     [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
     This METHOD()                                                               \
     {                                                                            \
@@ -387,7 +399,7 @@ public extension<
         return result;                                                           \
     }
 
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(METHOD, ADAPTER)     \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(METHOD, ADAPTER)     \
     [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
     This METHOD(This other)                                                     \
     {                                                                            \
@@ -398,44 +410,44 @@ public extension<
         return result;                                                           \
     }
 
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(METHOD, CORE_METHOD) \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(METHOD, CORE_METHOD) \
     [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
     This METHOD(This other) { return this.CORE_METHOD(other); }
 
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_FRACTIONAL_REQUIREMENTS                \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(plus, add)          \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(minus, sub)         \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(multipliedBy, mul)  \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(dividedBy, div)     \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_FRACTIONAL_REQUIREMENTS                \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(plus, add)          \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(minus, sub)         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(multipliedBy, mul)  \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT(dividedBy, div)     \
     [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
     This negated() { return this.neg(); }                                        \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         absoluteValue, __differentiableNumericsAbs)                             \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         reciprocal, __differentiableNumericsRcp)
 
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_EXPONENTIAL_REQUIREMENTS               \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_EXPONENTIAL_REQUIREMENTS               \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         exponential, __differentiableNumericsExp)                              \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         exponentialWithBase2, __differentiableNumericsExp2)                    \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         exponentialWithBase10, __differentiableNumericsRegisteredExp10)        \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         logarithm, __differentiableNumericsLog)                                \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         logarithmWithBase2, __differentiableNumericsLog2)                      \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         logarithmWithBase10, __differentiableNumericsLog10)                    \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
         raisedToThePowerOf, __differentiableNumericsPow)
 
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_TRIGONOMETRIC_REQUIREMENTS             \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_TRIGONOMETRIC_REQUIREMENTS             \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         sin, __differentiableNumericsSin)                                      \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         cos, __differentiableNumericsCos)                                      \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         tan, __differentiableNumericsTan)                                      \
     [Differentiable] [ForceInline] [require(cooperative_vector)]                 \
     void sincos(out This sineResult, out This cosineResult)                      \
@@ -446,40 +458,40 @@ public extension<
                 this[index], sineResult[index], cosineResult[index]);            \
     }
 
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_INVERSE_REQUIREMENTS                   \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_INVERSE_REQUIREMENTS                   \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         asin, __differentiableNumericsAsin)                                    \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         acos, __differentiableNumericsAcos)                                    \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         atan, __differentiableNumericsAtan)                                    \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
         atan2, __differentiableNumericsAtan2)
 
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_HYPERBOLIC_REQUIREMENTS                \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_HYPERBOLIC_REQUIREMENTS                \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         sinh, __differentiableNumericsSinh)                                    \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         cosh, __differentiableNumericsCosh)                                    \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         tanh, __differentiableNumericsTanh)                                    \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         asinh, __differentiableNumericsAsinh)                                  \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         acosh, __differentiableNumericsAcosh)                                  \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         atanh, __differentiableNumericsAtanh)
 
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_ROOT_REQUIREMENTS                      \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_ROOT_REQUIREMENTS                      \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         squareRoot, __differentiableNumericsSqrt)                              \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT(                         \
         reciprocalSquareRoot, __differentiableNumericsRsqrt)
 
-#define NUMERICS_DIFFERENTIABLE_COOPVEC_ORDERING_REQUIREMENTS                  \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
+#define SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_ORDERING_REQUIREMENTS                  \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
         minimum, __differentiableNumericsMinimum)                              \
-    NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT(                        \
         maximum, __differentiableNumericsMaximum)
 
 // Keep this conformance separate so it owns the differentiated `fromScalar` witness. Reusing the
@@ -511,7 +523,7 @@ public extension<T : __BuiltinFloatingPointType & IScalarDifferentiableFractiona
             __differentiableNumericsConstructFromFloatingPoint<T>(value));
     }
 
-    NUMERICS_DIFFERENTIABLE_COOPVEC_FRACTIONAL_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_FRACTIONAL_REQUIREMENTS
 }
 
 public extension<
@@ -519,7 +531,7 @@ public extension<
     let N : int>
     CoopVec<T, N> : IDifferentiableExponentialFunctions
 {
-    NUMERICS_DIFFERENTIABLE_COOPVEC_EXPONENTIAL_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_EXPONENTIAL_REQUIREMENTS
 }
 
 public extension<
@@ -527,7 +539,7 @@ public extension<
     let N : int>
     CoopVec<T, N> : IDifferentiableTrigonometricFunctions
 {
-    NUMERICS_DIFFERENTIABLE_COOPVEC_TRIGONOMETRIC_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_TRIGONOMETRIC_REQUIREMENTS
 }
 
 public extension<
@@ -535,7 +547,7 @@ public extension<
     let N : int>
     CoopVec<T, N> : IDifferentiableInverseTrigonometricFunctions
 {
-    NUMERICS_DIFFERENTIABLE_COOPVEC_INVERSE_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_INVERSE_REQUIREMENTS
 }
 
 public extension<
@@ -543,49 +555,49 @@ public extension<
     let N : int>
     CoopVec<T, N> : IDifferentiableHyperbolicFunctions
 {
-    NUMERICS_DIFFERENTIABLE_COOPVEC_HYPERBOLIC_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_HYPERBOLIC_REQUIREMENTS
 }
 
 public extension<T : __BuiltinFloatingPointType & IDifferentiableRootFunctions, let N : int>
     CoopVec<T, N> : IDifferentiableRootFunctions
 {
-    NUMERICS_DIFFERENTIABLE_COOPVEC_ROOT_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_ROOT_REQUIREMENTS
 }
 
 public extension<T : __BuiltinFloatingPointType & IScalarDifferentiableReal, let N : int>
     CoopVec<T, N> : IDifferentiableRealOrderingFunctions
 {
-    NUMERICS_DIFFERENTIABLE_COOPVEC_ORDERING_REQUIREMENTS
+    SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_ORDERING_REQUIREMENTS
 }
 
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_ORDERING_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_ROOT_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_HYPERBOLIC_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_INVERSE_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_TRIGONOMETRIC_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_EXPONENTIAL_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_FRACTIONAL_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT
-#undef NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_ORDERING_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_ROOT_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_HYPERBOLIC_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_INVERSE_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_TRIGONOMETRIC_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_EXPONENTIAL_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_FRACTIONAL_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_CORE_BINARY_REQUIREMENT
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_BINARY_REQUIREMENT
+#undef SLANG_NUMERICS_DIFFERENTIABLE_COOPVEC_UNARY_REQUIREMENT
 
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_ROOT_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_HYPERBOLIC_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_INVERSE_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_TRIGONOMETRIC_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_EXPONENTIAL_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_FLOATING_POINT_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT
-#undef NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT
-#undef NUMERICS_DIFFERENTIABLE_ORDERING_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_ROOT_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_HYPERBOLIC_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_INVERSE_TRIGONOMETRIC_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_TRIGONOMETRIC_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS
-#undef NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT
-#undef NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ROOT_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_HYPERBOLIC_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_INVERSE_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_TRIGONOMETRIC_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_EXPONENTIAL_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_FLOATING_POINT_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_FRACTIONAL_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT
+#undef SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT
+#undef SLANG_NUMERICS_DIFFERENTIABLE_ORDERING_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_ROOT_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_HYPERBOLIC_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_INVERSE_TRIGONOMETRIC_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_TRIGONOMETRIC_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_EXPONENTIAL_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_POINT_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_FRACTIONAL_REQUIREMENTS
+#undef SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT
+#undef SLANG_NUMERICS_DIFFERENTIABLE_UNARY_REQUIREMENT

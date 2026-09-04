@@ -357,22 +357,22 @@ public T lerp<T : IDifferentiableFractional>(T x, T y, T factor)
     return x.plus(y.minus(x).multipliedBy(factor));
 }
 
-#define NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(NAME, BODY)                  \
+#define SLANG_NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(NAME, BODY)                  \
     [__readNone] [Differentiable] [ForceInline] [OverloadRank(-10)]            \
     public T NAME<T : IDifferentiableRealOrderingFunctions>(T x, T y, T z)     \
     {                                                                            \
         BODY                                                                     \
     }
 
-NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(max3, return x.maximum(y.maximum(z));)
-NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(min3, return x.minimum(y.minimum(z));)
-NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(
+SLANG_NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(max3, return x.maximum(y.maximum(z));)
+SLANG_NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(min3, return x.minimum(y.minimum(z));)
+SLANG_NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM(
     median3,
     T lower = y.minimum(z); T upper = y.maximum(z); return upper.minimum(x.maximum(lower));)
 
-#undef NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM
+#undef SLANG_NUMERICS_DIFFERENTIABLE_THREE_WAY_EXTREMUM
 
-#define NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(NAME, BODY)                  \
+#define SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(NAME, BODY)                  \
     [__readNone] [Differentiable] [ForceInline] [OverloadRank(-10)]            \
     public T NAME<                                                              \
         T : IDifferentiableFloatingPoint & IDifferentiableRealOrderingFunctions>( \
@@ -391,7 +391,7 @@ public T fmax<
     return x.maximum(y);
 }
 
-NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(fmax3, return x.maximum(y.maximum(z));)
+SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(fmax3, return x.maximum(y.maximum(z));)
 
 [__readNone]
 [Differentiable]
@@ -403,12 +403,12 @@ public T fmin<
     return x.minimum(y);
 }
 
-NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(fmin3, return x.minimum(y.minimum(z));)
-NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(
+SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(fmin3, return x.minimum(y.minimum(z));)
+SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM(
     fmedian3,
     T lower = y.minimum(z); T upper = y.maximum(z); return upper.minimum(x.maximum(lower));)
 
-#undef NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM
+#undef SLANG_NUMERICS_DIFFERENTIABLE_FLOATING_EXTREMUM
 
 /// Raises a positive base through the differentiable exponential-function contract.
 [__readNone]

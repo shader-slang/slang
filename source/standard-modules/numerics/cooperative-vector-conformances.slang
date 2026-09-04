@@ -82,7 +82,7 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
         return result;
     }
 
-#define NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(NAME, OP)                   \
+#define SLANG_NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(NAME, OP)                   \
     [ForceInline] [require(cooperative_vector)]                                 \
     This NAME(This other)                                                       \
     {                                                                            \
@@ -93,11 +93,11 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
         return result;                                                           \
     }
 
-    NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitwiseAnd, &)
-    NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitwiseOr, |)
-    NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitwiseXor, ^)
+    SLANG_NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitwiseAnd, &)
+    SLANG_NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitwiseOr, |)
+    SLANG_NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT(bitwiseXor, ^)
 
-#undef NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT
+#undef SLANG_NUMERICS_COOPVEC_INTEGER_BINARY_REQUIREMENT
 
     [ForceInline] [require(cooperative_vector)]
     This bitwiseNot()
@@ -223,7 +223,7 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
     }
 }
 
-#define NUMERICS_COOPVEC_UNARY_REQUIREMENT(NAME, BUILTIN)                       \
+#define SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(NAME, BUILTIN)                       \
     [ForceInline] [require(cooperative_vector)]                                 \
     This NAME()                                                                 \
     {                                                                            \
@@ -234,7 +234,7 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
         return result;                                                           \
     }
 
-#define NUMERICS_COOPVEC_BINARY_REQUIREMENT(NAME, BUILTIN)                      \
+#define SLANG_NUMERICS_COOPVEC_BINARY_REQUIREMENT(NAME, BUILTIN)                      \
     [ForceInline] [require(cooperative_vector)]                                 \
     This NAME(This other)                                                       \
     {                                                                            \
@@ -248,9 +248,9 @@ public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int
 public extension<T : __BuiltinFloatingPointType & ITrigonometricFunctions, let N : int>
     CoopVec<T, N> : ITrigonometricFunctions
 {
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(sin, __numericInterfaceBuiltinSin)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(cos, __numericInterfaceBuiltinCos)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(tan, __numericInterfaceBuiltinTan)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(sin, __numericInterfaceBuiltinSin)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(cos, __numericInterfaceBuiltinCos)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(tan, __numericInterfaceBuiltinTan)
 
     [ForceInline] [require(cooperative_vector)]
     void sincos(out This sineResult, out This cosineResult)
@@ -270,44 +270,46 @@ public extension<T : __BuiltinFloatingPointType & ITrigonometricFunctions, let N
 public extension<T : __BuiltinFloatingPointType & IExponentialFunctions, let N : int>
     CoopVec<T, N> : IExponentialFunctions
 {
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(exponential, __numericInterfaceBuiltinExp)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(exponentialWithBase2, __numericInterfaceBuiltinExp2)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(exponentialWithBase10, __numericInterfaceBuiltinExp10)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(logarithm, __numericInterfaceBuiltinLog)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(logarithmWithBase2, __numericInterfaceBuiltinLog2)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(logarithmWithBase10, __numericInterfaceBuiltinLog10)
-    NUMERICS_COOPVEC_BINARY_REQUIREMENT(raisedToThePowerOf, __numericInterfaceBuiltinPow)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(exponential, __numericInterfaceBuiltinExp)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(exponentialWithBase2, __numericInterfaceBuiltinExp2)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(exponentialWithBase10, __numericInterfaceBuiltinExp10)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(logarithm, __numericInterfaceBuiltinLog)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(logarithmWithBase2, __numericInterfaceBuiltinLog2)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(logarithmWithBase10, __numericInterfaceBuiltinLog10)
+    SLANG_NUMERICS_COOPVEC_BINARY_REQUIREMENT(raisedToThePowerOf, __numericInterfaceBuiltinPow)
 }
 
 public extension<T : __BuiltinFloatingPointType & IInverseTrigonometricFunctions, let N : int>
     CoopVec<T, N> : IInverseTrigonometricFunctions
 {
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(asin, __numericInterfaceBuiltinAsin)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(acos, __numericInterfaceBuiltinAcos)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(atan, __numericInterfaceBuiltinAtan)
-    NUMERICS_COOPVEC_BINARY_REQUIREMENT(atan2, __numericInterfaceBuiltinAtan2)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(asin, __numericInterfaceBuiltinAsin)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(acos, __numericInterfaceBuiltinAcos)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(atan, __numericInterfaceBuiltinAtan)
+    SLANG_NUMERICS_COOPVEC_BINARY_REQUIREMENT(atan2, __numericInterfaceBuiltinAtan2)
 }
 
 public extension<T : __BuiltinFloatingPointType & IHyperbolicFunctions, let N : int>
     CoopVec<T, N> : IHyperbolicFunctions
 {
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(sinh, __numericInterfaceBuiltinSinh)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(cosh, __numericInterfaceBuiltinCosh)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(tanh, __numericInterfaceBuiltinTanh)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(asinh, __numericInterfaceBuiltinAsinh)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(acosh, __numericInterfaceBuiltinAcosh)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(atanh, __numericInterfaceBuiltinAtanh)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(sinh, __numericInterfaceBuiltinSinh)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(cosh, __numericInterfaceBuiltinCosh)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(tanh, __numericInterfaceBuiltinTanh)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(asinh, __numericInterfaceBuiltinAsinh)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(acosh, __numericInterfaceBuiltinAcosh)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(atanh, __numericInterfaceBuiltinAtanh)
 }
 
 public extension<T : __BuiltinFloatingPointType & IRootFunctions, let N : int>
     CoopVec<T, N> : IRootFunctions
 {
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(squareRoot, __numericInterfaceBuiltinSqrt)
-    NUMERICS_COOPVEC_UNARY_REQUIREMENT(reciprocalSquareRoot, __numericInterfaceBuiltinReciprocalSqrt)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(squareRoot, __numericInterfaceBuiltinSqrt)
+    SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT(
+        reciprocalSquareRoot,
+        __numericInterfaceBuiltinReciprocalSqrt)
 }
 
-#undef NUMERICS_COOPVEC_UNARY_REQUIREMENT
-#undef NUMERICS_COOPVEC_BINARY_REQUIREMENT
+#undef SLANG_NUMERICS_COOPVEC_UNARY_REQUIREMENT
+#undef SLANG_NUMERICS_COOPVEC_BINARY_REQUIREMENT
 
 public extension<T : __BuiltinFloatingPointType & IScalarReal, let N : int>
     CoopVec<T, N> : IRealOrderingFunctions

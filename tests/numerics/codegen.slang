@@ -12,7 +12,11 @@
 // HLSL-NOT: IElementaryFunctions
 // HLSL-NOT: IReal
 // HLSL: sin(
+// HLSL-NOT: __numericInterface
+// HLSL-NOT: IElementaryFunctions
+// HLSL-NOT: IReal
 // HLSL: exp(
+// HLSL-NOT: __numericInterface
 // HLSL-NOT: IElementaryFunctions
 // HLSL-NOT: IReal
 
@@ -20,7 +24,11 @@
 // SPIRV-NOT: IElementaryFunctions
 // SPIRV-NOT: IReal
 // SPIRV: OpExtInst {{.*}} Sin
+// SPIRV-NOT: __numericInterface
+// SPIRV-NOT: IElementaryFunctions
+// SPIRV-NOT: IReal
 // SPIRV: OpExtInst {{.*}} Exp
+// SPIRV-NOT: __numericInterface
 // SPIRV-NOT: IElementaryFunctions
 // SPIRV-NOT: IReal
 
@@ -46,12 +54,19 @@ T.Mask orderedMask<T : IComponentwiseOrdered>(T x, T y)
     return x < y;
 }
 
+T reciprocal<T : IFractional>(T value)
+{
+    return rcp(value);
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
     float4 floatingResult = floatingCurve(floatingInput[0], floatingInput[1]);
+    float2x2 matrixReciprocal = reciprocal(float2x2(2.0));
     int4 integerResult = integerCurve(integerInput[0], integerInput[1]);
     bool ordered = orderedMask(floatingInput[0], floatingInput[1]).all();
-    outputBuffer[0] = floatingResult + float4(integerResult) + float(ordered);
+    outputBuffer[0] =
+        floatingResult + float4(integerResult) + float(ordered) + matrixReciprocal[0][0];
 }
