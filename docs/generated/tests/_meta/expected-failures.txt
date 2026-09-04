@@ -149,6 +149,22 @@ docs/generated/tests/design/cross-cutting/core-module/core-int8-min-return-bound
 # kernel argument. (Will become a tracking issue after human triage.)
 docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-buffer-slots.slang
 
+# Pending: docs/generated/tests/_meta/findings/metadata-unorm-structured-buffer-element-sigsegv.yaml
+# `RWStructuredBuffer<unorm float>` (and the `snorm` spelling) segfaults
+# slangc (exit 139) on `-target hlsl` and `-target spirv-asm`, with and
+# without `-dump-ir`, while the same modifier on `RWTexture2D<unorm float4>`
+# compiles and emits the attribute. Probably the same root cause as
+# ir-types-unorm-snorm-struct-field-sigsegv. (Will become a tracking issue
+# after human triage.)
+docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffer-element.slang
+
+# shader-slang/slang#12492 fixes the `ref`-accessor lowering (#12487 / #9636):
+# the accessor no longer aborts Metal / emits invalid SPIR-V, and on pointer-less
+# targets its helper is inlined. That makes the `.1` (Metal) sub-test pass, so its
+# entry was removed. The SPIR-V (`.2`), GLSL, and WGSL directives still pin the
+# pre-fix shape (a surviving/pointer-returning `Cell_value_ref` helper), so they
+# now fail against the fixed compiler until the doc/test agents regenerate these
+# generated tests. They stay listed as awaiting-regeneration, not compiler bugs.
 # Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-metal-unknown-addressspace-abort.yaml
 # Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-spirv-invalid-funcall-return-type.yaml
 # The emission fan-out for the `ref`-accessor claim reaches the last two
@@ -166,6 +182,8 @@ docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-bu
 # triage.)
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property-glsl.slang
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property-wgsl.slang
 
 # https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
 # construction is rejected inside a generic function's array bound with

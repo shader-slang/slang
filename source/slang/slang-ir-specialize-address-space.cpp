@@ -372,9 +372,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             }
         }
 
-        HashSet<IRFunc*> newWorkList;
         while (workList.getCount())
         {
+            // Each round reprocesses only the callers queued by the previous
+            // round (those whose callee's result address space just changed), so
+            // `newWorkList` must be reset per round. Hoisting it out of the loop
+            // would leave already-converged callers queued forever, so the loop
+            // would never terminate once any function's result type changed.
+            HashSet<IRFunc*> newWorkList;
             for (Index i = 0; i < workList.getCount(); i++)
             {
                 auto func = workList[i];
