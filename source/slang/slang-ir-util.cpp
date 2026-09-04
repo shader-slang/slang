@@ -309,6 +309,9 @@ bool isValueType(IRInst* dataType)
     case kIROp_InterfaceType:
     case kIROp_ClassType:
     case kIROp_VectorType:
+    // Cooperative vectors are first-class numeric values, not handles through which a call can
+    // produce side effects.
+    case kIROp_CoopVectorType:
     case kIROp_MatrixType:
     case kIROp_TupleType:
     case kIROp_ResultType:
