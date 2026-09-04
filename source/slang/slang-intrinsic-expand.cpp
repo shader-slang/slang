@@ -800,32 +800,85 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             auto arg = m_args[argIndex].get();
             auto argType = arg->getDataType();
 
+            // `$P` is the single expansion site for the type-prefix used by ~100 `__intrinsic_asm`
+            // bodies (`$P_abs`, `$P_cos`, `$P_asfloat`, … as well as `$P_min`/`$P_max`); the prefix
+            // names the *element* type (`F32` for `float` or `float3`). A `$P`-using intrinsic is
+            // only reached with operands conforming to the interface it is declared for (all are
+            // arithmetic/`IComparable`-family), so the operand is always a builtin scalar, vector,
+            // or matrix of a scalar element type — never an arbitrary struct/resource. For a vector
+            // operand the prefix is that of its element type, so `<prefix>_<op>(wholeVector)`
+            // resolves as long as a matching vector-arity prelude helper exists (as the `min`/`max`
+            // helpers do); otherwise it would emit a call to an undeclared function. We therefore
+            // require a vector helper for a vector operand and diagnose when one is missing, and
+            // diagnose a composite (matrix) that has no `$P` prefix at all, rather than emitting
+            // unresolvable target code.
+            const bool argIsVector = as<IRVectorType>(argType) != nullptr;
+            if (auto vectorType = as<IRVectorType>(argType))
+                argType = vectorType->getElementType();
+
             const char* str = "";
+            // Whether the element prefix selected below has vector-arity `<prefix>_min`/`_max`
+            // helpers in the preludes. The narrow ints (I8/I16/U8/U16) have no scalar helper to
+            // build such a vector helper on, so they remain `false`; every other prefix has one.
+            // The `true` rows must stay in sync with the `SLANG_PRELUDE_VECTOR_MIN_MAX` /
+            // `SLANG_CUDA_VECTOR_MIN_MAX` instantiations in `slang-cpp-scalar-intrinsics.h` and
+            // `slang-cuda-prelude.h`; a prefix marked `true` here with no prelude helper would emit
+            // an undeclared call, and one marked `false` with a helper would over-diagnose.
+            bool elementHasVectorMinMax = false;
             switch (argType->getOp())
             {
-#define CASE(OP, STR) \
-    case kIROp_##OP:  \
-        str = #STR;   \
+#define CASE(OP, STR, HAS_VEC)            \
+    case kIROp_##OP:                      \
+        str = #STR;                       \
+        elementHasVectorMinMax = HAS_VEC; \
         break
 
-                CASE(Int8Type, I8);
-                CASE(Int16Type, I16);
-                CASE(IntType, I32);
-                CASE(Int64Type, I64);
-                CASE(UInt8Type, U8);
-                CASE(UInt16Type, U16);
-                CASE(UIntType, U32);
-                CASE(UInt64Type, U64);
-                CASE(IntPtrType, IPTR);
-                CASE(UIntPtrType, UPTR);
-                CASE(HalfType, F16);
-                CASE(FloatType, F32);
-                CASE(DoubleType, F64);
+                CASE(Int8Type, I8, false);
+                CASE(Int16Type, I16, false);
+                CASE(IntType, I32, true);
+                CASE(Int64Type, I64, true);
+                CASE(UInt8Type, U8, false);
+                CASE(UInt16Type, U16, false);
+                CASE(UIntType, U32, true);
+                CASE(UInt64Type, U64, true);
+                CASE(IntPtrType, IPTR, true);
+                CASE(UIntPtrType, UPTR, true);
+                CASE(HalfType, F16, true);
+                CASE(FloatType, F32, true);
+                CASE(DoubleType, F64, true);
 
 #undef CASE
 
             default:
-                SLANG_UNEXPECTED("unexpected type in intrinsic definition");
+                break;
+            }
+
+            // The only vector-arity `$P` helpers in the preludes are `<prefix>_min`/`<prefix>_max`;
+            // every other `$P` operation has only a scalar `<prefix>_<op>` helper, so a
+            // whole-vector operand resolves iff the operation is `min`/`max` AND the element prefix
+            // has the vector helper. `cursor` points just past the `P`, at the `_<op>(...)` suffix.
+            // The operation name is always immediately followed by `(` (e.g. `$P_min($0, $1)`), so
+            // match the full
+            // `_min(`/`_max(` token rather than a bare `_min` prefix — otherwise a hypothetical
+            // `$P_minfoo(...)` would be misread as `min`. (`opIsMinOrMax` is used only for a vector
+            // operand.)
+            const UnownedStringSlice suffix(cursor, end);
+            const bool opIsMinOrMax = suffix.startsWith(UnownedStringSlice("_min(")) ||
+                                      suffix.startsWith(UnownedStringSlice("_max("));
+            const bool hasVectorHelper = elementHasVectorMinMax && opIsMinOrMax;
+
+            // Diagnose the two cases that would otherwise emit unresolvable target code: an operand
+            // whose (element) type has no `$P` prefix at all (`str` empty — e.g. a matrix), and a
+            // vector operand for which no vector-arity helper exists (any `$P` operation other than
+            // `min`/`max`, or a narrow-int `min`/`max`). Leaving `str` unemitted is harmless
+            // because raising an error makes the emit pipeline discard the generated source on its
+            // non-zero error count.
+            if (str[0] == '\0' || (argIsVector && !hasVectorHelper))
+            {
+                m_emitter->getSink()->diagnose(Diagnostics::UnsupportedTypeForTargetIntrinsic{
+                    .operation = _getIntrinsicOperationName(m_callInst),
+                    .type = arg->getDataType(),
+                    .location = m_callInst->sourceLoc});
                 break;
             }
             m_writer->emit(str);
