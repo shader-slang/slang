@@ -1,0 +1,525 @@
+name: Issue Board Onboard (reusable)
+
+# Onboard a newly opened issue onto the shared "Slang-All" ProjectsV2 board
+# (org project 10):
+#   - adds the issue to the board (idempotent),
+#   - classifies + sets Source (Internal / Community / Bot) with the same
+#     source-internal family logic as pr-board-sync.yml,
+#   - when Source is Internal: assigns the author, sets Status to In Triage,
+#     and puts the card on the current Sprint.
+#
+# Cross-repo reuse: any shader-slang repo adds a thin caller that declares
+# issues:opened (and optional workflow_dispatch) and maps SLANG_PR_BOT_TOKEN.
+# Board IDs default to Slang-All; Source option names match the PR board
+# (Internal / Community / Bot) even though this is a different project --
+# option IDs are looked up by name at runtime.
+#
+# The inlined Source-classification helpers are copied VERBATIM from
+# pr-board-sync.yml (extract-js:classify / team-roster / source-internal-index).
+# pr-classify.test.js asserts they stay byte-identical so the existing
+# classification tests cover this workflow too.
+
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        description: "Issue number to onboard. Empty uses github.event.issue (issues:opened)."
+        type: string
+        default: ""
+      project_id:
+        description: "ProjectsV2 board node id (the 'Slang-All' issues board)."
+        type: string
+        default: "PVT_kwDOAb2kZs4AcYVs"
+      status_field:
+        type: string
+        default: "Status"
+      status_in_triage:
+        type: string
+        default: "In Triage"
+      source_field:
+        type: string
+        default: "Source"
+      source_internal:
+        type: string
+        default: "Internal"
+      source_community:
+        type: string
+        default: "Community"
+      source_bot:
+        type: string
+        default: "Bot"
+      source_internal_team:
+        description: "Base org/team-slug for Source Internal (default shader-slang/source-internal). Also includes sibling teams whose slug starts with that slug plus '-' (e.g. source-internal-*) when their description has 'Scope: [repo1, repo2]' listing repositories (bare short names or owner/repo; matching is by short name)."
+        type: string
+        default: "shader-slang/source-internal"
+      sprint_field:
+        description: "Iteration field name for the current sprint."
+        type: string
+        default: "Sprint"
+      bot_authors:
+        description: "Comma-separated logins always treated as bots."
+        type: string
+        default: "nv-slang-bot,slang-coworker-nanoclaw,Copilot,copilot-swe-agent"
+    secrets:
+      SLANG_PR_BOT_TOKEN:
+        description: "Dedicated bot PAT (org Projects RW + Members read; repo Issues write)."
+        required: true
+
+permissions: {}
+
+jobs:
+  onboard:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: issue-onboard-${{ github.event.issue.number || inputs.issue_number || github.run_id }}
+      cancel-in-progress: false
+    env:
+      HAS_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN != '' }}
+    steps:
+      - name: Note skipped (no token)
+        if: ${{ env.HAS_TOKEN != 'true' }}
+        run: |
+          echo "Skipping issue onboard: SLANG_PR_BOT_TOKEN is not available to this run."
+
+      - name: Onboard issue
+        if: ${{ env.HAS_TOKEN == 'true' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          PROJECT_ID: ${{ inputs.project_id }}
+          STATUS_FIELD: ${{ inputs.status_field }}
+          STATUS_IN_TRIAGE: ${{ inputs.status_in_triage }}
+          SOURCE_FIELD: ${{ inputs.source_field }}
+          SOURCE_INTERNAL: ${{ inputs.source_internal }}
+          SOURCE_COMMUNITY: ${{ inputs.source_community }}
+          SOURCE_BOT: ${{ inputs.source_bot }}
+          SOURCE_INTERNAL_TEAM: ${{ inputs.source_internal_team }}
+          SPRINT_FIELD: ${{ inputs.sprint_field }}
+          BOT_AUTHORS: ${{ inputs.bot_authors }}
+        with:
+          github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
+          script: |
+            const PROJECT_ID = process.env.PROJECT_ID;
+            const SOURCE_FIELD = process.env.SOURCE_FIELD;
+            const SOURCE_INTERNAL = process.env.SOURCE_INTERNAL;
+            const SOURCE_COMMUNITY = process.env.SOURCE_COMMUNITY;
+            const SOURCE_BOT = process.env.SOURCE_BOT;
+            const STATUS_FIELD = process.env.STATUS_FIELD;
+            const STATUS_IN_TRIAGE = process.env.STATUS_IN_TRIAGE;
+            const SPRINT_FIELD = process.env.SPRINT_FIELD;
+            const SOURCE_INTERNAL_TEAM = process.env.SOURCE_INTERNAL_TEAM || "";
+
+            const botAuthors = (process.env.BOT_AUTHORS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+
+            // Shared Source-classification helpers, copied VERBATIM from
+            // pr-board-sync.yml. pr-classify.test.js asserts every extracted
+            // function here is byte-identical to the tested PR copy.
+            // ----- extract-js:team-roster:begin -----
+            const DEFAULT_MAX_TEAM_READ_ATTEMPTS = 3;
+            const DEFAULT_TEAM_READ_BACKOFF_MS = 1000;
+
+            // Build the per-run team-read cache used by Source classification and
+            // by the owners/maintainer pools. paginateTeams({org}) and
+            // paginateMembers({org, team_slug}) return arrays; throw {status}
+            // on failure. warn(message) records a warning. sleep(ms) is injectable
+            // so tests can observe the exponential backoff without actually waiting.
+            //
+            // tryListTeamMembers return shapes:
+            //   - empty Set — bare/blank teamSpec (definitely nobody)
+            //   - null — all retry attempts failed (also "unknown": do not guess
+            //     Source). This settled failure is cached for the rest of the run;
+            //     the next workflow run starts with a fresh cache and retries.
+            //   - non-empty Set — successful read (cached for the run)
+            function createTeamReadCache({
+              paginateTeams, paginateMembers, warn,
+              sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+              maxAttempts = DEFAULT_MAX_TEAM_READ_ATTEMPTS,
+              baseDelayMs = DEFAULT_TEAM_READ_BACKOFF_MS,
+            }) {
+              const warned = {};
+              function warnOnce(message) {
+                if (warned[message]) return;
+                warned[message] = true;
+                warn(message);
+              }
+              async function readWithBackoff(label, read) {
+                let lastError;
+                for (let attempt = 1; attempt <= maxAttempts; ++attempt) {
+                  try {
+                    return await read();
+                  } catch (error) {
+                    lastError = error;
+                    if (attempt === maxAttempts) break;
+                    const delayMs = baseDelayMs * (2 ** (attempt - 1));
+                    warn(
+                      `${label} (${error.status}); retrying in ${delayMs}ms ` +
+                      `(${attempt}/${maxAttempts})`);
+                    await sleep(delayMs);
+                  }
+                }
+                warn(
+                  `${label} after ${maxAttempts} attempts (${lastError?.status})`);
+                return null;
+              }
+              let orgTeams; // undefined = unread; null = retries exhausted
+              async function listOrgTeams(org) {
+                if (orgTeams !== undefined) return orgTeams;
+                orgTeams = await readWithBackoff(
+                  `could not list teams in ${org}`,
+                  () => paginateTeams({ org }));
+                return orgTeams;
+              }
+              const teamCache = {};
+              async function tryListTeamMembers(teamSpec) {
+                if (!teamSpec || !teamSpec.includes("/")) return new Set();
+                if (Object.hasOwn(teamCache, teamSpec)) return teamCache[teamSpec];
+                const slash = teamSpec.indexOf("/");
+                const org = teamSpec.slice(0, slash);
+                const slug = teamSpec.slice(slash + 1);
+                const data = await readWithBackoff(
+                  `could not list team ${teamSpec}`,
+                  () => paginateMembers({ org, team_slug: slug }));
+                teamCache[teamSpec] = data
+                  ? new Set(data.map(m => m.login))
+                  : null;
+                return teamCache[teamSpec];
+              }
+              // Empty on any read error — for owners/maintainer pools, where an
+              // unreadable team just means no pick from it.
+              async function listTeamMembers(teamSpec) {
+                return (await tryListTeamMembers(teamSpec)) || new Set();
+              }
+              return {
+                warnOnce, listOrgTeams, tryListTeamMembers, listTeamMembers,
+                readWithBackoff, maxAttempts,
+              };
+            }
+            // ----- extract-js:team-roster:end -----
+            // ----- extract-js:classify:begin -----
+            // Short repo name (lowercased), from "owner/name" or a bare name.
+            function repoShortName(repo) {
+              if (!repo) return "";
+              const slash = String(repo).lastIndexOf("/");
+              return (slash >= 0 ? String(repo).slice(slash + 1) : String(repo)).toLowerCase();
+            }
+
+            // Parse "Scope: [repo1, repo2]" from a team description into short
+            // repo names (lowercased). Bare names and owner/name forms are both
+            // accepted; the owner is stripped, so Scope: [otherorg/slangpy]
+            // matches shader-slang/slangpy (short names are unique in practice).
+            // Returns [] when Scope: [...] is absent. The brackets delimit the
+            // list so other description text can follow. The label is
+            // case-insensitive; a space before the colon (e.g. "Scope :") is
+            // not accepted — write `Scope: [...]` exactly.
+            function parseTeamScopeRepos(description) {
+              if (!description) return [];
+              const match = String(description).match(/\bScope:\s*\[([^\]]*)\]/i);
+              if (!match) return [];
+              return match[1].split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
+                const slash = s.lastIndexOf("/");
+                return (slash >= 0 ? s.slice(slash + 1) : s).toLowerCase();
+              });
+            }
+
+            // True when teamSlug is the base source-internal team or a sibling
+            // whose slug starts with "<base>-" (e.g. source-internal-slangpy).
+            function isSourceInternalFamilySlug(baseSlug, teamSlug) {
+              if (!baseSlug || !teamSlug) return false;
+              return teamSlug === baseSlug || teamSlug.startsWith(baseSlug + "-");
+            }
+
+            // True when login is in the member set (case-insensitive).
+            function isInternalLogin(login, members) {
+              if (!login || !members) return false;
+              const lower = login.toLowerCase();
+              for (const m of members) {
+                if ((m || "").toLowerCase() === lower) return true;
+              }
+              return false;
+            }
+
+            // Effective Internal member set for a repo, from the source-internal
+            // team family: one entry per team, { repos, members }, where
+            // repos === null marks the base team (it covers every repo) and any
+            // other entry covers just the repos its Scope: lists.
+            //
+            // Returns null -- meaning "membership is unknown for this repo" --
+            // when the family is null (the org team list was unreadable) or when
+            // a team that covers this repo has a falsy members (null/undefined;
+            // its roster was unreadable). Relies on loadSourceInternalIndex
+            // always including the base entry (repos === null) in a non-null
+            // family; without that, a repo covered by nothing would look like
+            // Community instead of unknown. Callers must not treat null as
+            // "not a member": a transient API error would then be persisted as
+            // Community.
+            function internalMembersForRepo(repo, teams) {
+              if (!teams) return null;
+              const short = repoShortName(repo);
+              const out = new Set();
+              for (const t of teams) {
+                if (t.repos) {
+                  let hit = false;
+                  for (const r of t.repos) {
+                    if ((r || "").toLowerCase() === short) { hit = true; break; }
+                  }
+                  if (!hit) continue;
+                }
+                if (!t.members) return null;
+                for (const m of t.members) if (m) out.add(m);
+              }
+              return out;
+            }
+
+            // Classify Source from bot flag + resolved team membership, or null
+            // when membership could not be determined so the caller leaves Source
+            // unset. Any falsy members (null/undefined) is that unknown; an
+            // EMPTY set is a successful read of a family nobody is on, hence
+            // Community.
+            function classifyAuthorSource({ isBot, login, members,
+                                           sourceBot, sourceInternal, sourceCommunity }) {
+              if (isBot) return sourceBot;
+              if (!members) return null;
+              return isInternalLogin(login, members) ? sourceInternal : sourceCommunity;
+            }
+            // ----- extract-js:classify:end -----
+            // ----- extract-js:source-internal-index:begin -----
+            async function loadSourceInternalIndex({
+              teamSpec, listOrgTeams, tryListTeamMembers, warnOnce,
+              parseTeamScopeRepos, isSourceInternalFamilySlug,
+            }) {
+              if (!teamSpec || !teamSpec.includes("/")) return [];
+              const slash = teamSpec.indexOf("/");
+              const org = teamSpec.slice(0, slash);
+              const baseSlug = teamSpec.slice(slash + 1);
+              const teams = await listOrgTeams(org);
+              if (!teams) return null;
+              const family = [];
+              for (const team of teams) {
+                const slug = team.slug || "";
+                if (!isSourceInternalFamilySlug(baseSlug, slug)) continue;
+                const members = await tryListTeamMembers(`${org}/${slug}`);
+                if (slug === baseSlug) {
+                  family.push({ repos: null, members });
+                } else {
+                  const repos = parseTeamScopeRepos(team.description || "");
+                  // A sibling with no parseable Scope: [...] contributes nobody, so
+                  // its members would silently look Community. Name it in the log
+                  // rather than letting the misconfiguration pass as a plausible
+                  // Source.
+                  if (repos.length) family.push({ repos, members });
+                  else warnOnce(
+                    `team ${org}/${slug} has no 'Scope: [repo, ...]'; ignoring it`);
+                }
+              }
+              // A configured base team that is absent from the listing (renamed,
+              // deleted, or invisible to this token) would silently make every
+              // author Community, so treat it as unreadable instead.
+              if (!family.some(t => t.repos === null)) {
+                warnOnce(`team ${teamSpec} not found in ${org}; leaving Source unset`);
+                return null;
+              }
+              return family;
+            }
+            // ----- extract-js:source-internal-index:end -----
+
+            // The iteration whose [startDate, startDate+duration) window (UTC)
+            // contains now. GitHub stores startDate as YYYY-MM-DD and duration
+            // in whole days; the last day of a sprint is still in-range.
+            // ----- extract-js:current-iteration:begin -----
+            function currentIteration(iterations, now) {
+              if (!iterations || !iterations.length) return null;
+              const t = now instanceof Date ? now.getTime() : new Date(now).getTime();
+              if (Number.isNaN(t)) return null;
+              for (const it of iterations) {
+                if (!it || !it.startDate) continue;
+                const durationDays = Number(it.duration);
+                if (!durationDays) continue;
+                const start = Date.parse(String(it.startDate) + "T00:00:00Z");
+                if (Number.isNaN(start)) continue;
+                const end = start + durationDays * 86400000;
+                if (t >= start && t < end) return it;
+              }
+              return null;
+            }
+            // ----- extract-js:current-iteration:end -----
+
+            const {
+              warnOnce, listOrgTeams, tryListTeamMembers,
+            } = createTeamReadCache({
+              paginateTeams: ({ org }) => github.paginate(
+                github.rest.teams.list, { org, per_page: 100 }),
+              paginateMembers: ({ org, team_slug }) => github.paginate(
+                github.rest.teams.listMembersInOrg,
+                { org, team_slug, per_page: 100 }),
+              warn: (message) => core.warning(message),
+            });
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const number = Number(
+              process.env.ISSUE_NUMBER || context.payload.issue?.number || 0);
+            if (!number) {
+              core.setFailed("no issue number (opened event or issue_number input)");
+              return;
+            }
+
+            let issue = context.payload.issue;
+            if (!issue || issue.number !== number) {
+              const r = await github.rest.issues.get({
+                owner, repo, issue_number: number });
+              issue = r.data;
+            }
+            if (issue.pull_request) {
+              console.log(`#${number} is a pull request; skipping issue onboard`);
+              return;
+            }
+
+            const user = issue.user || {};
+            const login = user.login;
+            const isBot = user.type === "Bot" ||
+              botAuthors.includes((login || "").toLowerCase());
+
+            const members = isBot
+              ? null
+              : internalMembersForRepo(
+                  repo, await loadSourceInternalIndex({
+                    teamSpec: SOURCE_INTERNAL_TEAM,
+                    listOrgTeams,
+                    tryListTeamMembers,
+                    warnOnce,
+                    parseTeamScopeRepos,
+                    isSourceInternalFamilySlug,
+                  }));
+            const source = classifyAuthorSource({
+              isBot, login, members,
+              sourceBot: SOURCE_BOT,
+              sourceInternal: SOURCE_INTERNAL,
+              sourceCommunity: SOURCE_COMMUNITY,
+            });
+            if (source) {
+              if (isBot) {
+                console.log(`issue author ${login}; classified as Bot`);
+              } else {
+                console.log(
+                  `issue author ${login}; source-internal for ${repo}: ${isInternalLogin(login, members)}`);
+              }
+            } else {
+              core.warning(
+                `could not determine Source for ${login}; leaving Source unset`);
+            }
+
+            const nodeId = issue.node_id;
+            if (!nodeId) {
+              core.setFailed(`issue #${number} has no node_id`);
+              return;
+            }
+
+            const fieldCache = {};
+            async function field(name) {
+              if (fieldCache[name]) return fieldCache[name];
+              const data = await github.graphql(`
+                query($project: ID!, $name: String!) {
+                  node(id: $project) {
+                    ... on ProjectV2 {
+                      field(name: $name) {
+                        ... on ProjectV2SingleSelectField { id options { id name } }
+                        ... on ProjectV2IterationField {
+                          id
+                          configuration {
+                            iterations { id title startDate duration }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }`, { project: PROJECT_ID, name });
+              const f = data?.node?.field || {};
+              const options = {};
+              for (const o of (f.options || [])) options[o.name] = o.id;
+              fieldCache[name] = {
+                id: f.id,
+                options,
+                iterations: f.configuration?.iterations || [],
+              };
+              return fieldCache[name];
+            }
+
+            async function ensureItem(contentId) {
+              if (!contentId) return null;
+              const r = await github.graphql(`
+                mutation($project: ID!, $content: ID!) {
+                  addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
+                    item { id }
+                  }
+                }`, { project: PROJECT_ID, content: contentId });
+              return r?.addProjectV2ItemById?.item?.id || null;
+            }
+
+            async function setSingleSelect(itemId, fieldName, optionName) {
+              if (!itemId || !optionName) return;
+              const f = await field(fieldName);
+              const optionId = (f.options || {})[optionName];
+              if (!f.id || !optionId) {
+                core.warning(`field ${fieldName} option ${optionName} not found on board`);
+                return;
+              }
+              await github.graphql(`
+                mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $project, itemId: $item, fieldId: $field,
+                    value: { singleSelectOptionId: $option }
+                  }) { projectV2Item { id } }
+                }`, { project: PROJECT_ID, item: itemId, field: f.id, option: optionId });
+              console.log(`set ${fieldName} = ${optionName}`);
+            }
+
+            async function setIteration(itemId, fieldName, iteration) {
+              if (!itemId || !iteration?.id) return;
+              const f = await field(fieldName);
+              if (!f.id) {
+                core.warning(`field ${fieldName} not found on board`);
+                return;
+              }
+              await github.graphql(`
+                mutation($project: ID!, $item: ID!, $field: ID!, $iteration: ID!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $project, itemId: $item, fieldId: $field,
+                    value: { iterationId: $iteration }
+                  }) { projectV2Item { id } }
+                }`, {
+                  project: PROJECT_ID, item: itemId, field: f.id,
+                  iteration: iteration.id,
+                });
+              console.log(`set ${fieldName} = ${iteration.title || iteration.id}`);
+            }
+
+            const itemId = await ensureItem(nodeId);
+            if (!itemId) {
+              core.setFailed(`could not add issue #${number} to the board`);
+              return;
+            }
+            console.log(`board item ${itemId} for #${number}`);
+
+            if (source) await setSingleSelect(itemId, SOURCE_FIELD, source);
+
+            if (source === SOURCE_INTERNAL) {
+              try {
+                await github.rest.issues.addAssignees({
+                  owner, repo, issue_number: number, assignees: [login],
+                });
+                console.log(`assigned #${number} -> ${login}`);
+              } catch (error) {
+                core.warning(
+                  `could not assign #${number} to ${login} (${error.status})`);
+              }
+              await setSingleSelect(itemId, STATUS_FIELD, STATUS_IN_TRIAGE);
+              const sprintField = await field(SPRINT_FIELD);
+              const sprint = currentIteration(sprintField.iterations, new Date());
+              if (sprint) {
+                await setIteration(itemId, SPRINT_FIELD, sprint);
+              } else {
+                core.warning(
+                  `no current iteration on field ${SPRINT_FIELD}; leaving Sprint unset`);
+              }
+            }

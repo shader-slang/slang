@@ -50,11 +50,14 @@ name: PR Board Sync (reusable)
 #
 # Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
 # declares the PR event triggers and calls this one, mapping the single required
-# secret explicitly (no `secrets: inherit`; callers should set `permissions: {}`
-# because this workflow uses the PAT for everything, not the GITHUB_TOKEN):
+# secret explicitly (no `secrets: inherit`) and granting the GITHUB_TOKEN
+# permissions its repo-scoped writes need (see "Caller permissions"):
 #
 #   jobs:
 #     board-sync:
+#       permissions:
+#         issues: write
+#         pull-requests: write
 #       uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
 #       secrets:
 #         SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
@@ -63,14 +66,24 @@ name: PR Board Sync (reusable)
 # defaults to the shared board's values; callers pass only the one secret.
 #
 # Required secret (a shader-slang **org-level** secret, shared org-wide):
-#   SLANG_PR_BOT_TOKEN - a dedicated bot PAT used for EVERY GitHub call this
-#     workflow makes (so growing its capabilities never changes the caller
-#     contract — you widen this PAT's scopes centrally, callers are untouched).
+#   SLANG_PR_BOT_TOKEN - a dedicated bot PAT used for org-team/ProjectsV2 calls,
+#     repo reads, and compatibility fallback writes while callers adopt the
+#     GITHUB_TOKEN grants below.
 #     Scopes needed: org Projects read+write (board) and Members read; repo
 #     Contents read, Pull requests write, Issues write, Metadata read. Members
 #     read is what Source classification needs; when a team roster remains
 #     unreadable after bounded retries, no Source is written and a later
 #     workflow run retries with a fresh in-memory cache.
+#
+# Caller permissions: repo-scoped writes are made as github-actions[bot] with the
+# run's GITHUB_TOKEN: PR/issue assignees and comments need `issues: write`, while
+# review requests need `pull-requests: write`. The PAT remains the fallback for
+# those writes while callers roll out the grants, and remains mandatory for org
+# team reads and ProjectsV2 writes, which GITHUB_TOKEN cannot do. A called
+# workflow can never hold more permission than its caller granted, so callers
+# grant both permissions on the calling job. Without them, the PAT fallback keeps
+# assignment/reviewer writes working, but the comment is skipped rather than
+# posted as the PAT owner (which would subscribe that person to the PR).
 #
 # Safety: every job runs only on PR metadata / API calls and never checks out or
 # executes PR code, so `pull_request_target` (secrets available for fork PRs) is
@@ -172,12 +185,20 @@ on:
         default: "bmillsNV"
     secrets:
       SLANG_PR_BOT_TOKEN:
-        description: "Dedicated bot PAT used for every GitHub call this workflow makes (org Projects RW + Members read; repo Contents read, Pull requests write, Issues write, Metadata read)."
+        description: "Dedicated bot PAT used for org Projects RW + Members read, repo reads, and as a compatibility fallback for repo writes while callers grant GITHUB_TOKEN Issues/Pull requests write."
         required: true
 
-# Every step authenticates with SLANG_PR_BOT_TOKEN, so the GITHUB_TOKEN is unused;
-# deny it entirely. (Callers therefore need no permissions block.)
-permissions: {}
+# NOTE: deliberately no `permissions:` block here, so this workflow's GITHUB_TOKEN
+# is exactly what the calling job granted.
+#
+# Repo-scoped writes use the run's GITHUB_TOKEN so the visible actor is
+# github-actions[bot]. It would be tempting to declare its `issues: write` and
+# `pull-requests: write` permissions here, but a called workflow may not request
+# more than its caller granted -- GitHub would reject un-updated callers at
+# STARTUP. Inheriting keeps the rollout safe: updated callers use GITHUB_TOKEN;
+# un-updated callers fall back to the PAT for assignment/reviewer writes, while
+# the comment is skipped because a PAT-authored comment would subscribe its human
+# owner. Org team reads and ProjectsV2 writes always use the PAT.
 
 jobs:
   board-sync:
@@ -528,6 +549,12 @@ jobs:
           BOT_OWNERS_TEAM: ${{ inputs.bot_owners_team }}
           MAINTAINER_TEAM: ${{ inputs.maintainer_team }}
           FALLBACK_ASSIGNEE: ${{ inputs.fallback_assignee }}
+          # The run's own GITHUB_TOKEN, used for repo-scoped writes so assignments,
+          # review requests, and comments show up as github-actions[bot]. Its reach
+          # is exactly what the calling job granted; the PAT remains available to
+          # the github-script client for org/Projects calls and compatibility
+          # fallback during the caller rollout.
+          ACTIONS_TOKEN: ${{ github.token }}
         with:
           github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
           script: |
@@ -1488,17 +1515,62 @@ jobs:
               for (const iss of linkedIssues) {
                 if (iss.assignees?.length) continue;
                 try {
-                  await github.rest.issues.addAssignees({
+                  const args = {
                     owner: context.repo.owner, repo: context.repo.repo,
                     issue_number: iss.number, assignees: [ownerLogin],
-                  });
+                  };
+                  await actionsWrite(
+                    "POST", repoApiPath(`/issues/${iss.number}/assignees`),
+                    { assignees: args.assignees },
+                    () => github.rest.issues.addAssignees(args));
                   console.log(`assigned issue #${iss.number} -> ${ownerLogin}`);
                 } catch (error) {
                   core.warning(
-                    `could not assign issue #${iss.number} (${error.status})`);
+                    `could not assign issue #${iss.number} ` +
+                    `(${error.message || error.status})`);
                 }
               }
             }
+
+            // Make a repo-scoped write as github-actions[bot]. github-script gives
+            // us exactly one authenticated Octokit (`github`), and it is bound to
+            // SLANG_PR_BOT_TOKEN because org-team and ProjectsV2 calls require the
+            // PAT, so repo writes use the run's GITHUB_TOKEN through raw fetch.
+            //
+            // While cross-repo callers roll out GITHUB_TOKEN write permissions,
+            // assignment/reviewer writes may pass `patFallback` to preserve their
+            // previous behavior on a 403. Comments deliberately do not: posting a
+            // comment as the PAT owner would subscribe that human to the PR, the
+            // problem this identity split exists to prevent.
+            // ----- extract-js:actions-write:begin -----
+            async function actionsWrite(method, path, body, patFallback = null) {
+              const api = process.env.GITHUB_API_URL || "https://api.github.com";
+              const response = await fetch(`${api}${path}`, {
+                method,
+                headers: {
+                  authorization: `Bearer ${process.env.ACTIONS_TOKEN}`,
+                  accept: "application/vnd.github+json",
+                  "x-github-api-version": "2022-11-28",
+                  "content-type": "application/json",
+                },
+                body: body === undefined ? undefined : JSON.stringify(body),
+              });
+              if (response.status === 403 && patFallback) {
+                core.warning(
+                  `GITHUB_TOKEN cannot ${method} ${path}; using the PAT fallback. ` +
+                  `Update the calling job's issues/pull-requests permissions.`);
+                return patFallback();
+              }
+              if (!response.ok) {
+                throw new Error(
+                  `${response.status} ${(await response.text()).slice(0, 200)}`);
+              }
+            }
+
+            function repoApiPath(suffix) {
+              return `/repos/${context.repo.owner}/${context.repo.repo}${suffix}`;
+            }
+            // ----- extract-js:actions-write:end -----
 
             // Backfill a PR's assignee + reviewers (linked-issue Internal assignee
             // -> committer-signal owner -> maintainer). For Community/Bot:
@@ -1512,19 +1584,24 @@ jobs:
             // fires at most once). Linked-issue assignment is also idempotent:
             // only unassigned issues are updated, including when the PR was
             // assigned earlier or the issue was linked later.
+
+            // Posted as github-actions[bot] (see actionsWrite) so this
+            // greeting does not quietly turn the PAT's owner into a watcher of
+            // every Community/Bot PR. Best-effort: a failure here (e.g. a caller
+            // that did not grant `issues: write`) leaves the PR assigned
+            // and the reviewer requested, just without the note.
             async function postAssignmentComment(number, {
               source, assignee, suggestedReviewer,
               autoRequestedReviewer, autoRequestedHasSignal,
             }) {
               try {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner, repo: context.repo.repo,
-                  issue_number: number,
-                  body: formatAssignmentComment({
-                    source, assignee, suggestedReviewer,
-                    autoRequestedReviewer, autoRequestedHasSignal,
-                  }),
-                });
+                await actionsWrite(
+                  "POST", repoApiPath(`/issues/${number}/comments`), {
+                    body: formatAssignmentComment({
+                      source, assignee, suggestedReviewer,
+                      autoRequestedReviewer, autoRequestedHasSignal,
+                    }),
+                  });
                 if (suggestedReviewer) {
                   console.log(
                     `assignment comment for ${assignee}; suggested ${suggestedReviewer}`);
@@ -1533,7 +1610,9 @@ jobs:
                 }
               } catch (error) {
                 core.warning(
-                  `could not post assignment comment (${error.status})`);
+                  `could not post assignment comment (${error.message}); ` +
+                  `a 403 means the calling workflow's job needs ` +
+                  `permissions: issues: write`);
               }
             }
 
@@ -1601,10 +1680,14 @@ jobs:
               }
               if (!assignee) return;                    // no owner and no maintainer
 
-              await github.rest.issues.addAssignees({
+              const ownerAssignment = {
                 owner: context.repo.owner, repo: context.repo.repo,
                 issue_number: number, assignees: [assignee],
-              });
+              };
+              await actionsWrite(
+                "POST", repoApiPath(`/issues/${number}/assignees`),
+                { assignees: ownerAssignment.assignees },
+                () => github.rest.issues.addAssignees(ownerAssignment));
               console.log(`assigned ${assignee} (source ${source})`);
 
               // For a Community PR, also co-assign the original author. ProjectsV2
@@ -1618,14 +1701,19 @@ jobs:
               if (source === SOURCE_COMMUNITY && info.authorLogin &&
                   info.authorLogin.toLowerCase() !== assignee.toLowerCase()) {
                 try {
-                  await github.rest.issues.addAssignees({
+                  const authorAssignment = {
                     owner: context.repo.owner, repo: context.repo.repo,
                     issue_number: number, assignees: [info.authorLogin],
-                  });
+                  };
+                  await actionsWrite(
+                    "POST", repoApiPath(`/issues/${number}/assignees`),
+                    { assignees: authorAssignment.assignees },
+                    () => github.rest.issues.addAssignees(authorAssignment));
                   console.log(`co-assigned community author ${info.authorLogin}`);
                 } catch (error) {
                   core.warning(
-                    `could not co-assign community author ${info.authorLogin} (${error.status})`);
+                    `could not co-assign community author ${info.authorLogin} ` +
+                    `(${error.message || error.status})`);
                 }
               }
 
@@ -1634,23 +1722,32 @@ jobs:
               const toRemove =
                 info.requestedReviewers.filter(r => IGNORED.has(r.toLowerCase()));
               if (toRemove.length) {
-                await github.rest.pulls.removeRequestedReviewers({
+                const args = {
                   owner: context.repo.owner, repo: context.repo.repo,
                   pull_number: number, reviewers: toRemove,
-                });
+                };
+                await actionsWrite(
+                  "DELETE", repoApiPath(`/pulls/${number}/requested_reviewers`),
+                  { reviewers: toRemove },
+                  () => github.rest.pulls.removeRequestedReviewers(args));
               }
 
               // autoRequestedReviewer is already filtered (not author, not ignored,
               // no real existing reviewer) — request that login only.
               if (autoRequestedReviewer) {
                 try {
-                  await github.rest.pulls.requestReviewers({
+                  const args = {
                     owner: context.repo.owner, repo: context.repo.repo,
                     pull_number: number, reviewers: [autoRequestedReviewer],
-                  });
+                  };
+                  await actionsWrite(
+                    "POST", repoApiPath(`/pulls/${number}/requested_reviewers`),
+                    { reviewers: args.reviewers },
+                    () => github.rest.pulls.requestReviewers(args));
                 } catch (error) {
                   core.warning(
-                    `could not request reviewers ${autoRequestedReviewer} (${error.status})`);
+                    `could not request reviewers ${autoRequestedReviewer} ` +
+                    `(${error.message || error.status})`);
                 }
               }
 
@@ -2041,8 +2138,11 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
+          # Compatibility fallback for cross-repo callers that have not yet
+          # granted pull-requests: write to their GITHUB_TOKEN.
+          PAT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
         with:
-          github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
+          github-token: ${{ github.token }}
           script: |
             const ignored = (process.env.IGNORED_REVIEWERS || "")
               .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -2052,10 +2152,34 @@ jobs:
             const requested = (pr.requested_reviewers || []).map(r => r.login);
             const toRemove = requested.filter(l => ignored.includes((l || "").toLowerCase()));
             if (!toRemove.length) return;
-            await github.rest.pulls.removeRequestedReviewers({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number,
-              reviewers: toRemove,
-            });
+            const args = {
+              owner: context.repo.owner, repo: context.repo.repo,
+              pull_number: pr.number, reviewers: toRemove,
+            };
+            try {
+              await github.rest.pulls.removeRequestedReviewers(args);
+            } catch (error) {
+              if (error.status !== 403) throw error;
+              core.warning(
+                `GITHUB_TOKEN cannot unrequest reviewers; using the PAT fallback. ` +
+                `Update the calling job's pull-requests permission.`);
+              const api = process.env.GITHUB_API_URL || "https://api.github.com";
+              const response = await fetch(
+                `${api}/repos/${context.repo.owner}/${context.repo.repo}` +
+                `/pulls/${pr.number}/requested_reviewers`,
+                {
+                  method: "DELETE",
+                  headers: {
+                    authorization: `Bearer ${process.env.PAT_TOKEN}`,
+                    accept: "application/vnd.github+json",
+                    "x-github-api-version": "2022-11-28",
+                    "content-type": "application/json",
+                  },
+                  body: JSON.stringify({ reviewers: toRemove }),
+                });
+              if (!response.ok) {
+                throw new Error(
+                  `${response.status} ${(await response.text()).slice(0, 200)}`);
+              }
+            }
             console.log(`unrequested: ${toRemove.join(", ")}`);

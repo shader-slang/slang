@@ -3268,6 +3268,7 @@ static SlangResult stripDbgSpirvFromArtifact(
     // to check if the instruction number is for a debug instruction as
     // listed in slang-emit-spirv-ops-debug-info-ext.h
     static const uint32_t debugExtInstVals[] = {
+        NonSemanticShaderDebugInfo100DebugInfoNone,
         NonSemanticShaderDebugInfo100DebugCompilationUnit,
         NonSemanticShaderDebugInfo100DebugTypeBasic,
         NonSemanticShaderDebugInfo100DebugTypePointer,

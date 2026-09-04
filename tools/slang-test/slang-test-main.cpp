@@ -2697,6 +2697,15 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
+// Inspect the raw result kind: deserializing into a zero-field struct via getMessage() accepts `{}`
+// but rejects JSON `null`, so it cannot detect a null result.
+static bool receivedNullResult(JSONRPCConnection* connection)
+{
+    JSONResultResponse resultResponse;
+    return SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
+           resultResponse.result.getKind() == JSONValue::Kind::Null;
+}
+
 TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 {
     // We don't support running language server tests in parallel yet.
@@ -2818,9 +2827,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
             List<LanguageServerProtocol::CompletionItem> completionItems;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2857,9 +2865,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
             LanguageServerProtocol::SignatureHelp sigInfo;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2904,9 +2911,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(waitForNonDiagnosticResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
             LanguageServerProtocol::Hover hover;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2916,6 +2922,43 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                                << hover.range.start.character << " - " << hover.range.end.line
                                << "," << hover.range.end.character;
                 actualOutputSB << "\ncontent:\n" << hover.contents.value << "\n";
+            }
+        }
+        else if (line.startsWith("RESOLVE"))
+        {
+            // Drive completionItem/resolve for an item that carries a textEdit but no `data`
+            // (the file/import completion shape). LSP requires resolve to answer with the item,
+            // never null, so the server must echo it back with its textEdit preserved.
+            LanguageServerProtocol::TextEditCompletionItem item;
+            item.label = "resolveItem";
+            item.textEdit.newText = "resolveItem";
+            item.textEdit.range.start.line = 5;
+            item.textEdit.range.start.character = 0;
+            item.textEdit.range.end.line = 5;
+            item.textEdit.range.end.character = 3;
+            if (SLANG_FAILED(connection->sendCall(
+                    UnownedStringSlice("completionItem/resolve"),
+                    &item,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\n";
+            LanguageServerProtocol::TextEditCompletionItem resolved;
+            if (receivedNullResult(connection))
+            {
+                actualOutputSB << "null\n";
+            }
+            else if (SLANG_SUCCEEDED(connection->getMessage(&resolved)))
+            {
+                actualOutputSB << "label: " << resolved.label << "\n";
+                actualOutputSB << "textEdit: " << resolved.textEdit.newText << "\n";
+                actualOutputSB << "range: " << resolved.textEdit.range.start.line << ","
+                               << resolved.textEdit.range.start.character << " - "
+                               << resolved.textEdit.range.end.line << ","
+                               << resolved.textEdit.range.end.character << "\n";
             }
         }
         else if (line.startsWith("DIAGNOSTICS"))

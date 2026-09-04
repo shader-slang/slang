@@ -4058,6 +4058,16 @@ standalone_note(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-generic-parameter-count-overload-tie-breaker",
+    40021,
+    "deprecated generic-parameter-count overload tie-breaker",
+    span {
+        loc = "location",
+        message = "overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c"
+    }
+)
+
 err(
     "case-outside-switch",
     39999,
@@ -5599,6 +5609,13 @@ err(
     55102,
     "invalid pytorch kernel parameter type",
     span { loc = "location", message = "'~type:IRInst' is not a valid parameter type for a pytorch kernel function." }
+)
+
+err(
+    "torch-entry-point-requires-body",
+    55103,
+    "'[TorchEntryPoint]' function requires a body",
+    span { loc = "location", message = "a '[TorchEntryPoint]' function must have a body; a forward declaration cannot be compiled for the torch target." }
 )
 
 err(

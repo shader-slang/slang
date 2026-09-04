@@ -770,3 +770,341 @@ SLANG_UNIT_TEST(replayContextOrphanSweepKeepsEntryPointRetention)
     entryPoint->release();
     SLANG_CHECK(TestOwningProxy::s_owningProxyDestroyed == 1);
 }
+
+// =============================================================================
+// Custom-file-system createSession playback tests
+// =============================================================================
+
+// A minimal user-supplied ISlangFileSystem, used to drive createSession down the
+// custom-file-system arms of GlobalSessionProxy::createSession that the default
+// tests never reach. loadFile is stubbed because these tests create a session but
+// compile nothing.
+//
+// The double deliberately denies the extended file-system interfaces
+// (ISlangFileSystemExt / ISlangMutableFileSystem) on *both* probe paths that the
+// wrap machinery consults, and the two must agree: tryWrap() selects the proxy
+// overload by queryInterface (proxy-base.cpp), and the chosen
+// MutableFileSystemProxy(ISlangFileSystem*) constructor then re-probes via castAs
+// (proxy-mutable-file-system.h) to decide whether it may forward extended
+// operations. Denying on only one path would be internally inconsistent, so both
+// queryInterface and castAs report a plain read-only ISlangFileSystem here.
+//
+// s_liveCount lets a test observe that every reference the createSession
+// record/playback paths take on a user file system is also released: a residual
+// reference leaves the count above zero after teardown, which a leak sanitizer
+// would flag but a Debug run would otherwise miss.
+class TestFileSystem : public ISlangFileSystem
+{
+public:
+    TestFileSystem() { ++s_liveCount; }
+    virtual ~TestFileSystem() { --s_liveCount; }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) override
+    {
+        // Single-inheritance chain (ISlangFileSystem : ISlangCastable : ISlangUnknown),
+        // so `this` is the canonical identity for all three; the extended file-system
+        // interfaces are denied here -- this is the first of the two probe paths the
+        // wrapper consults (see the class comment on why both must agree).
+        if (uuid == ISlangFileSystem::getTypeGuid() || uuid == ISlangCastable::getTypeGuid() ||
+            uuid == ISlangUnknown::getTypeGuid())
+        {
+            *outObject = static_cast<ISlangFileSystem*>(this);
+            addRef();
+            return SLANG_OK;
+        }
+        *outObject = nullptr;
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return ++m_refCount; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override
+    {
+        uint32_t count = --m_refCount;
+        if (count == 0)
+            delete this;
+        return count;
+    }
+
+    SLANG_NO_THROW void* SLANG_MCALL castAs(SlangUUID const& uuid) override
+    {
+        // The second probe path (see the class comment): returning null keeps castAs
+        // consistent with queryInterface's denial of the extended/mutable file-system
+        // interfaces, so the MutableFileSystemProxy wrapper treats this double as a
+        // plain read-only file system.
+        SLANG_UNUSED(uuid);
+        return nullptr;
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) override
+    {
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(outBlob);
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    /// Number of live instances, so a test can assert the createSession paths leak
+    /// no reference onto a user-supplied file system.
+    static std::atomic<int> s_liveCount;
+
+private:
+    std::atomic<uint32_t> m_refCount{1};
+};
+
+std::atomic<int> TestFileSystem::s_liveCount{0};
+
+// Record and play back a single createSession that supplies a custom
+// ISlangFileSystem on SessionDesc::fileSystem. This drives the not-yet-registered
+// write arm (records kCustomFileSystemHandle) and, on playback, the matching
+// kCustomFileSystemHandle branch that wraps a fresh per-call ReplayNullFileSystem
+// as the stand-in file system and takes the guarded owning-reference release() in
+// GlobalSessionProxy::createSession -- an arm no default-file-system test reaches.
+//
+// The test pins three things independently:
+//   * TestFileSystem::s_liveCount back to 0 at teardown tracks the user-supplied
+//     file system (the write side): the write kCustomFileSystemHandle arm balances
+//     the reference it takes on that object.
+//   * ReplayNullFileSystem's live count (testsOnlyReplayNullFileSystemLiveCount)
+//     tracks the playback stand-in: it is created during executeAll and self-deleted
+//     when its wrapper proxy dies. This gives the #12865 stand-in leak fix a
+//     deterministic guard in every build, not only under the leak sanitizer.
+//   * The orphan-count check confirms the recreated session was noted as an orphaned
+//     playback proxy, so a regression that stopped the dispatcher noting orphans
+//     fails here rather than only surfacing as a sanitizer leak.
+//
+// replayContextCustomFileSystemRegisteredSessionPlayback below is the dedicated
+// regression check for the registered-reuse leak (#12470).
+SLANG_UNIT_TEST(replayContextCustomFileSystemSessionPlayback)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    // Deliberate reset for test isolation: TestFileSystem is used only by these three
+    // tests and each asserts the count back to 0 at teardown, so start from a known 0.
+    TestFileSystem::s_liveCount = 0;
+
+    // The constructor starts the refcount at 1; adopt that reference rather than
+    // adding a second one the test never releases.
+    TestFileSystem* fileSystem = new TestFileSystem();
+    Slang::ComPtr<ISlangFileSystem> fileSystemPtr(Slang::INIT_ATTACH, fileSystem);
+    SLANG_CHECK(TestFileSystem::s_liveCount == 1);
+
+    ctx().enable();
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> recordedGlobalSession;
+    Slang::ComPtr<slang::ISession> recordedSession;
+    {
+        SlangGlobalSessionDesc globalDesc = {};
+        globalDesc.apiVersion = 0;
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
+        slang::SessionDesc sessionDesc = {};
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV;
+        targetDesc.profile = recordedGlobalSession->findProfile("spirv_1_5");
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.targetCount = 1;
+        // The custom file system routes createSession down the kCustomFileSystemHandle
+        // path instead of the default-file-system path every other test exercises.
+        sessionDesc.fileSystem = fileSystemPtr.get();
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            recordedGlobalSession->createSession(sessionDesc, recordedSession.writeRef())));
+    }
+
+    uint64_t recordedSessionHandle = ctx().getProxyHandle(recordedSession.get());
+    SLANG_CHECK(recordedSessionHandle >= kFirstValidHandle);
+
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isPlayback());
+    ctx().executeAll();
+    ctx().disable();
+
+    // Playback took the reading kCustomFileSystemHandle arm, so a stand-in
+    // ReplayNullFileSystem was created and is still held by the recreated session's
+    // file-system proxy. This assertion directly guards the #12865 fix: reverting
+    // the arm to the old, untracked new NULLFileSystem() would leave this counter at
+    // 0 and fail here.
+    SLANG_CHECK(SlangRecord::testsOnlyReplayNullFileSystemLiveCount() >= 1);
+
+    // The session was recreated by playback and noted as an orphaned proxy.
+    ISlangUnknown* playedBackSessionUnk = ctx().getProxy(recordedSessionHandle);
+    SLANG_CHECK(playedBackSessionUnk != nullptr);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(playedBackSessionUnk) > 0);
+
+    // Drop everything that could hold a reference on the user file system -- the
+    // recorded session (whose real session holds the file-system proxy that in turn
+    // holds our object) and the registries/orphan set that reset() drains -- then
+    // release our own reference. If the createSession paths balanced their
+    // references, the object is gone; a residual reference is a leak.
+    recordedSession.setNull();
+    recordedGlobalSession.setNull();
+    ctx().reset();
+    // Draining the context destroyed the recreated session's file-system proxy,
+    // which released the stand-in to a zero refcount and freed it. A non-zero count
+    // here means a ReplayNullFileSystem was created but never destroyed -- i.e. the
+    // stand-in leaked.
+    SLANG_CHECK(SlangRecord::testsOnlyReplayNullFileSystemLiveCount() == 0);
+    SLANG_CHECK(TestFileSystem::s_liveCount == 1); // only fileSystemPtr remains
+    fileSystemPtr.setNull();
+    SLANG_CHECK(TestFileSystem::s_liveCount == 0);
+}
+
+// Record and play back two createSession calls that supply the *same* custom
+// ISlangFileSystem object. The first call sees an unregistered file system and
+// records kCustomFileSystemHandle (as above); the second sees it already registered
+// (isInterfaceRegistered / getProxyHandle) and records the file-system proxy handle,
+// so on playback the second call takes the `default:` branch --
+// `toSlangInterface(getProxy(handle))`, a *borrowed* pointer for which
+// ownsFileSystemWrapper stays false and no release() runs. That arm's failure mode
+// is a double-release / use-after-free rather than a leak, which the leak
+// suppression net structurally cannot catch, so covering it needs a test that
+// executes it. The s_liveCount check additionally catches a residual reference on
+// the registered-file-system write arm.
+SLANG_UNIT_TEST(replayContextCustomFileSystemRegisteredSessionPlayback)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    // Deliberate reset for test isolation: TestFileSystem is used only by these three
+    // tests and each asserts the count back to 0 at teardown, so start from a known 0.
+    TestFileSystem::s_liveCount = 0;
+
+    TestFileSystem* fileSystem = new TestFileSystem();
+    Slang::ComPtr<ISlangFileSystem> fileSystemPtr(Slang::INIT_ATTACH, fileSystem);
+    SLANG_CHECK(TestFileSystem::s_liveCount == 1);
+
+    ctx().enable();
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> recordedGlobalSession;
+    Slang::ComPtr<slang::ISession> recordedSession1;
+    Slang::ComPtr<slang::ISession> recordedSession2;
+    {
+        SlangGlobalSessionDesc globalDesc = {};
+        globalDesc.apiVersion = 0;
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
+        slang::SessionDesc sessionDesc = {};
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV;
+        targetDesc.profile = recordedGlobalSession->findProfile("spirv_1_5");
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.targetCount = 1;
+        sessionDesc.fileSystem = fileSystemPtr.get();
+
+        // First call: file system not yet registered -> kCustomFileSystemHandle.
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            recordedGlobalSession->createSession(sessionDesc, recordedSession1.writeRef())));
+        // Second call, same file-system object: now registered -> records its proxy
+        // handle, so playback takes the `default:` branch.
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            recordedGlobalSession->createSession(sessionDesc, recordedSession2.writeRef())));
+    }
+
+    uint64_t sessionHandle1 = ctx().getProxyHandle(recordedSession1.get());
+    uint64_t sessionHandle2 = ctx().getProxyHandle(recordedSession2.get());
+    SLANG_CHECK(sessionHandle1 >= kFirstValidHandle);
+    SLANG_CHECK(sessionHandle2 >= kFirstValidHandle);
+    SLANG_CHECK(sessionHandle1 != sessionHandle2);
+
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isPlayback());
+    ctx().executeAll();
+    ctx().disable();
+
+    // Both sessions were recreated: the first via the kCustomFileSystemHandle branch,
+    // the second via the borrowed `default:` branch.
+    SLANG_CHECK(ctx().getProxy(sessionHandle1) != nullptr);
+    SLANG_CHECK(ctx().getProxy(sessionHandle2) != nullptr);
+
+    recordedSession1.setNull();
+    recordedSession2.setNull();
+    recordedGlobalSession.setNull();
+    ctx().reset();
+    SLANG_CHECK(TestFileSystem::s_liveCount == 1); // only fileSystemPtr remains
+    fileSystemPtr.setNull();
+    SLANG_CHECK(TestFileSystem::s_liveCount == 0);
+}
+
+// Record and play back two createSession calls with *distinct* custom file-system
+// objects. Both are unregistered at their call, so both record kCustomFileSystemHandle
+// and both take the reading kCustomFileSystemHandle arm on playback. Recording wraps two
+// distinct file systems into two distinct proxies (two handle allocations); playback must
+// allocate a distinct stand-in proxy per occurrence too, or the handle counter drifts from
+// recording and the later session's recorded handle no longer resolves. This pins that the
+// stand-in on that arm keeps per-call identity (a shared, deduplicated instance would make
+// the second occurrence reuse the first proxy and desync the handles).
+SLANG_UNIT_TEST(replayContextTwoDistinctCustomFileSystemsPlayback)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    TestFileSystem::s_liveCount = 0;
+
+    TestFileSystem* fileSystemA = new TestFileSystem();
+    Slang::ComPtr<ISlangFileSystem> fileSystemAPtr(Slang::INIT_ATTACH, fileSystemA);
+    TestFileSystem* fileSystemB = new TestFileSystem();
+    Slang::ComPtr<ISlangFileSystem> fileSystemBPtr(Slang::INIT_ATTACH, fileSystemB);
+    SLANG_CHECK(TestFileSystem::s_liveCount == 2);
+
+    ctx().enable();
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> recordedGlobalSession;
+    Slang::ComPtr<slang::ISession> recordedSessionA;
+    Slang::ComPtr<slang::ISession> recordedSessionB;
+    {
+        SlangGlobalSessionDesc globalDesc = {};
+        globalDesc.apiVersion = 0;
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
+        slang::SessionDesc sessionDesc = {};
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV;
+        targetDesc.profile = recordedGlobalSession->findProfile("spirv_1_5");
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.targetCount = 1;
+
+        // First distinct custom file system -> kCustomFileSystemHandle.
+        sessionDesc.fileSystem = fileSystemAPtr.get();
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            recordedGlobalSession->createSession(sessionDesc, recordedSessionA.writeRef())));
+        // Second, *different* custom file system: also unregistered, so also
+        // kCustomFileSystemHandle -- the case that reuse of a shared stand-in would break.
+        sessionDesc.fileSystem = fileSystemBPtr.get();
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            recordedGlobalSession->createSession(sessionDesc, recordedSessionB.writeRef())));
+    }
+
+    uint64_t sessionHandleA = ctx().getProxyHandle(recordedSessionA.get());
+    uint64_t sessionHandleB = ctx().getProxyHandle(recordedSessionB.get());
+    SLANG_CHECK(sessionHandleA >= kFirstValidHandle);
+    SLANG_CHECK(sessionHandleB >= kFirstValidHandle);
+    SLANG_CHECK(sessionHandleA != sessionHandleB);
+
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isPlayback());
+    ctx().executeAll();
+    ctx().disable();
+
+    // Both sessions must resolve at their recorded handles: a handle desync on the
+    // second kCustomFileSystemHandle occurrence would leave sessionHandleB unresolved.
+    ISlangUnknown* playedBackA = ctx().getProxy(sessionHandleA);
+    ISlangUnknown* playedBackB = ctx().getProxy(sessionHandleB);
+    SLANG_CHECK(playedBackA != nullptr);
+    SLANG_CHECK(playedBackB != nullptr);
+    SLANG_CHECK(playedBackA != playedBackB);
+
+    recordedSessionA.setNull();
+    recordedSessionB.setNull();
+    recordedGlobalSession.setNull();
+    ctx().reset();
+    SLANG_CHECK(TestFileSystem::s_liveCount == 2); // only the two ComPtrs remain
+    fileSystemAPtr.setNull();
+    fileSystemBPtr.setNull();
+    SLANG_CHECK(TestFileSystem::s_liveCount == 0);
+}
