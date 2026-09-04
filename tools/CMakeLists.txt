@@ -138,6 +138,32 @@ if(SLANG_ENABLE_SLANGI)
     )
 endif()
 
+set(SLANG_PACKAGE_COMPILER_COMMIT_HEADER
+    "${CMAKE_CURRENT_BINARY_DIR}/slang-package-compiler-commit.h"
+)
+add_custom_target(
+    slang-package-compiler-commit-header
+    COMMAND
+        ${CMAKE_COMMAND} "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+        "-DSOURCE_DIR=${slang_SOURCE_DIR}"
+        "-DOUTPUT_FILE=${SLANG_PACKAGE_COMPILER_COMMIT_HEADER}" -P
+        "${slang_SOURCE_DIR}/cmake/GeneratePackageCompilerCommit.cmake"
+    BYPRODUCTS "${SLANG_PACKAGE_COMPILER_COMMIT_HEADER}"
+)
+
+slang_add_target(
+    slang-package
+    EXECUTABLE
+    LINK_WITH_PRIVATE core compiler-core
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        "SLANG_PACKAGE_COMPILER_VERSION=\"${SLANG_VERSION_FULL}\""
+    INSTALL
+    EXPORT_SET_NAME SlangTargets
+    PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
+)
+add_dependencies(slang-package slang-package-compiler-commit-header)
+target_include_directories(slang-package PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+
 if(SLANG_ENABLE_GFX)
     #
     # GFX
@@ -397,6 +423,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
+            "SLANG_PACKAGE_COMPILER_VERSION=\"${SLANG_VERSION_FULL}\""
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core
@@ -411,6 +438,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
     )
+    add_dependencies(slang-unit-test slang-package-compiler-commit-header)
+    target_include_directories(
+        slang-unit-test
+        PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    )
     # slang-repro-validator.cpp is part of the slang DLL's normal source set, but
     # isReproStateValid() is a free function in namespace Slang with no SLANG_API
     # export annotation, so it is not visible from outside the DLL. The unit tests
@@ -420,8 +452,30 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         slang-unit-test
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-bundle.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-docs.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-git.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-json.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-local.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-lock.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-path.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-report.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-resolver.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-tool.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-types.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-validate.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
+    )
+    if(NOT SLANG_ENABLE_PACKAGE_GIT_TESTS)
+        set_source_files_properties(
+            ${slang_SOURCE_DIR}/tools/slang-unit-test/unit-test-package-git.cpp
+            PROPERTIES HEADER_FILE_ONLY ON
+        )
+    endif()
+    target_include_directories(
+        slang-unit-test
+        PRIVATE ${slang_SOURCE_DIR}/tools/slang-package
     )
     # The unit tests include internal slang headers (e.g. slang-repro.h) that
     # transitively pull in FIDDLE / capability generated headers. The `slang`
