@@ -4300,33 +4300,52 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
 
-        // Now we need to iterate over all the blocks in the function looking
-        // for any `return*` instructions, so that we can write to the output variable
-        for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
+        // Write directly into the output when it is a single addressable location
+        // of the local temp's type, so partial writes leave untouched elements
+        // unwritten instead of copying the whole (partly undefined) aggregate back
+        // at each return. Excludes `in out` (needs the input copy-in) and outputs
+        // reshaped by legalization (e.g. a Hull control-point array), which keep
+        // the copy-back path below.
+        IRPtrTypeBase* outputPtrType = nullptr;
+        if (globalOutputVal.flavor == ScalarizedVal::Flavor::address)
+            outputPtrType = as<IRPtrTypeBase>(globalOutputVal.irValue->getDataType());
+        if (!as<IRBorrowInOutParamType>(paramType) && outputPtrType &&
+            isTypeEqual(outputPtrType->getValueType(), valueType))
         {
-            auto terminatorInst = bb->getLastInst();
-            if (!terminatorInst)
-                continue;
-
-            switch (terminatorInst->getOp())
+            localVariable->replaceUsesWith(globalOutputVal.irValue);
+            localVariable->removeAndDeallocate();
+        }
+        else
+        {
+            // Now we need to iterate over all the blocks in the function looking
+            // for any `return*` instructions, so that we can write to the output
+            // variable
+            for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
             {
-            default:
-                continue;
+                auto terminatorInst = bb->getLastInst();
+                if (!terminatorInst)
+                    continue;
 
-            case kIROp_Return:
-                break;
+                switch (terminatorInst->getOp())
+                {
+                default:
+                    continue;
+
+                case kIROp_Return:
+                    break;
+                }
+
+                // We dont' re-use `builder` here because we don't want to
+                // disrupt the source location it is using for inserting
+                // temporary variables at the top of the function.
+                //
+                IRBuilder terminatorBuilder(func);
+                terminatorBuilder.setInsertBefore(terminatorInst);
+
+                // Assign from the local variabel to the global output
+                // variable before the actual `return` takes place.
+                assign(&terminatorBuilder, globalOutputVal, localVal);
             }
-
-            // We dont' re-use `builder` here because we don't want to
-            // disrupt the source location it is using for inserting
-            // temporary variables at the top of the function.
-            //
-            IRBuilder terminatorBuilder(func);
-            terminatorBuilder.setInsertBefore(terminatorInst);
-
-            // Assign from the local variabel to the global output
-            // variable before the actual `return` takes place.
-            assign(&terminatorBuilder, globalOutputVal, localVal);
         }
     }
     else if (auto ptrType = as<IRPtrTypeBase>(paramType))
