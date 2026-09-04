@@ -2995,9 +2995,7 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
             }
         }
 
-        // If checking converted a member expression into a resolved DeclRefExpr,
-        // update base so generic member application retains the resolved target.
-        if (as<MemberExpr>(base) && as<DeclRefExpr>(checkedBase))
+        if (as<MemberExpr>(base) && (as<DeclRefExpr>(checkedBase) || as<OverloadedExpr>(checkedBase)))
         {
             base = checkedBase;
         }

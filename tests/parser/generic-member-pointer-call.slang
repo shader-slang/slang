@@ -7,6 +7,11 @@ struct Foo
     {
         return N;
     }
+
+    int Bar<int N>(int x) 
+    { 
+        return N + x; 
+    }
 };
 
 void main()
