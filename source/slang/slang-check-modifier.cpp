@@ -1201,8 +1201,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         if (!val)
             return nullptr;
 
-        preferRecomputeAttr->sideEffectBehavior =
-            (PreferRecomputeAttribute::SideEffectBehavior)val->getValue();
+        preferRecomputeAttr->sideEffectBehavior = (SideEffectBehavior)val->getValue();
     }
     else if (auto comInterfaceAttr = as<ComInterfaceAttribute>(attr))
     {

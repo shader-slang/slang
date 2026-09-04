@@ -329,6 +329,7 @@ struct ASTDumpContext
     void dump(ImageFormat imageFormat) { m_writer->emit(getGLSLNameForImageFormat(imageFormat)); }
     void dump(TryClauseType clauseType) { m_writer->emit(getTryClauseTypeName(clauseType)); }
     void dump(BuiltinRequirementKind kind) { m_writer->emit((int)kind); }
+    void dump(SideEffectBehavior behavior) { m_writer->emit((int)behavior); }
     void dump(BuiltinOperationKind op) { m_writer->emit(getBuiltinOperationOpText(op)); }
     void dump(MarkupVisibility v) { m_writer->emit((int)v); }
     void dump(TypeTag tag) { m_writer->emit((int)tag); }
