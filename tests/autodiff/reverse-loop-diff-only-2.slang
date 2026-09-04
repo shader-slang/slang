@@ -1,6 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
+// -fp-mode fast: the `return 0` / loop-elimination checks below rely on folding the primal's
+// `w - detach(w)` (i.e. `w - w`) to 0, which is only value-preserving under fast math (issue #12405).
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none -fp-mode fast
 //TEST:SIMPLE(filecheck=REPORT):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
