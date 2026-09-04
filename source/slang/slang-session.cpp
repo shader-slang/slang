@@ -412,9 +412,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::loadModuleInfoFromIRBlob(
 
     RefPtr<IRModule> irModule;
     String compilerVersion;
-    UInt version;
+    UInt64 version;
     String name;
-    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, compilerVersion, version, name));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, &compilerVersion, version, &name));
+    // The public metadata API exposes the version as a signed SlangInt, while untrusted serialized
+    // data can contain any UInt64 value.
+    if (version > UInt64((std::numeric_limits<SlangInt>::max)()))
+        return SLANG_FAIL;
     const auto compilerVersionSlice = m_stringSlicePool.addAndGetSlice(compilerVersion);
     const auto nameSlice = m_stringSlicePool.addAndGetSlice(name);
     outModuleCompilerVersion = compilerVersionSlice.begin();
@@ -1220,6 +1224,37 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // If we failed to find a previously-loaded module, then we
     // will go ahead and load the module from the serialized form.
     //
+    auto irChunk = moduleChunk->findIR();
+    // Missing IR is malformed rather than a version mismatch.
+    if (!irChunk)
+        return nullptr;
+
+    UInt64 moduleVersion = 0;
+    UInt64 serializationVersion = 0;
+    const auto readResult =
+        readSerializedModuleInfo(irChunk, nullptr, moduleVersion, nullptr, &serializationVersion);
+    if (SLANG_FAILED(readResult))
+    {
+        if (readResult == SLANG_E_NOT_AVAILABLE)
+        {
+            sink->diagnose(Diagnostics::UnsupportedSerializedModuleFormatVersion{
+                .actualVersion = String(serializationVersion),
+                .location = SourceLoc()});
+        }
+        // Other failures are malformed metadata and retain the existing load-failure behavior.
+        return nullptr;
+    }
+
+    if (!IRModule::isModuleVersionSupported(moduleVersion))
+    {
+        sink->diagnose(Diagnostics::UnsupportedSerializedModuleVersion{
+            .actualVersion = String(moduleVersion),
+            .minimumVersion = String(IRModule::k_minSupportedModuleVersion),
+            .maximumVersion = String(IRModule::k_maxSupportedModuleVersion),
+            .location = SourceLoc()});
+        return nullptr;
+    }
+
     PathInfo filePathInfo;
     return loadSerializedModule(
         moduleName,
@@ -1294,7 +1329,8 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     const PathInfo& moduleFilePathInfo,
     ISlangBlob* moduleFileContents,
     SourceLoc const& requestingLoc,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    bool isSpeculativeLoad)
 {
     auto astBuilder = getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
@@ -1311,6 +1347,57 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     auto moduleChunk = ModuleChunk::find(rootChunk);
     if (!moduleChunk)
     {
+        return nullptr;
+    }
+
+    auto irChunk = moduleChunk->findIR();
+    // Missing IR is malformed rather than a version mismatch.
+    if (!irChunk)
+        return nullptr;
+
+    UInt64 moduleVersion = 0;
+    UInt64 serializationVersion = 0;
+    const auto readResult =
+        readSerializedModuleInfo(irChunk, nullptr, moduleVersion, nullptr, &serializationVersion);
+    if (SLANG_FAILED(readResult))
+    {
+        if (readResult == SLANG_E_NOT_AVAILABLE)
+        {
+            if (isSpeculativeLoad)
+            {
+                sink->diagnose(Diagnostics::IgnoringUnsupportedSerializedModuleFormatVersion{
+                    .actualVersion = String(serializationVersion),
+                    .location = requestingLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::UnsupportedSerializedModuleFormatVersion{
+                    .actualVersion = String(serializationVersion),
+                    .location = requestingLoc});
+            }
+        }
+        // Other failures are malformed metadata and retain the existing load-failure behavior.
+        return nullptr;
+    }
+
+    if (!IRModule::isModuleVersionSupported(moduleVersion))
+    {
+        if (isSpeculativeLoad)
+        {
+            sink->diagnose(Diagnostics::IgnoringUnsupportedSerializedModuleVersion{
+                .actualVersion = String(moduleVersion),
+                .minimumVersion = String(IRModule::k_minSupportedModuleVersion),
+                .maximumVersion = String(IRModule::k_maxSupportedModuleVersion),
+                .location = requestingLoc});
+        }
+        else
+        {
+            sink->diagnose(Diagnostics::UnsupportedSerializedModuleVersion{
+                .actualVersion = String(moduleVersion),
+                .minimumVersion = String(IRModule::k_minSupportedModuleVersion),
+                .maximumVersion = String(IRModule::k_maxSupportedModuleVersion),
+                .location = requestingLoc});
+        }
         return nullptr;
     }
 
@@ -1365,12 +1452,19 @@ RefPtr<Module> Linkage::loadModuleImpl(
     SourceLoc const& requestingLoc,
     DiagnosticSink* sink,
     const LoadedModuleDictionary* additionalLoadedModules,
-    ModuleBlobType blobType)
+    ModuleBlobType blobType,
+    bool isSpeculativeLoad)
 {
     switch (blobType)
     {
     case ModuleBlobType::IR:
-        return loadBinaryModuleImpl(moduleName, modulePathInfo, moduleBlob, requestingLoc, sink);
+        return loadBinaryModuleImpl(
+            moduleName,
+            modulePathInfo,
+            moduleBlob,
+            requestingLoc,
+            sink,
+            isSpeculativeLoad);
 
     case ModuleBlobType::Source:
         return loadSourceModuleImpl(
@@ -1667,6 +1761,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     PathInfo requestingPathInfo =
         getSourceManager()->getPathInfo(requestingLoc, SourceLocType::Actual);
 
+    HashSet<String> serializedModulePathsTried;
     for (auto type : typesToTry)
     {
         for (auto sourceFileName : sourceFileNamesToTry)
@@ -1710,6 +1805,13 @@ RefPtr<Module> Linkage::findOrImportModule(
                 // If we failed to find the file at this step, we
                 // will continue the search for our other options.
                 //
+                continue;
+            }
+            if (type == ModuleBlobType::IR &&
+                !serializedModulePathsTried.add(filePathInfo.getMostUniqueIdentity()))
+            {
+                // The source and literate-source candidates can map to the same binary path.
+                // Avoid loading and diagnosing that path more than once.
                 continue;
             }
 
@@ -1765,7 +1867,8 @@ RefPtr<Module> Linkage::findOrImportModule(
                 requestingLoc,
                 sink,
                 loadedModules,
-                type);
+                type,
+                /*isSpeculativeLoad*/ true);
 
             // If the attempt to load the module from the given path
             // was successful, we go ahead and use it, without trying
@@ -1803,7 +1906,8 @@ RefPtr<Module> Linkage::findOrImportModule(
                     requestingLoc,
                     sink,
                     nullptr,
-                    ModuleBlobType::IR);
+                    ModuleBlobType::IR,
+                    /*isSpeculativeLoad*/ true);
                 if (module)
                 {
                     if (auto irModule = module->getIRModule())
