@@ -2007,7 +2007,10 @@ Modifier* SemanticsVisitor::checkModifier(
                     return nullptr;
                 }
             }
+#if IGNORE_WARNING_FOR_CONSTEXPR
+            // TODO: temporarily disable the warnings with constexpr
             getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = m});
+#endif
             auto constMod = m_astBuilder->create<ConstModifier>();
             constMod->loc = m->loc;
             constMod->keywordName = getSession()->getNameObj("const");
@@ -2481,7 +2484,10 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         {
             if (syntaxNode->findModifier<ConstModifier>())
             {
+#if IGNORE_WARNING_FOR_CONSTEXPR
+                // TODO: temporarily disable the warnings with constexpr
                 getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = ceM});
+#endif
                 removeModifier(syntaxNode, ceM);
             }
         }
