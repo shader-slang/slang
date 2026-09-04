@@ -1399,6 +1399,12 @@ SLANG_UNIT_TEST(PackageToolUpdateRequiresConfirmation)
     const char* statusArguments[] = {"slang-package", "status"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
+    String statusReport;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
+    SLANG_CHECK(
+        statusReport.getUnownedSlice().indexOf(UnownedStringSlice("no lock required")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("buildable.")) >= 0);
+    SLANG_CHECK(statusReport.getUnownedSlice().indexOf(UnownedStringSlice("  - ")) < 0);
 
     List<LocalPackage> localPackages;
     LocalPackage localPackage;
@@ -1409,7 +1415,6 @@ SLANG_UNIT_TEST(PackageToolUpdateRequiresConfirmation)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeProjectLocalPackages(temp.path, localPackages, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
-    String statusReport;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getWorkspaceStatusReport(temp.path, statusReport, error)));
     SLANG_CHECK(
         statusReport.getUnownedSlice().indexOf(UnownedStringSlice("local package registrations")) >=

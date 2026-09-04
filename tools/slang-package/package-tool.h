@@ -28,8 +28,8 @@ SlangResult discoverPackageRoot(const String& startDirectory, String& outRoot, S
 
 /// Produce the same workspace-state report printed by `slang package status`.
 ///
-/// Reportable drift is returned in `outReport` with `SLANG_OK`. Unreadable or malformed required
-/// JSON is returned through `outError` as a failure.
+/// A current workspace is one header line. Drift is listed only when something is dirty.
+/// Unreadable or malformed required JSON is returned through `outError` as a failure.
 SlangResult getWorkspaceStatusReport(
     const String& projectRoot,
     String& outReport,

@@ -324,15 +324,14 @@ declared dependencies, reads materialized manifests, inventories exports needed 
 checks toolchain constraints. The command prints a warning. `slang package validate` has no skip
 flag.
 
-`slang package status` inventories the root manifest and lock, buildability, registered edits and
-overrides, materialized manifests, the workspace Git root, origin, commit, and dirty state when
-available, plus origins, commit divergence, changed and untracked file counts, and stashes for
-every tool-owned checkout. Like
-`git status`, reportable drift does not make the command fail: missing materialization, stale lock
-state, active local state, dirty checkouts, and `Buildable: no` are part of the report. Status
-returns nonzero only when required root manifest, existing lock, or workspace JSON cannot be read
-and parsed well enough to produce a report. It does not inspect `build/`, modify package state, or
-contact remotes.
+`slang package status` prints one header line when the workspace is current, for example
+`Package 'video-preview': lock current, 3 packages, buildable.` Extra lines appear only when
+something is dirty: a missing or inconsistent lock, unmaterialized or dirty tool-owned checkouts,
+active edits, enabled overrides, or a graph that is not buildable. Disabled overrides are silent.
+If the package root sits inside a larger Git work tree, status names that enclosing root. Like
+`git status`, reportable drift does not make the command fail. Status returns nonzero only when
+required root manifest, existing lock, or workspace JSON cannot be read and parsed well enough to
+produce a report. It does not inspect `build/`, modify package state, or contact remotes.
 
 Use `slang package dependency add` and `dependency remove` to edit direct manifest edges, and
 `dependency list` to inspect them. Add accepts exactly one source shape:

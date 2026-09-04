@@ -110,15 +110,15 @@ checkout. Once a lock exists, fetch reproduces it and never reselects versions.
 slang package status
 ```
 
-After a successful fetch, status should report `Buildable: yes`, no active local edit or override
-state, and clean tool-owned Git checkouts. It inventories all manifest/lock mismatches, missing
-materialization, wrong origins, changed or untracked files, commit divergence, and stashes. Status
-does not inspect `build/`, fetch, update, or contact remotes. When it finds drift, it reports the
-state and names the corrective command without returning a failure merely because the workspace is
-dirty or incomplete.
+After a successful fetch, status should be one line: the package name, that the lock is current,
+and that the workspace is buildable. Extra lines appear only for drift such as a missing lock,
+unmaterialized or dirty checkouts, edits, or enabled overrides. Status does not inspect `build/`,
+fetch, update, or contact remotes. When it finds drift, it lists the problems and names the
+corrective command without returning a failure merely because the workspace is dirty or incomplete.
 
-If you run status before fetch, it reports the missing lock or materialization and
-`Buildable: no`. Status returns nonzero only when required JSON cannot be read and parsed.
+If you run status before fetch, the header says the lock is absent or the graph is not buildable,
+and the following lines name the missing lock or materialization. Status returns nonzero only when
+required JSON cannot be read and parsed.
 
 ## Preview a new solve, then apply it
 

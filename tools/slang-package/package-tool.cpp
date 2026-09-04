@@ -55,7 +55,7 @@ static void _printHelp(bool experimental = false)
         "  test             Reserved. Package testing is not implemented yet.\n"
         "  docs [--print]   Open build/docs/index.md with the registered application.\n"
         "                   --print writes the path instead of launching.\n"
-        "  status           Report lock, buildability, local state, and checkouts.\n"
+        "  status           Report whether the workspace is current; details only when dirty.\n"
         "  validate         Check that this package is suitable for sharing.\n"
         "  tree             Print the selected dependency graph.\n"
         "  why <name>       Print every graph path that requires a package.\n"
@@ -1410,7 +1410,7 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     return SLANG_OK;
 }
 
-/// Report committed resolution, local package state, buildability, and materialized checkouts.
+/// Report whether the workspace is current, with extra lines only when something is dirty.
 ///
 /// Like `git status`, reportable drift is data rather than command failure. This function fails
 /// only when the root manifest, an existing lock, or workspace-local JSON cannot be read and
@@ -1431,7 +1431,6 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
         SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
 
     StringBuilder observations;
-    StringBuilder report;
     Index observationCount = 0;
     auto addObservation = [&](const String& observation)
     {
@@ -1439,23 +1438,8 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
         observations << "  - " << observation << "\n";
     };
 
-    String gitRoot;
-    String gitError;
-    bool hasGitRoot = SLANG_SUCCEEDED(getGitWorkingTreeRoot(projectRoot, gitRoot, gitError));
-    String workspaceGitOrigin;
-    String workspaceGitCommit;
-    GitWorkingTreeStatus workspaceGitStatus;
-    bool hasWorkspaceGitOrigin =
-        hasGitRoot && SLANG_SUCCEEDED(getRepositoryOrigin(gitRoot, workspaceGitOrigin, gitError));
-    bool hasWorkspaceGitCommit =
-        hasGitRoot &&
-        SLANG_SUCCEEDED(getRepositoryHeadCommit(gitRoot, workspaceGitCommit, gitError));
-    bool hasWorkspaceGitStatus =
-        hasWorkspaceGitCommit &&
-        SLANG_SUCCEEDED(
-            getWorkingTreeStatus(gitRoot, workspaceGitCommit, workspaceGitStatus, gitError));
-
     String issue;
+    bool lockMatchesManifest = false;
     if (!hasLock)
     {
         if (manifest.dependencies.getCount())
@@ -1473,7 +1457,8 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     }
     else
     {
-        if (SLANG_FAILED(_validateLockAgainstManifest(manifest, lock, issue)))
+        lockMatchesManifest = SLANG_SUCCEEDED(_validateLockAgainstManifest(manifest, lock, issue));
+        if (!lockMatchesManifest)
             addObservation(issue);
         issue = String();
         if (SLANG_FAILED(_validateLocalPackages(projectRoot, lock, localPackages, issue)))
@@ -1484,14 +1469,12 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     // Reading a dependency's own `slang-package.json` and asking Git about its checkout both fail
     // for an absent directory, and those failures would only restate the absence -- one as a
     // missing JSON file, the other as Git refusing to run in a directory that does not exist.
-    List<String> toolOwnedNames;
     List<String> unmaterializedNames;
     for (const auto& package : lock.packages)
     {
         if (findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
             package.path.getLength())
             continue;
-        toolOwnedNames.add(package.name);
         String packageRoot =
             Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest), package.name);
         SlangPathType pathType;
@@ -1500,7 +1483,6 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
             unmaterializedNames.add(package.name);
     }
 
-    Index cleanCheckoutCount = 0;
     if (unmaterializedNames.getCount())
     {
         StringBuilder detail;
@@ -1559,107 +1541,23 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
                    << " stash(es)). Run 'slang package edit " << package.name
                    << "' to keep the work, or 'slang package fetch --clean' to discard it.";
             addObservation(detail);
-            continue;
         }
-        ++cleanCheckoutCount;
     }
 
-    report << "Package '" << manifest.name << "'.\n";
-    if (hasGitRoot)
+    for (const auto& package : localPackages)
     {
-        report << "Git root: " << gitRoot << ".\n";
-        report << "Git origin: "
-               << (hasWorkspaceGitOrigin ? workspaceGitOrigin : String("unavailable")) << ".\n";
-        report << "Git commit: "
-               << (hasWorkspaceGitCommit ? workspaceGitCommit : String("unavailable")) << ".\n";
-        if (hasWorkspaceGitStatus)
+        if (isEditedLocalPackage(package))
         {
-            report << "Git work tree: " << workspaceGitStatus.changedFileCount
-                   << " changed/untracked file(s), " << workspaceGitStatus.stashCount
-                   << " stash(es).\n";
+            addObservation(
+                String("Package '") + package.name +
+                "' is in edit mode; the workspace is not portable.");
         }
-        else
+        else if (package.enabled)
         {
-            report << "Git work tree: unavailable.\n";
+            addObservation(
+                String("Package '") + package.name +
+                "' has an enabled override; the workspace is not portable.");
         }
-        if (gitRoot != projectRoot)
-            report << "Package root: " << projectRoot << " (inside the Git work tree).\n";
-    }
-    else
-    {
-        report << "Git root: unavailable (not in a work tree or Git is unavailable).\n";
-    }
-    if (hasLock)
-        report << "Lock: " << lock.packages.getCount() << " selected package(s).\n";
-    else
-        report << "Lock: absent.\n";
-    if (localPackages.getCount() == 0)
-    {
-        report << "Local package state: none.\n";
-    }
-    else
-    {
-        report << "Local package state:\n";
-        for (const auto& package : localPackages)
-        {
-            if (isEditedLocalPackage(package))
-            {
-                Index lockedIndex = findLockedPackageIndex(lock, package.name);
-                GitWorkingTreeStatus gitStatus;
-                String gitError;
-                bool haveGitStatus =
-                    lockedIndex >= 0 && SLANG_SUCCEEDED(getWorkingTreeStatus(
-                                            Path::combine(projectRoot, package.path),
-                                            lock.packages[lockedIndex].commit,
-                                            gitStatus,
-                                            gitError));
-                if (haveGitStatus)
-                {
-                    report << "  " << package.name << ": edit at " << package.path << " ("
-                           << gitStatus.changedFileCount << " changed/untracked file(s), "
-                           << gitStatus.commitsAhead << " commit(s) ahead, "
-                           << gitStatus.commitsBehind << " commit(s) behind, "
-                           << gitStatus.stashCount << " stash(es))\n";
-                }
-                else if (lockedIndex < 0)
-                {
-                    report << "  " << package.name << ": edit at " << package.path
-                           << " (not in the current lock; checkout left in place)\n";
-                }
-                else
-                {
-                    report << "  " << package.name << ": edit at " << package.path
-                           << " (Git state unavailable)\n";
-                }
-                addObservation(
-                    String("Package '") + package.name +
-                    "' is in edit mode; the workspace is not portable.");
-            }
-            else
-            {
-                String effectiveVersion = package.as;
-                if (!effectiveVersion.getLength())
-                {
-                    Index lockedIndex = findLockedPackageIndex(lock, package.name);
-                    if (lockedIndex >= 0)
-                        effectiveVersion = lock.packages[lockedIndex].version;
-                }
-                report << "  " << package.name << ": override "
-                       << (package.enabled ? "enabled" : "disabled") << " at " << package.path
-                       << " as " << effectiveVersion << "\n";
-                if (package.enabled)
-                {
-                    addObservation(
-                        String("Package '") + package.name +
-                        "' has an enabled override; the workspace is not portable.");
-                }
-            }
-        }
-    }
-    if (toolOwnedNames.getCount())
-    {
-        report << cleanCheckoutCount << " of " << toolOwnedNames.getCount()
-               << " tool-owned Git checkout(s) are clean.\n";
     }
 
     List<String> buildWarnings;
@@ -1669,20 +1567,42 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
     bool isBuildable =
         canCheckBuildability &&
         SLANG_SUCCEEDED(validateBuildableProject(projectRoot, issue, &buildWarnings));
-    report << "Buildable: " << (isBuildable ? "yes" : "no") << ".\n";
     if (canCheckBuildability && !isBuildable)
         addObservation(issue);
     for (const auto& warning : buildWarnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
 
-    if (observationCount)
+    StringBuilder report;
+    report << "Package '" << manifest.name << "': ";
+    if (!hasLock)
     {
-        report << "Workspace observations:\n" << observations;
+        if (manifest.dependencies.getCount() == 0)
+            report << "no lock required";
+        else
+            report << "lock absent";
+    }
+    else if (lockMatchesManifest)
+    {
+        report << "lock current, " << lock.packages.getCount()
+               << (lock.packages.getCount() == 1 ? " package" : " packages");
     }
     else
     {
-        report << "Workspace state has no reported drift.\n";
+        report << "lock does not match, " << lock.packages.getCount()
+               << (lock.packages.getCount() == 1 ? " package" : " packages");
     }
+    report << ", " << (isBuildable ? "buildable" : "not buildable") << ".\n";
+
+    String gitRoot;
+    String gitError;
+    if (SLANG_SUCCEEDED(getGitWorkingTreeRoot(projectRoot, gitRoot, gitError)) &&
+        gitRoot != projectRoot)
+    {
+        report << "Package root is inside the Git work tree " << gitRoot << ".\n";
+    }
+
+    if (observationCount)
+        report << observations;
     outReport = report.produceString();
     return SLANG_OK;
 }

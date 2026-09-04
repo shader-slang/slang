@@ -232,10 +232,10 @@ version, dependencies, and exports selected for this workspace.
 - A real update materializes Git source under `deps/NAME`, publish-checks new or changed Git
   packages, checks closure-wide buildability, writes `slang-package-lock.json`, and regenerates
   `build/search-paths`.
-- `status` reports how the root manifest, lock, local registrations, materialized manifests, and
-  every tool-owned Git checkout relate. It aggregates wrong origins, changed/untracked counts,
-  commit divergence, stashes, and buildability without inspecting `build/` or contacting remotes.
-  Reportable drift, including active edits and overrides, does not make status fail.
+- `status` prints one line when the workspace is current. When something is dirty, it lists
+  missing materialization, wrong origins, changed/untracked counts, commit divergence, stashes,
+  active edits, enabled overrides, and buildability, without inspecting `build/` or contacting
+  remotes. Reportable drift does not make status fail.
 - `fetch` subsequently reproduces that lock without consulting newer tags, publisher retractions,
   or version selection:
 
@@ -1140,8 +1140,8 @@ license can ever be valid requires an explicit license choice.
 
 ### Status reports state; validate gates sharing
 
-`status` reports whether materialized manifests and Git checkouts match the lock and whether the
-available graph is buildable. Like `git status`, reportable drift still returns success; malformed
+`status` prints one line when the lock, checkouts, and buildability are current, and lists only the
+dirty items otherwise. Like `git status`, reportable drift still returns success; malformed
 required JSON is an error because no reliable report can be produced. `validate` applies the
 license, source-layout, and path-portability rules to the workspace package as a sharing gate.
 
@@ -1313,10 +1313,10 @@ them or update this chapter and its regression tests in the same change.
   buildability. Validate checks workspace publishability and lock portability.
 - `--skip-validate` exists only on fetch, update, and build; it warns and keeps lock, manifest,
   closure, toolchain, export, and dirty-checkout checks.
-- `status` diagnoses lock, registration, and checkout state without mutation or remote access. It
-  inventories all discovered observations, reports buildability, never inspects `build/`, and is
-  not the package-quality gate. Reportable drift returns success; unreadable or malformed required
-  JSON returns failure.
+- `status` diagnoses lock, registration, and checkout state without mutation or remote access. A
+  current workspace is one header line; observations appear only when something is dirty. It never
+  inspects `build/` and is not the package-quality gate. Reportable drift returns success;
+  unreadable or malformed required JSON returns failure.
 
 ### Output and side-effect contract
 
