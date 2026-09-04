@@ -608,6 +608,49 @@ Downstream packaging may or may not choose to distribute them, at their
 discretion. **We strongly encourage downstream users of Slang to move to the
 new library names as soon as they are able.**
 
+## Building with AddressSanitizer
+
+Configuring with `-DSLANG_ENABLE_ASAN=ON` needs two environment settings that are easy to miss,
+because without them the build fails partway through for reasons that do not mention the sanitizer.
+
+```bash
+# 1. The build compiles and then *runs* its own generators (slang-embed, slang-fiddle). Under
+#    SLANG_ENABLE_ASAN they are instrumented and link the ASan runtime dynamically, so the runtime
+#    must be locatable or they fail to start:
+#        slang-embed: error while loading shared libraries: libclang_rt.asan-x86_64.so:
+#        cannot open shared object file: No such file or directory
+export LD_LIBRARY_PATH="$(clang -print-runtime-dir):$LD_LIBRARY_PATH"
+
+# 2. Those same generators leak, and LeakSanitizer's non-zero exit status fails the build:
+#        ERROR: LeakSanitizer: detected memory leaks
+#        SUMMARY: AddressSanitizer: 828842 byte(s) leaked in 3661 allocation(s)
+#    They are short-lived build tools, so leak detection is not meaningful for them.
+export ASAN_OPTIONS=detect_leaks=0
+
+cmake --preset default -DSLANG_ENABLE_ASAN=ON
+cmake --build --preset release
+```
+
+When _running_ the resulting binaries, put the build's own `lib/` directory on `LD_LIBRARY_PATH` as
+well. `slang-test` loads its tools (`librender-test-tool.so` and friends) with `dlopen`, and if that
+fails the affected tests are reported as **ignored** rather than failed — so a missing path silently
+removes coverage instead of producing an error.
+
+This is needed only for sanitizer builds. Normally that `dlopen` resolves through the executable's
+`$ORIGIN/../lib` runpath without any help; under a sanitizer the call is intercepted by the
+sanitizer runtime and issued from _its_ object, which has no runpath, so `$ORIGIN/../lib` is never
+searched. Setting `LD_LIBRARY_PATH` for the runtime alone is therefore not enough — it must also
+name the build's `lib/`:
+
+```bash
+export LD_LIBRARY_PATH="$PWD/build/Release/lib:$(clang -print-runtime-dir):$LD_LIBRARY_PATH"
+```
+
+The same applies to `-DSLANG_ENABLE_TSAN=ON`, with `libclang_rt.tsan-x86_64.so` in place of the ASan
+runtime; `ASAN_OPTIONS=detect_leaks=0` is not needed there, as ThreadSanitizer has no leak checker.
+
+The equivalent settings for CI are in `.github/workflows/ci-slang-sanitizer.yml`.
+
 ## Notes
 
 [^1] below 3.25, CMake lacks the ability to mark directories as being
