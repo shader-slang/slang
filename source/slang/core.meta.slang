@@ -4537,6 +4537,11 @@ attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribu
 __attributeTarget(FuncDecl)
 attribute_syntax [outputtopology(topology)]         : OutputTopologyAttribute;
 
+/// Used on an hull shader entrypoint to declare the output primitive type of the tessellator.
+/// @param topology The output primitive type, must be one of "point", "line", "triangle_cw", and "triangle_ccw".
+__attributeTarget(FuncDecl)
+attribute_syntax [OutputTopology(topology)]         : OutputTopologyAttribute;
+
 /// Used on an hull shader entrypoint to specify the patch type used by the hull shader.
 /// @param mode The patch type used by the hull shader. Valid values are "tri", "quad" and "isoline".
 __attributeTarget(FuncDecl)
