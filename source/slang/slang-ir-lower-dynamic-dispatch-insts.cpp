@@ -1679,42 +1679,34 @@ struct ExistentialLoweringContext : public InstPassBase
         return true;
     }
 
-    // Dynamic-dispatch handles are 64-bit, so they need a 64-bit integer carrier.
-    // That carrier is `uint2` (chosen in PR #9386 to avoid requiring the SPIR-V
-    // Int64 capability), except on Metal: MSL cannot cast a vector to a pointer, so
-    // there the carrier is a scalar `ulong` (which can be cast to a `device T*`).
-    // The helpers below own this choice so call sites need not know it. See #11313.
-    bool useUInt64HandleRepresentation() { return isMetalTarget(targetProgram->getTargetReq()); }
+    // Dynamic-dispatch handles are 64-bit values carried as `uint2` (PR #9386; avoids
+    // the SPIR-V Int64 capability). The carrier is host-visible ABI and must be the
+    // same on every target: a scalar 64-bit carrier aligns to 8 instead of 4 and shifts
+    // nested-existential payload layouts (see the nested-existential-in-buffer test).
+    // MSL can't cast a vector to a pointer; legalizeIRForMetal splits such casts
+    // through a scalar `uint64_t`. The helpers below own the representation.
 
-    // Return the lowered IR type that carries a dynamic-dispatch handle: a scalar
-    // `ulong` on Metal, or a `uint2` elsewhere.
+    // Return the lowered IR type that carries a dynamic-dispatch handle: a `uint2`.
     IRType* getLoweredHandleType(IRBuilder& builder)
     {
-        if (useUInt64HandleRepresentation())
-            return builder.getUInt64Type();
         return builder.getVectorType(
             builder.getUIntType(),
             builder.getIntValue(builder.getIntType(), 2));
     }
 
     // Build a lowered handle value carrying the 32-bit `id` in its low bits, to
-    // match getLoweredHandleType(): zero-extend `id` into a `ulong` on Metal, or
-    // pack it into element 0 of a `uint2` (element 1 = 0) elsewhere.
+    // match getLoweredHandleType(): pack it into element 0 of a `uint2`
+    // (element 1 = 0).
     IRInst* makeHandleFromID(IRBuilder& builder, IRInst* id)
     {
-        if (useUInt64HandleRepresentation())
-            return builder.emitCast(builder.getUInt64Type(), id);
         IRInst* args[] = {id, builder.getIntValue(builder.getUIntType(), 0)};
         return builder.emitMakeVector(getLoweredHandleType(builder), 2, args);
     }
 
     // Read the 32-bit id back out of a lowered handle value produced by
-    // makeHandleFromID(): truncate the `ulong` to `uint` on Metal, or extract
-    // element 0 of the `uint2` elsewhere.
+    // makeHandleFromID(): extract element 0 of the `uint2`.
     IRInst* getIDFromHandle(IRBuilder& builder, IRInst* handle)
     {
-        if (useUInt64HandleRepresentation())
-            return builder.emitCast(builder.getUIntType(), handle);
         UInt index = 0;
         return builder.emitSwizzle(builder.getUIntType(), handle, 1, &index);
     }
