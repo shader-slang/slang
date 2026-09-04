@@ -2175,7 +2175,22 @@ bool SemanticsVisitor::_coerce(
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {
+        // `tagType` is only assigned once the `EnumDecl` reaches `ReadyForLookup`, and a
+        // conversion can be checked before that (e.g. an array bound in the signature of a
+        // declaration that precedes any other use of the enum). Without this, `tagType` is null
+        // and the comparison below silently declines to offer the conversion.
+        //
+        // Requesting `ReadyForLookup` here is re-entrancy-safe: an enum's case initializers are
+        // checked at `DefinitionChecked`, which is past `ReadyForLookup`, so an enum reached from
+        // inside its own checking already satisfies this state and `ensureDecl` returns at its
+        // already-checked early-out rather than reaching the cyclic-reference path. See
+        // tests/language-feature/enums/mutually-referencing-enums.slang.
+        ensureDecl(enumDecl, DeclCheckState::ReadyForLookup);
+
+        // `ReadyForLookup` assigns `tagType` on every path (a default, explicit, or error type), so
+        // it is non-null here.
         Type* tagType = enumDecl->tagType;
+        SLANG_ASSERT(tagType);
         if (tagType == toType)
         {
             if (outCost)
@@ -2201,9 +2216,12 @@ bool SemanticsVisitor::_coerce(
     {
         if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
         {
+            // As above: the enum may not have reached the state that assigns `tagType` yet, and
+            // the same re-entrancy-safety argument applies.
+            ensureDecl(toEnumDeclRef, DeclCheckState::ReadyForLookup);
+
             auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
-            if (!tagType)
-                return false;
+            SLANG_ASSERT(tagType);
 
             Expr* tagExpr = nullptr;
             ConversionCost tagCost = kConversionCost_None;
