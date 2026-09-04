@@ -2397,6 +2397,12 @@ bool SemanticsVisitor::_coerce(
             derefExpr->base = fromExpr;
             derefExpr->type = QualType(fromElementType);
             derefExpr->checked = true;
+            // Carry the source location onto the synthesized dereference, as
+            // every other synthesized expr in this function does. Without it, a
+            // failed coercion of the element type reports E30019 at an invalid
+            // location and the renderer drops the caret and "expected/got"
+            // detail (#12911).
+            derefExpr->loc = fromExpr->loc;
         }
 
         ConversionCost subCost = kConversionCost_None;
