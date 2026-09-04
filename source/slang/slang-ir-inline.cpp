@@ -200,6 +200,12 @@ struct InliningPassBase
         {
             if (auto resolvedTable = as<IRWitnessTable>(resolveLookups(lookup->getWitnessTable())))
             {
+                // Inliner's resolveLookups: deliberately a flat lookup. An
+                // inherited base-interface key would miss here (its entry
+                // lives on a nested base-interface table; see #11487). The
+                // fall-through `return inst` leaves the lookup intact, and
+                // the typeflow specializer's inheritance-closure walk
+                // resolves it correctly later.
                 if (auto result = findWitnessTableEntry(resolvedTable, lookup->getRequirementKey()))
                     return result;
             }
