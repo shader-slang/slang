@@ -574,6 +574,12 @@ extern "C"
     SLANG_API SlangMatrixLayoutMode
     spReflectionTypeLayout_GetMatrixLayoutMode(SlangReflectionTypeLayout* type);
 
+    // Returns the global ordering index of `type`'s generic type parameter, or -1.
+    // -1 covers two distinct cases: `type` is not a generic-type-parameter layout, or
+    // it is one but no global ordering was available (program-less layout of a type
+    // referencing a global generic parameter). Check
+    // spReflectionTypeLayout_getKind(type) == SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER
+    // first to distinguish them.
     SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLayout* type);
 
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(
