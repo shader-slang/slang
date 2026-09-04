@@ -49,10 +49,10 @@ bool traceSceneVisibilityRayImpl<let Flags : int>(const bool useAlphaTest, inout
         rayFlags,
         0xff,
         rayDesc);
-    q.Proceed();
+    (void)q.Proceed();
     if (getCommittedStatus(q) == COMMITTED_TRIANGLE_HIT)
     {
-        q.CommittedRayT();
+        (void)q.CommittedRayT();
         return true;
     }
     return false;

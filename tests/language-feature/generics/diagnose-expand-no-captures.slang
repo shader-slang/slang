@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 // `expand` without any `each` referencing a type pack should produce
 // error 30105 because expand needs at least one captured pack.

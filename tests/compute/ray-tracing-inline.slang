@@ -26,7 +26,7 @@ bool traceRayClosestHit(
         0xff,
         ray);
 
-    q.Proceed();
+    (void)q.Proceed();
     if(q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
         t = q.CommittedRayT();
@@ -43,6 +43,6 @@ void computeMain(
     uint3 threadIdx : SV_DispatchThreadID)
 {
     float t = 0.0;
-    traceRayClosestHit(float3(0.1, 0.1, 0.0), float3(0,0,1), t);
+    (void)traceRayClosestHit(float3(0.1, 0.1, 0.0), float3(0,0,1), t);
     outputBuffer[threadIdx.x] = t;
 }

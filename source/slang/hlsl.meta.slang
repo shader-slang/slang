@@ -5875,8 +5875,10 @@ $}
 // Atomic intrinsic insts.
 
 __intrinsic_op($(kIROp_AtomicExchange))
+[DiscardableResult]
 T __atomic_exchange<T>(__ref T val, T newValue, MemoryOrder order = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicCompareExchange))
+[DiscardableResult]
 T __atomic_compare_exchange<T>(
     __ref T val,
     T compareValue,
@@ -5884,22 +5886,31 @@ T __atomic_compare_exchange<T>(
     MemoryOrder successOrder = MemoryOrder.Relaxed,
     MemoryOrder failOrder = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicAdd))
+[DiscardableResult]
 T __atomic_add<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicSub))
+[DiscardableResult]
 T __atomic_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicMax))
+[DiscardableResult]
 T __atomic_max<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicMin))
+[DiscardableResult]
 T __atomic_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicAnd))
+[DiscardableResult]
 T __atomic_and<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicOr))
+[DiscardableResult]
 T __atomic_or<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicXor))
+[DiscardableResult]
 T __atomic_xor<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicInc))
+[DiscardableResult]
 T __atomic_increment<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 __intrinsic_op($(kIROp_AtomicDec))
+[DiscardableResult]
 T __atomic_decrement<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 
 // Atomic Reduction intrinsics (void return).
@@ -27158,7 +27169,7 @@ $}
 
         case hlsl:
             uint isSingleLod = 0;
-            __queryFootprint$(CoarseOrFine)NVAPI(
+            let _footprintData = __queryFootprint$(CoarseOrFine)NVAPI(
                 Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
@@ -27192,7 +27203,7 @@ $}
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
-            __queryFootprint$(CoarseOrFine)BiasNVAPI(
+            let _footprintData = __queryFootprint$(CoarseOrFine)BiasNVAPI(
                 Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
@@ -27275,7 +27286,7 @@ $}
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
-            __queryFootprint$(CoarseOrFine)LevelNVAPI(
+            let _footprintData = __queryFootprint$(CoarseOrFine)LevelNVAPI(
                 Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
@@ -27312,7 +27323,7 @@ $}
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
-            __queryFootprint$(CoarseOrFine)GradNVAPI(
+            let _footprintData = __queryFootprint$(CoarseOrFine)GradNVAPI(
                 Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),

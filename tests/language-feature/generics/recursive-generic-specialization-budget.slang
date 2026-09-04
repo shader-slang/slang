@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
 
 // Verify backend generic specialization stops with a diagnostic when a
 // recursive specialization chain exceeds the backend budget.

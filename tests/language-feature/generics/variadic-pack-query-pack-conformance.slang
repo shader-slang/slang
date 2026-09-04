@@ -39,7 +39,7 @@ void acceptPack<each T : IBar>() {}
 int sumBars<each T : IBar>(expand each T values)
 {
     int sum = 0;
-    expand(sum += (each values).getValue());
+    (void)(expand(sum += (each values).getValue()));
     return sum;
 }
 

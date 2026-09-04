@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -entry main -stage compute
 //
 // Verifies that float literal overflows and underflows trigger diagnostics. See
 // docs/language-reference/expressions-literal.md for details.

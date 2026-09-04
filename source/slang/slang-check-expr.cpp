@@ -3850,9 +3850,66 @@ Expr* SemanticsVisitor::CheckExpr(Expr* uncheckedExpr)
     // that is allowable in an expression context (e.g., make sure
     // that `expr` names a value and not a type).
     //
-    // TODO: Implement this step.
+    // For most call sites this is handled by the coercion that follows (coercing to a known target
+    // type rejects a type-valued expression). For sites that require a proper-typed value but have
+    // no target type to coerce to (an expression statement, most notably), see
+    // `checkExprOfProperType`.
 
     return checkedExpr;
+}
+
+bool SemanticsVisitor::isProperType(Type* type)
+{
+    // The only caller is `isExprOfProperType`, which reads a checked expression's type; a checked
+    // expression always has a type, so a null here is a contract violation, not a runtime case.
+    SLANG_ASSERT(type);
+
+    // A proper type is defined here by exclusion: any type that is not one of the "names a X, not a
+    // value" types. Those are a type-valued expression (`TypeType`, e.g. `MyType`), an unapplied
+    // generic (`GenericDeclRefType`, e.g. `RWStructuredBuffer`), and a namespace (`NamespaceType`).
+    // Should a future non-value type be added, extend this exclusion list accordingly.
+    return !as<TypeType>(type) && !as<GenericDeclRefType>(type) && !as<NamespaceType>(type);
+}
+
+bool SemanticsVisitor::isExprOfProperType(Expr* expr)
+{
+    return isProperType(expr->type.type);
+}
+
+/// Return the kind of entity a non-proper type names, as a word for a diagnostic message: `"type"`
+/// for a `TypeType`, `"generic"` for an unapplied `GenericDeclRefType`, and `"namespace"` for a
+/// `NamespaceType`. The caller only reaches here for a non-proper type, so any other type is a
+/// contract violation.
+static char const* getNonProperTypeEntityKindName(Type* type)
+{
+    if (as<TypeType>(type))
+        return "type";
+    if (as<GenericDeclRefType>(type))
+        return "generic";
+    if (as<NamespaceType>(type))
+        return "namespace";
+    SLANG_UNEXPECTED("type is not one of the non-proper type kinds");
+    UNREACHABLE_RETURN("type");
+}
+
+Expr* SemanticsVisitor::checkExprOfProperType(Expr* expr)
+{
+    expr = CheckExpr(expr);
+
+    // Enforce that the checked expression denotes a value. If it instead names a type, an unapplied
+    // generic, or a namespace, it is not valid where a value is required, and left unchecked it
+    // would reach IR lowering and hit an `unexpected: <...>Type` internal error. Diagnose it and
+    // rewrite to an `ErrorType` so that downstream checks skip it via the usual cascading-error
+    // avoidance. A `void`-typed expression is a proper-typed value and is allowed here.
+    if (!isExprOfProperType(expr))
+    {
+        getSink()->diagnose(Diagnostics::ExprDoesNotHaveProperType{
+            .kind = getNonProperTypeEntityKindName(expr->type.type),
+            .expr = expr});
+        expr->type = QualType(m_astBuilder->getErrorType());
+    }
+
+    return expr;
 }
 
 static bool _canLValueCoerceScalarType(Type* a, Type* b)
@@ -5072,10 +5129,33 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         expr->originalFunctionExpr = expr->functionExpr;
     auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
     m_treatAsDifferentiableExpr = nullptr;
-    // Next check the argument expressions
-    for (auto& arg : expr->arguments)
+
+    // A comma expression `a, b` evaluates `a` for its side effects and discards its result, then
+    // yields `b`. So its left operand is always in a statement-like context (even when the comma's
+    // own result is consumed, as in `int x = (foo(), 3);`), while its right operand inherits the
+    // enclosing context. Route the left operand through the statement-like check here, before the
+    // generic operand loop, so it is still unchecked when we hand it over; the statement-level walks
+    // then peel a comma to its right operand only and never re-analyze the left one.
+    bool isCommaExpr = false;
+    if (auto infixExpr = as<InfixExpr>(expr))
     {
-        arg = CheckExpr(arg);
+        if (auto varExpr = as<VarExpr>(infixExpr->functionExpr))
+            isCommaExpr = varExpr->name && varExpr->name->text == "," &&
+                          infixExpr->arguments.getCount() == 2;
+    }
+
+    if (isCommaExpr)
+    {
+        expr->arguments[0] = checkExprInStmtLikeContext(expr->arguments[0]);
+        expr->arguments[1] = CheckExpr(expr->arguments[1]);
+    }
+    else
+    {
+        // Next check the argument expressions
+        for (auto& arg : expr->arguments)
+        {
+            arg = CheckExpr(arg);
+        }
     }
 
     // if the expression is '&&' or '||', we will convert it

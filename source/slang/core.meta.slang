@@ -1956,10 +1956,9 @@ Tuple<T, U> concat<each T, each U>(Tuple<T> t, Tuple<U> u)
 
 //@hidden:
 [__unsafeForceInlineEarly]
-bool __assign(inout bool v, bool newVal)
+void __tupleEqualsKernel<T : IComparable>(inout bool result, T a, T b)
 {
-    v = newVal;
-    return newVal;
+    result = result && a.equals(b);
 }
 
 [__unsafeForceInlineEarly]
@@ -2017,7 +2016,7 @@ extension Tuple<T> : IComparable
     bool equals(Tuple<T> other)
     {
         bool result = true;
-        expand result && __assign(result, result && (each this).equals(each other));
+        expand __tupleEqualsKernel(result, each this, each other);
         return result;
     }
 }
@@ -4106,6 +4105,7 @@ struct Atomic<T : IAtomicable>
     /// Atomically replace the stored `T` value with a new `T` value and return
     /// replaced value
     __intrinsic_op($(kIROp_AtomicExchange))
+    [DiscardableResult]
     [__ref] T exchange(T newValue, MemoryOrder order = MemoryOrder.Relaxed); // returns old value
 
     /// Atomically replace and return the stored `T` value with a new `T` value
@@ -4119,6 +4119,7 @@ struct Atomic<T : IAtomicable>
     ///
     /// `failOrder` must not be `MemoryOrder.Release` or `MemoryOrder.AcquireRelease`
     __intrinsic_op($(kIROp_AtomicCompareExchange))
+    [DiscardableResult]
     [__ref] T compareExchange(
         T compareValue,
         T newValue,
@@ -4132,21 +4133,25 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     /// Atomically adds the given value to the stored value and returns the
     /// original stored value.
     __intrinsic_op($(kIROp_AtomicAdd))
+    [DiscardableResult]
     [__ref] T add(T value, MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically subtracts the given value from the stored value and returns
     /// the original stored value.
     __intrinsic_op($(kIROp_AtomicSub))
+    [DiscardableResult]
     [__ref] T sub(T value, MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically computes the maximum of the stored value and the given
     /// value, storing the result and returning the original stored value.
     __intrinsic_op($(kIROp_AtomicMax))
+    [DiscardableResult]
     [__ref] T max(T value, MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically computes the minimum of the stored value and the given
     /// value, storing the result and returning the original stored value.
     __intrinsic_op($(kIROp_AtomicMin))
+    [DiscardableResult]
     [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically adds the given value to the stored value without returning
@@ -4214,28 +4219,33 @@ extension<T : IBitAtomicable> Atomic<T>
     /// and the given value, storing the result and returning the original
     /// stored value.
     __intrinsic_op($(kIROp_AtomicAnd))
+    [DiscardableResult]
     [__ref] T and(T value, MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically performs a bitwise OR operation between the stored value and
     /// the given value, storing the result and returning the original stored
     /// value.
     __intrinsic_op($(kIROp_AtomicOr))
+    [DiscardableResult]
     [__ref] T or(T value, MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically performs a bitwise XOR operation between the stored value
     /// and the given value, storing the result and returning the original
     /// stored value.
     __intrinsic_op($(kIROp_AtomicXor))
+    [DiscardableResult]
     [__ref] T xor(T value, MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically increments the stored value and returns the original stored
     /// value.
     __intrinsic_op($(kIROp_AtomicInc))
+    [DiscardableResult]
     [__ref] T increment(MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically decrements the stored value and returns the original stored
     /// value.
     __intrinsic_op($(kIROp_AtomicDec))
+    [DiscardableResult]
     [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically performs a bitwise AND without returning the original value.
@@ -4707,6 +4717,24 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 ///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [NoDiscard] : NoDiscardAttribute;
+
+/// Marks a function whose result may be discarded without a diagnostic. When a call to a
+/// function marked with `[DiscardableResult]` appears in a context where its result is
+/// discarded — an expression statement, or a `for` loop's side-effect expression — the
+/// compiler does not warn that the result is unused. This is the counterpart of
+/// `[NoDiscard]`, and the two cannot both be applied to the same function.
+/// @remarks
+/// This is useful for functions that are often called for their side effects even though
+/// they also return a value. For example, an atomic operation that updates memory in place
+/// and returns the previous value:
+/// ```
+/// [DiscardableResult]
+/// int InterlockedAddAndGetOld(...) { ... }
+/// InterlockedAddAndGetOld(...); // OK: the returned old value may be ignored
+/// ```
+///
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [DiscardableResult] : DiscardableResultAttribute;
 
 /// @internal
 /// Marks a member function to make `this` argument passed by const reference.

@@ -13,6 +13,6 @@ __extern_cpp int foo(Ptr<Foo> a, Ptr<Foo> b);
 
 export __extern_cpp int main(int argc, Ptr<NativeString> argv)
 {
-    foo(nullptr, nullptr);
+    (void)foo(nullptr, nullptr);
     return 0;
 }

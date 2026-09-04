@@ -18,6 +18,6 @@ void computeMain()
     let loaded = buf[0].load(MemoryOrder.Acquire);
     buf[0].store(loaded + 10u, MemoryOrder.Release);
     let prev = buf[0].exchange(100u, MemoryOrder.AcquireRelease);
-    buf[0].compareExchange(100u, prev, MemoryOrder.AcquireRelease, MemoryOrder.Acquire);
+    (void)buf[0].compareExchange(100u, prev, MemoryOrder.AcquireRelease, MemoryOrder.Acquire);
     // BUF: 10
 }

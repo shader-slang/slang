@@ -105,9 +105,9 @@ float g(float x)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    f(0, 3.f);
+    (void)f(0, 3.f);
     outputBuffer[3] = g(2.f);
-    f(1, 2.f);
+    (void)f(1, 2.f);
     outputBuffer[4] = g(2.f); 
 
     // Clear the first 3 elements

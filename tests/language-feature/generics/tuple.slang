@@ -13,7 +13,7 @@ T writeSingle<T : __BuiltinFloatingPointType>(inout int offset, T value)
 void write<each T : __BuiltinFloatingPointType>(Tuple<T> tuple)
 {
     int offset = 0;
-    expand writeSingle(offset, each tuple);
+    (void)(expand writeSingle(offset, each tuple));
 }
 
 [numthreads(1,1,1)]

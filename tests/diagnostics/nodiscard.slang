@@ -1,7 +1,12 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG):
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG,non-exhaustive):
 
 // Test the `[NoDiscard]` attribute: calling a function marked `[NoDiscard]`
 // and discarding its result produces an error.
+//
+// Non-exhaustive: the bare expression-statements here (e.g. `t.regular();`, `w1 + w2;`) now also
+// draw the general expression-statement diagnostics of shader-slang/slang#12428 (E30073/E30074),
+// which are covered exhaustively by `expression-statement.slang`; this test only asserts the
+// `[NoDiscard]`-specific behavior.
 
 struct MyType
 {

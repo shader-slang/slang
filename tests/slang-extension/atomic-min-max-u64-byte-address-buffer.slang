@@ -40,11 +40,11 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         int idx = (tid & 3) ^ (tid >> 2);
         if (bool(idx & 1))
         {
-            outputBuffer.InterlockedMaxU64((idx << 3), value);
+            (void)outputBuffer.InterlockedMaxU64((idx << 3), value);
         }
         else
         {
-            outputBuffer.InterlockedMinU64((idx << 3), value);
+            (void)outputBuffer.InterlockedMinU64((idx << 3), value);
         }
     }
 }

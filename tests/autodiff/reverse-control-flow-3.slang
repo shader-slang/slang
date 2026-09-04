@@ -148,7 +148,7 @@ void handleHit(inout PathState path, inout PathResult rs, inout VisibilityQuery 
         return;
     }
      
-    generateScatterRay(param, path, rs);
+    (void)generateScatterRay(param, path, rs);
 
     rs.L = rs.thp * lightEval(path.depth);
 

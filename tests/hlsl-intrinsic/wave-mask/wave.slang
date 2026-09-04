@@ -62,7 +62,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     const int value = inputBuffer[index];
     const int elementCount = 9;
     
-    exclusivePrefixSum(waveMask, index, waveLaneId, value, elementCount);
+    (void)exclusivePrefixSum(waveMask, index, waveLaneId, value, elementCount);
     
     // We don't read from any other lane, so we don't actually need any sync
     //WaveMaskSharedSync(waveMask); 
