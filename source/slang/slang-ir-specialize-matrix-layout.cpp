@@ -7,115 +7,43 @@
 namespace Slang
 {
 
-// Returns true if `inst` is the `MatrixLayoutMode.Unknown` literal, i.e. an unspecified layout.
-// `MatrixLayoutMode` is an enum rather than an `int` so the literal stays recognizable as a
-// generic argument. `inst` can be any `specialize` argument, so a non-match is not an error;
-// a matrix type's own layout operand is checked more strictly in `visitMatrixTypes`.
-static bool isUnknownMatrixLayout(IRInst* inst, IRType* matrixLayoutModeType)
+// Returns the `MatrixLayoutMode` enum type, or null if `parent` contains no matrix type.
+// Every matrix type carries this type on its layout operand, so any of them reveals it.
+// Recurses because matrix types inside generics are not hoisted to global scope.
+static IRType* findMatrixLayoutModeType(IRInst* parent)
 {
-    auto lit = as<IRIntLit>(inst);
-    if (!lit || lit->getFullType() != matrixLayoutModeType)
-        return false;
-    return lit->getValue() == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+    for (auto child : parent->getChildren())
+    {
+        if (auto matrixType = as<IRMatrixType>(child))
+            return matrixType->getLayout()->getFullType();
+        if (auto layoutModeType = findMatrixLayoutModeType(child))
+            return layoutModeType;
+    }
+    return nullptr;
 }
-
-// Collects the matrix types with an unspecified layout, and the `specialize` insts that pass
-// one as a generic argument.
-struct UnresolvedMatrixLayoutCollector
-{
-    IRType* matrixLayoutModeType = nullptr;
-    List<IRMatrixType*> matrixTypes;
-    List<IRSpecialize*> specializeInsts;
-
-    // Collects the matrix types whose layout is `Unknown`. Every layout operand is typed
-    // `MatrixLayoutMode`, and IR types are deduplicated, so the first matrix type seen provides
-    // that type and every later one must agree; a mismatch would be silently skipped.
-    void visitMatrixTypes(IRInst* parent)
-    {
-        for (auto child : parent->getChildren())
-        {
-            if (auto matrixType = as<IRMatrixType>(child))
-            {
-                auto layout = matrixType->getLayout();
-                if (!matrixLayoutModeType)
-                    matrixLayoutModeType = layout->getFullType();
-                SLANG_ASSERT(layout->getFullType() == matrixLayoutModeType);
-
-                if (isUnknownMatrixLayout(layout, matrixLayoutModeType))
-                    matrixTypes.add(matrixType);
-            }
-            visitMatrixTypes(child);
-        }
-    }
-
-    // Collects the `specialize` insts that pass `Unknown` as a generic argument.
-    // Needs `matrixLayoutModeType`, so call after `visitMatrixTypes`.
-    void visitSpecializeInsts(IRInst* parent)
-    {
-        for (auto child : parent->getChildren())
-        {
-            if (auto specializeInst = as<IRSpecialize>(child))
-            {
-                for (UInt i = 0; i < specializeInst->getArgCount(); i++)
-                {
-                    if (isUnknownMatrixLayout(specializeInst->getArg(i), matrixLayoutModeType))
-                    {
-                        specializeInsts.add(specializeInst);
-                        break;
-                    }
-                }
-            }
-            visitSpecializeInsts(child);
-        }
-    }
-};
 
 void specializeMatrixLayout(IRModule* module, TargetProgram* target)
 {
-    UnresolvedMatrixLayoutCollector collector;
-    collector.visitMatrixTypes(module->getModuleInst());
-    if (!collector.matrixLayoutModeType)
+    auto matrixLayoutModeType = findMatrixLayoutModeType(module->getModuleInst());
+    if (!matrixLayoutModeType)
         return;
-    collector.visitSpecializeInsts(module->getModuleInst());
+
+    IRBuilder builder(module);
+
+    // `MatrixLayoutMode.Unknown` is a single deduplicated constant, so every unspecified layout
+    // in the module, including one passed as a generic argument, is a use of this instruction.
+    auto unknownLayout =
+        builder.getIntValue(matrixLayoutModeType, SLANG_MATRIX_LAYOUT_MODE_UNKNOWN);
+    if (!unknownLayout->hasUses())
+        return;
 
     IRIntegerValue defaultLayout = target->getOptionSet().getMatrixLayoutMode();
     if (defaultLayout == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
         defaultLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
-    IRBuilder builder(module);
-    auto resolvedLayout = builder.getIntValue(collector.matrixLayoutModeType, defaultLayout);
-
-    for (auto matrixType : collector.matrixTypes)
-    {
-        builder.setInsertBefore(matrixType);
-        auto replacementMatrixType = builder.getMatrixType(
-            matrixType->getElementType(),
-            matrixType->getRowCount(),
-            matrixType->getColumnCount(),
-            resolvedLayout);
-        matrixType->replaceUsesWith(replacementMatrixType);
-    }
-
-    // Also resolve the layout where it is a generic argument, or specialization would substitute
-    // it into `matrix<T, N, M, L>` and mint a new unspecified-layout type after this pass ran.
-    for (auto specializeInst : collector.specializeInsts)
-    {
-        List<IRInst*> args;
-        for (UInt i = 0; i < specializeInst->getArgCount(); i++)
-        {
-            auto arg = specializeInst->getArg(i);
-            args.add(
-                isUnknownMatrixLayout(arg, collector.matrixLayoutModeType) ? resolvedLayout : arg);
-        }
-
-        builder.setInsertBefore(specializeInst);
-        auto replacement = builder.emitSpecializeInst(
-            specializeInst->getFullType(),
-            specializeInst->getBase(),
-            (UInt)args.getCount(),
-            args.getBuffer());
-        specializeInst->replaceUsesWith(replacement);
-    }
+    // Users are hoistable, so `replaceUsesWith` re-deduplicates them: a matrix type with the
+    // resolved layout merges with an existing identical one instead of becoming a duplicate.
+    unknownLayout->replaceUsesWith(builder.getIntValue(matrixLayoutModeType, defaultLayout));
 }
 
 } // namespace Slang
