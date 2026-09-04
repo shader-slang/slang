@@ -26,6 +26,14 @@ bool isUserPointerType(IRInst* type)
     return ptrType->getAddressSpace() == AddressSpace::UserPointer;
 }
 
+bool isCudaKernelParamBorrowInType(IRInst* type)
+{
+    auto ptrType = as<IRBorrowInParamType>(type);
+    if (!ptrType)
+        return false;
+    return ptrType->getAddressSpace() == AddressSpace::CudaKernelParam;
+}
+
 bool isAddressInst(IRInst* inst)
 {
     switch (inst->getOp())
@@ -2156,6 +2164,46 @@ IRVarLayout* findVarLayout(IRInst* value)
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
         return as<IRVarLayout>(layoutDecoration->getLayout());
     return nullptr;
+}
+
+bool isEntryPointByValueUniformAggregateParam(IRParam* param)
+{
+    SLANG_ASSERT(param);
+
+    // Must be an entry-point kernel parameter: an `IRParam` in the entry function's first block
+    // (later-block `IRParam`s are block/phi params, not kernel params).
+    auto block = as<IRBlock>(param->getParent());
+    if (!block)
+        return false;
+    auto parentFunc = as<IRFunc>(block->getParent());
+    if (!parentFunc || block != parentFunc->getFirstBlock() ||
+        !parentFunc->findDecoration<IREntryPointDecoration>())
+        return false;
+
+    // Must be uniform, not varying; a missing layout counts as varying, the conservative direction.
+    // Not asserted, even though no CUDA stage should reach here with a varying aggregate:
+    // `SLANG_ASSERT` is `SLANG_ASSUME` in release, so asserting the negation of this condition
+    // would license deleting the decline it guards.
+    auto varLayout = findVarLayout(param);
+    if (!varLayout || isVaryingParameter(varLayout))
+        return false;
+
+    // Must be a fixed-size by-value aggregate. Narrower than `isCompositeType` on purpose: that
+    // also admits `UnsizedArrayType`, which has no by-value storage whose address could be
+    // forwarded. `lowerTuples` runs first, so the tuple assert is a tripwire for a pipeline
+    // reordering.
+    auto type = param->getDataType();
+    if (!type)
+        return false;
+    SLANG_ASSERT(type->getOp() != kIROp_TupleType);
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_ArrayType:
+        return true;
+    default:
+        return false;
+    }
 }
 
 UnownedStringSlice getBuiltinFuncName(IRInst* callee)
