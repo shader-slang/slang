@@ -591,7 +591,8 @@ enum class UserDefinedAttributeTargets
     Var = 2,
     Function = 4,
     Param = 8,
-    All = 0x0F
+    EnumCase = 0x10,
+    All = 0x1F
 };
 
 const int kUnsizedArrayMagicLength = 0x7FFFFFFF;
