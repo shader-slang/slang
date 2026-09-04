@@ -2073,6 +2073,49 @@ public:                                                              \
 */
     typedef void (*SlangDiagnosticCallback)(char const* message, void* userData);
 
+    /** A span of source code, used to highlight a location in a diagnostic. */
+    struct SlangDiagnosticSpan
+    {
+        const char* filename; /**< Source file path; empty string if unavailable. */
+        uint32_t startLine;   /**< 1-based start line; 0 if unavailable. */
+        uint32_t startCol;    /**< 1-based start column; 0 if unavailable. */
+        uint32_t endLine;     /**< 1-based end line; 0 if unavailable. */
+        uint32_t endCol;      /**< 1-based end column; 0 if unavailable. */
+        const char* message;  /**< Label shown at this location; may be empty. */
+    };
+
+    /** A fully structured diagnostic, passed to SlangStructuredDiagnosticCallback.
+
+        All `const char*` pointers are valid only for the duration of the callback invocation.
+
+        Note: some diagnostics attach follow-up "notes" (e.g. "see previous definition here")
+        that are rendered into the `outDiagnostics` text blob. This struct does not currently
+        carry that note text or its source locations; only the primary/secondary spans above
+        are delivered.
+    */
+    struct SlangStructuredDiagnostic
+    {
+        SlangSeverity severity; /**< Effective severity after overrides. */
+        int64_t code;        /**< Numeric error code, e.g. 30013 for E30013. Always non-negative for
+                                  diagnostics currently emitted by the compiler; negative values are
+                                  reserved to indicate the absence of a code. */
+        const char* message; /**< Primary human-readable message. */
+        SlangDiagnosticSpan primarySpan; /**< Primary source location and label. */
+        const SlangDiagnosticSpan*
+            secondarySpans;          /**< Additional highlighted locations; may be null. */
+        uint32_t secondarySpanCount; /**< Number of entries in secondarySpans. */
+    };
+
+    /** Callback type for receiving structured diagnostics.
+
+        @param diagnostic  Pointer to the diagnostic data; valid only during the call.
+        @param userData    The opaque pointer passed to setDiagnosticCallback.
+        @return            Reserved for future use; currently ignored by the implementation.
+    */
+    typedef bool (*SlangStructuredDiagnosticCallback)(
+        const SlangStructuredDiagnostic* diagnostic,
+        void* userData);
+
     /*!
     @brief Get the build version 'tag' string. The string is the same as
     produced via `git describe --tags --match v*` for the project. If such a
@@ -4743,6 +4786,33 @@ struct ISession : public ISlangUnknown
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) = 0;
+
+    /** Register a callback to receive structured diagnostics from operations on this session.
+
+        The callback fires once per diagnostic that goes through the compiler's structured
+        diagnostic path (internally called "rich diagnostics"; see
+        CompilerOptionName::EnableRichDiagnostics) after severity overrides are applied,
+        carrying the severity, numeric code, human-readable message, and primary/secondary
+        source spans.  All `const char*` pointers inside `SlangStructuredDiagnostic` are
+        valid only for the duration of the callback.
+
+        Note: a diagnostic emitted through the compiler's older, unstructured reporting path
+        (which most front-end diagnostics still use, in addition to raw text from downstream
+        compilers such as DXC or glslang) is not delivered here; it appears only in the
+        `outDiagnostics` blob as before.
+
+        There is no synchronization between registering/clearing the callback and diagnostics
+        being reported for compiles already in flight: do not call `setDiagnosticCallback` on
+        this session concurrently with, or while relying on, an in-progress operation on the
+        same session whose diagnostics you are observing through the callback.
+
+        Pass `nullptr` for `callback` to remove a previously registered callback.
+
+        @param callback  The callback to invoke, or nullptr to clear.
+        @param userData  Opaque pointer forwarded to the callback unchanged.
+    */
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    setDiagnosticCallback(SlangStructuredDiagnosticCallback callback, void* userData) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()

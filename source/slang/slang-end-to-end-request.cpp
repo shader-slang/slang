@@ -2382,6 +2382,7 @@ SlangReflection* EndToEndCompileRequest::getReflection()
         return nullptr;
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    linkage->installDiagnosticCallback(sink);
     auto programLayout = targetProgram->getOrCreateLayout(&sink);
 
     return (SlangReflection*)programLayout;
