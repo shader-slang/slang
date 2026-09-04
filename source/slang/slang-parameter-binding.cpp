@@ -2159,6 +2159,11 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     return typeLayout;
 }
 
+static bool hasSVPrefixSemantic(VarLayout* varLayout)
+{
+    return varLayout && varLayout->systemValueSemantic.toLower().startsWith("sv_");
+}
+
 /// Compute layout information for an entry-point parameter `decl`.
 ///
 /// This function should be used for a top-level entry point varying
@@ -2331,6 +2336,23 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
         {
             getSink(context)->diagnose(
                 Diagnostics::VkIndexWithoutVkLocation{.location = indexAttr->loc});
+        }
+        else if (
+            isKhronosTarget(context->getTargetRequest()) && context->stage == Stage::Fragment &&
+            hasSVPrefixSemantic(varLayout))
+        {
+            // Otherwise the completion pass assigns locations in declaration order, disagreeing
+            // with the render-target index whenever `SV_Target<N>`s are declared out of order.
+            // Fragment stage only: a SPIR-V vertex `SV_InstanceID` output is also a user-defined
+            // varying, and presetting it would trip diagnostic 39023 against an implicitly-bound
+            // sibling (tests/bugs/gh-3087-multi-entry-point.slang).
+            if (auto typeResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput);
+                typeResInfo)
+            {
+                auto varResInfo =
+                    varLayout->findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
+                varResInfo->index = (UInt)varLayout->systemValueSemanticIndex;
+            }
         }
     }
 
@@ -3579,8 +3601,21 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             for (auto rr : resultTypeLayout->resourceInfos)
             {
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
-                resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    entryPointRes->count.getFiniteValue();
+                auto resultRes = resultLayout->findOrAddResourceInfo(rr.kind);
+
+                // A direct fragment return like `float4 pmain() : SV_Target1` is itself the leaf,
+                // so the usual rebase to the running count would clobber the location already
+                // preset from N. Struct fields are unaffected: their preset index survives as an
+                // offset under the container's base of 0.
+                bool preservePresetSvTargetLocation =
+                    isKhronosTarget(context->getTargetRequest()) &&
+                    context->stage == Stage::Fragment &&
+                    rr.kind == LayoutResourceKind::VaryingOutput &&
+                    hasSVPrefixSemantic(resultLayout);
+                if (!preservePresetSvTargetLocation)
+                {
+                    resultRes->index = entryPointRes->count.getFiniteValue();
+                }
                 entryPointRes->count += rr.count;
             }
 
