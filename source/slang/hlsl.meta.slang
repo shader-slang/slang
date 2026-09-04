@@ -32600,6 +32600,17 @@ CoopVec<T, N> exp2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 // [ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
+CoopVec<T, N> exp10<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    CoopVec<T, N> ret;
+    for(int i = 0; i < N; ++i)
+        ret[i] = exp10(x[i]);
+    return ret;
+}
+
+// [ForceInline]
+[require(cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
