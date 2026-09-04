@@ -62,6 +62,11 @@
       "skip_linux_aarch64": "true"
     },
     {
+      "option": "SLANG_ENABLE_TSAN",
+      "linux_only": "true",
+      "skip_linux_aarch64": "true"
+    },
+    {
       "option": "SLANG_ENABLE_COVERAGE",
       "extra_cmake_flags": "-DCMAKE_COMPILE_WARNING_AS_ERROR=OFF"
     },

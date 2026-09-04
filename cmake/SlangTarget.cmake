@@ -23,9 +23,10 @@ function(slang_add_target dir type)
         NO_SOURCE
         # Don't generate split debug info for this target
         NO_SPLIT_DEBUG_INFO
-        # Don't apply ASAN instrumentation to this target (use when the target
-        # links external libraries that are not ASAN-instrumented)
-        SKIP_ASAN
+        # Skip sanitizer (ASan/UBSan/TSan) instrumentation for this target.
+        # Intended for targets that wrap external libraries built without
+        # sanitizers (the sole current user is slang-glslang).
+        SKIP_SANITIZERS
     )
     set(single_value_args
         # Set the target name, useful for multiple targets from the same
@@ -321,16 +322,24 @@ function(slang_add_target dir type)
     #
     # Set common compile options and properties
     #
-    set(_asan_opt "")
-    if(ARG_SKIP_ASAN)
-        set(_asan_opt SKIP_ASAN)
+    set(_sanitizer_opt "")
+    if(ARG_SKIP_SANITIZERS)
+        set(_sanitizer_opt SKIP_SANITIZERS)
     endif()
     if(ARG_USE_EXTRA_WARNINGS)
-        set_default_compile_options(${target} USE_EXTRA_WARNINGS ${_asan_opt})
+        set_default_compile_options(
+            ${target}
+            USE_EXTRA_WARNINGS
+            ${_sanitizer_opt}
+        )
     elseif(ARG_USE_FEWER_WARNINGS)
-        set_default_compile_options(${target} USE_FEWER_WARNINGS ${_asan_opt})
+        set_default_compile_options(
+            ${target}
+            USE_FEWER_WARNINGS
+            ${_sanitizer_opt}
+        )
     else()
-        set_default_compile_options(${target} ${_asan_opt})
+        set_default_compile_options(${target} ${_sanitizer_opt})
     endif()
 
     # Set debug info options if not disabled

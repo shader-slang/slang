@@ -90,7 +90,7 @@ endfunction()
 function(set_default_compile_options target)
     cmake_parse_arguments(
         ARG
-        "USE_EXTRA_WARNINGS;USE_FEWER_WARNINGS;SKIP_ASAN"
+        "USE_EXTRA_WARNINGS;USE_FEWER_WARNINGS;SKIP_SANITIZERS"
         ""
         ""
         ${ARGN}
@@ -233,7 +233,7 @@ function(set_default_compile_options target)
             $<$<STREQUAL:${SLANG_LIB_TYPE},STATIC>:STB_IMAGE_STATIC>
     )
 
-    if(SLANG_ENABLE_ASAN AND NOT ARG_SKIP_ASAN)
+    if(SLANG_ENABLE_ASAN AND NOT ARG_SKIP_SANITIZERS)
         # -fno-sanitize-recover=undefined is intentionally omitted so that
         # halt_on_error can be controlled at runtime via UBSAN_OPTIONS.
         # For abort-on-first-UB locally, set UBSAN_OPTIONS=halt_on_error=1.
@@ -273,6 +273,34 @@ function(set_default_compile_options target)
             target_link_options(${target} BEFORE PRIVATE /INCREMENTAL:NO)
         else()
             message(FATAL_ERROR "SLANG_ENABLE_ASAN: unsupported C++ compiler")
+        endif()
+    endif()
+
+    if(SLANG_ENABLE_TSAN AND NOT ARG_SKIP_SANITIZERS)
+        if(WIN32)
+            # ThreadSanitizer has no Windows implementation in any of clang-cl,
+            # MinGW, or MSVC, so reject it here rather than emit flags that fail
+            # to compile or link.
+            message(
+                FATAL_ERROR
+                "SLANG_ENABLE_TSAN is not supported on Windows."
+            )
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+            target_compile_options(${target} PRIVATE -fsanitize=thread)
+            target_link_options(${target} BEFORE PRIVATE -fsanitize=thread)
+            if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT APPLE)
+                # By default clang does not link a TSan runtime into a shared
+                # library, leaving the instrumented DSO's `__tsan_*` references
+                # unresolved, which `-Wl,--no-undefined` (set for every ELF
+                # target above) then rejects. `-shared-libsan` links the shared
+                # TSan runtime so those references resolve. This is the same
+                # accommodation the ASan branch above needs; macOS clang already
+                # uses the shared runtime.
+                target_compile_options(${target} PRIVATE -shared-libsan)
+                target_link_options(${target} BEFORE PRIVATE -shared-libsan)
+            endif()
+        else()
+            message(FATAL_ERROR "SLANG_ENABLE_TSAN: unsupported C++ compiler")
         endif()
     endif()
 
